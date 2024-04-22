@@ -1,0 +1,27 @@
+// A Multivariate polynomial, e.g. "7*x*y + z - 13"
+
+polynomial = { SOI ~ term+ ~ EOI}
+
+term = { monomial | constant }
+
+// A product of powers (e.g. x^2*y^3), possibly with coefficient or sign (e.g. 2*x*y, -x*y)
+monomial = { ( (constant ~ "*"?) | sign)? ~ power ~ ("*" ~ power)* }
+
+// Optional sign followed by one or more decimal digits, e.g. 0, 1, +1, -1, 987, +897, -987.
+constant = { sign? ~ integer}
+
+// Plus or minus.
+sign = {"+" | "-" }
+
+// One or more digits.
+integer = { ASCII_DIGIT+ }
+
+// A symbolic variable, maybe raised to some power, e.g. X, x^0, x^1, XX13^1212.
+power = { var ~ ("^" ~ integer)? }
+
+// A symbolic variable.
+// One or more alpha characters and then maybe an integer, e.g. x, x1, x_1, X, X1, XX, XY11, etc.
+var = { ASCII_ALPHA+ ~ "_"? ~ integer? }
+
+
+

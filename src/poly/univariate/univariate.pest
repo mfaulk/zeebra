@@ -1,0 +1,27 @@
+// Implicitly handles whitespace?
+WHITESPACE = _{ " " }
+
+// One or more digits.
+integer = { ASCII_DIGIT+ }
+
+// Plus or minus.
+sign = {"+" | "-" }
+
+// Optional sign followed by one or more decimal digits, e.g. 0, 1, +1, -1, 987, +897, -987.
+constant = { sign? ~ integer}
+
+// A symbolic variable.
+// One or more alpha characters and then maybe an integer, e.g. x, x1, X, X1, XX, XY11, etc.
+var = { ASCII_ALPHA+ ~ integer? }
+
+// A symbolic variable, maybe raised to some power, e.g. X, x^0, x^1, XX13^1212.
+power = { var ~ ("^" ~ integer)? }
+
+// Maybe a sign, followed by zero or more decimal digits, followed by a power.
+monomial = { ( (constant ~ "*"?) | sign)? ~ power }
+
+// A term in a univariate, either a monomial or a constant, e.g. -x^2, +88XX^123, -8.
+term = { monomial | constant }
+
+// Start of input, followed by one or more terms, followed by end of input.
+polynomial = { SOI ~ term+ ~ EOI}
