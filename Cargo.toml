@@ -1,7 +1,13 @@
 [package]
 name = "zeebra"
+description = "Computational algebra for Zero-Knowledge Proofs"
+repository = "https://github.com/mfaulk/zeebra"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+readme = "README.md"
+keywords = ["zkp", "zero-knowledge", "algebra", "cryptography"]
+
 
 [lib]
 doctest = false
