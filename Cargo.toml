@@ -1,3 +1,5 @@
+cargo-features = ["generic_const_exprs", "const_trait_impl", "bigint_helper_methods", "is_sorted"]
+
 [package]
 name = "zeebra"
 description = "Computational algebra for Zero-Knowledge Proofs"
