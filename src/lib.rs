@@ -3,12 +3,6 @@
 //! This crate provides efficient operations for computing with finite fields and polynomials
 //! over finite fields.  
 
-#![feature(generic_const_exprs)]
-// Allows constants to be initialized like `const foo: Foo = Foo::from(bar)`.
-#![feature(const_trait_impl)]
-// Provides u64 carrying_add and borrowing_sub.
-#![feature(bigint_helper_methods)]
-#![feature(is_sorted)]
 // These are noisy. Maybe re-enable them later.
 #![allow(clippy::suspicious_arithmetic_impl)]
 #![allow(clippy::needless_range_loop)]

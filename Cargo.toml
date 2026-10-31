@@ -1,4 +1,5 @@
-cargo-features = ["generic_const_exprs", "const_trait_impl", "bigint_helper_methods", "is_sorted"]
+# Standalone package: prevents Cargo from searching parent directories for a workspace.
+[workspace]
 
 [package]
 name = "zeebra"

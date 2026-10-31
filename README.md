@@ -17,6 +17,21 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Grobner Bases
 - [ ] Polynomial System Solving via Grobner Basis Algorithms
 
+## Building and Testing
+Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
+
+```sh
+cargo build
+cargo test
+```
+
+Development checks, matching what CI enforces:
+
+```sh
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
 
