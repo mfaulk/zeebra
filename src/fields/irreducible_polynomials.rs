@@ -10,8 +10,7 @@
 //! However, the choice influences the cost of multiplication in the field, and so care is taken
 //! to choose efficient (or "low weight") irreducible polynomials.
 
-/// Irreducible Polynomials over GF(2)
-/// Trinomials, Pentanomials, ...
+// Irreducible polynomials over GF(2): trinomials, pentanomials, ...
 
 // Bit pattern for x^5 + x^2 + 1, irreducible over GF(2)
 #[allow(unused)]

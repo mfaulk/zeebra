@@ -434,7 +434,7 @@ mod tests {
         let s2 = BigUInt::from_dec_str(s).unwrap().to_dec_str();
         // Trim leading zeros from s.
         let mut s_trimmed = s.trim_start_matches('0');
-        if s_trimmed.len() == 0 {
+        if s_trimmed.is_empty() {
             s_trimmed = "0";
         }
         assert_eq!(s_trimmed, s2);

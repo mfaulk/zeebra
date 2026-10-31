@@ -117,6 +117,8 @@ impl<T: Ring> Matrix<T> {
     }
 
     /// The inverse, if any, of this matrix.
+    // TODO: return `linalg::Error` instead of `()`, which carries no failure detail.
+    #[allow(clippy::result_unit_err)]
     pub fn inverse<R: Ring>(&self) -> Result<Matrix<R>, ()> {
         todo!()
     }
@@ -167,7 +169,7 @@ impl<T: Ring> Matrix<T> {
     }
 
     /// The elements of the given row.
-    pub fn row(&self, row_index: usize) -> RowIterator<T> {
+    pub fn row(&self, row_index: usize) -> RowIterator<'_, T> {
         assert!(
             row_index < self.num_rows,
             "row_index: {}, num_rows: {}",
@@ -181,18 +183,18 @@ impl<T: Ring> Matrix<T> {
     ///
     /// # Panics
     /// * If the row index is out of bounds.
-    pub fn row_mut(&mut self, row_index: usize) -> RowIteratorMut<T> {
+    pub fn row_mut(&mut self, row_index: usize) -> RowIteratorMut<'_, T> {
         assert!(row_index < self.num_rows, "row_index: {}", row_index);
         RowIteratorMut::new(self, row_index)
     }
 
     /// Iterate over the rows of the matrix.
-    pub fn rows(&self) -> RowsIterator<T> {
+    pub fn rows(&self) -> RowsIterator<'_, T> {
         RowsIterator::new(self)
     }
 
     /// Iterate over the rows of the matrix, as mutable references.
-    pub fn rows_mut(&mut self) -> RowsIteratorMut<T> {
+    pub fn rows_mut(&mut self) -> RowsIteratorMut<'_, T> {
         RowsIteratorMut::new(self)
     }
 
@@ -228,13 +230,15 @@ impl<T: Ring> Matrix<T> {
 
 impl<F: FiniteField> Matrix<F> {
     /// The determinant of the matrix.
+    // TODO: return `linalg::Error` instead of `()`, which carries no failure detail.
+    #[allow(clippy::result_unit_err)]
     pub fn determinant(&self) -> Result<F, ()> {
         if !self.is_square() {
             return Err(());
         }
         let mut det = F::ONE;
         // Compute the determinant via LU decomposition.
-        match crout_lu_pivoting(&self) {
+        match crout_lu_pivoting(self) {
             Ok((L, U, _P)) => {
                 for i in 0..self.num_rows {
                     det = det * U[[i, i]] * L[[i, i]];
@@ -309,7 +313,7 @@ mod tests {
     // Spot-check that swapping rows works.
     fn test_swap_rows() {
         type F = Zp541;
-        let elements: Vec<F> = (1..=9u64).map(|x| F::new(x)).collect();
+        let elements: Vec<F> = (1..=9u64).map(F::new).collect();
         let mut m = super::Matrix::new(3, 3, &elements);
         m.swap_rows(0, 1);
         let expected: Vec<F> = vec![

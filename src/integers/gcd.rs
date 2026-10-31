@@ -7,14 +7,14 @@ pub fn gcd_u64(a: u64, b: u64) -> u64 {
 
 /// Greatest common divisor of two integers.
 pub fn gcd_u128(a: u128, b: u128) -> u128 {
-    let mut a = a.clone();
-    let mut b = b.clone();
+    let mut a = a;
+    let mut b = b;
     if a == 0 {
         return b;
     }
     while b != 0 {
         // If a = qb + r, then gcd(a,b) = gcd(b,r)
-        let temp = b.clone();
+        let temp = b;
         b = a % &b;
         a = temp;
     }

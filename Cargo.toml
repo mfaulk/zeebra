@@ -16,13 +16,15 @@ keywords = ["zkp", "zero-knowledge", "algebra", "cryptography"]
 doctest = false
 
 [dependencies]
-bincode = "1.3.3"
-itertools = "0.12.1"
 lazy_static = "1.4.0"
 pest = "2.7"
 pest_derive = "2.7"
-pest_generator = "2.7"
+# `proptest` is a normal dependency, not a dev-dependency: `Arbitrary` is implemented for public
+# types so that downstream crates can property-test against them.
 proptest = "1.3.1"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_arrays = "0.1.0"
+
+[dev-dependencies]
+bincode = "1.3.3"

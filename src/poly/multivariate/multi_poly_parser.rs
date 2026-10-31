@@ -17,6 +17,8 @@ struct MultivariatePolynomialParser;
 /// # Arguments
 /// * `str` - A string to parse.
 /// * `variables` - Variable names.
+// TODO: box the error. `pest::error::Error` is large, so it inflates every `Ok` value too.
+#[allow(clippy::result_large_err)]
 pub fn parse_multivariate_polynomial<const N: usize, F: FiniteField>(
     str: &str,
     variables: [&str; N],

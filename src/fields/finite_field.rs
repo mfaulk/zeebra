@@ -44,6 +44,8 @@ where
     fn new(val: u64) -> Self;
 
     /// Parse a string representation of a finite field element.
+    // TODO: return a named error type instead of `()`, which carries no failure detail.
+    #[allow(clippy::result_unit_err)]
     fn from_str(_value: &str) -> Result<Self, ()>;
 
     /// A uniformly random field element.
@@ -78,7 +80,7 @@ where
         // Exponentiation by squaring.
         if b == 1 {
             *self
-        } else if b % 2 == 0 {
+        } else if b.is_multiple_of(2) {
             // b is even: a^b = a^(b/2) * a^(b/2)
             let y = self.pow(b / 2);
             y * y

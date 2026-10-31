@@ -147,7 +147,7 @@ impl<F: FiniteField> Polynomial<F> for DensePolynomial<F> {
         // Exponentiation by squaring.
         if b == 1 {
             self.clone()
-        } else if b % 2 == 0 {
+        } else if b.is_multiple_of(2) {
             // b is even: a^b = a^(b/2) * a^(b/2)
             let y = self.pow(b / 2);
             &y * &y
@@ -160,7 +160,7 @@ impl<F: FiniteField> Polynomial<F> for DensePolynomial<F> {
     fn compose(&self, p: &Self) -> Self {
         let mut result = Self::zero();
         for (power, coefficient) in self.coefficients.iter().enumerate() {
-            result = result + p.pow(power as u32) * coefficient;
+            result += p.pow(power as u32) * coefficient;
         }
         result
     }
@@ -196,8 +196,6 @@ impl<F: FiniteField> Display for DensePolynomial<F> {
             } else {
                 format!("x^{}", i)
             };
-
-            format!("x^{}", i);
 
             if i == 0 {
                 // c * x^0 is just c.
@@ -418,7 +416,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_ser_de(poly in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp541>>(d)))) {
+        fn test_ser_de(poly in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp541>>))) {
             serialize_then_deserialize(poly);
         }
     }

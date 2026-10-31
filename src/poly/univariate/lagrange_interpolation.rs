@@ -25,7 +25,7 @@ pub fn interpolate<F: FiniteField>(points: Vec<(F, F)>) -> UnivariatePolynomial<
     let mut result = UnivariatePolynomial::<F>::zero();
     for (j, (_x_j, y_j)) in points.iter().enumerate() {
         let l_j = lagrange_polynomial(j, &points);
-        result = result + l_j * y_j;
+        result += l_j * y_j;
     }
     result
 }
@@ -39,8 +39,8 @@ fn lagrange_polynomial<F: FiniteField>(j: usize, points: &[(F, F)]) -> Univariat
         if k == j {
             continue;
         }
-        numerator = numerator * UnivariatePolynomial::new(&[x_k.neg(), F::one()]); // -x_k + x
-        denominator = denominator * (x_j - x_k);
+        numerator *= UnivariatePolynomial::new(&[x_k.neg(), F::one()]); // -x_k + x
+        denominator *= x_j - x_k;
     }
     let (quotient, remainder) = numerator.div(&UnivariatePolynomial::lift(&denominator));
     assert_eq!(remainder, UnivariatePolynomial::zero());

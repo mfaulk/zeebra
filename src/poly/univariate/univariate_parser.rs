@@ -14,6 +14,8 @@ use std::str::FromStr;
 struct UnivariatePolynomialParser;
 
 // Parse a string representing a univariate polynomial.
+// TODO: box the error. `pest::error::Error` is large, so it inflates every `Ok` value too.
+#[allow(clippy::result_large_err)]
 pub fn parse_univariate_polynomial<F: FiniteField>(
     str: &str,
 ) -> Result<UnivariatePolynomial<F>, Error<Rule>> {
@@ -37,10 +39,10 @@ pub fn parse_univariate_polynomial<F: FiniteField>(
                                     Rule::constant => {
                                         let c = parse_constant(&pair_3);
                                         let constant_poly = UnivariatePolynomial::new(&[c]);
-                                        polynomial = polynomial + constant_poly;
+                                        polynomial += constant_poly;
                                     }
                                     Rule::monomial => {
-                                        polynomial = polynomial + parse_monomial(pair_3);
+                                        polynomial += parse_monomial(pair_3);
                                     }
                                     _ => panic!(
                                         "A term must be a monomial or a constant: {:?}",
@@ -57,7 +59,7 @@ pub fn parse_univariate_polynomial<F: FiniteField>(
                 }
             }
             Rule::EOI => continue, // End of input.
-            _ => panic!("Not a univariate polynomial: {:?}", &str),
+            _ => panic!("Not a univariate polynomial: {:?}", str),
         }
     }
 

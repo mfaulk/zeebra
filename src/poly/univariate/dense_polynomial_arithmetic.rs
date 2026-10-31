@@ -186,8 +186,8 @@ mod tests {
     proptest! {
         #[test]
         fn test_addition_is_commutative(
-            p in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d))),
-            q in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d)))) {
+            p in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
+            q in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
             addition_is_commutative(&p, &q);
         }
     }
@@ -263,8 +263,8 @@ mod tests {
     proptest! {
         #[test]
         fn test_multiplication_is_commutative(
-            p in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d))),
-            q in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d)))) {
+            p in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
+            q in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
             multiplication_is_commutative(&p, &q);
         }
     }

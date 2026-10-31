@@ -29,7 +29,7 @@ pub fn div_with_remainder<F: FiniteField>(
         // 0 + 0x + ... + c*x^exponent
         let mut coefficients = vec![F::zero(); exponent + 1];
         coefficients[exponent] = c;
-        remainder = remainder - (UnivariatePolynomial::new(&coefficients) * divisor);
+        remainder -= UnivariatePolynomial::new(&coefficients) * divisor;
     }
 
     (UnivariatePolynomial::new(&quotient_coefficients), remainder)
@@ -66,7 +66,7 @@ mod tests {
         #[test]
         // Dividing by 1 should return the dividend with remainder zero.
         fn test_divide_by_1(
-            p in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d)))) {
+            p in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
             let one = DensePolynomial::<Zp7>::one();
             let (q, r) = div_with_remainder(&p, &one);
             assert_eq!(q, p);
@@ -100,8 +100,8 @@ mod tests {
     proptest! {
         #[test]
         fn test_recover_dividend(
-            p in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d))),
-            q in ((0..=100usize).prop_flat_map(|d| any_with::<DensePolynomial<Zp7>>(d))),
+            p in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
+            q in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
         ) {
             if q.is_zero() {
                 return Ok(())

@@ -44,6 +44,11 @@ impl<T: Ring> Vector<T> {
         self.elements.len()
     }
 
+    /// True if the vector has no elements.
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
     /// The elements of the vector.
     pub fn elements(&self) -> &Vec<T> {
         &self.elements
