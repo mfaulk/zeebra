@@ -31,8 +31,8 @@ use serde::{Deserialize, Serialize};
 use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants};
 
 use crate::{
-    FiniteField,
-    identities::{One, Zero}, Ring,
+    identities::{One, Zero},
+    FiniteField, Ring,
 };
 
 #[derive(Copy, Clone, Hash, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -264,7 +264,7 @@ mod tests {
     use crate::{
         fields::{
             binary_field::{
-                BinaryFieldElement, degree_u128, degree_u64, long_divide, multiply_polynomials,
+                degree_u128, degree_u64, long_divide, multiply_polynomials, BinaryFieldElement,
             },
             irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X_1},
         },

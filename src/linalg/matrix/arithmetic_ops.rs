@@ -1,8 +1,8 @@
 //! Matrix-Matrix operations.
 
+use crate::{impl_add_variants, impl_mul_variants};
 use crate::{linalg::matrix::Matrix, Ring};
 use std::ops::{Add, Mul};
-use crate::{impl_add_variants, impl_mul_variants};
 
 /// Matrices of the same size may be added element-wise.
 impl<T: Ring> Add for &Matrix<T> {

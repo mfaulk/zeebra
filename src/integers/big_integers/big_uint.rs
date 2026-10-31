@@ -27,9 +27,12 @@ lazy_static! {
     pub static ref TWO: BigUInt = BigUInt::new_from_u64(2);
 }
 
-#[derive(Default, Debug, Clone, Hash)]
+#[derive(Default, Debug, Clone, Hash, PartialEq)]
 pub struct BigUInt {
-    // The integer's words, in little-endian order. An empty vector is also interpreted as 0.
+    /// The integer's words, in little-endian order, with no higher-order zero words. Zero is the
+    /// empty vector. Every constructor must uphold that canonical form: `PartialEq` and `Hash` are
+    /// derived over `words`, so a redundant `[0]` would compare equal to `[]` while hashing
+    /// differently, breaking `Hash`'s contract with `Eq`.
     words: Vec<u64>,
 }
 
@@ -44,15 +47,13 @@ impl BigUInt {
     }
 
     pub fn new_from_u64(value: u64) -> Self {
-        Self { words: vec![value] }
+        Self::new(&[value])
     }
 
     pub fn new_from_u128(value: u128) -> Self {
         let low = value as u64;
         let hi = (value >> 64) as u64;
-        Self {
-            words: vec![low, hi],
-        }
+        Self::new(&[low, hi])
     }
 
     /// Randomly sample a value in the range [low,high].
@@ -98,7 +99,7 @@ impl BigUInt {
             words = multi_word_mul(&words, &[10u64]);
             words = multi_word_add(&words, &[b as u64]);
         }
-        Ok(Self { words })
+        Ok(Self::new(&words))
     }
 
     /// Convert to UTF-8 bytes of a decimal string.
@@ -130,7 +131,7 @@ impl BigUInt {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.words == vec![0] || self.words == vec![]
+        self.words.is_empty()
     }
 
     pub fn is_one(&self) -> bool {
@@ -214,16 +215,6 @@ impl BigUInt {
 impl<const N_WORDS: usize> From<Ux64<N_WORDS>> for BigUInt {
     fn from(src: Ux64<N_WORDS>) -> Self {
         BigUInt::new(&src.words)
-    }
-}
-
-impl PartialEq for BigUInt {
-    fn eq(&self, other: &Self) -> bool {
-        // Zero can be represented as [0] or as the empty list of words [].
-        if self.is_zero() && other.is_zero() {
-            return true;
-        }
-        self.words == other.words
     }
 }
 
@@ -359,7 +350,7 @@ impl Shr<usize> for &BigUInt {
 
     fn shr(self, shift: usize) -> Self::Output {
         let words = shift_right(&self.words, shift as u32);
-        BigUInt { words }
+        BigUInt::new(&words)
     }
 }
 
@@ -381,6 +372,9 @@ mod tests {
     use crate::integers::big_integers::big_uint::{BigUInt, ONE, TWO};
     use proptest::prelude::*;
     use rand::{rngs::StdRng, SeedableRng};
+    use std::collections::hash_map::DefaultHasher;
+    use std::collections::HashSet;
+    use std::hash::{Hash, Hasher};
 
     #[test]
     fn test_zero() {
@@ -390,6 +384,43 @@ mod tests {
         assert!(BigUInt::new(&[0]).is_zero());
         // Higher-order zero words are ignored.
         assert!(BigUInt::new(&[0, 0]).is_zero());
+    }
+
+    /// Values that compare equal must hash equally, as `Hash`'s contract with `Eq` requires.
+    #[test]
+    fn test_equal_values_hash_equally() {
+        fn hash_of(value: &BigUInt) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        // Each of these is zero, reached by a different constructor.
+        let zeros = [
+            BigUInt::zero(),
+            BigUInt::default(),
+            BigUInt::new(&[]),
+            BigUInt::new(&[0]),
+            BigUInt::new(&[0, 0]),
+            BigUInt::new_from_u64(0),
+            BigUInt::new_from_u128(0),
+            BigUInt::from_dec_str("0").unwrap(),
+        ];
+        for value in &zeros {
+            assert_eq!(value, &zeros[0]);
+            assert_eq!(hash_of(value), hash_of(&zeros[0]));
+        }
+    }
+
+    /// A value and its hash-set membership agree, so equal keys resolve to the same bucket.
+    #[test]
+    fn test_hash_set_membership_follows_equality() {
+        let mut set = HashSet::new();
+        set.insert(BigUInt::from_dec_str("0").unwrap());
+        assert!(set.contains(&BigUInt::zero()));
+        assert_eq!(set.len(), 1);
+        set.insert(BigUInt::zero());
+        assert_eq!(set.len(), 1);
     }
 
     #[test]

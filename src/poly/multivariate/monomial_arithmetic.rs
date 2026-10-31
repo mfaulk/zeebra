@@ -1,8 +1,8 @@
 //! Arithmetic operations on monomials.
 
+use crate::impl_mul_variants;
 use crate::Monomial;
 use std::ops;
-use crate::impl_mul_variants;
 
 // &Monomial * &Monomial
 impl<const N: usize> ops::Mul<&Monomial<N>> for &Monomial<N> {

@@ -1,8 +1,8 @@
 //! Arithmetic operations for dense univariate polynomials.
 
+use crate::{impl_add_variants, impl_mul_variants, impl_sub_variants};
 use crate::{poly::univariate::dense_polynomial::DensePolynomial, FiniteField, Polynomial};
 use std::{cmp::max, ops};
-use crate::{impl_add_variants, impl_mul_variants, impl_sub_variants};
 
 // Borrowed + Borrowed
 impl<F: FiniteField> ops::Add<&DensePolynomial<F>> for &DensePolynomial<F> {
