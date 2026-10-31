@@ -1,8 +1,8 @@
 //! Vector-Vector operations.
 
+use crate::impl_add_variants;
 use crate::{linalg::vector::Vector, Ring};
 use std::ops::Add;
-use crate::impl_add_variants;
 
 /// Vectors of the same size and type may be added element-wise.
 impl<T: Ring> Add for &Vector<T> {

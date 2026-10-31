@@ -128,11 +128,11 @@ fn reduce_grobner_basis<const N: usize, F: FiniteField>(
 mod tests {
     use std::collections::HashSet;
 
+    use crate::util::contains_duplicates;
     use crate::{
         fields::Zp13, grobner::buchberger::buchberger, poly::MonomialOrder, MultivariatePolynomial,
         One,
     };
-    use crate::util::contains_duplicates;
 
     #[test]
     /// Spot-check a few examples.

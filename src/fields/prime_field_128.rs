@@ -14,7 +14,12 @@ use proptest::{
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::{FiniteField, identities::{One, Zero}, impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants, integers::{big_uint::BigUInt, factor, find_generator, U256, utils::u128_from_parts}, Ring};
+use crate::{
+    identities::{One, Zero},
+    impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
+    integers::{big_uint::BigUInt, factor, find_generator, utils::u128_from_parts, U256},
+    FiniteField, Ring,
+};
 
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
 /// Element of a prime field with prime modulus P.
@@ -212,7 +217,7 @@ mod tests {
     use std::collections::HashSet;
 
     use proptest::{prelude::any, proptest};
-    use rand::{prelude::StdRng, SeedableRng, thread_rng};
+    use rand::{prelude::StdRng, thread_rng, SeedableRng};
 
     use crate::{
         fields::{PrimeFieldElement128, Zp221360928884514619393, Zp541},
