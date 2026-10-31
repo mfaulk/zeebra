@@ -2,6 +2,8 @@
 ![Zeebra](./zeebra.jpg "Zeebra is ZEro knowledge algeBRA")
 
 # Zeebra is ZEro-knowledge algEBRA
+[![CI](https://github.com/mfaulk/zeebra/actions/workflows/rust.yml/badge.svg)](https://github.com/mfaulk/zeebra/actions/workflows/rust.yml)
+
 Zeebra implements a subset of computational algebra and number theory for zero-knowledge cryptography.
 
 ## Why You Should Use Zeebra
