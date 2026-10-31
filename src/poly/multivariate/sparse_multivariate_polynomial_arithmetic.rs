@@ -355,7 +355,7 @@ mod tests {
 
         // no monomial in r is divisible by the leading term of any divisor.
         for divisor in &divisors {
-            for (monomial, _) in &remainder.terms {
+            for monomial in remainder.terms.keys() {
                 assert_eq!(
                     None,
                     monomial.checked_div(&divisor.leading_term(order).monomial)

@@ -62,7 +62,7 @@ mod tests {
     fn test_generator_zp<R: RngCore + CryptoRng>(p: u64, rng: &mut R) {
         let (prime_factors, powers) = factor(&BigUInt::new_from_u64(p - 1), rng);
         let g = find_generator(&prime_factors, &powers, rng);
-        println!("g: {}", &g);
+        println!("g: {}", g);
 
         let mut group_elements: HashSet<BigUInt> = Default::default();
         for i in 1..p {

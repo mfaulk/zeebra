@@ -46,6 +46,12 @@ use crate::{
     FiniteField,
 };
 
+/// An `A = LU` decomposition, as `(L, U)`.
+pub type Lu<T> = (Matrix<T>, Matrix<T>);
+
+/// A pivoting `PA = LU` decomposition, as `(L, U, P)`.
+pub type LuPivoting<T> = (Matrix<T>, Matrix<T>, Matrix<T>);
+
 /// Crout's A=LU decomposition of a non-singular matrix, without pivoting.
 ///
 /// # Arguments
@@ -54,7 +60,7 @@ use crate::{
 /// # Returns
 /// * `Ok((L, U))` - The LU decomposition of A. L is a lower triangular matrix and U is a unit upper triangular matrix.
 /// * `Err(_)` - If the matrix A is not square, is singular, or if pivoting is required.
-pub fn crout_lu<T: FiniteField>(A: &Matrix<T>) -> Result<(Matrix<T>, Matrix<T>), Error> {
+pub fn crout_lu<T: FiniteField>(A: &Matrix<T>) -> Result<Lu<T>, Error> {
     if !A.is_square() {
         return Err(Error::NotSquare {
             num_rows: A.num_rows(),
@@ -119,9 +125,7 @@ pub fn crout_lu<T: FiniteField>(A: &Matrix<T>) -> Result<(Matrix<T>, Matrix<T>),
 /// # Returns
 /// * `Ok((L, U, P))` - The LU decomposition of A. L is a lower triangular matrix, U is a unit upper triangular matrix, and P is a perumation matrix.
 /// * `Err(_)` - If the matrix A is not square or is singular.
-pub fn crout_lu_pivoting<T: FiniteField>(
-    A: &Matrix<T>,
-) -> Result<(Matrix<T>, Matrix<T>, Matrix<T>), Error> {
+pub fn crout_lu_pivoting<T: FiniteField>(A: &Matrix<T>) -> Result<LuPivoting<T>, Error> {
     if !A.is_square() {
         return Err(Error::NotSquare {
             num_rows: A.num_rows(),
@@ -150,7 +154,7 @@ pub fn crout_lu_pivoting<T: FiniteField>(
             for k in 0..i {
                 sum += A[[i, k]] * A[[k, j]];
             }
-            A[[i, j]] = A[[i, j]] - sum;
+            A[[i, j]] -= sum;
         }
 
         // i >= j
@@ -165,7 +169,7 @@ pub fn crout_lu_pivoting<T: FiniteField>(
             for k in 0..j {
                 sum += A[[i, k]] * A[[k, j]];
             }
-            A[[i, j]] = A[[i, j]] - sum;
+            A[[i, j]] -= sum;
         }
 
         if let Some(pivot_row) = (j..n).find(|&i| !A[[i, j]].is_zero()) {
@@ -178,7 +182,7 @@ pub fn crout_lu_pivoting<T: FiniteField>(
             // Divide each remaining candidate by the pivot to compute the elements of L below the pivot.
             let pivot = A[[j, j]];
             for i in (j + 1)..n {
-                A[[i, j]] = A[[i, j]] / pivot;
+                A[[i, j]] /= pivot;
             }
         } else {
             return Err(Error::NotInvertible);

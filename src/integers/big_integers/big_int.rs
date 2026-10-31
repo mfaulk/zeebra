@@ -341,7 +341,7 @@ mod tests {
     fn from_and_to_str(mut s: &str) {
         let s2 = BigInt::from_dec_str(s).unwrap().to_dec_str();
         // Standardize various versions of input zeros
-        if s == "" || s == "-0" || s == "+0" {
+        if s.is_empty() || s == "-0" || s == "+0" {
             s = "0"
         }
 
@@ -358,7 +358,7 @@ mod tests {
         fn test_from_dec_str(digits in "[0-9]{1,20}", signum in select(vec!["+", "-", ""])) { // Regex for numerical strings up to 20 digits long.
             println!("digits: {}", digits);
             let mut digits_trimmed = digits.trim_start_matches('0');
-            if digits_trimmed.len() == 0 {
+            if digits_trimmed.is_empty() {
                 digits_trimmed = "0";
             }
             from_and_to_str(&(signum.to_owned() + digits_trimmed));

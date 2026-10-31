@@ -73,6 +73,8 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// # Arguments
     /// * `value` - A Sage-style string, e.g. "2*x^3 + 1".
     /// * `variables` - The expected variable names.
+    // TODO: box the error. `pest::error::Error` is large, so it inflates every `Ok` value too.
+    #[allow(clippy::result_large_err)]
     pub fn parse(value: &str, variables: [&str; N]) -> Result<Self, Error<Rule>> {
         parse_multivariate_polynomial(value, variables)
     }
@@ -137,20 +139,20 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         self.terms
             .iter()
             .max_by(|a, b| order.cmp(a.0, b.0))
-            .map(|(monom, coefficient)| Term::new(coefficient.clone(), monom.clone()))
+            .map(|(monom, coefficient)| Term::new(*coefficient, *monom))
             .unwrap_or(Term::zero())
     }
 
     /// The leading monomial w.r.t. the given monomial order.
     pub fn leading_monomial(&self, order: MonomialOrder) -> Monomial<N> {
         let term = self.leading_term(order);
-        term.monomial().clone()
+        *term.monomial()
     }
 
     /// The leading coefficient w.r.t. the given monomial order.
     pub fn leading_coefficient(&self, order: MonomialOrder) -> F {
         let term = self.leading_term(order);
-        term.coefficient.clone()
+        term.coefficient
     }
 
     /// The multidegree of the polynomial w.r.t. the given monomial order.

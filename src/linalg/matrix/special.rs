@@ -25,10 +25,8 @@ pub fn is_upper_unit_triangular<T: FiniteField>(m: &Matrix<T>) -> bool {
     for i in 0..num_rows {
         for j in 0..num_columns {
             // Elements on the diagonal must be one.
-            if i == j {
-                if m[[i, j]] != T::ONE {
-                    return false;
-                }
+            if i == j && m[[i, j]] != T::ONE {
+                return false;
             }
             // Elements below the diagonal must be zero.
             if i > j && m[[i, j]] != T::ZERO {

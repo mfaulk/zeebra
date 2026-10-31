@@ -20,7 +20,7 @@ fn buchberger<const N: usize, F: FiniteField>(
     f: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
-    let mut g: Vec<MultivariatePolynomial<N, F>> = f.iter().cloned().collect();
+    let mut g: Vec<MultivariatePolynomial<N, F>> = f.to_vec();
     let mut g_prime: Vec<MultivariatePolynomial<N, F>>;
 
     loop {
@@ -107,7 +107,7 @@ fn reduce_grobner_basis<const N: usize, F: FiniteField>(
     let mut reduced_g: HashSet<MultivariatePolynomial<N, F>> = g.iter().cloned().collect();
     for p in g {
         let p_monomials: Vec<MultivariatePolynomial<N, F>> =
-            p.terms().iter().map(|(m, _c)| m.into()).collect::<Vec<_>>();
+            p.terms().keys().map(|m| m.into()).collect::<Vec<_>>();
         let divisors: Vec<MultivariatePolynomial<N, F>> = reduced_g
             .iter()
             .filter(|q| p != **q)

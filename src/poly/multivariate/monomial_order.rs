@@ -42,9 +42,9 @@ impl MonomialOrder {
         };
 
         match ordering {
-            Ordering::Greater => a.clone(),
-            Ordering::Less => b.clone(),
-            Ordering::Equal => a.clone(),
+            Ordering::Greater => *a,
+            Ordering::Less => *b,
+            Ordering::Equal => *a,
         }
     }
 
@@ -71,7 +71,7 @@ impl MonomialOrder {
 ///
 /// Compares exponents of x1 in the monomials, and in case of equality compares exponents of x2, etc.
 fn lex<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> Ordering {
-    a.exponents().cmp(&b.exponents())
+    a.exponents().cmp(b.exponents())
 }
 
 /// Graded lexicographic order.

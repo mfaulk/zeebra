@@ -1,5 +1,4 @@
 /// The `matrix!` macro enables easy construction of small matrices.
-
 #[macro_export]
 macro_rules! matrix {
     () => {
@@ -43,7 +42,7 @@ mod tests {
         let expected = Matrix::new(
             2,
             3,
-            &vec![
+            &[
                 F::new(1),
                 F::new(2),
                 F::new(3),
