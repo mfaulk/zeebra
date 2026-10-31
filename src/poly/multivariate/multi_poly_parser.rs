@@ -28,14 +28,11 @@ pub fn parse_multivariate_polynomial<const N: usize, F: FiniteField>(
     let str: String = str.chars().filter(|c| !c.is_whitespace()).collect();
     // println!("Parsing {}", str);
 
-    // This for loop shouldn't be necessary.
-    for pair in MultivariatePolynomialParser::parse(Rule::polynomial, &str)? {
+    // The grammar matches a single `polynomial` pair, so only the first is significant.
+    if let Some(pair) = MultivariatePolynomialParser::parse(Rule::polynomial, &str)?.next() {
         match pair.as_rule() {
-            Rule::polynomial => {
-                polynomial = parse_polynomial(pair, variables);
-                break;
-            }
-            Rule::EOI => break, // End of input.
+            Rule::polynomial => polynomial = parse_polynomial(pair, variables),
+            Rule::EOI => {} // Empty input is the zero polynomial.
             _ => panic!("Not a Multivariate polynomial: {}", str),
         }
     }
@@ -71,22 +68,16 @@ fn parse_term<const N: usize, F: FiniteField>(
 ) -> SparseMultiPoly<N, F> {
     // println!("parsing term: {}", term.as_span().as_str());
 
-    // This for loop shouldn't be necessary?
-    for pair in term.into_inner() {
-        // A term is a monomial (i.e. c*x*y) or a constant.
-        match pair.as_rule() {
-            Rule::constant => {
-                let c: F = parse_constant(&pair);
-                return SparseMultiPoly::from(c);
-            }
-            Rule::monomial => {
-                return parse_monomial(pair, variables);
-            }
-            _ => panic!("A term must be a monomial or a constant: {:?}", pair),
-        }
+    // A term is a monomial (i.e. c*x*y) or a constant.
+    let pair = term
+        .into_inner()
+        .next()
+        .expect("A term must contain a monomial or a constant");
+    match pair.as_rule() {
+        Rule::constant => SparseMultiPoly::from(parse_constant::<F>(&pair)),
+        Rule::monomial => parse_monomial(pair, variables),
+        _ => panic!("A term must be a monomial or a constant: {:?}", pair),
     }
-
-    unimplemented!()
 }
 
 // Parse a Pair that has matched on the 'constant' rule.
