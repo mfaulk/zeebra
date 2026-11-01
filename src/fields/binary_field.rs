@@ -711,4 +711,27 @@ mod tests {
             products_stay_within_the_field(a, b);
         }
     }
+
+    /// The strategy is usable, equal values hash equally, and elements stay below the order.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::identities::{One, Zero};
+        use crate::test_support::{
+            assert_hash_agrees_with_eq, assert_strategy_is_not_degenerate, draw,
+        };
+        let strategy = Gf256::arbitrary();
+        assert_strategy_is_not_degenerate(&strategy, "BinaryFieldElement");
+
+        let mut values = draw(&strategy, 32);
+        values.extend([Gf256::zero(), Gf256::one(), Gf256::default()]);
+        assert_hash_agrees_with_eq(&values, "BinaryFieldElement");
+
+        for v in &values {
+            assert!(
+                (v.coefficients as u128) < Gf256::order(),
+                "{:?} is not reduced",
+                v
+            );
+        }
+    }
 }

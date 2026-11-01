@@ -203,4 +203,18 @@ mod tests {
             prop_assert_eq!(cmp, lex);
         }
     }
+
+    /// The strategy is usable and equal monomials hash equally.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{
+            assert_hash_agrees_with_eq, assert_strategy_is_not_degenerate, draw,
+        };
+        let strategy = any::<Monomial<3>>();
+        assert_strategy_is_not_degenerate(&strategy, "Monomial");
+
+        let mut values = draw(&strategy, 32);
+        values.extend([Monomial::<3>::one(), Monomial::<3>::new(&[0, 0, 0])]);
+        assert_hash_agrees_with_eq(&values, "Monomial");
+    }
 }
