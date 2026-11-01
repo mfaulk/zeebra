@@ -20,7 +20,7 @@ extern crate pest;
 pub mod macros;
 mod fft;
 pub mod fields;
-mod grobner;
+pub mod grobner;
 mod identities;
 pub mod integers;
 pub mod linalg;
