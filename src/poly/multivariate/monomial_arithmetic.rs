@@ -58,11 +58,12 @@ mod tests {
         assert_eq!(a.checked_div(&d), None);
     }
 
+    /// Multiplying monomials adds exponents, which panics rather than wrapping on overflow.
     #[test]
-    #[should_panic]
-    #[ignore]
-    // Should panic if any exponent overflows.
+    #[should_panic(expected = "overflow")]
     fn test_overflow_panics() {
-        todo!()
+        let a = Monomial::<3>::new(&[u32::MAX, 0, 0]);
+        let b = Monomial::<3>::new(&[1, 0, 0]);
+        let _product = &a * &b;
     }
 }

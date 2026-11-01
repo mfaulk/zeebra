@@ -131,7 +131,6 @@ mod tests {
             is_diagonal, is_lower_triangular, is_upper_triangular,
             matrix::special::is_reduced_row_echelon, Matrix,
         },
-        matrix,
     };
 
     #[test]

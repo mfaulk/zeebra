@@ -422,11 +422,18 @@ mod tests {
         }
     }
 
-    #[ignore]
+    /// A primitive nth root of unity satisfies r^n = 1 and r^k != 1 for every 0 < k < n.
     #[test]
-    // Should return a **primitive** nth root of unity.
     fn test_root_of_unity_is_primitive() {
-        // r^n = 1, but r^k != 1 for any k < n.
-        todo!()
+        type Zp = Zp541;
+        let mut rng = StdRng::seed_from_u64(7);
+        // 540 = 2^2 * 3^3 * 5, so these all divide the multiplicative group's order.
+        for n in [2u64, 4, 5, 10, 27, 108] {
+            let r = Zp::root_of_unity(n, &mut rng);
+            assert_eq!(r.pow(n as u128), Zp::one(), "n = {}", n);
+            for k in 1..n {
+                assert_ne!(r.pow(k as u128), Zp::one(), "n = {}, k = {}", n, k);
+            }
+        }
     }
 }
