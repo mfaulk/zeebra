@@ -36,8 +36,8 @@ mod tests {
         // An arbitrary rectangular matrix
         let m: Matrix<F> = matrix![F::new(1), F::new(2), F::new(3);
                           F::new(4), F::new(5), F::new(6)];
-        assert_eq!(2, m.num_rows);
-        assert_eq!(3, m.num_columns);
+        assert_eq!(2, m.num_rows());
+        assert_eq!(3, m.num_columns());
 
         let expected = Matrix::new(
             2,

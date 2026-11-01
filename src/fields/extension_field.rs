@@ -47,7 +47,7 @@ pub struct ExtensionFieldElement<const P: u64, const N: usize, M: IrreduciblePol
     /// coefficient is a reduced residue mod P, which `new` establishes and the arithmetic
     /// operations preserve. `PartialEq` and `Hash` both key on this array, so that canonical form
     /// is what keeps them consistent.
-    pub coefficients: [u64; N],
+    coefficients: [u64; N],
     modulus: PhantomData<M>,
 }
 
@@ -119,6 +119,11 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ExtensionFiel
             coefficients: reduced,
             modulus: PhantomData,
         }
+    }
+
+    /// The polynomial's coefficients, low-order first, each reduced mod P.
+    pub fn coefficients(&self) -> &[u64; N] {
+        &self.coefficients
     }
 }
 
@@ -742,7 +747,7 @@ mod tests {
 
             let binary_product = BinaryFieldElement::<X8_X4_X3_X_1>::new(a)
                 * BinaryFieldElement::<X8_X4_X3_X_1>::new(b);
-            prop_assert_eq!(bits(extension(a) * extension(b)), binary_product.coefficients);
+            prop_assert_eq!(bits(extension(a) * extension(b)), binary_product.coefficients());
         }
     }
 
