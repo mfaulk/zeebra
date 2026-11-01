@@ -1,21 +1,15 @@
-//! Fields GF(p^n) of power-prime dimension.
+//! Fields GF(p^n) of prime-power order.
 //!
-//! For prime p, the field GF(q) with q = p^n is represented as polynomials over GF(p) whose
-//! degree is strictly less than n. Addition and subtraction in GF(q) are the normal addition
-//! and subtraction of polynomials over GF(p). Multiplication is constructed using an
-//! irreducible polynomial P in GF(p)[X] of degree n: the product of two elements a, b, is the
-//! remainder of Euclidean division by P of the product ab.
-//!
-//! # Incomplete: multiplication is not yet polynomial multiplication
-//! `Mul` currently multiplies coefficients componentwise and does not reduce by an irreducible
-//! polynomial — the type has no parameter naming one. This type is therefore the direct product
-//! ring GF(p)^N, not the field GF(p^N): `X * X` yields `X` rather than `X^2`, and elements with a
-//! zero coefficient have no multiplicative inverse, so `inverse` (which applies Fermat's little
-//! theorem) silently returns a non-inverse for them. Completing this requires a const parameter
-//! for the irreducible polynomial.
+//! For prime p, the field GF(q) with q = p^n is represented as polynomials over GF(p) of degree
+//! strictly less than n. Addition and subtraction are the coefficientwise operations of GF(p). The
+//! product of a and b is the remainder of ab on Euclidean division by a monic irreducible
+//! polynomial of degree n, supplied by the [`IrreduciblePolynomial`] parameter. That reduction is
+//! what keeps multiplication closed and makes every nonzero element invertible.
 
 use std::{
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+    marker::PhantomData,
     ops,
 };
 
@@ -36,35 +30,102 @@ use crate::{
     FiniteField, Ring,
 };
 
-/// Element of the field GF(p^n).
-#[derive(Copy, Clone, Hash, Debug, Eq, PartialEq)]
-pub struct ExtensionFieldElement<const P: u64, const N: usize> {
-    /// The coefficients of a polynomial in GF(p)[X] of degree less than N.
-    pub coefficients: [u64; N],
+/// The monic irreducible polynomial of degree N over GF(P) that defines GF(P^N).
+///
+/// The polynomial must genuinely be irreducible over GF(P). A reducible modulus yields a ring with
+/// zero divisors, in which some nonzero elements have no multiplicative inverse and `inverse` —
+/// which relies on Fermat's little theorem — returns a silently wrong value.
+pub trait IrreduciblePolynomial<const P: u64, const N: usize>: 'static {
+    /// Coefficients c_0, ..., c_{N-1} of `x^N + c_{N-1} x^{N-1} + ... + c_1 x + c_0`, low-order
+    /// first. The leading coefficient is implicitly 1.
+    const COEFFICIENTS: [u64; N];
 }
 
-impl<const P: u64, const N: usize> ExtensionFieldElement<P, N> {
-    /// An element of GF(p^n).
-    ///
-    /// # Arguments
-    /// * `coefficients` - coefficients[i] is c_i in the polynomial \sum_{i=1}^m c_i * x_i.
-    pub fn new(coefficients: [u64; N]) -> Self {
-        // TODO: each coefficient must be in [0,p-1]
-        Self { coefficients }
+/// Element of the field GF(P^N), with multiplication reduced by the irreducible polynomial M.
+pub struct ExtensionFieldElement<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> {
+    /// Coefficients c_0, ..., c_{N-1} of the polynomial `sum c_i x^i`, low-order first. Every
+    /// coefficient is a reduced residue mod P, which `new` establishes and the arithmetic
+    /// operations preserve. `PartialEq` and `Hash` both key on this array, so that canonical form
+    /// is what keeps them consistent.
+    pub coefficients: [u64; N],
+    modulus: PhantomData<M>,
+}
+
+// The trait impls below are written out rather than derived: a derive would bound the modulus
+// marker type M by each trait, even though M appears only in `PhantomData`.
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Clone
+    for ExtensionFieldElement<P, N, M>
+{
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-// impl Default
-impl<const P: u64, const N: usize> Default for ExtensionFieldElement<P, N> {
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Copy
+    for ExtensionFieldElement<P, N, M>
+{
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> PartialEq
+    for ExtensionFieldElement<P, N, M>
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.coefficients == other.coefficients
+    }
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Eq
+    for ExtensionFieldElement<P, N, M>
+{
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Hash
+    for ExtensionFieldElement<P, N, M>
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.coefficients.hash(state);
+    }
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Debug
+    for ExtensionFieldElement<P, N, M>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.coefficients)
+    }
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Default
+    for ExtensionFieldElement<P, N, M>
+{
     fn default() -> Self {
+        Self::ZERO
+    }
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ExtensionFieldElement<P, N, M> {
+    /// An element of GF(P^N).
+    ///
+    /// # Arguments
+    /// * `coefficients` - coefficients[i] is c_i in the polynomial `sum c_i x^i`. Each is reduced
+    ///   mod P so that equal elements share one representation.
+    pub fn new(coefficients: [u64; N]) -> Self {
+        let mut reduced = coefficients;
+        for c in reduced.iter_mut() {
+            *c %= P;
+        }
         Self {
-            coefficients: [0u64; N],
+            coefficients: reduced,
+            modulus: PhantomData,
         }
     }
 }
 
 // impl Serialize
-impl<const P: u64, const N: usize> Serialize for ExtensionFieldElement<P, N> {
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Serialize
+    for ExtensionFieldElement<P, N, M>
+{
     fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -74,7 +135,9 @@ impl<const P: u64, const N: usize> Serialize for ExtensionFieldElement<P, N> {
 }
 
 // impl Deserialize
-impl<'de, const P: u64, const N: usize> Deserialize<'de> for ExtensionFieldElement<P, N> {
+impl<'de, const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Deserialize<'de>
+    for ExtensionFieldElement<P, N, M>
+{
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -84,27 +147,48 @@ impl<'de, const P: u64, const N: usize> Deserialize<'de> for ExtensionFieldEleme
 }
 
 // impl Zero
-impl<const P: u64, const N: usize> Zero for ExtensionFieldElement<P, N> {
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Zero
+    for ExtensionFieldElement<P, N, M>
+{
     const ZERO: Self = ExtensionFieldElement {
         coefficients: [0u64; N],
+        modulus: PhantomData,
     };
 }
 
 // impl One
-impl<const P: u64, const N: usize> One for ExtensionFieldElement<P, N> {
-    // TODO: this is wrong.
-    const ONE: Self = ExtensionFieldElement {
-        coefficients: [1u64; N],
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> One
+    for ExtensionFieldElement<P, N, M>
+{
+    const ONE: Self = {
+        // The constant polynomial 1.
+        let mut coefficients = [0u64; N];
+        coefficients[0] = 1;
+        ExtensionFieldElement {
+            coefficients,
+            modulus: PhantomData,
+        }
     };
 }
 
 // impl Ring
-impl<const P: u64, const N: usize> Ring for ExtensionFieldElement<P, N> {}
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Ring
+    for ExtensionFieldElement<P, N, M>
+{
+}
 
 // impl FiniteField
-impl<const P: u64, const N: usize> FiniteField for ExtensionFieldElement<P, N> {
-    fn new(_val: u64) -> Self {
-        todo!()
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
+    for ExtensionFieldElement<P, N, M>
+{
+    fn new(val: u64) -> Self {
+        // The constant polynomial `val`.
+        let mut coefficients = [0u64; N];
+        coefficients[0] = val % P;
+        Self {
+            coefficients,
+            modulus: PhantomData,
+        }
     }
 
     fn from_str(_value: &str) -> Result<Self, ()> {
@@ -116,7 +200,10 @@ impl<const P: u64, const N: usize> FiniteField for ExtensionFieldElement<P, N> {
         for c in coefficients.iter_mut() {
             *c = rng.next_u64() % P;
         }
-        Self::new(coefficients)
+        Self {
+            coefficients,
+            modulus: PhantomData,
+        }
     }
 
     fn primitive_element<R: RngCore + CryptoRng>(_rng: &mut R) -> Self {
@@ -128,7 +215,7 @@ impl<const P: u64, const N: usize> FiniteField for ExtensionFieldElement<P, N> {
     }
 
     fn order() -> u128 {
-        // TODO: p^n can be larger than u64
+        // TODO: p^n can be larger than u128
         (P as u128).pow(N as u32)
     }
 
@@ -138,63 +225,64 @@ impl<const P: u64, const N: usize> FiniteField for ExtensionFieldElement<P, N> {
 }
 
 // impl Display
-impl<const P: u64, const N: usize> Display for ExtensionFieldElement<P, N> {
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Display
+    for ExtensionFieldElement<P, N, M>
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO: ???
         write!(f, "{:?}", self.coefficients)
     }
 }
 
 // Borrowed + Borrowed
-impl<const P: u64, const N: usize> ops::Add<&ExtensionFieldElement<P, N>>
-    for &ExtensionFieldElement<P, N>
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>>
+    ops::Add<&ExtensionFieldElement<P, N, M>> for &ExtensionFieldElement<P, N, M>
 {
-    type Output = ExtensionFieldElement<P, N>;
+    type Output = ExtensionFieldElement<P, N, M>;
 
-    fn add(self, rhs: &ExtensionFieldElement<P, N>) -> ExtensionFieldElement<P, N> {
+    fn add(self, rhs: &ExtensionFieldElement<P, N, M>) -> Self::Output {
         let mut coefficients = [0u64; N];
         for i in 0..N {
-            let a = self.coefficients[i];
-            let b = rhs.coefficients[i];
-            let sum = a as u128 + b as u128;
+            let sum = self.coefficients[i] as u128 + rhs.coefficients[i] as u128;
             coefficients[i] = (sum % P as u128) as u64;
         }
         ExtensionFieldElement::new(coefficients)
     }
 }
 
-impl_add_variants!([const P:u64, const N: usize], ExtensionFieldElement<P, N>);
+impl_add_variants!([const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>], ExtensionFieldElement<P, N, M>);
 
 // Borrowed - Borrowed
-impl<const P: u64, const N: usize> ops::Sub<&ExtensionFieldElement<P, N>>
-    for &ExtensionFieldElement<P, N>
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>>
+    ops::Sub<&ExtensionFieldElement<P, N, M>> for &ExtensionFieldElement<P, N, M>
 {
-    type Output = ExtensionFieldElement<P, N>;
+    type Output = ExtensionFieldElement<P, N, M>;
 
-    fn sub(self, rhs: &ExtensionFieldElement<P, N>) -> Self::Output {
+    fn sub(self, rhs: &ExtensionFieldElement<P, N, M>) -> Self::Output {
         let mut coefficients = [0u64; N];
         for i in 0..N {
-            let a = self.coefficients[i];
-            let b = rhs.coefficients[i];
-            let difference = a as i128 - b as i128;
-            coefficients[i] = difference.wrapping_rem_euclid(P as i128) as u64;
+            let difference = self.coefficients[i] as i128 - rhs.coefficients[i] as i128;
+            coefficients[i] = difference.rem_euclid(P as i128) as u64;
         }
         ExtensionFieldElement::new(coefficients)
     }
 }
 
-impl_sub_variants!([const P:u64, const N: usize], ExtensionFieldElement<P, N>);
+impl_sub_variants!([const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>], ExtensionFieldElement<P, N, M>);
 
-impl<const P: u64, const N: usize> ops::Neg for ExtensionFieldElement<P, N> {
-    type Output = ExtensionFieldElement<P, N>;
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ops::Neg
+    for ExtensionFieldElement<P, N, M>
+{
+    type Output = ExtensionFieldElement<P, N, M>;
 
     fn neg(self) -> Self::Output {
         ExtensionFieldElement::zero() - self
     }
 }
 
-impl<const P: u64, const N: usize> ops::Neg for &ExtensionFieldElement<P, N> {
-    type Output = ExtensionFieldElement<P, N>;
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ops::Neg
+    for &ExtensionFieldElement<P, N, M>
+{
+    type Output = ExtensionFieldElement<P, N, M>;
 
     fn neg(self) -> Self::Output {
         ExtensionFieldElement::zero() - self
@@ -202,26 +290,58 @@ impl<const P: u64, const N: usize> ops::Neg for &ExtensionFieldElement<P, N> {
 }
 
 // Borrowed * Borrowed
-impl<const P: u64, const N: usize> ops::Mul<Self> for &ExtensionFieldElement<P, N> {
-    type Output = ExtensionFieldElement<P, N>;
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ops::Mul<Self>
+    for &ExtensionFieldElement<P, N, M>
+{
+    type Output = ExtensionFieldElement<P, N, M>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut coefficients = [0u64; N];
+        let p = P as u128;
+
+        // The schoolbook product of two polynomials of degree < N has degree < 2N - 1. A heap
+        // buffer is used because `[u64; 2 * N - 1]` would need const-expression arithmetic.
+        let mut product = vec![0u128; 2 * N - 1];
         for i in 0..N {
-            let a = self.coefficients[i];
-            let b = rhs.coefficients[i];
-            let prod = a as u128 * b as u128;
-            coefficients[i] = (prod % P as u128) as u64;
+            let a = self.coefficients[i] as u128;
+            if a == 0 {
+                continue;
+            }
+            for j in 0..N {
+                product[i + j] = (product[i + j] + a * rhs.coefficients[j] as u128) % p;
+            }
+        }
+
+        // Reduce to degree < N. The modulus gives x^N = -(c_{N-1} x^{N-1} + ... + c_0), so each
+        // term of degree i >= N folds down into the N coefficients below it. Working downwards
+        // means a folded term is itself reduced before it is reached.
+        let modulus = M::COEFFICIENTS;
+        for i in (N..product.len()).rev() {
+            let leading = product[i];
+            if leading == 0 {
+                continue;
+            }
+            product[i] = 0;
+            for j in 0..N {
+                let term = (leading * modulus[j] as u128) % p;
+                product[i - N + j] = (product[i - N + j] + p - term) % p;
+            }
+        }
+
+        let mut coefficients = [0u64; N];
+        for (coefficient, reduced) in coefficients.iter_mut().zip(product.iter()) {
+            *coefficient = *reduced as u64;
         }
         ExtensionFieldElement::new(coefficients)
     }
 }
 
-impl_mul_variants!([const P:u64, const N: usize], ExtensionFieldElement<P, N>);
+impl_mul_variants!([const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>], ExtensionFieldElement<P, N, M>);
 
 // Borrowed / Borrowed
-impl<const P: u64, const N: usize> ops::Div<Self> for &ExtensionFieldElement<P, N> {
-    type Output = ExtensionFieldElement<P, N>;
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ops::Div<Self>
+    for &ExtensionFieldElement<P, N, M>
+{
+    type Output = ExtensionFieldElement<P, N, M>;
 
     fn div(self, rhs: Self) -> Self::Output {
         // Division is multiplication by the inverse.
@@ -229,10 +349,12 @@ impl<const P: u64, const N: usize> ops::Div<Self> for &ExtensionFieldElement<P, 
     }
 }
 
-impl_div_variants!([const P:u64, const N: usize], ExtensionFieldElement<P, N>);
+impl_div_variants!([const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>], ExtensionFieldElement<P, N, M>);
 
 // impl Arbitrary
-impl<const P: u64, const N: usize> Arbitrary for ExtensionFieldElement<P, N> {
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Arbitrary
+    for ExtensionFieldElement<P, N, M>
+{
     type Parameters = ();
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
@@ -251,31 +373,39 @@ impl<const P: u64, const N: usize> Arbitrary for ExtensionFieldElement<P, N> {
 
 #[cfg(test)]
 mod tests {
-    use proptest::{arbitrary::Arbitrary, proptest};
+    use proptest::{arbitrary::Arbitrary, prop_assert_eq, proptest};
     use rand::thread_rng;
 
     use crate::{
-        fields::extension_field::ExtensionFieldElement,
+        fields::{
+            binary_field::BinaryFieldElement,
+            extension_field::{ExtensionFieldElement, IrreduciblePolynomial},
+            irreducible_polynomials::{
+                Modulus13Pow4, Modulus251Pow4, Modulus2Pow8, Modulus5Pow3, X8_X4_X3_X_1,
+            },
+        },
         identities::{One, Zero},
         FiniteField,
     };
 
-    type F13x4 = ExtensionFieldElement<13, 4>;
-    type F61x8 = ExtensionFieldElement<61, 8>;
+    type F13x4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
+    type F251x4 = ExtensionFieldElement<251, 4, Modulus251Pow4>;
+    type F5x3 = ExtensionFieldElement<5, 3, Modulus5Pow3>;
+    type F2x8 = ExtensionFieldElement<2, 8, Modulus2Pow8>;
 
     #[test]
     // random should not panic.
     fn test_random() {
         let mut rng = thread_rng();
         for _i in 0..1000 {
-            let _element = ExtensionFieldElement::<61, 8>::random(&mut rng);
+            let _element = F251x4::random(&mut rng);
         }
     }
 
     #[test]
     // ZERO is the additive identity.
     fn test_add_zero() {
-        type F = ExtensionFieldElement<61, 8>;
+        type F = F251x4;
         let mut rng = thread_rng();
         let element = F::random(&mut rng);
         let sum = element + F::zero();
@@ -284,9 +414,7 @@ mod tests {
 
     #[test]
     fn test_add() {
-        const P: u64 = 13;
-        const N: usize = 4;
-        type Field = ExtensionFieldElement<P, N>;
+        type Field = F13x4;
         let a = Field::new([1, 2, 3, 4]);
         let b = Field::new([11, 11, 11, 11]);
         let sum = a + b;
@@ -295,9 +423,7 @@ mod tests {
 
     #[test]
     fn test_sub() {
-        const P: u64 = 13;
-        const N: usize = 4;
-        type F = ExtensionFieldElement<P, N>;
+        type F = F13x4;
         let a = F::new([1, 2, 3, 4]);
         let b = F::new([11, 11, 11, 11]);
         let diff = a - b;
@@ -307,7 +433,7 @@ mod tests {
     #[test]
     // ONE is the multiplicative identity.
     fn test_mul_one() {
-        type F = ExtensionFieldElement<61, 8>;
+        type F = F251x4;
         let mut rng = thread_rng();
         let element = F::random(&mut rng);
         let prod = element * F::one();
@@ -316,17 +442,47 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        type F = ExtensionFieldElement<13, 4>;
+        // (1 + 2X + 3X^2 + 4X^3)(11 + 11X + 11X^2 + 11X^3) mod X^4 + X^3 + 1 over GF(13).
+        type F = F13x4;
         let a = F::new([1, 2, 3, 4]);
         let b = F::new([11, 11, 11, 11]);
         let prod = a * b;
-        assert_eq!(prod, F::new([11, 9, 7, 5]));
+        assert_eq!(prod, F::new([10, 0, 9, 5]));
+    }
+
+    /// Multiplication is polynomial multiplication: X * X is X^2, not a componentwise product.
+    #[test]
+    fn test_multiplication_is_polynomial_multiplication() {
+        let x = F13x4::new([0, 1, 0, 0]); // X
+        assert_eq!(x * x, F13x4::new([0, 0, 1, 0])); // X^2
+    }
+
+    /// ONE is the constant polynomial 1, not an all-ones coefficient vector.
+    #[test]
+    fn test_one_is_the_constant_polynomial_one() {
+        assert_eq!(F13x4::one(), F13x4::new([1, 0, 0, 0]));
+    }
+
+    /// Every nonzero element is invertible, including those with a zero coefficient.
+    #[test]
+    fn test_inverse_of_element_with_a_zero_coefficient() {
+        let a = F13x4::new([1, 0, 1, 1]);
+        assert_eq!(a * a.inverse(), F13x4::one());
+    }
+
+    /// Reduction by X^N wraps a product back into degree less than N.
+    #[test]
+    fn test_multiplication_reduces_by_the_modulus() {
+        // In GF(13^4) modulo X^4 + X^3 + 1, X^3 * X = X^4 = -(X^3 + 1) = 12*X^3 + 12.
+        let x = F13x4::new([0, 1, 0, 0]);
+        let x_cubed = F13x4::new([0, 0, 0, 1]);
+        assert_eq!(x_cubed * x, F13x4::new([12, 0, 0, 12]));
     }
 
     #[test]
     // a * a_inv = 1
     fn test_inverse() {
-        type F = ExtensionFieldElement<13, 4>;
+        type F = F13x4;
         let a = F::new([1, 2, 3, 4]);
         assert_eq!(a * a.inverse(), F::one());
     }
@@ -335,7 +491,7 @@ mod tests {
     #[should_panic]
     // Zero does not have a multiplicative inverse.
     fn test_inverse_of_zero() {
-        type F = ExtensionFieldElement<61, 8>;
+        type F = F251x4;
         let mut rng = thread_rng();
         let element = F::random(&mut rng);
         let _result = element / F::zero();
@@ -343,7 +499,7 @@ mod tests {
 
     #[test]
     fn test_divide_by_one() {
-        type F = ExtensionFieldElement<61, 8>;
+        type F = F251x4;
         let mut rng = thread_rng();
         let element = F::random(&mut rng);
         let result = element / F::one();
@@ -352,19 +508,15 @@ mod tests {
 
     #[test]
     fn test_divide() {
-        type F = ExtensionFieldElement<13, 4>;
+        // b^-1 = 9 + 8X + 4X^2 + 8X^3 mod X^4 + X^3 + 1 over GF(13), so a/b = a * b^-1.
+        type F = F13x4;
         let a = F::new([1, 2, 3, 4]);
         let b = F::new([11, 11, 11, 11]);
         let result = a / b;
-        assert_eq!(result, F::new([6, 12, 5, 11]));
+        assert_eq!(result, F::new([9, 5, 2, 11]));
     }
 
-    // Commutative-ring axioms, checked over arbitrary elements.
-    //
-    // The multiplicative axioms are deliberately limited to those that hold in any commutative
-    // ring. `a * a.inverse() == one()` is NOT asserted here: `Mul` is currently componentwise, so
-    // this type is the direct product GF(p)^N rather than GF(p^N), and elements with a zero
-    // coefficient have no inverse. See the module TODO.
+    // The field axioms, checked over arbitrary elements of GF(5^3), GF(13^4), and GF(251^4).
 
     fn addition_is_commutative<F: FiniteField>(a: F, b: F) {
         assert_eq!(a + b, b + a);
@@ -400,9 +552,28 @@ mod tests {
         assert_eq!(a * (b + c), (a * b) + (a * c));
     }
 
-    fn coefficients_stay_reduced<const P: u64, const N: usize>(
-        a: ExtensionFieldElement<P, N>,
-        b: ExtensionFieldElement<P, N>,
+    fn element_times_its_inverse_is_one<F: FiniteField>(a: F) {
+        if a.is_zero() {
+            return; // Zero has no multiplicative inverse.
+        }
+        assert_eq!(a * a.inverse(), F::one());
+    }
+
+    fn division_undoes_multiplication<F: FiniteField>(a: F, b: F) {
+        if b.is_zero() {
+            return; // Division by zero is undefined.
+        }
+        assert_eq!((a * b) / b, a);
+    }
+
+    fn frobenius_fixes_every_element<F: FiniteField>(a: F) {
+        // a^(p^n) = a for every a in GF(p^n).
+        assert_eq!(a.pow(F::order()), a);
+    }
+
+    fn coefficients_stay_reduced<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>>(
+        a: ExtensionFieldElement<P, N, M>,
+        b: ExtensionFieldElement<P, N, M>,
     ) {
         // Every coefficient of a sum or product must be a reduced residue mod p.
         for c in (a + b)
@@ -421,7 +592,7 @@ mod tests {
         }
 
         #[test]
-        fn test_addition_is_commutative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary()) {
+        fn test_addition_is_commutative_61x8(a in F251x4::arbitrary(), b in F251x4::arbitrary()) {
             addition_is_commutative(a, b);
         }
 
@@ -431,7 +602,7 @@ mod tests {
         }
 
         #[test]
-        fn test_addition_is_associative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary(), c in F61x8::arbitrary()) {
+        fn test_addition_is_associative_61x8(a in F251x4::arbitrary(), b in F251x4::arbitrary(), c in F251x4::arbitrary()) {
             addition_is_associative(a, b, c);
         }
 
@@ -441,7 +612,7 @@ mod tests {
         }
 
         #[test]
-        fn test_zero_is_the_additive_identity_61x8(a in F61x8::arbitrary()) {
+        fn test_zero_is_the_additive_identity_61x8(a in F251x4::arbitrary()) {
             zero_is_the_additive_identity(a);
         }
 
@@ -451,7 +622,7 @@ mod tests {
         }
 
         #[test]
-        fn test_subtracting_an_element_from_itself_gives_zero_61x8(a in F61x8::arbitrary()) {
+        fn test_subtracting_an_element_from_itself_gives_zero_61x8(a in F251x4::arbitrary()) {
             subtracting_an_element_from_itself_gives_zero(a);
         }
 
@@ -461,7 +632,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multiplication_is_commutative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary()) {
+        fn test_multiplication_is_commutative_61x8(a in F251x4::arbitrary(), b in F251x4::arbitrary()) {
             multiplication_is_commutative(a, b);
         }
 
@@ -471,7 +642,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multiplication_is_associative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary(), c in F61x8::arbitrary()) {
+        fn test_multiplication_is_associative_61x8(a in F251x4::arbitrary(), b in F251x4::arbitrary(), c in F251x4::arbitrary()) {
             multiplication_is_associative(a, b, c);
         }
 
@@ -481,7 +652,7 @@ mod tests {
         }
 
         #[test]
-        fn test_one_is_the_multiplicative_identity_61x8(a in F61x8::arbitrary()) {
+        fn test_one_is_the_multiplicative_identity_61x8(a in F251x4::arbitrary()) {
             one_is_the_multiplicative_identity(a);
         }
 
@@ -491,7 +662,7 @@ mod tests {
         }
 
         #[test]
-        fn test_multiplication_distributes_over_addition_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary(), c in F61x8::arbitrary()) {
+        fn test_multiplication_distributes_over_addition_61x8(a in F251x4::arbitrary(), b in F251x4::arbitrary(), c in F251x4::arbitrary()) {
             multiplication_distributes_over_addition(a, b, c);
         }
 
@@ -501,8 +672,77 @@ mod tests {
         }
 
         #[test]
-        fn test_coefficients_stay_reduced_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary()) {
+        fn test_coefficients_stay_reduced_61x8(a in F251x4::arbitrary(), b in F251x4::arbitrary()) {
             coefficients_stay_reduced(a, b);
+        }
+
+        #[test]
+        fn test_element_times_its_inverse_is_one_5x3(a in F5x3::arbitrary()) {
+            element_times_its_inverse_is_one(a);
+        }
+
+        #[test]
+        fn test_element_times_its_inverse_is_one_13x4(a in F13x4::arbitrary()) {
+            element_times_its_inverse_is_one(a);
+        }
+
+        #[test]
+        fn test_element_times_its_inverse_is_one_251x4(a in F251x4::arbitrary()) {
+            element_times_its_inverse_is_one(a);
+        }
+
+        #[test]
+        fn test_division_undoes_multiplication_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary()) {
+            division_undoes_multiplication(a, b);
+        }
+
+        #[test]
+        fn test_division_undoes_multiplication_251x4(a in F251x4::arbitrary(), b in F251x4::arbitrary()) {
+            division_undoes_multiplication(a, b);
+        }
+
+        #[test]
+        fn test_frobenius_fixes_every_element_5x3(a in F5x3::arbitrary()) {
+            frobenius_fixes_every_element(a);
+        }
+
+        #[test]
+        fn test_frobenius_fixes_every_element_13x4(a in F13x4::arbitrary()) {
+            frobenius_fixes_every_element(a);
+        }
+
+        #[test]
+        fn test_multiplication_is_associative_5x3(a in F5x3::arbitrary(), b in F5x3::arbitrary(), c in F5x3::arbitrary()) {
+            multiplication_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_distributes_over_addition_5x3(a in F5x3::arbitrary(), b in F5x3::arbitrary(), c in F5x3::arbitrary()) {
+            multiplication_distributes_over_addition(a, b, c);
+        }
+
+        /// GF(2^8) built as an extension field agrees with the independent bit-pattern
+        /// implementation in `binary_field`, given the same irreducible polynomial.
+        #[test]
+        fn test_gf256_agrees_with_binary_field(a in 0u64..256, b in 0u64..256) {
+            let extension = |bits: u64| {
+                let mut coefficients = [0u64; 8];
+                for (i, c) in coefficients.iter_mut().enumerate() {
+                    *c = (bits >> i) & 1;
+                }
+                F2x8::new(coefficients)
+            };
+            let bits = |element: F2x8| {
+                element
+                    .coefficients
+                    .iter()
+                    .enumerate()
+                    .fold(0u64, |acc, (i, c)| acc | (c << i))
+            };
+
+            let binary_product = BinaryFieldElement::<X8_X4_X3_X_1>::new(a)
+                * BinaryFieldElement::<X8_X4_X3_X_1>::new(b);
+            prop_assert_eq!(bits(extension(a) * extension(b)), binary_product.coefficients);
         }
     }
 }
