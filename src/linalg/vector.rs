@@ -124,22 +124,39 @@ mod tests {
     use crate::{fields::Zp541, identities::One};
     use proptest::prelude::*;
 
+    // `Arbitrary`'s size parameter defaults to zero, so a bare `any::<Vector<_>>()` would draw
+    // nothing but the empty vector and these properties would hold over no elements at all.
+    const MAX_SIZE: usize = 10;
+
     proptest! {
         #[test]
-        fn test_vector_transpose(v in any::<Vector<Zp541>>()) {
+        fn test_vector_transpose(
+            v in (1..=MAX_SIZE).prop_flat_map(any_with::<Vector<Zp541>>)) {
             let vt = v.transpose();
             assert_eq!(v.elements, vt.elements);
             assert_ne!(v.vector_type, vt.vector_type);
         }
 
         #[test]
-        fn test_vector_apply(v in any::<Vector<Zp541>>()) {
+        fn test_vector_apply(
+            v in (1..=MAX_SIZE).prop_flat_map(any_with::<Vector<Zp541>>)) {
             let w = v.apply(|x| x + &Zp541::one());
             assert_eq!(v.elements.len(), w.elements.len());
             assert_eq!(v.vector_type, w.vector_type);
             for i in 0..v.elements.len() {
                 assert_eq!(v.elements[i] + &Zp541::one(), w.elements[i]);
             }
+        }
+    }
+
+    /// The strategy is usable once given a size; the default of zero yields only empty vectors.
+    #[test]
+    fn test_arbitrary_is_not_degenerate() {
+        use crate::test_support::{assert_strategy_is_not_degenerate, draw};
+        let strategy = (1..=MAX_SIZE).prop_flat_map(any_with::<Vector<Zp541>>);
+        assert_strategy_is_not_degenerate(&strategy, "Vector");
+        for v in draw(&strategy, 16) {
+            assert!(!v.is_empty());
         }
     }
 }
