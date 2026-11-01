@@ -97,14 +97,6 @@ impl<const P: u64> FiniteField for BinaryFieldElement<P> {
         Self::new(coefficients)
     }
 
-    fn primitive_element<R: RngCore + CryptoRng>(_rng: &mut R) -> Self {
-        todo!()
-    }
-
-    fn root_of_unity<R: RngCore + CryptoRng>(_n: u64, _rng: &mut R) -> Self {
-        todo!()
-    }
-
     fn order() -> u128 {
         // 2^m where m is determined by the degree of the modulus polynomial.
         let m = 63 - P.leading_zeros();
@@ -273,8 +265,10 @@ fn degree_u128(bit_pattern: u128) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use crate::identities::{One, Zero};
     use proptest::{arbitrary::Arbitrary, proptest};
     use rand::thread_rng;
+    use std::collections::HashSet;
 
     use crate::{
         fields::{
@@ -760,5 +754,162 @@ mod tests {
                 v
             );
         }
+    }
+
+    /// A primitive element generates the whole multiplicative group, so its order is q - 1.
+    #[test]
+    fn test_primitive_element_generates_the_group() {
+        use rand::{prelude::StdRng, SeedableRng};
+        let mut rng = StdRng::seed_from_u64(13);
+
+        // GF(32) and GF(256) are small enough to enumerate: the powers of a generator must be
+        // every nonzero element exactly once, which pins the order to exactly q - 1. The weaker
+        // `g^(q-1) == 1` holds for every element and would not distinguish a generator.
+        let g = Gf32::primitive_element(&mut rng);
+        let mut seen = HashSet::new();
+        let mut x = Gf32::one();
+        for _ in 0..(Gf32::order() - 1) {
+            x *= g;
+            seen.insert(x);
+        }
+        assert_eq!(seen.len() as u128, Gf32::order() - 1);
+        assert!(!seen.contains(&Gf32::zero()));
+
+        let g = Gf256::primitive_element(&mut rng);
+        let mut seen = HashSet::new();
+        let mut x = Gf256::one();
+        for _ in 0..(Gf256::order() - 1) {
+            x *= g;
+            seen.insert(x);
+        }
+        assert_eq!(seen.len() as u128, Gf256::order() - 1);
+
+        // GF(2^63) is far too large to enumerate, so check the order against each prime divisor
+        // of q - 1 = 2^63 - 1 = 7^2 * 73 * 127 * 337 * 92737 * 649657.
+        let g = Gf2Pow63::primitive_element(&mut rng);
+        let group_order = Gf2Pow63::order() - 1;
+        assert_eq!(g.pow(group_order), Gf2Pow63::one());
+        for r in [7u128, 73, 127, 337, 92737, 649657] {
+            assert_eq!(group_order % r, 0, "{} should divide {}", r, group_order);
+            assert_ne!(g.pow(group_order / r), Gf2Pow63::one(), "r = {}", r);
+        }
+    }
+
+    /// A primitive nth root of unity satisfies r^n = 1 and r^k != 1 for every 0 < k < n.
+    #[test]
+    fn test_root_of_unity_is_primitive() {
+        use rand::{prelude::StdRng, SeedableRng};
+        let mut rng = StdRng::seed_from_u64(31);
+
+        // The group order of GF(256) is 255 = 3 * 5 * 17.
+        for n in [3u64, 5, 15, 17, 51, 85, 255] {
+            let r = Gf256::root_of_unity(n, &mut rng);
+            assert_eq!(r.pow(n as u128), Gf256::one(), "n = {}", n);
+            for k in 1..n {
+                assert_ne!(r.pow(k as u128), Gf256::one(), "n = {}, k = {}", n, k);
+            }
+        }
+
+        // The group order of GF(32) is the prime 31, so 31 is the only nontrivial divisor.
+        let r = Gf32::root_of_unity(31, &mut rng);
+        assert_eq!(r.pow(31), Gf32::one());
+        for k in 1..31 {
+            assert_ne!(r.pow(k), Gf32::one(), "k = {}", k);
+        }
+    }
+
+    /// `n` must divide the order of the multiplicative group.
+    #[test]
+    #[should_panic(expected = "must divide the group order")]
+    fn test_root_of_unity_rejects_n_not_dividing_the_group_order() {
+        use rand::{prelude::StdRng, SeedableRng};
+        let mut rng = StdRng::seed_from_u64(5);
+        // 4 does not divide 255, the group order of GF(256).
+        let _r = Gf256::root_of_unity(4, &mut rng);
+    }
+
+    /// Rabin's irreducibility test over GF(2), built on the bit-pattern arithmetic above.
+    ///
+    /// A degree-n polynomial f is irreducible over GF(2) exactly when x^(2^n) = x mod f and
+    /// gcd(x^(2^(n/p)) - x, f) = 1 for every prime p dividing n. Trial division is not an option
+    /// at degree 63: there are 2^31 monic candidate divisors.
+    fn is_irreducible_over_gf2(f: u64) -> bool {
+        let n = degree_u64(f);
+        const X: u64 = 0b10;
+
+        // x^(2^n) must be x again.
+        if x_to_the_2_to_the(n, f) != X {
+            return false;
+        }
+        for p in prime_divisors(n) {
+            // Subtraction is XOR in characteristic 2.
+            let h = x_to_the_2_to_the(n / p, f) ^ X;
+            if h == 0 || gcd_over_gf2(h, f) != 1 {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// x^(2^k) mod f, by k repeated squarings starting from x.
+    fn x_to_the_2_to_the(k: u32, f: u64) -> u64 {
+        let mut acc: u64 = 0b10;
+        for _ in 0..k {
+            acc = long_divide(multiply_polynomials(acc, acc), f).1;
+        }
+        acc
+    }
+
+    /// The monic gcd of two polynomials over GF(2), by the Euclidean algorithm.
+    fn gcd_over_gf2(mut a: u64, mut b: u64) -> u64 {
+        while b != 0 {
+            let remainder = long_divide(a as u128, b).1;
+            a = b;
+            b = remainder;
+        }
+        a
+    }
+
+    fn prime_divisors(mut n: u32) -> Vec<u32> {
+        let mut divisors = Vec::new();
+        let mut d = 2;
+        while d * d <= n {
+            if n.is_multiple_of(d) {
+                divisors.push(d);
+                while n.is_multiple_of(d) {
+                    n /= d;
+                }
+            }
+            d += 1;
+        }
+        if n > 1 {
+            divisors.push(n);
+        }
+        divisors
+    }
+
+    /// Every modulus this crate declares for GF(2^m) really is irreducible.
+    ///
+    /// `primitive_element` searches until it finds a generator, so a reducible modulus would not
+    /// merely give wrong answers — it would not terminate.
+    #[test]
+    fn test_declared_moduli_are_irreducible() {
+        assert!(is_irreducible_over_gf2(X5_X2_1));
+        assert!(is_irreducible_over_gf2(X8_X4_X3_X_1));
+        assert!(is_irreducible_over_gf2(X63_X_1));
+    }
+
+    /// The test rejects reducible input, so the certification above is not vacuous.
+    #[test]
+    fn test_reducible_polynomials_are_rejected() {
+        assert!(!is_irreducible_over_gf2(0b100)); // x^2 = x * x
+        assert!(!is_irreducible_over_gf2(0b101)); // x^2 + 1 = (x + 1)^2
+        assert!(!is_irreducible_over_gf2(0b10001)); // x^4 + 1 = (x + 1)^4
+        assert!(!is_irreducible_over_gf2(0b1001)); // x^3 + 1 = (x + 1)(x^2 + x + 1)
+
+        // And it accepts the smallest irreducibles of degree 2 and 3.
+        assert!(is_irreducible_over_gf2(0b111)); // x^2 + x + 1
+        assert!(is_irreducible_over_gf2(0b1011)); // x^3 + x + 1
+        assert!(is_irreducible_over_gf2(0b1101)); // x^3 + x^2 + 1
     }
 }

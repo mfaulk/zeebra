@@ -11,6 +11,9 @@
 //! to choose efficient (or "low weight") irreducible polynomials.
 
 // Irreducible polynomials over GF(2): trinomials, pentanomials, ...
+//
+// Certified by `binary_field::tests::test_declared_moduli_are_irreducible`, which runs Rabin's
+// test; trial division is infeasible at degree 63.
 
 // Bit pattern for x^5 + x^2 + 1, irreducible over GF(2)
 #[allow(unused)]
