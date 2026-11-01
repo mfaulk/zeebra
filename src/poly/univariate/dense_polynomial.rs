@@ -217,13 +217,34 @@ impl<F: FiniteField> Display for DensePolynomial<F> {
     }
 }
 
+/// Degree of the polynomials drawn by `Arbitrary`.
+///
+/// A named type rather than a bare `usize` so that `Default` can be nonzero. With a `usize`, the
+/// default was zero and a bare `any::<DensePolynomial<_>>()` drew only constants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PolynomialParams {
+    pub degree: usize,
+}
+
+impl Default for PolynomialParams {
+    fn default() -> Self {
+        Self { degree: 4 }
+    }
+}
+
+impl From<usize> for PolynomialParams {
+    fn from(degree: usize) -> Self {
+        Self { degree }
+    }
+}
+
 // impl Arbitrary
 impl<F: FiniteField + 'static> Arbitrary for DensePolynomial<F> {
-    type Parameters = usize; // degree
+    type Parameters = PolynomialParams;
 
     // Generate a random polynomial of the given degree.
-    fn arbitrary_with(degree: Self::Parameters) -> Self::Strategy {
-        vec(any::<F>(), degree + 1)
+    fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
+        vec(any::<F>(), params.degree + 1)
             .prop_filter("nonzero leading coefficient", |coefficients| {
                 !coefficients.last().unwrap().is_zero()
             })
@@ -236,6 +257,7 @@ impl<F: FiniteField + 'static> Arbitrary for DensePolynomial<F> {
 
 #[cfg(test)]
 mod tests {
+    use super::PolynomialParams;
     use proptest::prelude::*;
     use rand::{prelude::StdRng, SeedableRng};
 
@@ -431,7 +453,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_ser_de(poly in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp541>>))) {
+        fn test_ser_de(poly in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp541>>))) {
             serialize_then_deserialize(poly);
         }
     }
@@ -470,9 +492,18 @@ mod tests {
     fn test_arbitrary_and_representation_are_sound() {
         use crate::test_support::{assert_strategy_is_not_degenerate, draw};
         type F = Zp541;
-        // The degree parameter defaults to zero, so pass one explicitly to get varied degrees.
-        let strategy = (0..=8usize).prop_flat_map(any_with::<DensePolynomial<F>>);
+        let strategy = (0..=8usize)
+            .prop_map(PolynomialParams::from)
+            .prop_flat_map(any_with::<DensePolynomial<F>>);
         assert_strategy_is_not_degenerate(&strategy, "DensePolynomial");
+
+        // The bare default must reach past degree zero, which a `usize` parameter did not.
+        let defaulted = any::<DensePolynomial<F>>();
+        assert_strategy_is_not_degenerate(&defaulted, "DensePolynomial (default params)");
+        assert!(
+            draw(&defaulted, 16).iter().any(|p| p.degree() > 0),
+            "the default strategy generated only constants"
+        );
 
         let mut values = draw(&strategy, 32);
         values.extend([

@@ -72,12 +72,13 @@ impl<T: Ring> IndexMut<[usize; 2]> for Matrix<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::linalg::MatrixParams;
     use crate::{fields::Zp541, linalg::matrix::Matrix};
     use proptest::prelude::*;
 
     proptest! {
         #[test]
-        fn test_indexing(m in (1..=10usize, 1..=10usize).prop_flat_map(any_with::<Matrix::<Zp541>>)) {
+        fn test_indexing(m in (1..=10usize, 1..=10usize).prop_map(MatrixParams::from).prop_flat_map(any_with::<Matrix::<Zp541>>)) {
             let num_rows = m.num_rows;
             let num_columns = m.num_columns;
             for i in 0..num_rows {

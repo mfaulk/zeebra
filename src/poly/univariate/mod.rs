@@ -16,7 +16,7 @@ mod polynomial_trait;
 mod univariate_parser;
 
 use crate::FiniteField;
-pub use dense_polynomial::DensePolynomial as UnivariatePolynomial;
+pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialParams};
 pub use gcd::gcd;
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
 pub use polynomial_trait::Polynomial;

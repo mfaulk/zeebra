@@ -353,12 +353,44 @@ impl<T: Ring + 'static> Display for Matrix<T> {
     }
 }
 
+/// Dimensions of the matrices drawn by `Arbitrary`.
+///
+/// A named type rather than a `(usize, usize)` so that `Default` can be nonzero. With a tuple,
+/// the default was `(0, 0)` and a bare `any::<Matrix<_>>()` drew nothing but the empty matrix,
+/// making every property over it hold vacuously.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MatrixParams {
+    pub num_rows: usize,
+    pub num_columns: usize,
+}
+
+impl Default for MatrixParams {
+    fn default() -> Self {
+        Self {
+            num_rows: 4,
+            num_columns: 4,
+        }
+    }
+}
+
+impl From<(usize, usize)> for MatrixParams {
+    fn from((num_rows, num_columns): (usize, usize)) -> Self {
+        Self {
+            num_rows,
+            num_columns,
+        }
+    }
+}
+
 /// Implement Arbitrary
 impl<T: Ring + 'static> Arbitrary for Matrix<T> {
-    type Parameters = (usize, usize); // (num_rows, num_columns)
+    type Parameters = MatrixParams;
 
     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
-        let (num_rows, num_columns) = args;
+        let MatrixParams {
+            num_rows,
+            num_columns,
+        } = args;
 
         vec(any::<T>(), num_rows * num_columns)
             .prop_map(move |elements| Matrix::new(num_rows, num_columns, &elements))
@@ -371,6 +403,7 @@ impl<T: Ring + 'static> Arbitrary for Matrix<T> {
 #[cfg(test)]
 mod tests {
     use super::Matrix;
+    use super::MatrixParams;
     use crate::{
         fields::{Zp1091, Zp541},
         FiniteField,
@@ -380,7 +413,7 @@ mod tests {
     proptest! {
         #[test]
         // (A^T)^T = A
-        fn test_transpose_twice_is_identity(m in (1..=10usize, 1..=10usize).prop_flat_map(any_with::<super::Matrix::<Zp541>>))
+        fn test_transpose_twice_is_identity(m in (1..=10usize, 1..=10usize).prop_map(MatrixParams::from).prop_flat_map(any_with::<super::Matrix::<Zp541>>))
         {
             let m_t_t = m.transpose().transpose();
             assert_eq!(m, m_t_t);
@@ -501,13 +534,23 @@ mod tests {
         assert_eq!(C.determinant(), Ok(F::new(0)));
     }
 
-    /// The strategy is usable once given dimensions; the default of (0, 0) yields only 0x0.
+    /// The strategy varies both at explicit dimensions and at `MatrixParams`' default.
     #[test]
     fn test_arbitrary_is_not_degenerate() {
         use crate::test_support::{assert_strategy_is_not_degenerate, draw};
-        let strategy = (1..=6usize, 1..=6usize).prop_flat_map(any_with::<super::Matrix<Zp541>>);
-        assert_strategy_is_not_degenerate(&strategy, "Matrix");
-        for m in draw(&strategy, 16) {
+        let sized = (1..=6usize, 1..=6usize)
+            .prop_map(MatrixParams::from)
+            .prop_flat_map(any_with::<super::Matrix<Zp541>>);
+        assert_strategy_is_not_degenerate(&sized, "Matrix");
+        for m in draw(&sized, 16) {
+            assert!(m.num_rows() > 0 && m.num_columns() > 0);
+        }
+
+        // The bare default must not collapse to the 0x0 matrix, which is what a
+        // `(usize, usize)` parameter did.
+        let defaulted = any::<super::Matrix<Zp541>>();
+        assert_strategy_is_not_degenerate(&defaulted, "Matrix (default params)");
+        for m in draw(&defaulted, 16) {
             assert!(m.num_rows() > 0 && m.num_columns() > 0);
         }
     }
@@ -614,7 +657,7 @@ mod tests {
         /// Rank is unchanged by transposition and never exceeds either dimension.
         #[test]
         fn test_rank_matches_transpose(
-            m in (1..=6usize, 1..=6usize).prop_flat_map(any_with::<super::Matrix<Zp541>>)) {
+            m in (1..=6usize, 1..=6usize).prop_map(MatrixParams::from).prop_flat_map(any_with::<super::Matrix<Zp541>>)) {
             let rank = m.rank();
             prop_assert_eq!(rank, m.transpose().rank());
             prop_assert!(rank <= m.num_rows().min(m.num_columns()));
@@ -623,7 +666,7 @@ mod tests {
         /// A square matrix is invertible exactly when it has full rank.
         #[test]
         fn test_inverse_exists_iff_full_rank(
-            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n)))) {
+            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n).into()))) {
             let n = m.num_rows();
             match m.inverse() {
                 Ok(inverse) => {
@@ -689,14 +732,14 @@ mod tests {
         /// The LU-based determinant agrees with cofactor expansion, including its sign.
         #[test]
         fn test_determinant_agrees_with_cofactor_expansion(
-            m in (1..=4usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n)))) {
+            m in (1..=4usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n).into()))) {
             prop_assert_eq!(m.determinant().unwrap(), determinant_by_cofactor(&m));
         }
 
         /// The determinant is zero exactly when the matrix is singular.
         #[test]
         fn test_determinant_is_zero_iff_singular(
-            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n)))) {
+            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n).into()))) {
             let n = m.num_rows();
             let singular = m.rank() < n;
             prop_assert_eq!(m.determinant().unwrap() == Zp541::new(0), singular);

@@ -126,6 +126,7 @@ impl<F: FiniteField> ops::Mul<F> for DensePolynomial<F> {
 
 #[cfg(test)]
 mod tests {
+    use crate::poly::univariate::PolynomialParams;
     use crate::{
         fields::{PrimeFieldElement64, Zp7},
         poly::univariate::dense_polynomial::DensePolynomial,
@@ -186,8 +187,8 @@ mod tests {
     proptest! {
         #[test]
         fn test_addition_is_commutative(
-            p in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
-            q in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
+            p in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
+            q in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
             addition_is_commutative(&p, &q);
         }
     }
@@ -263,8 +264,8 @@ mod tests {
     proptest! {
         #[test]
         fn test_multiplication_is_commutative(
-            p in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
-            q in ((0..=100usize).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
+            p in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
+            q in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
             multiplication_is_commutative(&p, &q);
         }
     }

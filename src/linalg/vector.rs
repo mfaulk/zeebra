@@ -107,10 +107,31 @@ impl<T: Ring> Vector<T> {
 // TODO: try_from matrix
 
 /// Implement Arbitrary
+/// Length of the vectors drawn by `Arbitrary`.
+///
+/// A named type rather than a bare `usize` so that `Default` can be nonzero. With a `usize`, the
+/// default was zero and a bare `any::<Vector<_>>()` drew nothing but the empty vector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VectorParams {
+    pub size: usize,
+}
+
+impl Default for VectorParams {
+    fn default() -> Self {
+        Self { size: 4 }
+    }
+}
+
+impl From<usize> for VectorParams {
+    fn from(size: usize) -> Self {
+        Self { size }
+    }
+}
+
 impl<T: Ring + 'static> Arbitrary for Vector<T> {
-    type Parameters = usize; // size
-    fn arbitrary_with(size: Self::Parameters) -> Self::Strategy {
-        vec(any::<T>(), size)
+    type Parameters = VectorParams;
+    fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
+        vec(any::<T>(), params.size)
             .prop_map(|elements| Vector::new(&elements))
             .boxed()
     }
@@ -121,6 +142,7 @@ impl<T: Ring + 'static> Arbitrary for Vector<T> {
 #[cfg(test)]
 mod tests {
     use super::Vector;
+    use super::VectorParams;
     use crate::{fields::Zp541, identities::One};
     use proptest::prelude::*;
 
@@ -131,7 +153,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_vector_transpose(
-            v in (1..=MAX_SIZE).prop_flat_map(any_with::<Vector<Zp541>>)) {
+            v in (1..=MAX_SIZE).prop_map(VectorParams::from).prop_flat_map(any_with::<Vector<Zp541>>)) {
             let vt = v.transpose();
             assert_eq!(v.elements, vt.elements);
             assert_ne!(v.vector_type, vt.vector_type);
@@ -139,7 +161,7 @@ mod tests {
 
         #[test]
         fn test_vector_apply(
-            v in (1..=MAX_SIZE).prop_flat_map(any_with::<Vector<Zp541>>)) {
+            v in (1..=MAX_SIZE).prop_map(VectorParams::from).prop_flat_map(any_with::<Vector<Zp541>>)) {
             let w = v.apply(|x| x + &Zp541::one());
             assert_eq!(v.elements.len(), w.elements.len());
             assert_eq!(v.vector_type, w.vector_type);
@@ -149,13 +171,23 @@ mod tests {
         }
     }
 
-    /// The strategy is usable once given a size; the default of zero yields only empty vectors.
+    /// The strategy varies both at an explicit size and at `VectorParams`' default.
     #[test]
     fn test_arbitrary_is_not_degenerate() {
         use crate::test_support::{assert_strategy_is_not_degenerate, draw};
-        let strategy = (1..=MAX_SIZE).prop_flat_map(any_with::<Vector<Zp541>>);
-        assert_strategy_is_not_degenerate(&strategy, "Vector");
-        for v in draw(&strategy, 16) {
+        let sized = (1..=MAX_SIZE)
+            .prop_map(VectorParams::from)
+            .prop_flat_map(any_with::<Vector<Zp541>>);
+        assert_strategy_is_not_degenerate(&sized, "Vector");
+        for v in draw(&sized, 16) {
+            assert!(!v.is_empty());
+        }
+
+        // The bare default must not collapse to the empty vector, which is what a `usize`
+        // parameter did.
+        let defaulted = any::<Vector<Zp541>>();
+        assert_strategy_is_not_degenerate(&defaulted, "Vector (default params)");
+        for v in draw(&defaulted, 16) {
             assert!(!v.is_empty());
         }
     }

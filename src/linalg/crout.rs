@@ -234,7 +234,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_crout_lu_does_not_panic(
-            m in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            m in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             let _res = super::crout_lu(&m);
         }
     }
@@ -242,7 +242,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_crout_lu_pivoting_does_not_panic(
-            m in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            m in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             let _res = super::crout_lu_pivoting(&m);
         }
     }
@@ -298,7 +298,7 @@ mod tests {
         #[test]
         // If successful, L is lower triangular.
         fn test_crout_lu_returns_L_lower_triangular(
-            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             if let Ok((L,_U)) = super::crout_lu(&A) {
                 println!("{}", L);
                 prop_assert!(is_lower_triangular(&L));
@@ -310,7 +310,7 @@ mod tests {
         #[test]
         // If successful, L is lower triangular.
         fn test_crout_lu_pivoting_returns_L_lower_triangular(
-            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             if let Ok((L,_U, _P)) = super::crout_lu_pivoting(&A) {
                 println!("{}", L);
                 prop_assert!(is_lower_triangular(&L));
@@ -322,7 +322,7 @@ mod tests {
         #[test]
         // If successful, U is upper triangular.
         fn test_crout_lu_returns_U_upper_unit_triangular(
-            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             if let Ok((_L,U)) = super::crout_lu(&A) {
                 println!("{}", U);
                 prop_assert!(is_upper_unit_triangular(&U));
@@ -335,7 +335,7 @@ mod tests {
         #[test]
         // If successful, U is upper triangular.
         fn test_crout_lu_pivoting_returns_U_upper_triangular(
-            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             if let Ok((_L,U, _P)) = super::crout_lu_pivoting(&A) {
                 println!("{}", U);
                 prop_assert!(is_upper_triangular(&U));
@@ -348,7 +348,7 @@ mod tests {
         #[test]
         // If successful, A = LU.
         fn test_crout_lu_decomposes_A_into_LU(
-            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             let n = A.num_rows();
             println!("A: {:#?}", A);
             if let Ok((L,U)) = super::crout_lu(&A) {
@@ -365,7 +365,7 @@ mod tests {
         #[test]
         // If successful, PA = LU.
         fn test_crout_lu_pivoting_decomposes_PA_into_LU(
-            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n)))) {
+            A in (1..=10usize).prop_flat_map(|n| any_with::<super::Matrix::<Zp541>>((n,n).into()))) {
             let n = A.num_rows();
             println!("A: {:#?}", A);
             if let Ok((L,U,P)) = super::crout_lu_pivoting(&A) {
