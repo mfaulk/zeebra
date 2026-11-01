@@ -133,6 +133,44 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
             })
     }
 
+    /// The polynomial that results from fixing variable `index` to `value`.
+    ///
+    /// The named variable disappears, so the result lies in the polynomial ring over the
+    /// remaining variables, carried here as a zero exponent in that position.
+    ///
+    /// # Panics
+    /// Panics if `index` is not a variable of this ring.
+    pub fn substitute(&self, index: usize, value: F) -> Self {
+        assert!(
+            index < N,
+            "index {} is not one of the {} variables",
+            index,
+            N
+        );
+        let substituted: Vec<(Monomial<N>, F)> = self
+            .terms
+            .iter()
+            .map(|(monomial, coefficient)| {
+                let exponent = monomial.exponents()[index];
+                let mut exponents = [0u32; N];
+                exponents.copy_from_slice(monomial.exponents());
+                exponents[index] = 0;
+                (
+                    Monomial::new(&exponents),
+                    *coefficient * value.pow(exponent as u128),
+                )
+            })
+            .collect();
+        // Through `new`, which merges monomials that have become equal once the variable is gone
+        // and drops any term whose coefficient cancelled to zero.
+        Self::new(&substituted)
+    }
+
+    /// True if the polynomial has no variables, i.e. is an element of the base field.
+    pub fn is_constant(&self) -> bool {
+        self.terms.keys().all(|monomial| monomial.is_one())
+    }
+
     pub fn terms(&self) -> &HashMap<Monomial<N>, F> {
         &self.terms
     }
@@ -454,5 +492,68 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Substituting a value for one variable removes it and leaves the rest untouched.
+    #[test]
+    fn test_substitute() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y"];
+        let p: SparseMultiPoly<2, F> =
+            SparseMultiPoly::parse("x^2*y + 3*x + 2*y + 5", vars).unwrap();
+
+        // x = 2: 4y + 6 + 2y + 5 = 6y + 11
+        let expected: SparseMultiPoly<2, F> = SparseMultiPoly::parse("6*y + 11", vars).unwrap();
+        assert_eq!(p.substitute(0, F::new(2)), expected);
+
+        // y = 1: x^2 + 3x + 2 + 5 = x^2 + 3x + 7
+        let expected: SparseMultiPoly<2, F> =
+            SparseMultiPoly::parse("x^2 + 3*x + 7", vars).unwrap();
+        assert_eq!(p.substitute(1, F::new(1)), expected);
+
+        // Substituting every variable leaves a constant equal to the full evaluation.
+        let both = p.substitute(0, F::new(2)).substitute(1, F::new(1));
+        assert!(both.is_constant());
+        assert_eq!(
+            both.eval(&[F::new(2), F::new(1)]),
+            p.eval(&[F::new(2), F::new(1)])
+        );
+    }
+
+    /// Substituting agrees with evaluating, for every point of a small field.
+    #[test]
+    fn test_substitute_agrees_with_eval() {
+        type F = PrimeFieldElement64<7>;
+        let vars = ["x", "y"];
+        let p: SparseMultiPoly<2, F> =
+            SparseMultiPoly::parse("x^2*y + 3*x*y^2 + 2*y + 5", vars).unwrap();
+
+        for a in 0..7u64 {
+            for b in 0..7u64 {
+                let (x, y) = (F::new(a), F::new(b));
+                // Substituting one variable then the other must match evaluating at once.
+                let by_substitution = p.substitute(0, x).substitute(1, y);
+                assert!(by_substitution.is_constant());
+                assert_eq!(
+                    by_substitution.eval(&[F::zero(), F::zero()]),
+                    p.eval(&[x, y]),
+                    "at ({}, {})",
+                    a,
+                    b
+                );
+            }
+        }
+    }
+
+    /// Terms that cancel after substitution are dropped, not kept with a zero coefficient.
+    #[test]
+    fn test_substitute_drops_cancelled_terms() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y"];
+        // At x = 1 this is y - y = 0.
+        let p: SparseMultiPoly<2, F> = SparseMultiPoly::parse("x*y - y", vars).unwrap();
+        let at_one = p.substitute(0, F::new(1));
+        assert!(at_one.is_zero(), "expected zero, got {}", at_one);
+        assert!(at_one.terms().is_empty());
     }
 }
