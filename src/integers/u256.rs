@@ -275,10 +275,25 @@ mod tests {
         }
     }
 
-    #[ignore] // Blocked: `U256` implements neither `Display` nor `to_dec_str`.
+    /// `Display` renders the value in decimal, across word boundaries and at the maximum.
     #[test]
     fn test_to_string() {
-        unimplemented!()
+        assert_eq!(U256::from(0u64).to_string(), "0");
+        assert_eq!(U256::from(111u64).to_string(), "111");
+        assert_eq!(U256::from(u64::MAX).to_string(), "18446744073709551615");
+
+        // 2^128 - 1 spans two words.
+        let two_pow_128 = "340282366920938463463374607431768211455";
+        assert_eq!(
+            U256::from_dec_str(two_pow_128).unwrap().to_string(),
+            two_pow_128
+        );
+
+        // 2^256 - 1 fills all four.
+        assert_eq!(
+            U256::max().to_string(),
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        );
     }
 
     #[test]

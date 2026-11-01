@@ -224,9 +224,10 @@ impl<const N_WORDS: usize> FromStr for Ux64<N_WORDS> {
 }
 
 impl<const N_WORDS: usize> Display for Ux64<N_WORDS> {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
-        // See Knuth, TAOCP, Volume 2, section 4.4
-        unimplemented!()
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Defers to `BigUInt`, which already implements the repeated division by ten that
+        // decimal conversion needs. See Knuth, TAOCP, Volume 2, section 4.4.
+        write!(f, "{}", BigUInt::from(*self).to_dec_str())
     }
 }
 
