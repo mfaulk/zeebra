@@ -78,9 +78,7 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// # Arguments
     /// * `value` - A Sage-style string, e.g. "2*x^3 + 1".
     /// * `variables` - The expected variable names.
-    // TODO: box the error. `pest::error::Error` is large, so it inflates every `Ok` value too.
-    #[allow(clippy::result_large_err)]
-    pub fn parse(value: &str, variables: [&str; N]) -> Result<Self, Error<Rule>> {
+    pub fn parse(value: &str, variables: [&str; N]) -> Result<Self, Box<Error<Rule>>> {
         parse_multivariate_polynomial(value, variables)
     }
 

@@ -14,11 +14,12 @@ use std::str::FromStr;
 struct UnivariatePolynomialParser;
 
 // Parse a string representing a univariate polynomial.
-// TODO: box the error. `pest::error::Error` is large, so it inflates every `Ok` value too.
-#[allow(clippy::result_large_err)]
+//
+// The error is boxed because `pest::error::Error` is several hundred bytes, which would otherwise
+// inflate every `Ok` value in this `Result` to the same size.
 pub fn parse_univariate_polynomial<F: FiniteField>(
     str: &str,
-) -> Result<UnivariatePolynomial<F>, Error<Rule>> {
+) -> Result<UnivariatePolynomial<F>, Box<Error<Rule>>> {
     // Whitespace is not significant.
     let str: String = str.chars().filter(|c| !c.is_whitespace()).collect();
 
@@ -36,7 +37,7 @@ pub fn parse_univariate_polynomial<F: FiniteField>(
             None => variable = Some(var.as_str()),
             Some(name) if name == var.as_str() => {}
             Some(name) => {
-                return Err(Error::new_from_span(
+                return Err(Box::new(Error::new_from_span(
                     ErrorVariant::CustomError {
                         message: format!(
                             "a univariate polynomial has one variable, found `{}` and `{}`",
@@ -45,7 +46,7 @@ pub fn parse_univariate_polynomial<F: FiniteField>(
                         ),
                     },
                     var.as_span(),
-                ));
+                )));
             }
         }
     }

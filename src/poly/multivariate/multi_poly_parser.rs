@@ -17,12 +17,12 @@ struct MultivariatePolynomialParser;
 /// # Arguments
 /// * `str` - A string to parse.
 /// * `variables` - Variable names.
-// TODO: box the error. `pest::error::Error` is large, so it inflates every `Ok` value too.
-#[allow(clippy::result_large_err)]
+// The error is boxed because `pest::error::Error` is several hundred bytes, which would otherwise
+// inflate every `Ok` value in this `Result` to the same size.
 pub fn parse_multivariate_polynomial<const N: usize, F: FiniteField>(
     str: &str,
     variables: [&str; N],
-) -> Result<SparseMultiPoly<N, F>, Error<Rule>> {
+) -> Result<SparseMultiPoly<N, F>, Box<Error<Rule>>> {
     // The result.
     let mut polynomial = SparseMultiPoly::<N, F>::zero();
 

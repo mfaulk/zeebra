@@ -179,7 +179,6 @@ impl<F: FiniteField> TryFrom<&str> for DensePolynomial<F> {
     type Error = ();
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        println!("{}", value);
         // TODO: return an informative error.
         parse_univariate_polynomial(value).map_err(|_| ())
     }
