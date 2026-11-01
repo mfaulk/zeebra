@@ -147,10 +147,23 @@ mod tests {
         assert_eq!(p, expected);
     }
 
+    /// Interpolating n points gives a polynomial of degree at most n - 1 through those points.
     #[test]
-    #[ignore]
-    // Should produce a polynomial of the correct degree <= n-1.
     fn test_interpolate_correct_degree() {
-        todo!()
+        type F = PrimeFieldElement64<541>;
+        for n in 1..=6u64 {
+            // Points on the curve y = x^2 + 1, so the result has degree 2 once n > 2.
+            let points: Vec<(F, F)> = (0..n)
+                .map(|x| {
+                    let x = F::new(x);
+                    (x, x * x + F::one())
+                })
+                .collect();
+            let p = interpolate(points.clone());
+            assert!(p.degree() <= (n - 1) as u32, "n = {}", n);
+            for (x, y) in points {
+                assert_eq!(p.eval(&x), y, "n = {}", n);
+            }
+        }
     }
 }

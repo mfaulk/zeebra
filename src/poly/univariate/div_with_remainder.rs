@@ -51,6 +51,7 @@ mod tests {
             dense_polynomial::DensePolynomial, div_with_remainder::div_with_remainder, Polynomial,
             UnivariatePolynomial,
         },
+        FiniteField,
     };
 
     #[test]
@@ -90,11 +91,31 @@ mod tests {
         assert_eq!(remainder, dividend);
     }
 
+    /// For f = g*q + r with deg(f) >= deg(g), the quotient has degree deg(f) - deg(g).
     #[test]
-    #[ignore]
-    // For f = g*q + r, if deg(f) >= deg(g), then deg(q) = deg(f) - deg(g).
     fn test_degree_of_quotient() {
-        todo!()
+        type F = Zp7;
+        type P = DensePolynomial<F>;
+
+        let dividend = P::new(&[F::new(1), F::new(2), F::new(3), F::new(4), F::new(5)]);
+        for divisor in [
+            P::new(&[F::new(3)]),                       // degree 0
+            P::new(&[F::new(1), F::new(1)]),            // degree 1
+            P::new(&[F::new(2), F::new(0), F::new(6)]), // degree 2
+        ] {
+            let (quotient, remainder) = div_with_remainder(&dividend, &divisor);
+            assert_eq!(
+                quotient.degree(),
+                dividend.degree() - divisor.degree(),
+                "divisor {:?}",
+                divisor
+            );
+            // The remainder's degree stays strictly below the divisor's, unless it is zero.
+            if !remainder.is_zero() {
+                assert!(remainder.degree() < divisor.degree() || divisor.degree() == 0);
+            }
+            assert_eq!(&(&quotient * &divisor) + &remainder, dividend);
+        }
     }
 
     proptest! {

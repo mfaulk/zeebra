@@ -118,7 +118,7 @@ mod tests {
             gauss_jordan::{gauss_jordan_elimination, gaussian_elimination},
             is_reduced_row_echelon, Matrix,
         },
-        matrix, FiniteField,
+        FiniteField,
     };
     use proptest::prelude::*;
 

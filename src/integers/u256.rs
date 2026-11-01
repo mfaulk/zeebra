@@ -152,10 +152,25 @@ mod tests {
         assert!(borrow);
     }
 
-    #[ignore]
+    /// Subtraction of in-range values, including a borrow across a word boundary.
     #[test]
     fn test_sub() {
-        unimplemented!()
+        let a = U256::from(1000u64);
+        assert_eq!(a - U256::from(1u64), U256::from(999u64));
+        assert_eq!(a - U256::from(0u64), a);
+        assert_eq!(a - a, U256::from(0u64));
+
+        // 2^64 - 1 borrows from the second word.
+        let two_pow_64 = U256::from_dec_str("18446744073709551616").unwrap();
+        assert_eq!(
+            two_pow_64 - U256::from(1u64),
+            U256::from(18446744073709551615u64)
+        );
+
+        // Subtraction undoes addition.
+        let x = U256::from_dec_str("9872349872349873498372498234792").unwrap();
+        let y = U256::from_dec_str("98127301297120012301231213210").unwrap();
+        assert_eq!((x + y) - y, x);
     }
 
     #[test]
@@ -260,7 +275,7 @@ mod tests {
         }
     }
 
-    #[ignore]
+    #[ignore] // Blocked: `U256` implements neither `Display` nor `to_dec_str`.
     #[test]
     fn test_to_string() {
         unimplemented!()

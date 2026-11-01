@@ -183,12 +183,13 @@ mod tests {
         assert_eq!(evaluations, expected);
     }
 
+    /// Building a domain from a generator that is not an nth root of unity is rejected.
     #[test]
-    #[should_panic]
-    #[ignore]
-    // When w is not an nth root of unity, ...
+    #[should_panic(expected = "root of unity")]
     fn test_evaluate_w_not_nth_root_of_unity() {
-        todo!()
+        type F = PrimeFieldElement64<541>;
+        // 2^4 = 16 != 1 in GF(541), so 2 does not generate a domain of size 4.
+        let _domain = FFTDomain::<F>::from_generator(F::new(2), 4);
     }
 
     #[test]
