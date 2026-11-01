@@ -24,7 +24,7 @@ use std::{
     ops,
 };
 
-use proptest::{arbitrary::Arbitrary, prelude::BoxedStrategy};
+use proptest::{arbitrary::Arbitrary, prelude::BoxedStrategy, strategy::Strategy};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -193,7 +193,9 @@ impl<const P: u64> Arbitrary for BinaryFieldElement<P> {
     type Parameters = ();
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        todo!()
+        // Every bit pattern below the field's order is a distinct element. The modulus has degree
+        // m, so it is at least 2^m = order, and `new`'s `coefficients < P` assertion holds.
+        (0u64..Self::order() as u64).prop_map(Self::new).boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -259,6 +261,7 @@ fn degree_u128(bit_pattern: u128) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use proptest::{arbitrary::Arbitrary, proptest};
     use rand::thread_rng;
 
     use crate::{
@@ -270,6 +273,12 @@ mod tests {
         },
         FiniteField,
     };
+
+    // GF(2^5), GF(2^8), and GF(2^63): a small field, a byte-sized field, and one near the width
+    // limit of the u64 bit-pattern representation.
+    type Gf32 = BinaryFieldElement<X5_X2_1>;
+    type Gf256 = BinaryFieldElement<X8_X4_X3_X_1>;
+    type Gf2Pow63 = BinaryFieldElement<X63_X_1>;
 
     #[test]
     fn test_degree() {
@@ -378,18 +387,6 @@ mod tests {
         let b = BinaryFieldElement::<X5_X2_1>::new(0b0100); // x^2
         let prod = a * b;
         assert_eq!(prod.coefficients, 0b10100); // x^4 + x^2
-    }
-
-    #[test]
-    /// a * b = b * a
-    fn test_mul_is_commutative() {
-        for a_coefficients in 0..1000 {
-            for b_coefficients in 0..1000 {
-                let a = BinaryFieldElement::<X63_X_1>::new(a_coefficients);
-                let b = BinaryFieldElement::<X63_X_1>::new(b_coefficients);
-                assert_eq!(a * b, b * a)
-            }
-        }
     }
 
     #[test]
@@ -507,5 +504,211 @@ mod tests {
         //   x^29 + x^27 + x^26 + x^23 + x^22 + x^21 + x^17 + x^13 + x^11 + x^10 + x^8 + x^7 + x^6 + x^5
         let expected = BinaryFieldElement::<P>::new(0b101100111000100010110111100000);
         assert_eq!(a / b, expected);
+    }
+
+    // The field axioms, checked over arbitrary elements. Each helper is instantiated below for
+    // GF(2^5), GF(2^8), and GF(2^63).
+
+    fn addition_is_commutative<F: FiniteField>(a: F, b: F) {
+        assert_eq!(a + b, b + a);
+    }
+
+    fn addition_is_associative<F: FiniteField>(a: F, b: F, c: F) {
+        assert_eq!((a + b) + c, a + (b + c));
+    }
+
+    fn zero_is_the_additive_identity<F: FiniteField>(a: F) {
+        assert_eq!(a + F::zero(), a);
+    }
+
+    fn every_element_is_its_own_additive_inverse<F: FiniteField>(a: F) {
+        // GF(2^m) has characteristic 2, so a + a = 0.
+        assert_eq!(a + a, F::zero());
+    }
+
+    fn multiplication_is_commutative<F: FiniteField>(a: F, b: F) {
+        assert_eq!(a * b, b * a);
+    }
+
+    fn multiplication_is_associative<F: FiniteField>(a: F, b: F, c: F) {
+        assert_eq!((a * b) * c, a * (b * c));
+    }
+
+    fn one_is_the_multiplicative_identity<F: FiniteField>(a: F) {
+        assert_eq!(a * F::one(), a);
+    }
+
+    fn multiplication_distributes_over_addition<F: FiniteField>(a: F, b: F, c: F) {
+        assert_eq!(a * (b + c), (a * b) + (a * c));
+    }
+
+    fn element_times_its_inverse_is_one<F: FiniteField>(a: F) {
+        if a.is_zero() {
+            return; // Zero has no multiplicative inverse.
+        }
+        assert_eq!(a * a.inverse(), F::one());
+    }
+
+    fn division_undoes_multiplication<F: FiniteField>(a: F, b: F) {
+        if b.is_zero() {
+            return; // Division by zero is undefined.
+        }
+        assert_eq!((a * b) / b, a);
+    }
+
+    fn frobenius_fixes_every_element<F: FiniteField>(a: F) {
+        // a^(2^m) = a for every a in GF(2^m), since the multiplicative group has order 2^m - 1.
+        assert_eq!(a.pow(F::order()), a);
+    }
+
+    fn products_stay_within_the_field<const P: u64>(
+        a: BinaryFieldElement<P>,
+        b: BinaryFieldElement<P>,
+    ) {
+        // Reduction by the modulus must bring the product's degree back below m.
+        let product = a * b;
+        assert!((product.coefficients as u128) < BinaryFieldElement::<P>::order());
+    }
+
+    proptest! {
+        #[test]
+        fn test_addition_is_commutative_gf32(a in Gf32::arbitrary(), b in Gf32::arbitrary()) {
+            addition_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_addition_is_commutative_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary()) {
+            addition_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_addition_is_commutative_gf2pow63(a in Gf2Pow63::arbitrary(), b in Gf2Pow63::arbitrary()) {
+            addition_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_addition_is_associative_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary(), c in Gf256::arbitrary()) {
+            addition_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_addition_is_associative_gf2pow63(a in Gf2Pow63::arbitrary(), b in Gf2Pow63::arbitrary(), c in Gf2Pow63::arbitrary()) {
+            addition_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_zero_is_the_additive_identity_gf256(a in Gf256::arbitrary()) {
+            zero_is_the_additive_identity(a);
+        }
+
+        #[test]
+        fn test_zero_is_the_additive_identity_gf2pow63(a in Gf2Pow63::arbitrary()) {
+            zero_is_the_additive_identity(a);
+        }
+
+        #[test]
+        fn test_every_element_is_its_own_additive_inverse_gf32(a in Gf32::arbitrary()) {
+            every_element_is_its_own_additive_inverse(a);
+        }
+
+        #[test]
+        fn test_every_element_is_its_own_additive_inverse_gf2pow63(a in Gf2Pow63::arbitrary()) {
+            every_element_is_its_own_additive_inverse(a);
+        }
+
+        #[test]
+        fn test_multiplication_is_commutative_gf32(a in Gf32::arbitrary(), b in Gf32::arbitrary()) {
+            multiplication_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_multiplication_is_commutative_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary()) {
+            multiplication_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_multiplication_is_commutative_gf2pow63(a in Gf2Pow63::arbitrary(), b in Gf2Pow63::arbitrary()) {
+            multiplication_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_multiplication_is_associative_gf32(a in Gf32::arbitrary(), b in Gf32::arbitrary(), c in Gf32::arbitrary()) {
+            multiplication_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_is_associative_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary(), c in Gf256::arbitrary()) {
+            multiplication_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_is_associative_gf2pow63(a in Gf2Pow63::arbitrary(), b in Gf2Pow63::arbitrary(), c in Gf2Pow63::arbitrary()) {
+            multiplication_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_one_is_the_multiplicative_identity_gf256(a in Gf256::arbitrary()) {
+            one_is_the_multiplicative_identity(a);
+        }
+
+        #[test]
+        fn test_one_is_the_multiplicative_identity_gf2pow63(a in Gf2Pow63::arbitrary()) {
+            one_is_the_multiplicative_identity(a);
+        }
+
+        #[test]
+        fn test_multiplication_distributes_over_addition_gf32(a in Gf32::arbitrary(), b in Gf32::arbitrary(), c in Gf32::arbitrary()) {
+            multiplication_distributes_over_addition(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_distributes_over_addition_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary(), c in Gf256::arbitrary()) {
+            multiplication_distributes_over_addition(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_distributes_over_addition_gf2pow63(a in Gf2Pow63::arbitrary(), b in Gf2Pow63::arbitrary(), c in Gf2Pow63::arbitrary()) {
+            multiplication_distributes_over_addition(a, b, c);
+        }
+
+        #[test]
+        fn test_element_times_its_inverse_is_one_gf32(a in Gf32::arbitrary()) {
+            element_times_its_inverse_is_one(a);
+        }
+
+        #[test]
+        fn test_element_times_its_inverse_is_one_gf256(a in Gf256::arbitrary()) {
+            element_times_its_inverse_is_one(a);
+        }
+
+        #[test]
+        fn test_element_times_its_inverse_is_one_gf2pow63(a in Gf2Pow63::arbitrary()) {
+            element_times_its_inverse_is_one(a);
+        }
+
+        #[test]
+        fn test_division_undoes_multiplication_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary()) {
+            division_undoes_multiplication(a, b);
+        }
+
+        #[test]
+        fn test_division_undoes_multiplication_gf2pow63(a in Gf2Pow63::arbitrary(), b in Gf2Pow63::arbitrary()) {
+            division_undoes_multiplication(a, b);
+        }
+
+        #[test]
+        fn test_frobenius_fixes_every_element_gf32(a in Gf32::arbitrary()) {
+            frobenius_fixes_every_element(a);
+        }
+
+        #[test]
+        fn test_frobenius_fixes_every_element_gf256(a in Gf256::arbitrary()) {
+            frobenius_fixes_every_element(a);
+        }
+
+        #[test]
+        fn test_products_stay_within_the_field_gf256(a in Gf256::arbitrary(), b in Gf256::arbitrary()) {
+            products_stay_within_the_field(a, b);
+        }
     }
 }

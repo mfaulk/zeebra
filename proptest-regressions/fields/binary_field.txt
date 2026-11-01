@@ -1,0 +1,12 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c47a8071c4ca7a8834ec54ef2cd58b99f8941bd2a9f2700910da820a00000460 # shrinks to a = BinaryFieldElement { coefficients: 1 }, b = BinaryFieldElement { coefficients: 1 }
+cc 44db00ca767c9e3320221952ad8c8669995372152094b0a18d19e8697c7d961d # shrinks to a = BinaryFieldElement { coefficients: 1 }
+cc 28e102ab4a74ac0bb302da095b0c06a94953635d95455e43fc1cbf874332f681 # shrinks to a = BinaryFieldElement { coefficients: 1 }
+cc beb2d23387d63b8f477bf37af9286878923cf83a294c52b7cf025b1bf7e7233d # shrinks to a = BinaryFieldElement { coefficients: 1 }
+cc d0becf3aad69e5d439bdb33d441202dccf0d79227fc97312fd207e01043908be # shrinks to a = BinaryFieldElement { coefficients: 1 }
+cc 9603eb74d6792b3400e1079d0edc98c46502faf5166dd5d08124bd50e08353fe # shrinks to a = BinaryFieldElement { coefficients: 1 }, b = BinaryFieldElement { coefficients: 1 }
