@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e0b59028536f740a37d92c7eca9bcc664beb8cd430828da705bccd1615a42065 # shrinks to m = Matrix { num_rows: 2, num_columns: 2, elements: [PrimeFieldElement64 { value: 491 }, PrimeFieldElement64 { value: 271 }, PrimeFieldElement64 { value: 222 }, PrimeFieldElement64 { value: 233 }] }
+cc 68520063a1400b842cc637ec128d3c72e3cf48a9920a88a0b5a14a05e77037d0 # shrinks to m = Matrix { num_rows: 2, num_columns: 5, elements: [PrimeFieldElement64 { value: 0 }, PrimeFieldElement64 { value: 135 }, PrimeFieldElement64 { value: 35 }, PrimeFieldElement64 { value: 50 }, PrimeFieldElement64 { value: 433 }, PrimeFieldElement64 { value: 38 }, PrimeFieldElement64 { value: 534 }, PrimeFieldElement64 { value: 506 }, PrimeFieldElement64 { value: 114 }, PrimeFieldElement64 { value: 322 }] }

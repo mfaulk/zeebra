@@ -21,7 +21,7 @@ mod matrix_vector_ops;
 mod special;
 
 use crate::linalg::{
-    crout_lu_pivoting,
+    crout_lu_pivoting, gauss_jordan_elimination,
     matrix::iterating::{RowIteratorMut, RowsIteratorMut},
 };
 pub use error::*;
@@ -116,13 +116,6 @@ impl<T: Ring> Matrix<T> {
         }
     }
 
-    /// The inverse, if any, of this matrix.
-    // TODO: return `linalg::Error` instead of `()`, which carries no failure detail.
-    #[allow(clippy::result_unit_err)]
-    pub fn inverse<R: Ring>(&self) -> Result<Matrix<R>, ()> {
-        todo!()
-    }
-
     /// The submatrix of this matrix consisting of the given rows and columns.
     ///
     /// # Arguments
@@ -156,11 +149,6 @@ impl<T: Ring> Matrix<T> {
     /// The number of columns in the matrix.
     pub fn num_columns(&self) -> usize {
         self.num_columns
-    }
-
-    /// The rank (number of linearly independent columns) of the matrix.
-    pub fn rank<R: Ring>(_m: &Matrix<R>) -> usize {
-        todo!()
     }
 
     /// The elements of the matrix, in row-major order.
@@ -229,6 +217,53 @@ impl<T: Ring> Matrix<T> {
 }
 
 impl<F: FiniteField> Matrix<F> {
+    /// The rank of the matrix: the number of linearly independent rows, equivalently columns.
+    pub fn rank(&self) -> usize {
+        // Row reduction preserves rank, and in reduced row echelon form every row either holds a
+        // pivot or is entirely zero, so the rank is the number of rows that survive.
+        let reduced = gauss_jordan_elimination(self);
+        (0..reduced.num_rows())
+            .filter(|&i| reduced.row(i).any(|x| *x != F::ZERO))
+            .count()
+    }
+
+    /// The inverse of this matrix.
+    ///
+    /// # Errors
+    /// * `NotSquare` if the matrix is not square.
+    /// * `NotInvertible` if the matrix is square but singular.
+    pub fn inverse(&self) -> Result<Matrix<F>, Error> {
+        if !self.is_square() {
+            return Err(Error::NotSquare {
+                num_rows: self.num_rows,
+                num_columns: self.num_columns,
+            });
+        }
+        let n = self.num_rows;
+
+        // Reduce [A | I]. The row operations that carry A to the identity carry I to A inverse, so
+        // the right half of the result is the inverse whenever the left half reduces to I.
+        let mut augmented = Matrix::zero(n, 2 * n);
+        for i in 0..n {
+            for j in 0..n {
+                augmented[[i, j]] = self[[i, j]];
+            }
+            augmented[[i, n + i]] = F::ONE;
+        }
+        let reduced = gauss_jordan_elimination(&augmented);
+
+        let rows: Vec<usize> = (0..n).collect();
+        let left: Vec<usize> = (0..n).collect();
+        let right: Vec<usize> = (n..2 * n).collect();
+
+        // A is invertible exactly when its half reduces to the identity; anything else leaves a
+        // zero row, meaning the rows were dependent.
+        if reduced.submatrix(&rows, &left) != Matrix::identity(n) {
+            return Err(Error::NotInvertible);
+        }
+        Ok(reduced.submatrix(&rows, &right))
+    }
+
     /// The determinant of the matrix.
     // TODO: return `linalg::Error` instead of `()`, which carries no failure detail.
     #[allow(clippy::result_unit_err)]
@@ -293,6 +328,7 @@ impl<T: Ring + 'static> Arbitrary for Matrix<T> {
 
 #[cfg(test)]
 mod tests {
+    use super::Matrix;
     use crate::{
         fields::{Zp1091, Zp541},
         FiniteField,
@@ -431,6 +467,132 @@ mod tests {
         assert_strategy_is_not_degenerate(&strategy, "Matrix");
         for m in draw(&strategy, 16) {
             assert!(m.num_rows() > 0 && m.num_columns() > 0);
+        }
+    }
+
+    /// Rank counts independent rows: zero for the zero matrix, full for the identity, and fewer
+    /// than the row count when a row is a combination of the others.
+    #[test]
+    fn test_rank() {
+        type F = Zp541;
+        assert_eq!(Matrix::<F>::zero(3, 3).rank(), 0);
+        assert_eq!(Matrix::<F>::identity(4).rank(), 4);
+
+        // The second row is twice the first, so only one row is independent.
+        let dependent = matrix![F::new(1), F::new(2); F::new(2), F::new(4)];
+        assert_eq!(dependent.rank(), 1);
+
+        let full = matrix![F::new(1), F::new(2); F::new(3), F::new(4)];
+        assert_eq!(full.rank(), 2);
+
+        // Non-square: rank cannot exceed the smaller dimension.
+        let wide = matrix![
+            F::new(1), F::new(0), F::new(5);
+            F::new(0), F::new(1), F::new(7)
+        ];
+        assert_eq!(wide.rank(), 2);
+        assert_eq!(wide.transpose().rank(), 2);
+
+        // A single zero row drops the rank by one.
+        let with_zero_row = matrix![
+            F::new(1), F::new(2);
+            F::new(0), F::new(0)
+        ];
+        assert_eq!(with_zero_row.rank(), 1);
+    }
+
+    /// A * A^-1 = A^-1 * A = I, and inverting twice returns the original.
+    #[test]
+    fn test_inverse() {
+        type F = Zp541;
+        let identity = Matrix::<F>::identity(3);
+        assert_eq!(identity.inverse().unwrap(), identity);
+
+        let a = matrix![F::new(1), F::new(2); F::new(3), F::new(4)];
+        let a_inverse = a.inverse().unwrap();
+        assert_eq!(&a * &a_inverse, Matrix::identity(2));
+        assert_eq!(&a_inverse * &a, Matrix::identity(2));
+        assert_eq!(a_inverse.inverse().unwrap(), a);
+
+        // A larger case that needs a row swap: the leading entry is zero.
+        let needs_pivoting = matrix![
+            F::new(0), F::new(1), F::new(0);
+            F::new(1), F::new(0), F::new(0);
+            F::new(0), F::new(0), F::new(2)
+        ];
+        let inverse = needs_pivoting.inverse().unwrap();
+        assert_eq!(&needs_pivoting * &inverse, Matrix::identity(3));
+    }
+
+    /// The computed inverse matches one derived independently over GF(541).
+    #[test]
+    fn test_inverse_spotcheck() {
+        type F = Zp541;
+        let a = matrix![
+            F::new(2), F::new(1), F::new(1);
+            F::new(1), F::new(3), F::new(2);
+            F::new(1), F::new(0), F::new(0)
+        ];
+        let expected = matrix![
+            F::new(0),   F::new(0),   F::new(1);
+            F::new(539), F::new(1),   F::new(3);
+            F::new(3),   F::new(540), F::new(536)
+        ];
+        assert_eq!(a.inverse().unwrap(), expected);
+        assert_eq!(&a * &expected, Matrix::identity(3));
+    }
+
+    /// A singular or non-square matrix has no inverse, and says which.
+    #[test]
+    fn test_inverse_rejects_singular_and_non_square() {
+        type F = Zp541;
+        let singular = matrix![F::new(1), F::new(2); F::new(2), F::new(4)];
+        assert_eq!(singular.rank(), 1);
+        assert_eq!(singular.inverse(), Err(super::Error::NotInvertible));
+
+        assert_eq!(
+            Matrix::<F>::zero(2, 2).inverse(),
+            Err(super::Error::NotInvertible)
+        );
+
+        let not_square = matrix![
+            F::new(1), F::new(2), F::new(3);
+            F::new(4), F::new(5), F::new(6)
+        ];
+        assert_eq!(
+            not_square.inverse(),
+            Err(super::Error::NotSquare {
+                num_rows: 2,
+                num_columns: 3
+            })
+        );
+    }
+
+    proptest! {
+        /// Rank is unchanged by transposition and never exceeds either dimension.
+        #[test]
+        fn test_rank_matches_transpose(
+            m in (1..=6usize, 1..=6usize).prop_flat_map(any_with::<super::Matrix<Zp541>>)) {
+            let rank = m.rank();
+            prop_assert_eq!(rank, m.transpose().rank());
+            prop_assert!(rank <= m.num_rows().min(m.num_columns()));
+        }
+
+        /// A square matrix is invertible exactly when it has full rank.
+        #[test]
+        fn test_inverse_exists_iff_full_rank(
+            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n)))) {
+            let n = m.num_rows();
+            match m.inverse() {
+                Ok(inverse) => {
+                    prop_assert_eq!(m.rank(), n);
+                    prop_assert_eq!(&m * &inverse, super::Matrix::identity(n));
+                }
+                Err(e) => {
+                    prop_assert_eq!(e, super::Error::NotInvertible);
+                    prop_assert!(m.rank() < n);
+                }
+            }
         }
     }
 }
