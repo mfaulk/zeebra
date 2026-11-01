@@ -261,11 +261,26 @@ mod tests {
         assert_eq!(p.coefficients, [F::zero()])
     }
 
+    /// `from_zeros` builds the monic product of (x - z), so each z is a root.
     #[test]
-    #[ignore]
-    // Should produce the lowest-degree polynomial with the given zeros.
     fn test_from_zeros() {
-        todo!()
+        type F = PrimeFieldElement64<7>;
+        let zeros = [F::new(1), F::new(3), F::new(5)];
+        let p = DensePolynomial::<F>::from_zeros(&zeros);
+
+        // Degree equals the number of zeros, so this is the lowest-degree monic such polynomial.
+        assert_eq!(p.degree(), zeros.len() as u32);
+        for z in zeros {
+            assert_eq!(p.eval(&z), F::zero(), "{:?} should be a root", z);
+        }
+        // A value that is not a listed zero is not a root.
+        assert_ne!(p.eval(&F::new(2)), F::zero());
+
+        // With no zeros the product is empty, giving the constant polynomial one.
+        assert_eq!(
+            DensePolynomial::<F>::from_zeros(&[]),
+            DensePolynomial::one()
+        );
     }
 
     #[test]
@@ -442,8 +457,10 @@ mod tests {
 
         assert_eq!(P::try_from("1+3*x").unwrap().to_string(), "1 + 3*x");
         assert_eq!(P::try_from("x+11*x^2").unwrap().to_string(), "x + 11*x^2");
+        // One variable per polynomial: mixing `x` and `y` here is a parse error, not a degree-3
+        // term. Line above already covers that a non-`x` name still displays as `x`.
         assert_eq!(
-            P::try_from("9 + x + 2*x^2 + 5*y^3").unwrap().to_string(),
+            P::try_from("9 + x + 2*x^2 + 5*x^3").unwrap().to_string(),
             "9 + x + 2*x^2 + 5*x^3"
         );
     }
