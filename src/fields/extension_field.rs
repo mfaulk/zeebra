@@ -27,7 +27,7 @@ use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_va
 
 use crate::{
     identities::{One, Zero},
-    FiniteField, Ring,
+    FiniteField, ParseFieldElementError, Ring,
 };
 
 /// The monic irreducible polynomial of degree N over GF(P) that defines GF(P^N).
@@ -196,7 +196,7 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
         }
     }
 
-    fn from_str(_value: &str) -> Result<Self, ()> {
+    fn from_str(_value: &str) -> Result<Self, ParseFieldElementError> {
         todo!()
     }
 

@@ -33,7 +33,7 @@ pub mod util;
 pub(crate) mod test_support;
 
 pub use fft::{evaluate, interpolate, powers_of, FFTDomain};
-pub use fields::FiniteField;
+pub use fields::{FiniteField, ParseFieldElementError};
 pub use identities::{One, Zero};
 pub use poly::{
     gcd, lagrange_interpolate, Monomial, MultivariatePolynomial, Polynomial, PolynomialParams,

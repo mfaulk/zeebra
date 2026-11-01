@@ -18,7 +18,7 @@ use crate::{
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
     integers::{big_uint::BigUInt, factor, find_generator, utils::u128_from_parts, U256},
-    FiniteField, Ring,
+    FiniteField, ParseFieldElementError, Ring,
 };
 
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
@@ -65,8 +65,8 @@ impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
         }
     }
 
-    fn from_str(value: &str) -> Result<Self, ()> {
-        let parsed = BigUInt::from_dec_str(value).map_err(|_| ())?;
+    fn from_str(value: &str) -> Result<Self, ParseFieldElementError> {
+        let parsed = BigUInt::from_dec_str(value)?;
         let modulus = BigUInt::new_from_u128(P);
         let residue = parsed % &modulus;
         let words = residue.as_le_words();

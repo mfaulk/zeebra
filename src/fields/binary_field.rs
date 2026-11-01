@@ -32,7 +32,7 @@ use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_va
 
 use crate::{
     identities::{One, Zero},
-    FiniteField, Ring,
+    FiniteField, ParseFieldElementError, Ring,
 };
 
 #[derive(Copy, Clone, Hash, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -86,7 +86,7 @@ impl<const P: u64> FiniteField for BinaryFieldElement<P> {
         todo!()
     }
 
-    fn from_str(_value: &str) -> Result<Self, ()> {
+    fn from_str(_value: &str) -> Result<Self, ParseFieldElementError> {
         todo!()
     }
 
