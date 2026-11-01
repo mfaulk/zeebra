@@ -2,7 +2,7 @@
 
 use crate::{poly::univariate::UnivariatePolynomial, FiniteField};
 use pest::{
-    error::Error,
+    error::{Error, ErrorVariant},
     iterators::{Pair, Pairs},
     Parser,
 };
@@ -26,6 +26,30 @@ pub fn parse_univariate_polynomial<F: FiniteField>(
     let mut polynomial = UnivariatePolynomial::new(&[F::zero()]);
 
     let pairs: Pairs<Rule> = UnivariatePolynomialParser::parse(Rule::polynomial, &str)?;
+
+    // The grammar accepts any identifier as the variable and the name is otherwise ignored, so
+    // "meow" is a valid univariate variable. Two *distinct* names are not: without this check
+    // "x + y" parses as two degree-one monomials and sums to "2x".
+    let mut variable: Option<&str> = None;
+    for var in pairs.clone().flatten().filter(|p| p.as_rule() == Rule::var) {
+        match variable {
+            None => variable = Some(var.as_str()),
+            Some(name) if name == var.as_str() => {}
+            Some(name) => {
+                return Err(Error::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: format!(
+                            "a univariate polynomial has one variable, found `{}` and `{}`",
+                            name,
+                            var.as_str()
+                        ),
+                    },
+                    var.as_span(),
+                ));
+            }
+        }
+    }
+
     for pair_1 in pairs {
         match pair_1.as_rule() {
             Rule::polynomial => {
@@ -126,7 +150,7 @@ mod tests {
         },
         FiniteField,
     };
-    use pest::error::ErrorVariant::ParsingError;
+    use pest::error::ErrorVariant::{CustomError, ParsingError};
 
     #[test]
     // Attempting to parse an empty string should return a ParsingError.
@@ -145,22 +169,24 @@ mod tests {
         }
     }
 
-    #[ignore] // Currently, multivariate polynomials are parsed incorrectly.
+    /// A polynomial naming two distinct variables is rejected rather than silently collapsed.
     #[test]
-    // Parsing a Multivariate polynomial should return an error.
     fn test_parsing_multivariate_polynomial() {
         type F = PrimeFieldElement64<1091>;
 
         match parse_univariate_polynomial::<F>("x + y") {
-            Ok(p) => panic!("{:?}", p),
+            Ok(p) => panic!("expected an error, parsed {:?}", p),
             Err(e) => match e.variant {
-                ParsingError {
-                    positives: _,
-                    negatives: _,
-                } => {} // This is expected,
+                CustomError { message } => {
+                    assert!(message.contains("one variable"), "{}", message);
+                }
                 _ => panic!("Unexpected error {:?}", e),
             },
         }
+
+        // The name itself is not significant, so a single consistent name of any spelling parses.
+        assert!(parse_univariate_polynomial::<F>("meow + meow").is_ok());
+        assert!(parse_univariate_polynomial::<F>("y^2 + y").is_ok());
     }
 
     #[test]
