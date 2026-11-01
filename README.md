@@ -17,7 +17,7 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Linear Algebra over Finite Fields
 - [x] Number-Theoretic Transform (FFT over Finite Fields)
 - [x] Grobner Bases
-- [ ] Polynomial System Solving via Grobner Basis Algorithms
+- [x] Polynomial System Solving via Grobner Basis Algorithms
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -33,6 +33,35 @@ Development checks, matching what CI enforces:
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
+
+## Solving Polynomial Systems
+`grobner::solve` finds every point of F^N at which a system of multivariate polynomials
+vanishes, over a finite field F:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{fields::Zp13, grobner::solve, MultivariatePolynomial};
+
+let vars = ["x", "y"];
+let system = vec![
+    MultivariatePolynomial::<2, Zp13>::parse("x + y", vars).unwrap(),
+    MultivariatePolynomial::<2, Zp13>::parse("x*y - 1", vars).unwrap(),
+];
+
+let mut rng = StdRng::seed_from_u64(0);
+for point in solve(&system, &mut rng) {
+    println!("x = {}, y = {}", point[0], point[1]);
+}
+```
+
+It computes a lexicographic Grobner basis, which is triangular, then assigns variables from the
+last backwards, abandoning a partial assignment as soon as it contradicts the system. An
+inconsistent system is detected from its basis being `{1}` and yields no points. The order of the
+returned points is unspecified.
+
+The search enumerates the base field at each level, so it is practical only for small fields, and
+refuses outright above an order of 2^20. Solving over a large field needs univariate root finding
+rather than enumeration.
 
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
