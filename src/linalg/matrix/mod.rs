@@ -216,6 +216,41 @@ impl<T: Ring> Matrix<T> {
     }
 }
 
+/// The determinant of a permutation matrix: one if the permutation is even, minus one if odd.
+fn permutation_sign<F: FiniteField>(p: &Matrix<F>) -> F {
+    let n = p.num_rows();
+    // Row i of a permutation matrix has its single nonzero entry in column `image[i]`.
+    let image: Vec<usize> = (0..n)
+        .map(|i| {
+            (0..n)
+                .find(|&j| p[[i, j]] != F::ZERO)
+                .expect("a permutation matrix has a nonzero entry in every row")
+        })
+        .collect();
+
+    // Every permutation factors into disjoint cycles, and a cycle of length k costs k - 1
+    // transpositions, so the parity of the whole permutation is (n - cycle count) mod 2.
+    let mut visited = vec![false; n];
+    let mut cycles = 0;
+    for start in 0..n {
+        if visited[start] {
+            continue;
+        }
+        cycles += 1;
+        let mut i = start;
+        while !visited[i] {
+            visited[i] = true;
+            i = image[i];
+        }
+    }
+
+    if (n - cycles).is_multiple_of(2) {
+        F::ONE
+    } else {
+        F::ZERO - F::ONE
+    }
+}
+
 impl<F: FiniteField> Matrix<F> {
     /// The rank of the matrix: the number of linearly independent rows, equivalently columns.
     pub fn rank(&self) -> usize {
@@ -265,27 +300,34 @@ impl<F: FiniteField> Matrix<F> {
     }
 
     /// The determinant of the matrix.
-    // TODO: return `linalg::Error` instead of `()`, which carries no failure detail.
-    #[allow(clippy::result_unit_err)]
-    pub fn determinant(&self) -> Result<F, ()> {
+    ///
+    /// # Errors
+    /// * `NotSquare` if the matrix is not square.
+    pub fn determinant(&self) -> Result<F, Error> {
         if !self.is_square() {
-            return Err(());
+            return Err(Error::NotSquare {
+                num_rows: self.num_rows,
+                num_columns: self.num_columns,
+            });
         }
         let mut det = F::ONE;
         // Compute the determinant via LU decomposition.
         match crout_lu_pivoting(self) {
-            Ok((L, U, _P)) => {
+            Ok((L, U, P)) => {
                 for i in 0..self.num_rows {
                     det = det * U[[i, i]] * L[[i, i]];
                 }
-                // TODO: Each row exchange changes the sign of the determinant.
-                // Compute the parity of the permutation.
+                // PA = LU, so det(P) det(A) = det(L) det(U). Each row exchange flips the sign of
+                // the determinant, and det(P) is that accumulated sign. It is its own inverse,
+                // so recovering det(A) is a multiplication rather than a division.
+                det *= permutation_sign(&P);
             }
             Err(Error::NotInvertible) => {
+                // A singular matrix has determinant zero.
                 det = F::ZERO;
             }
-            _ => {
-                return Err(());
+            Err(e) => {
+                return Err(e);
             }
         }
         Ok(det)
@@ -594,5 +636,85 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The determinant by cofactor expansion along the first row.
+    ///
+    /// Deliberately independent of the LU-based implementation under test, so a sign or pivoting
+    /// error in that implementation shows up as a disagreement rather than as agreement with
+    /// itself.
+    fn determinant_by_cofactor<F: FiniteField>(m: &Matrix<F>) -> F {
+        let n = m.num_rows();
+        assert_eq!(n, m.num_columns());
+        if n == 1 {
+            return m[[0, 0]];
+        }
+        let rows: Vec<usize> = (1..n).collect();
+        let mut det = F::ZERO;
+        for j in 0..n {
+            let columns: Vec<usize> = (0..n).filter(|&c| c != j).collect();
+            let minor = determinant_by_cofactor(&m.submatrix(&rows, &columns));
+            let term = m[[0, j]] * minor;
+            det = if j % 2 == 0 { det + term } else { det - term };
+        }
+        det
+    }
+
+    /// The cofactor oracle reproduces the Sage-derived values the LU implementation is held to.
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_determinant_by_cofactor_agrees_with_sage() {
+        type F = Zp541;
+        // Same A and B as `test_determinant`; B is A with its first two rows swapped, and
+        // 501 == -40 mod 541, so these pin down the sign.
+        let A = matrix![
+            F::new(1),   F::new(1), F::new(2);
+            F::new(8),   F::new(4), F::new(3);
+            F::new(539), F::new(2), F::new(540)
+        ];
+        let B = matrix![
+            F::new(8),   F::new(4), F::new(3);
+            F::new(1),   F::new(1), F::new(2);
+            F::new(539), F::new(2), F::new(540)
+        ];
+        assert_eq!(determinant_by_cofactor(&A), F::new(40));
+        assert_eq!(determinant_by_cofactor(&B), F::new(501));
+        assert_eq!(
+            determinant_by_cofactor(&Matrix::<F>::identity(4)),
+            F::new(1)
+        );
+    }
+
+    proptest! {
+        /// The LU-based determinant agrees with cofactor expansion, including its sign.
+        #[test]
+        fn test_determinant_agrees_with_cofactor_expansion(
+            m in (1..=4usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n)))) {
+            prop_assert_eq!(m.determinant().unwrap(), determinant_by_cofactor(&m));
+        }
+
+        /// The determinant is zero exactly when the matrix is singular.
+        #[test]
+        fn test_determinant_is_zero_iff_singular(
+            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n)))) {
+            let n = m.num_rows();
+            let singular = m.rank() < n;
+            prop_assert_eq!(m.determinant().unwrap() == Zp541::new(0), singular);
+            prop_assert_eq!(m.inverse().is_err(), singular);
+        }
+    }
+
+    /// A non-square matrix has no determinant, and reports its dimensions.
+    #[test]
+    fn test_determinant_rejects_non_square() {
+        type F = Zp541;
+        let not_square = matrix![F::new(1), F::new(2), F::new(3); F::new(4), F::new(5), F::new(6)];
+        assert_eq!(
+            not_square.determinant(),
+            Err(super::Error::NotSquare {
+                num_rows: 2,
+                num_columns: 3
+            })
+        );
     }
 }
