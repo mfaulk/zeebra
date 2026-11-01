@@ -130,14 +130,28 @@ impl From<BigUInt> for BigInt {
 }
 
 impl Display for BigInt {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_dec_str())
     }
 }
 
 impl Ord for BigInt {
-    fn cmp(&self, _other: &Self) -> Ordering {
-        todo!()
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Zero first, so that a non-canonical (+/-1, magnitude 0) would still compare equal to it.
+        if self.is_zero() && other.is_zero() {
+            return Ordering::Equal;
+        }
+        // Differing signs decide it outright; a negative is below a positive whatever the
+        // magnitudes are.
+        if self.signum != other.signum {
+            return self.signum.cmp(&other.signum);
+        }
+        // Equal signs: magnitudes order directly when positive, and invert when negative.
+        if self.signum == -1 {
+            other.magnitude.cmp(&self.magnitude)
+        } else {
+            self.magnitude.cmp(&other.magnitude)
+        }
     }
 }
 
@@ -318,6 +332,7 @@ impl Arbitrary for BigInt {
 mod tests {
     use crate::integers::big_integers::{big_int::BigInt, big_uint::BigUInt};
     use proptest::{prelude::*, sample::select};
+    use std::cmp::Ordering;
 
     #[test]
     // Zero should have a signum of 0.
@@ -506,5 +521,90 @@ mod tests {
         // Shifting past the width of the value leaves zero, which is unsigned.
         assert_eq!(&a >> 200, BigInt::zero());
         assert_eq!(&a.neg() >> 200, BigInt::zero());
+    }
+
+    /// The strategy is usable, and the sign is zero exactly when the magnitude is.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{
+            assert_ord_agrees_with_eq, assert_strategy_is_not_degenerate, draw,
+        };
+        let strategy = BigInt::arbitrary();
+        assert_strategy_is_not_degenerate(&strategy, "BigInt");
+
+        let mut values = draw(&strategy, 32);
+        values.extend([
+            BigInt::zero(),
+            BigInt::default(),
+            BigInt::from_dec_str("0").unwrap(),
+            BigInt::from_dec_str("-0").unwrap(),
+            BigInt::zero().neg(),
+        ]);
+
+        assert_ord_agrees_with_eq(&values, "BigInt");
+
+        // Sign-magnitude admits a second zero, (signum = +/-1, magnitude = 0), which would
+        // compare unequal to `zero()` under the derived `PartialEq`.
+        for v in &values {
+            assert_eq!(
+                v.is_zero(),
+                *v == BigInt::zero(),
+                "{:?} disagrees with zero() about being zero",
+                v
+            );
+        }
+    }
+
+    /// `Display` agrees with `to_dec_str`, including the sign.
+    #[test]
+    fn test_display() {
+        assert_eq!(BigInt::zero().to_string(), "0");
+        assert_eq!(BigInt::one().to_string(), "1");
+        assert_eq!(BigInt::from_dec_str("-42").unwrap().to_string(), "-42");
+        let big = "340282366920938463463374607431768211457";
+        assert_eq!(BigInt::from_dec_str(big).unwrap().to_string(), big);
+        assert_eq!(
+            BigInt::from_dec_str(big).unwrap().neg().to_string(),
+            format!("-{}", big)
+        );
+    }
+
+    /// Ordering sorts by sign first, then by magnitude, and agrees with equality.
+    #[test]
+    fn test_ord() {
+        let neg_big = BigInt::from_dec_str("-100").unwrap();
+        let neg_small = BigInt::from_dec_str("-1").unwrap();
+        let zero = BigInt::zero();
+        let pos_small = BigInt::from_dec_str("1").unwrap();
+        let pos_big = BigInt::from_dec_str("100").unwrap();
+
+        let sorted = vec![
+            neg_big.clone(),
+            neg_small.clone(),
+            zero.clone(),
+            pos_small.clone(),
+            pos_big.clone(),
+        ];
+        let mut shuffled = vec![
+            pos_small.clone(),
+            neg_big.clone(),
+            pos_big.clone(),
+            zero.clone(),
+            neg_small.clone(),
+        ];
+        shuffled.sort();
+        assert_eq!(shuffled, sorted);
+
+        // A negative is below zero even when its magnitude is the larger one.
+        assert!(neg_big < zero);
+        assert!(neg_big < neg_small);
+        assert!(pos_big > pos_small);
+
+        // Ordering must agree with the derived equality.
+        for a in &sorted {
+            for b in &sorted {
+                assert_eq!(a == b, a.cmp(b) == Ordering::Equal, "{:?} vs {:?}", a, b);
+            }
+        }
     }
 }
