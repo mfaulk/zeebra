@@ -118,7 +118,7 @@ mod tests {
             gauss_jordan::{gauss_jordan_elimination, gaussian_elimination},
             is_reduced_row_echelon, Matrix,
         },
-        FiniteField,
+        matrix, FiniteField,
     };
     use proptest::prelude::*;
 
@@ -198,26 +198,17 @@ mod tests {
         }
     }
 
+    /// A matrix already in row echelon form with unit pivots is a fixed point.
     #[test]
-    #[ignore]
-    // Does not change a matrix that is already in row echelon form.
     fn test_gaussian_elimination_upper_triangular() {
         type F = Zp541;
-        let matrix: Matrix<F> = Matrix::new(
-            3,
-            3,
-            &[
-                F::new(1),
-                F::new(0),
-                F::new(0),
-                F::new(0),
-                F::new(2),
-                F::new(2),
-                F::new(0),
-                F::new(0),
-                F::new(3),
-            ],
-        );
+        // Pivots must already be 1: `gaussian_elimination` normalizes each pivot, so a matrix in
+        // row echelon form with non-unit pivots is legitimately rescaled rather than left alone.
+        let matrix: Matrix<F> = matrix![
+            F::new(1), F::new(0), F::new(0);
+            F::new(0), F::new(1), F::new(1);
+            F::new(0), F::new(0), F::new(1)
+        ];
         let row_echelon_form = gaussian_elimination(&matrix);
         assert_eq!(row_echelon_form, matrix, "{}, {}", row_echelon_form, matrix);
     }
@@ -263,13 +254,31 @@ mod tests {
         assert_eq!(row_echelon_form, expected);
     }
 
+    /// Reduced row echelon form is a fixed point of the algorithm that produces it.
     #[test]
-    #[ignore]
     fn test_gauss_jordan_elimination() {
-        todo!()
+        type F = Zp541;
+
+        // The identity matrix is already in reduced row echelon form.
+        let identity = Matrix::<F>::identity(4);
+        assert_eq!(gauss_jordan_elimination(&identity), identity);
+
+        // So is a matrix with a free column and a trailing zero row.
+        let reduced: Matrix<F> = matrix![
+            F::new(1), F::new(0), F::new(7);
+            F::new(0), F::new(1), F::new(2);
+            F::new(0), F::new(0), F::new(0)
+        ];
+        assert!(is_reduced_row_echelon(&reduced));
+        assert_eq!(gauss_jordan_elimination(&reduced), reduced);
+
+        // Reducing an arbitrary matrix twice is the same as reducing it once.
+        let matrix: Matrix<F> = matrix![
+            F::new(2), F::new(4), F::new(6);
+            F::new(1), F::new(3), F::new(5);
+            F::new(7), F::new(8), F::new(9)
+        ];
+        let once = gauss_jordan_elimination(&matrix);
+        assert_eq!(gauss_jordan_elimination(&once), once);
     }
-
-    // The identity matrix is already in reduced row echelon form.
-
-    // Does not change a matrix that is already in reduced row echelon form.
 }

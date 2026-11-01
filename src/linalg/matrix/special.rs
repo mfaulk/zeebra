@@ -126,11 +126,12 @@ pub fn is_reduced_row_echelon<T: FiniteField>(m: &Matrix<T>) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::{
-        fields::Zp1091,
+        fields::{FiniteField, Zp1091},
         linalg::{
             is_diagonal, is_lower_triangular, is_upper_triangular,
             matrix::special::is_reduced_row_echelon, Matrix,
         },
+        matrix,
     };
 
     #[test]
@@ -155,29 +156,100 @@ mod tests {
         assert!(is_reduced_row_echelon(&I));
     }
 
+    /// Entries below the diagonal must be zero; the diagonal itself is unconstrained.
     #[test]
-    #[ignore]
     fn test_is_upper_triangular() {
-        todo!()
+        type F = Zp1091;
+        assert!(is_upper_triangular(&matrix![
+            F::new(1), F::new(2), F::new(3);
+            F::new(0), F::new(4), F::new(5);
+            F::new(0), F::new(0), F::new(6)
+        ]));
+        // A zero on the diagonal is still upper triangular.
+        assert!(is_upper_triangular(&matrix![
+            F::new(1), F::new(2);
+            F::new(0), F::new(0)
+        ]));
+        // A single nonzero entry below the diagonal disqualifies it.
+        assert!(!is_upper_triangular(&matrix![
+            F::new(1), F::new(2);
+            F::new(3), F::new(4)
+        ]));
     }
 
+    /// Entries above the diagonal must be zero; the diagonal itself is unconstrained.
     #[test]
-    #[ignore]
     fn test_is_lower_triangular() {
-        todo!()
+        type F = Zp1091;
+        assert!(is_lower_triangular(&matrix![
+            F::new(1), F::new(0), F::new(0);
+            F::new(2), F::new(3), F::new(0);
+            F::new(4), F::new(5), F::new(6)
+        ]));
+        // A zero on the diagonal is still lower triangular.
+        assert!(is_lower_triangular(&matrix![
+            F::new(0), F::new(0);
+            F::new(1), F::new(2)
+        ]));
+        // A single nonzero entry above the diagonal disqualifies it.
+        assert!(!is_lower_triangular(&matrix![
+            F::new(1), F::new(2);
+            F::new(0), F::new(3)
+        ]));
     }
 
+    /// Only the diagonal may be nonzero, so a diagonal matrix is both triangular forms at once.
     #[test]
-    #[ignore]
     fn test_is_diagonal() {
-        todo!()
+        type F = Zp1091;
+        let diagonal: Matrix<F> = matrix![
+            F::new(7), F::new(0);
+            F::new(0), F::new(9)
+        ];
+        assert!(is_diagonal(&diagonal));
+        assert!(is_upper_triangular(&diagonal));
+        assert!(is_lower_triangular(&diagonal));
+
+        // Triangular but not diagonal: the off-diagonal entry is nonzero.
+        assert!(!is_diagonal(&matrix![
+            F::new(1), F::new(2);
+            F::new(0), F::new(3)
+        ]));
     }
 
+    /// Each of the four conditions defining reduced row echelon form is enforced.
     #[test]
-    #[ignore]
     fn test_is_reduced_row_echelon() {
-        // type F = Zp1091;
-        // let m = Matrix::<F>::identity(9);
-        // assert!(is_reduced_row_echelon(&m));
+        type F = Zp1091;
+        // Two pivots and a trailing zero row.
+        assert!(is_reduced_row_echelon(&matrix![
+            F::new(1), F::new(0), F::new(4);
+            F::new(0), F::new(1), F::new(5);
+            F::new(0), F::new(0), F::new(0)
+        ]));
+
+        // 1. A leading entry that is not 1.
+        assert!(!is_reduced_row_echelon(&matrix![
+            F::new(2), F::new(0);
+            F::new(0), F::new(1)
+        ]));
+
+        // 2. A pivot not strictly right of the pivot above it.
+        assert!(!is_reduced_row_echelon(&matrix![
+            F::new(0), F::new(1);
+            F::new(1), F::new(0)
+        ]));
+
+        // 3. A pivot that is not the only nonzero entry in its column.
+        assert!(!is_reduced_row_echelon(&matrix![
+            F::new(1), F::new(0);
+            F::new(1), F::new(1)
+        ]));
+
+        // 4. A zero row above a nonzero row.
+        assert!(!is_reduced_row_echelon(&matrix![
+            F::new(0), F::new(0);
+            F::new(1), F::new(0)
+        ]));
     }
 }
