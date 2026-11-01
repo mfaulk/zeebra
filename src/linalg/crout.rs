@@ -214,22 +214,21 @@ mod tests {
     pub use crate::linalg::matrix::{
         is_lower_triangular, is_upper_triangular, is_upper_unit_triangular,
     };
-    use crate::{fields::Zp541, FiniteField, One, Zero};
+    use crate::{fields::Zp541, linalg::Error, FiniteField, One, Zero};
 
+    /// A = LU is recovered from known factors: L lower triangular, U upper unit triangular.
     #[test]
-    #[ignore]
-    // Spot-check against Sage.
+    #[allow(non_snake_case)]
     fn test_spotcheck_crout_lu() {
-        /*
-            Sage's echelon_form() function returns a matrix in reduced row echelon form:
+        type F = Zp541;
+        let L = matrix![F::new(2), F::ZERO; F::new(3), F::new(5)];
+        let U = matrix![F::ONE, F::new(7); F::ZERO, F::ONE];
+        let A = &L * &U;
+        assert_eq!(A, matrix![F::new(2), F::new(14); F::new(3), F::new(26)]);
 
-           '''sage
-           p = 541
-           Fp = GF(p)
-           M = Matrix(Fp, [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-           TODO
-        */
-        todo!()
+        let (L2, U2) = super::crout_lu(&A).unwrap();
+        assert_eq!(L, L2);
+        assert_eq!(U, U2);
     }
 
     proptest! {
@@ -248,22 +247,51 @@ mod tests {
         }
     }
 
+    /// Both variants reject a non-square matrix, reporting its dimensions.
     #[test]
-    #[ignore]
     fn test_crout_lu_rejects_non_square_matrices() {
-        todo!()
+        type F = Zp541;
+        let not_square = matrix![F::ONE, F::new(2), F::new(3); F::new(4), F::new(5), F::new(6)];
+        assert_eq!(
+            super::crout_lu(&not_square),
+            Err(Error::NotSquare {
+                num_rows: 2,
+                num_columns: 3
+            })
+        );
+        assert_eq!(
+            super::crout_lu_pivoting(&not_square),
+            Err(Error::NotSquare {
+                num_rows: 2,
+                num_columns: 3
+            })
+        );
     }
 
+    /// A singular matrix has no LU decomposition, which pivoting detects as non-invertibility.
     #[test]
-    #[ignore]
     fn test_crout_lu_rejects_singular_matrices() {
-        todo!()
+        type F = Zp541;
+        // The second row is a multiple of the first, so the matrix is singular.
+        let singular = matrix![F::ONE, F::new(2); F::new(2), F::new(4)];
+        assert_eq!(
+            super::crout_lu_pivoting(&singular),
+            Err(Error::NotInvertible)
+        );
     }
 
+    /// A zero pivot stops the non-pivoting variant, while the pivoting variant handles it.
     #[test]
-    #[ignore]
+    #[allow(non_snake_case)]
     fn test_crout_lu_rejects_matrices_requiring_pivoting() {
-        todo!()
+        type F = Zp541;
+        // A leading zero leaves no pivot in the first column at the cursor.
+        let A = matrix![F::ZERO, F::ONE; F::ONE, F::ZERO];
+        assert_eq!(super::crout_lu(&A), Err(Error::PivotingRequired));
+
+        // The same matrix decomposes once row swaps are allowed.
+        let (L, U, P) = super::crout_lu_pivoting(&A).unwrap();
+        assert_eq!(&P * A, L * U);
     }
 
     proptest! {
