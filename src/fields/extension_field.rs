@@ -19,7 +19,8 @@ use proptest::{
 };
 use rand::{CryptoRng, RngCore};
 use serde::{
-    ser::{Serialize, Serializer},
+    de::{self, SeqAccess, Visitor},
+    ser::{Serialize, SerializeTuple, Serializer},
     Deserialize, Deserializer,
 };
 
@@ -27,6 +28,7 @@ use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_va
 
 use crate::{
     identities::{One, Zero},
+    integers::{big_uint::BigUInt, factor},
     FiniteField, ParseFieldElementError, Ring,
 };
 
@@ -39,6 +41,17 @@ pub trait IrreduciblePolynomial<const P: u64, const N: usize>: 'static {
     /// Coefficients c_0, ..., c_{N-1} of `x^N + c_{N-1} x^{N-1} + ... + c_1 x + c_0`, low-order
     /// first. The leading coefficient is implicitly 1.
     const COEFFICIENTS: [u64; N];
+}
+
+/// The value of a `BigUInt` that is known to fit in a `u128`.
+///
+/// Used for the prime factors of q - 1, which cannot exceed q - 1 itself.
+fn big_uint_to_u128(value: &BigUInt) -> u128 {
+    let words = value.as_le_words();
+    assert!(words.len() <= 2, "{:?} does not fit in a u128", value);
+    let low = *words.first().unwrap_or(&0) as u128;
+    let high = *words.get(1).unwrap_or(&0) as u128;
+    low | (high << 64)
 }
 
 /// Element of the field GF(P^N), with multiplication reduced by the irreducible polynomial M.
@@ -128,14 +141,53 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ExtensionFiel
 }
 
 // impl Serialize
+//
+// Only the coefficients are encoded: P, N, and the modulus are carried by the type, so there is
+// nothing about them to transmit. Written by hand rather than derived because `M` appears in a
+// `PhantomData` and a derive would demand that it implement `Serialize` too.
 impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Serialize
     for ExtensionFieldElement<P, N, M>
 {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        todo!()
+        let mut tuple = serializer.serialize_tuple(N)?;
+        for coefficient in &self.coefficients {
+            tuple.serialize_element(coefficient)?;
+        }
+        tuple.end()
+    }
+}
+
+/// Reads the N coefficients back into an element.
+struct CoefficientsVisitor<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> {
+    modulus: PhantomData<M>,
+}
+
+impl<'de, const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Visitor<'de>
+    for CoefficientsVisitor<P, N, M>
+{
+    type Value = ExtensionFieldElement<P, N, M>;
+
+    fn expecting(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} field element coefficients", N)
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut coefficients = [0u64; N];
+        for (i, coefficient) in coefficients.iter_mut().enumerate() {
+            *coefficient = seq
+                .next_element()?
+                .ok_or_else(|| de::Error::invalid_length(i, &self))?;
+        }
+        // Through `new`, so coefficients that arrive unreduced are brought back into canonical
+        // form. `PartialEq` and `Hash` key on the array, so a decoded value must not be able to
+        // compare unequal to the element it represents.
+        Ok(ExtensionFieldElement::new(coefficients))
     }
 }
 
@@ -143,11 +195,16 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Serialize
 impl<'de, const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Deserialize<'de>
     for ExtensionFieldElement<P, N, M>
 {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        todo!()
+        deserializer.deserialize_tuple(
+            N,
+            CoefficientsVisitor::<P, N, M> {
+                modulus: PhantomData,
+            },
+        )
     }
 }
 
@@ -196,6 +253,9 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
         }
     }
 
+    // TODO: unimplemented. Unlike a prime field, the input here is a polynomial rather than a
+    // decimal integer, so this first needs a decision about the accepted syntax — plausibly the
+    // Sage-style form that `SparseMultiPoly::parse` already handles.
     fn from_str(_value: &str) -> Result<Self, ParseFieldElementError> {
         todo!()
     }
@@ -211,12 +271,43 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
         }
     }
 
-    fn primitive_element<R: RngCore + CryptoRng>(_rng: &mut R) -> Self {
-        todo!()
+    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        // The multiplicative group of GF(P^N) is cyclic of order q - 1. An element generates it
+        // unless its order is a proper divisor of q - 1, and every proper divisor divides
+        // (q - 1) / r for some prime r | q - 1 — so those quotients are the only exponents worth
+        // testing. See Handbook of Applied Cryptography, Algorithm 4.80.
+        //
+        // `find_generator` cannot be reused here: it works on integers mod p via `pow_mod_p`,
+        // whereas these elements are polynomials.
+        let group_order = Self::order() - 1;
+        let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
+        let quotients: Vec<u128> = prime_factors
+            .iter()
+            .map(|r| group_order / big_uint_to_u128(r))
+            .collect();
+
+        loop {
+            let candidate = Self::random(rng);
+            if candidate.is_zero() {
+                continue;
+            }
+            if quotients
+                .iter()
+                .all(|&exponent| candidate.pow(exponent) != Self::one())
+            {
+                return candidate;
+            }
+        }
     }
 
-    fn root_of_unity<R: RngCore + CryptoRng>(_n: u64, _rng: &mut R) -> Self {
-        todo!()
+    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
+        // n must divide the group order.
+        let group_order = Self::order() - 1;
+        assert_eq!(group_order % n as u128, 0, "n must divide the group order.");
+
+        // If g generates a group of order q - 1, then g^((q-1)/n) has order exactly n.
+        let g = Self::primitive_element(rng);
+        g.pow(group_order / n as u128)
     }
 
     fn order() -> u128 {
@@ -379,20 +470,22 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Arbitrary
 #[cfg(test)]
 mod tests {
     use proptest::{arbitrary::Arbitrary, prop_assert_eq, proptest};
-    use rand::thread_rng;
+    use rand::{prelude::StdRng, thread_rng, SeedableRng};
 
     use crate::{
         fields::{
             binary_field::BinaryFieldElement,
             extension_field::{ExtensionFieldElement, IrreduciblePolynomial},
             irreducible_polynomials::{
-                Modulus13Pow4, Modulus251Pow4, Modulus2Pow8, Modulus5Pow3, X8_X4_X3_X_1,
+                Modulus13Pow4, Modulus251Pow4, Modulus2Pow8, Modulus3Pow2, Modulus5Pow3,
+                X8_X4_X3_X_1,
             },
         },
         identities::{One, Zero},
         FiniteField,
     };
 
+    type F3x2 = ExtensionFieldElement<3, 2, Modulus3Pow2>;
     type F13x4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
     type F251x4 = ExtensionFieldElement<251, 4, Modulus251Pow4>;
     type F5x3 = ExtensionFieldElement<5, 3, Modulus5Pow3>;
@@ -769,5 +862,89 @@ mod tests {
                 assert!(c < 13, "{:?} has an unreduced coefficient", v);
             }
         }
+    }
+
+    /// A primitive element generates the whole multiplicative group, so its order is q - 1.
+    #[test]
+    fn test_primitive_element_generates_the_group() {
+        let mut rng = StdRng::seed_from_u64(11);
+
+        // GF(9) is small enough to enumerate: the powers of a generator must be every nonzero
+        // element exactly once.
+        let g = F3x2::primitive_element(&mut rng);
+        let mut seen = std::collections::HashSet::new();
+        let mut x = F3x2::one();
+        for _ in 0..(F3x2::order() - 1) {
+            x *= g;
+            seen.insert(x);
+        }
+        assert_eq!(seen.len() as u128, F3x2::order() - 1);
+        assert!(!seen.contains(&F3x2::zero()));
+        assert_eq!(g.pow(F3x2::order() - 1), F3x2::one());
+
+        // GF(125) likewise.
+        let g = F5x3::primitive_element(&mut rng);
+        let mut seen = std::collections::HashSet::new();
+        let mut x = F5x3::one();
+        for _ in 0..(F5x3::order() - 1) {
+            x *= g;
+            seen.insert(x);
+        }
+        assert_eq!(seen.len() as u128, F5x3::order() - 1);
+
+        // GF(13^4) is too large to enumerate, so check the order via the prime divisors of
+        // q - 1: a generator must not be killed by any proper divisor.
+        let g = F13x4::primitive_element(&mut rng);
+        let group_order = F13x4::order() - 1;
+        assert_eq!(g.pow(group_order), F13x4::one());
+        for r in [2u128, 3, 5, 7, 17] {
+            assert_eq!(group_order % r, 0, "{} should divide {}", r, group_order);
+            assert_ne!(g.pow(group_order / r), F13x4::one(), "r = {}", r);
+        }
+    }
+
+    /// A primitive nth root of unity satisfies r^n = 1 and r^k != 1 for every 0 < k < n.
+    #[test]
+    fn test_root_of_unity_is_primitive() {
+        let mut rng = StdRng::seed_from_u64(29);
+
+        // The group order of GF(125) is 124 = 2^2 * 31.
+        for n in [2u64, 4, 31, 62, 124] {
+            let r = F5x3::root_of_unity(n, &mut rng);
+            assert_eq!(r.pow(n as u128), F5x3::one(), "n = {}", n);
+            for k in 1..n {
+                assert_ne!(r.pow(k as u128), F5x3::one(), "n = {}, k = {}", n, k);
+            }
+        }
+
+        // The group order of GF(9) is 8, so these are the powers of two up to it.
+        for n in [2u64, 4, 8] {
+            let r = F3x2::root_of_unity(n, &mut rng);
+            assert_eq!(r.pow(n as u128), F3x2::one(), "n = {}", n);
+            for k in 1..n {
+                assert_ne!(r.pow(k as u128), F3x2::one(), "n = {}, k = {}", n, k);
+            }
+        }
+    }
+
+    /// Serialization round-trips, and deserialization reduces coefficients into canonical form.
+    #[test]
+    fn test_ser_de() {
+        let mut rng = StdRng::seed_from_u64(7);
+        for _ in 0..32 {
+            let element = F13x4::random(&mut rng);
+            let bytes = bincode::serialize(&element).unwrap();
+            let recovered: F13x4 = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(element, recovered);
+        }
+        // Only the coefficients are encoded; P, N and the modulus live in the type.
+        let bytes = bincode::serialize(&F13x4::one()).unwrap();
+        assert_eq!(bytes.len(), 4 * std::mem::size_of::<u64>());
+
+        // Coefficients that arrive unreduced are brought back into canonical form, so a decoded
+        // value can never compare unequal to the element it represents.
+        let unreduced = bincode::serialize(&[14u64, 0, 0, 0]).unwrap();
+        let decoded: F13x4 = bincode::deserialize(&unreduced).unwrap();
+        assert_eq!(decoded, F13x4::new([1, 0, 0, 0]));
     }
 }
