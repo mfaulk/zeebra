@@ -59,7 +59,6 @@ impl BigInt {
 
     /// Integer value of a string of decimal digits.
     pub fn from_dec_str(s: &str) -> Result<BigInt, FromDecStrErr> {
-        println!("BigInt::from_dec_str({})", s);
         let mut signum = 0;
         let mut magnitude = BigUInt::zero();
 

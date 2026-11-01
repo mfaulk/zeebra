@@ -34,7 +34,6 @@ const NUM_ITERATIONS_MR: usize = 5;
 /// This is a probabilistic algorithm. If successful, returns a non-trivial factor (not necessarily prime).
 /// If not successful, the algorithm should be retried with a different initial point.
 pub fn pollards_rho(n: &BigUInt, x_0: &BigUInt) -> Result<BigUInt, ()> {
-    println!("pollards rho, n: {}, x_0: {}", n, x_0);
     // Defines the pseudo-random sequence x_{i+1} = x_i^2 + 1 (mod n)
     fn f(x: &BigUInt, n: &BigUInt) -> BigUInt {
         (x * x + &BigUInt::one()) % n

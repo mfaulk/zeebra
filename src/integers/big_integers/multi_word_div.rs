@@ -172,7 +172,9 @@ pub fn multi_word_div(u: &[u64], v: &[u64]) -> (Vec<u64>, Vec<u64>) {
         // If q*v is greater than u, subtract 1 from q, then recompute q*v.
         let mut qv = multi_word_mul(&[q], &v);
         if multi_word_cmp(&qv, &u[j..=j + n]) == Ordering::Greater {
-            println!("This step should happen extremely rarely.");
+            // This correction is reached extremely rarely; see
+            // `tests::test_div_rare_update_to_q`, which is still waiting on an input that
+            // exercises it.
             q -= 1;
             // Subtracting v from `qv` is cheaper than recomputing it by multiplying.
             let (new_qv, borrow) = multi_word_sub(&qv, &v);

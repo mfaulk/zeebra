@@ -82,7 +82,6 @@ pub fn is_prime<R: RngCore + CryptoRng>(n: &BigUInt, n_iterations: usize, rng: &
 /// Returns true if `a` is a witness for the compositeness of n. Returning false
 /// indicates that n may be either prime or composite.
 fn miller_rabin_is_composite(n: &BigUInt, a: &BigUInt) -> bool {
-    println!("miller-rabin n: {}, a: {}", n, a);
     assert!(*n > *TWO); // n > 2
     assert_eq!(n % &BigUInt::new_from_u64(2), BigUInt::one()); // n must be odd.
 
@@ -103,7 +102,6 @@ fn miller_rabin_is_composite(n: &BigUInt, a: &BigUInt) -> bool {
     // If **any** of the congruences hold, then `a` is a non-witness and n is a "probable prime".
 
     // a^k
-    println!("a: {}, e: {}, k: {}", a, e, k);
     let a_k = a.pow_mod_p(&k, n);
 
     // a^k \eqiv? 1 (mod n)
