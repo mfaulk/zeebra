@@ -11,7 +11,21 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use crate::{integers::FromDecStrErr, Ring};
+use crate::{
+    integers::{big_uint::BigUInt, factor, FromDecStrErr},
+    Ring,
+};
+
+/// The value of a `BigUInt` that is known to fit in a `u128`.
+///
+/// Used for the prime factors of q - 1, which cannot exceed q - 1 itself.
+fn big_uint_to_u128(value: &BigUInt) -> u128 {
+    let words = value.as_le_words();
+    assert!(words.len() <= 2, "{:?} does not fit in a u128", value);
+    let low = *words.first().unwrap_or(&0) as u128;
+    let high = *words.get(1).unwrap_or(&0) as u128;
+    low | (high << 64)
+}
 
 /// Why a string could not be parsed as a finite field element.
 ///
@@ -83,10 +97,49 @@ where
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self;
 
     /// A primitive element of the finite field is a generator of the field's multiplicative group.
-    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self;
+    ///
+    /// Found by random search. The multiplicative group of a finite field is cyclic of order
+    /// q - 1, and an element generates it unless its order is a proper divisor of q - 1. Every
+    /// proper divisor divides (q - 1) / r for some prime r | q - 1, so those quotients are the
+    /// only exponents worth testing. See Handbook of Applied Cryptography, Algorithm 4.80.
+    ///
+    /// This default works for any finite field, since it uses nothing but the field's own
+    /// arithmetic. A type with a cheaper construction may override it — the prime fields do,
+    /// via `find_generator`, which exploits their elements being integers mod p.
+    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        let group_order = Self::order() - 1;
+        let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
+        let quotients: Vec<u128> = prime_factors
+            .iter()
+            .map(|r| group_order / big_uint_to_u128(r))
+            .collect();
+
+        loop {
+            let candidate = Self::random(rng);
+            if candidate.is_zero() {
+                continue;
+            }
+            if quotients
+                .iter()
+                .all(|&exponent| candidate.pow(exponent) != Self::one())
+            {
+                return candidate;
+            }
+        }
+    }
 
     /// A primitive, non-trivial nth root of unity, x^n = 1
-    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self;
+    ///
+    /// # Panics
+    /// Panics unless `n` divides the order of the multiplicative group.
+    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
+        let group_order = Self::order() - 1;
+        assert_eq!(group_order % n as u128, 0, "n must divide the group order.");
+
+        // If g has order q - 1, then g^((q-1)/n) has order exactly n.
+        let g = Self::primitive_element(rng);
+        g.pow(group_order / n as u128)
+    }
 
     /// The number of elements q = p^k in the field, where p is a prime.
     fn order() -> u128;

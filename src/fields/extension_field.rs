@@ -28,7 +28,6 @@ use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_va
 
 use crate::{
     identities::{One, Zero},
-    integers::{big_uint::BigUInt, factor},
     FiniteField, ParseFieldElementError, Ring,
 };
 
@@ -41,17 +40,6 @@ pub trait IrreduciblePolynomial<const P: u64, const N: usize>: 'static {
     /// Coefficients c_0, ..., c_{N-1} of `x^N + c_{N-1} x^{N-1} + ... + c_1 x + c_0`, low-order
     /// first. The leading coefficient is implicitly 1.
     const COEFFICIENTS: [u64; N];
-}
-
-/// The value of a `BigUInt` that is known to fit in a `u128`.
-///
-/// Used for the prime factors of q - 1, which cannot exceed q - 1 itself.
-fn big_uint_to_u128(value: &BigUInt) -> u128 {
-    let words = value.as_le_words();
-    assert!(words.len() <= 2, "{:?} does not fit in a u128", value);
-    let low = *words.first().unwrap_or(&0) as u128;
-    let high = *words.get(1).unwrap_or(&0) as u128;
-    low | (high << 64)
 }
 
 /// Element of the field GF(P^N), with multiplication reduced by the irreducible polynomial M.
@@ -269,45 +257,6 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
             coefficients,
             modulus: PhantomData,
         }
-    }
-
-    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        // The multiplicative group of GF(P^N) is cyclic of order q - 1. An element generates it
-        // unless its order is a proper divisor of q - 1, and every proper divisor divides
-        // (q - 1) / r for some prime r | q - 1 — so those quotients are the only exponents worth
-        // testing. See Handbook of Applied Cryptography, Algorithm 4.80.
-        //
-        // `find_generator` cannot be reused here: it works on integers mod p via `pow_mod_p`,
-        // whereas these elements are polynomials.
-        let group_order = Self::order() - 1;
-        let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
-        let quotients: Vec<u128> = prime_factors
-            .iter()
-            .map(|r| group_order / big_uint_to_u128(r))
-            .collect();
-
-        loop {
-            let candidate = Self::random(rng);
-            if candidate.is_zero() {
-                continue;
-            }
-            if quotients
-                .iter()
-                .all(|&exponent| candidate.pow(exponent) != Self::one())
-            {
-                return candidate;
-            }
-        }
-    }
-
-    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
-        // n must divide the group order.
-        let group_order = Self::order() - 1;
-        assert_eq!(group_order % n as u128, 0, "n must divide the group order.");
-
-        // If g generates a group of order q - 1, then g^((q-1)/n) has order exactly n.
-        let g = Self::primitive_element(rng);
-        g.pow(group_order / n as u128)
     }
 
     fn order() -> u128 {
