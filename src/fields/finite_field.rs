@@ -11,7 +11,40 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use crate::Ring;
+use crate::{integers::FromDecStrErr, Ring};
+
+/// Why a string could not be parsed as a finite field element.
+///
+/// Carries which character was rejected, so a caller can report the position of the problem
+/// rather than only that parsing failed.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ParseFieldElementError {
+    /// A character was not a decimal digit. Holds the offending byte, offset from `b'0'`.
+    InvalidCharacter(u8),
+
+    /// The value did not fit the field's representation.
+    OutOfRange,
+}
+
+impl Display for ParseFieldElementError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidCharacter(_) => write!(f, "a character is not in the range 0-9"),
+            Self::OutOfRange => write!(f, "the value is too large for the field"),
+        }
+    }
+}
+
+impl std::error::Error for ParseFieldElementError {}
+
+impl From<FromDecStrErr> for ParseFieldElementError {
+    fn from(err: FromDecStrErr) -> Self {
+        match err {
+            FromDecStrErr::InvalidCharacter(c) => Self::InvalidCharacter(c),
+            FromDecStrErr::InvalidLength => Self::OutOfRange,
+        }
+    }
+}
 
 /// A Finite Field element.
 pub trait FiniteField:
@@ -44,9 +77,7 @@ where
     fn new(val: u64) -> Self;
 
     /// Parse a string representation of a finite field element.
-    // TODO: return a named error type instead of `()`, which carries no failure detail.
-    #[allow(clippy::result_unit_err)]
-    fn from_str(_value: &str) -> Result<Self, ()>;
+    fn from_str(_value: &str) -> Result<Self, ParseFieldElementError>;
 
     /// A uniformly random field element.
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self;

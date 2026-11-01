@@ -15,7 +15,7 @@ use crate::{
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
     integers::{big_uint::BigUInt, factor, find_generator},
-    FiniteField, Ring,
+    FiniteField, ParseFieldElementError, Ring,
 };
 
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
@@ -51,8 +51,8 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         Self { value: val % P }
     }
 
-    fn from_str(value: &str) -> Result<Self, ()> {
-        let parsed = BigUInt::from_dec_str(value).map_err(|_| ())?;
+    fn from_str(value: &str) -> Result<Self, ParseFieldElementError> {
+        let parsed = BigUInt::from_dec_str(value)?;
         let modulus = BigUInt::new_from_u64(P);
         let residue = parsed % &modulus;
         let words = residue.as_le_words();
@@ -194,7 +194,7 @@ mod tests {
             PrimeFieldElement64, Zp1091, Zp18446744073709551557, Zp2147483647, Zp541, Zp65537, Zp7,
         },
         identities::{One, Zero},
-        FiniteField,
+        FiniteField, ParseFieldElementError,
     };
 
     #[test]
@@ -464,5 +464,24 @@ mod tests {
         for v in &values {
             assert!(v.value < 541, "{:?} is not reduced", v);
         }
+    }
+
+    /// A parse failure reports which character was rejected, rather than only that it failed.
+    #[test]
+    fn test_from_str_reports_the_offending_character() {
+        type Zp = Zp541;
+        // `from_dec_str` reports the byte offset from b'0', so 'x' (120) arrives as 72.
+        assert_eq!(
+            Zp::from_str("12x3"),
+            Err(ParseFieldElementError::InvalidCharacter(b'x' - b'0'))
+        );
+        assert_eq!(
+            Zp::from_str("-5"),
+            Err(ParseFieldElementError::InvalidCharacter(
+                b'-'.wrapping_sub(b'0')
+            ))
+        );
+        // A valid string still parses, reduced mod P.
+        assert_eq!(Zp::from_str("542").unwrap(), Zp::new(1));
     }
 }
