@@ -154,6 +154,7 @@ mod tests {
         poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
         FiniteField, Monomial,
     };
+    use proptest::prelude::*;
 
     // TODO: Proptest that Zero is the additive identity.
 
@@ -209,24 +210,38 @@ mod tests {
         assert_eq!(&b + &a, expected);
     }
 
+    /// Subtraction removes exactly what addition contributed.
     #[test]
-    #[ignore]
-    // a + b = b + a
-    fn test_add_is_commutative() {
-        todo!()
-    }
-
-    #[test]
-    #[ignore]
     fn test_sub() {
-        todo!()
+        type F = PrimeFieldElement64<541>;
+        let vars = ["x", "y"];
+        let p: SparseMultiPoly<2, F> = SparseMultiPoly::parse("5*x^2*y + 3*x + 7", vars).unwrap();
+        let q: SparseMultiPoly<2, F> = SparseMultiPoly::parse("3*x + 7", vars).unwrap();
+        let expected: SparseMultiPoly<2, F> = SparseMultiPoly::parse("5*x^2*y", vars).unwrap();
+
+        assert_eq!(&p - &q, expected);
+        // Subtracting in the other order negates the result.
+        assert_eq!(&q - &p, -expected.clone());
+        // Terms that cancel are dropped rather than kept with a zero coefficient.
+        assert_eq!(&q - &q, SparseMultiPoly::zero());
     }
 
-    #[test]
-    #[ignore]
-    // a - a = 0
-    fn test_sub_is_additive_inverse() {
-        todo!()
+    proptest! {
+        /// a + b = b + a
+        #[test]
+        fn test_add_is_commutative(
+            a in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>(),
+            b in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
+            prop_assert_eq!(&a + &b, &b + &a);
+        }
+
+        /// a - a = 0
+        #[test]
+        fn test_sub_is_additive_inverse(
+            a in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
+            prop_assert_eq!(&a - &a, SparseMultiPoly::zero());
+            prop_assert_eq!(&a + &(-a.clone()), SparseMultiPoly::zero());
+        }
     }
 
     #[test]
@@ -275,18 +290,22 @@ mod tests {
         assert_eq!(&p * &q, expected);
     }
 
-    #[test]
-    #[ignore]
-    // a * 1 = a
-    fn test_mul_one_is_identity() {
-        todo!()
-    }
+    proptest! {
+        /// a * 1 = a
+        #[test]
+        fn test_mul_one_is_identity(
+            a in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
+            prop_assert_eq!(&a * &SparseMultiPoly::one(), a.clone());
+            prop_assert_eq!(&a * &SparseMultiPoly::zero(), SparseMultiPoly::zero());
+        }
 
-    #[test]
-    #[ignore]
-    //
-    fn test_mul_is_commutative() {
-        todo!()
+        /// a * b = b * a
+        #[test]
+        fn test_mul_is_commutative(
+            a in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>(),
+            b in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
+            prop_assert_eq!(&a * &b, &b * &a);
+        }
     }
 
     #[test]

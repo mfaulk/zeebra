@@ -40,8 +40,10 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// # Arguments
     /// * `terms` - A list of terms (monomial, coefficient).
     ///
-    /// The zero polynomial may be represented as an empty set of terms, or by the single
-    /// term 0 * Monomial:one().
+    /// Terms whose coefficient is zero are omitted, including terms that cancel when merged, so
+    /// the zero polynomial is always the empty set of terms. `PartialEq` is derived over that set
+    /// and `Hash` is written over it, so a surviving zero term would make a polynomial unequal to
+    /// its own canonical form.
     pub fn new<T>(terms: &[T]) -> Self
     where
         T: Into<Term<N, F>> + Clone,
@@ -64,6 +66,9 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                 }
             }
         }
+
+        // Merging can cancel a monomial out entirely; such a term is not part of the polynomial.
+        terms_map.retain(|_monomial, c| !c.is_zero());
 
         Self { terms: terms_map }
     }
@@ -214,9 +219,19 @@ impl<const N: usize, F: FiniteField> Hash for SparseMultiPoly<N, F> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ArbParams {
-    num_terms: usize,
+    /// How many (monomial, coefficient) pairs to draw. Duplicate monomials are combined and zero
+    /// coefficients dropped, so the generated polynomial may end up with fewer terms than this.
+    pub num_terms: usize,
+}
+
+impl Default for ArbParams {
+    fn default() -> Self {
+        // Must be nonzero: drawing no pairs would make `any::<SparseMultiPoly>()` generate
+        // nothing but the zero polynomial, and every property over it would hold vacuously.
+        Self { num_terms: 4 }
+    }
 }
 
 /// Arbitrary
@@ -231,8 +246,8 @@ impl<const N: usize, F: FiniteField + 'static> Arbitrary for SparseMultiPoly<N, 
             .prop_map(|(monomials, coefficients)| {
                 // Collecting into an array so that the size is known at compile time.
                 let mut terms: Vec<Term<N, F>> = vec![];
-                for (i, (m, c)) in monomials.into_iter().zip(coefficients).enumerate() {
-                    terms[i] = (c, m).into();
+                for (m, c) in monomials.into_iter().zip(coefficients) {
+                    terms.push((c, m).into());
                 }
                 Self::new(&terms)
             })
@@ -283,11 +298,20 @@ mod tests {
         assert_eq!(p, expected)
     }
 
+    /// `new` collects terms into a map, so the order they are supplied in does not matter.
     #[test]
-    #[ignore]
-    // Order of terms should not matter.
     fn test_new_term_order_is_irrelevant() {
-        todo!()
+        type F = PrimeFieldElement64<337>;
+        let x2y = (Monomial::<2>::new(&[2, 1]), F::new(5));
+        let x = (Monomial::<2>::new(&[1, 0]), F::new(3));
+        let one = (Monomial::<2>::new(&[0, 0]), F::new(7));
+
+        let ascending = SparseMultiPoly::new(&[one, x, x2y]);
+        let descending = SparseMultiPoly::new(&[x2y, x, one]);
+        let shuffled = SparseMultiPoly::new(&[x, x2y, one]);
+
+        assert_eq!(ascending, descending);
+        assert_eq!(ascending, shuffled);
     }
 
     #[test]

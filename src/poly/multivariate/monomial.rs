@@ -2,7 +2,7 @@
 
 use crate::FiniteField;
 use proptest::{
-    arbitrary::{any, Arbitrary},
+    arbitrary::Arbitrary,
     collection::vec,
     prelude::{BoxedStrategy, Strategy},
 };
@@ -117,8 +117,9 @@ impl<const N: usize> Distribution<Monomial<N>> for Standard {
 impl<const N: usize> Arbitrary for Monomial<N> {
     type Parameters = ();
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        // Create a strategy for generating a vector of N usizes
-        vec(any::<u32>(), N)
+        // Exponents are kept small: multiplying monomials adds exponents, so full-range u32
+        // values would overflow in any product rather than exercising the operation.
+        vec(0u32..=16, N)
             // Map the generated vector to a Monomial
             .prop_map(|vec| {
                 let mut array = [0; N];
@@ -190,9 +191,7 @@ mod tests {
 
     proptest! {
         #[test]
-        #[ignore]
         fn test_lcm(a in any::<Monomial<7>>(), b in any::<Monomial<7>>()) {
-            // TODO: without parameters, this may only generate monomials with degree 0.
             test_lcm_helper(&a, &b)?;
         }
 
