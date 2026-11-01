@@ -5,13 +5,24 @@
 //! and subtraction of polynomials over GF(p). Multiplication is constructed using an
 //! irreducible polynomial P in GF(p)[X] of degree n: the product of two elements a, b, is the
 //! remainder of Euclidean division by P of the product ab.
+//!
+//! # Incomplete: multiplication is not yet polynomial multiplication
+//! `Mul` currently multiplies coefficients componentwise and does not reduce by an irreducible
+//! polynomial — the type has no parameter naming one. This type is therefore the direct product
+//! ring GF(p)^N, not the field GF(p^N): `X * X` yields `X` rather than `X^2`, and elements with a
+//! zero coefficient have no multiplicative inverse, so `inverse` (which applies Fermat's little
+//! theorem) silently returns a non-inverse for them. Completing this requires a const parameter
+//! for the irreducible polynomial.
 
 use std::{
     fmt::{Display, Formatter},
     ops,
 };
 
-use proptest::{prelude::Arbitrary, strategy::BoxedStrategy};
+use proptest::{
+    prelude::Arbitrary,
+    strategy::{BoxedStrategy, Strategy},
+};
 use rand::{CryptoRng, RngCore};
 use serde::{
     ser::{Serialize, Serializer},
@@ -225,7 +236,14 @@ impl<const P: u64, const N: usize> Arbitrary for ExtensionFieldElement<P, N> {
     type Parameters = ();
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        todo!()
+        // Each of the N coefficients is independently drawn from GF(p).
+        proptest::collection::vec(0u64..P, N)
+            .prop_map(|drawn| {
+                let mut coefficients = [0u64; N];
+                coefficients.copy_from_slice(&drawn);
+                Self::new(coefficients)
+            })
+            .boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -233,6 +251,7 @@ impl<const P: u64, const N: usize> Arbitrary for ExtensionFieldElement<P, N> {
 
 #[cfg(test)]
 mod tests {
+    use proptest::{arbitrary::Arbitrary, proptest};
     use rand::thread_rng;
 
     use crate::{
@@ -240,6 +259,9 @@ mod tests {
         identities::{One, Zero},
         FiniteField,
     };
+
+    type F13x4 = ExtensionFieldElement<13, 4>;
+    type F61x8 = ExtensionFieldElement<61, 8>;
 
     #[test]
     // random should not panic.
@@ -335,5 +357,152 @@ mod tests {
         let b = F::new([11, 11, 11, 11]);
         let result = a / b;
         assert_eq!(result, F::new([6, 12, 5, 11]));
+    }
+
+    // Commutative-ring axioms, checked over arbitrary elements.
+    //
+    // The multiplicative axioms are deliberately limited to those that hold in any commutative
+    // ring. `a * a.inverse() == one()` is NOT asserted here: `Mul` is currently componentwise, so
+    // this type is the direct product GF(p)^N rather than GF(p^N), and elements with a zero
+    // coefficient have no inverse. See the module TODO.
+
+    fn addition_is_commutative<F: FiniteField>(a: F, b: F) {
+        assert_eq!(a + b, b + a);
+    }
+
+    fn addition_is_associative<F: FiniteField>(a: F, b: F, c: F) {
+        assert_eq!((a + b) + c, a + (b + c));
+    }
+
+    fn zero_is_the_additive_identity<F: FiniteField>(a: F) {
+        assert_eq!(a + F::zero(), a);
+    }
+
+    // `a - a` is the point of the test, not a mistake.
+    #[allow(clippy::eq_op)]
+    fn subtracting_an_element_from_itself_gives_zero<F: FiniteField>(a: F) {
+        assert_eq!(a - a, F::zero());
+    }
+
+    fn multiplication_is_commutative<F: FiniteField>(a: F, b: F) {
+        assert_eq!(a * b, b * a);
+    }
+
+    fn multiplication_is_associative<F: FiniteField>(a: F, b: F, c: F) {
+        assert_eq!((a * b) * c, a * (b * c));
+    }
+
+    fn one_is_the_multiplicative_identity<F: FiniteField>(a: F) {
+        assert_eq!(a * F::one(), a);
+    }
+
+    fn multiplication_distributes_over_addition<F: FiniteField>(a: F, b: F, c: F) {
+        assert_eq!(a * (b + c), (a * b) + (a * c));
+    }
+
+    fn coefficients_stay_reduced<const P: u64, const N: usize>(
+        a: ExtensionFieldElement<P, N>,
+        b: ExtensionFieldElement<P, N>,
+    ) {
+        // Every coefficient of a sum or product must be a reduced residue mod p.
+        for c in (a + b)
+            .coefficients
+            .iter()
+            .chain((a * b).coefficients.iter())
+        {
+            assert!(*c < P);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_addition_is_commutative_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary()) {
+            addition_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_addition_is_commutative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary()) {
+            addition_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_addition_is_associative_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary(), c in F13x4::arbitrary()) {
+            addition_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_addition_is_associative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary(), c in F61x8::arbitrary()) {
+            addition_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_zero_is_the_additive_identity_13x4(a in F13x4::arbitrary()) {
+            zero_is_the_additive_identity(a);
+        }
+
+        #[test]
+        fn test_zero_is_the_additive_identity_61x8(a in F61x8::arbitrary()) {
+            zero_is_the_additive_identity(a);
+        }
+
+        #[test]
+        fn test_subtracting_an_element_from_itself_gives_zero_13x4(a in F13x4::arbitrary()) {
+            subtracting_an_element_from_itself_gives_zero(a);
+        }
+
+        #[test]
+        fn test_subtracting_an_element_from_itself_gives_zero_61x8(a in F61x8::arbitrary()) {
+            subtracting_an_element_from_itself_gives_zero(a);
+        }
+
+        #[test]
+        fn test_multiplication_is_commutative_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary()) {
+            multiplication_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_multiplication_is_commutative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary()) {
+            multiplication_is_commutative(a, b);
+        }
+
+        #[test]
+        fn test_multiplication_is_associative_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary(), c in F13x4::arbitrary()) {
+            multiplication_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_is_associative_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary(), c in F61x8::arbitrary()) {
+            multiplication_is_associative(a, b, c);
+        }
+
+        #[test]
+        fn test_one_is_the_multiplicative_identity_13x4(a in F13x4::arbitrary()) {
+            one_is_the_multiplicative_identity(a);
+        }
+
+        #[test]
+        fn test_one_is_the_multiplicative_identity_61x8(a in F61x8::arbitrary()) {
+            one_is_the_multiplicative_identity(a);
+        }
+
+        #[test]
+        fn test_multiplication_distributes_over_addition_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary(), c in F13x4::arbitrary()) {
+            multiplication_distributes_over_addition(a, b, c);
+        }
+
+        #[test]
+        fn test_multiplication_distributes_over_addition_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary(), c in F61x8::arbitrary()) {
+            multiplication_distributes_over_addition(a, b, c);
+        }
+
+        #[test]
+        fn test_coefficients_stay_reduced_13x4(a in F13x4::arbitrary(), b in F13x4::arbitrary()) {
+            coefficients_stay_reduced(a, b);
+        }
+
+        #[test]
+        fn test_coefficients_stay_reduced_61x8(a in F61x8::arbitrary(), b in F61x8::arbitrary()) {
+            coefficients_stay_reduced(a, b);
+        }
     }
 }
