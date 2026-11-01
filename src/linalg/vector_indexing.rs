@@ -28,6 +28,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::linalg::VectorParams;
     use crate::{
         fields::{FiniteField, Zp541},
         linalg::vector::Vector,
@@ -39,7 +40,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_indexing(v in (1..=MAX_SIZE).prop_flat_map(any_with::<Vector::<Zp541>>)) {
+        fn test_indexing(v in (1..=MAX_SIZE).prop_map(VectorParams::from).prop_flat_map(any_with::<Vector::<Zp541>>)) {
             for i in 0..v.len() {
                 assert_eq!(v[i], v.elements[i]);
             }
@@ -54,7 +55,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_indexing_mut(mut v in (1..=MAX_SIZE).prop_flat_map(any_with::<Vector::<Zp541>>)) {
+        fn test_indexing_mut(mut v in (1..=MAX_SIZE).prop_map(VectorParams::from).prop_flat_map(any_with::<Vector::<Zp541>>)) {
             for i in 0..v.len() {
                 v[i] = Zp541::new(i as u64);
                 assert_eq!(v[i], Zp541::new(i as u64));

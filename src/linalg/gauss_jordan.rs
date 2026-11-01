@@ -112,6 +112,7 @@ pub fn gauss_jordan_elimination<T: FiniteField>(matrix: &Matrix<T>) -> Matrix<T>
 
 #[cfg(test)]
 mod tests {
+    use crate::linalg::MatrixParams;
     use crate::{
         fields::Zp541,
         linalg::{
@@ -189,7 +190,7 @@ mod tests {
     proptest! {
         #[test]
         // Gauss-Jordan elimination should yield a matrix in reduced row echelon form.
-        fn test_gauss_jordan_is_rref(m in (1..=10usize, 1..=10usize).prop_flat_map(any_with::<super::Matrix::<Zp541>>))
+        fn test_gauss_jordan_is_rref(m in (1..=10usize, 1..=10usize).prop_map(MatrixParams::from).prop_flat_map(any_with::<super::Matrix::<Zp541>>))
         {
             let res = gauss_jordan_elimination(&m);
             println!("m: {}", m);

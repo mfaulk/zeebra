@@ -38,6 +38,7 @@ fn make_monic<F: FiniteField>(f: &UnivariatePolynomial<F>) -> UnivariatePolynomi
 
 #[cfg(test)]
 mod tests {
+    use crate::poly::univariate::PolynomialParams;
     use proptest::{prelude::*, proptest};
 
     use crate::{
@@ -58,8 +59,8 @@ mod tests {
         #[test]
         /// gcd(a,b) is a monic polynomial (i.e. the leading coefficient is 1).
         fn test_gcd_is_monic(
-            a in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
-            b in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
+            a in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            b in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
             let gcd = gcd(&a, &b);
             prop_assert_eq!(gcd.coefficients().last().unwrap(), &Zp1091::one());
         }
@@ -67,8 +68,8 @@ mod tests {
         #[test]
         /// gcd(a, b) divides a and b.
         fn test_gcd_divides_a_and_b(
-            a in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
-            b in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
+            a in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            b in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
             let gcd = gcd(&a, &b);
             prop_assert_eq!(a.div(&gcd).1, UnivariatePolynomial::<Zp1091>::zero());
             prop_assert_eq!(b.div(&gcd).1, UnivariatePolynomial::<Zp1091>::zero());
@@ -77,7 +78,7 @@ mod tests {
         #[test]
         /// gcd(0, a) = gcd(a, 0) = a, up to a constant factor.
         fn test_gcd_with_zero(
-            a in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
+            a in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
             let zero = UnivariatePolynomial::<Zp1091>::zero();
             let a_monic = make_monic(&a);
             prop_assert_eq!(gcd(&zero, &a), a_monic.clone());
@@ -95,17 +96,17 @@ mod tests {
         #[test]
         /// gcd(a, b) = gcd(b, a)
         fn test_gcd_is_symmetric(
-            a in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
-            b in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
+            a in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            b in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
             prop_assert_eq!(gcd(&a, &b), gcd(&b, &a));
         }
 
         #[test]
         // gcd(a,b)= gcd(a,b+ra) for any polynomial r.
         fn test_gcd_is_linear_combination(
-            a in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
-            b in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
-            r in ((0..=100usize).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
+            a in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            b in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            r in ((0..=100usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
             let gcd_ab = gcd(&a, &b);
             let gcd_a_b_plus_ra = gcd(&a, &(b + &a * &r));
             prop_assert_eq!(gcd_ab, gcd_a_b_plus_ra);

@@ -4,4 +4,6 @@ mod multivariate;
 mod univariate;
 
 pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial};
-pub use univariate::{gcd, lagrange_interpolate, Polynomial, UnivariatePolynomial};
+pub use univariate::{
+    gcd, lagrange_interpolate, Polynomial, PolynomialParams, UnivariatePolynomial,
+};

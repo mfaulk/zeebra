@@ -69,6 +69,7 @@ impl_mul_variants!([T: Ring], Matrix<T>);
 mod tests {
     use super::Matrix;
     use crate::fields::{Zp541, Zp65537};
+    use crate::linalg::MatrixParams;
     use proptest::prelude::*;
 
     const MAX_ROWS: usize = 10;
@@ -77,7 +78,7 @@ mod tests {
     proptest! {
         #[test]
         // The zero matrix is the additive identity: A + 0 = A
-        fn test_additive_identity(m in (1..=MAX_ROWS, 1..=MAX_COLS).prop_flat_map(any_with::<Matrix::<Zp541>>))
+        fn test_additive_identity(m in (1..=MAX_ROWS, 1..=MAX_COLS).prop_map(MatrixParams::from).prop_flat_map(any_with::<Matrix::<Zp541>>))
         {
             let zero = Matrix::<Zp541>::zero(m.num_rows, m.num_columns);
             assert_eq!(zero + &m, m);
@@ -90,8 +91,8 @@ mod tests {
         // Create two arbitrary matrices of the same size. Maybe there's a better way to do this?
         fn test_addition_is_commutative((a,b) in (1..=MAX_ROWS, 1..=MAX_COLS)
                 .prop_flat_map(|params| {
-            any_with::<Matrix::<Zp541>>(params).prop_flat_map(move |a| {
-                any_with::<Matrix::<Zp541>>(params).prop_map( move |b| (a.clone(),b))})})){
+            any_with::<Matrix::<Zp541>>(params.into()).prop_flat_map(move |a| {
+                any_with::<Matrix::<Zp541>>(params.into()).prop_map( move |b| (a.clone(),b))})})){
 
             assert_eq!(&a + &b, &b + &a);
         }
@@ -100,7 +101,7 @@ mod tests {
     proptest! {
         #[test]
         // The identity matrix is the multiplicative identity.
-        fn test_multiplicative_identity(m in (1..=MAX_ROWS, 1..=MAX_COLS).prop_flat_map(any_with::<Matrix::<Zp541>>))
+        fn test_multiplicative_identity(m in (1..=MAX_ROWS, 1..=MAX_COLS).prop_map(MatrixParams::from).prop_flat_map(any_with::<Matrix::<Zp541>>))
         {
             // The left-multiplicative identity.
             let I_m = Matrix::<Zp541>::identity(m.num_rows);
@@ -128,8 +129,8 @@ mod tests {
         // Create two arbitrary matrices of the same size. Maybe there's a better way to do this?
         fn test_sum_transposed((a,b) in (1..=MAX_ROWS, 1..=MAX_COLS)
                 .prop_flat_map(|params| {
-            any_with::<Matrix::<Zp541>>(params).prop_flat_map(move |a| {
-                any_with::<Matrix::<Zp541>>(params).prop_map( move |b| (a.clone(),b))})})){
+            any_with::<Matrix::<Zp541>>(params.into()).prop_flat_map(move |a| {
+                any_with::<Matrix::<Zp541>>(params.into()).prop_map( move |b| (a.clone(),b))})})){
 
             assert_eq!((&a + &b).transpose(), a.transpose() + b.transpose());
         }
@@ -142,8 +143,8 @@ mod tests {
             (a,b) in (1..=MAX_ROWS, 1..=MAX_COLS, 1..=MAX_COLS)
                 .prop_flat_map(|params| {
                 let (p,q,r) = params;
-                any_with::<Matrix::<Zp65537>>((q,p)).prop_flat_map(move |a| {
-                any_with::<Matrix::<Zp65537>>((p,r)).prop_map(move |b| { (a.clone(),b) })})})){
+                any_with::<Matrix::<Zp65537>>((q,p).into()).prop_flat_map(move |a| {
+                any_with::<Matrix::<Zp65537>>((p,r).into()).prop_map(move |b| { (a.clone(),b) })})})){
 
             let ab_transpose = (&a * &b).transpose();
             let a_transpose = a.transpose();
