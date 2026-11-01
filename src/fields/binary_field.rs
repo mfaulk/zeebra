@@ -39,7 +39,10 @@ use crate::{
 /// A binary field GF(2^m), modulo an irreducible polynomial P.
 pub struct BinaryFieldElement<const P: u64> {
     /// The i^th bit represents c_i in the polynomial \sum_{i=1}^m c_i * x_i.
-    pub coefficients: u64,
+    ///
+    /// Private so that the bit pattern cannot be set outside the field's order from outside:
+    /// `new` asserts `coefficients < P`, and `PartialEq` and `Hash` are derived over this.
+    coefficients: u64,
 }
 
 impl<const P: u64> BinaryFieldElement<P> {
@@ -56,6 +59,11 @@ impl<const P: u64> BinaryFieldElement<P> {
     /// (The bit pattern of) this field's modulus, i.e., irreducible polynomial.
     pub fn modulus(&self) -> u64 {
         P
+    }
+
+    /// The coefficient bit pattern: the i^th bit is c_i in \sum c_i x^i.
+    pub fn coefficients(&self) -> u64 {
+        self.coefficients
     }
 }
 

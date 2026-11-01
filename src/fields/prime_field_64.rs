@@ -21,8 +21,19 @@ use crate::{
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
 /// Element of a prime field with prime modulus P.
 pub struct PrimeFieldElement64<const P: u64> {
-    /// The element's representative integer in [0,p-1]
-    pub value: u64,
+    /// The element's representative integer in [0,p-1].
+    ///
+    /// Private so that the reduced-residue invariant cannot be broken from outside: every
+    /// operation here assumes `value < P`, and `PartialEq` and `Hash` are derived over it, so an
+    /// unreduced value would compare unequal to the element it represents.
+    value: u64,
+}
+
+impl<const P: u64> PrimeFieldElement64<P> {
+    /// The element's representative integer in [0,p-1].
+    pub fn value(&self) -> u64 {
+        self.value
+    }
 }
 
 impl<const P: u64> Zero for PrimeFieldElement64<P> {

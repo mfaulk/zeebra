@@ -31,10 +31,13 @@ pub use special::*;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Matrix<T: Ring> {
     /// Number of rows in the matrix.
-    pub num_rows: usize,
+    ///
+    /// Private, with `num_rows()` as the accessor: `elements.len()` must stay equal to
+    /// `num_rows * num_columns`, which assigning a dimension from outside would break.
+    num_rows: usize,
 
-    /// Number of columns in the matrix.
-    pub num_columns: usize,
+    /// Number of columns in the matrix. Private for the same reason as `num_rows`.
+    num_columns: usize,
 
     /// Elements of the matrix, in row-major order.
     pub(crate) elements: Vec<T>,

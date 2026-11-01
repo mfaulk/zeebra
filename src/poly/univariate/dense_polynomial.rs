@@ -21,9 +21,13 @@ use crate::{
 /// A Polynomial over a finite field `F`.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 pub struct DensePolynomial<F: FiniteField> {
-    /// coefficients[i] = a_i
+    /// coefficients[i] = a_i, with no high-order zeros and never empty.
+    ///
+    /// `pub(crate)` rather than `pub`: `new` establishes that trimmed form via `trim`, and
+    /// `PartialEq` is derived over this vector, so a trailing zero pushed from outside would make
+    /// a polynomial unequal to its own canonical form. Read it through `Polynomial::coefficients`.
     #[serde(bound = "F: FiniteField")]
-    pub coefficients: Vec<F>,
+    pub(crate) coefficients: Vec<F>,
 }
 
 impl<F: FiniteField> DensePolynomial<F> {
