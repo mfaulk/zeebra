@@ -464,4 +464,37 @@ mod tests {
             "9 + x + 2*x^2 + 5*x^3"
         );
     }
+
+    /// The strategy is usable, and coefficients stay in the trimmed form `new` establishes.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{assert_strategy_is_not_degenerate, draw};
+        type F = Zp541;
+        // The degree parameter defaults to zero, so pass one explicitly to get varied degrees.
+        let strategy = (0..=8usize).prop_flat_map(any_with::<DensePolynomial<F>>);
+        assert_strategy_is_not_degenerate(&strategy, "DensePolynomial");
+
+        let mut values = draw(&strategy, 32);
+        values.extend([
+            DensePolynomial::<F>::zero(),
+            DensePolynomial::<F>::new(&[]),
+            DensePolynomial::<F>::new(&[F::zero()]),
+            DensePolynomial::<F>::new(&[F::zero(), F::zero()]),
+        ]);
+
+        for p in &values {
+            // `trim` maps [] to [0], so coefficients are never empty.
+            assert!(!p.coefficients.is_empty(), "{:?} has no coefficients", p);
+            // No high-order zeros, except the single zero of the zero polynomial.
+            if p.coefficients.len() > 1 {
+                assert!(
+                    !p.coefficients.last().unwrap().is_zero(),
+                    "{:?} has a trailing zero coefficient",
+                    p
+                );
+            }
+            // Every representation of zero agrees with `zero()`.
+            assert_eq!(p.is_zero(), *p == DensePolynomial::<F>::zero(), "{:?}", p);
+        }
+    }
 }

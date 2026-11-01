@@ -422,4 +422,15 @@ mod tests {
         );
         assert_eq!(C.determinant(), Ok(F::new(0)));
     }
+
+    /// The strategy is usable once given dimensions; the default of (0, 0) yields only 0x0.
+    #[test]
+    fn test_arbitrary_is_not_degenerate() {
+        use crate::test_support::{assert_strategy_is_not_degenerate, draw};
+        let strategy = (1..=6usize, 1..=6usize).prop_flat_map(any_with::<super::Matrix<Zp541>>);
+        assert_strategy_is_not_degenerate(&strategy, "Matrix");
+        for m in draw(&strategy, 16) {
+            assert!(m.num_rows() > 0 && m.num_columns() > 0);
+        }
+    }
 }

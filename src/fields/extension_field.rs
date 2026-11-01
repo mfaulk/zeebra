@@ -745,4 +745,24 @@ mod tests {
             prop_assert_eq!(bits(extension(a) * extension(b)), binary_product.coefficients);
         }
     }
+
+    /// The strategy is usable, equal values hash equally, and coefficients stay reduced mod P.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{
+            assert_hash_agrees_with_eq, assert_strategy_is_not_degenerate, draw,
+        };
+        let strategy = F13x4::arbitrary();
+        assert_strategy_is_not_degenerate(&strategy, "ExtensionFieldElement");
+
+        let mut values = draw(&strategy, 32);
+        values.extend([F13x4::zero(), F13x4::one(), F13x4::default()]);
+        assert_hash_agrees_with_eq(&values, "ExtensionFieldElement");
+
+        for v in &values {
+            for c in v.coefficients {
+                assert!(c < 13, "{:?} has an unreduced coefficient", v);
+            }
+        }
+    }
 }

@@ -739,4 +739,33 @@ mod tests {
         let high = BigUInt::new_from_u64(14);
         let _sample = BigUInt::sample_inclusive(&low, &high, &mut rng);
     }
+
+    /// The strategy is usable, and equal values hash equally over the canonical word form.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{
+            assert_hash_agrees_with_eq, assert_ord_agrees_with_eq,
+            assert_strategy_is_not_degenerate, draw,
+        };
+        let strategy = BigUInt::arbitrary();
+        assert_strategy_is_not_degenerate(&strategy, "BigUInt");
+
+        let mut values = draw(&strategy, 32);
+        // Include every spelling of zero, which is where a duplicate representation would show.
+        values.extend([
+            BigUInt::zero(),
+            BigUInt::default(),
+            BigUInt::new(&[0, 0]),
+            BigUInt::from_dec_str("0").unwrap(),
+        ]);
+        assert_hash_agrees_with_eq(&values, "BigUInt");
+        assert_ord_agrees_with_eq(&values, "BigUInt");
+
+        // Canonical form: no higher-order zero words.
+        for v in &values {
+            if let Some(last) = v.as_le_words().last() {
+                assert_ne!(*last, 0, "{:?} has a leading zero word", v);
+            }
+        }
+    }
 }

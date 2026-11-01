@@ -436,4 +436,22 @@ mod tests {
             }
         }
     }
+
+    /// The strategy is usable, equal values hash equally, and representatives stay below P.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{
+            assert_hash_agrees_with_eq, assert_strategy_is_not_degenerate, draw,
+        };
+        let strategy = Zp541::arbitrary();
+        assert_strategy_is_not_degenerate(&strategy, "PrimeFieldElement64");
+
+        let mut values = draw(&strategy, 32);
+        values.extend([Zp541::zero(), Zp541::one(), Zp541::default()]);
+        assert_hash_agrees_with_eq(&values, "PrimeFieldElement64");
+
+        for v in &values {
+            assert!(v.value < 541, "{:?} is not reduced", v);
+        }
+    }
 }

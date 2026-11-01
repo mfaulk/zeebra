@@ -422,4 +422,39 @@ mod tests {
     }
 
     // Operations should not produce unnecessary terms with zero coefficient.
+
+    /// The strategy is usable, equal polynomials hash equally, and no zero terms are retained.
+    #[test]
+    fn test_arbitrary_and_representation_are_sound() {
+        use crate::test_support::{
+            assert_hash_agrees_with_eq, assert_strategy_is_not_degenerate, draw,
+        };
+        use proptest::arbitrary::Arbitrary;
+        type F = PrimeFieldElement64<541>;
+        type Poly = SparseMultiPoly<2, F>;
+        let strategy = Poly::arbitrary();
+        assert_strategy_is_not_degenerate(&strategy, "SparseMultiPoly");
+
+        let mut values = draw(&strategy, 32);
+        // Every spelling of zero, including one built from terms that cancel.
+        let x = Monomial::<2>::new(&[1, 0]);
+        values.extend([
+            Poly::zero(),
+            Poly::default(),
+            Poly::new(&[(x, F::zero())]),
+            Poly::new(&[(x, F::new(3)), (x, F::new(538))]),
+        ]);
+        assert_hash_agrees_with_eq(&values, "SparseMultiPoly");
+
+        for p in &values {
+            for (monomial, coefficient) in p.terms.iter() {
+                assert!(
+                    !coefficient.is_zero(),
+                    "{:?} retained a zero coefficient for {:?}",
+                    p,
+                    monomial
+                );
+            }
+        }
+    }
 }
