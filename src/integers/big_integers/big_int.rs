@@ -262,9 +262,9 @@ impl Rem<&BigInt> for &BigInt {
 
     fn rem(self, rhs: &BigInt) -> Self::Output {
         let rem = &self.magnitude % &rhs.magnitude;
-        let signum = self.signum * rhs.signum;
-        debug_assert!(signum == -1 || signum == 0 || signum == 1);
-        if signum == -1 {
+        // Under truncated division the remainder takes the sign of the dividend alone, which is
+        // what makes `a == (a / b) * b + (a % b)` hold for a negative divisor.
+        if self.signum == -1 {
             BigInt::from(rem).neg()
         } else {
             BigInt::from(rem)
@@ -443,27 +443,68 @@ mod tests {
         }
     }
 
+    /// Division truncates toward zero; the quotient's sign is the product of the operands' signs.
     #[test]
-    #[ignore]
     fn test_div() {
-        todo!()
+        let magnitude = BigInt::from_dec_str("1361129467683753853853498429727072845824").unwrap(); // 2^130
+        let divisor = BigInt::from_dec_str("3486784401").unwrap(); // 3^20
+        let quotient = BigInt::from_dec_str("390368118915923145387932584629").unwrap();
+
+        assert_eq!(&magnitude / &divisor, quotient);
+        assert_eq!(&magnitude.neg() / &divisor, quotient.neg());
+        assert_eq!(&magnitude / &divisor.neg(), quotient.neg());
+        assert_eq!(&magnitude.neg() / &divisor.neg(), quotient);
+
+        // A dividend smaller in magnitude than the divisor truncates to zero, without a sign.
+        assert_eq!(&divisor / &magnitude, BigInt::zero());
+        assert_eq!(&divisor.neg() / &magnitude, BigInt::zero());
     }
 
+    /// The remainder takes the sign of the dividend, so a = (a / b) * b + (a % b) always holds.
     #[test]
-    #[ignore]
     fn test_rem() {
-        todo!()
+        let magnitude = BigInt::from_dec_str("1361129467683753853853498429727072845824").unwrap(); // 2^130
+        let divisor = BigInt::from_dec_str("3486784401").unwrap(); // 3^20
+        let remainder = BigInt::from_dec_str("3063273595").unwrap();
+
+        // The sign of the divisor does not affect the remainder.
+        assert_eq!(&magnitude % &divisor, remainder);
+        assert_eq!(&magnitude % &divisor.neg(), remainder);
+        assert_eq!(&magnitude.neg() % &divisor, remainder.neg());
+        assert_eq!(&magnitude.neg() % &divisor.neg(), remainder.neg());
+
+        // Truncated division's defining identity, over every sign combination.
+        for a in [magnitude.clone(), magnitude.neg()] {
+            for b in [divisor.clone(), divisor.neg()] {
+                let recovered = &(&(&a / &b) * &b) + &(&a % &b);
+                assert_eq!(recovered, a, "a = {:?}, b = {:?}", a, b);
+            }
+        }
     }
 
+    /// Shifting left by k multiplies the magnitude by 2^k and preserves the sign.
     #[test]
-    #[ignore]
     fn test_shift_left() {
-        todo!()
+        let a = BigInt::from_dec_str("1267650600228229401496703205507").unwrap(); // 2^100+2^7+3
+        let expected = BigInt::from_dec_str("174224571863520493293247799023069827170304").unwrap();
+
+        assert_eq!(&a << 37, expected);
+        assert_eq!(&a.neg() << 37, expected.neg());
+        assert_eq!(&a << 0, a);
+        assert_eq!(&BigInt::zero() << 64, BigInt::zero());
     }
 
+    /// Shifting right by k divides the magnitude by 2^k and preserves the sign.
     #[test]
-    #[ignore]
     fn test_shift_right() {
-        todo!()
+        let a = BigInt::from_dec_str("1267650600228229401496703205507").unwrap(); // 2^100+2^7+3
+        let expected = BigInt::from_dec_str("9903520314283042199192993793").unwrap();
+
+        assert_eq!(&a >> 7, expected);
+        assert_eq!(&a.neg() >> 7, expected.neg());
+        assert_eq!(&a >> 0, a);
+        // Shifting past the width of the value leaves zero, which is unsigned.
+        assert_eq!(&a >> 200, BigInt::zero());
+        assert_eq!(&a.neg() >> 200, BigInt::zero());
     }
 }
