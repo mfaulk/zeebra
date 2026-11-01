@@ -228,12 +228,16 @@ fn multiply_polynomials(a: u64, b: u64) -> u128 {
 /// * `numerator` - Bit pattern of numerator polynomial.
 /// * `denominator` - Bit pattern of denominator polynomial.
 fn long_divide(numerator: u128, denominator: u64) -> (u64, u64) {
+    assert_ne!(denominator, 0, "division by the zero polynomial");
     let denominator = denominator as u128;
     // The numerator will be reduced until it has degree less than m.
     let m = degree_u128(denominator);
     let mut quotient: u64 = 0;
     let mut remainder = numerator;
-    while degree_u128(remainder) >= m {
+    // `degree_u128` reports 0 for the zero polynomial rather than "no degree", so a zero
+    // remainder has to be excluded explicitly. Without that, dividing by a degree-0 polynomial
+    // (the constant 1) loops forever: the remainder alternates between 0 and 1.
+    while remainder != 0 && degree_u128(remainder) >= m {
         let shift = degree_u128(remainder) - m;
         quotient += 1 << shift;
         remainder ^= denominator << shift;
@@ -387,6 +391,21 @@ mod tests {
         let (quotient, remainder) = long_divide(a, b);
         assert_eq!(quotient, 0b100); // x^2
         assert_eq!(remainder, 0b10011001); // x^7 + x^4 + x^3 + 1
+    }
+
+    /// Dividing by the constant polynomial 1 terminates and returns the numerator.
+    #[test]
+    fn test_long_divide_by_one() {
+        assert_eq!(long_divide(0b1101, 0b1), (0b1101, 0));
+        assert_eq!(long_divide(0, 0b1), (0, 0));
+        assert_eq!(long_divide(u64::MAX as u128, 0b1), (u64::MAX, 0));
+    }
+
+    /// The zero polynomial is not a valid divisor.
+    #[test]
+    #[should_panic(expected = "division by the zero polynomial")]
+    fn test_long_divide_by_zero_panics() {
+        let _ = long_divide(0b1101, 0);
     }
 
     #[test]
