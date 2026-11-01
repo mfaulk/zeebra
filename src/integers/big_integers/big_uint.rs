@@ -483,11 +483,20 @@ mod tests {
         }
     }
 
+    /// Subtraction of multi-word values, checked against independently computed differences.
     #[test]
-    #[ignore]
-    // Spot check a few values against Sage.
     fn test_sub_spotcheck() {
-        todo!()
+        let a = BigUInt::from_dec_str("6277101735386680763835789423207666416102355444464034512895")
+            .unwrap(); // 2^192 - 1
+        let b = BigUInt::from_dec_str("18446744073709563961").unwrap(); // 2^64 + 12345
+        let expected =
+            BigUInt::from_dec_str("6277101735386680763835789423207666416083908700390324948934")
+                .unwrap();
+        assert_eq!(&a - &b, expected);
+
+        // Subtracting a value from itself gives zero, in the canonical empty-word form.
+        assert_eq!(&a - &a, BigUInt::zero());
+        assert_eq!(&a - &BigUInt::zero(), a);
     }
 
     // (a + b) - b = a
@@ -505,11 +514,18 @@ mod tests {
         }
     }
 
+    /// Multiplication of multi-word values, checked against an independently computed product.
     #[test]
-    #[ignore]
-    // Spot check a few values against Sage.
     fn test_mul_spotcheck() {
-        todo!()
+        let a = BigUInt::from_dec_str("123456789012345678901234567890").unwrap();
+        let b = BigUInt::from_dec_str("987654321098765432109876543210").unwrap();
+        let expected =
+            BigUInt::from_dec_str("121932631137021795226185032733622923332237463801111263526900")
+                .unwrap();
+        assert_eq!(&a * &b, expected);
+
+        assert_eq!(&a * &BigUInt::one(), a);
+        assert_eq!(&a * &BigUInt::zero(), BigUInt::zero());
     }
 
     // a * b = b * a
@@ -572,16 +588,37 @@ mod tests {
         assert_eq!(x.pow(&BigUInt::new_from_u64(18)), expected);
     }
 
+    /// Division truncates toward zero, checked against an independently computed quotient.
     #[test]
-    #[ignore]
     fn test_div() {
-        todo!()
+        let a =
+            BigUInt::from_dec_str("1606938044258990275541962092341162602522202993782792835301383")
+                .unwrap(); // 2^200 + 7
+        let b = BigUInt::from_dec_str("717897987691852588770249").unwrap(); // 3^50
+        let expected = BigUInt::from_dec_str("2238393297946874000179418290327143433").unwrap();
+        assert_eq!(&a / &b, expected);
+
+        assert_eq!(&a / &BigUInt::one(), a);
+        assert_eq!(&a / &a, BigUInt::one());
+        // A smaller dividend yields a zero quotient.
+        assert_eq!(&b / &a, BigUInt::zero());
     }
 
+    /// The remainder satisfies a = (a / b) * b + (a % b), checked against a known value.
     #[test]
-    #[ignore]
     fn test_rem() {
-        todo!()
+        let a =
+            BigUInt::from_dec_str("1606938044258990275541962092341162602522202993782792835301383")
+                .unwrap(); // 2^200 + 7
+        let b = BigUInt::from_dec_str("717897987691852588770249").unwrap(); // 3^50
+        let expected = BigUInt::from_dec_str("249667313308346329176566").unwrap();
+        assert_eq!(&a % &b, expected);
+        assert_eq!(&(&(&a / &b) * &b) + &expected, a);
+
+        assert_eq!(&a % &BigUInt::one(), BigUInt::zero());
+        assert_eq!(&a % &a, BigUInt::zero());
+        // A dividend smaller than the divisor is its own remainder.
+        assert_eq!(&b % &a, b);
     }
 
     proptest! {
@@ -592,10 +629,15 @@ mod tests {
         }
     }
 
+    /// The gcd divides both arguments, and is their greatest such divisor for a known pair.
     #[test]
-    #[ignore]
     fn test_gcd_divides_a_and_b() {
-        todo!()
+        let a = BigUInt::from_dec_str("1936908127739502919680").unwrap(); // 2^64 * 3 * 5 * 7
+        let b = BigUInt::from_dec_str("141733920768").unwrap(); // 2^32 * 3 * 11
+        let g = a.gcd(&b);
+        assert_eq!(g, BigUInt::from_dec_str("12884901888").unwrap()); // 2^32 * 3
+        assert_eq!(&a % &g, BigUInt::zero());
+        assert_eq!(&b % &g, BigUInt::zero());
     }
 
     #[test]
@@ -611,16 +653,33 @@ mod tests {
         assert_eq!(a.gcd(&b), BigUInt::new_from_u64(5));
     }
 
+    /// Shifting left by k multiplies by 2^k, across and beyond a word boundary.
     #[test]
-    #[ignore]
     fn test_shift_left() {
-        todo!()
+        let a = BigUInt::from_dec_str("1267650600228229401496703205507").unwrap(); // 2^100+2^7+3
+        let expected = BigUInt::from_dec_str("174224571863520493293247799023069827170304").unwrap();
+        assert_eq!(&a << 37, expected);
+
+        assert_eq!(&a << 0, a);
+        assert_eq!(&a << 1, &a + &a);
+        assert_eq!(&BigUInt::zero() << 64, BigUInt::zero());
+        // A shift by a whole word is multiplication by 2^64.
+        let two_pow_64 = &BigUInt::one() << 64;
+        assert_eq!(&a << 64, &a * &two_pow_64);
     }
 
+    /// Shifting right by k divides by 2^k, discarding the low bits.
     #[test]
-    #[ignore]
     fn test_shift_right() {
-        todo!()
+        let a = BigUInt::from_dec_str("1267650600228229401496703205507").unwrap(); // 2^100+2^7+3
+        let expected = BigUInt::from_dec_str("9903520314283042199192993793").unwrap();
+        assert_eq!(&a >> 7, expected);
+
+        assert_eq!(&a >> 0, a);
+        // Shifting further than the value is wide leaves zero.
+        assert_eq!(&a >> 200, BigUInt::zero());
+        // Right shift undoes left shift.
+        assert_eq!(&(&a << 37) >> 37, a);
     }
 
     #[test]
