@@ -44,13 +44,38 @@ impl<F: FiniteField> SparseRow<F> {
         Self { entries: merged }
     }
 
-    /// A row from entries that are already sorted, deduplicated, and nonzero.
+    /// A row from entries that are already sorted by column, deduplicated, and nonzero.
     ///
-    /// # Panics
-    /// In debug builds, if the entries violate any of those.
-    pub fn from_sorted(entries: Vec<(usize, F)>) -> Self {
+    /// Avoids the sort [`SparseRow::new`] performs, for a caller that already has canonical data.
+    ///
+    /// # Errors
+    /// [`NotCanonical`] if the entries are not strictly increasing by column, or if any
+    /// coefficient is zero. Validated in every build, not only in debug: a row that violates the
+    /// invariant makes `is_zero` wrong, makes the merge in `subtract_scaled` wrong, and lets
+    /// [`SparseMatrix::new`](super::SparseMatrix::new) accept out-of-range columns, since that
+    /// relies on the last stored column being the largest.
+    pub fn from_sorted(entries: Vec<(usize, F)>) -> Result<Self, NotCanonical> {
         let row = Self { entries };
-        debug_assert!(row.is_canonical(), "{:?} is not canonical", row.entries);
+        match row.first_violation() {
+            Some(violation) => Err(violation),
+            None => Ok(row),
+        }
+    }
+
+    /// As [`SparseRow::from_sorted`], without the validation.
+    ///
+    /// Crate-internal, for the paths that generate the entries themselves and so cannot produce a
+    /// non-canonical row: a polynomial's terms shifted by a monomial are distinct and nonzero, and
+    /// a monomial order is multiplicative, so sorting the terms sorts the columns. Validated by
+    /// `debug_assert`, which is what makes that reasoning testable rather than merely asserted.
+    pub(crate) fn from_sorted_unchecked(entries: Vec<(usize, F)>) -> Self {
+        let row = Self { entries };
+        debug_assert_eq!(
+            row.first_violation(),
+            None,
+            "{:?} is not canonical",
+            row.entries
+        );
         row
     }
 
@@ -194,7 +219,9 @@ impl<F: FiniteField> SparseRow<F> {
 
     /// A row from a dense vector of coefficients, keeping only the nonzero ones.
     pub fn from_dense(coefficients: &[F]) -> Self {
-        Self::from_sorted(
+        // Enumerating a slice yields strictly increasing indices and the zeros are filtered out,
+        // so the result is canonical by construction.
+        Self::from_sorted_unchecked(
             coefficients
                 .iter()
                 .enumerate()
@@ -204,17 +231,69 @@ impl<F: FiniteField> SparseRow<F> {
         )
     }
 
-    /// True if the entries are strictly increasing by column and all nonzero.
-    fn is_canonical(&self) -> bool {
-        self.entries
+    /// The first way these entries break the representation invariant, if they do.
+    fn first_violation(&self) -> Option<NotCanonical> {
+        if let Some((column, _)) = self
+            .entries
             .iter()
-            .all(|(_, coefficient)| !coefficient.is_zero())
-            && self.entries.windows(2).all(|pair| pair[0].0 < pair[1].0)
+            .find(|(_, coefficient)| coefficient.is_zero())
+        {
+            return Some(NotCanonical::ZeroCoefficient { column: *column });
+        }
+        for pair in self.entries.windows(2) {
+            if pair[0].0 == pair[1].0 {
+                return Some(NotCanonical::DuplicateColumn { column: pair[0].0 });
+            }
+            if pair[0].0 > pair[1].0 {
+                return Some(NotCanonical::OutOfOrder {
+                    column: pair[0].0,
+                    followed_by: pair[1].0,
+                });
+            }
+        }
+        None
+    }
+
+    /// True if the entries are strictly increasing by column and all nonzero.
+    pub(crate) fn is_canonical(&self) -> bool {
+        self.first_violation().is_none()
     }
 }
 
+/// Why a sequence of entries is not a valid sparse row.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NotCanonical {
+    /// A stored coefficient was zero. An omitted entry is the only representation of zero, so a
+    /// stored zero would make `is_zero` disagree with the row's value.
+    ZeroCoefficient { column: usize },
+
+    /// The same column appeared twice.
+    DuplicateColumn { column: usize },
+
+    /// A column was followed by a smaller one.
+    OutOfOrder { column: usize, followed_by: usize },
+}
+
+impl std::fmt::Display for NotCanonical {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroCoefficient { column } => {
+                write!(f, "column {} holds a zero coefficient", column)
+            }
+            Self::DuplicateColumn { column } => write!(f, "column {} appears twice", column),
+            Self::OutOfOrder {
+                column,
+                followed_by,
+            } => write!(f, "column {} is followed by {}", column, followed_by),
+        }
+    }
+}
+
+impl std::error::Error for NotCanonical {}
+
 #[cfg(test)]
 mod tests {
+    use super::NotCanonical;
     use super::SparseRow;
     use crate::{fields::Zp13, FiniteField, One, Zero};
 
@@ -391,19 +470,64 @@ mod tests {
         let _ = row.to_dense(5);
     }
 
-    /// `from_sorted` rejects entries that break the representation invariant.
+    /// `from_sorted` accepts canonical entries and names what is wrong with the rest.
+    ///
+    /// Validated in release as well as debug. A non-canonical row would make `is_zero` wrong, make
+    /// the merge in `subtract_scaled` wrong, and let `SparseMatrix::new` accept an out-of-range
+    /// column, since that range-checks only the last stored entry.
     #[test]
-    #[should_panic(expected = "not canonical")]
-    #[cfg(debug_assertions)]
-    fn test_from_sorted_rejects_unsorted_entries() {
-        let _ = SparseRow::from_sorted(vec![(5, F::new(1)), (2, F::new(1))]);
+    fn test_from_sorted_validates() {
+        assert_eq!(
+            SparseRow::from_sorted(vec![(1, F::new(2)), (4, F::new(3))])
+                .expect("canonical")
+                .entries(),
+            &[(1, F::new(2)), (4, F::new(3))]
+        );
+        // The zero row is canonical.
+        assert!(SparseRow::<F>::from_sorted(vec![])
+            .expect("canonical")
+            .is_zero());
+
+        assert_eq!(
+            SparseRow::from_sorted(vec![(5, F::new(1)), (2, F::new(1))]),
+            Err(NotCanonical::OutOfOrder {
+                column: 5,
+                followed_by: 2
+            })
+        );
+        assert_eq!(
+            SparseRow::from_sorted(vec![(2, F::new(1)), (2, F::new(1))]),
+            Err(NotCanonical::DuplicateColumn { column: 2 })
+        );
+        assert_eq!(
+            SparseRow::from_sorted(vec![(2, F::zero())]),
+            Err(NotCanonical::ZeroCoefficient { column: 2 })
+        );
     }
 
-    /// And rejects a stored zero coefficient, which would make `is_zero` wrong.
+    /// The rejection reasons describe themselves, since they reach a caller as an error.
     #[test]
-    #[should_panic(expected = "not canonical")]
-    #[cfg(debug_assertions)]
-    fn test_from_sorted_rejects_a_zero_coefficient() {
-        let _ = SparseRow::from_sorted(vec![(2, F::zero())]);
+    fn test_not_canonical_messages() {
+        assert!(NotCanonical::ZeroCoefficient { column: 7 }
+            .to_string()
+            .contains('7'));
+        assert!(NotCanonical::DuplicateColumn { column: 7 }
+            .to_string()
+            .contains('7'));
+        assert!(NotCanonical::OutOfOrder {
+            column: 7,
+            followed_by: 3
+        }
+        .to_string()
+        .contains('3'));
+    }
+
+    /// An out-of-range column cannot slip past `SparseMatrix::new` by being stored out of order.
+    ///
+    /// Regression test: the matrix range-checks only the last stored entry, so the row
+    /// `[(9, 1), (1, 1)]` would have passed a width of five had `from_sorted` not rejected it.
+    #[test]
+    fn test_unsorted_row_cannot_hide_an_out_of_range_column() {
+        assert!(SparseRow::from_sorted(vec![(9, F::new(1)), (1, F::new(1))]).is_err());
     }
 }

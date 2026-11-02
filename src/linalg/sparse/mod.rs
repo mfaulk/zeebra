@@ -12,4 +12,4 @@ mod row;
 
 pub use elimination::{reduced_row_echelon, row_echelon, EliminationStatistics};
 pub use matrix::SparseMatrix;
-pub use row::SparseRow;
+pub use row::{NotCanonical, SparseRow};

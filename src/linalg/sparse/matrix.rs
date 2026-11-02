@@ -19,10 +19,22 @@ pub struct SparseMatrix<F: FiniteField> {
 impl<F: FiniteField> SparseMatrix<F> {
     /// A matrix of the given rows.
     ///
+    /// Only the last stored column of each row is range-checked, because a `SparseRow` keeps its
+    /// entries strictly increasing by column and so the last one is the largest. That invariant is
+    /// enforced by every `SparseRow` constructor in every build — see
+    /// [`SparseRow::from_sorted`] — and the `debug_assert` below is what keeps this function's
+    /// reliance on it from becoming silent if that ever changes.
+    ///
     /// # Panics
     /// If any row holds a column index at or beyond `num_columns`.
     pub fn new(num_columns: usize, rows: Vec<SparseRow<F>>) -> Self {
         for (index, row) in rows.iter().enumerate() {
+            debug_assert!(
+                row.is_canonical(),
+                "row {} is not a canonical sparse row: {:?}",
+                index,
+                row.entries()
+            );
             if let Some(column) = row.trailing_column() {
                 assert!(
                     column < num_columns,
