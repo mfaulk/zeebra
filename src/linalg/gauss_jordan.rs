@@ -71,7 +71,12 @@ fn gaussian_elimination<T: FiniteField>(matrix: &Matrix<T>) -> Matrix<T> {
             // Eliminate the current column by subtracting multiples of the current row from all rows below it.
             let current_row: Vec<T> = A.row(cursor.row).cloned().collect();
             for i in (cursor.row + 1)..num_rows {
-                let factor = A[[i, cursor.column]]; // The pivot is now 1.
+                // The pivot is one, so the factor is the entry itself. A zero entry is already
+                // eliminated and its row operation would change nothing.
+                let factor = A[[i, cursor.column]];
+                if factor.is_zero() {
+                    continue;
+                }
                 for j in cursor.column..num_columns {
                     A[[i, j]] -= factor * current_row[j]
                 }
@@ -98,13 +103,24 @@ pub fn gauss_jordan_elimination<T: FiniteField>(matrix: &Matrix<T>) -> Matrix<T>
         let pivot_column: Option<usize> = A.row(i).position(|&x| x != T::ZERO);
 
         if let Some(pivot_column) = pivot_column {
-            let pivot = A[[i, pivot_column]];
-            debug_assert_eq!(pivot, T::ONE, "pivot: {}", pivot);
+            // Forward elimination normalized this pivot to one, which is what lets the factor
+            // below be read directly. Dividing by it would compute the inverse of one: a modular
+            // exponentiation per row, about n(n-1)/2 of them over a full-rank n x n matrix.
+            debug_assert_eq!(
+                A[[i, pivot_column]],
+                T::ONE,
+                "pivot: {}",
+                A[[i, pivot_column]]
+            );
             let pivot_row: Vec<T> = A.row(i).cloned().collect();
 
             // Eliminate values above the pivot.
             for k in 0..i {
-                let factor = A[[k, pivot_column]] / pivot; // The pivot is now 1.
+                let factor = A[[k, pivot_column]];
+                // Already eliminated; the row operation would subtract zero from every entry.
+                if factor.is_zero() {
+                    continue;
+                }
                 for j in 0..num_columns {
                     A[[k, j]] -= factor * pivot_row[j];
                 }
