@@ -81,21 +81,33 @@ impl_sub_variants!([const N: usize, F: FiniteField], SparseMultiPoly<N, F>);
 impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// Divides `self` by `divisor` and returns the quotient and remainder.
     pub fn div_rem(&self, divisor: &Self, order: MonomialOrder) -> (Self, Self) {
-        let mut remainder = self.clone();
+        assert!(!divisor.is_zero(), "cannot divide by the zero polynomial");
+
+        // `working` holds what is left to reduce; `remainder` collects the terms that cannot be.
+        let mut working = self.clone();
         let mut quotient = SparseMultiPoly::zero();
-        while !remainder.terms.is_empty() {
-            let lead_term = remainder.leading_term(order);
-            match lead_term.checked_div(&divisor.leading_term(order)) {
+        let mut remainder = SparseMultiPoly::zero();
+        let divisor_lead = divisor.leading_term(order);
+
+        while !working.is_zero() {
+            let lead_term = working.leading_term(order);
+            match lead_term.checked_div(&divisor_lead) {
                 Some(q) => {
                     let q: SparseMultiPoly<N, F> = q.into();
-                    remainder -= &q * divisor;
+                    working -= &q * divisor;
                     quotient += q;
                 }
                 None => {
-                    return (quotient, remainder);
+                    // An irreducible leading term does not end the division: lower terms may
+                    // still be divisible. Set it aside and carry on, so that no monomial of the
+                    // remainder is divisible by the divisor's leading term.
+                    let lead: SparseMultiPoly<N, F> = lead_term.into();
+                    working -= lead.clone();
+                    remainder += lead;
                 }
             }
         }
+
         (quotient, remainder)
     }
 
@@ -152,7 +164,7 @@ mod tests {
     use crate::{
         fields::PrimeFieldElement64,
         poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
-        FiniteField, Monomial,
+        FiniteField, Monomial, MultivariatePolynomial,
     };
     use proptest::prelude::*;
 
@@ -344,13 +356,17 @@ mod tests {
         }
 
         {
-            // p / y = (5*x^11*y) * y + 14*x^3 + 3*x*y
+            // p / y = (5*x^11*y + 3*x) * y + 14*x^3
+            //
+            // Both 5*x^11*y^2 and 3*x*y are divisible by y, so both belong in the quotient. This
+            // expectation previously stopped at the first irreducible term and left 3*x*y in the
+            // remainder, where it was still divisible by the divisor.
             let (q, r) = p.div_rem(
                 &SparseMultiPoly::parse("y", vars).unwrap(),
                 MonomialOrder::Lexicographic,
             );
-            assert_eq!(q, SparseMultiPoly::parse("5*x^11*y", vars).unwrap());
-            assert_eq!(r, SparseMultiPoly::parse("14*x^3 + 3*x*y", vars).unwrap());
+            assert_eq!(q, SparseMultiPoly::parse("5*x^11*y + 3*x", vars).unwrap());
+            assert_eq!(r, SparseMultiPoly::parse("14*x^3", vars).unwrap());
         }
     }
 
@@ -389,4 +405,102 @@ mod tests {
         }
         assert_eq!(p, p_recovered);
     }
+
+    /// Division leaves a remainder no monomial of which is divisible by the divisor's lead.
+    ///
+    /// Regression test: `div_rem` used to return as soon as the *leading* term was not
+    /// divisible, leaving lower reducible terms behind. The identity f = q*g + r still held, so
+    /// only the normal-form property was violated.
+    #[test]
+    fn test_div_rem_reduces_every_divisible_term() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        for order in ALL_ORDERS {
+            // LT(x^2 + y) is x^2 under every order here, which y does not divide — but the
+            // lower term y does.
+            let f = parse("x^2 + y");
+            let g = parse("y");
+            let (q, r) = f.div_rem(&g, order);
+
+            assert_eq!(q, parse("1"), "{}", order.name());
+            assert_eq!(r, parse("x^2"), "{}", order.name());
+            assert_eq!(&(&q * &g) + &r, f, "{}: f = q*g + r violated", order.name());
+            assert!(
+                !r.terms()
+                    .keys()
+                    .any(|m| m.checked_div(&g.leading_monomial(order)).is_some()),
+                "{}: remainder still has a term divisible by LT(g)",
+                order.name()
+            );
+        }
+    }
+
+    /// `div_rem` agrees with `multi_div_rem` given a single divisor.
+    ///
+    /// `multi_div_rem` already satisfied the contract, so it serves as the oracle.
+    #[test]
+    fn test_div_rem_agrees_with_multi_div_rem() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        let cases = [
+            ("x^2 + y", "y"),
+            ("x^2*y + x + y + 1", "y"),
+            ("x^3 + x^2*y + z", "x^2"),
+            ("x*y*z + x + y + z + 1", "z"),
+            ("x^2 + 2*x*y + y^2", "x + y"),
+            ("x^5 + 1", "x^2 + 1"),
+            ("z^4 + y^2 + x", "x"),
+        ];
+
+        for order in ALL_ORDERS {
+            for (dividend, divisor) in cases {
+                let f = parse(dividend);
+                let g = parse(divisor);
+                let (q, r) = f.div_rem(&g, order);
+                let (qs, r_multi) = f.multi_div_rem(std::slice::from_ref(&g), order);
+                assert_eq!(
+                    (q, r),
+                    (qs[0].clone(), r_multi),
+                    "{} / {} under {}",
+                    dividend,
+                    divisor,
+                    order.name()
+                );
+            }
+        }
+    }
+
+    proptest! {
+        /// Over random input, division satisfies both halves of its contract.
+        #[test]
+        fn test_div_rem_contract(
+            f in any::<MultivariatePolynomial<3, PrimeFieldElement64<13>>>(),
+            g in any::<MultivariatePolynomial<3, PrimeFieldElement64<13>>>()) {
+            prop_assume!(!g.is_zero());
+            for order in ALL_ORDERS {
+                let (q, r) = f.div_rem(&g, order);
+                // f = q*g + r
+                prop_assert_eq!(&(&q * &g) + &r, f.clone(), "{}", order.name());
+                // and no monomial of r is divisible by LT(g)
+                let lead = g.leading_monomial(order);
+                for m in r.terms().keys() {
+                    prop_assert!(
+                        m.checked_div(&lead).is_none(),
+                        "{}: {:?} is divisible by LT(g) = {:?}",
+                        order.name(), m.exponents(), lead.exponents()
+                    );
+                }
+            }
+        }
+    }
+
+    const ALL_ORDERS: [MonomialOrder; 3] = [
+        MonomialOrder::Lexicographic,
+        MonomialOrder::GradedLexicographic,
+        MonomialOrder::GradedReverseLexicographic,
+    ];
 }
