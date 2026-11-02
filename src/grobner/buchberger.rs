@@ -2,8 +2,6 @@
 //!
 //! See Sec 2.7 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea.
 
-use std::collections::HashSet;
-
 use crate::{
     grobner::s_polynomial::s_polynomial, poly::MonomialOrder, FiniteField, MultivariatePolynomial,
 };
@@ -19,7 +17,13 @@ pub fn buchberger<const N: usize, F: FiniteField>(
     f: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
-    let mut g: Vec<MultivariatePolynomial<N, F>> = f.to_vec();
+    // A zero generator contributes nothing to the ideal, and would otherwise reach
+    // `leading_coefficient().inverse()` with a zero coefficient.
+    let mut g: Vec<MultivariatePolynomial<N, F>> =
+        f.iter().filter(|p| !p.is_zero()).cloned().collect();
+    if g.is_empty() {
+        return Vec::new();
+    }
     let mut g_prime: Vec<MultivariatePolynomial<N, F>>;
 
     loop {
@@ -63,34 +67,45 @@ fn minimize_grobner_basis<const N: usize, F: FiniteField>(
     g: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
-    // Scale each polynomial to have leading coefficient 1.
-    let g: Vec<MultivariatePolynomial<N, F>> = g
-        .iter()
-        .map(|p| {
-            let lc = p.leading_coefficient(order);
-            p.scale(&lc.inverse())
-        })
-        .collect();
-
-    let mut g_minimal: HashSet<MultivariatePolynomial<N, F>> = g.iter().cloned().collect();
-    for p in g {
-        let lm_p: MultivariatePolynomial<N, F> = p.leading_monomial(order).into();
-        let divisors: Vec<MultivariatePolynomial<N, F>> = g_minimal
-            .iter()
-            .filter(|q| p != **q)
-            .map(|q| q.leading_monomial(order).into())
-            .collect();
-        // With nothing else left to divide by, LT(p) cannot lie in <LT(G \ {p})> — that ideal is
-        // zero — so p is not redundant. `multi_div_rem` requires a non-empty divisor list.
-        if divisors.is_empty() {
-            continue;
-        }
-        if lm_p.multi_div_rem(&divisors, order).1.is_zero() {
-            // LT(p) \in <LT(G \ {p})>
-            g_minimal.remove(&p);
+    // Scale each polynomial to have leading coefficient 1, dropping zeros and duplicates.
+    // First-occurrence order is preserved, so the outcome does not depend on hashing.
+    let mut monic: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(g.len());
+    for p in g.iter().filter(|p| !p.is_zero()) {
+        let scaled = p.scale(&p.leading_coefficient(order).inverse());
+        if !monic.contains(&scaled) {
+            monic.push(scaled);
         }
     }
-    g_minimal.into_iter().collect()
+
+    // Drop any element whose leading term is divisible by another's, which is exactly
+    // LT(p) in <LT(G \ {p})> for a set of leading terms.
+    //
+    // Two elements can share a leading monomial, in which case each divides the other and one
+    // must go. Indices decide which, so the result is reproducible; a `HashSet` here made the
+    // surviving element depend on iteration order.
+    let mut keep = vec![true; monic.len()];
+    for i in 0..monic.len() {
+        let lead_i = monic[i].leading_monomial(order);
+        for j in 0..monic.len() {
+            if i == j || !keep[j] {
+                continue;
+            }
+            if lead_i
+                .checked_div(&monic[j].leading_monomial(order))
+                .is_some()
+            {
+                keep[i] = false;
+                break;
+            }
+        }
+    }
+
+    monic
+        .into_iter()
+        .zip(keep)
+        .filter(|(_, keep)| *keep)
+        .map(|(p, _)| p)
+        .collect()
 }
 
 /// Reduce a Grobner basis
@@ -132,13 +147,17 @@ fn reduce_grobner_basis<const N: usize, F: FiniteField>(
         );
         reduced.push(remainder);
     }
+
+    // Sort by leading monomial, descending, so the basis is returned in a canonical order.
+    // Minimization leaves the leading monomials distinct, so this is a total order on the
+    // result, and a reduced Gröbner basis is unique as a set — which makes the sequence unique
+    // too. Without this the order came from `HashSet` iteration and varied between runs.
+    reduced.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
     reduced
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use crate::util::contains_duplicates;
     use crate::{
         fields::Zp13, grobner::buchberger::buchberger, poly::MonomialOrder, FiniteField,
@@ -158,18 +177,15 @@ mod tests {
             MultivariatePolynomial::parse("x*y*z - 1", vars).unwrap(),
         ];
 
-        // TODO: Ensure that the basis is sorted, to simplify comparisons.
-        let g: HashSet<MultivariatePolynomial<3, F>> = buchberger(&f, order).into_iter().collect();
-        for p in &g {
-            println!("{}", p);
-        }
+        let g = buchberger(&f, order);
 
-        // These were computed with groebner.jl
-        let expected: HashSet<MultivariatePolynomial<3, F>> = HashSet::from([
-            MultivariatePolynomial::parse("z^3 - 1", vars).unwrap(),
-            MultivariatePolynomial::parse("y^2 + y*z + z^2", vars).unwrap(),
+        // Computed with groebner.jl, and compared as a sequence rather than a set: the basis is
+        // returned sorted by leading monomial, descending, so the order is part of the contract.
+        let expected: Vec<MultivariatePolynomial<3, F>> = vec![
             MultivariatePolynomial::parse("x + y + z", vars).unwrap(),
-        ]);
+            MultivariatePolynomial::parse("y^2 + y*z + z^2", vars).unwrap(),
+            MultivariatePolynomial::parse("z^3 - 1", vars).unwrap(),
+        ];
 
         assert_eq!(g, expected);
     }
@@ -325,4 +341,188 @@ mod tests {
         assert_eq!(g.len(), 1);
         assert!(g[0].is_one(), "expected the basis {{1}}, got {}", g[0]);
     }
+
+    /// A zero generator contributes nothing to the ideal and must not derail the computation.
+    ///
+    /// Regression test: `minimize_grobner_basis` scaled each element by the inverse of its
+    /// leading coefficient, and the zero polynomial's is zero, so `inverse()` asserted.
+    #[test]
+    fn test_zero_generators_are_ignored() {
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+        let zero = MultivariatePolynomial::<3, F>::zero();
+
+        for order in ALL_ORDERS {
+            // A zero generator alone generates the zero ideal, whose basis is empty.
+            assert!(
+                buchberger(std::slice::from_ref(&zero), order).is_empty(),
+                "{}",
+                order.name()
+            );
+            assert!(
+                buchberger(&[zero.clone(), zero.clone()], order).is_empty(),
+                "{}",
+                order.name()
+            );
+
+            // Mixed with real generators, the zeros make no difference.
+            let without = buchberger(&[parse("x + y"), parse("y^2 - 1")], order);
+            let with = buchberger(
+                &[parse("x + y"), zero.clone(), parse("y^2 - 1"), zero.clone()],
+                order,
+            );
+            assert_eq!(with, without, "{}", order.name());
+        }
+    }
+
+    /// Duplicate and redundant generators do not change the basis.
+    #[test]
+    fn test_duplicate_and_redundant_generators() {
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        for order in ALL_ORDERS {
+            let base = buchberger(&[parse("x + y"), parse("y^2 - 1")], order);
+
+            // The same generator twice.
+            assert_eq!(
+                buchberger(&[parse("x + y"), parse("x + y"), parse("y^2 - 1")], order),
+                base,
+                "{}: duplicates changed the basis",
+                order.name()
+            );
+
+            // A scalar multiple of a generator is redundant.
+            assert_eq!(
+                buchberger(
+                    &[parse("x + y"), parse("3*x + 3*y"), parse("y^2 - 1")],
+                    order
+                ),
+                base,
+                "{}: a scalar multiple changed the basis",
+                order.name()
+            );
+
+            // A generator already in the ideal is redundant.
+            assert_eq!(
+                buchberger(
+                    &[parse("x + y"), parse("y^2 - 1"), parse("x*y + y^2")],
+                    order
+                ),
+                base,
+                "{}: a redundant generator changed the basis",
+                order.name()
+            );
+        }
+    }
+
+    /// The basis is returned in a deterministic order, run to run and regardless of input order.
+    ///
+    /// Regression test: the basis was accumulated into a `HashSet`, so its iteration order
+    /// varied between runs of identical input.
+    #[test]
+    fn test_basis_order_is_deterministic() {
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        for order in ALL_ORDERS {
+            let system = [
+                parse("x + y + z"),
+                parse("x*y + x*z + y*z"),
+                parse("x*y*z - 1"),
+            ];
+
+            let first = buchberger(&system, order);
+            for _ in 0..8 {
+                assert_eq!(
+                    buchberger(&system, order),
+                    first,
+                    "{}: repeated runs disagree",
+                    order.name()
+                );
+            }
+
+            // Permuting the generators yields the same basis in the same order, since a reduced
+            // basis is unique as a set and the ordering is derived from it.
+            let permuted = [system[2].clone(), system[0].clone(), system[1].clone()];
+            assert_eq!(
+                buchberger(&permuted, order),
+                first,
+                "{}: generator order changed the result",
+                order.name()
+            );
+
+            // Strictly decreasing leading monomials, which is what makes the order canonical.
+            for window in first.windows(2) {
+                assert_eq!(
+                    order.cmp(
+                        &window[0].leading_monomial(order),
+                        &window[1].leading_monomial(order)
+                    ),
+                    std::cmp::Ordering::Greater,
+                    "{}: basis is not sorted by leading monomial",
+                    order.name()
+                );
+            }
+        }
+    }
+
+    /// An inconsistent system yields the basis {1} under every order.
+    #[test]
+    fn test_inconsistent_system_under_every_order() {
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        for order in ALL_ORDERS {
+            for system in [
+                vec![parse("x"), parse("x - 1")],
+                vec![parse("x + y"), parse("x + y - 1")],
+                vec![parse("1")],
+            ] {
+                let basis = buchberger(&system, order);
+                assert_eq!(basis.len(), 1, "{}", order.name());
+                assert!(basis[0].is_one(), "{}: got {}", order.name(), basis[0]);
+            }
+        }
+    }
+
+    /// The basis properties hold for every system under every order.
+    #[test]
+    fn test_grobner_properties_under_every_order() {
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+
+        let systems: Vec<Vec<&str>> = vec![
+            vec!["x^2 - y"],
+            vec!["x + y + z"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x^2 + y^2 - 1", "x - y"],
+            vec!["x*y - 1", "x - y"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x^3 - 2*x*y", "x^2*y - 2*y^2 + x"],
+            vec!["x + y", "x^2 + z", "y*z - 1"],
+            vec!["x*y*z - 1", "x*y - z"],
+        ];
+
+        for order in ALL_ORDERS {
+            for system in &systems {
+                let f: Vec<MultivariatePolynomial<3, F>> = system
+                    .iter()
+                    .map(|s| MultivariatePolynomial::parse(s, vars).unwrap())
+                    .collect();
+                assert_is_reduced_grobner_basis(&f, order);
+            }
+        }
+    }
+
+    const ALL_ORDERS: [MonomialOrder; 3] = [
+        MonomialOrder::Lexicographic,
+        MonomialOrder::GradedLexicographic,
+        MonomialOrder::GradedReverseLexicographic,
+    ];
 }
