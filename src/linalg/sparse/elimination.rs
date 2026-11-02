@@ -554,7 +554,7 @@ mod tests {
             .map(|(index, row)| {
                 let mut entries: Vec<(usize, F)> = row.entries().to_vec();
                 entries.push((3 + index, F::ONE));
-                SparseRow::from_sorted(entries)
+                SparseRow::from_sorted_unchecked(entries)
             })
             .collect();
         let mut augmented = SparseMatrix::new(3 + original.num_rows(), augmented_rows);
@@ -584,7 +584,7 @@ mod tests {
             }
             assert_eq!(
                 SparseRow::new(&rebuilt),
-                SparseRow::from_sorted(left),
+                SparseRow::from_sorted_unchecked(left),
                 "a reduced row is not the combination of originals its certificate claims"
             );
         }
