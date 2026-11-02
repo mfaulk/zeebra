@@ -26,9 +26,24 @@ use crate::{
 pub struct PrimeFieldElement128<const P: u128> {
     /// The element's representative integer in [0,p-1].
     ///
-    /// Private so that the reduced-residue invariant cannot be broken from outside. See
-    /// `PrimeFieldElement64`.
+    /// Private so that the reduced-residue invariant cannot be broken from outside, and validated
+    /// on deserialization because that path bypasses the constructors. See `PrimeFieldElement64`.
+    #[serde(deserialize_with = "reduced_residue::<_, P>")]
     value: u128,
+}
+
+/// Accepts a representative only if it is already reduced modulo P. See `PrimeFieldElement64`.
+fn reduced_residue<'de, D, const P: u128>(deserializer: D) -> Result<u128, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = u128::deserialize(deserializer)?;
+    if value >= P {
+        return Err(serde::de::Error::custom(format!(
+            "{value} is not a reduced residue modulo {P}"
+        )));
+    }
+    Ok(value)
 }
 
 impl<const P: u128> PrimeFieldElement128<P> {
@@ -239,6 +254,45 @@ mod tests {
         fields::{PrimeFieldElement128, Zp221360928884514619393, Zp541},
         FiniteField, One, Zero,
     };
+
+    /// A small 128-bit-backed field. Note `Zp541` is the 64-bit type, not this one.
+    type P541 = PrimeFieldElement128<541>;
+
+    /// Deserializing an unreduced representative is rejected rather than admitted.
+    #[test]
+    fn test_deserializing_an_unreduced_representative_is_rejected() {
+        // At or above 2P, the case a single conditional subtraction cannot reduce.
+        let encoded = bincode::serialize(&1500u128).unwrap();
+        let decoded: Result<P541, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "1500 should be rejected modulo 541");
+
+        // Just above P, which `sub` would otherwise pass through unreduced.
+        let encoded = bincode::serialize(&542u128).unwrap();
+        let decoded: Result<P541, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "542 should be rejected modulo 541");
+
+        // The modulus itself is not a representative.
+        let encoded = bincode::serialize(&541u128).unwrap();
+        let decoded: Result<P541, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "541 should be rejected modulo 541");
+    }
+
+    /// Validating deserialization does not change the wire format: every element round-trips.
+    #[test]
+    fn test_serde_round_trip_is_unchanged() {
+        for value in [0u128, 1, 2, 539, 540] {
+            let element = P541::new(value);
+            let encoded = bincode::serialize(&element).unwrap();
+            let decoded: P541 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, element);
+        }
+
+        // The largest representative of the 68-bit prime, which needs more than 64 bits.
+        let element = PrimeFieldElement128::<221360928884514619393>::new(221360928884514619392u128);
+        let encoded = bincode::serialize(&element).unwrap();
+        let decoded: Zp221360928884514619393 = bincode::deserialize(&encoded).unwrap();
+        assert_eq!(decoded, element);
+    }
 
     #[test]
     // The default value should be zero.

@@ -40,9 +40,38 @@ use crate::{
 pub struct BinaryFieldElement<const P: u64> {
     /// The i^th bit represents c_i in the polynomial \sum_{i=1}^m c_i * x_i.
     ///
-    /// Private so that the bit pattern cannot be set outside the field's order from outside:
-    /// `new` asserts `coefficients < P`, and `PartialEq` and `Hash` are derived over this.
+    /// Private so that the bit pattern cannot be set from outside: `new` and deserialization both
+    /// check it, and `PartialEq` and `Hash` are derived over it, so an unreduced pattern would
+    /// compare unequal to the element it represents.
+    #[serde(deserialize_with = "reduced_polynomial::<_, P>")]
     coefficients: u64,
+}
+
+/// The number of valid bit patterns, 2^m for the modulus' degree m.
+///
+/// Elements of GF(2^m) are the polynomials of degree strictly below m, so this is the exclusive
+/// upper bound on a valid pattern. It is tighter than P: since P is monic of degree m, P itself is
+/// 2^m plus lower-order terms, and every pattern in [2^m, P) has degree m and is not an element.
+const fn num_elements<const P: u64>() -> u64 {
+    1 << (63 - P.leading_zeros())
+}
+
+/// Accepts a bit pattern only if it denotes a polynomial of degree below the modulus' degree.
+///
+/// Rejecting rather than reducing: a pattern outside the field did not come from this field, so it
+/// signals corruption or a mismatched modulus, and reducing it silently would hide that.
+fn reduced_polynomial<'de, D, const P: u64>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let coefficients = u64::deserialize(deserializer)?;
+    if coefficients >= num_elements::<P>() {
+        return Err(serde::de::Error::custom(format!(
+            "the bit pattern {coefficients} has degree at least that of the modulus {P}, so it \
+             does not denote an element of this field"
+        )));
+    }
+    Ok(coefficients)
 }
 
 impl<const P: u64> BinaryFieldElement<P> {
@@ -52,7 +81,14 @@ impl<const P: u64> BinaryFieldElement<P> {
     /// * `coefficients` - The i^th bit represents c_i in the polynomial \sum_{i=1}^m c_i * x_i.
     pub fn new(coefficients: u64) -> Self {
         // TODO: debug_assert that P is irreducible?
-        assert!(coefficients < P);
+        //
+        // The bound is 2^m, not P. Both reject patterns of degree above the modulus, but P also
+        // admits [2^m, P) — patterns of degree exactly m, which are not elements of GF(2^m) and
+        // which no arithmetic here can produce.
+        assert!(
+            coefficients < num_elements::<P>(),
+            "the bit pattern {coefficients} has degree at least that of the modulus {P}"
+        );
         Self { coefficients }
     }
 
@@ -272,6 +308,7 @@ mod tests {
 
     use crate::{
         fields::{
+            binary_field::num_elements,
             binary_field::{
                 degree_u128, degree_u64, long_divide, multiply_polynomials, BinaryFieldElement,
             },
@@ -279,6 +316,54 @@ mod tests {
         },
         FiniteField,
     };
+
+    /// GF(2^5) modulo x^5 + x^2 + 1, whose 32 elements are the patterns below 2^5.
+    type F32 = BinaryFieldElement<X5_X2_1>;
+
+    /// The valid-pattern bound is 2^m, which is strictly tighter than the modulus itself.
+    #[test]
+    fn test_num_elements_is_two_to_the_modulus_degree() {
+        // X5_X2_1 is 0b100101 = 37, of degree 5, so GF(2^5) has 32 elements.
+        assert_eq!(num_elements::<X5_X2_1>(), 32);
+        assert!(num_elements::<X5_X2_1>() < X5_X2_1);
+        assert_eq!(num_elements::<X5_X2_1>() as u128, F32::order());
+    }
+
+    /// Deserializing a bit pattern of degree at or above the modulus' is rejected.
+    #[test]
+    fn test_deserializing_a_pattern_outside_the_field_is_rejected() {
+        // 32 = x^5 has degree 5, the modulus' own degree, so it is not an element.
+        let encoded = bincode::serialize(&32u64).unwrap();
+        let decoded: Result<F32, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "x^5 is not an element of GF(2^5)");
+
+        // 36 lies in [2^m, P), the gap the old `coefficients < P` bound wrongly admitted.
+        let encoded = bincode::serialize(&36u64).unwrap();
+        let decoded: Result<F32, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "patterns in [2^m, P) are not elements");
+
+        let encoded = bincode::serialize(&1000u64).unwrap();
+        let decoded: Result<F32, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "1000 is far outside GF(2^5)");
+    }
+
+    /// Validating deserialization does not change the wire format: every element round-trips.
+    #[test]
+    fn test_serde_round_trip_is_unchanged() {
+        for coefficients in 0..32u64 {
+            let element = F32::new(coefficients);
+            let encoded = bincode::serialize(&element).unwrap();
+            let decoded: F32 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, element);
+        }
+    }
+
+    /// `new` rejects a pattern of degree at or above the modulus', as deserialization does.
+    #[test]
+    #[should_panic(expected = "has degree at least that of the modulus")]
+    fn test_new_rejects_a_pattern_outside_the_field() {
+        let _ = F32::new(36);
+    }
 
     // GF(2^5), GF(2^8), and GF(2^63): a small field, a byte-sized field, and one near the width
     // limit of the u64 bit-pattern representation.

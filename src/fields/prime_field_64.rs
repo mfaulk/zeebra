@@ -26,7 +26,31 @@ pub struct PrimeFieldElement64<const P: u64> {
     /// Private so that the reduced-residue invariant cannot be broken from outside: every
     /// operation here assumes `value < P`, and `PartialEq` and `Hash` are derived over it, so an
     /// unreduced value would compare unequal to the element it represents.
+    ///
+    /// Deserialization is the one construction path that bypasses a constructor, so it validates
+    /// rather than trusting its input. Add and sub reduce by conditional subtraction, which
+    /// assumes the operands are already reduced: `sub` would pass an unreduced value straight
+    /// through, and `add` would still be unreduced for any input at or above 2P.
+    #[serde(deserialize_with = "reduced_residue::<_, P>")]
     value: u64,
+}
+
+/// Accepts a representative only if it is already reduced modulo P.
+///
+/// Rejecting rather than reducing: a value outside [0,P) did not come from this field, so it
+/// signals either corruption or a mismatched modulus, and silently reinterpreting it would hide
+/// that. Canonical values are unaffected, so this does not change the serialized format.
+fn reduced_residue<'de, D, const P: u64>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = u64::deserialize(deserializer)?;
+    if value >= P {
+        return Err(serde::de::Error::custom(format!(
+            "{value} is not a reduced residue modulo {P}"
+        )));
+    }
+    Ok(value)
 }
 
 impl<const P: u64> PrimeFieldElement64<P> {
@@ -210,6 +234,60 @@ mod tests {
         identities::{One, Zero},
         FiniteField, ParseFieldElementError,
     };
+
+    /// Deserializing an unreduced representative is rejected rather than admitted.
+    #[test]
+    fn test_deserializing_an_unreduced_representative_is_rejected() {
+        // 9 is congruent to 2 mod 7, but is not the representative this field uses. Admitting it
+        // would break the invariant that addition and subtraction rely on.
+        let encoded = bincode::serialize(&9u64).unwrap();
+        let decoded: Result<Zp7, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "9 should be rejected modulo 7");
+    }
+
+    /// The modulus itself is not a valid representative; P-1 is the largest one.
+    #[test]
+    fn test_deserializing_rejects_the_modulus_and_admits_p_minus_one() {
+        let encoded = bincode::serialize(&7u64).unwrap();
+        let decoded: Result<Zp7, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "7 should be rejected modulo 7");
+
+        let encoded = bincode::serialize(&6u64).unwrap();
+        let decoded: Zp7 = bincode::deserialize(&encoded).expect("6 is a valid residue mod 7");
+        assert_eq!(decoded.value(), 6);
+    }
+
+    /// Validating deserialization does not change the wire format: every element round-trips.
+    #[test]
+    fn test_serde_round_trip_is_unchanged() {
+        for value in 0..7u64 {
+            let element = Zp7::new(value);
+            let encoded = bincode::serialize(&element).unwrap();
+            let decoded: Zp7 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, element);
+        }
+
+        // A value near the top of the range, where the largest 64-bit prime lives.
+        let element = Zp18446744073709551557::new(u64::MAX);
+        let encoded = bincode::serialize(&element).unwrap();
+        let decoded: Zp18446744073709551557 = bincode::deserialize(&encoded).unwrap();
+        assert_eq!(decoded, element);
+    }
+
+    /// Arithmetic on a deserialized element agrees with arithmetic on a constructed one.
+    ///
+    /// This is the defect the rejection prevents: the conditional add subtracts P at most once, so
+    /// an unreduced input would have produced an unreduced output.
+    #[test]
+    fn test_deserialized_elements_arithmetic_agrees_with_constructed() {
+        for value in 0..7u64 {
+            let encoded = bincode::serialize(&value).unwrap();
+            let decoded: Zp7 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded + Zp7::zero(), Zp7::new(value));
+            assert_eq!(decoded - Zp7::zero(), Zp7::new(value));
+            assert_eq!(decoded + Zp7::one(), Zp7::new(value + 1));
+        }
+    }
 
     #[test]
     // The default value should be zero.
