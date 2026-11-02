@@ -11,10 +11,10 @@ use rand::{prelude::StdRng, Rng, SeedableRng};
 use zeebra::{
     fields::Zp2147483647,
     grobner::{
-        benchmark_systems::{cyclic, katsura},
+        benchmark_systems::{cyclic, katsura, planted},
         buchberger,
     },
-    FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
+    FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
 type F = Zp2147483647;
@@ -46,22 +46,10 @@ fn random_system<const N: usize>(seed: u64) -> Vec<MultivariatePolynomial<N, F>>
         .collect()
 }
 
-/// A system whose solution is known: `x_i - a_i` for a fixed point, mixed with a quadratic that
-/// also vanishes there. Linear equations alongside nonlinear ones match the anticipated shape.
-fn planted_system<const N: usize>(seed: u64) -> Vec<MultivariatePolynomial<N, F>> {
+/// A deterministic point to plant a solution at.
+fn planted_point<const N: usize>(seed: u64) -> Vec<F> {
     let mut rng = StdRng::seed_from_u64(seed);
-    let point: Vec<F> = (0..N).map(|_| F::random(&mut rng)).collect();
-
-    let mut system: Vec<MultivariatePolynomial<N, F>> = Vec::new();
-    for i in 0..N {
-        let mut exponents = [0u32; N];
-        exponents[i] = 1;
-        system.push(MultivariatePolynomial::new(&[
-            (Monomial::new(&exponents), F::one()),
-            (Monomial::one(), F::zero() - point[i]),
-        ]));
-    }
-    system
+    (0..N).map(|_| F::random(&mut rng)).collect()
 }
 
 fn bench_family<const N: usize>(
@@ -90,7 +78,8 @@ fn benches(c: &mut Criterion) {
     bench_family::<5>(&mut group, "katsura", katsura::<5, F>());
     bench_family::<3>(&mut group, "random", random_system::<3>(5));
     bench_family::<4>(&mut group, "random", random_system::<4>(5));
-    bench_family::<6>(&mut group, "planted", planted_system::<6>(9));
+    let point = planted_point::<6>(9);
+    bench_family::<6>(&mut group, "planted", planted::<6, F>(&point));
 
     group.finish();
 }

@@ -95,10 +95,76 @@ pub fn katsura<const N: usize, F: FiniteField>() -> Vec<MultivariatePolynomial<N
     system
 }
 
+/// A zero-dimensional system with a known solution, in which the nonlinear equations matter.
+///
+/// Variables are taken in consecutive pairs. Each pair (x, y) with planted values (a, b) gets
+///
+/// ```text
+/// x^2 + y^2 - (a^2 + b^2)
+/// x*y - a*b
+/// ```
+///
+/// Both vanish at the planted point, neither follows from the other, and neither is linear, so
+/// solving genuinely requires nonlinear reduction. Each pair contributes the four solutions
+/// (a,b), (b,a), (-a,-b), (-b,-a), so the system is zero-dimensional with the planted point among
+/// them. An odd final variable gets the linear equation `x - a`.
+///
+/// Planting the answer in nonlinear equations is the point: a system of `x_i - a_i` is already a
+/// Gröbner basis under every order and so measures nothing.
+pub fn planted<const N: usize, F: FiniteField>(point: &[F]) -> Vec<MultivariatePolynomial<N, F>> {
+    assert_eq!(
+        point.len(),
+        N,
+        "the planted point needs one value per variable"
+    );
+    let mut system: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(N);
+
+    let mut i = 0;
+    while i + 1 < N {
+        let (a, b) = (point[i], point[i + 1]);
+
+        // x_i^2 + x_{i+1}^2 - (a^2 + b^2)
+        let mut x_squared = [0u32; N];
+        x_squared[i] = 2;
+        let mut y_squared = [0u32; N];
+        y_squared[i + 1] = 2;
+        system.push(MultivariatePolynomial::new(&[
+            (Monomial::new(&x_squared), F::one()),
+            (Monomial::new(&y_squared), F::one()),
+            (Monomial::one(), F::zero() - (a * a + b * b)),
+        ]));
+
+        // x_i * x_{i+1} - a*b
+        let mut product = [0u32; N];
+        product[i] = 1;
+        product[i + 1] = 1;
+        system.push(MultivariatePolynomial::new(&[
+            (Monomial::new(&product), F::one()),
+            (Monomial::one(), F::zero() - a * b),
+        ]));
+
+        i += 2;
+    }
+
+    // An odd trailing variable is pinned linearly, so the system stays square.
+    if i < N {
+        let mut exponents = [0u32; N];
+        exponents[i] = 1;
+        system.push(MultivariatePolynomial::new(&[
+            (Monomial::new(&exponents), F::one()),
+            (Monomial::one(), F::zero() - point[i]),
+        ]));
+    }
+
+    system
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{cyclic, katsura};
-    use crate::{fields::Zp2147483647, MultivariatePolynomial};
+    use super::{cyclic, katsura, planted};
+    use rand::{prelude::StdRng, SeedableRng};
+
+    use crate::{fields::Zp2147483647, FiniteField, MultivariatePolynomial, Zero};
 
     type F = Zp2147483647;
 
@@ -154,6 +220,63 @@ mod tests {
         assert_eq!(katsura::<3, F>().len(), 3);
         assert_eq!(katsura::<4, F>().len(), 4);
         assert_eq!(katsura::<5, F>().len(), 5);
+    }
+
+    /// The planted point is a root of every generator, so the advertised solution really solves it.
+    #[test]
+    fn test_planted_point_is_a_root() {
+        let point: Vec<F> = [3u64, 5, 7, 11].iter().map(|v| F::new(*v)).collect();
+        let system = planted::<4, F>(&point);
+        for p in &system {
+            assert!(
+                p.eval(&point).is_zero(),
+                "{} does not vanish at the planted point",
+                p
+            );
+        }
+    }
+
+    /// The planted system is genuinely nonlinear, which is the property the benchmark needs.
+    ///
+    /// A system of `x_i - a_i` is already a Gröbner basis under every order, so it would measure
+    /// nothing. This asserts the generators are not all linear.
+    #[test]
+    fn test_planted_system_is_nonlinear() {
+        let point: Vec<F> = [3u64, 5, 7, 11].iter().map(|v| F::new(*v)).collect();
+        let system = planted::<4, F>(&point);
+        let quadratics = system
+            .iter()
+            .filter(|p| p.terms().keys().any(|m| m.degree() == 2))
+            .count();
+        assert_eq!(
+            quadratics, 4,
+            "every generator of an even-sized system is quadratic"
+        );
+    }
+
+    /// An odd variable count still yields one equation per variable.
+    #[test]
+    fn test_planted_system_is_square_for_an_odd_variable_count() {
+        let point: Vec<F> = [3u64, 5, 7].iter().map(|v| F::new(*v)).collect();
+        let system = planted::<3, F>(&point);
+        assert_eq!(system.len(), 3);
+        for p in &system {
+            assert!(p.eval(&point).is_zero(), "{} does not vanish", p);
+        }
+    }
+
+    /// The planted point is recovered by solving, so the system is zero-dimensional as claimed.
+    #[test]
+    fn test_planted_point_is_among_the_solutions() {
+        let point: Vec<F> = [3u64, 5].iter().map(|v| F::new(*v)).collect();
+        let system = planted::<2, F>(&point);
+        let mut rng = StdRng::seed_from_u64(7);
+        let solutions = crate::grobner::solve(&system, &mut rng);
+        assert!(
+            solutions.contains(&[point[0], point[1]]),
+            "the planted point is not among {:?}",
+            solutions
+        );
     }
 
     /// No generator is zero or constant, which would make a family trivially degenerate.
