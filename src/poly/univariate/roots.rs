@@ -11,24 +11,21 @@
 //! roots live only in an extension, and collapses multiplicities. What remains is a squarefree
 //! product of linear factors, which equal-degree splitting breaks apart.
 //!
-//! Splitting is randomized, as there is no known efficient deterministic method. Each attempt
-//! succeeds with probability of roughly one half, independently, so the expected number of
-//! attempts is a small constant.
+//! This is the degree-one case of [`factorize`](super::factorize), and shares its splitter. It
+//! stays separate because it needs only that one degree, where full factorization works through
+//! every degree up to that of f.
 //!
 //! # References
 //! * A Computational Introduction to Number Theory and Algebra, 20.2 and 21.3
-//! * Handbook of Applied Cryptography, 3.4
 
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    poly::univariate::{gcd, pow_mod, Polynomial, UnivariatePolynomial},
+    poly::univariate::{
+        factorize::separate_equal_degree, gcd, pow_mod, Polynomial, UnivariatePolynomial,
+    },
     FiniteField,
 };
-
-/// Splitting is expected to succeed within a couple of attempts, so exhausting this many means
-/// something is wrong rather than merely unlucky. Guards against looping forever on a defect.
-const MAX_SPLIT_ATTEMPTS: usize = 1000;
 
 /// The distinct roots of `f` in F, in unspecified order.
 ///
@@ -62,86 +59,15 @@ pub fn roots<F: FiniteField, R: RngCore + CryptoRng>(
         return Vec::new();
     }
 
-    // Break the squarefree product of linear factors apart.
-    let mut roots = Vec::new();
-    let mut pending = vec![linear_part];
-    while let Some(factor) = pending.pop() {
-        if factor.degree() == 1 {
-            // c_1 x + c_0 vanishes at -c_0 / c_1.
+    // Each linear factor is monic after splitting a monic product, so c_1 x + c_0 vanishes at
+    // -c_0 / c_1.
+    separate_equal_degree(&linear_part, 1, rng)
+        .iter()
+        .map(|factor| {
             let coefficients = factor.coefficients();
-            roots.push(F::zero() - coefficients[0] / coefficients[1]);
-            continue;
-        }
-        let (left, right) = split(&factor, rng);
-        pending.push(left);
-        pending.push(right);
-    }
-    roots
-}
-
-/// Split a squarefree product of two or more distinct linear factors into two proper factors.
-fn split<F: FiniteField, R: RngCore + CryptoRng>(
-    g: &UnivariatePolynomial<F>,
-    rng: &mut R,
-) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
-    debug_assert!(g.degree() > 1);
-
-    for _ in 0..MAX_SPLIT_ATTEMPTS {
-        let h = random_element_of_quotient(g, rng);
-
-        // For each root a of g, the candidate vanishes at a depending on h(a). Which roots that
-        // selects is effectively a coin flip per root, so the gcd is a proper factor unless the
-        // flips all agree.
-        let candidate = if F::characteristic() == 2 {
-            trace(&h, g)
-        } else {
-            // The nonzero squares of F are exactly the elements y with y^((q-1)/2) = 1, so this
-            // vanishes at the roots where h takes a square value.
-            &pow_mod(&h, (F::order() - 1) / 2, g) - &UnivariatePolynomial::one()
-        };
-
-        // Correctness rests on this check, not on the candidate: any proper divisor of g is a
-        // valid split. The candidate only governs how often an attempt succeeds, so an error in
-        // the trace or the exponent would cost attempts rather than give a wrong answer.
-        let divisor = gcd(g, &candidate);
-        if !divisor.is_zero() && divisor.degree() > 0 && divisor.degree() < g.degree() {
-            let quotient = g.div(&divisor).0;
-            return (divisor, quotient);
-        }
-    }
-
-    panic!(
-        "failed to split {} in {} attempts; it may not be a squarefree product of linear factors",
-        g, MAX_SPLIT_ATTEMPTS
-    );
-}
-
-/// The absolute trace of `h` in F[x]/(g), for a field of characteristic two.
-///
-/// `(q-1)/2` is not available in characteristic two, so the role of "half the elements" is played
-/// by the trace map to GF(2), which is `y + y^2 + y^4 + ... + y^(2^(m-1))` for q = 2^m.
-pub(crate) fn trace<F: FiniteField>(
-    h: &UnivariatePolynomial<F>,
-    g: &UnivariatePolynomial<F>,
-) -> UnivariatePolynomial<F> {
-    // q = 2^m, so m is the position of its single set bit.
-    let m = F::order().trailing_zeros();
-    let mut term = h.div(g).1;
-    let mut sum = term.clone();
-    for _ in 1..m {
-        term = pow_mod(&term, 2, g);
-        sum = &sum + &term;
-    }
-    sum.div(g).1
-}
-
-/// A uniformly random element of F[x]/(g), i.e. a polynomial of degree below `g`.
-fn random_element_of_quotient<F: FiniteField, R: RngCore + CryptoRng>(
-    g: &UnivariatePolynomial<F>,
-    rng: &mut R,
-) -> UnivariatePolynomial<F> {
-    let coefficients: Vec<F> = (0..g.degree()).map(|_| F::random(rng)).collect();
-    UnivariatePolynomial::new(&coefficients)
+            F::zero() - coefficients[0] / coefficients[1]
+        })
+        .collect()
 }
 
 #[cfg(test)]

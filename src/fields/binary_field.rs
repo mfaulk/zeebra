@@ -971,7 +971,7 @@ mod tests {
     /// passing.
     #[test]
     fn test_trace_maps_into_gf2() {
-        use crate::{identities::One, poly::trace, Polynomial, UnivariatePolynomial};
+        use crate::{identities::One, poly::trace_to_gf2, Polynomial, UnivariatePolynomial};
         use rand::{prelude::StdRng, Rng, SeedableRng};
 
         let mut rng = StdRng::seed_from_u64(43);
@@ -989,7 +989,7 @@ mod tests {
                 .map(|_| Gf256::new(rng.gen_range(0..256)))
                 .collect();
             let h = UnivariatePolynomial::new(&coefficients);
-            let t = trace(&h, &g);
+            let t = trace_to_gf2(&h, &g, 1);
 
             for a in &chosen {
                 let value = t.eval(a);
@@ -999,6 +999,138 @@ mod tests {
                     value,
                     a
                 );
+            }
+        }
+    }
+
+    /// The trace satisfies T^2 = T, because it lands in GF(2) where squaring is the identity.
+    ///
+    /// Holds for any degree, unlike evaluating at a root: for d > 1 the roots live in
+    /// GF(2^(m*d)) and cannot be represented as elements of GF(2^m). This is what catches an
+    /// error in the trace at d > 1, since factorization itself cannot — any candidate that
+    /// splits is accepted, so a wrong trace merely costs attempts.
+    #[test]
+    fn test_trace_is_idempotent() {
+        use crate::{
+            identities::One, is_irreducible, poly::trace_to_gf2, pow_mod, Polynomial,
+            UnivariatePolynomial,
+        };
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(59);
+
+        // d = 1: a product of distinct linear factors.
+        let linear = [Gf256::new(2), Gf256::new(57), Gf256::new(201)]
+            .iter()
+            .fold(UnivariatePolynomial::<Gf256>::one(), |acc, a| {
+                acc * UnivariatePolynomial::new(&[Gf256::zero() - *a, Gf256::one()])
+            });
+
+        // d = 2: a product of distinct irreducible quadratics.
+        let mut quadratics: Vec<UnivariatePolynomial<Gf256>> = Vec::new();
+        for c in 1..80u64 {
+            let candidate = UnivariatePolynomial::new(&[Gf256::new(c), Gf256::one(), Gf256::one()]);
+            if is_irreducible(&candidate) {
+                quadratics.push(candidate);
+            }
+            if quadratics.len() == 2 {
+                break;
+            }
+        }
+        assert_eq!(quadratics.len(), 2);
+        let quadratic = &quadratics[0] * &quadratics[1];
+
+        for (g, d) in [(&linear, 1u32), (&quadratic, 2)] {
+            for _ in 0..16 {
+                let coefficients: Vec<Gf256> = (0..g.degree())
+                    .map(|_| Gf256::new(rng.gen_range(0..256)))
+                    .collect();
+                let h = UnivariatePolynomial::new(&coefficients);
+                let t = trace_to_gf2(&h, g, d);
+                assert_eq!(
+                    pow_mod(&t, 2, g),
+                    t.div(g).1,
+                    "the trace of {} is not idempotent at d = {}",
+                    h,
+                    d
+                );
+            }
+        }
+    }
+
+    /// Factorization over GF(2^m), which drives the characteristic-two splitter at degree > 1.
+    ///
+    /// Lives here because `BinaryFieldElement` is private to the `fields` module, so from `poly`
+    /// only GF(2) is reachable in characteristic two — and at m = 1 the trace has a single term.
+    #[test]
+    fn test_factorize_over_gf256() {
+        use crate::{factorize, identities::One, is_irreducible, Polynomial, UnivariatePolynomial};
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(53);
+
+        // Two distinct irreducible monic quadratics, found rather than assumed.
+        let mut quadratics: Vec<UnivariatePolynomial<Gf256>> = Vec::new();
+        for c in 1..80u64 {
+            let candidate = UnivariatePolynomial::new(&[Gf256::new(c), Gf256::one(), Gf256::one()]);
+            if is_irreducible(&candidate) {
+                quadratics.push(candidate);
+            }
+            if quadratics.len() == 2 {
+                break;
+            }
+        }
+        assert_eq!(quadratics.len(), 2, "expected two irreducible quadratics");
+
+        // Their product has two degree-two factors, so the splitter has to separate them —
+        // the case m = 1 never reaches.
+        let f = &quadratics[0] * &quadratics[1];
+        let factors = factorize(&f, &mut rng);
+        assert_eq!(factors.len(), 2);
+        for (factor, multiplicity) in &factors {
+            assert_eq!(*multiplicity, 1);
+            assert_eq!(factor.degree(), 2);
+            assert!(is_irreducible(factor), "{} is not irreducible", factor);
+        }
+
+        // With a repeated factor too.
+        let g = quadratics[0].pow(3) * quadratics[1].clone();
+        let factors = factorize(&g, &mut rng);
+        let product = factors
+            .iter()
+            .fold(UnivariatePolynomial::<Gf256>::one(), |acc, (p, m)| {
+                acc * p.pow(*m as u32)
+            });
+        assert_eq!(product, g);
+        assert_eq!(factors.len(), 2);
+
+        // And on polynomials whose factor structure is not known in advance: the product of the
+        // factors must reconstruct the input, and each factor must be irreducible. Those two
+        // together are complete, factorization being unique up to units.
+        let candidates = [
+            vec![7u64, 3, 1, 5],
+            vec![1, 0, 0, 0, 1],
+            vec![200, 17, 99],
+            vec![9, 9, 9, 9, 9, 9],
+            vec![1, 2, 3, 4, 5, 6, 7],
+        ];
+        for coefficients in &candidates {
+            let p = UnivariatePolynomial::new(
+                &coefficients
+                    .iter()
+                    .map(|c| Gf256::new(*c))
+                    .collect::<Vec<_>>(),
+            );
+            let factors = factorize(&p, &mut rng);
+            let product = factors
+                .iter()
+                .fold(UnivariatePolynomial::<Gf256>::one(), |acc, (g, m)| {
+                    acc * g.pow(*m as u32)
+                });
+            let monic = p.scale(&p.coefficients().last().unwrap().inverse());
+            assert_eq!(product, monic, "coefficients {:?}", coefficients);
+            for (factor, _) in &factors {
+                assert!(is_irreducible(factor), "{} is not irreducible", factor);
             }
         }
     }
