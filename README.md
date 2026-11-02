@@ -49,13 +49,18 @@ reports those four as failures; the commands above select the tests that are mea
 
 ### Benchmarks
 
-Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense linear algebra,
-and Gröbner basis computation:
+Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense and sparse linear
+algebra, and Gröbner basis computation:
 
 ```sh
 cargo bench                              # everything
 cargo bench --bench grobner              # one suite
+cargo bench --bench sparse_linear_algebra
 ```
+
+`sparse_linear_algebra` runs sparse and dense elimination on identical matrices at several sizes
+and densities, because sparse storage is not unconditionally faster — above some density the
+bookkeeping costs more than the arithmetic it saves.
 
 Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
 counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
