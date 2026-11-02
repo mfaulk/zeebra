@@ -268,7 +268,7 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
             reduced.push(p.clone());
             continue;
         }
-        let remainder = p.multi_div_rem(&others, order).1;
+        let remainder = p.normal_form(&others, order);
         debug_assert!(
             !remainder.is_zero(),
             "reducing a minimal basis element cannot cancel its leading term"

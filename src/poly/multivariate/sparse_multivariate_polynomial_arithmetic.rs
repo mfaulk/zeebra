@@ -169,7 +169,10 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                 Some((reducer, quotient_monomial)) => {
                     // The quotient term times the divisor's leading term is exactly the term just
                     // popped, so only the divisor's tail still has to be subtracted.
-                    let quotient_coefficient = lead_coefficient / reducer.lead_coefficient;
+                    let quotient_coefficient = match reducer.lead_inverse {
+                        Some(inverse) => lead_coefficient * inverse,
+                        None => lead_coefficient,
+                    };
                     subtract_shifted(
                         &mut working,
                         &mut scratch,
@@ -227,7 +230,17 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 /// A divisor with its leading term and tail precomputed, so reduction does not recompute them.
 struct Reducer<const N: usize, F: FiniteField> {
     lead_monomial: Monomial<N>,
-    lead_coefficient: F,
+    /// The inverse of the leading coefficient, or `None` when this reducer is monic.
+    ///
+    /// Reduction divides the popped coefficient by this one on every step. Division is
+    /// multiplication by an inverse, and an inverse is a modular exponentiation of about log2(q)
+    /// multiplications, so computing it per step cost more than the term arithmetic it enabled.
+    /// Inverting once here turns the inner loop into a single multiply.
+    ///
+    /// `None` is not merely an optimization of the common case: Buchberger scales every generator
+    /// and every new basis element monic, so it is the only case that arises there, and it skips
+    /// the multiply entirely.
+    lead_inverse: Option<F>,
     /// Every term below the leading one, sorted ascending by the order.
     tail: Vec<(Monomial<N>, F)>,
 }
@@ -243,9 +256,14 @@ impl<const N: usize, F: FiniteField> Reducer<N, F> {
             .map(|(monomial, coefficient)| (*monomial, *coefficient))
             .collect();
         tail.sort_by(|a, b| order.cmp(&a.0, &b.0));
+        let lead_inverse = if lead_coefficient == F::ONE {
+            None
+        } else {
+            Some(lead_coefficient.inverse())
+        };
         Self {
             lead_monomial,
-            lead_coefficient,
+            lead_inverse,
             tail,
         }
     }
@@ -745,6 +763,38 @@ mod tests {
             assert_eq!(
                 f.normal_form(std::slice::from_ref(&zero), order),
                 f,
+                "{}",
+                order.name()
+            );
+        }
+    }
+
+    /// Reduction by a non-monic divisor scales by the leading coefficient's inverse.
+    ///
+    /// Buchberger makes every reducer monic, so the non-monic path is only reachable through the
+    /// public API and would otherwise go untested by the Gröbner tests.
+    #[test]
+    fn test_normal_form_by_a_non_monic_divisor() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y"];
+        // 3x - 1 has leading coefficient 3, whose inverse mod 13 is 9.
+        let divisor = MultivariatePolynomial::<2, F>::parse("3*x - 1", vars).unwrap();
+        let f = MultivariatePolynomial::<2, F>::parse("x^2 + y", vars).unwrap();
+
+        for order in ALL_ORDERS {
+            // The quotient is 9x + 3 and (9x + 3)(3x - 1) = 27x^2 - 3 = x^2 - 3 mod 13, so the
+            // normal form is y + 3. Note 1/3 = 9 and 9/3 = 3 mod 13.
+            let expected = MultivariatePolynomial::<2, F>::parse("y + 3", vars).unwrap();
+            assert_eq!(
+                f.normal_form(std::slice::from_ref(&divisor), order),
+                expected,
+                "{}",
+                order.name()
+            );
+            // And it still agrees with the independent oracle.
+            assert_eq!(
+                f.normal_form(std::slice::from_ref(&divisor), order),
+                f.multi_div_rem(std::slice::from_ref(&divisor), order).1,
                 "{}",
                 order.name()
             );
