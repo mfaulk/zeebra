@@ -6,35 +6,77 @@
 //!
 //! `N` is a const generic, so each variable count needs its own instantiation.
 
+use std::collections::HashMap;
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, Rng, SeedableRng};
-use zeebra::{fields::Zp2147483647, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial};
+use zeebra::{
+    fields::Zp2147483647, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, Zero,
+};
 
 type F = Zp2147483647;
 const ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
-/// A polynomial with roughly `terms` terms, exponents bounded by `max_exponent`.
+/// A polynomial with exactly `terms` distinct monomials, exponents bounded by `max_exponent`.
+///
+/// Sampling monomials independently and letting duplicates merge makes the term count a function
+/// of the arity: with N = 3 and exponents bounded by 4 there are only 5^3 = 125 monomials to draw
+/// from, so asking for 256 terms yielded 116 and the benchmark label overstated the input by more
+/// than a factor of two. Drawing until the target number of *distinct* monomials is reached keeps
+/// the label honest and the arities comparable to each other.
 fn random_poly<const N: usize>(
     terms: usize,
     max_exponent: u32,
     rng: &mut StdRng,
 ) -> MultivariatePolynomial<N, F> {
-    let drawn: Vec<(Monomial<N>, F)> = (0..terms)
-        .map(|_| {
-            let exponents: Vec<u32> = (0..N).map(|_| rng.gen_range(0..=max_exponent)).collect();
-            (Monomial::new(&exponents), F::random(rng))
-        })
-        .collect();
-    MultivariatePolynomial::new(&drawn)
+    let available = (max_exponent as u64 + 1).pow(N as u32);
+    assert!(
+        (terms as u64) <= available,
+        "{terms} distinct monomials requested but only {available} exist for {N} variables with \
+         exponents at most {max_exponent}"
+    );
+
+    let mut drawn: HashMap<Monomial<N>, F> = HashMap::with_capacity(terms);
+    while drawn.len() < terms {
+        let exponents: Vec<u32> = (0..N).map(|_| rng.gen_range(0..=max_exponent)).collect();
+        // A repeat draw is discarded rather than merged, so the count is exact.
+        drawn.entry(Monomial::new(&exponents)).or_insert_with(|| {
+            let mut coefficient = F::random(rng);
+            // A zero coefficient would be dropped on construction, undoing the exact count.
+            while coefficient.is_zero() {
+                coefficient = F::random(rng);
+            }
+            coefficient
+        });
+    }
+
+    let terms: Vec<(Monomial<N>, F)> = drawn.into_iter().collect();
+    MultivariatePolynomial::new(&terms)
+}
+
+/// The smallest exponent bound admitting `terms` distinct monomials in N variables, at least 4.
+///
+/// Fixed per arity rather than per size, so that the exponent distribution does not vary between
+/// the sizes being compared. Only the low arities need more than 4: N = 3 has just 5^3 = 125
+/// monomials within that bound, fewer than the largest size benchmarked.
+fn exponent_bound<const N: usize>(terms: usize) -> u32 {
+    let mut bound = 4u32;
+    while (bound as u64 + 1).pow(N as u32) < terms as u64 {
+        bound += 1;
+    }
+    bound
 }
 
 fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
     let mut group = c.benchmark_group("sparse_poly");
 
-    for terms in [16usize, 64, 256] {
+    const SIZES: [usize; 3] = [16, 64, 256];
+    let max_exponent = exponent_bound::<N>(SIZES[SIZES.len() - 1]);
+
+    for terms in SIZES {
         let mut rng = StdRng::seed_from_u64(11);
-        let a = random_poly::<N>(terms, 4, &mut rng);
-        let b = random_poly::<N>(terms, 4, &mut rng);
+        let a = random_poly::<N>(terms, max_exponent, &mut rng);
+        let b = random_poly::<N>(terms, max_exponent, &mut rng);
 
         group.bench_with_input(
             BenchmarkId::new(format!("add/{}", arity), terms),

@@ -6,6 +6,17 @@
 //!
 //! Operands are drawn in advance and the loop consumes them in order, so the measurement covers
 //! the arithmetic and not the generation.
+//!
+//! Each operation is measured two ways, because neither alone is sufficient:
+//!
+//! - `<op>` accumulates into a running total, which creates a dependency chain and so reports
+//!   latency — but each sample also includes one addition, so it measures a fused `acc += x op y`
+//!   rather than the named operation. Improvements to addition show up in every one of these.
+//! - `isolated/<op>` discards each result through `black_box`, so the operation is measured on its
+//!   own at the cost of including the `black_box` barrier and loop overhead. Successive iterations
+//!   are independent, so this reports throughput rather than latency.
+//!
+//! Compare like with like across runs; do not read a change in one as a change in the other.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, SeedableRng};
@@ -94,6 +105,55 @@ fn bench_field<F: FiniteField>(c: &mut Criterion, name: &str) {
                     acc += black_box(x).inverse();
                 }
                 black_box(acc)
+            })
+        },
+    );
+
+    // Isolated variants: one operation per sample, no accumulating addition.
+    group.bench_with_input(
+        BenchmarkId::new("isolated/mul", name),
+        &(&a, &b),
+        |bencher, (a, b)| {
+            bencher.iter(|| {
+                for (x, y) in a.iter().zip(b.iter()) {
+                    black_box(*black_box(x) * *black_box(y));
+                }
+            })
+        },
+    );
+
+    group.bench_with_input(
+        BenchmarkId::new("isolated/add", name),
+        &(&a, &b),
+        |bencher, (a, b)| {
+            bencher.iter(|| {
+                for (x, y) in a.iter().zip(b.iter()) {
+                    black_box(*black_box(x) + *black_box(y));
+                }
+            })
+        },
+    );
+
+    group.bench_with_input(
+        BenchmarkId::new("isolated/sub", name),
+        &(&a, &b),
+        |bencher, (a, b)| {
+            bencher.iter(|| {
+                for (x, y) in a.iter().zip(b.iter()) {
+                    black_box(*black_box(x) - *black_box(y));
+                }
+            })
+        },
+    );
+
+    group.bench_with_input(
+        BenchmarkId::new("isolated/inverse", name),
+        &nonzero,
+        |bencher, values| {
+            bencher.iter(|| {
+                for x in values.iter() {
+                    black_box(black_box(x).inverse());
+                }
             })
         },
     );
