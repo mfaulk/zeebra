@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [ "main" ]
+  # Every pull request, not only those targeting main: a stack of dependent pull requests has
+  # each one based on the previous, and a base-branch filter would leave all but the first
+  # unchecked.
   pull_request:
-    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
