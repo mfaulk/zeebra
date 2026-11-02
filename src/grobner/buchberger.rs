@@ -520,6 +520,32 @@ mod tests {
         }
     }
 
+    /// grevlex produces a genuinely different basis from grlex, and often a much smaller one.
+    ///
+    /// This is the observable consequence of the dispatch fix: before it, `cmp` sent grevlex to
+    /// `grlex`, so the two orders computed identical bases and the advantage of grevlex — the
+    /// reason it is the order of choice for Gröbner computation — was unavailable.
+    #[test]
+    fn test_grevlex_differs_from_grlex() {
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let f: Vec<MultivariatePolynomial<3, F>> = ["x*z - y^2", "x^3 - z^2"]
+            .iter()
+            .map(|s| MultivariatePolynomial::parse(s, vars).unwrap())
+            .collect();
+
+        let grlex = buchberger(&f, MonomialOrder::GradedLexicographic);
+        let grevlex = buchberger(&f, MonomialOrder::GradedReverseLexicographic);
+
+        assert_ne!(grlex, grevlex);
+        assert_eq!(grlex.len(), 5, "grlex basis size changed");
+        assert_eq!(grevlex.len(), 2, "grevlex basis size changed");
+
+        // Both are nonetheless valid bases for the same ideal.
+        assert_is_reduced_grobner_basis(&f, MonomialOrder::GradedLexicographic);
+        assert_is_reduced_grobner_basis(&f, MonomialOrder::GradedReverseLexicographic);
+    }
+
     const ALL_ORDERS: [MonomialOrder; 3] = [
         MonomialOrder::Lexicographic,
         MonomialOrder::GradedLexicographic,
