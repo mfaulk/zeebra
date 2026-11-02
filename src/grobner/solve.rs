@@ -3,20 +3,30 @@
 //! A lexicographic Grobner basis generates the same ideal as the system it came from, so the two
 //! have the same solution set — but the basis is triangular. With x_0 > x_1 > ... > x_{N-1}, the
 //! elimination property puts a polynomial in x_{N-1} alone into the basis, then one in the last
-//! two variables, and so on. Assigning variables from the last backwards therefore meets a
-//! constraint at every step, which is what makes searching the field tractable.
+//! two variables, and so on.
+//!
+//! Variables are therefore assigned from the last backwards. At each step the basis polynomials
+//! that have become univariate in the current variable are solved with [`roots`], so only their
+//! common roots are tried — a handful of values rather than the whole field. A variable left
+//! unconstrained by the basis is free, and the only way to cover a free variable is to enumerate
+//! the field, which is what bounds the fields this can handle.
 //!
 //! # References
 //! * Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea, Sec 3.1
 
 use rand::{CryptoRng, RngCore};
 
-use crate::{grobner::buchberger, poly::MonomialOrder, FiniteField, MultivariatePolynomial};
+use crate::{
+    grobner::buchberger,
+    poly::{roots, MonomialOrder, Polynomial, UnivariatePolynomial},
+    FiniteField, MultivariatePolynomial,
+};
 
-/// The largest field this solver will enumerate.
+/// The largest field whose elements this solver will enumerate.
 ///
-/// Every level of the search tries each element of the base field, so the cost grows with the
-/// field's order. Rather than appearing to hang on a field it cannot handle, `solve` refuses.
+/// Only reached for a system with a free variable, where the solution set itself grows with the
+/// field and no algorithm could enumerate it. A system with finitely many solutions needs no
+/// enumeration at all, so this limit does not apply to it.
 const MAX_FIELD_ORDER: u128 = 1 << 20;
 
 /// Every point of F^N at which all polynomials of `system` vanish.
@@ -24,26 +34,18 @@ const MAX_FIELD_ORDER: u128 = 1 << 20;
 /// The order of the returned points is unspecified.
 ///
 /// # Panics
-/// Panics if the field's order exceeds `MAX_FIELD_ORDER`. Solving over a large field needs
-/// univariate root finding rather than enumeration; see the module documentation.
+/// Panics if the system leaves a variable unconstrained and the field's order exceeds
+/// `MAX_FIELD_ORDER`. A system with finitely many solutions has no such limit.
 pub fn solve<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
 ) -> Vec<[F; N]> {
-    assert!(
-        F::order() <= MAX_FIELD_ORDER,
-        "solve enumerates the base field, whose order {} exceeds the limit of {}",
-        F::order(),
-        MAX_FIELD_ORDER
-    );
-
-    let elements = field_elements(rng);
-
     // An empty system constrains nothing, so every point is a solution. Handled separately
     // because `buchberger` has no generators to work with.
     if system.is_empty() || system.iter().all(|p| p.is_zero()) {
         let mut solutions = Vec::new();
         let mut assignment = [F::zero(); N];
+        let elements = field_elements(rng);
         enumerate_all(&elements, N, &mut assignment, &mut solutions);
         return solutions;
     }
@@ -58,7 +60,16 @@ pub fn solve<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 
     let mut solutions = Vec::new();
     let mut assignment = [F::zero(); N];
-    extend(&basis, &elements, N, &mut assignment, &mut solutions);
+    // Built only if a free variable turns up, since that is the only case needing it.
+    let mut elements: Option<Vec<F>> = None;
+    extend(
+        &basis,
+        N,
+        &mut assignment,
+        &mut solutions,
+        &mut elements,
+        rng,
+    );
     solutions
 }
 
@@ -67,12 +78,13 @@ pub fn solve<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 ///
 /// `basis` always has the already-assigned variables substituted in, so at the deepest level
 /// every polynomial is a constant.
-fn extend<const N: usize, F: FiniteField>(
+fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
     basis: &[MultivariatePolynomial<N, F>],
-    elements: &[F],
     remaining: usize,
     assignment: &mut [F; N],
     solutions: &mut Vec<[F; N]>,
+    elements: &mut Option<Vec<F>>,
+    rng: &mut R,
 ) {
     if remaining == 0 {
         if basis.iter().all(|p| p.is_zero()) {
@@ -82,20 +94,92 @@ fn extend<const N: usize, F: FiniteField>(
     }
 
     let index = remaining - 1;
-    for value in elements {
-        assignment[index] = *value;
-        let substituted: Vec<MultivariatePolynomial<N, F>> =
-            basis.iter().map(|p| p.substitute(index, *value)).collect();
+    let candidates = match candidate_values(basis, index, rng) {
+        Some(values) => values,
+        None => {
+            // Nothing in the basis constrains this variable, so every element of the field has
+            // to be tried. Cloned rather than borrowed so `elements` stays available to recurse
+            // with.
+            if elements.is_none() {
+                assert!(
+                    F::order() <= MAX_FIELD_ORDER,
+                    "variable {} is unconstrained, so covering it means enumerating the field, \
+                     whose order {} exceeds the limit of {}",
+                    index,
+                    F::order(),
+                    MAX_FIELD_ORDER
+                );
+                *elements = Some(field_elements(rng));
+            }
+            elements.as_ref().expect("just populated").clone()
+        }
+    };
 
-        // Abandon the branch as soon as any polynomial becomes a nonzero constant, which says
-        // this partial assignment already contradicts the system. A lex basis is triangular, so
-        // the constraint on the deepest variable is univariate and this prunes immediately.
+    for value in candidates {
+        assignment[index] = value;
+        let substituted: Vec<MultivariatePolynomial<N, F>> =
+            basis.iter().map(|p| p.substitute(index, value)).collect();
+
+        // A nonzero constant says this partial assignment already contradicts the system.
         if substituted.iter().any(is_nonzero_constant) {
             continue;
         }
 
-        extend(&substituted, elements, index, assignment, solutions);
+        extend(&substituted, index, assignment, solutions, elements, rng);
     }
+}
+
+/// The values of variable `index` worth trying, or `None` if the basis does not constrain it.
+///
+/// A lex basis is triangular, so once the deeper variables are substituted at least one
+/// polynomial is usually univariate in this one. Its roots are the only possible values, which
+/// replaces a sweep of the whole field with a handful of candidates.
+fn candidate_values<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+    basis: &[MultivariatePolynomial<N, F>],
+    index: usize,
+    rng: &mut R,
+) -> Option<Vec<F>> {
+    let constraints: Vec<UnivariatePolynomial<F>> = basis
+        .iter()
+        .filter_map(|p| as_univariate(p, index))
+        // A constant carries no information about the variable: zero is satisfied by every value,
+        // and a nonzero constant is caught by the contradiction check instead.
+        .filter(|u| !u.is_zero() && u.degree() > 0)
+        .collect();
+
+    let (first, rest) = constraints.split_first()?;
+
+    // Take the roots of one constraint and keep those satisfying the others. Equivalent to the
+    // roots of their gcd, without needing to reason about a constant gcd separately.
+    let mut candidates = roots(first, rng);
+    for constraint in rest {
+        candidates.retain(|value| constraint.eval(value).is_zero());
+    }
+    Some(candidates)
+}
+
+/// `p` as a polynomial in variable `index` alone, or `None` if another variable appears in it.
+fn as_univariate<const N: usize, F: FiniteField>(
+    p: &MultivariatePolynomial<N, F>,
+    index: usize,
+) -> Option<UnivariatePolynomial<F>> {
+    let mut coefficients: Vec<F> = Vec::new();
+    for (monomial, coefficient) in p.terms() {
+        let exponents = monomial.exponents();
+        if exponents
+            .iter()
+            .enumerate()
+            .any(|(i, exponent)| i != index && *exponent != 0)
+        {
+            return None;
+        }
+        let degree = exponents[index] as usize;
+        if coefficients.len() <= degree {
+            coefficients.resize(degree + 1, F::zero());
+        }
+        coefficients[degree] = *coefficient;
+    }
+    Some(UnivariatePolynomial::new(&coefficients))
 }
 
 /// Every point of F^N, for a system that constrains nothing.
@@ -128,6 +212,12 @@ fn is_nonzero_constant<const N: usize, F: FiniteField>(p: &MultivariatePolynomia
 /// The multiplicative group is cyclic of order q - 1, so its powers cover every nonzero element.
 fn field_elements<F: FiniteField, R: RngCore + CryptoRng>(rng: &mut R) -> Vec<F> {
     let order = F::order();
+    assert!(
+        order <= MAX_FIELD_ORDER,
+        "enumerating a field of order {} exceeds the limit of {}",
+        order,
+        MAX_FIELD_ORDER
+    );
     let mut elements = Vec::with_capacity(order as usize);
     elements.push(F::zero());
 
@@ -148,7 +238,9 @@ mod tests {
 
     use super::{field_elements, solve};
     use crate::{
-        fields::PrimeFieldElement64, identities::Zero, FiniteField, MultivariatePolynomial,
+        fields::{PrimeFieldElement64, Zp18446744073709551557, Zp2147483647},
+        identities::Zero,
+        FiniteField, MultivariatePolynomial,
     };
 
     /// Every point at which the system vanishes, found by trying all of them.
@@ -309,5 +401,93 @@ mod tests {
         assert_eq!(elements.len(), 13);
         let distinct: HashSet<_> = elements.iter().collect();
         assert_eq!(distinct.len(), 13);
+    }
+
+    /// A system with finitely many solutions is solved over a field far too large to enumerate.
+    ///
+    /// The field-order assert is what makes this a proof rather than a timing observation: any
+    /// attempt to enumerate GF(2^31 - 1) would panic, so passing means the roots of the
+    /// univariate constraints were used instead.
+    #[test]
+    fn test_solve_over_a_field_too_large_to_enumerate() {
+        type F = Zp2147483647; // 2^31 - 1, about two thousand times the enumeration limit
+        let vars = ["x", "y"];
+        let mut rng = StdRng::seed_from_u64(37);
+        assert!(F::order() > super::MAX_FIELD_ORDER);
+
+        // A single point.
+        let f: Vec<MultivariatePolynomial<2, F>> = vec![
+            MultivariatePolynomial::parse("x - 5", vars).unwrap(),
+            MultivariatePolynomial::parse("y - 7", vars).unwrap(),
+        ];
+        let found: HashSet<_> = solve(&f, &mut rng).into_iter().collect();
+        assert_eq!(found, HashSet::from([[F::new(5), F::new(7)]]));
+
+        // Two points, reached through a quadratic constraint.
+        let f: Vec<MultivariatePolynomial<2, F>> = vec![
+            MultivariatePolynomial::parse("x^2 - 4", vars).unwrap(),
+            MultivariatePolynomial::parse("y - x", vars).unwrap(),
+        ];
+        let found: HashSet<_> = solve(&f, &mut rng).into_iter().collect();
+        let minus_two = F::zero() - F::new(2);
+        assert_eq!(
+            found,
+            HashSet::from([[F::new(2), F::new(2)], [minus_two, minus_two],])
+        );
+
+        // Every reported point must satisfy the original system.
+        for point in &found {
+            for p in &f {
+                assert!(p.eval(point).is_zero());
+            }
+        }
+    }
+
+    /// Three variables over the largest 64-bit prime.
+    #[test]
+    fn test_solve_three_variables_over_a_large_field() {
+        type F = Zp18446744073709551557;
+        let vars = ["x", "y", "z"];
+        let mut rng = StdRng::seed_from_u64(41);
+
+        let f: Vec<MultivariatePolynomial<3, F>> = vec![
+            MultivariatePolynomial::parse("z - 3", vars).unwrap(),
+            MultivariatePolynomial::parse("y - z^2", vars).unwrap(),
+            MultivariatePolynomial::parse("x - y - z", vars).unwrap(),
+        ];
+        let found = solve(&f, &mut rng);
+        // z = 3, y = 9, x = 12.
+        assert_eq!(found, vec![[F::new(12), F::new(9), F::new(3)]]);
+    }
+
+    /// A free variable still forces enumeration, which a large field cannot support.
+    ///
+    /// The limit is a property of the answer, not of the method: the solution set of `x - y` over
+    /// this field has 2^31 - 1 points, so no algorithm could list them.
+    #[test]
+    #[should_panic(expected = "unconstrained")]
+    fn test_solve_refuses_a_free_variable_over_a_large_field() {
+        type F = Zp2147483647;
+        let vars = ["x", "y"];
+        let mut rng = StdRng::seed_from_u64(43);
+        let f: Vec<MultivariatePolynomial<2, F>> =
+            vec![MultivariatePolynomial::parse("x - y", vars).unwrap()];
+        let _ = solve(&f, &mut rng);
+    }
+
+    /// A free variable over a small field is still handled, by enumeration.
+    #[test]
+    fn test_solve_free_variable_over_a_small_field() {
+        type F = PrimeFieldElement64<7>;
+        let vars = ["x", "y"];
+        let mut rng = StdRng::seed_from_u64(47);
+        let f: Vec<MultivariatePolynomial<2, F>> =
+            vec![MultivariatePolynomial::parse("x - y", vars).unwrap()];
+        let found: HashSet<_> = solve(&f, &mut rng).into_iter().collect();
+        // x = y, so seven points.
+        assert_eq!(found.len(), 7);
+        for point in &found {
+            assert_eq!(point[0], point[1]);
+        }
     }
 }

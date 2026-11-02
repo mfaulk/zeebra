@@ -55,13 +55,17 @@ for point in solve(&system, &mut rng) {
 ```
 
 It computes a lexicographic Grobner basis, which is triangular, then assigns variables from the
-last backwards, abandoning a partial assignment as soon as it contradicts the system. An
-inconsistent system is detected from its basis being `{1}` and yields no points. The order of the
-returned points is unspecified.
+last backwards. At each step the basis polynomials that have become univariate in the current
+variable are solved with `roots`, so only their common roots are tried. An inconsistent system is
+detected from its basis being `{1}` and yields no points. The order of the returned points is
+unspecified.
 
-The search enumerates the base field at each level, so it is practical only for small fields, and
-refuses outright above an order of 2^20. Solving over a large field needs univariate root finding
-rather than enumeration.
+A system with finitely many solutions therefore needs no enumeration, and works over fields far
+too large to list — the tests cover GF(2^31 - 1) and the largest 64-bit prime.
+
+A system that leaves a variable unconstrained is the exception. Its solution set grows with the
+field, so covering a free variable means enumerating, and `solve` refuses above an order of 2^20.
+That is a limit on the size of the answer rather than on the method.
 
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
