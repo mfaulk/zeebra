@@ -83,27 +83,14 @@ fn benches(c: &mut Criterion) {
     // Buchberger on these systems is slow enough that the default sample size would take minutes.
     group.sample_size(10);
 
-    // Instances are limited to those the current engine can finish. At the baseline, katsura-3
-    // in lex takes about 174 s and katsura-4 and cyclic-4 do not complete at all, so those are
-    // recorded in the milestone document rather than run here. Re-enable them as the engine
-    // improves.
     bench_family::<3>(&mut group, "cyclic", cyclic::<3, F>());
+    bench_family::<4>(&mut group, "cyclic", cyclic::<4, F>());
+    bench_family::<3>(&mut group, "katsura", katsura::<3, F>());
+    bench_family::<4>(&mut group, "katsura", katsura::<4, F>());
+    bench_family::<5>(&mut group, "katsura", katsura::<5, F>());
     bench_family::<3>(&mut group, "random", random_system::<3>(5));
+    bench_family::<4>(&mut group, "random", random_system::<4>(5));
     bench_family::<6>(&mut group, "planted", planted_system::<6>(9));
-
-    // katsura-3 excluded from lex, which is three orders of magnitude slower than the graded
-    // orders on this system.
-    for order in [
-        MonomialOrder::GradedLexicographic,
-        MonomialOrder::GradedReverseLexicographic,
-    ] {
-        let system = katsura::<3, F>();
-        group.bench_with_input(
-            BenchmarkId::new(format!("katsura/{}", order.name()), 3),
-            &system,
-            |bencher, system| bencher.iter(|| black_box(buchberger(black_box(system), order))),
-        );
-    }
 
     group.finish();
 }
