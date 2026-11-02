@@ -215,8 +215,82 @@ them.
 
 ## 7. Measurements
 
-To be completed. Baselines recorded before any optimization; after-figures recorded per change.
-Changes within noise are reported as such rather than claimed as improvements.
+Machine: AMD Ryzen Threadripper PRO 5995WX, 64 cores. `rustc 1.97.0`, release profile, Criterion
+with a 1 s warm-up and 2 s measurement window. Figures are the median of the reported interval.
+Measurements from other machines are not comparable.
+
+### 7.1 Field arithmetic — baseline
+
+Per operation, from a 256-operand loop. `p31` is 2^31 - 1, `p64` the largest 64-bit prime, `p68`
+a 68-bit prime in the `u128` type.
+
+| op | p31 | p64 | p68 |
+|---|---|---|---|
+| mul | 3.6 ns | 4.5 ns | **251 ns** |
+| add | 3.8 ns | 3.6 ns | **186 ns** |
+| sub | 4.5 ns | 4.5 ns | **177 ns** |
+| inverse | 329 ns | 746 ns | **21.5 us** |
+
+Two findings. **Inverse costs 90x to 165x a multiply**, consistent with Fermat's `log2(q)` modular
+multiplications — which is what makes the per-entry inverse in C5 so expensive. And the 128-bit
+field is roughly **50x slower than the 64-bit one even for addition**, because
+`PrimeFieldElement128` routes every operation through `U256`, a software bignum, and then performs
+a full `U256 % U256` long division. Addition of two already-reduced values needs only a
+conditional subtract.
+
+### 7.2 Linear algebra — baseline
+
+Dense Gauss–Jordan elimination, n x n.
+
+| n | p31 | p64 |
+|---|---|---|
+| 8 | 24.0 us | 49.6 us |
+| 16 | 103 us | 206 us |
+| 32 | 507 us | 937 us |
+| 64 | 2.81 ms | 4.50 ms |
+
+At n = 64 over p64 there are 64 pivots x 64 entries = 4096 divisions, each recomputing an inverse
+at 746 ns — about **3.06 ms of the 4.50 ms measured, or 68% of total runtime**, spent on inverses
+that one per pivot would replace.
+
+### 7.3 Sparse polynomials — baseline
+
+Selected figures at 6 variables:
+
+| op | 16 terms | 64 terms | 256 terms |
+|---|---|---|---|
+| add | 2.5 us | 9.6 us | 37.5 us |
+| mul | 20.3 us | 318 us | 6.48 ms |
+| mul by term | 1.4 us | 5.4 us | 20.1 us |
+
+Normal form, 48-term dividend at 6 variables: 300 us at 2 reducers, 581 us at 4, **2.14 ms at 8**.
+
+A larger instance was instrumented directly to characterise the growth. Reducing a 128-term
+polynomial in 6 variables modulo 16 reducers took **1.35 s** across 4464 reduction steps, peaking
+at 2512 terms — **303 us per step**, where a step touching 2512 terms should cost on the order of
+10 us. Two quadratic behaviours account for it:
+
+- `multi_div_rem` recomputes `p.leading_term(order)` **inside** the divisor loop, so a step with
+  16 divisors performs 16 full O(terms) scans.
+- The remainder is accumulated with `r += SparseMultiPoly::from(term)`, which rebuilds the whole
+  remainder map on each of 3791 insertions — about 7 million map operations, O(steps^2).
+
+### 7.4 Gröbner bases — baseline
+
+| system | lex | grlex | grevlex | basis size |
+|---|---|---|---|---|
+| cyclic-3 | 176 us | 171 us | 162 us | 3 |
+| katsura-3 | **173.9 s** | 149.5 ms | 146.1 ms | 3 / 4 / 4 |
+| katsura-4 | did not complete in 300 s | | | |
+| cyclic-4 | did not complete in 300 s | | | |
+
+Two observations. Lex on katsura-3 is **1160x slower** than the graded orders, the classic lex
+blowup amplified by a strategy that rescans every basis pair each round. And grlex and grevlex
+produce identical timings and identical basis sizes — independent confirmation of C1, since
+grevlex is in fact executing grlex.
+
+The benchmark suite therefore ships only the instances the current engine can finish. katsura-4
+and cyclic-4 are the targets for the improved engine.
 
 ## 8. Acceptance criteria
 

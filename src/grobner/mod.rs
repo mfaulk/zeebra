@@ -1,5 +1,6 @@
 //! Grobner Basis algorithms
 
+pub mod benchmark_systems;
 mod buchberger;
 mod s_polynomial;
 mod solve;
