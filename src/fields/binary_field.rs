@@ -912,4 +912,94 @@ mod tests {
         assert!(is_irreducible_over_gf2(0b1011)); // x^3 + x + 1
         assert!(is_irreducible_over_gf2(0b1101)); // x^3 + x^2 + 1
     }
+
+    /// `roots` works over GF(2^m), which needs the trace-based splitter.
+    ///
+    /// This test lives here rather than beside `roots` because `BinaryFieldElement` is private to
+    /// the `fields` module, so the odd-characteristic path is all that is reachable from there.
+    /// Without this, the `(q-1)/2` branch would be the only one exercised with m > 1.
+    #[test]
+    fn test_univariate_roots_over_gf256() {
+        use crate::{identities::One, roots, Polynomial, UnivariatePolynomial};
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(41);
+
+        // (x - a)(x - b)(x - c) for three distinct elements, so the roots are known in advance.
+        let chosen = [Gf256::new(1), Gf256::new(100), Gf256::new(255)];
+        let f = chosen
+            .iter()
+            .fold(UnivariatePolynomial::<Gf256>::one(), |acc, a| {
+                acc * UnivariatePolynomial::new(&[Gf256::zero() - *a, Gf256::one()])
+            });
+        let expected: HashSet<Gf256> = chosen.into_iter().collect();
+        let found: HashSet<Gf256> = roots(&f, &mut rng).into_iter().collect();
+        assert_eq!(found, expected);
+
+        // And agree with evaluation at all 256 elements, for polynomials whose roots are not
+        // known in advance.
+        let all: Vec<Gf256> = (0..256u64).map(Gf256::new).collect();
+        let candidates = [
+            vec![7u64, 3, 1, 5],
+            vec![1, 0, 0, 0, 1],
+            vec![0, 1, 1],
+            vec![200, 17],
+            vec![9, 9, 9, 9, 9, 9],
+        ];
+        for coefficients in &candidates {
+            let g = UnivariatePolynomial::new(
+                &coefficients
+                    .iter()
+                    .map(|c| Gf256::new(*c))
+                    .collect::<Vec<_>>(),
+            );
+            let by_evaluation: HashSet<Gf256> = all
+                .iter()
+                .copied()
+                .filter(|a| g.eval(a).is_zero())
+                .collect();
+            let by_roots: HashSet<Gf256> = roots(&g, &mut rng).into_iter().collect();
+            assert_eq!(by_roots, by_evaluation, "coefficients {:?}", coefficients);
+        }
+    }
+
+    /// The trace maps GF(2^m) onto GF(2), so evaluating it at a root of g yields 0 or 1.
+    ///
+    /// Worth testing directly: `roots` accepts a split only after checking the divisor's degree,
+    /// so a wrong trace would cost extra attempts rather than produce a wrong answer, and the
+    /// root-finding tests cannot tell the two apart. Truncating the trace sum leaves them
+    /// passing.
+    #[test]
+    fn test_trace_maps_into_gf2() {
+        use crate::{identities::One, poly::trace, Polynomial, UnivariatePolynomial};
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(43);
+
+        // g = (x - a)(x - b)(x - c), whose roots are known.
+        let chosen = [Gf256::new(2), Gf256::new(57), Gf256::new(201)];
+        let g = chosen
+            .iter()
+            .fold(UnivariatePolynomial::<Gf256>::one(), |acc, a| {
+                acc * UnivariatePolynomial::new(&[Gf256::zero() - *a, Gf256::one()])
+            });
+
+        for _ in 0..32 {
+            let coefficients: Vec<Gf256> = (0..g.degree())
+                .map(|_| Gf256::new(rng.gen_range(0..256)))
+                .collect();
+            let h = UnivariatePolynomial::new(&coefficients);
+            let t = trace(&h, &g);
+
+            for a in &chosen {
+                let value = t.eval(a);
+                assert!(
+                    value == Gf256::zero() || value == Gf256::one(),
+                    "trace evaluated to {} at {}, which is outside GF(2)",
+                    value,
+                    a
+                );
+            }
+        }
+    }
 }
