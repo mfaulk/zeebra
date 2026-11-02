@@ -10,6 +10,7 @@
 mod dense_polynomial;
 mod dense_polynomial_arithmetic;
 mod div_with_remainder;
+mod factorize;
 mod gcd;
 mod lagrange_interpolation;
 mod polynomial_trait;
@@ -19,13 +20,14 @@ mod univariate_parser;
 
 use crate::FiniteField;
 pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialParams};
+#[cfg(test)]
+pub(crate) use factorize::trace_to_gf2;
+pub use factorize::{factorize, is_irreducible};
 pub use gcd::gcd;
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
 pub use polynomial_trait::Polynomial;
 pub use pow_mod::pow_mod;
 pub use roots::roots;
-#[cfg(test)]
-pub(crate) use roots::trace;
 use std::cmp::max;
 
 // Trim leading terms with zero coefficient so the highest power of x has non-zero coefficient.

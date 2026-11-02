@@ -36,7 +36,7 @@ pub use fft::{evaluate, interpolate, powers_of, FFTDomain};
 pub use fields::{FiniteField, ParseFieldElementError};
 pub use identities::{One, Zero};
 pub use poly::{
-    gcd, lagrange_interpolate, pow_mod, roots, Monomial, MultivariatePolynomial, Polynomial,
-    PolynomialParams, UnivariatePolynomial,
+    factorize, gcd, is_irreducible, lagrange_interpolate, pow_mod, roots, Monomial,
+    MultivariatePolynomial, Polynomial, PolynomialParams, UnivariatePolynomial,
 };
 pub use rings::Ring;

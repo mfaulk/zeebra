@@ -67,6 +67,36 @@ A system that leaves a variable unconstrained is the exception. Its solution set
 field, so covering a free variable means enumerating, and `solve` refuses above an order of 2^20.
 That is a limit on the size of the answer rather than on the method.
 
+## Factoring Univariate Polynomials
+`factorize` returns the monic irreducible factors of a univariate polynomial over a finite field,
+with multiplicities, and `is_irreducible` tests a single polynomial:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{factorize, fields::Zp7, is_irreducible, FiniteField, UnivariatePolynomial};
+
+// x^3 + 6x^2 + 11x + 6 = (x + 1)(x + 2)(x + 3) over GF(7)
+let f = UnivariatePolynomial::<Zp7>::new(&[
+    Zp7::new(6), Zp7::new(11), Zp7::new(6), Zp7::new(1),
+]);
+
+let mut rng = StdRng::seed_from_u64(0);
+for (factor, multiplicity) in factorize(&f, &mut rng) {
+    assert!(is_irreducible(&factor));
+    println!("({})^{}", factor, multiplicity);
+}
+```
+
+The distinct irreducible factors of each degree are collected with `gcd(f, x^(q^d) - x)`, then
+each group of equal-degree factors is separated by Cantor–Zassenhaus splitting. Because
+`x^(q^d) - x` is squarefree, that gcd gives the distinct factors whatever the multiplicities in
+`f` are — so no squarefree decomposition is needed, and `x^p` in characteristic `p`, whose
+derivative vanishes, needs no special handling. Multiplicities are recovered afterwards by
+division.
+
+Splitting is randomized, so this takes an rng and the order of the returned factors is
+unspecified.
+
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
 
