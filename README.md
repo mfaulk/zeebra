@@ -34,13 +34,18 @@ cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-A few tests compare the optimized Gröbner engine against the naive reference implementation on
-systems where the reference takes minutes. They are `#[ignore]`d so the default suite stays fast,
-and need release mode to finish in reasonable time:
+Some tests compare the optimized Gröbner engine against the naive reference implementation, or
+factor large integers, on inputs slow enough to take minutes. They are `#[ignore]`d so the default
+suite stays fast, and need release mode to finish in reasonable time:
 
 ```sh
-cargo test --release -- --ignored
+cargo test --release -- --ignored test_optimized_agrees_with_reference_on_slow_systems
+cargo test --release -- --ignored test_factorization
 ```
+
+Four other `#[ignore]`d tests are unimplemented placeholders for statistical distribution checks
+and a rare division branch, and they panic if run. A bare `cargo test -- --ignored` therefore
+reports those four as failures; the commands above select the tests that are meant to pass.
 
 ### Benchmarks
 
@@ -86,8 +91,13 @@ is what makes a system easy to solve by back-substitution and can be dramaticall
 
 `buchberger_with_statistics` returns the same basis alongside counters describing the computation,
 which is useful for understanding cost on a hard system. `grobner::benchmark_systems` provides the
-standard `cyclic` and `katsura` families, and `grobner::reference` holds a deliberately naive
-textbook implementation kept as a correctness oracle — use `buchberger` for real work.
+standard `cyclic` and `katsura` families plus `planted`, which builds a zero-dimensional system
+around a solution you choose. `grobner::reference` holds a deliberately naive textbook
+implementation kept as a correctness oracle — use `buchberger` for real work.
+
+Field elements reject non-canonical representatives on deserialization. Every value this crate
+serializes round-trips unchanged, but bytes encoding an integer outside `[0, P)` are an error
+rather than being silently reduced, since they indicate corruption or a mismatched modulus.
 
 ## Solving Polynomial Systems
 `grobner::solve` finds every point of F^N at which a system of multivariate polynomials

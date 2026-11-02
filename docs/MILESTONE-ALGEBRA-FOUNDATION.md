@@ -1,6 +1,6 @@
 # Milestone: Algebra Foundation and Performance
 
-Status: in progress. Baseline commit `f56e5de`, 491 tests passing.
+Status: complete, in review. Baseline commit `f56e5de`, 491 tests passing; 537 at the close of the milestone.
 
 This milestone solidifies the correctness of Zeebra's computational algebra core, establishes
 reproducible benchmarks, removes measured bottlenecks, and replaces the naive Buchberger strategy
@@ -38,11 +38,15 @@ this milestone is specific to any application.
 - **`FiniteField::order() -> u128`** caps field order at 128 bits, so 254–255-bit fields are
   unreachable (section 9.3).
 - **`ExtensionFieldElement` and `BinaryFieldElement` are crate-private** with no external users.
-- Six tests remain `#[ignore]`d, each for a stated reason, none a placeholder.
+- Seven tests remain `#[ignore]`d. Three are real but slow — two large integer factorizations and
+  the comparison against the naive reference engine — and pass under
+  `cargo test --release -- --ignored <name>`. The other four are `unimplemented!()` placeholders
+  for statistical distribution checks and a rare division branch, and panic if run.
 
 ## 2. Confirmed correctness defects
 
-All six were reproduced before any fix. Each gets a regression test.
+All seven were reproduced before any fix. Each gets a regression test. C1 through C6 were found
+in the opening review; C7 was found in review of this milestone's own changes.
 
 ### C1 — `MonomialOrder::cmp` dispatches grevlex to grlex
 
@@ -123,6 +127,27 @@ Both reduce with a 128-bit division where a single conditional branch suffices, 
 are already reduced. Hardware 128/64 division is an order of magnitude slower than a compare and
 subtract. `Mul` necessarily needs a wide reduction, but add and sub do not.
 
+### C7 — Deserialization bypasses the representation invariant
+
+Found in review of this milestone, after C6 had been fixed. Every field type derives `Deserialize`
+over its private representation, which makes deserialization the one construction path that
+reaches a field element without passing a constructor, and the derived impl trusts its input.
+
+This already broke `PartialEq` and `Hash`, which are derived over the representation, so an
+unreduced value compared unequal to the element it denotes. C6 turned it into an arithmetic defect
+as well, because conditional reduction assumes its operands are already reduced:
+
+- `sub` returns an unreduced input unchanged — `9 - 0` over GF(7) gave 9.
+- `add` subtracts P at most once, so it is wrong at or above 2P — `26 + 0` over GF(13) gave 13.
+
+The remainder-based arithmetic C6 replaced happened to normalize such inputs, so this is a
+regression that C6 introduced and that blocks the optimization until the invariant holds.
+
+`BinaryFieldElement` shares the defect, and its stated bound was also wrong: `new` asserted
+`coefficients < P`, but the elements of GF(2^m) are the polynomials of degree below m and P is
+monic of degree m, so `[2^m, P)` was admitted while denoting no element. No arithmetic can produce
+such a pattern; only `new` and deserialization could inject one.
+
 ## 3. Performance bottlenecks from inspection
 
 Ordered by expected impact on Gröbner workloads. Section 7 reports measurements.
@@ -130,9 +155,10 @@ Ordered by expected impact on Gröbner workloads. Section 7 reports measurements
 | # | Bottleneck | Evidence | Outcome |
 |---|---|---|---|
 | P1 | 128-bit division in every field add, sub, and mul | C6; `prime_field_64.rs` | Fixed for add and sub (3.9x–105x). Multiply still divides: §9.3 |
-| P2 | Inverse by Fermat — `log2(q)` modmuls per call | `finite_field.rs` default | Not addressed; call count reduced instead (P3) |
-| P3 | Repeated inverse in pivot normalization | C5 | Fixed; 2.1x–3.4x on dense elimination |
+| P2 | Inverse by Fermat — `log2(q)` modmuls per call | `finite_field.rs` default | Not addressed. Call count reduced instead, in pivot normalization (P3), backward elimination, and reducer construction |
+| P3 | Repeated inverse in pivot normalization | C5 | Fixed; cumulatively 4.0x–10.8x on dense elimination |
 | P4 | `leading_term` is `O(terms)`, called once per reduction step | `max_by` over the whole map | Fixed in `normal_form` via precomputed sorted terms |
+| P9 | A modular inverse per reduction step, to divide by the reducer's leading coefficient | Found in review; `normal_form` inner loop | Fixed; inverted once per reducer, skipped entirely when monic. 1.9x–2.5x on Gröbner |
 | P5 | Each reduction step allocates: `SparseMultiPoly::from(term)`, `&q * divisor`, a fresh map | `div_rem`, `multi_div_rem` | Fixed in `normal_form` via a reused scratch buffer |
 | P6 | Buchberger rescans **all** basis pairs every outer iteration | `buchberger.rs` loop | Fixed; incremental pair queue |
 | P7 | No pair-elimination criteria, so every S-polynomial is reduced | `buchberger.rs` | Product criterion added, eliminating 20%–58% of pairs. Chain criterion deferred |
@@ -205,10 +231,19 @@ Machine, toolchain, and configuration are recorded alongside results in section 
 from different machines are not compared.
 
 **Field arithmetic** — multiply, add, subtract, invert over GF(2^31 - 1), the largest 64-bit
-prime, and a 68-bit prime in `u128`.
+prime, and a 68-bit prime in `u128`. Each operation is measured twice. The accumulating form
+(`acc += x op y`) is a dependency chain and so reports latency, but every sample also includes one
+addition, so it measures a fused operation rather than the named one. The `isolated/` form
+discards each result through `black_box`, measuring the operation alone at the cost of a barrier,
+and runs independent iterations so it reports throughput. Neither subsumes the other; figures are
+only ever compared within a form.
 
 **Sparse polynomials** — addition, multiplication, multiplication by a monomial, and normal form
-against a set of reducers, at several term counts and variable counts.
+against a set of reducers, at several term counts and variable counts. Inputs carry exactly the
+labelled number of distinct monomials: sampling monomials and letting duplicates merge made the
+realised count a function of the arity, so the sizes were neither accurate nor comparable across
+arities (§7.3). `normal_form` and `multi_div_rem` are both measured, on the same input in the same
+run, so their comparison needs no cross-run arithmetic.
 
 **Linear algebra** — dense Gaussian elimination and Gauss–Jordan at several sizes over a 31-bit
 and a 64-bit field.
@@ -216,6 +251,11 @@ and a 64-bit field.
 **Gröbner bases** — `cyclic-n` and `katsura-n` from the standard benchmark families, deterministic
 seeded random systems, and planted-solution systems where the answer is known. Instances are
 chosen to run in seconds, not minutes; the point is a reliable baseline, not a record.
+
+System generators live in `grobner::benchmark_systems` rather than in `benches/`, so that
+`cargo test` compiles and checks them. The planted family is why this matters: while it lived in
+the benchmark it emitted a fully linear system despite a comment describing nonlinear equations,
+and nothing could catch the discrepancy because the file was never built by the test suite.
 
 Because `N` is a const generic, each instance size needs its own instantiation. A macro generates
 them.
@@ -227,102 +267,117 @@ with a 1 s warm-up and 2 s measurement window. Figures are the median of the rep
 Measurements from other machines are not comparable.
 
 "Before" is the state at the start of this milestone; "after" is the final state of the branch.
-Where a change is within run-to-run variance it is recorded as no change rather than claimed.
+Run-to-run variance on this machine is about +/-10%, so a change below that is recorded as no
+change rather than claimed.
 
 ### 7.1 Field arithmetic
 
 Per operation, from a 256-operand loop. `p31` is 2^31 - 1, `p64` the largest 64-bit prime, `p68`
 a 68-bit prime in the `u128` type.
 
-| op | p31 before | p31 after | p64 before | p64 after | p68 before | p68 after |
-|---|---|---|---|---|---|---|
-| add | 3.8 ns | **0.97 ns** | 3.6 ns | **0.96 ns** | 186 ns | **2.07 ns** |
-| sub | 4.5 ns | **0.93 ns** | 4.5 ns | **0.92 ns** | 177 ns | **1.68 ns** |
-| mul | 3.6 ns | 2.07 ns | 4.5 ns | 2.73 ns | 251 ns | 157 ns |
-| inverse | 329 ns | 297 ns | 746 ns | 754 ns | 21.5 us | 22.8 us |
+The baseline was measured only with an accumulating loop (`acc += x op y`), so every sample
+included one addition. "After, composite" uses that same harness and is therefore the comparable
+column; "after, isolated" is a new microbenchmark that discards each result through `black_box`
+and so measures the named operation alone.
 
-Addition and subtraction are **3.9x to 4.9x** faster on the 64-bit fields and **89x to 105x** on
+| op | p31 before | p31 composite | p31 isolated | p64 before | p64 composite | p64 isolated | p68 before | p68 composite | p68 isolated |
+|---|---|---|---|---|---|---|---|---|---|
+| add | 3.8 ns | **1.01 ns** | 0.77 ns | 3.6 ns | **0.96 ns** | 0.85 ns | 186 ns | **2.12 ns** | 1.31 ns |
+| sub | 4.5 ns | **0.96 ns** | 0.76 ns | 4.5 ns | **0.95 ns** | 0.82 ns | 177 ns | **1.77 ns** | 1.20 ns |
+| mul | 3.6 ns | 2.44 ns | 2.12 ns | 4.5 ns | 2.84 ns | 2.96 ns | 251 ns | 183 ns | 174 ns |
+| inverse | 329 ns | 336 ns | 342 ns | 746 ns | 843 ns | 894 ns | 21.5 us | 22.7 us | 23.8 us |
+
+Addition and subtraction are **3.8x to 4.7x** faster on the 64-bit fields and **88x to 100x** on
 the 128-bit one, by replacing a 128-bit division with a conditional subtraction (C6). The 128-bit
 field is the large win because it previously routed every operation through `U256`, a software
 bignum, and then performed a full `U256 % U256` long division.
 
-Two figures in this table must not be read as improvements:
+Two rows must not be read as improvements:
 
-- **`mul` is unchanged.** No multiply implementation was modified. The benchmark loop accumulates
-  with `acc += x * y`, so each sample includes one addition, and it is the addition that got
-  faster. The honest reading is that this benchmark measures a multiply-add and cannot isolate the
-  multiply; a pure multiply measurement would need a different harness.
-- **`inverse` is unchanged.** Inversion is Fermat's `a^(q-2)`, built entirely from multiplications,
-  which were not touched. Across four runs the figures moved within about +/-10% in both
-  directions with no consistent sign — p64 measured 789 ns, 790 ns, 817 ns and 754 ns against a
-  746 ns baseline. This is noise, not a regression and not a gain.
+- **`mul` is unchanged.** No multiply implementation was modified. Its apparent gain in the
+  composite column is the faster accumulating addition, which is precisely why the isolated
+  variant was added — and the isolated p64 figure (2.96 ns) is slightly *above* the composite one,
+  because `black_box` imposes its own barrier.
+- **`inverse` is unchanged.** It is Fermat's `a^(q-2)`, built entirely from multiplications, which
+  were not touched. Across five runs p64 measured 789, 790, 817, 754 and 843 ns against a 746 ns
+  baseline. The spread covers the difference, so this is noise — neither a regression nor a gain.
 
-`PrimeFieldElement128::mul` remains a bottleneck at 157 ns, roughly **58x** the 64-bit multiply,
+`PrimeFieldElement128::mul` remains a bottleneck at 174 ns, roughly **59x** the 64-bit multiply,
 because it still reduces through `U256` long division. Montgomery or Barrett arithmetic would fix
 it but changes the element representation; see section 9.3.
 
 ### 7.2 Linear algebra
 
-Dense Gauss–Jordan elimination and matrix inversion, n x n.
+Dense Gauss–Jordan elimination and matrix inversion, n x n. Two changes contribute: one modular
+inverse per pivot instead of per entry (C5), and not dividing by a backward-elimination pivot that
+is already one.
 
 | | n=8 | n=16 | n=32 | n=64 |
 |---|---|---|---|---|
 | Gauss–Jordan p31, before | 24.0 us | 103 us | 507 us | 2.81 ms |
-| Gauss–Jordan p31, after | 15.1 us | 58.6 us | 256 us | **1.26 ms** |
-| speedup | 1.59x | 1.76x | 1.98x | **2.24x** |
+| Gauss–Jordan p31, after | 4.63 us | 18.4 us | 94.3 us | **703 us** |
+| speedup | 5.18x | 5.60x | 5.38x | **4.00x** |
 | Gauss–Jordan p64, before | 49.6 us | 206 us | 937 us | 4.50 ms |
-| Gauss–Jordan p64, after | 28.0 us | 110 us | 456 us | **2.12 ms** |
-| speedup | 1.77x | 1.87x | 2.05x | **2.13x** |
+| Gauss–Jordan p64, after | 9.43 us | 26.2 us | 111 us | **724 us** |
+| speedup | 5.26x | 7.87x | 8.44x | **6.21x** |
 | inverse p31, before | 49.7 us | 219 us | 1.12 ms | 6.28 ms |
-| inverse p31, after | 17.0 us | 75.5 us | 340 us | **1.96 ms** |
-| speedup | 2.92x | 2.90x | 3.30x | **3.20x** |
+| inverse p31, after | 7.34 us | 33.0 us | 196 us | **1.49 ms** |
+| speedup | 6.77x | 6.63x | 5.72x | **4.23x** |
 | inverse p64, before | 102 us | 429 us | 1.97 ms | 9.82 ms |
-| inverse p64, after | 33.1 us | 121 us | 573 us | **2.93 ms** |
-| speedup | 3.08x | 3.55x | 3.44x | **3.35x** |
+| inverse p64, after | 11.7 us | 39.6 us | 215 us | **1.51 ms** |
+| speedup | 8.70x | 10.8x | 9.14x | **6.51x** |
 
-From taking one modular inverse per pivot instead of one per entry (C5), plus the cheaper add and
-sub. The speedup grows with n, as expected: the eliminated work is one inverse per entry, so it
-scales with the row length. Inversion gains more than Gauss–Jordan at the same n because it
-eliminates on an n x 2n augmented matrix, giving each pivot twice the columns to amortise over.
+Inversion gains more than Gauss–Jordan at the same n because it eliminates on an n x 2n augmented
+matrix, giving each pivot twice the columns to amortise over.
 
-The prediction from the baseline was ~3x at n = 64 over p64, from 4096 inverses at 746 ns
-accounting for 3.06 ms of the 4.50 ms measured. The realised figure is 2.13x. The estimate was
-too optimistic because it costed the inverses at the standalone benchmark rate; in elimination
-they run on hot cached data and interleave with the surrounding multiply-subtract, so they were
-cheaper than the microbenchmark implies.
+**The 31-bit and 64-bit fields now measure almost the same** — 703 us against 724 us at n = 64,
+where the baseline had the 64-bit field nearly twice as slow. Inversion was the whole of that
+difference, and it is now out of the inner loops. This is the clearest evidence that the
+bottleneck the milestone identified is actually gone, rather than merely reduced.
+
+The original C5 prediction was 3x at n = 64 over p64, from 4096 inverses at 746 ns accounting for
+3.06 ms of the 4.50 ms measured. The realised figure is 6.21x — larger than predicted, because
+the estimate only counted the forward pass. Backward elimination was performing a further
+n(n-1)/2 inverses, 2016 at n = 64, none of which the baseline analysis had noticed.
 
 ### 7.3 Sparse polynomials
 
-At 6 variables:
+**The input generator was wrong, so the baseline table here is not comparable.** Monomials were
+sampled independently and duplicates merged, so the realised term count depended on the arity:
+with N = 3 and exponents bounded by 4 there are only 5^3 = 125 monomials, so the "256 terms" input
+actually held 116 terms and the "64" input held 52. Comparing arities at a fixed label compared
+116 terms against 254 against 256. The generator now draws until the target number of *distinct*
+monomials is reached, raising the exponent bound per arity where needed (N = 3 uses 6, since
+7^3 = 343 > 256).
+
+Current figures at 6 variables, where the generator was close to correct already:
 
 | op | 16 terms | 64 terms | 256 terms |
 |---|---|---|---|
-| add, before | 2.5 us | 9.6 us | 37.5 us |
-| add, after | 2.30 us | 8.89 us | 34.9 us |
-| mul, before | 20.3 us | 318 us | 6.48 ms |
-| mul, after | 18.2 us | 294 us | 5.98 ms |
-| mul by term, before | 1.4 us | 5.4 us | 20.1 us |
-| mul by term, after | 1.26 us | 4.83 us | 18.3 us |
+| add | 2.57 us | 9.99 us | 39.7 us |
+| mul | 20.3 us | 323 us | 6.94 ms |
+| mul by term | 1.52 us | 5.46 us | 20.6 us |
 
-These are **5% to 10%**, at the edge of what this harness resolves. The operations are dominated
-by hashing and map growth, not by field arithmetic, so making add and sub four times faster barely
-shows. P8 — building an intermediate `Vec` and then rebuilding the map — was left in place
-because the measurement says the surrounding map work, not the intermediate, is the cost.
+The before/after for these operations was **5% to 10%**, measured with the old generator on
+identical inputs on both sides, so that comparison remains valid even though the absolute numbers
+have moved. Its conclusion is unchanged: these operations are dominated by hashing and map growth,
+not by field arithmetic, which is why making add and sub four times faster barely showed, and why
+P8 was measured and declined.
 
 Reduction is where the milestone's gain is. `normal_form` and `multi_div_rem` are benchmarked on
 the same dividend in the same run, 48 terms against 2, 4 and 8 reducers:
 
 | variables | reducers | `multi_div_rem` | `normal_form` | speedup |
 |---|---|---|---|---|
-| 3 | 2 | 422 us | 11.1 us | 38x |
-| 3 | 4 | 1.09 ms | 24.2 us | 45x |
-| 3 | 8 | 1.35 ms | 28.8 us | 47x |
-| 6 | 2 | 277 us | 5.36 us | 52x |
-| 6 | 4 | 536 us | 9.48 us | 57x |
-| 6 | 8 | 1.26 ms | 14.9 us | **84x** |
-| 10 | 2 | 316 us | 6.62 us | 48x |
-| 10 | 4 | 369 us | 7.30 us | 50x |
-| 10 | 8 | 584 us | 10.9 us | 54x |
+| 3 | 2 | 773 us | 12.8 us | 60x |
+| 3 | 4 | 846 us | 14.2 us | 60x |
+| 3 | 8 | 1.40 ms | 25.1 us | 56x |
+| 6 | 2 | 325 us | 6.70 us | 49x |
+| 6 | 4 | 620 us | 10.6 us | 58x |
+| 6 | 8 | 1.16 ms | 15.1 us | **77x** |
+| 10 | 2 | 368 us | 7.83 us | 47x |
+| 10 | 4 | 419 us | 9.21 us | 46x |
+| 10 | 8 | 657 us | 14.7 us | 45x |
 
 The gap widens with the number of reducers, which is the signature of the defects involved:
 `multi_div_rem` rescans for the leading term inside the divisor loop, so its cost is proportional
@@ -338,40 +393,43 @@ equal in the same run:
 | 4 | 52.9 ms | 0.329 ms | 161x |
 | 16 | 13.81 s | 49.9 ms | **277x** |
 
-Three costs were removed. Two were visible by inspection — the `leading_term` rescan per divisor
+Four costs were removed. Two were visible by inspection — the `leading_term` rescan per divisor
 (P4) and accumulating the remainder with `r += SparseMultiPoly::from(term)`, which rebuilt the
 whole remainder map per insertion (P5). The third was not: `quotients[i] += ...` rebuilt each
 quotient's map on every step, worth about 10x on its own. `normal_form` returns only the
-remainder, so it does not pay for quotient bookkeeping that Gröbner reduction never reads.
+remainder, so it does not pay for quotient bookkeeping that Gröbner reduction never reads. The
+fourth, P9, was found in review: a modular inverse per step to divide by the reducer's leading
+coefficient, now taken once per reducer and skipped entirely for monic ones.
 
 ### 7.4 Gröbner bases
 
 | system | order | before | after | speedup |
 |---|---|---|---|---|
-| cyclic-3 | lex | 176 us | 29.3 us | 6.0x |
-| cyclic-3 | grlex | 171 us | 28.7 us | 6.0x |
-| cyclic-3 | grevlex | 162 us | 29.1 us | 5.6x |
-| cyclic-4 | grevlex | did not finish in 300 s | **270 us** | newly tractable |
-| katsura-3 | lex | 173.9 s | 66.1 us | **2,600,000x** |
-| katsura-3 | grlex | 149.5 ms | 60.9 us | 2455x |
-| katsura-3 | grevlex | 146.1 ms | 60.6 us | 2412x |
-| katsura-4 | lex | did not finish in 300 s | 1.27 ms | newly tractable |
-| katsura-4 | grlex | did not finish in 300 s | 484 us | newly tractable |
-| katsura-4 | grevlex | did not finish in 300 s | **305 us** | newly tractable |
-| katsura-5 | grlex | not attempted | 4.70 ms | newly tractable |
-| katsura-5 | grevlex | not attempted | **2.47 ms** | newly tractable |
+| cyclic-3 | lex | 176 us | 18.4 us | 9.6x |
+| cyclic-3 | grlex | 171 us | 18.8 us | 9.1x |
+| cyclic-3 | grevlex | 162 us | 18.7 us | 8.7x |
+| cyclic-4 | grevlex | did not finish in 300 s | **143 us** | newly tractable |
+| katsura-3 | lex | 173.9 s | 39.4 us | **4,400,000x** |
+| katsura-3 | grlex | 149.5 ms | 30.7 us | 4870x |
+| katsura-3 | grevlex | 146.1 ms | 31.2 us | 4683x |
+| katsura-4 | lex | did not finish in 300 s | 746 us | newly tractable |
+| katsura-4 | grlex | did not finish in 300 s | 210 us | newly tractable |
+| katsura-4 | grevlex | did not finish in 300 s | **126 us** | newly tractable |
+| katsura-5 | grlex | not attempted | 2.19 ms | newly tractable |
+| katsura-5 | grevlex | not attempted | **1.03 ms** | newly tractable |
 
 The katsura-3 lex figure is the headline but also the least representative: that instance was
 pathological for the old engine, which rescanned every basis pair each outer iteration while lex
-drove the basis large. The 2400x on the graded orders is the more honest summary of the
-algorithmic change. Both were verified to produce the same basis as the reference implementation.
+drove the basis large. The **~4700x on the graded orders** is the more honest summary. Both were
+verified to produce the same basis as the reference implementation.
 
-Two instances that previously did not finish in 300 s now finish in well under a millisecond, and
-katsura-5 — not attemptable before — finishes in 2.47 ms.
+These factors measure how inefficient the former implementation was. They are not evidence that
+Zeebra is competitive with established high-performance Gröbner engines, and should not be read
+that way.
 
 **grevlex now beats grlex**, as theory says it should. Before the C1 fix they were identical
-because grevlex was executing grlex. After: katsura-4 305 us against 484 us, katsura-5 2.47 ms
-against 4.70 ms with a 13-element basis against 16.
+because grevlex was executing grlex. After: katsura-4 126 us against 210 us, katsura-5 1.03 ms
+against 2.19 ms with a 13-element basis against 16.
 
 Counters from `cargo run --release --example grobner_statistics`, which attribute the change
 rather than infer it from wall-clock:
@@ -397,20 +455,25 @@ to zero — 80%. On katsura-5 lex it is 1725 of 1790, or 96%. Every one of those
 S-polynomial reduced at full cost to learn nothing. This is exactly what the chain criterion
 suppresses and what F4 amortises by reducing many S-polynomials in one matrix; see section 9.1.
 
+The planted-solution family is also benchmarked, at 6 variables: lex 55.8 us, grlex 39.4 us,
+grevlex 40.2 us. Its original formulation emitted only `x_i - a_i`, a fully linear system that is
+already a Gröbner basis under every order — all three orders reported an identical 12.4 us, which
+is the signature of measuring nothing. It now plants the solution in coupled quadratics.
+
 ## 8. Acceptance criteria
 
 All met.
 
 | Criterion | Status |
 |---|---|
-| C1–C6 fixed, each with a regression test that fails without the fix | Met |
+| C1–C7 fixed, each with a regression test that fails without the fix | Met. C7 was found reviewing this milestone's own C6 change |
 | All three monomial orders correct through the public API, with order axioms tested | Met — totality, antisymmetry, transitivity, multiplicativity, 1 minimal, across all three orders |
 | `div_rem` and `normal_form` satisfy their contracts as property tests | Met |
 | Buchberger uses incremental pair processing and at least the product criterion | Met — pair queue ordered by degree, product criterion. Chain criterion deferred |
-| Optimized and reference Buchberger agree over the benchmark systems and all three orders | Met — the slowest cases are `#[ignore]`d and run with `cargo test --release -- --ignored` |
+| Optimized and reference Buchberger agree over the benchmark systems and all three orders | Met — the slowest cases are `#[ignore]`d and run with `cargo test --release -- --ignored test_optimized_agrees_with_reference_on_slow_systems` |
 | A deterministic basis ordering, tested across repeated runs | Met — `HashSet` removed from both basis-reduction paths |
 | Reproducible benchmarks for field arithmetic, sparse polynomials, linear algebra, and Gröbner bases, with recorded baselines | Met — four benchmarks plus the statistics example |
-| Every performance claim backed by a before/after measurement | Met. Unchanged figures are labelled as such in §7.1, and P8 is documented as measured-and-declined in §3 |
+| Every performance claim backed by a before/after measurement | Met. Unchanged figures are labelled as such in §7.1, P8 is documented as measured-and-declined in §3, and §7.3 states where the baseline is not comparable |
 | The full suite, `cargo fmt --check`, and `clippy -D warnings` all pass | Met |
 
 ## 9. Design for the next milestone
