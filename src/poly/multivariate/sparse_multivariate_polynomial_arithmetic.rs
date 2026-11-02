@@ -1,6 +1,6 @@
 //! Arithmetic operations for sparse multivariate polynomials.
 
-use std::{ops, ops::Neg};
+use std::{cmp::Ordering, ops, ops::Neg};
 
 use crate::{impl_add_variants, impl_mul_variants, impl_sub_variants};
 
@@ -121,6 +121,71 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     ///  f = q_0 * f_0 + q_1 * f_1 + ... + q_{k-1} * f_{k-1} + r, such that no monomial in r
     /// is divisible by the leading term of any divisor. The result is not necessarily unique,
     /// and may depend on the order of the divisors.
+    /// Reduce `self` to normal form modulo `divisors`, discarding the quotients.
+    ///
+    /// Returns the remainder `multi_div_rem` would produce: no monomial of it is divisible by
+    /// the leading term of any divisor. As with `multi_div_rem` the result depends on the order
+    /// of the divisors, since the first whose leading term divides is the one applied.
+    ///
+    /// This is the operation Gröbner basis computation spends its time in, so it avoids the
+    /// costs `multi_div_rem` pays for the quotients it does not need:
+    ///
+    /// - Terms are held in a vector sorted by `order`, so the leading term is the last element
+    ///   and extracting it is constant time rather than a scan of the whole polynomial.
+    /// - Each divisor's leading term and tail are computed once, not once per reduction step.
+    /// - Reduction subtracts the divisor's tail by merging two sorted sequences, which is linear
+    ///   and allocation-free given a reused buffer, rather than building a polynomial and
+    ///   rebuilding a hash map.
+    /// - The remainder is appended to, rather than accumulated with `+=`, which rebuilt its map
+    ///   on every term.
+    ///
+    /// Sortedness survives the merge because monomial orders are multiplicative: multiplying a
+    /// sorted sequence of terms by a monomial preserves their order.
+    pub fn normal_form(&self, divisors: &[Self], order: MonomialOrder) -> Self {
+        // A zero divisor can never reduce anything, so drop them here rather than testing in the
+        // inner loop. `multi_div_rem` reaches the same conclusion by failing to divide.
+        let reducers: Vec<Reducer<N, F>> = divisors
+            .iter()
+            .filter(|d| !d.is_zero())
+            .map(|d| Reducer::new(d, order))
+            .collect();
+
+        if reducers.is_empty() {
+            return self.clone();
+        }
+
+        let mut working = sorted_terms(self, order);
+        let mut remainder: Vec<(Monomial<N>, F)> = Vec::new();
+        let mut scratch: Vec<(Monomial<N>, F)> = Vec::new();
+
+        while let Some((lead_monomial, lead_coefficient)) = working.pop() {
+            let applicable = reducers.iter().find_map(|reducer| {
+                lead_monomial
+                    .checked_div(&reducer.lead_monomial)
+                    .map(|quotient| (reducer, quotient))
+            });
+
+            match applicable {
+                Some((reducer, quotient_monomial)) => {
+                    // The quotient term times the divisor's leading term is exactly the term just
+                    // popped, so only the divisor's tail still has to be subtracted.
+                    let quotient_coefficient = lead_coefficient / reducer.lead_coefficient;
+                    subtract_shifted(
+                        &mut working,
+                        &mut scratch,
+                        &reducer.tail,
+                        &quotient_monomial,
+                        quotient_coefficient,
+                        order,
+                    );
+                }
+                None => remainder.push((lead_monomial, lead_coefficient)),
+            }
+        }
+
+        Self::new(&remainder)
+    }
+
     pub fn multi_div_rem(&self, divisors: &[Self], order: MonomialOrder) -> (Vec<Self>, Self) {
         assert!(!divisors.is_empty());
         assert!(divisors.iter().any(|d| !d.is_zero()));
@@ -157,6 +222,98 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 
         (quotients, r)
     }
+}
+
+/// A divisor with its leading term and tail precomputed, so reduction does not recompute them.
+struct Reducer<const N: usize, F: FiniteField> {
+    lead_monomial: Monomial<N>,
+    lead_coefficient: F,
+    /// Every term below the leading one, sorted ascending by the order.
+    tail: Vec<(Monomial<N>, F)>,
+}
+
+impl<const N: usize, F: FiniteField> Reducer<N, F> {
+    fn new(divisor: &SparseMultiPoly<N, F>, order: MonomialOrder) -> Self {
+        let (lead_coefficient, lead_monomial): (F, Monomial<N>) =
+            divisor.leading_term(order).into();
+        let mut tail: Vec<(Monomial<N>, F)> = divisor
+            .terms()
+            .iter()
+            .filter(|(monomial, _)| **monomial != lead_monomial)
+            .map(|(monomial, coefficient)| (*monomial, *coefficient))
+            .collect();
+        tail.sort_by(|a, b| order.cmp(&a.0, &b.0));
+        Self {
+            lead_monomial,
+            lead_coefficient,
+            tail,
+        }
+    }
+}
+
+/// The terms of `p`, sorted ascending by `order`, so the leading term is last.
+fn sorted_terms<const N: usize, F: FiniteField>(
+    p: &SparseMultiPoly<N, F>,
+    order: MonomialOrder,
+) -> Vec<(Monomial<N>, F)> {
+    let mut terms: Vec<(Monomial<N>, F)> = p
+        .terms()
+        .iter()
+        .map(|(monomial, coefficient)| (*monomial, *coefficient))
+        .collect();
+    terms.sort_by(|a, b| order.cmp(&a.0, &b.0));
+    terms
+}
+
+/// `working -= coefficient * monomial * tail`, for sequences sorted ascending by `order`.
+///
+/// Both inputs are sorted and the shifted tail stays sorted, because monomial orders are
+/// multiplicative. So this is a merge: linear in the two lengths, and writing sequentially into a
+/// reused buffer rather than allocating.
+fn subtract_shifted<const N: usize, F: FiniteField>(
+    working: &mut Vec<(Monomial<N>, F)>,
+    scratch: &mut Vec<(Monomial<N>, F)>,
+    tail: &[(Monomial<N>, F)],
+    monomial: &Monomial<N>,
+    coefficient: F,
+    order: MonomialOrder,
+) {
+    scratch.clear();
+    scratch.reserve(working.len() + tail.len());
+
+    let mut i = 0;
+    let mut j = 0;
+    while i < working.len() && j < tail.len() {
+        let shifted = &tail[j].0 * monomial;
+        match order.cmp(&working[i].0, &shifted) {
+            Ordering::Less => {
+                scratch.push(working[i]);
+                i += 1;
+            }
+            Ordering::Greater => {
+                scratch.push((shifted, F::zero() - coefficient * tail[j].1));
+                j += 1;
+            }
+            Ordering::Equal => {
+                let merged = working[i].1 - coefficient * tail[j].1;
+                // Terms that cancel are dropped, keeping the representation canonical.
+                if !merged.is_zero() {
+                    scratch.push((working[i].0, merged));
+                }
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    scratch.extend_from_slice(&working[i..]);
+    for (tail_monomial, tail_coefficient) in &tail[j..] {
+        scratch.push((
+            tail_monomial * monomial,
+            F::zero() - coefficient * *tail_coefficient,
+        ));
+    }
+
+    std::mem::swap(working, scratch);
 }
 
 #[cfg(test)]
@@ -495,6 +652,102 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// `normal_form` returns exactly the remainder `multi_div_rem` does.
+    ///
+    /// `multi_div_rem` is the existing, independently tested implementation, so it is the oracle
+    /// for the optimized one. Divisor order matters to both, so the sets are passed in the same
+    /// order rather than sorted.
+    #[test]
+    fn test_normal_form_agrees_with_multi_div_rem() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        let cases: Vec<(&str, Vec<&str>)> = vec![
+            ("x^2 + y", vec!["y"]),
+            ("x^2 + y", vec!["x"]),
+            ("x^2*y + x + y + 1", vec!["y", "x"]),
+            ("x^3 + x^2*y + z", vec!["x^2", "y"]),
+            ("x*y*z + x + y + z + 1", vec!["z", "y", "x"]),
+            ("x^2 + 2*x*y + y^2", vec!["x + y"]),
+            ("x^5 + 1", vec!["x^2 + 1"]),
+            ("z^4 + y^2 + x", vec!["x", "y", "z"]),
+            // Divisor order changes the remainder, so both must agree on each arrangement.
+            ("x^2*y^2 + x*y + 1", vec!["x*y - 1", "y^2 - 1"]),
+            ("x^2*y^2 + x*y + 1", vec!["y^2 - 1", "x*y - 1"]),
+            // A reducible lower term beneath an irreducible lead.
+            ("z^5 + x*y", vec!["x"]),
+            // A divisor that cannot reduce anything.
+            ("x + y + z", vec!["x^9"]),
+            // A zero divisor mixed in must be ignored by both.
+            ("x^2 + y", vec!["y", "0"]),
+            ("x^2 + y", vec!["0", "y"]),
+        ];
+
+        for order in ALL_ORDERS {
+            for (dividend, divisors) in &cases {
+                let f = parse(dividend);
+                let ds: Vec<MultivariatePolynomial<3, F>> =
+                    divisors.iter().map(|s| parse(s)).collect();
+                assert_eq!(
+                    f.normal_form(&ds, order),
+                    f.multi_div_rem(&ds, order).1,
+                    "{} modulo {:?} under {}",
+                    dividend,
+                    divisors,
+                    order.name()
+                );
+            }
+        }
+    }
+
+    proptest! {
+        /// Over random input, `normal_form` matches the oracle and satisfies the contract.
+        #[test]
+        fn test_normal_form_matches_the_oracle(
+            f in any::<MultivariatePolynomial<3, PrimeFieldElement64<13>>>(),
+            d1 in any::<MultivariatePolynomial<3, PrimeFieldElement64<13>>>(),
+            d2 in any::<MultivariatePolynomial<3, PrimeFieldElement64<13>>>()) {
+            prop_assume!(!d1.is_zero() || !d2.is_zero());
+            let divisors = [d1, d2];
+            for order in ALL_ORDERS {
+                let normal = f.normal_form(&divisors, order);
+                prop_assert_eq!(
+                    normal.clone(),
+                    f.multi_div_rem(&divisors, order).1,
+                    "{}", order.name()
+                );
+                // And the defining property: nothing left is reducible.
+                for m in normal.terms().keys() {
+                    for d in divisors.iter().filter(|d| !d.is_zero()) {
+                        prop_assert!(
+                            m.checked_div(&d.leading_monomial(order)).is_none(),
+                            "{}: {:?} is still divisible", order.name(), m.exponents()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Reduction by a set containing only zeros leaves the polynomial untouched.
+    #[test]
+    fn test_normal_form_with_no_usable_divisors() {
+        type F = PrimeFieldElement64<13>;
+        let vars = ["x", "y", "z"];
+        let f = MultivariatePolynomial::<3, F>::parse("x^2 + y", vars).unwrap();
+        let zero = MultivariatePolynomial::<3, F>::zero();
+        for order in ALL_ORDERS {
+            assert_eq!(f.normal_form(&[], order), f, "{}", order.name());
+            assert_eq!(
+                f.normal_form(std::slice::from_ref(&zero), order),
+                f,
+                "{}",
+                order.name()
+            );
         }
     }
 
