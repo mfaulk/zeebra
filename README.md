@@ -34,6 +34,71 @@ cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
+Some tests compare the optimized Gröbner engine against the naive reference implementation, or
+factor large integers, on inputs slow enough to take minutes. They are `#[ignore]`d so the default
+suite stays fast, and need release mode to finish in reasonable time:
+
+```sh
+cargo test --release -- --ignored test_optimized_agrees_with_reference_on_slow_systems
+cargo test --release -- --ignored test_factorization
+```
+
+Four other `#[ignore]`d tests are unimplemented placeholders for statistical distribution checks
+and a rare division branch, and they panic if run. A bare `cargo test -- --ignored` therefore
+reports those four as failures; the commands above select the tests that are meant to pass.
+
+### Benchmarks
+
+Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense linear algebra,
+and Gröbner basis computation:
+
+```sh
+cargo bench                              # everything
+cargo bench --bench grobner              # one suite
+```
+
+Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
+counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
+reductions, basis size:
+
+```sh
+cargo run --release --example grobner_statistics
+```
+
+Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
+[`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md).
+
+## Gröbner Bases
+
+`grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
+standard orders are available, and `MonomialOrder` is exported from the crate root:
+
+```rust
+use zeebra::{fields::Zp13, grobner::buchberger, MonomialOrder, MultivariatePolynomial};
+
+let vars = ["x", "y", "z"];
+let system = vec![
+    MultivariatePolynomial::<3, Zp13>::parse("x*z - y^2", vars).unwrap(),
+    MultivariatePolynomial::<3, Zp13>::parse("x^3 - z^2", vars).unwrap(),
+];
+
+let basis = buchberger(&system, MonomialOrder::GradedReverseLexicographic);
+```
+
+The returned basis is reduced and in a deterministic order, so it is reproducible across runs.
+Which order you pick matters: graded reverse lexicographic is usually cheapest, while lexicographic
+is what makes a system easy to solve by back-substitution and can be dramatically more expensive.
+
+`buchberger_with_statistics` returns the same basis alongside counters describing the computation,
+which is useful for understanding cost on a hard system. `grobner::benchmark_systems` provides the
+standard `cyclic` and `katsura` families plus `planted`, which builds a zero-dimensional system
+around a solution you choose. `grobner::reference` holds a deliberately naive textbook
+implementation kept as a correctness oracle — use `buchberger` for real work.
+
+Field elements reject non-canonical representatives on deserialization. Every value this crate
+serializes round-trips unchanged, but bytes encoding an integer outside `[0, P)` are an error
+rather than being silently reduced, since they indicate corruption or a mismatched modulus.
+
 ## Solving Polynomial Systems
 `grobner::solve` finds every point of F^N at which a system of multivariate polynomials
 vanishes, over a finite field F:

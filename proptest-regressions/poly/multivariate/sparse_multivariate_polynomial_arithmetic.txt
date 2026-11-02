@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 4740f054b31e15621759ce6fd18f9362c9241a5b83c13e9ece5878b4c25097fe # shrinks to a = SparseMultiPoly { terms: {Monomial { exponents: [0, 0] }: PrimeFieldElement64 { value: 1 }} }
 cc ecadef369b7d9eba0a602a516f3eae7c26a4177351a3f27aa36735b00530444b # shrinks to a = SparseMultiPoly { terms: {Monomial { exponents: [0, 712666597] }: PrimeFieldElement64 { value: 1 }} }, b = SparseMultiPoly { terms: {Monomial { exponents: [0, 3582300699] }: PrimeFieldElement64 { value: 1 }} }
+cc 01ad524e0968033c66b8271bc79aa2e3515e39a404642a093ee3802ccab37eaa # shrinks to f = SparseMultiPoly { terms: {Monomial { exponents: [12, 0, 0] }: PrimeFieldElement64 { value: 1 }, Monomial { exponents: [8, 10, 13] }: PrimeFieldElement64 { value: 1 }} }, g = SparseMultiPoly { terms: {Monomial { exponents: [0, 0, 1] }: PrimeFieldElement64 { value: 1 }} }

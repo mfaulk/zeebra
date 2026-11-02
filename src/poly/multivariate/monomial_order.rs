@@ -31,17 +31,15 @@ impl MonomialOrder {
         match self {
             MonomialOrder::Lexicographic => lex(a, b),
             MonomialOrder::GradedLexicographic => grlex(a, b),
-            MonomialOrder::GradedReverseLexicographic => grlex(a, b),
+            MonomialOrder::GradedReverseLexicographic => grevlex(a, b),
         }
     }
-    pub fn max<const N: usize>(&self, a: &Monomial<N>, b: &Monomial<N>) -> Monomial<N> {
-        let ordering = match self {
-            MonomialOrder::Lexicographic => lex(a, b),
-            MonomialOrder::GradedLexicographic => grlex(a, b),
-            MonomialOrder::GradedReverseLexicographic => grevlex(a, b),
-        };
 
-        match ordering {
+    /// The greater of two monomials under this order.
+    pub fn max<const N: usize>(&self, a: &Monomial<N>, b: &Monomial<N>) -> Monomial<N> {
+        // Defers to `cmp` so the two cannot drift apart, which is how grevlex came to be
+        // dispatched two different ways.
+        match self.cmp(a, b) {
             Ordering::Greater => *a,
             Ordering::Less => *b,
             Ordering::Equal => *a,
@@ -107,7 +105,7 @@ fn grevlex<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> Ordering {
 mod tests {
     use crate::{
         poly::multivariate::monomial_order::{grevlex, grlex, lex},
-        Monomial,
+        Monomial, MonomialOrder,
     };
     use proptest::{
         prelude::{any, TestCaseError},
@@ -201,5 +199,243 @@ mod tests {
         fn test_order_is_symmetric(a in any::<Monomial<7>>(), b in any::<Monomial<7>>()) {
             order_is_symmetric(a, b)?;
         }
+    }
+
+    /// Every order dispatches `cmp` to its own comparison, not another order's.
+    ///
+    /// Regression test for a dispatch bug: `GradedReverseLexicographic` routed `cmp` to `grlex`
+    /// while `max` routed it to `grevlex`, so grevlex silently behaved as grlex everywhere
+    /// `leading_term` was used, and the two functions disagreed with each other.
+    #[test]
+    fn test_cmp_dispatches_to_the_named_order() {
+        // In three variables at degree two, grlex and grevlex disagree on x*z versus y^2:
+        // grlex compares exponent vectors left to right, so x*z = (1,0,1) > y^2 = (0,2,0);
+        // grevlex compares from the right preferring the smaller, so y^2 > x*z.
+        let xz = Monomial::<3>::new(&[1, 0, 1]);
+        let y2 = Monomial::<3>::new(&[0, 2, 0]);
+
+        assert_eq!(
+            MonomialOrder::GradedLexicographic.cmp(&xz, &y2),
+            Ordering::Greater,
+            "grlex should rank x*z above y^2"
+        );
+        assert_eq!(
+            MonomialOrder::GradedReverseLexicographic.cmp(&xz, &y2),
+            Ordering::Less,
+            "grevlex should rank y^2 above x*z"
+        );
+
+        // The two orders must therefore not agree on this pair.
+        assert_ne!(
+            MonomialOrder::GradedLexicographic.cmp(&xz, &y2),
+            MonomialOrder::GradedReverseLexicographic.cmp(&xz, &y2)
+        );
+    }
+
+    /// `cmp` and `max` agree, for every order.
+    #[test]
+    fn test_cmp_and_max_agree() {
+        let monomials = sample_monomials();
+        for order in ALL_ORDERS {
+            for a in &monomials {
+                for b in &monomials {
+                    let expected = match order.cmp(a, b) {
+                        Ordering::Less => *b,
+                        _ => *a,
+                    };
+                    assert_eq!(
+                        order.max(a, b),
+                        expected,
+                        "{}: max disagrees with cmp on {:?} and {:?}",
+                        order.name(),
+                        a.exponents(),
+                        b.exponents()
+                    );
+                }
+            }
+        }
+    }
+
+    /// Each order is a total order: antisymmetric, and equal only for equal monomials.
+    #[test]
+    fn test_orders_are_total() {
+        let monomials = sample_monomials();
+        for order in ALL_ORDERS {
+            for a in &monomials {
+                for b in &monomials {
+                    assert_eq!(
+                        order.cmp(a, b),
+                        order.cmp(b, a).reverse(),
+                        "{} is not antisymmetric",
+                        order.name()
+                    );
+                    assert_eq!(
+                        order.cmp(a, b) == Ordering::Equal,
+                        a == b,
+                        "{} reports equality for distinct monomials",
+                        order.name()
+                    );
+                }
+            }
+        }
+    }
+
+    /// Each order is transitive.
+    #[test]
+    fn test_orders_are_transitive() {
+        let monomials = sample_monomials();
+        for order in ALL_ORDERS {
+            for a in &monomials {
+                for b in &monomials {
+                    for c in &monomials {
+                        if order.cmp(a, b) == Ordering::Less && order.cmp(b, c) == Ordering::Less {
+                            assert_eq!(
+                                order.cmp(a, c),
+                                Ordering::Less,
+                                "{} is not transitive",
+                                order.name()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Each order is multiplicative: a < b implies a*c < b*c.
+    ///
+    /// This is what makes a monomial order usable for division, and the sorted-merge reduction
+    /// relies on it: multiplying a sorted sequence of terms by a monomial preserves the order.
+    #[test]
+    fn test_orders_are_multiplicative() {
+        let monomials = sample_monomials();
+        for order in ALL_ORDERS {
+            for a in &monomials {
+                for b in &monomials {
+                    for c in &monomials {
+                        let ac = a * c;
+                        let bc = b * c;
+                        assert_eq!(
+                            order.cmp(a, b),
+                            order.cmp(&ac, &bc),
+                            "{}: multiplying by {:?} changed the order of {:?} and {:?}",
+                            order.name(),
+                            c.exponents(),
+                            a.exponents(),
+                            b.exponents()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// One is the least monomial under every order, so reduction terminates.
+    #[test]
+    fn test_one_is_minimal() {
+        let one = Monomial::<3>::one();
+        for order in ALL_ORDERS {
+            for m in sample_monomials() {
+                if m == one {
+                    continue;
+                }
+                assert_eq!(
+                    order.cmp(&one, &m),
+                    Ordering::Less,
+                    "{} does not rank 1 below {:?}",
+                    order.name(),
+                    m.exponents()
+                );
+            }
+        }
+    }
+
+    /// Each order ranks degree-two monomials in three variables as the textbook does.
+    #[test]
+    fn test_known_orderings_of_degree_two() {
+        let descending = |order: MonomialOrder, mut ms: Vec<Monomial<3>>| {
+            ms.sort_by(|a, b| order.cmp(a, b).reverse());
+            ms.iter()
+                .map(|m| m.exponents().to_vec())
+                .collect::<Vec<_>>()
+        };
+        let degree_two = vec![
+            Monomial::<3>::new(&[2, 0, 0]), // x^2
+            Monomial::<3>::new(&[1, 1, 0]), // xy
+            Monomial::<3>::new(&[1, 0, 1]), // xz
+            Monomial::<3>::new(&[0, 2, 0]), // y^2
+            Monomial::<3>::new(&[0, 1, 1]), // yz
+            Monomial::<3>::new(&[0, 0, 2]), // z^2
+        ];
+
+        // lex and grlex coincide within a single degree: x^2 > xy > xz > y^2 > yz > z^2.
+        let expected_lex = vec![
+            vec![2, 0, 0],
+            vec![1, 1, 0],
+            vec![1, 0, 1],
+            vec![0, 2, 0],
+            vec![0, 1, 1],
+            vec![0, 0, 2],
+        ];
+        assert_eq!(
+            descending(MonomialOrder::Lexicographic, degree_two.clone()),
+            expected_lex
+        );
+        assert_eq!(
+            descending(MonomialOrder::GradedLexicographic, degree_two.clone()),
+            expected_lex
+        );
+
+        // grevlex differs: x^2 > xy > y^2 > xz > yz > z^2.
+        assert_eq!(
+            descending(MonomialOrder::GradedReverseLexicographic, degree_two),
+            vec![
+                vec![2, 0, 0],
+                vec![1, 1, 0],
+                vec![0, 2, 0],
+                vec![1, 0, 1],
+                vec![0, 1, 1],
+                vec![0, 0, 2],
+            ]
+        );
+    }
+
+    /// Graded orders rank by total degree first; lex does not.
+    #[test]
+    fn test_graded_orders_rank_by_degree_first() {
+        let low = Monomial::<3>::new(&[1, 0, 0]); // x, degree 1
+        let high = Monomial::<3>::new(&[0, 0, 3]); // z^3, degree 3
+
+        for order in [
+            MonomialOrder::GradedLexicographic,
+            MonomialOrder::GradedReverseLexicographic,
+        ] {
+            assert_eq!(order.cmp(&low, &high), Ordering::Less, "{}", order.name());
+        }
+        // Under lex, x outranks z^3 despite the lower degree.
+        assert_eq!(
+            MonomialOrder::Lexicographic.cmp(&low, &high),
+            Ordering::Greater
+        );
+    }
+
+    const ALL_ORDERS: [MonomialOrder; 3] = [
+        MonomialOrder::Lexicographic,
+        MonomialOrder::GradedLexicographic,
+        MonomialOrder::GradedReverseLexicographic,
+    ];
+
+    /// Every monomial in three variables with exponents up to two, which covers the cases where
+    /// the three orders differ.
+    fn sample_monomials() -> Vec<Monomial<3>> {
+        let mut out = Vec::new();
+        for i in 0..3u32 {
+            for j in 0..3u32 {
+                for k in 0..3u32 {
+                    out.push(Monomial::new(&[i, j, k]));
+                }
+            }
+        }
+        out
     }
 }

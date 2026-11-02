@@ -26,9 +26,24 @@ use crate::{
 pub struct PrimeFieldElement128<const P: u128> {
     /// The element's representative integer in [0,p-1].
     ///
-    /// Private so that the reduced-residue invariant cannot be broken from outside. See
-    /// `PrimeFieldElement64`.
+    /// Private so that the reduced-residue invariant cannot be broken from outside, and validated
+    /// on deserialization because that path bypasses the constructors. See `PrimeFieldElement64`.
+    #[serde(deserialize_with = "reduced_residue::<_, P>")]
     value: u128,
+}
+
+/// Accepts a representative only if it is already reduced modulo P. See `PrimeFieldElement64`.
+fn reduced_residue<'de, D, const P: u128>(deserializer: D) -> Result<u128, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = u128::deserialize(deserializer)?;
+    if value >= P {
+        return Err(serde::de::Error::custom(format!(
+            "{value} is not a reduced residue modulo {P}"
+        )));
+    }
+    Ok(value)
 }
 
 impl<const P: u128> PrimeFieldElement128<P> {
@@ -143,8 +158,14 @@ impl<const P: u128> ops::Add for &PrimeFieldElement128<P> {
     type Output = PrimeFieldElement128<P>;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let sum = U256::new_from_u128(self.value) + U256::new_from_u128(rhs.value);
-        let value = (sum % U256::new_from_u128(P)).as_u128();
+        // Reduced operands sum to below 2P, so one conditional subtraction suffices — no need
+        // for a 256-bit intermediate or the software long division that reducing it required.
+        let (sum, carry) = self.value.overflowing_add(rhs.value);
+        let value = if carry || sum >= P {
+            sum.wrapping_sub(P)
+        } else {
+            sum
+        };
         PrimeFieldElement128 { value }
     }
 }
@@ -169,12 +190,12 @@ impl<const P: u128> ops::Sub<Self> for &PrimeFieldElement128<P> {
     type Output = PrimeFieldElement128<P>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let value = if self.value > rhs.value {
-            let difference = U256::new_from_u128(self.value) - U256::new_from_u128(rhs.value);
-            (difference % U256::new_from_u128(P)).as_u128()
+        // On borrow the difference is negative, and adding P brings it back into range.
+        let (difference, borrow) = self.value.overflowing_sub(rhs.value);
+        let value = if borrow {
+            difference.wrapping_add(P)
         } else {
-            // a - b mod p = a + (P -b) mod P
-            (self + (PrimeFieldElement128::new(P - rhs.value))).value
+            difference
         };
         Self::Output { value }
     }
@@ -233,6 +254,45 @@ mod tests {
         fields::{PrimeFieldElement128, Zp221360928884514619393, Zp541},
         FiniteField, One, Zero,
     };
+
+    /// A small 128-bit-backed field. Note `Zp541` is the 64-bit type, not this one.
+    type P541 = PrimeFieldElement128<541>;
+
+    /// Deserializing an unreduced representative is rejected rather than admitted.
+    #[test]
+    fn test_deserializing_an_unreduced_representative_is_rejected() {
+        // At or above 2P, the case a single conditional subtraction cannot reduce.
+        let encoded = bincode::serialize(&1500u128).unwrap();
+        let decoded: Result<P541, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "1500 should be rejected modulo 541");
+
+        // Just above P, which `sub` would otherwise pass through unreduced.
+        let encoded = bincode::serialize(&542u128).unwrap();
+        let decoded: Result<P541, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "542 should be rejected modulo 541");
+
+        // The modulus itself is not a representative.
+        let encoded = bincode::serialize(&541u128).unwrap();
+        let decoded: Result<P541, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "541 should be rejected modulo 541");
+    }
+
+    /// Validating deserialization does not change the wire format: every element round-trips.
+    #[test]
+    fn test_serde_round_trip_is_unchanged() {
+        for value in [0u128, 1, 2, 539, 540] {
+            let element = P541::new(value);
+            let encoded = bincode::serialize(&element).unwrap();
+            let decoded: P541 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, element);
+        }
+
+        // The largest representative of the 68-bit prime, which needs more than 64 bits.
+        let element = PrimeFieldElement128::<221360928884514619393>::new(221360928884514619392u128);
+        let encoded = bincode::serialize(&element).unwrap();
+        let decoded: Zp221360928884514619393 = bincode::deserialize(&encoded).unwrap();
+        assert_eq!(decoded, element);
+    }
 
     #[test]
     // The default value should be zero.
@@ -489,5 +549,58 @@ mod tests {
         for v in &values {
             assert!(v.value < P, "{:?} is not reduced", v);
         }
+    }
+
+    /// Conditional addition and subtraction agree with the previous `U256`-based reduction.
+    ///
+    /// Addition and subtraction used to build 256-bit values and reduce them by software long
+    /// division. The oracle here reproduces that reduction directly, so the test compares the
+    /// cheap path against the expensive one it replaced.
+    #[test]
+    fn test_conditional_arithmetic_matches_wide_reduction() {
+        use crate::integers::U256;
+
+        fn check<const P: u128>(values: &[u128]) {
+            for &a in values {
+                for &b in values {
+                    let x = PrimeFieldElement128::<P>::new(a);
+                    let y = PrimeFieldElement128::<P>::new(b);
+
+                    let wide_sum = U256::new_from_u128(x.value()) + U256::new_from_u128(y.value());
+                    let expected_sum = (wide_sum % U256::new_from_u128(P)).as_u128();
+                    assert_eq!(
+                        (x + y).value(),
+                        expected_sum,
+                        "P = {}: {} + {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+
+                    // a - b mod P, computed the long way round.
+                    let expected_difference = if x.value() >= y.value() {
+                        x.value() - y.value()
+                    } else {
+                        P - (y.value() - x.value())
+                    };
+                    assert_eq!(
+                        (x - y).value(),
+                        expected_difference,
+                        "P = {}: {} - {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+                }
+            }
+        }
+
+        // 3 * 2^66 + 1.
+        const P: u128 = 221360928884514619393;
+        check::<P>(&[0, 1, 2, P / 2, P - 3, P - 2, P - 1]);
+
+        // A small modulus in the 128-bit type, exhaustively.
+        let small: Vec<u128> = (0..11).collect();
+        check::<11>(&small);
     }
 }

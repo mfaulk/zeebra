@@ -82,9 +82,11 @@ pub fn crout_lu<T: FiniteField>(A: &Matrix<T>) -> Result<Lu<T>, Error> {
         return Err(Error::PivotingRequired);
     }
 
-    // The first row of U is the first row of A divided by the first entry of L.
+    // The first row of U is the first row of A divided by the first entry of L. One inverse for
+    // the row rather than one per entry, since `inverse()` is a modular exponentiation.
+    let first_inverse = L[[0, 0]].inverse();
     for j in 0..n {
-        U[[0, j]] = A[[0, j]] / L[[0, 0]];
+        U[[0, j]] = A[[0, j]] * first_inverse;
     }
 
     // For each remaining row...
@@ -104,13 +106,14 @@ pub fn crout_lu<T: FiniteField>(A: &Matrix<T>) -> Result<Lu<T>, Error> {
         }
 
         // And then the i^th row of U, omitting the diagonal.
+        let diagonal_inverse = L[[i, i]].inverse();
         for j in i + 1..n {
             // U_{ij} = \frac{A_{ij} - \sum_{k=1}^{j-1} L_{ik} U_{kj}}{L_{ii}}
             let mut sum = T::zero();
             for k in 0..j {
                 sum += L[[i, k]] * U[[k, j]];
             }
-            U[[i, j]] = (A[[i, j]] - sum) / L[[i, i]];
+            U[[i, j]] = (A[[i, j]] - sum) * diagonal_inverse;
         }
     }
 
@@ -179,10 +182,11 @@ pub fn crout_lu_pivoting<T: FiniteField>(A: &Matrix<T>) -> Result<LuPivoting<T>,
                 P.swap_rows(j, pivot_row);
             }
 
-            // Divide each remaining candidate by the pivot to compute the elements of L below the pivot.
-            let pivot = A[[j, j]];
+            // Divide each remaining candidate by the pivot to compute the elements of L below
+            // the pivot. One inverse for the column, not one per entry.
+            let pivot_inverse = A[[j, j]].inverse();
             for i in (j + 1)..n {
-                A[[i, j]] /= pivot;
+                A[[i, j]] *= pivot_inverse;
             }
         } else {
             return Err(Error::NotInvertible);

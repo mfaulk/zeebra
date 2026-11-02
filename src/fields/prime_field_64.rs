@@ -26,7 +26,31 @@ pub struct PrimeFieldElement64<const P: u64> {
     /// Private so that the reduced-residue invariant cannot be broken from outside: every
     /// operation here assumes `value < P`, and `PartialEq` and `Hash` are derived over it, so an
     /// unreduced value would compare unequal to the element it represents.
+    ///
+    /// Deserialization is the one construction path that bypasses a constructor, so it validates
+    /// rather than trusting its input. Add and sub reduce by conditional subtraction, which
+    /// assumes the operands are already reduced: `sub` would pass an unreduced value straight
+    /// through, and `add` would still be unreduced for any input at or above 2P.
+    #[serde(deserialize_with = "reduced_residue::<_, P>")]
     value: u64,
+}
+
+/// Accepts a representative only if it is already reduced modulo P.
+///
+/// Rejecting rather than reducing: a value outside [0,P) did not come from this field, so it
+/// signals either corruption or a mismatched modulus, and silently reinterpreting it would hide
+/// that. Canonical values are unaffected, so this does not change the serialized format.
+fn reduced_residue<'de, D, const P: u64>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = u64::deserialize(deserializer)?;
+    if value >= P {
+        return Err(serde::de::Error::custom(format!(
+            "{value} is not a reduced residue modulo {P}"
+        )));
+    }
+    Ok(value)
 }
 
 impl<const P: u64> PrimeFieldElement64<P> {
@@ -109,8 +133,16 @@ impl<const P: u64> ops::Add<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P>
     type Output = PrimeFieldElement64<P>;
 
     fn add(self, rhs: &PrimeFieldElement64<P>) -> Self::Output {
-        let sum = self.value as u128 + rhs.value as u128;
-        let value = (sum % P as u128) as u64;
+        // Both operands are reduced, so their sum is below 2P and a single conditional
+        // subtraction reduces it. `overflowing_add` keeps this entirely in 64 bits even when P is
+        // close to 2^64: on carry the true sum is 2^64 + sum, and the wrapping subtraction of P
+        // yields exactly that less P. A 128-bit remainder costs an order of magnitude more.
+        let (sum, carry) = self.value.overflowing_add(rhs.value);
+        let value = if carry || sum >= P {
+            sum.wrapping_sub(P)
+        } else {
+            sum
+        };
         PrimeFieldElement64 { value }
     }
 }
@@ -135,8 +167,14 @@ impl<const P: u64> ops::Sub for &PrimeFieldElement64<P> {
     type Output = PrimeFieldElement64<P>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let difference = self.value as i128 - rhs.value as i128;
-        let value = difference.wrapping_rem_euclid(P as i128) as u64;
+        // On borrow the difference is negative, and adding P brings it back into range. Replaces
+        // a signed 128-bit euclidean remainder.
+        let (difference, borrow) = self.value.overflowing_sub(rhs.value);
+        let value = if borrow {
+            difference.wrapping_add(P)
+        } else {
+            difference
+        };
         Self::Output { value }
     }
 }
@@ -186,7 +224,7 @@ impl<const P: u64> Arbitrary for PrimeFieldElement64<P> {
 mod tests {
     use std::collections::HashSet;
 
-    use proptest::{arbitrary::Arbitrary, proptest};
+    use proptest::{arbitrary::Arbitrary, prelude::any, prop_assert_eq, proptest};
     use rand::{prelude::StdRng, thread_rng, SeedableRng};
 
     use crate::{
@@ -196,6 +234,60 @@ mod tests {
         identities::{One, Zero},
         FiniteField, ParseFieldElementError,
     };
+
+    /// Deserializing an unreduced representative is rejected rather than admitted.
+    #[test]
+    fn test_deserializing_an_unreduced_representative_is_rejected() {
+        // 9 is congruent to 2 mod 7, but is not the representative this field uses. Admitting it
+        // would break the invariant that addition and subtraction rely on.
+        let encoded = bincode::serialize(&9u64).unwrap();
+        let decoded: Result<Zp7, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "9 should be rejected modulo 7");
+    }
+
+    /// The modulus itself is not a valid representative; P-1 is the largest one.
+    #[test]
+    fn test_deserializing_rejects_the_modulus_and_admits_p_minus_one() {
+        let encoded = bincode::serialize(&7u64).unwrap();
+        let decoded: Result<Zp7, _> = bincode::deserialize(&encoded);
+        assert!(decoded.is_err(), "7 should be rejected modulo 7");
+
+        let encoded = bincode::serialize(&6u64).unwrap();
+        let decoded: Zp7 = bincode::deserialize(&encoded).expect("6 is a valid residue mod 7");
+        assert_eq!(decoded.value(), 6);
+    }
+
+    /// Validating deserialization does not change the wire format: every element round-trips.
+    #[test]
+    fn test_serde_round_trip_is_unchanged() {
+        for value in 0..7u64 {
+            let element = Zp7::new(value);
+            let encoded = bincode::serialize(&element).unwrap();
+            let decoded: Zp7 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, element);
+        }
+
+        // A value near the top of the range, where the largest 64-bit prime lives.
+        let element = Zp18446744073709551557::new(u64::MAX);
+        let encoded = bincode::serialize(&element).unwrap();
+        let decoded: Zp18446744073709551557 = bincode::deserialize(&encoded).unwrap();
+        assert_eq!(decoded, element);
+    }
+
+    /// Arithmetic on a deserialized element agrees with arithmetic on a constructed one.
+    ///
+    /// This is the defect the rejection prevents: the conditional add subtracts P at most once, so
+    /// an unreduced input would have produced an unreduced output.
+    #[test]
+    fn test_deserialized_elements_arithmetic_agrees_with_constructed() {
+        for value in 0..7u64 {
+            let encoded = bincode::serialize(&value).unwrap();
+            let decoded: Zp7 = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded + Zp7::zero(), Zp7::new(value));
+            assert_eq!(decoded - Zp7::zero(), Zp7::new(value));
+            assert_eq!(decoded + Zp7::one(), Zp7::new(value + 1));
+        }
+    }
 
     #[test]
     // The default value should be zero.
@@ -483,5 +575,75 @@ mod tests {
         );
         // A valid string still parses, reduced mod P.
         assert_eq!(Zp::from_str("542").unwrap(), Zp::new(1));
+    }
+
+    /// Conditional addition and subtraction agree with reducing by a 128-bit remainder.
+    ///
+    /// The previous implementation computed `(a + b) % P` in 128 bits, which is correct but an
+    /// order of magnitude slower. That formula is the oracle here. Boundary values matter most:
+    /// with P close to 2^64 the sum overflows 64 bits, which is exactly the case the carry
+    /// handling exists for.
+    #[test]
+    fn test_conditional_arithmetic_matches_wide_reduction() {
+        fn check<const P: u64>(values: &[u64]) {
+            for &a in values {
+                for &b in values {
+                    let (x, y) = (
+                        PrimeFieldElement64::<P>::new(a),
+                        PrimeFieldElement64::<P>::new(b),
+                    );
+
+                    let expected_sum = ((x.value() as u128 + y.value() as u128) % P as u128) as u64;
+                    assert_eq!(
+                        (x + y).value(),
+                        expected_sum,
+                        "P = {}: {} + {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+
+                    let expected_difference =
+                        (x.value() as i128 - y.value() as i128).rem_euclid(P as i128) as u64;
+                    assert_eq!(
+                        (x - y).value(),
+                        expected_difference,
+                        "P = {}: {} - {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+                }
+            }
+        }
+
+        // Exhaustive over small fields.
+        let small: Vec<u64> = (0..7).collect();
+        check::<7>(&small);
+        let small: Vec<u64> = (0..13).collect();
+        check::<13>(&small);
+
+        // The largest 64-bit prime, where a + b overflows 64 bits for most pairs.
+        const BIG: u64 = 18446744073709551557;
+        check::<BIG>(&[0, 1, 2, BIG / 2, BIG - 3, BIG - 2, BIG - 1, u64::MAX % BIG]);
+
+        // 2^31 - 1, which cannot overflow, to cover the branch that is not taken.
+        check::<2147483647>(&[0, 1, 2, 1073741823, 2147483644, 2147483645, 2147483646]);
+    }
+
+    proptest! {
+        /// The same equivalence over random input, including a field near the 64-bit boundary.
+        #[test]
+        fn test_conditional_arithmetic_matches_wide_reduction_randomly(a in any::<u64>(), b in any::<u64>()) {
+            const BIG: u64 = 18446744073709551557;
+            let (x, y) = (PrimeFieldElement64::<BIG>::new(a), PrimeFieldElement64::<BIG>::new(b));
+
+            let expected_sum = ((x.value() as u128 + y.value() as u128) % BIG as u128) as u64;
+            prop_assert_eq!((x + y).value(), expected_sum);
+
+            let expected_difference =
+                (x.value() as i128 - y.value() as i128).rem_euclid(BIG as i128) as u64;
+            prop_assert_eq!((x - y).value(), expected_difference);
+        }
     }
 }
