@@ -367,9 +367,12 @@ exactly the work F4 is supposed to absorb into linear algebra.
 
 M15-5 is not the place for late algorithm changes. Defects it exposes get their own commits. One
 non-algorithmic change was made during M15-5: `F4Statistics` gained
-`max_live_nonzeros_as_built`, because the fill-in ratio the example first printed divided a single
-matrix's peak by a sum over every batch and so measured nothing. The counter is new; no
-computation changed.
+two fill-in counters, in two steps and for the same underlying reason: the ratio the example
+printed was not measuring fill-in. The first version divided one matrix's peak by a sum over every
+batch, which is meaningless. The second divided the largest matrix's peak by its own as-built
+count, which is meaningful but answers a different question — review found that the batch with the
+largest absolute peak is not the batch that densified most, and that the difference is up to 2.2x
+on the lex instances. Both ratios are now reported. The counters are new; no computation changed.
 
 CI gained a release-mode job that runs the two Gröbner engine-agreement tests that are `#[ignore]`d
 for speed, so the cross-check against the naive reference is enforced rather than merely
@@ -383,29 +386,39 @@ From `cargo run --release --example f4_statistics`, over GF(2^31 - 1). `bb:red` 
 critical pairs Buchberger reduces one at a time; `batches` is the number of matrices F4 builds to
 cover the same pairs. `bb:0` and `empty` are the same comparison for the work that produces
 nothing. `scaffld` is the share of matrix rows that symbolic preprocessing added to make the
-reduction possible rather than being halves of a critical pair. `fill` is the peak live nonzero
-count of the largest elimination over the entries that same matrix was built with.
+reduction possible rather than being halves of a critical pair.
 
-| system | order | bb:red | batches | max/batch | bb:0 | empty | max matrix | scaffld | peak nz | fill | basis |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| cyclic-3 | lex | 6 | 4 | 3 | 4 | 2 | 8x8 | 45.5% | 23 | 1.05 | 3 |
-| cyclic-4 | lex | 44 | 12 | 7 | 37 | 6 | 28x29 | 57.1% | 128 | 1.33 | 6 |
-| cyclic-4 | grevlex | 35 | 7 | 9 | 29 | 2 | 47x40 | 59.3% | 204 | 1.00 | 7 |
-| cyclic-5 | lex | 1222 | 32 | 137 | 1173 | 16 | 565x351 | 71.8% | 13993 | 1.83 | 11 |
-| cyclic-5 | grlex | 1454 | 23 | 305 | 1401 | 10 | 732x228 | 35.7% | 11379 | 1.00 | 30 |
-| cyclic-5 | grevlex | 868 | 22 | 171 | 827 | 9 | 635x463 | 65.5% | 17061 | 3.58 | 20 |
-| katsura-3 | grevlex | 7 | 3 | 4 | 4 | 1 | 15x15 | 53.3% | 54 | 1.04 | 4 |
-| katsura-4 | lex | 84 | 13 | 12 | 70 | 6 | 56x49 | 70.5% | 567 | 1.48 | 4 |
-| katsura-4 | grevlex | 15 | 4 | 6 | 10 | 1 | 51x56 | 75.6% | 546 | 1.65 | 7 |
-| katsura-5 | lex | 1790 | 29 | 84 | 1725 | 14 | 381x249 | 72.9% | 9285 | 1.53 | 5 |
-| katsura-5 | grlex | 100 | 7 | 30 | 85 | 3 | 162x176 | 73.7% | 3126 | 1.62 | 16 |
-| katsura-5 | grevlex | 49 | 6 | 15 | 39 | 2 | 278x291 | 87.2% | 7818 | 2.96 | 13 |
-| katsura-6 | grlex | 387 | 9 | 104 | 356 | 4 | 644x674 | 77.9% | 34746 | 2.45 | 32 |
-| katsura-6 | grevlex | 147 | 8 | 39 | 129 | 3 | 1388x1412 | 94.0% | 103314 | 6.16 | 22 |
-| katsura-6 | lex | — | 59 | 563 | — | 26 | 1954x1030 | 77.5% | 151624 | 4.72 | 6 |
-| katsura-7 | grlex | — | 11 | 414 | — | 5 | 2450x2476 | 80.0% | 368156 | 3.78 | 64 |
-| katsura-7 | grevlex | — | 10 | 146 | — | 4 | 6810x6862 | 95.9% | 1390812 | 13.19 | 41 |
-| planted-6 | lex | 12 | 3 | 6 | 6 | 1 | 15x16 | 27.3% | 42 | 1.08 | 6 |
+Two fill-in columns, because they answer different questions and are usually different batches.
+`worst` is the largest ratio of peak live entries to as-built entries over **every** batch — how
+badly sparse elimination densifies. `big` is that ratio for the single largest matrix — the one
+that sized memory. A batch going from 100 entries to 800 densifies eightfold; one going from 1000
+to 1500 has the larger absolute peak but densifies by half. Reporting only the second understates
+the first, which is the number a dense/sparse threshold has to rest on.
+
+| system | order | bb:red | batches | max/batch | bb:0 | empty | max matrix | scaffld | peak nz | worst | big | basis |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| cyclic-3 | lex | 6 | 4 | 3 | 4 | 2 | 8x8 | 45.5% | 23 | 1.11 | 1.05 | 3 |
+| cyclic-3 | grevlex | 6 | 4 | 3 | 4 | 2 | 9x9 | 52.0% | 25 | 1.09 | 1.09 | 3 |
+| cyclic-4 | lex | 44 | 12 | 7 | 37 | 6 | 28x29 | 57.1% | 128 | 1.80 | 1.33 | 6 |
+| cyclic-4 | grlex | 35 | 7 | 9 | 29 | 2 | 40x39 | 54.2% | 180 | 1.31 | 1.31 | 7 |
+| cyclic-4 | grevlex | 35 | 7 | 9 | 29 | 2 | 47x40 | 59.3% | 204 | 1.12 | 1.00 | 7 |
+| cyclic-5 | lex | 1222 | 32 | 137 | 1173 | 16 | 565x351 | 71.8% | 13993 | 3.31 | 1.83 | 11 |
+| cyclic-5 | grlex | 1454 | 23 | 305 | 1401 | 10 | 732x228 | 35.7% | 11379 | 1.77 | 1.00 | 30 |
+| cyclic-5 | grevlex | 868 | 22 | 171 | 827 | 9 | 635x463 | 65.5% | 17061 | 3.58 | 3.58 | 20 |
+| katsura-3 | lex | 10 | 4 | 4 | 6 | 1 | 15x15 | 51.2% | 61 | 1.22 | 1.17 | 3 |
+| katsura-3 | grevlex | 7 | 3 | 4 | 4 | 1 | 15x15 | 53.3% | 54 | 1.04 | 1.04 | 4 |
+| katsura-4 | lex | 84 | 13 | 12 | 70 | 6 | 56x49 | 70.5% | 567 | 2.34 | 1.48 | 4 |
+| katsura-4 | grlex | 27 | 5 | 10 | 20 | 2 | 51x57 | 69.8% | 405 | 1.38 | 1.16 | 8 |
+| katsura-4 | grevlex | 15 | 4 | 6 | 10 | 1 | 51x56 | 75.6% | 546 | 1.65 | 1.65 | 7 |
+| katsura-5 | lex | 1790 | 29 | 84 | 1725 | 14 | 381x249 | 72.9% | 9285 | 3.39 | 1.53 | 5 |
+| katsura-5 | grlex | 100 | 7 | 30 | 85 | 3 | 162x176 | 73.7% | 3126 | 1.62 | 1.62 | 16 |
+| katsura-5 | grevlex | 49 | 6 | 15 | 39 | 2 | 278x291 | 87.2% | 7818 | 2.96 | 2.96 | 13 |
+| katsura-6 | grlex | 387 | 9 | 104 | 356 | 4 | 644x674 | 77.9% | 34746 | 2.45 | 2.45 | 32 |
+| katsura-6 | grevlex | 147 | 8 | 39 | 129 | 3 | 1388x1412 | 94.0% | 103314 | 6.56 | 6.16 | 22 |
+| katsura-6 | lex | — | 59 | 563 | — | 26 | 1954x1030 | 77.5% | 151624 | 4.91 | 4.72 | 6 |
+| katsura-7 | grlex | — | 11 | 414 | — | 5 | 2450x2476 | 80.0% | 368156 | 3.78 | 3.78 | 64 |
+| katsura-7 | grevlex | — | 10 | 146 | — | 4 | 6810x6862 | 95.9% | 1390812 | 13.58 | 13.19 | 41 |
+| planted-6 | lex | 12 | 3 | 6 | 6 | 1 | 15x16 | 27.3% | 42 | 1.20 | 1.08 | 6 |
 
 A dash means Buchberger does not finish that instance here, so there is nothing to compare against.
 
@@ -424,11 +437,18 @@ division would do directly. They are not waste in the sense of being wrong, but 
 single largest cost F4 pays for batching, and reusing reducer multiples across batches is the
 obvious thing to attack next.
 
-**Fill-in is real and grows with the instance.** From 1.0x on the small systems to 13.2x on
-katsura-7 grevlex, where the peak is 1.39 million live entries against 105 thousand as built. That
-is the measurement that justifies the `max_live_nonzeros` budget existing at all, and it says a
-dense representation would be the better choice for the late, dense matrices — a hybrid worth
+**Fill-in is real and grows with the instance.** From 1.04x on katsura-3 to 13.58x on katsura-7
+grevlex, whose largest matrix alone goes from 105 thousand entries as built to 1.39 million live.
+That is the measurement that justifies the `max_live_nonzeros` budget existing at all, and it says
+a dense representation would be the better choice for the late, dense matrices — a hybrid worth
 measuring, and deliberately not attempted here.
+
+The gap between the two columns is itself informative, and it is largest under lex: katsura-5 lex
+densifies 3.39x at worst while its biggest matrix only densifies 1.53x, and katsura-4 lex is
+2.34x against 1.48x. Lex builds many matrices of very different sizes, and the ones that densify
+worst are not the ones that grow largest — so sizing a hybrid threshold off the biggest matrix
+would set it from the wrong batch. Under grevlex the two mostly coincide, because there are fewer
+matrices and the last one dominates both.
 
 **grevlex produces fewer, denser matrices; grlex more, sparser ones.** On katsura-7, grlex builds
 11 matrices peaking at 368 thousand entries and grevlex builds 10 peaking at 1.39 million. The
@@ -510,7 +530,7 @@ useless reductions out of 1790 and F4 is 13x faster. katsura-5 grevlex has 39 ou
 machinery — symbolic preprocessing, column sorting, construction — is pure overhead.
 
 **Under grevlex, F4's matrices get dense, and that is where it loses.** katsura-6 grevlex is 94%
-scaffolding with 6.2x fill-in, and it is the worst paired result in the table at 0.47x. The same
+scaffolding with 6.6x fill-in, and it is the worst paired result in the table at 0.47x. The same
 system under grlex is 78% scaffolding with 2.5x fill-in, and F4 wins at 1.67x. grevlex is the
 cheapest order for Buchberger and, at these sizes, the *worst* order for this F4 implementation —
 the opposite of the usual guidance, and a direct consequence of the fill-in rather than of
@@ -569,7 +589,7 @@ volume, and it is the clearest single cost in the whole milestone.
 |---|---|---|
 | Symbolic preprocessing misses a reducer multiple | Test the closure invariant directly; hand-verifiable small matrices; re-check selected S-pairs after every batch. | Did not occur. The invariant is asserted directly over ten systems under all three orders, as one wide batch and one pair at a time. |
 | Candidate extraction accepts or drops the wrong rows | Track the preprocessed leading-monomial set; assert candidates are not top-reducible; verify the batch resolves its pairs. | Did not occur. Exact agreement with both reference engines is the end-to-end confirmation. |
-| Fill-in makes sparse storage lose | Measure peak nonzeros and density; enforce configurable ceilings; defer hybrid representations until the numbers justify them. | **Occurred, and is the main finding.** Up to 13.2x on katsura-7 grevlex. The budget catches it; a hybrid representation is now a measured need rather than a guess. |
+| Fill-in makes sparse storage lose | Measure peak nonzeros and density; enforce configurable ceilings; defer hybrid representations until the numbers justify them. | **Occurred, and is the main finding.** Up to 13.6x on katsura-7 grevlex. The budget catches it; a hybrid representation is now a measured need rather than a guess. |
 | F4 is slower on the whole initial corpus | Benchmark progressively harder cases; keep Buchberger; if no crossover is found, document the bottleneck and name it as the M16 starting point. | Partly occurred: F4 loses on the small systems and wins where Buchberger wastes the most work. See section 7.2. |
 | Sharing the pair queue regresses Buchberger | Extract it as its own commit, guarded by Buchberger's existing tests — including the reference-agreement and determinism tests. | Did not occur. The extraction was its own commit and the existing tests passed unchanged. |
 | Scope drifts into a general matrix framework | Build only what F4 needs. Abstractions wait for a second caller. | Held. `linalg::sparse` is a row, a matrix, and two elimination functions; no representation policy, no traits. |
@@ -661,7 +681,7 @@ are measured rather than assumed. That is the milestone.
 
 1. **Reuse reducer multiples across batches.** The scaffolding share is the largest single cost
    this milestone measured, and it is pure recomputation.
-2. **A dense/sparse hybrid, with a measured threshold.** Fill-in reaches 13.2x and the
+2. **A dense/sparse hybrid, with a measured threshold.** Fill-in reaches 13.6x and the
    F4-shaped benchmark goes from 13 ms to 221 ms for a 2x shape increase. This needs a
    dense row-echelon-only implementation first, so that the crossover can be located rather than
    guessed — section 7.3 could not locate it because the dense comparison computes more.

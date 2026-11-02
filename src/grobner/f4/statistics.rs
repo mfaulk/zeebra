@@ -70,14 +70,27 @@ pub struct F4Statistics {
     pub max_matrix_columns: usize,
 
     /// The largest number of nonzero entries live in any elimination.
+    ///
+    /// This is the memory question: how big did the biggest matrix get. It is deliberately not the
+    /// fill-in question — see `worst_fill_in_peak`.
     pub max_live_nonzeros: usize,
 
     /// Nonzero entries in the matrix that reached `max_live_nonzeros`, as it was built.
     ///
-    /// The denominator for the worst fill-in observed. Carried separately because the batch with
-    /// the densest input is not necessarily the one whose elimination filled in the most, so
-    /// dividing by a total or by another batch's count would not measure anything.
+    /// Context for `max_live_nonzeros`: how dense the biggest matrix was to begin with.
     pub max_live_nonzeros_as_built: usize,
+
+    /// The peak live entries of the batch whose elimination filled in the most, proportionally.
+    ///
+    /// Tracked separately from `max_live_nonzeros` because **the biggest matrix is not necessarily
+    /// the one that densified worst**. A batch going from 100 entries to 800 fills in eightfold; a
+    /// batch going from 1000 to 1500 fills in by half but has the larger absolute peak. Reporting
+    /// the second as the worst fill-in would understate how badly sparse elimination can behave,
+    /// which is precisely the measurement a later dense/sparse threshold has to rest on.
+    pub worst_fill_in_peak: usize,
+
+    /// That same batch's entry count as built — the denominator of [`F4Statistics::worst_fill_in`].
+    pub worst_fill_in_as_built: usize,
 
     /// Summed over every batch: nonzero entries in the matrices as built.
     pub total_initial_nonzeros: usize,
@@ -115,6 +128,25 @@ impl F4Statistics {
             self.max_live_nonzeros = batch.elimination.peak_nonzeros;
             self.max_live_nonzeros_as_built = batch.elimination.initial_nonzeros;
         }
+
+        // The worst *ratio*, which is a different batch in general. Compared by cross-multiplying
+        // rather than by dividing, so the comparison is exact; `u128` because the product of two
+        // entry counts can exceed a `u64` on a large enough problem.
+        let (peak, built) = (
+            batch.elimination.peak_nonzeros as u128,
+            batch.elimination.initial_nonzeros as u128,
+        );
+        let (worst_peak, worst_built) = (
+            self.worst_fill_in_peak as u128,
+            self.worst_fill_in_as_built as u128,
+        );
+        // A batch with no entries has no ratio. Otherwise take it if nothing is recorded yet, or
+        // if its ratio beats what is: peak/built > worst_peak/worst_built, cross-multiplied.
+        let beats_the_record = worst_built == 0 || peak * worst_built > worst_peak * built;
+        if built > 0 && beats_the_record {
+            self.worst_fill_in_peak = batch.elimination.peak_nonzeros;
+            self.worst_fill_in_as_built = batch.elimination.initial_nonzeros;
+        }
         self.total_initial_nonzeros += batch.elimination.initial_nonzeros;
         self.total_final_nonzeros += batch.elimination.final_nonzeros;
         self.row_operations += batch.elimination.row_operations;
@@ -126,12 +158,28 @@ impl F4Statistics {
         }
     }
 
-    /// The worst fill-in observed: the peak live entries over the entries that matrix was built
-    /// with.
+    /// The worst fill-in observed: over every batch, the largest ratio of peak live entries to the
+    /// entries that batch's matrix was built with.
     ///
-    /// One when no matrix was built. Above one means elimination made a matrix denser than it
+    /// One when no matrix was built. Above one means elimination made some matrix denser than it
     /// started, which is the cost a sparse representation pays and the reason the peak is budgeted.
+    ///
+    /// This is a maximum over ratios, not the ratio at the maximum: see
+    /// [`F4Statistics::worst_fill_in_peak`] for why those differ and why both are reported.
     pub fn worst_fill_in(&self) -> f64 {
+        if self.worst_fill_in_as_built == 0 {
+            1.0
+        } else {
+            self.worst_fill_in_peak as f64 / self.worst_fill_in_as_built as f64
+        }
+    }
+
+    /// The fill-in of the largest matrix, which is not in general the worst fill-in.
+    ///
+    /// Reported alongside [`F4Statistics::worst_fill_in`] so the two can be compared: when they
+    /// differ, the matrix that strained memory most and the matrix that densified most were
+    /// different batches.
+    pub fn fill_in_of_the_largest_matrix(&self) -> f64 {
         if self.max_live_nonzeros_as_built == 0 {
             1.0
         } else {
@@ -207,6 +255,15 @@ mod tests {
             statistics.max_live_nonzeros_as_built, 20,
             "the denominator comes from the batch that peaked, not the other one"
         );
+        // The first batch grew 20 -> 25 and the second 9 -> 11, so 1.25x beats 1.22x: here
+        // the worst ratio and the largest matrix happen to be the same batch.
+        assert_eq!(
+            (
+                statistics.worst_fill_in_peak,
+                statistics.worst_fill_in_as_built
+            ),
+            (25, 20)
+        );
         assert_eq!(statistics.total_initial_nonzeros, 29);
         assert_eq!(statistics.total_final_nonzeros, 25);
         assert_eq!(statistics.row_operations, 9);
@@ -219,12 +276,59 @@ mod tests {
         );
     }
 
-    /// Fill-in is one before any matrix is built, and the peak over the as-built count after.
+    /// Fill-in is one before any matrix is built.
     #[test]
-    fn test_worst_fill_in() {
-        let mut statistics = F4Statistics::default();
+    fn test_worst_fill_in_of_nothing() {
+        let statistics = F4Statistics::default();
         assert_eq!(statistics.worst_fill_in(), 1.0);
+        assert_eq!(statistics.fill_in_of_the_largest_matrix(), 1.0);
+    }
 
+    /// The worst fill-in is the largest *ratio*, not the ratio of the largest matrix.
+    ///
+    /// Regression test. The implementation used to record the batch with the greatest absolute
+    /// peak and then divide that batch's peak by its own initial count, which answers a different
+    /// question. On the two batches below — 1000 entries growing to 1500, and 100 growing to 800 —
+    /// it reported 1.5x as the worst fill-in when the honest answer is 8x. That mattered because
+    /// the next milestone has to use this number to decide when sparse elimination stops paying.
+    #[test]
+    fn test_worst_fill_in_is_the_largest_ratio() {
+        let batch = |initial: usize, peak: usize| BatchStatistics {
+            elimination: EliminationStatistics {
+                initial_nonzeros: initial,
+                peak_nonzeros: peak,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut statistics = F4Statistics::default();
+        statistics.record(&batch(1000, 1500)); // 1.5x, and the larger matrix
+        statistics.record(&batch(100, 800)); // 8.0x, and the worse fill-in
+
+        assert_eq!(statistics.worst_fill_in(), 8.0);
+        assert_eq!(
+            statistics.max_live_nonzeros, 1500,
+            "memory is still sized by the largest matrix"
+        );
+        assert_eq!(
+            statistics.fill_in_of_the_largest_matrix(),
+            1.5,
+            "and that matrix's own fill-in is still available"
+        );
+
+        // Order of arrival does not matter.
+        let mut reversed = F4Statistics::default();
+        reversed.record(&batch(100, 800));
+        reversed.record(&batch(1000, 1500));
+        assert_eq!(reversed.worst_fill_in(), 8.0);
+        assert_eq!(reversed.max_live_nonzeros, 1500);
+    }
+
+    /// A batch that did not densify at all does not displace a worse one.
+    #[test]
+    fn test_worst_fill_in_ignores_flat_batches() {
+        let mut statistics = F4Statistics::default();
         statistics.record(&BatchStatistics {
             elimination: EliminationStatistics {
                 initial_nonzeros: 10,
@@ -235,15 +339,20 @@ mod tests {
         });
         assert_eq!(statistics.worst_fill_in(), 2.5);
 
-        // A later batch with a lower peak does not move it, even if it is denser to begin with.
+        // Bigger absolute peak, but it barely grew.
         statistics.record(&BatchStatistics {
             elimination: EliminationStatistics {
-                initial_nonzeros: 20,
-                peak_nonzeros: 22,
+                initial_nonzeros: 1000,
+                peak_nonzeros: 1001,
                 ..Default::default()
             },
             ..Default::default()
         });
+        assert_eq!(statistics.worst_fill_in(), 2.5);
+        assert_eq!(statistics.max_live_nonzeros, 1001);
+
+        // An empty matrix has no ratio to speak of and must not divide by zero.
+        statistics.record(&BatchStatistics::default());
         assert_eq!(statistics.worst_fill_in(), 2.5);
     }
 
