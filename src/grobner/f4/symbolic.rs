@@ -112,6 +112,23 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         &self.elements[index]
     }
 
+    /// Append one element, as [`MonicBasis::new`] would have.
+    ///
+    /// The main loop grows the basis one element at a time, and rebuilding the whole structure per
+    /// batch would re-sort every element's terms for nothing.
+    ///
+    /// # Panics
+    /// If the polynomial is zero.
+    pub fn push(&mut self, polynomial: &MultivariatePolynomial<N, F>, order: MonomialOrder) {
+        let appended = Self::new(std::slice::from_ref(polynomial), order);
+        self.elements.extend(appended.elements);
+    }
+
+    /// The leading monomial of each element, in index order.
+    pub fn leading_monomials(&self) -> impl Iterator<Item = Monomial<N>> + '_ {
+        self.elements.iter().map(|element| element.leading_monomial)
+    }
+
     /// The first element, in index order, whose leading monomial divides `monomial`, with the
     /// quotient.
     ///
