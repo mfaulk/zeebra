@@ -143,8 +143,14 @@ impl<const P: u128> ops::Add for &PrimeFieldElement128<P> {
     type Output = PrimeFieldElement128<P>;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let sum = U256::new_from_u128(self.value) + U256::new_from_u128(rhs.value);
-        let value = (sum % U256::new_from_u128(P)).as_u128();
+        // Reduced operands sum to below 2P, so one conditional subtraction suffices — no need
+        // for a 256-bit intermediate or the software long division that reducing it required.
+        let (sum, carry) = self.value.overflowing_add(rhs.value);
+        let value = if carry || sum >= P {
+            sum.wrapping_sub(P)
+        } else {
+            sum
+        };
         PrimeFieldElement128 { value }
     }
 }
@@ -169,12 +175,12 @@ impl<const P: u128> ops::Sub<Self> for &PrimeFieldElement128<P> {
     type Output = PrimeFieldElement128<P>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let value = if self.value > rhs.value {
-            let difference = U256::new_from_u128(self.value) - U256::new_from_u128(rhs.value);
-            (difference % U256::new_from_u128(P)).as_u128()
+        // On borrow the difference is negative, and adding P brings it back into range.
+        let (difference, borrow) = self.value.overflowing_sub(rhs.value);
+        let value = if borrow {
+            difference.wrapping_add(P)
         } else {
-            // a - b mod p = a + (P -b) mod P
-            (self + (PrimeFieldElement128::new(P - rhs.value))).value
+            difference
         };
         Self::Output { value }
     }
@@ -489,5 +495,58 @@ mod tests {
         for v in &values {
             assert!(v.value < P, "{:?} is not reduced", v);
         }
+    }
+
+    /// Conditional addition and subtraction agree with the previous `U256`-based reduction.
+    ///
+    /// Addition and subtraction used to build 256-bit values and reduce them by software long
+    /// division. The oracle here reproduces that reduction directly, so the test compares the
+    /// cheap path against the expensive one it replaced.
+    #[test]
+    fn test_conditional_arithmetic_matches_wide_reduction() {
+        use crate::integers::U256;
+
+        fn check<const P: u128>(values: &[u128]) {
+            for &a in values {
+                for &b in values {
+                    let x = PrimeFieldElement128::<P>::new(a);
+                    let y = PrimeFieldElement128::<P>::new(b);
+
+                    let wide_sum = U256::new_from_u128(x.value()) + U256::new_from_u128(y.value());
+                    let expected_sum = (wide_sum % U256::new_from_u128(P)).as_u128();
+                    assert_eq!(
+                        (x + y).value(),
+                        expected_sum,
+                        "P = {}: {} + {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+
+                    // a - b mod P, computed the long way round.
+                    let expected_difference = if x.value() >= y.value() {
+                        x.value() - y.value()
+                    } else {
+                        P - (y.value() - x.value())
+                    };
+                    assert_eq!(
+                        (x - y).value(),
+                        expected_difference,
+                        "P = {}: {} - {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+                }
+            }
+        }
+
+        // 3 * 2^66 + 1.
+        const P: u128 = 221360928884514619393;
+        check::<P>(&[0, 1, 2, P / 2, P - 3, P - 2, P - 1]);
+
+        // A small modulus in the 128-bit type, exhaustively.
+        let small: Vec<u128> = (0..11).collect();
+        check::<11>(&small);
     }
 }

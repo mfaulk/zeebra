@@ -56,11 +56,15 @@ fn gaussian_elimination<T: FiniteField>(matrix: &Matrix<T>) -> Matrix<T> {
                 A.swap_rows(cursor.row, pivot_row);
             }
             // The cursor now contains a pivot.
-            // Divide the current row by the pivot to make the pivot equal to 1.
+            // Scale the current row so the pivot becomes 1.
             {
-                let pivot = A[[cursor.row, cursor.column]];
+                // One inverse for the row, not one per entry. `Div` on a field element is
+                // multiplication by `inverse()`, and `inverse()` is a modular exponentiation of
+                // about log2(q) multiplications — so dividing entry by entry paid for that
+                // exponentiation once per column.
+                let pivot_inverse = A[[cursor.row, cursor.column]].inverse();
                 for j in cursor.column..num_columns {
-                    A[[cursor.row, j]] /= pivot;
+                    A[[cursor.row, j]] *= pivot_inverse;
                 }
             }
 

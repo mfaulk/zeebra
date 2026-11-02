@@ -109,8 +109,16 @@ impl<const P: u64> ops::Add<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P>
     type Output = PrimeFieldElement64<P>;
 
     fn add(self, rhs: &PrimeFieldElement64<P>) -> Self::Output {
-        let sum = self.value as u128 + rhs.value as u128;
-        let value = (sum % P as u128) as u64;
+        // Both operands are reduced, so their sum is below 2P and a single conditional
+        // subtraction reduces it. `overflowing_add` keeps this entirely in 64 bits even when P is
+        // close to 2^64: on carry the true sum is 2^64 + sum, and the wrapping subtraction of P
+        // yields exactly that less P. A 128-bit remainder costs an order of magnitude more.
+        let (sum, carry) = self.value.overflowing_add(rhs.value);
+        let value = if carry || sum >= P {
+            sum.wrapping_sub(P)
+        } else {
+            sum
+        };
         PrimeFieldElement64 { value }
     }
 }
@@ -135,8 +143,14 @@ impl<const P: u64> ops::Sub for &PrimeFieldElement64<P> {
     type Output = PrimeFieldElement64<P>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let difference = self.value as i128 - rhs.value as i128;
-        let value = difference.wrapping_rem_euclid(P as i128) as u64;
+        // On borrow the difference is negative, and adding P brings it back into range. Replaces
+        // a signed 128-bit euclidean remainder.
+        let (difference, borrow) = self.value.overflowing_sub(rhs.value);
+        let value = if borrow {
+            difference.wrapping_add(P)
+        } else {
+            difference
+        };
         Self::Output { value }
     }
 }
@@ -186,7 +200,7 @@ impl<const P: u64> Arbitrary for PrimeFieldElement64<P> {
 mod tests {
     use std::collections::HashSet;
 
-    use proptest::{arbitrary::Arbitrary, proptest};
+    use proptest::{arbitrary::Arbitrary, prelude::any, prop_assert_eq, proptest};
     use rand::{prelude::StdRng, thread_rng, SeedableRng};
 
     use crate::{
@@ -483,5 +497,75 @@ mod tests {
         );
         // A valid string still parses, reduced mod P.
         assert_eq!(Zp::from_str("542").unwrap(), Zp::new(1));
+    }
+
+    /// Conditional addition and subtraction agree with reducing by a 128-bit remainder.
+    ///
+    /// The previous implementation computed `(a + b) % P` in 128 bits, which is correct but an
+    /// order of magnitude slower. That formula is the oracle here. Boundary values matter most:
+    /// with P close to 2^64 the sum overflows 64 bits, which is exactly the case the carry
+    /// handling exists for.
+    #[test]
+    fn test_conditional_arithmetic_matches_wide_reduction() {
+        fn check<const P: u64>(values: &[u64]) {
+            for &a in values {
+                for &b in values {
+                    let (x, y) = (
+                        PrimeFieldElement64::<P>::new(a),
+                        PrimeFieldElement64::<P>::new(b),
+                    );
+
+                    let expected_sum = ((x.value() as u128 + y.value() as u128) % P as u128) as u64;
+                    assert_eq!(
+                        (x + y).value(),
+                        expected_sum,
+                        "P = {}: {} + {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+
+                    let expected_difference =
+                        (x.value() as i128 - y.value() as i128).rem_euclid(P as i128) as u64;
+                    assert_eq!(
+                        (x - y).value(),
+                        expected_difference,
+                        "P = {}: {} - {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+                }
+            }
+        }
+
+        // Exhaustive over small fields.
+        let small: Vec<u64> = (0..7).collect();
+        check::<7>(&small);
+        let small: Vec<u64> = (0..13).collect();
+        check::<13>(&small);
+
+        // The largest 64-bit prime, where a + b overflows 64 bits for most pairs.
+        const BIG: u64 = 18446744073709551557;
+        check::<BIG>(&[0, 1, 2, BIG / 2, BIG - 3, BIG - 2, BIG - 1, u64::MAX % BIG]);
+
+        // 2^31 - 1, which cannot overflow, to cover the branch that is not taken.
+        check::<2147483647>(&[0, 1, 2, 1073741823, 2147483644, 2147483645, 2147483646]);
+    }
+
+    proptest! {
+        /// The same equivalence over random input, including a field near the 64-bit boundary.
+        #[test]
+        fn test_conditional_arithmetic_matches_wide_reduction_randomly(a in any::<u64>(), b in any::<u64>()) {
+            const BIG: u64 = 18446744073709551557;
+            let (x, y) = (PrimeFieldElement64::<BIG>::new(a), PrimeFieldElement64::<BIG>::new(b));
+
+            let expected_sum = ((x.value() as u128 + y.value() as u128) % BIG as u128) as u64;
+            prop_assert_eq!((x + y).value(), expected_sum);
+
+            let expected_difference =
+                (x.value() as i128 - y.value() as i128).rem_euclid(BIG as i128) as u64;
+            prop_assert_eq!((x - y).value(), expected_difference);
+        }
     }
 }
