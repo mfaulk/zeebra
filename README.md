@@ -34,6 +34,61 @@ cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
+A few tests compare the optimized Gröbner engine against the naive reference implementation on
+systems where the reference takes minutes. They are `#[ignore]`d so the default suite stays fast,
+and need release mode to finish in reasonable time:
+
+```sh
+cargo test --release -- --ignored
+```
+
+### Benchmarks
+
+Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense linear algebra,
+and Gröbner basis computation:
+
+```sh
+cargo bench                              # everything
+cargo bench --bench grobner              # one suite
+```
+
+Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
+counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
+reductions, basis size:
+
+```sh
+cargo run --release --example grobner_statistics
+```
+
+Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
+[`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md).
+
+## Gröbner Bases
+
+`grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
+standard orders are available, and `MonomialOrder` is exported from the crate root:
+
+```rust
+use zeebra::{fields::Zp13, grobner::buchberger, MonomialOrder, MultivariatePolynomial};
+
+let vars = ["x", "y", "z"];
+let system = vec![
+    MultivariatePolynomial::<3, Zp13>::parse("x*z - y^2", vars).unwrap(),
+    MultivariatePolynomial::<3, Zp13>::parse("x^3 - z^2", vars).unwrap(),
+];
+
+let basis = buchberger(&system, MonomialOrder::GradedReverseLexicographic);
+```
+
+The returned basis is reduced and in a deterministic order, so it is reproducible across runs.
+Which order you pick matters: graded reverse lexicographic is usually cheapest, while lexicographic
+is what makes a system easy to solve by back-substitution and can be dramatically more expensive.
+
+`buchberger_with_statistics` returns the same basis alongside counters describing the computation,
+which is useful for understanding cost on a hard system. `grobner::benchmark_systems` provides the
+standard `cyclic` and `katsura` families, and `grobner::reference` holds a deliberately naive
+textbook implementation kept as a correctness oracle — use `buchberger` for real work.
+
 ## Solving Polynomial Systems
 `grobner::solve` finds every point of F^N at which a system of multivariate polynomials
 vanishes, over a finite field F:

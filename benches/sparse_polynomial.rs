@@ -74,6 +74,17 @@ fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
             BenchmarkId::new(format!("normal_form/{}", arity), reducer_count),
             &(&dividend, &reducers),
             |bencher, (dividend, reducers)| {
+                bencher.iter(|| black_box(black_box(*dividend).normal_form(reducers, ORDER)))
+            },
+        );
+
+        // The same reduction through `multi_div_rem`, which also returns quotients. Kept as a
+        // measured comparison: `normal_form` exists because this path is quadratic in the number
+        // of reduction steps, and the gap widens with the size of the dividend.
+        group.bench_with_input(
+            BenchmarkId::new(format!("multi_div_rem/{}", arity), reducer_count),
+            &(&dividend, &reducers),
+            |bencher, (dividend, reducers)| {
                 bencher.iter(|| black_box(black_box(*dividend).multi_div_rem(reducers, ORDER).1))
             },
         );
