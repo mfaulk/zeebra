@@ -13,6 +13,7 @@ mod div_with_remainder;
 mod gcd;
 mod lagrange_interpolation;
 mod polynomial_trait;
+mod pow_mod;
 mod univariate_parser;
 
 use crate::FiniteField;
@@ -20,6 +21,7 @@ pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialPa
 pub use gcd::gcd;
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
 pub use polynomial_trait::Polynomial;
+pub use pow_mod::pow_mod;
 use std::cmp::max;
 
 // Trim leading terms with zero coefficient so the highest power of x has non-zero coefficient.
