@@ -50,6 +50,9 @@ Four other `#[ignore]`d tests are unimplemented placeholders for statistical dis
 and a rare division branch, and they panic if run. A bare `cargo test -- --ignored` therefore
 reports those four as failures; the commands above select the tests that are meant to pass.
 
+CI runs the two Gröbner engine-agreement tests among those in a separate release-mode job, so the
+cross-check against the naive reference implementation is enforced rather than merely available.
+
 ### Benchmarks
 
 Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense and sparse linear
@@ -70,11 +73,17 @@ counters — pairs considered, pairs eliminated by Buchberger's first criterion,
 reductions, basis size:
 
 ```sh
-cargo run --release --example grobner_statistics
+cargo run --release --example grobner_statistics   # Buchberger
+cargo run --release --example f4_statistics        # F4, beside Buchberger
 ```
 
+`f4_statistics` prints matrix dimensions, how many reductions each matrix absorbed, how much of
+each matrix was reduction scaffolding, and how much elimination filled it in. It asserts that the
+two engines agree wherever both can run.
+
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
-[`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md).
+[`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md) and
+[`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md).
 
 ## Gröbner Bases
 
