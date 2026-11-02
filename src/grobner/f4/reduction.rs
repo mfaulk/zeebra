@@ -1,0 +1,557 @@
+//! The F4 reduction step: a batch of critical pairs in, new basis elements out.
+//!
+//! Symbolic preprocessing, matrix construction, elimination, and then the step that makes F4 F4:
+//!
+//! > A nonzero row of the reduced matrix is a **new** relation exactly when its leading monomial
+//! > is not the leading monomial of any row that went in.
+//!
+//! That is Faugère's `F+ = {f in F~ : LM(f) not in LM(F)}`. Rows whose leading monomial was
+//! already there carry relations the batch already represented; only a pivot in a column that no
+//! input row led with is information the basis did not have.
+//!
+//! The closure invariant from [`super::symbolic`] is what makes this sound. Every column monomial
+//! divisible by some `LM(g)` is the leading monomial of some row, hence excluded — so a candidate's
+//! leading monomial is never top-reducible by the current basis. Candidate extraction does not have
+//! to test for that; it gets it from the preprocessing being complete, and the tests assert the
+//! consequence rather than trusting it.
+//!
+//! Batch reduction legitimately produces different polynomials from reducing the same pairs one at
+//! a time, because a batch can use relations discovered from its other pairs. The requirement is
+//! not that the polynomials match but that the ideal is unchanged and the selected pairs end up
+//! resolved, which is what the tests check.
+
+use crate::{
+    grobner::{
+        f4::{
+            macaulay::{BuildBudgetExceeded, MacaulayMatrix},
+            options::{F4Error, F4Options},
+            statistics::BatchStatistics,
+            symbolic::{symbolic_preprocessing_within, MonicBasis, RowKind},
+        },
+        pairs::CriticalPair,
+    },
+    linalg::sparse::row_echelon_within,
+    poly::MonomialOrder,
+    FiniteField, MultivariatePolynomial,
+};
+
+/// What one batch produced.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchOutcome<const N: usize, F: FiniteField> {
+    /// New basis elements, monic, sorted descending by leading monomial.
+    ///
+    /// Their leading monomials are distinct, and none is divisible by the leading monomial of a
+    /// current basis element. They may still be redundant against each other; interreduction at
+    /// the end of the computation deals with that.
+    pub candidates: Vec<MultivariatePolynomial<N, F>>,
+
+    /// What the batch cost.
+    pub statistics: BatchStatistics,
+}
+
+/// Reduce a batch of critical pairs, returning the new basis elements it yields.
+///
+/// `basis` must be the basis the pairs were built against, under `order`: a pair names basis
+/// elements by index and carries the lcm of their leading monomials.
+///
+/// # Errors
+/// Returns an [`F4Error`] if the matrix or its elimination exceeds a limit in `options`. The basis
+/// is left untouched, so a caller may retry with a smaller batch.
+///
+/// Each budget is enforced while the resource it bounds is being consumed — rows as preprocessing
+/// discovers them, columns as the monomial set grows, entries as rows are written and as
+/// elimination fills them in — so a limit refuses the allocation rather than reporting it after
+/// the fact. See [`F4Options::max_live_nonzeros`] for what the entry budget does and does not
+/// account for.
+pub fn reduce_batch<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    order: MonomialOrder,
+    options: &F4Options,
+) -> Result<BatchOutcome<N, F>, F4Error> {
+    // Every budget is enforced while the thing it bounds is being built, not after it exists.
+    // Symbolic preprocessing discovers rows one at a time and matrix construction writes entries
+    // one row at a time, so both can refuse to continue; checking afterwards would mean paying the
+    // allocation in order to find out it was not allowed.
+    let preprocessed = symbolic_preprocessing_within(basis, pairs, options.max_matrix_rows)
+        .map_err(|exceeded| F4Error::TooManyRows {
+            limit: exceeded.limit,
+        })?;
+
+    let mut matrix = MacaulayMatrix::build_within(
+        basis,
+        &preprocessed,
+        order,
+        options.max_matrix_columns,
+        options.max_live_nonzeros,
+    )
+    .map_err(|exceeded| match exceeded {
+        BuildBudgetExceeded::Columns { limit } => F4Error::TooManyColumns { limit },
+        BuildBudgetExceeded::Nonzeros { nonzeros, limit } => {
+            F4Error::TooManyNonzeros { nonzeros, limit }
+        }
+    })?;
+
+    let reducer_rows = preprocessed
+        .rows
+        .iter()
+        .filter(|row| row.kind == RowKind::Reducer)
+        .count();
+    let rows = matrix.num_rows();
+    let columns = matrix.num_columns();
+
+    let elimination =
+        row_echelon_within(matrix.matrix_mut(), options.max_live_nonzeros).map_err(|nonzeros| {
+            F4Error::TooManyNonzeros {
+                nonzeros,
+                limit: options.max_live_nonzeros,
+            }
+        })?;
+
+    // A pivot in a column no input row led with is a relation the basis did not have.
+    let mut candidates: Vec<MultivariatePolynomial<N, F>> = (0..matrix.num_rows())
+        .filter_map(|index| {
+            let column = matrix.matrix().row(index).leading_column()?;
+            let monomial = matrix.columns()[column];
+            if preprocessed.leading_monomials.contains(&monomial) {
+                return None;
+            }
+            Some(matrix.row_polynomial(index))
+        })
+        .collect();
+
+    // Echelon rows have distinct leading columns, so the leading monomials are distinct and this
+    // is a total order on the candidates — which makes the output a function of the input.
+    candidates.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
+
+    let statistics = BatchStatistics {
+        pairs: pairs.len(),
+        rows,
+        reducer_rows,
+        columns,
+        elimination,
+        candidates: candidates.len(),
+    };
+
+    Ok(BatchOutcome {
+        candidates,
+        statistics,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reduce_batch;
+    use crate::{
+        grobner::{
+            f4::{
+                options::{F4Error, F4Options},
+                symbolic::MonicBasis,
+            },
+            pairs::CriticalPair,
+            s_polynomial,
+        },
+        poly::MonomialOrder,
+        FiniteField, MultivariatePolynomial, One,
+    };
+
+    use crate::fields::{Zp13, Zp2147483647, Zp7};
+
+    type F = Zp13;
+    const VARS: [&str; 3] = ["x", "y", "z"];
+    const ALL_ORDERS: [MonomialOrder; 3] = [
+        MonomialOrder::Lexicographic,
+        MonomialOrder::GradedLexicographic,
+        MonomialOrder::GradedReverseLexicographic,
+    ];
+
+    fn parse(s: &str) -> MultivariatePolynomial<3, F> {
+        MultivariatePolynomial::parse(s, VARS).unwrap()
+    }
+
+    fn system(strings: &[&str]) -> Vec<MultivariatePolynomial<3, F>> {
+        strings.iter().map(|s| parse(s)).collect()
+    }
+
+    /// Every pair of a system, as one batch.
+    fn all_pairs<const N: usize, G: FiniteField>(
+        polynomials: &[MultivariatePolynomial<N, G>],
+        order: MonomialOrder,
+    ) -> Vec<CriticalPair<N>> {
+        let mut pairs = Vec::new();
+        for left in 0..polynomials.len() {
+            for right in (left + 1)..polynomials.len() {
+                pairs.push(CriticalPair::new(polynomials, left, right, order));
+            }
+        }
+        pairs
+    }
+
+    /// The textbook case: f = x^2 + y and g = x^2 + z, whose S-polynomial is y - z.
+    ///
+    /// The batch's one new relation is that S-polynomial, made monic. Under every order the
+    /// leading monomial is y or z depending on how the order ranks them, so the candidate is
+    /// y - z or z - y; both are the same relation up to a unit, and both are monic.
+    #[test]
+    fn test_hand_verifiable_batch() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^2 + y", "x^2 + z"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = all_pairs(&polynomials, order);
+
+            let outcome =
+                reduce_batch(&basis, &pairs, order, &F4Options::default()).expect("within limits");
+
+            assert_eq!(outcome.candidates.len(), 1, "{}", order.name());
+            let candidate = &outcome.candidates[0];
+            assert_eq!(candidate.leading_coefficient(order), F::ONE);
+            // y - z up to sign, which is the S-polynomial of the pair up to a unit.
+            let s = s_polynomial(&polynomials[0], &polynomials[1], order);
+            let scaled = s.scale(&s.leading_coefficient(order).inverse());
+            assert_eq!(*candidate, scaled, "{}", order.name());
+
+            // Two rows, three columns, rank two, one zero row.
+            assert_eq!(outcome.statistics.rows, 2, "{}", order.name());
+            assert_eq!(outcome.statistics.columns, 3, "{}", order.name());
+            assert_eq!(outcome.statistics.elimination.rank, 2, "{}", order.name());
+        }
+    }
+
+    /// A batch whose rows are all dependent produces nothing, without failing.
+    #[test]
+    fn test_batch_that_reduces_entirely_to_zero() {
+        for order in ALL_ORDERS {
+            // x^2 - 1 and y^3 - 1 have relatively prime leading monomials, so their S-polynomial
+            // reduces to zero modulo the two of them -- and the matrix must therefore find no new
+            // pivot. The product criterion would skip this pair; reducing it anyway is the point.
+            let polynomials = system(&["x^2 - 1", "y^3 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = all_pairs(&polynomials, order);
+
+            let outcome =
+                reduce_batch(&basis, &pairs, order, &F4Options::default()).expect("within limits");
+            assert!(
+                outcome.candidates.is_empty(),
+                "{}: expected no new relation, got {:?}",
+                order.name(),
+                outcome.candidates
+            );
+            // Something did cancel: the rank is below the row count.
+            assert!(
+                outcome.statistics.elimination.zero_rows > 0,
+                "{}: nothing reduced to zero, so nothing was learned either",
+                order.name()
+            );
+        }
+    }
+
+    /// A candidate's leading monomial is never divisible by a basis element's.
+    ///
+    /// This is the consequence of the closure invariant, and the property that makes candidate
+    /// extraction sound: a pivot whose leading monomial were top-reducible would be a relation the
+    /// basis already implied, dressed up as a new element.
+    #[test]
+    fn test_candidates_are_not_top_reducible() {
+        let systems: Vec<Vec<&str>> = vec![
+            vec!["x^2 + y", "x^2 + z"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x^3 - 2*x*y", "x^2*y - 2*y^2 + x"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x^2 + y^2 + z^2", "x*y + y*z"],
+            vec!["x^2 + y + 1", "y^2 + z + 2", "z^2 + x + 3"],
+        ];
+
+        for order in ALL_ORDERS {
+            for strings in &systems {
+                let polynomials = system(strings);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = all_pairs(&polynomials, order);
+                let outcome = reduce_batch(&basis, &pairs, order, &F4Options::default())
+                    .expect("within limits");
+
+                for candidate in &outcome.candidates {
+                    let monomial = candidate.leading_monomial(order);
+                    assert!(
+                        !basis.is_top_reducible(&monomial),
+                        "{:?} under {}: candidate {} leads with a reducible monomial",
+                        strings,
+                        order.name(),
+                        candidate
+                    );
+                }
+            }
+        }
+    }
+
+    /// Every candidate lies in the ideal generated by the batch's input.
+    ///
+    /// A candidate is a combination of the matrix rows, and every row is a monomial multiple of a
+    /// basis element, so it belongs to the ideal by construction. Checked here against the
+    /// independent `normal_form`: reducing a candidate modulo a Gröbner basis of the input must
+    /// give zero. The input is not yet a Gröbner basis, so `buchberger` supplies one.
+    #[test]
+    fn test_candidates_lie_in_the_ideal() {
+        use crate::grobner::buchberger;
+
+        let systems: Vec<Vec<&str>> = vec![
+            vec!["x^2 + y", "x^2 + z"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+        ];
+
+        for order in ALL_ORDERS {
+            for strings in &systems {
+                let polynomials = system(strings);
+                let reference = buchberger(&polynomials, order);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = all_pairs(&polynomials, order);
+                let outcome = reduce_batch(&basis, &pairs, order, &F4Options::default())
+                    .expect("within limits");
+
+                for candidate in &outcome.candidates {
+                    assert!(
+                        candidate.normal_form(&reference, order).is_zero(),
+                        "{:?} under {}: candidate {} is not in the ideal",
+                        strings,
+                        order.name(),
+                        candidate
+                    );
+                }
+            }
+        }
+    }
+
+    /// The batch resolves its own pairs: each selected S-polynomial reduces to zero modulo the
+    /// basis augmented with the batch's output.
+    ///
+    /// This is the correctness requirement for a batch. It does not ask the candidates to match
+    /// what one-pair-at-a-time reduction would produce — a batch may use relations found from its
+    /// other pairs — only that the pairs it took responsibility for are now resolved.
+    #[test]
+    fn test_batch_resolves_its_pairs() {
+        let systems: Vec<Vec<&str>> = vec![
+            vec!["x^2 + y", "x^2 + z"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x^3 - 2*x*y", "x^2*y - 2*y^2 + x"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x^2 + y^2 + z^2", "x*y + y*z"],
+            // Three generators sharing a leading monomial, so several pairs share an lcm.
+            vec!["x^2 + y", "x^2 + z", "x^2 + y + z"],
+        ];
+
+        for order in ALL_ORDERS {
+            for strings in &systems {
+                let polynomials = system(strings);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = all_pairs(&polynomials, order);
+                let outcome = reduce_batch(&basis, &pairs, order, &F4Options::default())
+                    .expect("within limits");
+
+                let mut augmented = polynomials.clone();
+                augmented.extend(outcome.candidates.iter().cloned());
+
+                for pair in &pairs {
+                    let s = s_polynomial(&polynomials[pair.left], &polynomials[pair.right], order);
+                    assert!(
+                        s.normal_form(&augmented, order).is_zero(),
+                        "{:?} under {}: S({}, {}) is not resolved by the batch",
+                        strings,
+                        order.name(),
+                        polynomials[pair.left],
+                        polynomials[pair.right]
+                    );
+                }
+            }
+        }
+    }
+
+    /// A batch of several pairs resolves all of them, including linearly dependent rows.
+    ///
+    /// Three generators with the same leading monomial give three pairs whose six matrix rows span
+    /// only a two-dimensional space of new relations, so the elimination has dependencies to find.
+    #[test]
+    fn test_batch_with_dependent_rows() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^2 + y", "x^2 + z", "x^2 + y + z"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = all_pairs(&polynomials, order);
+            let outcome =
+                reduce_batch(&basis, &pairs, order, &F4Options::default()).expect("within limits");
+
+            assert_eq!(outcome.statistics.pairs, 3, "{}", order.name());
+            assert_eq!(outcome.statistics.rows, 6, "{}", order.name());
+            assert!(
+                outcome.statistics.elimination.zero_rows > 0,
+                "{}: six rows over three columns must be dependent",
+                order.name()
+            );
+            // Candidates have distinct leading monomials, which echelon form guarantees.
+            let mut leads: Vec<_> = outcome
+                .candidates
+                .iter()
+                .map(|p| p.leading_monomial(order))
+                .collect();
+            let before = leads.len();
+            leads.sort();
+            leads.dedup();
+            assert_eq!(leads.len(), before, "{}", order.name());
+        }
+    }
+
+    /// Cancellation that depends on the characteristic is found over the field in question.
+    ///
+    /// The batch reduces `x^2 + 8y` against `x^2 + y`. Over GF(7) the coefficient 8 is 1, so the
+    /// two rows are identical, the elimination finds a dependency, and there is no new relation.
+    /// Over GF(2^31 - 1) they differ and the S-polynomial `7y` is a new relation. The same batch,
+    /// the same code, two different answers — which is what a single-field test would not catch.
+    #[test]
+    fn test_characteristic_dependent_cancellation() {
+        use crate::Monomial;
+        let order = MonomialOrder::Lexicographic;
+
+        fn outcome_over<G: FiniteField>(order: MonomialOrder) -> (usize, usize) {
+            let x_squared = Monomial::<3>::new(&[2, 0, 0]);
+            let y = Monomial::<3>::new(&[0, 1, 0]);
+            let polynomials: Vec<MultivariatePolynomial<3, G>> = vec![
+                MultivariatePolynomial::new(&[(x_squared, G::ONE), (y, G::new(8))]),
+                MultivariatePolynomial::new(&[(x_squared, G::ONE), (y, G::ONE)]),
+            ];
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = vec![CriticalPair::new(&polynomials, 0, 1, order)];
+            let outcome =
+                reduce_batch(&basis, &pairs, order, &F4Options::default()).expect("within limits");
+            (
+                outcome.candidates.len(),
+                outcome.statistics.elimination.zero_rows,
+            )
+        }
+
+        assert_eq!(
+            outcome_over::<Zp7>(order),
+            (0, 1),
+            "over GF(7) the rows are identical"
+        );
+        assert_eq!(
+            outcome_over::<Zp2147483647>(order),
+            (1, 0),
+            "over GF(2^31 - 1) they are independent"
+        );
+    }
+
+    /// An empty batch produces nothing and costs nothing.
+    #[test]
+    fn test_empty_batch() {
+        let order = MonomialOrder::Lexicographic;
+        let basis = MonicBasis::new(&system(&["x^2 + y"]), order);
+        let outcome =
+            reduce_batch(&basis, &[], order, &F4Options::default()).expect("within limits");
+        assert!(outcome.candidates.is_empty());
+        assert_eq!(outcome.statistics.rows, 0);
+        assert_eq!(outcome.statistics.columns, 0);
+    }
+
+    /// Reduction is deterministic: the same batch gives the same candidates in the same order.
+    #[test]
+    fn test_reduction_is_deterministic() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^2*y + z", "y^2*z + x", "x*z^2 + y", "x*y*z - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = all_pairs(&polynomials, order);
+
+            let first = reduce_batch(&basis, &pairs, order, &F4Options::default()).unwrap();
+            for _ in 0..8 {
+                assert_eq!(
+                    reduce_batch(&basis, &pairs, order, &F4Options::default()).unwrap(),
+                    first,
+                    "{}",
+                    order.name()
+                );
+            }
+        }
+    }
+
+    /// Candidates come out sorted descending by leading monomial.
+    #[test]
+    fn test_candidates_are_sorted() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = all_pairs(&polynomials, order);
+            let outcome = reduce_batch(&basis, &pairs, order, &F4Options::default()).unwrap();
+
+            for window in outcome.candidates.windows(2) {
+                assert_eq!(
+                    order.cmp(
+                        &window[0].leading_monomial(order),
+                        &window[1].leading_monomial(order)
+                    ),
+                    std::cmp::Ordering::Greater,
+                    "{}: candidates are not sorted",
+                    order.name()
+                );
+            }
+        }
+    }
+
+    /// Each resource limit is reported as its own error, and the basis is untouched.
+    #[test]
+    fn test_resource_limits_are_reported() {
+        let order = MonomialOrder::Lexicographic;
+        let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+        let basis = MonicBasis::new(&polynomials, order);
+        let pairs = all_pairs(&polynomials, order);
+
+        // A row limit of one cannot hold even a single pair's two halves.
+        assert!(matches!(
+            reduce_batch(
+                &basis,
+                &pairs,
+                order,
+                &F4Options {
+                    max_matrix_rows: 1,
+                    ..F4Options::default()
+                }
+            ),
+            Err(F4Error::TooManyRows { limit: 1, .. })
+        ));
+
+        assert!(matches!(
+            reduce_batch(
+                &basis,
+                &pairs,
+                order,
+                &F4Options {
+                    max_matrix_columns: 1,
+                    ..F4Options::default()
+                }
+            ),
+            Err(F4Error::TooManyColumns { limit: 1, .. })
+        ));
+
+        assert!(matches!(
+            reduce_batch(
+                &basis,
+                &pairs,
+                order,
+                &F4Options {
+                    max_live_nonzeros: 1,
+                    ..F4Options::default()
+                }
+            ),
+            Err(F4Error::TooManyNonzeros { limit: 1, .. })
+        ));
+
+        // Generous limits succeed on the same input, so the failures are the limits and not the
+        // batch.
+        assert!(reduce_batch(&basis, &pairs, order, &F4Options::default()).is_ok());
+    }
+}

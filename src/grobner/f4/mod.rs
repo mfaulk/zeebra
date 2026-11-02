@@ -12,6 +12,7 @@
 //! - [`symbolic`] turns a batch of pairs into a set of rows closed under reduction.
 //! - [`macaulay`] lays those rows out as a sparse matrix with monomials for columns.
 //! - [`crate::linalg::sparse`] reduces it.
+//! - [`reduction`] extracts the rows whose leading monomial is new.
 //!
 //! [`super::buchberger`] is unchanged and remains the correctness oracle.
 //!
@@ -20,9 +21,16 @@
 //! this implementation is built on.
 
 pub mod macaulay;
+pub mod options;
+pub mod reduction;
+pub mod statistics;
 pub mod symbolic;
 
-pub use macaulay::MacaulayMatrix;
+pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
+pub use options::{F4Error, F4Options};
+pub use reduction::{reduce_batch, BatchOutcome};
+pub use statistics::{BatchStatistics, F4Statistics};
 pub use symbolic::{
-    symbolic_preprocessing, MonicBasis, MonicElement, Preprocessed, PreprocessedRow, RowKind,
+    symbolic_preprocessing, symbolic_preprocessing_within, MonicBasis, MonicElement, Preprocessed,
+    PreprocessedRow, RowBudgetExceeded, RowKind,
 };

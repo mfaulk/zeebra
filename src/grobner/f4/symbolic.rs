@@ -227,6 +227,22 @@ pub fn symbolic_preprocessing<const N: usize, F: FiniteField>(
     basis: &MonicBasis<N, F>,
     pairs: &[CriticalPair<N>],
 ) -> Preprocessed<N> {
+    symbolic_preprocessing_within(basis, pairs, usize::MAX)
+        .expect("an unbounded preprocessing cannot exceed its budget")
+}
+
+/// As [`symbolic_preprocessing`], abandoned once more than `max_rows` rows are needed.
+///
+/// The closure is discovered a row at a time and there is no way to know in advance how many rows
+/// it will take, so a budget has to be checked as rows are added rather than afterwards: a batch
+/// that would need millions of reducer multiples must not allocate them all before anyone notices.
+/// `Err` means the limit was crossed, and carries nothing about how many rows the batch would
+/// really have needed, because the work of finding that out is the work being refused.
+pub fn symbolic_preprocessing_within<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    max_rows: usize,
+) -> Result<Preprocessed<N>, RowBudgetExceeded> {
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
@@ -244,6 +260,9 @@ pub fn symbolic_preprocessing<const N: usize, F: FiniteField>(
                 .lcm
                 .checked_div(&basis.element(basis_index).leading_monomial)
                 .expect("a pair's lcm is divisible by each of its leading monomials");
+            if rows.len() == max_rows {
+                return Err(RowBudgetExceeded { limit: max_rows });
+            }
             rows.push(PreprocessedRow {
                 multiplier,
                 basis_index,
@@ -271,6 +290,10 @@ pub fn symbolic_preprocessing<const N: usize, F: FiniteField>(
             continue;
         };
 
+        if rows.len() == max_rows {
+            return Err(RowBudgetExceeded { limit: max_rows });
+        }
+
         covered.insert(monomial);
         for (shifted, _) in basis.shifted_terms(basis_index, &multiplier) {
             pending.push_back(shifted);
@@ -282,15 +305,24 @@ pub fn symbolic_preprocessing<const N: usize, F: FiniteField>(
         });
     }
 
-    Preprocessed {
+    Ok(Preprocessed {
         rows,
         leading_monomials: covered,
-    }
+    })
+}
+
+/// Symbolic preprocessing needed more rows than it was allowed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RowBudgetExceeded {
+    pub limit: usize,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{symbolic_preprocessing, MonicBasis, Preprocessed, PreprocessedRow, RowKind};
+    use super::{
+        symbolic_preprocessing, symbolic_preprocessing_within, MonicBasis, Preprocessed,
+        PreprocessedRow, RowBudgetExceeded, RowKind,
+    };
     use crate::{
         fields::Zp13,
         grobner::pairs::CriticalPair,
@@ -669,6 +701,61 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The row budget is exact at its boundary, and refuses the work rather than reporting it.
+    ///
+    /// A batch needing `n` rows succeeds at a budget of `n` and fails at `n - 1`. Failing at the
+    /// boundary is what shows the check happens as rows are discovered: a check after the fact
+    /// would have had to build all `n` first, which for a batch that needs millions is exactly
+    /// the allocation the budget exists to prevent.
+    #[test]
+    fn test_row_budget_is_exact() {
+        let order = MonomialOrder::Lexicographic;
+        let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+        let basis = MonicBasis::new(&polynomials, order);
+        let mut pairs = Vec::new();
+        for left in 0..polynomials.len() {
+            for right in (left + 1)..polynomials.len() {
+                pairs.push(CriticalPair::new(&polynomials, left, right, order));
+            }
+        }
+
+        let needed = symbolic_preprocessing(&basis, &pairs).rows.len();
+        assert!(needed > 2 * pairs.len(), "the closure should add reducers");
+
+        assert_eq!(
+            symbolic_preprocessing_within(&basis, &pairs, needed)
+                .expect("a budget of exactly what is needed suffices")
+                .rows
+                .len(),
+            needed
+        );
+        assert_eq!(
+            symbolic_preprocessing_within(&basis, &pairs, needed - 1),
+            Err(RowBudgetExceeded { limit: needed - 1 })
+        );
+
+        // A budget too small even for the pair halves fails on the first push.
+        assert_eq!(
+            symbolic_preprocessing_within(&basis, &pairs, 0),
+            Err(RowBudgetExceeded { limit: 0 })
+        );
+        assert_eq!(
+            symbolic_preprocessing_within(&basis, &pairs, 1),
+            Err(RowBudgetExceeded { limit: 1 })
+        );
+    }
+
+    /// An empty batch needs no rows, so any budget covers it, including zero.
+    #[test]
+    fn test_row_budget_with_an_empty_batch() {
+        let order = MonomialOrder::Lexicographic;
+        let basis = MonicBasis::new(&system(&["x^2 + y"]), order);
+        assert!(symbolic_preprocessing_within(&basis, &[], 0)
+            .expect("nothing to build")
+            .rows
+            .is_empty());
     }
 
     /// An empty batch produces no rows.
