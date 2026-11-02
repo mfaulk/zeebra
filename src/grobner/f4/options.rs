@@ -97,7 +97,13 @@ pub enum F4Error {
     TooManyBatches { limit: usize },
 
     /// The basis held, or grew beyond, more elements than allowed.
+    ///
+    /// Applies to the generators as supplied, not only to what the computation appends: a basis
+    /// that starts over the limit is over the limit.
     TooManyBasisElements { elements: usize, limit: usize },
+
+    /// The options cannot be satisfied by any computation.
+    InvalidOptions { reason: &'static str },
 }
 
 impl Display for F4Error {
@@ -123,9 +129,12 @@ impl Display for F4Error {
             }
             Self::TooManyBasisElements { elements, limit } => write!(
                 f,
-                "the basis grew to {} elements, over the limit of {}",
+                "the basis held {} elements, over the limit of {}",
                 elements, limit
             ),
+            Self::InvalidOptions { reason } => {
+                write!(f, "the options are unsatisfiable: {}", reason)
+            }
         }
     }
 }

@@ -18,6 +18,8 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Number-Theoretic Transform (FFT over Finite Fields)
 - [x] Grobner Bases
 - [x] Polynomial System Solving via Grobner Basis Algorithms
+- [x] Sparse Linear Algebra over Finite Fields
+- [x] F4 Grobner Bases
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -40,6 +42,7 @@ suite stays fast, and need release mode to finish in reasonable time:
 
 ```sh
 cargo test --release -- --ignored test_optimized_agrees_with_reference_on_slow_systems
+cargo test --release -- --ignored test_f4_on_larger_systems
 cargo test --release -- --ignored test_factorization
 ```
 
@@ -98,7 +101,59 @@ is what makes a system easy to solve by back-substitution and can be dramaticall
 which is useful for understanding cost on a hard system. `grobner::benchmark_systems` provides the
 standard `cyclic` and `katsura` families plus `planted`, which builds a zero-dimensional system
 around a solution you choose. `grobner::reference` holds a deliberately naive textbook
-implementation kept as a correctness oracle — use `buchberger` for real work.
+implementation kept as a correctness oracle — use `buchberger` or `f4` for real work.
+
+### F4
+
+`grobner::f4` computes the same basis by Faugère's F4 algorithm, which replaces individual
+S-polynomial reductions with batched symbolic preprocessing and sparse finite-field linear algebra:
+
+```rust
+use zeebra::{fields::Zp13, grobner::f4, MonomialOrder, MultivariatePolynomial};
+
+let vars = ["x", "y", "z"];
+let system = vec![
+    MultivariatePolynomial::<3, Zp13>::parse("x*z - y^2", vars).unwrap(),
+    MultivariatePolynomial::<3, Zp13>::parse("x^3 - z^2", vars).unwrap(),
+];
+
+let basis = f4(&system, MonomialOrder::GradedReverseLexicographic).unwrap();
+```
+
+A reduced Gröbner basis is unique for a given ideal and order, so `f4` and `buchberger` return
+exactly the same thing, with the same handling of zero, duplicate, and redundant generators. They
+differ only in how they get there, and therefore in cost.
+
+**Which to use.** `buchberger` is the better choice on small systems, where building a matrix costs
+more than the reductions it replaces. F4 pays off where Buchberger wastes the most work: on
+katsura-5 under lex, Buchberger reduces 1790 S-polynomials and 1725 of them come out zero, while
+F4 covers the same ground in 29 matrices. See
+[`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md) for measurements, including the cases where F4
+loses.
+
+`f4` returns a `Result`: an F4 matrix can grow far beyond what its inputs suggest, and elimination
+can make it denser still, so both are budgeted. Exceeding a budget is an `F4Error` naming the limit
+— never a basis that looks complete and is not. `f4_with_options` takes an `F4Options` and returns
+`F4Statistics` alongside the basis:
+
+```rust
+use zeebra::{fields::Zp13, grobner::{f4_with_options, F4Options}, MonomialOrder, MultivariatePolynomial};
+
+let vars = ["x", "y", "z"];
+let system = vec![MultivariatePolynomial::<3, Zp13>::parse("x*z - y^2", vars).unwrap()];
+let options = F4Options { max_pairs_per_batch: Some(16), ..F4Options::default() };
+
+let (basis, statistics) =
+    f4_with_options(&system, MonomialOrder::GradedReverseLexicographic, &options).unwrap();
+println!("{} batches, largest matrix {} x {}",
+    statistics.batches, statistics.max_matrix_rows, statistics.max_matrix_columns);
+```
+
+`max_pairs_per_batch: Some(1)` reduces one S-polynomial per matrix, which is useful for isolating
+the effect of batching; the answer does not change, only the number and shape of the matrices.
+
+`grobner::solve` still uses `buchberger`. The sparse linear algebra F4 is built on is reusable on
+its own, as `linalg::sparse`.
 
 Field elements reject non-canonical representatives on deserialization. Every value this crate
 serializes round-trips unchanged, but bytes encoding an integer outside `[0, P)` are an error
