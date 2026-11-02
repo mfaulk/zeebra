@@ -72,6 +72,13 @@ pub struct F4Statistics {
     /// The largest number of nonzero entries live in any elimination.
     pub max_live_nonzeros: usize,
 
+    /// Nonzero entries in the matrix that reached `max_live_nonzeros`, as it was built.
+    ///
+    /// The denominator for the worst fill-in observed. Carried separately because the batch with
+    /// the densest input is not necessarily the one whose elimination filled in the most, so
+    /// dividing by a total or by another batch's count would not measure anything.
+    pub max_live_nonzeros_as_built: usize,
+
     /// Summed over every batch: nonzero entries in the matrices as built.
     pub total_initial_nonzeros: usize,
 
@@ -104,7 +111,10 @@ impl F4Statistics {
         self.max_pairs_per_batch = self.max_pairs_per_batch.max(batch.pairs);
         self.max_matrix_rows = self.max_matrix_rows.max(batch.rows);
         self.max_matrix_columns = self.max_matrix_columns.max(batch.columns);
-        self.max_live_nonzeros = self.max_live_nonzeros.max(batch.elimination.peak_nonzeros);
+        if batch.elimination.peak_nonzeros > self.max_live_nonzeros {
+            self.max_live_nonzeros = batch.elimination.peak_nonzeros;
+            self.max_live_nonzeros_as_built = batch.elimination.initial_nonzeros;
+        }
         self.total_initial_nonzeros += batch.elimination.initial_nonzeros;
         self.total_final_nonzeros += batch.elimination.final_nonzeros;
         self.row_operations += batch.elimination.row_operations;
@@ -113,6 +123,19 @@ impl F4Statistics {
         self.reducer_rows += batch.reducer_rows;
         if batch.candidates == 0 {
             self.empty_batches += 1;
+        }
+    }
+
+    /// The worst fill-in observed: the peak live entries over the entries that matrix was built
+    /// with.
+    ///
+    /// One when no matrix was built. Above one means elimination made a matrix denser than it
+    /// started, which is the cost a sparse representation pays and the reason the peak is budgeted.
+    pub fn worst_fill_in(&self) -> f64 {
+        if self.max_live_nonzeros_as_built == 0 {
+            1.0
+        } else {
+            self.max_live_nonzeros as f64 / self.max_live_nonzeros_as_built as f64
         }
     }
 
@@ -180,6 +203,10 @@ mod tests {
             "the maximum, not the last"
         );
         assert_eq!(statistics.max_live_nonzeros, 25);
+        assert_eq!(
+            statistics.max_live_nonzeros_as_built, 20,
+            "the denominator comes from the batch that peaked, not the other one"
+        );
         assert_eq!(statistics.total_initial_nonzeros, 29);
         assert_eq!(statistics.total_final_nonzeros, 25);
         assert_eq!(statistics.row_operations, 9);
@@ -190,6 +217,34 @@ mod tests {
             statistics.empty_batches, 1,
             "the second batch produced none"
         );
+    }
+
+    /// Fill-in is one before any matrix is built, and the peak over the as-built count after.
+    #[test]
+    fn test_worst_fill_in() {
+        let mut statistics = F4Statistics::default();
+        assert_eq!(statistics.worst_fill_in(), 1.0);
+
+        statistics.record(&BatchStatistics {
+            elimination: EliminationStatistics {
+                initial_nonzeros: 10,
+                peak_nonzeros: 25,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        assert_eq!(statistics.worst_fill_in(), 2.5);
+
+        // A later batch with a lower peak does not move it, even if it is denser to begin with.
+        statistics.record(&BatchStatistics {
+            elimination: EliminationStatistics {
+                initial_nonzeros: 20,
+                peak_nonzeros: 22,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        assert_eq!(statistics.worst_fill_in(), 2.5);
     }
 
     /// The reducer fraction is zero before any matrix is built, and a proportion after.

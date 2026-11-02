@@ -29,6 +29,25 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
+  slow-tests:
+    name: Slow tests (release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The `#[ignore]`d tests that are real but slow, named individually: a bare `--ignored`
+      # would also pick up the four `unimplemented!()` placeholders, which panic by design.
+      # Release mode is required — the naive reference engine is impractical in a debug build.
+      - name: Gröbner engines agree on the slow systems
+        run: |
+          cargo test --release --lib -- --ignored --exact \
+            grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems \
+            grobner::f4::tests::test_f4_on_larger_systems
+
   format:
     name: Format
     runs-on: ubuntu-latest
