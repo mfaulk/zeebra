@@ -4,24 +4,17 @@
 //! basis elements on each pass. When a reduction yields a new basis element, only the pairs
 //! involving that element are enqueued; everything already handled stays handled.
 //!
-//! Pairs are selected in order of the total degree of their lcm — the normal strategy — which
-//! keeps the intermediate polynomials as small as possible for as long as possible. Ties are
-//! broken by the lcm and then by the pair's indices, so the whole computation is deterministic.
-//!
-//! Buchberger's first criterion eliminates a pair outright when the two leading monomials are
-//! relatively prime, because its S-polynomial is then guaranteed to reduce to zero. Skipping it
-//! avoids the reduction entirely.
+//! Pair selection and the product criterion live in [`super::pairs`], which F4 shares.
 //!
 //! [`super::reference::buchberger_reference`] keeps the textbook formulation for comparison, and
 //! the two are checked against each other over the benchmark families and all three orders.
 //!
 //! See Sec 2.7 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea.
 
-use std::{cmp::Reverse, collections::BinaryHeap};
-
 use crate::{
-    grobner::s_polynomial::s_polynomial, poly::MonomialOrder, FiniteField, Monomial,
-    MultivariatePolynomial,
+    grobner::{pairs::PairQueue, s_polynomial::s_polynomial},
+    poly::MonomialOrder,
+    FiniteField, MultivariatePolynomial,
 };
 
 /// Counters describing the work a Gröbner basis computation performed.
@@ -50,20 +43,6 @@ pub struct Statistics {
 
     /// The largest number of terms in any polynomial produced by a reduction.
     pub max_terms: usize,
-}
-
-/// A critical pair, keyed for selection.
-///
-/// Ordered by the total degree of the lcm first, which is the normal selection strategy, then by
-/// the lcm and the indices so that the order is total and the computation reproducible. The lcm
-/// comparison uses `Monomial`'s derived ordering rather than the monomial order under
-/// computation: it only has to be deterministic, not meaningful.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct PairKey<const N: usize> {
-    degree: u64,
-    lcm: Monomial<N>,
-    left: usize,
-    right: usize,
 }
 
 /// The reduced Gröbner basis for the given polynomials, with respect to the given monomial order.
@@ -102,34 +81,23 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
         return (Vec::new(), statistics);
     }
 
-    // Every pair of the initial generators. `Reverse` turns the max-heap into a min-heap, so the
-    // lowest-degree pair is selected first.
-    let mut pending: BinaryHeap<Reverse<PairKey<N>>> = BinaryHeap::new();
-    for left in 0..basis.len() {
-        for right in (left + 1)..basis.len() {
-            pending.push(Reverse(pair_key(&basis, left, right, order)));
-        }
-    }
+    let mut pending = PairQueue::seeded(&basis, order);
 
-    while let Some(Reverse(pair)) = pending.pop() {
+    while let Some(pair) = pending.pop() {
         statistics.pairs_considered += 1;
         statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
-
-        let left = &basis[pair.left];
-        let right = &basis[pair.right];
 
         // Buchberger's first criterion. If the leading monomials share no variable, their lcm is
         // their product and S(left, right) is guaranteed to reduce to zero modulo the two of
         // them, so the reduction can be skipped without affecting the result.
-        if are_relatively_prime(
-            &left.leading_monomial(order),
-            &right.leading_monomial(order),
-        ) {
+        if pair.is_eliminated_by_product_criterion(&basis, order) {
             statistics.pairs_eliminated_by_product_criterion += 1;
             continue;
         }
 
         statistics.pairs_reduced += 1;
+        let left = &basis[pair.left];
+        let right = &basis[pair.right];
         let remainder = s_polynomial(left, right, order).normal_form(&basis, order);
 
         if remainder.is_zero() {
@@ -147,39 +115,10 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
 
         // Only the pairs involving the new element are new. This is what makes the processing
         // incremental: the textbook formulation rebuilds every pair on every pass.
-        for existing in 0..added {
-            pending.push(Reverse(pair_key(&basis, existing, added, order)));
-        }
+        pending.push_pairs_with(&basis, added, order);
     }
 
     (reduce_grobner_basis(&basis, order), statistics)
-}
-
-/// The selection key for the pair of basis elements at `left` and `right`.
-fn pair_key<const N: usize, F: FiniteField>(
-    basis: &[MultivariatePolynomial<N, F>],
-    left: usize,
-    right: usize,
-    order: MonomialOrder,
-) -> PairKey<N> {
-    let lcm = Monomial::lcm(
-        &basis[left].leading_monomial(order),
-        &basis[right].leading_monomial(order),
-    );
-    PairKey {
-        degree: lcm.degree(),
-        lcm,
-        left,
-        right,
-    }
-}
-
-/// True if two monomials share no variable, i.e. their lcm is their product.
-fn are_relatively_prime<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
-    a.exponents()
-        .iter()
-        .zip(b.exponents().iter())
-        .all(|(x, y)| *x == 0 || *y == 0)
 }
 
 /// Finds a minimal Grobner basis.
