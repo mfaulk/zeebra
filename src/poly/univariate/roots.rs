@@ -1,0 +1,319 @@
+//! Finding the roots of a univariate polynomial in a finite field.
+//!
+//! Every element of GF(q) satisfies a^q = a, so
+//!
+//! ```text
+//! x^q - x = product over a in GF(q) of (x - a)
+//! ```
+//!
+//! and `gcd(f, x^q - x)` is therefore exactly the product of `(x - a)` over the *distinct* roots
+//! of f that lie in GF(q). One gcd both discards the irreducible factors of higher degree, whose
+//! roots live only in an extension, and collapses multiplicities. What remains is a squarefree
+//! product of linear factors, which equal-degree splitting breaks apart.
+//!
+//! Splitting is randomized, as there is no known efficient deterministic method. Each attempt
+//! succeeds with probability of roughly one half, independently, so the expected number of
+//! attempts is a small constant.
+//!
+//! # References
+//! * A Computational Introduction to Number Theory and Algebra, 20.2 and 21.3
+//! * Handbook of Applied Cryptography, 3.4
+
+use rand::{CryptoRng, RngCore};
+
+use crate::{
+    poly::univariate::{gcd, pow_mod, Polynomial, UnivariatePolynomial},
+    FiniteField,
+};
+
+/// Splitting is expected to succeed within a couple of attempts, so exhausting this many means
+/// something is wrong rather than merely unlucky. Guards against looping forever on a defect.
+const MAX_SPLIT_ATTEMPTS: usize = 1000;
+
+/// The distinct roots of `f` in F, in unspecified order.
+///
+/// A root of multiplicity greater than one is reported once. Roots lying only in an extension of
+/// F are not reported, since they are not elements of F.
+///
+/// # Panics
+/// Panics if `f` is the zero polynomial, every element of which is a root.
+pub fn roots<F: FiniteField, R: RngCore + CryptoRng>(
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
+) -> Vec<F> {
+    assert!(
+        !f.is_zero(),
+        "every element is a root of the zero polynomial"
+    );
+
+    // A nonzero constant has no roots.
+    if f.degree() == 0 {
+        return Vec::new();
+    }
+
+    // gcd(f, x^q - x) keeps exactly the distinct roots of f that lie in F. `x^q` is reduced
+    // modulo f as it is built, since materializing it would need q coefficients.
+    let x = UnivariatePolynomial::new(&[F::zero(), F::one()]);
+    let x_to_the_q = pow_mod(&x, F::order(), f);
+    let linear_part = gcd(f, &(&x_to_the_q - &x));
+
+    // A constant gcd means f shares no linear factor with x^q - x, i.e. has no root in F.
+    if linear_part.is_zero() || linear_part.degree() == 0 {
+        return Vec::new();
+    }
+
+    // Break the squarefree product of linear factors apart.
+    let mut roots = Vec::new();
+    let mut pending = vec![linear_part];
+    while let Some(factor) = pending.pop() {
+        if factor.degree() == 1 {
+            // c_1 x + c_0 vanishes at -c_0 / c_1.
+            let coefficients = factor.coefficients();
+            roots.push(F::zero() - coefficients[0] / coefficients[1]);
+            continue;
+        }
+        let (left, right) = split(&factor, rng);
+        pending.push(left);
+        pending.push(right);
+    }
+    roots
+}
+
+/// Split a squarefree product of two or more distinct linear factors into two proper factors.
+fn split<F: FiniteField, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    rng: &mut R,
+) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
+    debug_assert!(g.degree() > 1);
+
+    for _ in 0..MAX_SPLIT_ATTEMPTS {
+        let h = random_element_of_quotient(g, rng);
+
+        // For each root a of g, the candidate vanishes at a depending on h(a). Which roots that
+        // selects is effectively a coin flip per root, so the gcd is a proper factor unless the
+        // flips all agree.
+        let candidate = if F::characteristic() == 2 {
+            trace(&h, g)
+        } else {
+            // The nonzero squares of F are exactly the elements y with y^((q-1)/2) = 1, so this
+            // vanishes at the roots where h takes a square value.
+            &pow_mod(&h, (F::order() - 1) / 2, g) - &UnivariatePolynomial::one()
+        };
+
+        // Correctness rests on this check, not on the candidate: any proper divisor of g is a
+        // valid split. The candidate only governs how often an attempt succeeds, so an error in
+        // the trace or the exponent would cost attempts rather than give a wrong answer.
+        let divisor = gcd(g, &candidate);
+        if !divisor.is_zero() && divisor.degree() > 0 && divisor.degree() < g.degree() {
+            let quotient = g.div(&divisor).0;
+            return (divisor, quotient);
+        }
+    }
+
+    panic!(
+        "failed to split {} in {} attempts; it may not be a squarefree product of linear factors",
+        g, MAX_SPLIT_ATTEMPTS
+    );
+}
+
+/// The absolute trace of `h` in F[x]/(g), for a field of characteristic two.
+///
+/// `(q-1)/2` is not available in characteristic two, so the role of "half the elements" is played
+/// by the trace map to GF(2), which is `y + y^2 + y^4 + ... + y^(2^(m-1))` for q = 2^m.
+pub(crate) fn trace<F: FiniteField>(
+    h: &UnivariatePolynomial<F>,
+    g: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    // q = 2^m, so m is the position of its single set bit.
+    let m = F::order().trailing_zeros();
+    let mut term = h.div(g).1;
+    let mut sum = term.clone();
+    for _ in 1..m {
+        term = pow_mod(&term, 2, g);
+        sum = &sum + &term;
+    }
+    sum.div(g).1
+}
+
+/// A uniformly random element of F[x]/(g), i.e. a polynomial of degree below `g`.
+fn random_element_of_quotient<F: FiniteField, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    rng: &mut R,
+) -> UnivariatePolynomial<F> {
+    let coefficients: Vec<F> = (0..g.degree()).map(|_| F::random(rng)).collect();
+    UnivariatePolynomial::new(&coefficients)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use rand::{prelude::StdRng, SeedableRng};
+
+    use crate::{
+        fields::PrimeFieldElement64,
+        identities::{One, Zero},
+        poly::univariate::{roots::roots, Polynomial, UnivariatePolynomial},
+        FiniteField,
+    };
+
+    /// Every element of F at which `f` vanishes, found by trying all of them.
+    ///
+    /// Shares no code with `roots`: no gcd, no modular exponentiation, no splitting.
+    fn by_evaluation<const P: u64>(
+        f: &UnivariatePolynomial<PrimeFieldElement64<P>>,
+    ) -> HashSet<PrimeFieldElement64<P>> {
+        (0..P)
+            .map(PrimeFieldElement64::<P>::new)
+            .filter(|a| f.eval(a).is_zero())
+            .collect()
+    }
+
+    fn poly<const P: u64>(coefficients: &[u64]) -> UnivariatePolynomial<PrimeFieldElement64<P>> {
+        UnivariatePolynomial::new(
+            &coefficients
+                .iter()
+                .map(|c| PrimeFieldElement64::<P>::new(*c))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// `roots` agrees with evaluating at every element of the field.
+    #[test]
+    fn test_roots_agree_with_evaluation() {
+        fn check<const P: u64>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            // Coefficients are low-order first.
+            let polynomials: Vec<Vec<u64>> = vec![
+                vec![1, 1],           // x + 1
+                vec![0, 1],           // x
+                vec![P - 1, 0, 1],    // x^2 - 1, two roots
+                vec![1, 0, 1],        // x^2 + 1, roots only when -1 is a square
+                vec![0, 0, 1],        // x^2, a repeated root
+                vec![0, 0, 0, 1],     // x^3
+                vec![P - 1, 0, 0, 1], // x^3 - 1
+                vec![2, 3, 1],        // a generic quadratic
+                vec![1, 2, 3, 4],     // a generic cubic
+                vec![1],              // a nonzero constant, no roots (5 would vanish in GF(5))
+                vec![1, 1, 1, 1, 1],  // a generic quartic
+            ];
+
+            for coefficients in &polynomials {
+                let f = poly::<P>(coefficients);
+                let expected = by_evaluation::<P>(&f);
+                let found: HashSet<_> = roots(&f, &mut rng).into_iter().collect();
+                assert_eq!(
+                    found, expected,
+                    "coefficients {:?} over GF({})",
+                    coefficients, P
+                );
+
+                // Each reported root must genuinely be one, and each must appear once.
+                let as_vec = roots(&f, &mut rng);
+                assert_eq!(as_vec.len(), found.len(), "duplicate roots reported");
+                for a in &as_vec {
+                    assert!(f.eval(a).is_zero(), "{} is not a root of {}", a, f);
+                }
+            }
+        }
+
+        // GF(2) exercises the characteristic-two splitter; the rest exercise the odd-q one.
+        check::<2>(1);
+        check::<3>(2);
+        check::<5>(3);
+        check::<7>(4);
+        check::<13>(5);
+        check::<31>(6);
+    }
+
+    /// x^q - x splits completely, so every element of the field is a root.
+    #[test]
+    fn test_roots_of_x_to_the_q_minus_x() {
+        const P: u64 = 11;
+        let mut rng = StdRng::seed_from_u64(7);
+        // x^11 - x
+        let mut coefficients = vec![0u64; 12];
+        coefficients[11] = 1;
+        coefficients[1] = P - 1;
+        let f = poly::<P>(&coefficients);
+
+        let found: HashSet<_> = roots(&f, &mut rng).into_iter().collect();
+        assert_eq!(found.len(), P as usize);
+        assert_eq!(found, by_evaluation::<P>(&f));
+    }
+
+    /// The product of (x - a) over the reported roots divides f.
+    #[test]
+    fn test_root_factors_divide_the_polynomial() {
+        const P: u64 = 13;
+        let mut rng = StdRng::seed_from_u64(11);
+        let polynomials: Vec<Vec<u64>> = vec![
+            vec![P - 1, 0, 1],
+            vec![0, 0, 1],
+            vec![1, 2, 3, 4],
+            vec![P - 1, 0, 0, 1],
+            vec![1, 1, 1, 1, 1],
+        ];
+
+        for coefficients in &polynomials {
+            let f = poly::<P>(coefficients);
+            let product = roots(&f, &mut rng).into_iter().fold(
+                UnivariatePolynomial::<PrimeFieldElement64<P>>::one(),
+                |acc, a| {
+                    let linear = UnivariatePolynomial::new(&[
+                        PrimeFieldElement64::<P>::zero() - a,
+                        PrimeFieldElement64::<P>::one(),
+                    ]);
+                    acc * linear
+                },
+            );
+            assert!(
+                f.div(&product).1.is_zero(),
+                "{} does not divide {}",
+                product,
+                f
+            );
+        }
+    }
+
+    /// A polynomial irreducible over F has no roots in F, though it has them in an extension.
+    #[test]
+    fn test_no_roots_for_an_irreducible_polynomial() {
+        const P: u64 = 7;
+        let mut rng = StdRng::seed_from_u64(13);
+        // x^2 + 1 over GF(7): the squares are {1, 2, 4}, so -1 = 6 is not among them.
+        let f = poly::<P>(&[1, 0, 1]);
+        for a in 0..P {
+            assert!(!f.eval(&PrimeFieldElement64::<P>::new(a)).is_zero());
+        }
+        assert!(roots(&f, &mut rng).is_empty());
+    }
+
+    /// A repeated root is reported exactly once.
+    #[test]
+    fn test_repeated_roots_are_reported_once() {
+        const P: u64 = 13;
+        let mut rng = StdRng::seed_from_u64(17);
+        // (x - 3)^4
+        let three = PrimeFieldElement64::<P>::new(3);
+        let linear = UnivariatePolynomial::new(&[
+            PrimeFieldElement64::<P>::zero() - three,
+            PrimeFieldElement64::<P>::one(),
+        ]);
+        let f = linear.pow(4);
+
+        let found = roots(&f, &mut rng);
+        assert_eq!(found, vec![three]);
+    }
+
+    /// The zero polynomial has no meaningful root set.
+    #[test]
+    #[should_panic(expected = "every element is a root of the zero polynomial")]
+    fn test_roots_of_zero_panics() {
+        let mut rng = StdRng::seed_from_u64(19);
+        let _ = roots(
+            &UnivariatePolynomial::<PrimeFieldElement64<7>>::zero(),
+            &mut rng,
+        );
+    }
+}
