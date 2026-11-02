@@ -15,6 +15,17 @@ use crate::{
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
+/// Why a Macaulay matrix was not built.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BuildBudgetExceeded {
+    /// The batch's rows held more distinct monomials than the column budget allowed.
+    Columns { limit: usize },
+
+    /// The rows held more entries than the entry budget allowed. `nonzeros` is the count when the
+    /// limit was crossed, so the overshoot is bounded by one row.
+    Nonzeros { nonzeros: usize, limit: usize },
+}
+
 /// A sparse matrix whose columns are labelled by monomials and whose rows carry their provenance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MacaulayMatrix<const N: usize, F: FiniteField> {
@@ -35,6 +46,27 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         preprocessed: &Preprocessed<N>,
         order: MonomialOrder,
     ) -> Self {
+        Self::build_within(basis, preprocessed, order, usize::MAX, usize::MAX)
+            .expect("an unbounded construction cannot exceed its budget")
+    }
+
+    /// As [`MacaulayMatrix::build`], abandoned if the matrix would exceed either budget.
+    ///
+    /// Both budgets are checked *while* the matrix is assembled, not after. Column collection
+    /// stops as soon as too many distinct monomials have been seen, and entry counting stops as
+    /// soon as too many entries have been written, so neither the monomial set nor the rows are
+    /// fully materialized before the limit is noticed. The point of a budget is to refuse the
+    /// allocation, which a check afterwards cannot do.
+    ///
+    /// Neither error says how large the matrix would have been: establishing that is the work
+    /// being refused.
+    pub fn build_within(
+        basis: &MonicBasis<N, F>,
+        preprocessed: &Preprocessed<N>,
+        order: MonomialOrder,
+        max_columns: usize,
+        max_nonzeros: usize,
+    ) -> Result<Self, BuildBudgetExceeded> {
         // The distinct monomials of every row, descending.
         let mut columns: Vec<Monomial<N>> = {
             let mut distinct: HashSet<Monomial<N>> = HashSet::new();
@@ -42,6 +74,9 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
             for row in &preprocessed.rows {
                 for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
                     if distinct.insert(monomial) {
+                        if seen.len() == max_columns {
+                            return Err(BuildBudgetExceeded::Columns { limit: max_columns });
+                        }
                         seen.push(monomial);
                     }
                 }
@@ -56,10 +91,20 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
             .map(|(index, monomial)| (*monomial, index))
             .collect();
 
-        let sparse_rows: Vec<SparseRow<F>> = preprocessed
-            .rows
-            .iter()
-            .map(|row| {
+        // Entries written so far, so a matrix that is small in each dimension but dense cannot
+        // slip past the row and column budgets.
+        let mut nonzeros = 0usize;
+        let mut sparse_rows: Vec<SparseRow<F>> = Vec::with_capacity(preprocessed.rows.len());
+        for row in &preprocessed.rows {
+            let terms = basis.element(row.basis_index).terms.len();
+            nonzeros += terms;
+            if nonzeros > max_nonzeros {
+                return Err(BuildBudgetExceeded::Nonzeros {
+                    nonzeros,
+                    limit: max_nonzeros,
+                });
+            }
+            sparse_rows.push({
                 // A row's terms arrive descending by the order and the columns are descending too,
                 // so the column indices come out increasing — exactly the order a sparse row
                 // stores them in, with no sorting needed. The monomials of a polynomial are
@@ -76,14 +121,14 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
                     })
                     .collect();
                 SparseRow::from_sorted_unchecked(entries)
-            })
-            .collect();
+            });
+        }
 
-        Self {
+        Ok(Self {
             matrix: SparseMatrix::new(columns.len(), sparse_rows),
             columns,
             rows: preprocessed.rows.clone(),
-        }
+        })
     }
 
     /// The monomial labelling each column, descending under the order.
@@ -136,7 +181,7 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
 
 #[cfg(test)]
 mod tests {
-    use super::MacaulayMatrix;
+    use super::{BuildBudgetExceeded, MacaulayMatrix};
     use crate::{
         fields::Zp13,
         grobner::{
@@ -387,6 +432,79 @@ mod tests {
                     "{}",
                     order.name()
                 );
+            }
+        }
+    }
+
+    /// The column and entry budgets are exact at their boundaries, and stop mid-construction.
+    ///
+    /// Succeeding at exactly what the matrix needs and failing one below it is what shows the
+    /// checks happen while the monomial set and the rows are being assembled. A check afterwards
+    /// would have to materialize the whole matrix to discover it was not allowed, which is the
+    /// allocation the budget exists to refuse.
+    #[test]
+    fn test_build_budgets_are_exact() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let mut pairs = Vec::new();
+            for left in 0..polynomials.len() {
+                for right in (left + 1)..polynomials.len() {
+                    pairs.push(CriticalPair::new(&polynomials, left, right, order));
+                }
+            }
+            let preprocessed = symbolic_preprocessing(&basis, &pairs);
+            let full = MacaulayMatrix::build(&basis, &preprocessed, order);
+            let (columns, nonzeros) = (full.num_columns(), full.nonzeros());
+
+            assert_eq!(
+                MacaulayMatrix::build_within(&basis, &preprocessed, order, columns, nonzeros)
+                    .expect("budgets of exactly what is needed suffice"),
+                full,
+                "{}",
+                order.name()
+            );
+            assert_eq!(
+                MacaulayMatrix::build_within(&basis, &preprocessed, order, columns - 1, nonzeros),
+                Err(BuildBudgetExceeded::Columns { limit: columns - 1 }),
+                "{}",
+                order.name()
+            );
+
+            // The entry budget reports the count that crossed it, which overshoots by at most the
+            // entries of a single row.
+            match MacaulayMatrix::<3, F>::build_within(
+                &basis,
+                &preprocessed,
+                order,
+                columns,
+                nonzeros - 1,
+            ) {
+                Err(BuildBudgetExceeded::Nonzeros {
+                    nonzeros: hit,
+                    limit,
+                }) => {
+                    assert_eq!(limit, nonzeros - 1, "{}", order.name());
+                    assert!(
+                        hit > limit,
+                        "{}: {} should exceed {}",
+                        order.name(),
+                        hit,
+                        limit
+                    );
+                    assert!(
+                        hit <= nonzeros,
+                        "{}: {} overshot the matrix total {}",
+                        order.name(),
+                        hit,
+                        nonzeros
+                    );
+                }
+                other => panic!(
+                    "{}: expected an entry-budget error, got {:?}",
+                    order.name(),
+                    other
+                ),
             }
         }
     }

@@ -60,12 +60,32 @@ pub struct EliminationStatistics {
 /// Entries above a pivot are left alone. [`reduced_row_echelon`] removes them, at the cost of a
 /// second pass that F4's candidate extraction has no use for.
 pub fn row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> EliminationStatistics {
+    row_echelon_within(matrix, usize::MAX)
+        .expect("an unbounded elimination cannot exceed its budget")
+}
+
+/// As [`row_echelon`], but abandoned if more than `max_nonzeros` entries are ever live at once.
+///
+/// Elimination can make a matrix far denser than the one it was handed, and how much denser is not
+/// predictable from the input. A budget turns running out of memory into a return value: the
+/// `Err` carries the count that crossed the limit, and `matrix` is left partially reduced and
+/// should not be read.
+///
+/// The budget is checked after every row operation, so the overshoot is bounded by one row rather
+/// than by the whole matrix.
+pub fn row_echelon_within<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    max_nonzeros: usize,
+) -> Result<EliminationStatistics, usize> {
     let initial_nonzeros = matrix.nonzeros();
     let mut statistics = EliminationStatistics {
         initial_nonzeros,
         peak_nonzeros: initial_nonzeros,
         ..Default::default()
     };
+    if initial_nonzeros > max_nonzeros {
+        return Err(initial_nonzeros);
+    }
 
     // Nonzero entries held by the rows left in the matrix. The row being worked on is taken out of
     // the matrix, so its own entries are added back in when the peak is sampled.
@@ -93,8 +113,11 @@ pub fn row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> EliminationS
                     let pivot: &SparseRow<F> = matrix.row(pivot_index);
                     row.subtract_scaled(pivot, &factor, &mut scratch);
                     statistics.row_operations += 1;
-                    statistics.peak_nonzeros =
-                        statistics.peak_nonzeros.max(resident + row.nonzeros());
+                    let live = resident + row.nonzeros();
+                    statistics.peak_nonzeros = statistics.peak_nonzeros.max(live);
+                    if live > max_nonzeros {
+                        return Err(live);
+                    }
                 }
                 None => {
                     if row.normalize() {
@@ -119,7 +142,7 @@ pub fn row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> EliminationS
     debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
     debug_assert_eq!(statistics.rank, matrix.nonzero_rows());
     debug_assert_eq!(statistics.rank + statistics.zero_rows, matrix.num_rows());
-    statistics
+    Ok(statistics)
 }
 
 /// Reduce `matrix` to reduced row echelon form in place, and report the work done.
@@ -170,7 +193,7 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
 
 #[cfg(test)]
 mod tests {
-    use super::{reduced_row_echelon, row_echelon, EliminationStatistics};
+    use super::{reduced_row_echelon, row_echelon, row_echelon_within, EliminationStatistics};
     use crate::{
         fields::{Zp13, Zp2147483647, Zp541, Zp7},
         linalg::{gauss_jordan_elimination, sparse::SparseMatrix, sparse::SparseRow, Matrix},
@@ -615,6 +638,58 @@ mod tests {
             assert_eq!(again, first);
             assert_eq!(statistics, first_statistics);
         }
+    }
+
+    /// A budget large enough to cover the peak behaves exactly as the unbounded elimination.
+    #[test]
+    fn test_budget_that_is_never_reached() {
+        let mut bounded = matrix_of(
+            &[
+                &[(0, 1), (1, 2), (2, 3)],
+                &[(0, 4), (1, 5), (2, 6)],
+                &[(0, 7), (1, 8), (2, 9)],
+            ],
+            3,
+        );
+        let mut unbounded = bounded.clone();
+
+        let statistics = row_echelon_within(&mut bounded, 1000).expect("budget not reached");
+        assert_eq!(statistics, row_echelon(&mut unbounded));
+        assert_eq!(bounded, unbounded);
+    }
+
+    /// A budget below the peak abandons the elimination and reports the count that crossed it.
+    #[test]
+    fn test_budget_that_is_exceeded() {
+        // The fill-in matrix: a dense first row makes each two-entry row fourteen entries.
+        let width = 16;
+        let mut rows: Vec<SparseRow<F>> = vec![SparseRow::new(
+            &(0..width).map(|c| (c, F::ONE)).collect::<Vec<_>>(),
+        )];
+        rows.extend((1..width).map(|i| SparseRow::new(&[(0, F::ONE), (i, F::ONE)])));
+        let matrix = SparseMatrix::new(width, rows);
+
+        let unbounded = row_echelon(&mut matrix.clone());
+        assert!(unbounded.peak_nonzeros > matrix.nonzeros());
+
+        // A budget just under the peak must stop, and report at least the budget.
+        let mut bounded = matrix.clone();
+        let observed = row_echelon_within(&mut bounded, unbounded.peak_nonzeros - 1)
+            .expect_err("the budget should have been exceeded");
+        assert!(
+            observed > unbounded.peak_nonzeros - 1,
+            "reported {} for a budget of {}",
+            observed,
+            unbounded.peak_nonzeros - 1
+        );
+
+        // A budget below even the input is rejected before any work is done.
+        let mut tiny = matrix.clone();
+        assert_eq!(
+            row_echelon_within(&mut tiny, matrix.nonzeros() - 1),
+            Err(matrix.nonzeros())
+        );
+        assert_eq!(tiny, matrix, "no work should have been done");
     }
 
     /// Rank is computed over the field in question, not over the integers.
