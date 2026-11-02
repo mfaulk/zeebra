@@ -482,15 +482,20 @@ Instances Buchberger does not finish here, from the `grobner_f4_only` group:
 
 | system | order | F4 | Buchberger |
 |---|---|---|---|
-| katsura-6 | lex | **3.19 s** | did not finish; see below |
+| katsura-6 | lex | **3.19 s** | did not finish in 1800 s |
 | katsura-7 | grlex | **554 ms** | not attempted |
 | katsura-7 | grevlex | **898 ms** | not attempted |
 
 katsura-6 under lex is the clearest single result in the milestone: **F4 computes it in 3.19 s
-where Buchberger did not finish in 575 s**, which is a lower bound of 180x and almost certainly a
-large underestimate. katsura-7 is not reachable by Buchberger here at all. These are
-`grobner_f4_only` rather than paired benchmarks precisely because putting Buchberger in them would
-hang the suite, and leaving them out would understate the milestone.
+where Buchberger did not finish in 1800 s**, measured by running `buchberger` on that one instance
+under a thirty-minute budget, which it exhausted. That is a lower bound of 564x and, since the
+computation was still running when it was killed, an underestimate by an unknown margin. katsura-7
+is not reachable by Buchberger here at all.
+
+These are `grobner_f4_only` rather than paired benchmarks precisely because putting Buchberger in
+them would hang the suite, and leaving them out would understate the milestone. The bound is
+stated as a bound rather than converted into a speedup figure that implies a measurement nobody
+made.
 
 **The desired outcome was achieved, and the shape of it is specific.** F4 wins decisively where
 Buchberger wastes the most work — 13.0x on katsura-5 under lex, 4.0x on random-4 under lex, 3.0x
