@@ -3,6 +3,7 @@
 mod crout;
 mod gauss_jordan;
 mod matrix;
+pub mod sparse;
 mod vector;
 mod vector_indexing;
 mod vector_ops;

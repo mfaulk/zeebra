@@ -43,5 +43,9 @@ name = "linear_algebra"
 harness = false
 
 [[bench]]
+name = "sparse_linear_algebra"
+harness = false
+
+[[bench]]
 name = "grobner"
 harness = false
