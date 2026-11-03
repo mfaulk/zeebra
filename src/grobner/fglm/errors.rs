@@ -17,6 +17,12 @@ pub enum FglmError {
     /// this case too, for a ring with at least one variable.
     PositiveDimensional,
 
+    /// The multiplication operators needed more stored entries than the limit allowed.
+    ///
+    /// Carries the count as well as the limit, which is informative here: the budget is tested
+    /// after each column is built, so the overshoot is bounded by a single column.
+    OperatorStorageExceeded { entries: usize, limit: usize },
+
     /// More standard monomials than the limit allowed.
     ///
     /// Carries only the limit. Enumeration stops at the first crossing, so any count it could
@@ -30,6 +36,11 @@ impl Display for FglmError {
             Self::PositiveDimensional => write!(
                 f,
                 "the ideal is positive-dimensional, so its quotient algebra is infinite"
+            ),
+            Self::OperatorStorageExceeded { entries, limit } => write!(
+                f,
+                "the multiplication operators needed {} entries, over the limit of {}",
+                entries, limit
             ),
             Self::QuotientDimensionExceeded { limit } => write!(
                 f,

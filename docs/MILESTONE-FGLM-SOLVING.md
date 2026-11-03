@@ -1,7 +1,8 @@
 # Milestone: FGLM and Zero-Dimensional Polynomial-System Solving
 
-**Status:** M17-1 complete. M17-0 design approved against the merged M16 code and baseline
-measured; classification and the quotient monomial basis implemented.
+**Status:** M17-2 complete. M17-0 design approved against the merged M16 code and baseline
+measured; classification, the quotient monomial basis, and the quotient algebra with its
+multiplication operators implemented.
 **Prerequisite:** M16 on `main` at `494c16e`, CI green. Satisfied.
 
 This document began as the M17-0 deliverable — the mathematical design, the API contracts, the
@@ -271,6 +272,25 @@ See §2.5. The proposal leaves this open; it is settled.
 not as an error." The intended semantics, which §9 of this document adopts, is: **a
 zero-dimensional system with no base-field solution is `Ok(None)`, never an error**. Resource
 exhaustion is `Err`. The two must be distinguishable, which is the whole point.
+### 3.6 `coordinates` cannot fail, so it returns no `Result`
+
+The design first had `coordinates` return `Result<Vec<F>, FglmError>` with a `NotAGrobnerBasis`
+variant, on the reasoning that a normal-form term outside the standard monomials means the input
+was not a Gröbner basis. The variant is unreachable.
+
+`normal_form` moves a term to the remainder **exactly when** no leading monomial of its divisors
+divides it, and that is the definition of a standard monomial. The divisors are the same basis
+whose leading monomials defined the quotient. So every term of the result is standard, whatever the
+input was — a non-Gröbner input gives wrong *coordinates*, not a term outside `B`.
+
+One condition has to hold for that argument: the two must agree on which divisors exist.
+`normal_form` drops zero divisors, so `QuotientBasis` had to drop zero basis elements too. It did
+not, and the consequence was worse than an unreachable error — the zero polynomial's leading
+monomial is 1, which divides everything, so a basis with a zero element appended reported quotient
+dimension 0 and made a proper ideal look like the unit ideal. Fixed, with a test, in M17-2.
+
+`NotAGrobnerBasis` is still the right error for FGLM to return, but from the place that can
+actually detect it: M17-C's check that the accepted target monomials number exactly `D`.
 
 ---
 
@@ -418,9 +438,10 @@ operator(i, B, G, order):
         column[j] <- coordinates(p, B)
 ```
 
-`coordinates` maps each monomial of the normal form to its index in `B`. **A nonzero term whose
-monomial is not in `B` is an internal inconsistency** — either the input was not a Gröbner basis or
-`B` is not the standard monomial set — and must be an error, never a silently dropped term.
+`coordinates` maps each monomial of the normal form to its index in `B`. A nonzero term whose
+monomial is not in `B` would be an internal inconsistency — but it cannot occur, and §3.6 is why.
+What must never happen is for such a term to be *silently dropped*, so the lookup panics rather
+than skipping.
 
 The common case is that `x_i * B[j]` is itself standard, and then the column is a unit vector and
 no reduction is performed at all. §7.2 exploits that.
@@ -579,14 +600,25 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     /// T_i applied to a coordinate vector.
     pub fn multiply_by_variable(&self, variable: usize, v: &[F]) -> Vec<F>;
 
-    /// The coordinate vector of a polynomial's residue class.
-    pub fn coordinates(&self, p: &MultivariatePolynomial<N, F>) -> Result<Vec<F>, FglmError>;
+    /// The coordinate vector of a polynomial's residue class. Infallible — see §3.6.
+    pub fn coordinates(&self, p: &MultivariatePolynomial<N, F>) -> Vec<F>;
 
     /// The normal form a coordinate vector represents. Inverse of `coordinates`.
     pub fn polynomial(&self, v: &[F]) -> MultivariatePolynomial<N, F>;
 
-    /// T_i as a matrix, for the commutation and vanishing tests. Columns, in basis index order.
+    /// T_i, for the commutation and vanishing tests.
     pub fn operator(&self, variable: usize) -> &MultiplicationOperator<F>;
+
+    /// The source basis, kept so `coordinates` can reduce a polynomial the caller supplies.
+    pub fn source_basis(&self) -> &[MultivariatePolynomial<N, F>];
+}
+
+impl<F: FiniteField> MultiplicationOperator<F> {
+    pub fn dimension(&self) -> usize;
+    pub fn apply(&self, v: &[F]) -> Vec<F>;
+    pub fn column(&self, j: usize) -> Vec<F>;        // the dense matrix view
+    pub fn stored_entries(&self) -> usize;           // what `max_operator_entries` counts
+    pub fn standard_columns(&self) -> usize;         // columns that are unit vectors — see §7.2
 }
 
 // ---- conversion ----------------------------------------------------------- M17-C
@@ -693,22 +725,39 @@ enum Column<F: FiniteField> {
 }
 ```
 
-The split is not a premature optimization, it is the shape of the object: `x_i * b_j` is standard
-for most `(i, j)`, since the staircase is closed downwards and only its outer surface leaves it
-under multiplication. A dense `D x D` matrix per variable would store `N * D^2` field elements
-where the great majority are structurally zero.
+**The split is justified on two of three benchmark families and not on the third**, which was
+worth measuring rather than assuming. `cargo run --release --example fglm_operators`, grevlex:
 
-Storage, at 8 bytes per `PrimeFieldElement64` and 16 bytes per `(usize, F)` entry:
+| system | N | D | columns inside the staircase | stored entries vs `N * D^2` | dense bytes / sparse bytes |
+|---|---|---|---|---|---|
+| katsura-3 | 3 | 4 | 25.0% | 56.25% | **0.89x** |
+| katsura-5 | 5 | 16 | 27.5% | 58.67% | **0.85x** |
+| katsura-7 | 7 | 64 | 27.9% | 56.70% | **0.88x** |
+| cyclic-3 | 3 | 6 | 38.9% | 15.74% | 3.18x |
+| cyclic-5 | 5 | 70 | 42.3% | 8.41% | 5.95x |
+| cyclic-6 | 6 | 156 | 39.7% | 8.80% | 5.68x |
+| planted-4 | 4 | 16 | 37.5% | 5.47% | 9.14x |
+| planted-6 | 6 | 64 | 37.5% | 1.37% | 36.57x |
+| planted-8 | 8 | 256 | 37.5% | 0.34% | **146.29x** |
 
-| D | dense, N = 8 | sparse, N = 8, at 10% fill |
-|---|---|---|
-| 64 | 262 KB | 52 KB |
-| 156 | 1.6 MB | 312 KB |
-| 1,024 | 67 MB | 13 MB |
-| 4,096 | 1.07 GB | 215 MB |
+Two corrections to the reasoning this design was first written with.
 
-So the operators are what sets the ceiling on `D`, not the span of §7.3, and `max_operator_entries`
-counts entries rather than bytes for the same reason `F4Options::max_live_nonzeros` does.
+**A standard product is not the common case.** It is 25% to 42% of columns, never a majority. The
+staircase is closed downwards, but in `N` variables a thin staircase has far more outer surface
+than interior, so most products leave it. The first version of this section asserted "most", and
+the first version of the test asserted it too; the test failed, which is how the figures above came
+to be measured.
+
+**On the katsura family the sparse form costs more memory than a dense matrix.** A stored entry is
+16 bytes — a `usize` index and a 64-bit element — against 8 bytes for a dense cell, so sparsity has
+to beat 50% fill to pay at all, and katsura sits at 56–59%. The table's last column is below 1.00x
+on every katsura instance.
+
+The representation is kept because it is correct, simple, and right on two families out of three by
+up to 146x; **a dense or hybrid column, chosen per operator from the measured fill, is an M17-E
+question and is deliberately not an option yet.** `max_operator_entries` counts entries rather than
+bytes for the same reason `F4Options::max_live_nonzeros` does, and the figures above are what make
+it possible to convert an entry budget into a dimension.
 
 ### 7.3 The incremental span
 
@@ -779,9 +828,9 @@ Proposed defaults, and where each number comes from:
 
 | option | default | reasoning |
 |---|---|---|
-| `max_quotient_dimension` | 4,096 | §7.2: 215 MB of operators at 10% fill with N = 8, 1.07 GB dense. 26x the largest D in the corpus (156). |
-| `max_operator_entries` | 20,000,000 | ≈ 320 MB at 16 bytes, the same figure and the same accounting as `F4Options::max_live_nonzeros`. |
-| `max_span_entries` | 20,000,000 | As above. Reached at `D ≈ 3,160`, so it binds slightly before `max_quotient_dimension` does — deliberately, since the span is allocated before the conversion runs. |
+| `max_quotient_dimension` | 4,096 | 26x the largest `D` in the corpus (cyclic-6's 156). The enumeration itself is cheap at any such `D` — 4,096 monomials of eight `u32`s is 131 KB — so this limit exists to stop a walk that should not have started, and the operator budget is what bounds memory. |
+| `max_operator_entries` | 20,000,000 | ≈ 320 MB at 16 bytes, the same figure and accounting as `F4Options::max_live_nonzeros`. With the measured fills of §7.2 and N = 8 it binds at **`D ≈ 2,100` on a katsura-shaped staircase, `D ≈ 5,300` on a cyclic-shaped one, and `D ≈ 27,000` on a planted one**. So which of the two limits fires first depends on the shape, which is why both exist. |
+| `max_span_entries` | 20,000,000 | As above, `2 * D^2` entries, reached at `D ≈ 3,160`. Checked before the span is allocated rather than as it fills. |
 | `max_branches` | `None` | A zero-dimensional system's search tree is finite. A limit here is for a caller with a latency budget, not for termination. |
 | `max_solutions` | `None` | As above: bounded by D. |
 
@@ -915,9 +964,8 @@ a milestone that only measured the instances FGLM wins would be hiding it. It is
 planted-8, which is the worst available choice.
 
 **katsura-7 is the milestone's central instance.** Its grevlex basis takes 30 ms and its quotient
-algebra has dimension 64, so the operators are 7 columns-sets of at most 64 entries each — tens of
-kilobytes — and the span is a 64-row, 128-column dense block. Everything FGLM needs is trivially
-small. The direct lex route, meanwhile, does not arrive at a hundredfold the default budget and
+algebra has dimension 64, so the seven operators hold 16,257 entries between them — 260 KB — and
+the span is a 64-row, 128-column dense block. Everything FGLM needs is trivially small. The direct lex route, meanwhile, does not arrive at a hundredfold the default budget and
 thirteen minutes. The milestone's case is not that FGLM is faster here but that **the direct route
 does not arrive at all**.
 
@@ -940,8 +988,8 @@ this.
 |---|---|---|---|
 | M17-0 | this document, the corrected `benchmark_systems` doc comment, `examples/fglm_baseline.rs` | design reviewed, baseline reproducible | **merged**, `31b72c9` |
 | M17-1 | `classify_ideal`, `QuotientBasis` | correct classification on §9's cases, bounded enumeration | **done** |
-| M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms | next |
-| M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | |
+| M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms | **done** |
+| M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | next |
 | M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | |
 | M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | |
 

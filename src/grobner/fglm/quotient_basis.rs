@@ -59,12 +59,29 @@ pub fn classify_ideal<const N: usize, F: FiniteField>(
     // The zero ideal needs no case of its own. Both engines return the empty basis for it, and an
     // empty basis has no leading monomial that is a pure power of anything, so the loop below
     // reports it as positive-dimensional — which is right, since R/{0} = R.
-    let leading: Vec<Monomial<N>> = basis.iter().map(|p| p.leading_monomial(order)).collect();
+    let leading = leading_monomials(basis, order);
     if (0..N).all(|i| leading.iter().any(|m| is_pure_power_of(m, i))) {
         IdealClass::ZeroDimensional
     } else {
         IdealClass::PositiveDimensional
     }
+}
+
+/// The leading monomials of the nonzero elements of `basis`.
+///
+/// Zero is excluded because it generates nothing and because `normal_form` excludes it too: a
+/// zero polynomial's leading monomial is 1, which divides every monomial, so counting it would
+/// collapse every quotient to dimension zero while the reduction that defines those coordinates
+/// ignored it. Neither engine returns a zero basis element, but these are public functions.
+fn leading_monomials<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> Vec<Monomial<N>> {
+    basis
+        .iter()
+        .filter(|p| !p.is_zero())
+        .map(|p| p.leading_monomial(order))
+        .collect()
 }
 
 /// Whether `m` is `x_i^d` for some `d > 0`.
@@ -118,7 +135,7 @@ impl<const N: usize> QuotientBasis<N> {
             return Err(FglmError::PositiveDimensional);
         }
 
-        let leading: Vec<Monomial<N>> = basis.iter().map(|p| p.leading_monomial(order)).collect();
+        let leading = leading_monomials(basis, order);
         let mut monomials = enumerate_standard(&leading, max_dimension)?;
 
         // The traversal order is an artifact of the walk. Sorting by the source order makes the
@@ -571,6 +588,32 @@ mod tests {
             let backwards =
                 quotient_basis_of(&["y^3 - 1", "x^2 - y"], ["x", "y"], order).expect("finite");
             assert_eq!(forwards, backwards, "{:?}", order);
+        }
+    }
+
+    /// A zero polynomial in the basis changes nothing.
+    ///
+    /// It generates nothing, and `normal_form` already drops zero divisors — so if the leading
+    /// monomials were taken from it too, the two would disagree about which reducers exist. The
+    /// zero polynomial's leading monomial is 1, which divides every monomial, so including it
+    /// would collapse the quotient to dimension zero and make a proper ideal look like the unit
+    /// ideal.
+    #[test]
+    fn test_a_zero_polynomial_in_the_basis_is_ignored() {
+        for order in ORDERS {
+            let mut basis = basis_of(&["x^2 - y", "y^3 - 1"], ["x", "y"], order);
+            let clean = QuotientBasis::new(&basis, order, usize::MAX).expect("finite");
+
+            basis.push(MultivariatePolynomial::zero());
+            assert_eq!(
+                classify_ideal(&basis, order),
+                IdealClass::ZeroDimensional,
+                "{:?}",
+                order
+            );
+            let padded = QuotientBasis::new(&basis, order, usize::MAX).expect("finite");
+            assert_eq!(padded, clean, "under {:?}", order);
+            assert_eq!(padded.dimension(), 6);
         }
     }
 

@@ -120,6 +120,7 @@ cargo run --release --example f4_milestone         # both engines, at matched an
 cargo run --release --example fglm_baseline        # which systems are zero-dimensional, and what
                                                    # a lex basis costs against a grevlex one
 cargo run --release --example fglm_baseline -- cyclic-6   # one system per process
+cargo run --release --example fglm_operators      # how sparse the multiplication operators are
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -235,9 +236,40 @@ assert_eq!(quotient.dimension(), 4);      // 1, x, y, xy
 
 `D` is the dimension of `R/I` as a vector space, **not** the Krull dimension: it counts the zeros
 over the algebraic closure with multiplicity, so it is an upper bound on the number of distinct
-points rather than a count of them. A positive-dimensional ideal is rejected with
-`FglmError::PositiveDimensional` before any enumeration, since the enumeration would not
-terminate, and the `max_dimension` argument bounds it otherwise.
+points rather than a count of them. `<x^2, y^2>` above has one distinct zero and `D = 4`. A
+positive-dimensional ideal is rejected with `FglmError::PositiveDimensional` before any
+enumeration, since the enumeration would not terminate, and the `max_dimension` argument bounds it
+otherwise.
+
+`grobner::QuotientAlgebra` adds the arithmetic: coordinate vectors over those monomials, and the
+`N` linear operators that multiply by a variable.
+
+```rust
+use zeebra::fields::Zp2147483647;
+use zeebra::grobner::{f4, FglmOptions, QuotientAlgebra};
+use zeebra::{MonomialOrder, MultivariatePolynomial, Zero};
+
+type F = Zp2147483647;
+let order = MonomialOrder::GradedReverseLexicographic;
+
+let system: Vec<MultivariatePolynomial<2, F>> = ["x^2", "y^2"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, ["x", "y"]).unwrap())
+    .collect();
+let basis = f4(&system, order).unwrap();
+let algebra = QuotientAlgebra::new(&basis, order, &FglmOptions::default()).unwrap();
+
+// Multiplication by x is nilpotent here: x is nonzero in R/I but x^2 is not.
+let x = algebra.multiply_by_variable(0, &algebra.one());
+let x_squared = algebra.multiply_by_variable(0, &x);
+assert!(x.iter().any(|c| !c.is_zero()));
+assert!(x_squared.iter().all(|c| c.is_zero()));
+```
+
+That nilpotence is the point of keeping multiplicities: `<x^2, y^2>` has a single geometric zero,
+and an operator with no eigenbasis. `cargo run --release --example fglm_operators` reports how much
+storage the operators need — 0.34% of a dense matrix on planted-8, but 57% on the katsura family,
+where the sparse representation does not pay for itself.
 
 ### F4
 
