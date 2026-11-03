@@ -1,11 +1,16 @@
-//! What reducer selection and the divisor index do to the whole computation.
+//! What reducer selection and the reducer cache do to the whole computation.
 //!
-//! `examples/f4_profile.rs` reports one configuration at a time. This reports the two
-//! reducer-selection policies side by side on the counters the hypothesis is stated in: the
-//! closure size (`reducers`), the matrix shape, the peak live entries, the row operations
-//! elimination performed, and the stage times. The hypothesis is that the smaller multiplier gives
-//! a smaller closure and therefore a smaller matrix; the point of putting elimination and the
-//! total next to it is that a smaller matrix is only worth having if the computation gets shorter.
+//! `examples/f4_profile.rs` reports one configuration at a time, and its `b` row turns on reducer
+//! selection and the cache together. This separates them, on the counters the two hypotheses are
+//! stated in: the closure size (`reducers`), the matrix shape, the peak live entries, the row
+//! operations elimination performed, the share of reducer multiples that had been built before,
+//! and the stage times.
+//!
+//! The selection hypothesis is that the smaller multiplier gives a smaller closure and therefore a
+//! smaller matrix; elimination and the total are next to it because a smaller matrix is only worth
+//! having if the computation gets shorter. The cache hypothesis is that the same multiple recurs
+//! often enough across batches to be worth remembering; `reuse` is that rate and `symb/ms` is what
+//! acting on it costs.
 //!
 //! ```text
 //! cargo run --release --example f4_selection
@@ -17,7 +22,7 @@ use zeebra::{
     fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura},
-        f4_with_options, F4Options, F4Statistics, ReducerSelection,
+        f4_with_options, CacheMode, F4Options, F4Statistics, ReducerSelection,
     },
     MonomialOrder, MultivariatePolynomial,
 };
@@ -41,10 +46,10 @@ fn millis(duration: Duration) -> f64 {
 
 fn header() {
     println!(
-        "{:<12} {:<8} {:<9} {:>9} {:>7} {:>7} {:>10} {:>11} {:>8} {:>8} {:>9} {:>7}",
+        "{:<12} {:<8} {:<14} {:>9} {:>7} {:>7} {:>10} {:>11} {:>8} {:>8} {:>9} {:>7} {:>6}",
         "system",
         "order",
-        "selection",
+        "configuration",
         "reducers",
         "rows",
         "cols",
@@ -53,9 +58,30 @@ fn header() {
         "symb/ms",
         "elim/ms",
         "total/ms",
-        "scan/q"
+        "scan/q",
+        "reuse"
     );
 }
+
+/// The configurations compared: each policy with the cache off, and the cache alone.
+const CONFIGURATIONS: [(&str, ReducerSelection, CacheMode); 4] = [
+    ("first", ReducerSelection::FirstApplicable, CacheMode::Off),
+    (
+        "first+count",
+        ReducerSelection::FirstApplicable,
+        CacheMode::Count,
+    ),
+    (
+        "first+store",
+        ReducerSelection::FirstApplicable,
+        CacheMode::Store,
+    ),
+    (
+        "largest",
+        ReducerSelection::LargestLeadingMonomial,
+        CacheMode::Off,
+    ),
+];
 
 fn row<const N: usize>(
     name: &str,
@@ -63,24 +89,22 @@ fn row<const N: usize>(
     orders: &[(&str, MonomialOrder)],
 ) {
     for &(order_name, order) in orders {
-        for (label, selection) in [
-            ("first", ReducerSelection::FirstApplicable),
-            ("largest", ReducerSelection::LargestLeadingMonomial),
-        ] {
+        for (label, selection, cache) in CONFIGURATIONS {
             let options = F4Options {
                 reducer_selection: selection,
+                reducer_cache: cache,
                 measure_stages: true,
                 ..F4Options::baseline()
             };
             let (_, s): (Vec<_>, F4Statistics) = match f4_with_options(system, order, &options) {
                 Ok(result) => result,
                 Err(error) => {
-                    println!("{:<12} {:<8} {:<9} {}", name, order_name, label, error);
+                    println!("{:<12} {:<8} {:<14} {}", name, order_name, label, error);
                     continue;
                 }
             };
             println!(
-                "{:<12} {:<8} {:<9} {:>9} {:>7} {:>7} {:>10} {:>11} {:>8.2} {:>8.2} {:>9.2} {:>7.1}",
+                "{:<12} {:<8} {:<14} {:>9} {:>7} {:>7} {:>10} {:>11} {:>8.2} {:>8.2} {:>9.2} {:>7.1} {:>6.2}",
                 name,
                 order_name,
                 label,
@@ -92,16 +116,18 @@ fn row<const N: usize>(
                 millis(s.stages.symbolic),
                 millis(s.stages.elimination),
                 millis(s.total),
-                s.divisor_scan_steps_per_query()
+                s.divisor_scan_steps_per_query(),
+                s.reducer_reuse_fraction()
             );
         }
     }
 }
 
 fn main() {
-    println!("Reducer selection, both policies, on the counters the hypothesis is stated in.");
-    println!("`reducers` is the closure size; `rows`/`cols` the largest matrix; `scan/q` basis");
-    println!("elements examined per divisor lookup.");
+    println!("Reducer selection and the reducer cache, separately, on the counters the two");
+    println!("hypotheses are stated in. `reducers` is the closure size; `rows`/`cols` the largest");
+    println!("matrix; `scan/q` basis elements examined per divisor lookup; `reuse` the share of");
+    println!("reducer multiples that had been needed in an earlier batch.");
     println!();
     header();
     row("cyclic-4", &cyclic::<4, F>(), &ALL);
