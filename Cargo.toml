@@ -13,7 +13,9 @@ keywords = ["zkp", "zero-knowledge", "algebra", "cryptography"]
 
 
 [lib]
-doctest = false
+# Doc examples are compiled and run. They were disabled, which made the CI job that runs them
+# green and vacuous: the crate had no executable examples at all, only `text` and `ignore` fences.
+doctest = true
 
 [dependencies]
 lazy_static = "1.4.0"

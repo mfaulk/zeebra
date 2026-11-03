@@ -78,8 +78,16 @@ pub enum ReducerSelection {
 ///
 /// Public fields with a `Default`, so a caller changes what it cares about:
 ///
-/// ```ignore
-/// let options = F4Options { max_pairs_per_batch: Some(16), ..F4Options::default() };
+/// ```
+/// use zeebra::grobner::F4Options;
+///
+/// let options = F4Options {
+///     max_pairs_per_batch: Some(16),
+///     ..F4Options::default()
+/// };
+/// assert_eq!(options.max_pairs_per_batch, Some(16));
+/// // Everything else is the recommended configuration, which is what `default()` is.
+/// assert_eq!(options.criteria, F4Options::recommended().criteria);
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct F4Options {

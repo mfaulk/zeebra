@@ -40,3 +40,13 @@ pub use poly::{
     MultivariatePolynomial, Polynomial, PolynomialParams, UnivariatePolynomial,
 };
 pub use rings::Ring;
+
+/// The README's code examples, compiled and run.
+///
+/// The README is where a reader meets the public API, so its examples are the ones most worth
+/// keeping true. `cfg(doctest)` means this item exists only when doc tests are collected, so the
+/// README is not pulled into the rendered crate documentation — only its fenced Rust blocks become
+/// tests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeExamples;

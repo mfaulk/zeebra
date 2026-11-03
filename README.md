@@ -38,6 +38,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --doc
 ```
 
+The Rust examples in this file are **compiled and run** by `cargo test --doc`, through a
+`cfg(doctest)` item in `src/lib.rs`, so they cannot drift from the API they document. Blocks that
+are illustrative rather than executable are fenced `text`.
+
 CI resolves its toolchain to `stable`, which moves. A clippy run that is clean on an older stable
 is therefore **not** evidence that CI is clean — new lints arrive with new releases, and one did
 during this project's history. `rustup update stable` before trusting a clean run, or name the
