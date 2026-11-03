@@ -30,10 +30,7 @@ use std::{
 };
 
 use crate::{
-    grobner::{
-        f4::{divisors::DivisorIndex, options::ReducerSelection},
-        pairs::CriticalPair,
-    },
+    grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
@@ -236,9 +233,6 @@ pub struct MonicBasis<const N: usize, F: FiniteField> {
     /// Kept because reducer selection compares them: "the largest leading monomial that divides"
     /// is not a question about exponent vectors alone.
     order: MonomialOrder,
-
-    /// The leading monomials, arranged for divisibility queries. See [`DivisorIndex`].
-    index: DivisorIndex<N>,
 }
 
 impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
@@ -284,16 +278,7 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             })
             .collect();
 
-        let mut index = DivisorIndex::new(order);
-        for element in &elements {
-            index.push(element.leading_monomial);
-        }
-
-        Self {
-            elements,
-            order,
-            index,
-        }
+        Self { elements, order }
     }
 
     /// The order the basis was prepared under.
@@ -330,9 +315,6 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             order.name()
         );
         let appended = Self::new(std::slice::from_ref(polynomial), order);
-        for element in &appended.elements {
-            self.index.push(element.leading_monomial);
-        }
         self.elements.extend(appended.elements);
     }
 
@@ -344,7 +326,7 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
     /// The first element, in index order, whose leading monomial divides `monomial`, with the
     /// quotient.
     ///
-    /// The reference scan for [`ReducerSelection::FirstApplicable`], which [`DivisorIndex`] has to
+    /// The reference scan for [`ReducerSelection::FirstApplicable`], which any faster lookup has to
     /// agree with element for element.
     pub fn find_divisor(&self, monomial: &Monomial<N>) -> Option<(usize, Monomial<N>)> {
         self.elements
@@ -403,12 +385,21 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         counts: &mut SymbolicCounts,
     ) -> Option<(usize, Monomial<N>)> {
         counts.divisor_queries += 1;
-        self.index.find(
-            &self.elements,
-            monomial,
-            selection,
-            &mut counts.divisor_scan_steps,
-        )
+        match selection {
+            ReducerSelection::FirstApplicable => {
+                for (index, element) in self.elements.iter().enumerate() {
+                    counts.divisor_scan_steps += 1;
+                    if let Some(quotient) = monomial.checked_div(&element.leading_monomial) {
+                        return Some((index, quotient));
+                    }
+                }
+                None
+            }
+            ReducerSelection::LargestLeadingMonomial => {
+                counts.divisor_scan_steps += self.elements.len();
+                self.find_largest_divisor(monomial)
+            }
+        }
     }
 
     /// True if some basis element's leading monomial divides `monomial`.
@@ -1174,6 +1165,64 @@ mod tests {
                     symbolic_preprocessing_with(&basis, &pairs, usize::MAX, selection, &mut warm)
                         .expect("unbounded");
                 assert_eq!(after.rows, expected.rows, "{}", order.name());
+            }
+        }
+    }
+
+    /// Each policy's dispatch returns exactly what its reference scan returns, over random bases.
+    ///
+    /// The differential test any faster lookup has to pass: agreement is not about returning *a*
+    /// divisor but *the* divisor, since a different divisor is a different multiplier and so a
+    /// different matrix row.
+    #[test]
+    fn test_dispatch_agrees_with_the_reference_scans() {
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(20260211);
+        for order in ALL_ORDERS {
+            for _ in 0..60 {
+                // Single-term generators, so the leading monomials are exactly what is drawn, from
+                // a small range so that equal leads and the tiebreaker both occur.
+                let size = rng.gen_range(1..=12);
+                let polynomials: Vec<MultivariatePolynomial<3, F>> = (0..size)
+                    .map(|_| {
+                        let exponents: Vec<u32> = (0..3).map(|_| rng.gen_range(0..=2)).collect();
+                        let mut lead = Monomial::<3>::new(&exponents);
+                        if lead.is_one() {
+                            lead = Monomial::new(&[1, 0, 0]);
+                        }
+                        MultivariatePolynomial::from(lead)
+                    })
+                    .collect();
+                let basis = MonicBasis::new(&polynomials, order);
+
+                for _ in 0..40 {
+                    let exponents: Vec<u32> = (0..3).map(|_| rng.gen_range(0..=4)).collect();
+                    let monomial = Monomial::<3>::new(&exponents);
+                    let mut counts = SymbolicCounts::default();
+                    assert_eq!(
+                        basis.find_divisor_with(
+                            &monomial,
+                            ReducerSelection::FirstApplicable,
+                            &mut counts
+                        ),
+                        basis.find_divisor(&monomial),
+                        "{}: first-applicable disagreed on {}",
+                        order.name(),
+                        monomial
+                    );
+                    assert_eq!(
+                        basis.find_divisor_with(
+                            &monomial,
+                            ReducerSelection::LargestLeadingMonomial,
+                            &mut counts
+                        ),
+                        basis.find_largest_divisor(&monomial),
+                        "{}: largest-leading-monomial disagreed on {}",
+                        order.name(),
+                        monomial
+                    );
+                }
             }
         }
     }
