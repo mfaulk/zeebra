@@ -17,7 +17,8 @@ pub use f4::{
     ReducerSelection, ReductionStrategy,
 };
 pub use fglm::{
-    classify_ideal, FglmError, FglmOptions, IdealClass, MultiplicationOperator, QuotientAlgebra,
+    classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
+    FglmError, FglmOptions, FglmStatistics, IdealClass, MultiplicationOperator, QuotientAlgebra,
     QuotientBasis,
 };
 pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue};
