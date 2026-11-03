@@ -1565,16 +1565,16 @@ each figure the fastest of several runs.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | baseline | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x |
 | A | 1.24x | 1.13x | 1.41x | 1.23x | 1.48x | 0.96x | 2.04x | 1.07x | 1.32x | 0.89x | 2.34x |
-| b-rejected | 1.11x | 1.13x | 0.48x | 0.98x | 0.70x | 0.62x | 0.45x | 1.02x | 1.02x | 0.45x | 0.30x |
+| b-selection | 1.11x | 1.13x | 0.48x | 0.98x | 0.70x | 0.62x | 0.45x | 1.02x | 1.02x | 0.45x | 0.30x |
 | C | 2.42x | 7.33x | 12.69x | 13.54x | 1.87x | 3.66x | 4.08x | 1.31x | 25.97x | 6.66x | 8.02x |
 | D | 1.17x | 1.46x | 1.41x | 1.11x | 1.09x | 1.34x | 1.41x | 1.02x | 1.46x | 1.53x | 1.90x |
 | d-dense | 1.08x | 0.83x | 0.83x | 0.87x | 0.89x | 0.82x | 0.71x | 1.02x | 0.69x | 0.60x | **refused** |
-| A+b-rej | 1.31x | 1.06x | 0.56x | 1.21x | 0.79x | 0.58x | 0.61x | 1.09x | 1.35x | 0.39x | 0.39x |
+| A+b-sel | 1.31x | 1.06x | 0.56x | 1.21x | 0.79x | 0.58x | 0.61x | 1.09x | 1.35x | 0.39x | 0.39x |
 | A+C | 3.00x | 7.21x | 15.33x | 13.83x | 2.47x | 4.41x | 5.61x | 1.35x | **27.35x** | 8.56x | 14.79x |
 | A+D | 1.37x | 1.49x | 2.40x | 1.56x | 1.77x | 1.55x | 3.51x | 1.11x | 2.23x | 2.10x | 7.57x |
 | C+D | 2.54x | 6.63x | 15.94x | 13.83x | 2.04x | 4.19x | 4.87x | 1.31x | 23.99x | 8.73x | 11.10x |
 | **A+C+D** | **3.09x** | **7.98x** | **17.46x** | **14.36x** | **2.79x** | **5.28x** | **6.83x** | **1.37x** | 24.96x | **11.15x** | **24.42x** |
-| A+b-rej+C+D | 3.01x | 7.58x | 13.10x | 14.21x | 1.94x | 4.68x | 4.25x | 1.36x | 25.45x | 9.53x | 14.34x |
+| A+b-sel+C+D | 3.01x | 7.58x | 13.10x | 14.21x | 1.94x | 4.68x | 4.25x | 1.36x | 25.45x | 9.53x | 14.34x |
 
 **A+C+D is the fastest configuration on ten of eleven instances**, and on those ten it exceeds
 every pair it contains. §7 of this plan predicted the opposite for one of the three interactions —
@@ -1610,13 +1610,15 @@ budget's own unit before allocating and refuses with
 instance needs a raised budget, deliberately: the default refusing it is the correct behaviour, and
 it is the only backend for which the entry budget was not already a memory bound.
 
-**Two rows are not candidates, and one of them measures less than its name suggests.**
-`b-rejected` sets `LargestLeadingMonomial` *and* `CacheMode::Store` — but `Store` was measured and
-not implemented, and behaves as `CacheMode::Count` (§7.2), so **what this row actually measures is
-the reducer-selection change alone**, with the cache contributing nothing but a counter. It is
-0.30x to 0.48x on the grevlex instances and marginally positive on three lex ones.
-`A+b-rej+C+D` shows what including it would have cost — 14.34x instead of 24.42x on katsura-7
-grevlex, about 40% of the win.
+**Two rows are not candidates.** `b-selection` sets `LargestLeadingMonomial`, M16-B's one
+remaining selectable rejection, so that the rejection stays reproducible: it is 0.30x to 0.48x on
+the grevlex instances and marginally positive on three lex ones. `A+b-sel+C+D` shows what
+including it would have cost — 14.34x instead of 24.42x on katsura-7 grevlex, about 40% of the win.
+
+The row was originally named `b-rejected` and set `CacheMode::Store` as well. It was renamed on
+review, because `Store` was measured and *not implemented* — it behaved as `CacheMode::Count`, so
+the row measured one strategy while being labelled as measuring two. `Store` has since been
+removed outright: an option named for a behaviour it does not have is worse than no option.
 
 **One thing the ablation cannot measure, and saying so is part of the result.** Two of M16's
 improvements are not option-gated: M16-B's cheaper monomial hash in symbolic preprocessing and
@@ -1733,6 +1735,22 @@ the *worst* order for this F4 implementation" — no longer holds, and that *is*
 matrix work: grevlex is now F4's **best** order on katsura-6 (3.24 ms against grlex's 3.88) and on
 katsura-7 (29.77 against 41.38). The inversion M15 called "a direct consequence of the fill-in"
 went away when the fill-in did, and §8.4 is where that is measured.
+
+#### 8.3.2 Three review corrections
+
+Recorded because the corrections matter more than the figures they replaced:
+
+1. **The engine comparison was unmatched.** It compared F4's default against `buchberger()`'s and
+   called the result "faster on every instance". The criteria are shared, so that credited F4 with
+   M16-C's work; §8.3 now reports both columns and the matched one is much the smaller.
+2. **"A+C+D is fastest on every instance" was true of one run and not the next.** §8.1 now says
+   ten of eleven, and explains the exception mechanistically.
+3. **`CacheMode::Store` stored nothing**, so the ablation row selecting it measured one strategy
+   while labelled as measuring two. The variant has been removed and the row renamed.
+
+Two changes were made to the code on review as well: the dense backend now bounds its *allocation*
+rather than only its nonzero count (§8.8), and the doc-test CI job — which reported "0 passed"
+because the crate had no executable examples — now runs six.
 
 ### 8.4 Fill-in and memory
 
