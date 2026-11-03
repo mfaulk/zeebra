@@ -9,7 +9,9 @@
 //!
 //! - `symbolic` — the closure, from the basis and the pairs.
 //! - `construction` — the monomial-to-column map and writing the entries.
-//! - `elimination` — row echelon on the matrices as built.
+//! - `elimination` — row echelon on the matrices as built, under each backend.
+//! - `conversion` — densifying and sparsifying those matrices, which the dense backend pays
+//!   around the algorithm and which is therefore reported apart from it.
 //! - `batch` — all three plus candidate extraction, i.e. one whole `reduce_batch`.
 //!
 //! The batches come from `zeebra::grobner::trace_batches`, not from a synthetic generator: an F4
@@ -35,7 +37,7 @@ use zeebra::{
         },
         trace_batches, F4Options, ReducerSelection,
     },
-    linalg::{echelon::row_echelon_with, Backend},
+    linalg::{echelon::row_echelon_with, Backend, DenseRows},
     MonomialOrder, MultivariatePolynomial,
 };
 
@@ -224,6 +226,46 @@ fn bench_elimination<const N: usize>(
     }
 }
 
+/// Densifying and sparsifying the matrices as built, which is what the dense backend pays around
+/// the algorithm.
+///
+/// Reported as its own benchmark rather than folded into `elimination/Dense`: conversion is real
+/// cost, but it is not elimination, and a comparison that conflates the two cannot say whether a
+/// representation or a conversion is what made the difference.
+fn bench_conversion<const N: usize>(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    label: &str,
+    batches: &[TracedBatch<N, F>],
+    order: MonomialOrder,
+) {
+    let options = F4Options::baseline();
+    let matrices: Vec<_> = batches
+        .iter()
+        .map(|batch| {
+            let preprocessed = symbolic_preprocessing_with(
+                &batch.basis,
+                &batch.pairs,
+                options.max_matrix_rows,
+                options.reducer_selection,
+                &mut ReducerCache::disabled(),
+            )
+            .expect("within limits");
+            MacaulayMatrix::build(&batch.basis, &preprocessed, order)
+                .matrix()
+                .clone()
+        })
+        .collect();
+
+    group.bench_function(BenchmarkId::new("conversion", label), |bencher| {
+        bencher.iter(|| {
+            for matrix in &matrices {
+                let dense = DenseRows::from_sparse(black_box(matrix));
+                black_box(dense.to_sparse());
+            }
+        })
+    });
+}
+
 fn bench_batch<const N: usize>(
     group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
     label: &str,
@@ -256,6 +298,7 @@ fn stages(c: &mut Criterion) {
                 bench_symbolic(&mut group, &label, batches);
                 bench_construction(&mut group, &label, batches, order);
                 bench_elimination(&mut group, &label, batches, order);
+                bench_conversion(&mut group, &label, batches, order);
                 bench_batch(&mut group, &label, batches, order);
             }
             Batches::Six(batches) => {
@@ -263,6 +306,7 @@ fn stages(c: &mut Criterion) {
                 bench_symbolic(&mut group, &label, batches);
                 bench_construction(&mut group, &label, batches, order);
                 bench_elimination(&mut group, &label, batches, order);
+                bench_conversion(&mut group, &label, batches, order);
                 bench_batch(&mut group, &label, batches, order);
             }
         }

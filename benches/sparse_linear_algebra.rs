@@ -6,15 +6,21 @@
 //! densities and both implementations run on the same matrices.
 //!
 //! Matrices are generated from a fixed seed, so runs are comparable.
+//!
+//! Two groups, and the difference between them is the point. `sparse_linalg` compares sparse row
+//! echelon against dense *reduced* row echelon, which does a second back-substitution pass the
+//! sparse side never does — indicative, and not evidence about storage. `matched_echelon` runs the
+//! identical algorithm under each backend of `linalg::echelon` and times the representation
+//! conversion in its own benchmark, which is the comparison a crossover can be read off.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, Rng, SeedableRng};
 use zeebra::{
     fields::Zp2147483647,
     linalg::{
-        gauss_jordan_elimination,
+        gauss_jordan_elimination, row_echelon_with,
         sparse::{row_echelon, SparseMatrix, SparseRow},
-        Matrix,
+        Backend, DenseRows, Matrix,
     },
     FiniteField,
 };
@@ -116,4 +122,105 @@ fn benches(c: &mut Criterion) {
 }
 
 criterion_group!(sparse_linear_algebra, benches);
-criterion_main!(sparse_linear_algebra);
+criterion_main!(sparse_linear_algebra, matched);
+
+// ---------------------------------------------------------------------------------------------
+// A matched-contract comparison.
+//
+// The group above compares sparse row echelon against dense *reduced* row echelon, which performs
+// a second back-substitution pass the sparse side never does, so it cannot separate the cost of a
+// representation from the cost of an algorithm. The group below runs the identical algorithm under
+// each backend — same pivot rule, same normalization, same statistics — on the identical matrices,
+// and times the representation conversion separately, because densifying a matrix is real cost but
+// it is not elimination.
+// ---------------------------------------------------------------------------------------------
+
+/// The shapes an F4 elimination actually sees, beside the square sweep.
+const SHAPES: [(usize, usize, usize); 4] = [
+    (64, 256, 8),
+    (256, 1024, 12),
+    (512, 2048, 16),
+    (1024, 1024, 20),
+];
+
+fn matched_contract(c: &mut Criterion) {
+    let mut group = c.benchmark_group("matched_echelon");
+    group.sample_size(20);
+
+    for n in SIZES {
+        for density in DENSITIES {
+            let matrix = random_sparse(n, density, 7);
+            let label = format!("{}pct/{}", (density * 100.0).round() as usize, n);
+
+            for backend in [Backend::Sparse, Backend::Dense, Backend::Adaptive] {
+                group.bench_with_input(
+                    BenchmarkId::new(format!("square/{:?}", backend), &label),
+                    &matrix,
+                    |bencher, matrix| {
+                        bencher.iter_batched_ref(
+                            || matrix.clone(),
+                            |matrix| {
+                                black_box(
+                                    row_echelon_with(backend, matrix, usize::MAX)
+                                        .expect("unbounded cannot fail"),
+                                )
+                            },
+                            BatchSize::SmallInput,
+                        )
+                    },
+                );
+            }
+
+            // What the dense backend pays before and after the algorithm, on its own.
+            group.bench_with_input(
+                BenchmarkId::new("square/conversion", &label),
+                &matrix,
+                |bencher, matrix| {
+                    bencher.iter(|| {
+                        let dense = DenseRows::from_sparse(black_box(matrix));
+                        black_box(dense.to_sparse())
+                    })
+                },
+            );
+        }
+    }
+
+    for (rows, columns, per_row) in SHAPES {
+        let matrix = macaulay_shaped(rows, columns, per_row, 11);
+        let label = format!("{}x{}", rows, columns);
+
+        for backend in [Backend::Sparse, Backend::Dense, Backend::Adaptive] {
+            group.bench_with_input(
+                BenchmarkId::new(format!("macaulay/{:?}", backend), &label),
+                &matrix,
+                |bencher, matrix| {
+                    bencher.iter_batched_ref(
+                        || matrix.clone(),
+                        |matrix| {
+                            black_box(
+                                row_echelon_with(backend, matrix, usize::MAX)
+                                    .expect("unbounded cannot fail"),
+                            )
+                        },
+                        BatchSize::SmallInput,
+                    )
+                },
+            );
+        }
+
+        group.bench_with_input(
+            BenchmarkId::new("macaulay/conversion", &label),
+            &matrix,
+            |bencher, matrix| {
+                bencher.iter(|| {
+                    let dense = DenseRows::from_sparse(black_box(matrix));
+                    black_box(dense.to_sparse())
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(matched, matched_contract);
