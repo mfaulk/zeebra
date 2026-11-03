@@ -12,9 +12,12 @@
 //! See Sec 2.7 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea.
 
 use crate::{
-    grobner::{pairs::PairQueue, s_polynomial::s_polynomial},
+    grobner::{
+        pairs::{are_relatively_prime, CriterionCounts, PairCriteria, PairQueue},
+        s_polynomial::s_polynomial,
+    },
     poly::MonomialOrder,
-    FiniteField, MultivariatePolynomial,
+    FiniteField, Monomial, MultivariatePolynomial,
 };
 
 /// Counters describing the work a Gröbner basis computation performed.
@@ -65,6 +68,21 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
     f: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> (Vec<MultivariatePolynomial<N, F>>, Statistics) {
+    buchberger_with_criteria(f, order, &PairCriteria::default())
+}
+
+/// As [`buchberger_with_statistics`], under the given pair-elimination criteria.
+///
+/// A criterion is a theorem that a pair's S-polynomial reduces to zero modulo relations already
+/// available, so enabling one must leave the computed reduced Gröbner basis unchanged. That makes
+/// [`PairCriteria::NONE`] the reference every criterion is checked against, and it is the reason
+/// this entry point exists at all: without it the criteria could only be compared through F4, and
+/// a disagreement would not say which engine was wrong.
+pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
+    f: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    criteria: &PairCriteria,
+) -> (Vec<MultivariatePolynomial<N, F>>, Statistics) {
     let mut statistics = Statistics::default();
 
     // A zero generator contributes nothing to the ideal, and would otherwise reach
@@ -81,7 +99,13 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
         return (Vec::new(), statistics);
     }
 
-    let mut pending = PairQueue::seeded(&basis, order);
+    // The leading monomials, maintained alongside the basis. Pair handling needs these and
+    // nothing else, and `leading_monomial` is a scan of a polynomial's whole term map — which
+    // generating the pairs of a newly appended element would otherwise repeat once per pair.
+    let mut leads: Vec<Monomial<N>> = basis.iter().map(|p| p.leading_monomial(order)).collect();
+
+    let mut counts = CriterionCounts::default();
+    let mut pending = PairQueue::seeded_from_leads(&leads, criteria, &mut counts);
 
     while let Some(pair) = pending.pop() {
         statistics.pairs_considered += 1;
@@ -90,7 +114,8 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
         // Buchberger's first criterion. If the leading monomials share no variable, their lcm is
         // their product and S(left, right) is guaranteed to reduce to zero modulo the two of
         // them, so the reduction can be skipped without affecting the result.
-        if pair.is_eliminated_by_product_criterion(&basis, order) {
+        if criteria.product && are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
+            counts.product += 1;
             statistics.pairs_eliminated_by_product_criterion += 1;
             continue;
         }
@@ -110,12 +135,13 @@ pub fn buchberger_with_statistics<const N: usize, F: FiniteField>(
         // Monic, so that the basis is normalized as it is built rather than only at the end.
         let monic = remainder.scale(&remainder.leading_coefficient(order).inverse());
         let added = basis.len();
+        leads.push(monic.leading_monomial(order));
         basis.push(monic);
         statistics.elements_added += 1;
 
         // Only the pairs involving the new element are new. This is what makes the processing
         // incremental: the textbook formulation rebuilds every pair on every pass.
-        pending.push_pairs_with(&basis, added, order);
+        pending.push_pairs_from_leads(&leads, added, criteria, &mut counts);
     }
 
     (reduce_grobner_basis(&basis, order), statistics)
