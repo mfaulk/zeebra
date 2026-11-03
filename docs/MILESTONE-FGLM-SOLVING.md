@@ -856,8 +856,13 @@ equal wherever both ran.**
 | planted-8 | zero-dim | 256 | 0.05 | 12 | 0.13 | 0.05 | 8 | 0.07 | 1.0x |
 
 "Does not finish" for katsura-7 under lex is `F4Error::TooManyNonzeros { nonzeros: 20003295,
-limit: 20000000 }` — it crosses `max_live_nonzeros` and returns an error rather than a basis. A
-dash under `lex bb ms` is M16 §8.3's finding that the classical engine does not complete the
+limit: 20000000 }` — it crosses `max_live_nonzeros` and returns an error rather than a basis. And
+the limit is not what is stopping it: raising `max_live_nonzeros` to 2 billion, a hundredfold, the
+same computation was **still running after 13 minutes at 5.5 GB resident** and was abandoned
+rather than completed. So katsura-7 under lex is out of reach of this F4 at any budget a
+workstation will give it, not merely out of reach of the default one.
+
+A dash under `lex bb ms` is M16 §8.3's finding that the classical engine does not complete the
 instance in 900 s with every pair criterion enabled.
 
 ### 10.1 What the baseline says
@@ -895,8 +900,9 @@ planted-8, which is the worst available choice.
 **katsura-7 is the milestone's central instance.** Its grevlex basis takes 30 ms and its quotient
 algebra has dimension 64, so the operators are 7 columns-sets of at most 64 entries each — tens of
 kilobytes — and the span is a 64-row, 128-column dense block. Everything FGLM needs is trivially
-small. The direct lex route, meanwhile, exhausts a 20-million-entry live-nonzero budget. The
-milestone's case is not that FGLM is faster here but that **the direct route does not arrive**.
+small. The direct lex route, meanwhile, does not arrive at a hundredfold the default budget and
+thirteen minutes. The milestone's case is not that FGLM is faster here but that **the direct route
+does not arrive at all**.
 
 **Standard monomial enumeration is free.** `walk ms` never exceeds 0.13 ms, and on cyclic-6 it is
 0.09 ms against the 13.48 ms basis it starts from — 0.7%. There is no case for a cleverer
