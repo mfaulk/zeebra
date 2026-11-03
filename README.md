@@ -65,14 +65,17 @@ cargo bench --bench sparse_linear_algebra
 cargo bench --bench f4_stages
 ```
 
-`sparse_linear_algebra` runs sparse and dense elimination on identical matrices at several sizes
-and densities, because sparse storage is not unconditionally faster — above some density the
-bookkeeping costs more than the arithmetic it saves.
+`sparse_linear_algebra` has two groups, and the difference between them matters. `sparse_linalg`
+times sparse row echelon beside dense *reduced* row echelon, which performs a back-substitution
+pass the sparse side never does; it is indicative of nothing about storage and is kept only for
+continuity. `matched_echelon` runs the identical algorithm under each `linalg::echelon` backend on
+identical matrices, and times densification and sparsification in their own benchmark, so the
+comparison measures representation rather than algorithm or conversion.
 
 `f4_stages` times F4's stages separately — symbolic preprocessing, matrix construction,
-elimination, and a whole batch — replaying the batches a real computation produced rather than
-synthetic ones. `grobner` says whether something got faster; `f4_stages` says whether a change
-removed cost or moved it from one stage to another.
+elimination under each backend, representation conversion, and a whole batch — replaying the
+batches a real computation produced rather than synthetic ones. `grobner` says whether something
+got faster; `f4_stages` says whether a change removed cost or moved it from one stage to another.
 
 Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
 counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
@@ -83,6 +86,7 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example elimination_density  # how dense an F4 matrix really is
 ```
 
 `f4_statistics` prints matrix dimensions, how many reductions each matrix absorbed, how much of
@@ -94,6 +98,13 @@ candidate extraction, and the final interreduction, with the remainder shown as 
 unattributed cost cannot hide. It takes the name of a configuration — `baseline` by default — so
 the effect of one optimization can be read off against another's. The timing comes from
 `F4Options::measure_stages`, which reads a clock four times per batch and is off by default.
+
+`elimination_density` reports the density a representation policy would have to read: the
+distribution of row densities as built and at each row's own peak during its reduction, the density
+of the densest 64x64 blocks, and the three backends' elimination times with representation
+conversion in its own column. A global density of a fraction of a percent says nothing about
+either. `-- list` names the instances; the largest are excluded by default, because a dense
+representation of katsura-7 grevlex is 374 MB for a matrix holding 112k entries.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md) and
@@ -183,7 +194,7 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 
 | Field | Choices | What it changes |
 |---|---|---|
-| `elimination` | `Backend::{Sparse, Dense, Adaptive}` | the representation elimination works in |
+| `elimination` | `Backend::{Sparse, Dense, Adaptive}` | the representation elimination works in: sparse rows throughout, dense rows throughout, or sparse rows reduced through a dense accumulator |
 | `reduction` | `ReductionStrategy::{Unstructured, Structured}` | whether reducer rows are established as pivots before the pair rows are reduced against them |
 | `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial |
 | `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
@@ -195,8 +206,16 @@ kept available separately from `default()` so that a comparison stays meaningful
 moves. `PairCriteria::NONE` reduces every pair, which is the reference the criteria are checked
 against: a criterion is sound exactly when enabling it does not change the basis.
 
+Every backend returns the identical matrix and the identical `EliminationStatistics`, so the choice
+is purely a cost one. `Backend::Adaptive` is the fastest on every instance measured — 1.2x to 2.0x
+over `Sparse` on the elimination stage — and `Backend::Dense` is slower than `Sparse` everywhere,
+which is the honest answer to whether a dense representation pays on F4-shaped matrices. It is kept
+because it is the control the other two are compared against. See §7.4 of
+[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md).
+
 `grobner::solve` still uses `buchberger`. The sparse linear algebra F4 is built on is reusable on
-its own, as `linalg::sparse`; `linalg::echelon` is the backend-selecting interface over it.
+its own, as `linalg::sparse`, with the dense representations as `linalg::dense`;
+`linalg::echelon` is the backend-selecting interface over both.
 
 `grobner::trace_batches` runs a computation and returns every batch it reduced, each as the basis
 at the time plus the pairs selected. That is what lets a stage be benchmarked or counted on real
