@@ -63,7 +63,14 @@ pub enum ReducerSelection {
 
     /// The element whose leading monomial is largest, giving the smallest multiplier.
     ///
-    /// Not yet implemented; currently first-applicable.
+    /// **Measured and rejected as a default.** The intuition is that a smaller multiplier gives a
+    /// smaller multiple and so a smaller closure; the measurement says the opposite, because the
+    /// reducer row leads with the monomial `u` being covered either way, so what the choice
+    /// changes is the row's *tail*. A large divisor's tail sits just below `u` and is still
+    /// reducible, so each such row spawns more rows. On katsura-7 grevlex this takes the largest
+    /// matrix from 6810x6862 to 16750x16812 and the computation from 887 ms to 3045 ms. Only the
+    /// lex instances of cyclic gain. Selectable for ablation; see
+    /// `docs/MILESTONE-F4-OPTIMIZATION.md` §7.2.
     LargestLeadingMonomial,
 }
 

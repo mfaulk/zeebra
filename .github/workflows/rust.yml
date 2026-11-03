@@ -29,6 +29,12 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
+      # `[lib] doctest = false` keeps these out of `cargo test`, so nothing ran them and they
+      # rotted: four prose blocks indented four spaces in module documentation were being
+      # compiled as Rust. Run them explicitly rather than leave them unchecked.
+      - name: Doc tests
+        run: cargo test --doc --verbose
+
   release-tests:
     name: Tests (release)
     runs-on: ubuntu-latest

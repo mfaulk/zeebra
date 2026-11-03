@@ -7,21 +7,23 @@
 //! with coefficients {a_0, ..., a_{n-1}} at the points {w^0, ..., w^{n-1}} where w is a primitive
 //! nth root of unity.
 //!
-//!
-//!     |    A(1)    |             |  1  1  ...  ...                1     |     |   a_0   |
-//!     |    A(w)    |             |  1  w  w^2  ...             w^{n-1}  |     |   a_1   |
-//!     |    A(w^2)  |      =      |  1  ...                       ...    |  *  |   a_2   |
-//!     |     ...    |             |  1  ...                       ...    |     |   ...   |
-//!     | A(w^{n-1}) |             |  1  w^{n-1} w^2(n-1) ... w^{(n-1)^2} |     | a_{n-1} |
-//!
+//! ```text
+//! |    A(1)    |             |  1  1  ...  ...                1     |     |   a_0   |
+//! |    A(w)    |             |  1  w  w^2  ...             w^{n-1}  |     |   a_1   |
+//! |    A(w^2)  |      =      |  1  ...                       ...    |  *  |   a_2   |
+//! |     ...    |             |  1  ...                       ...    |     |   ...   |
+//! | A(w^{n-1}) |             |  1  w^{n-1} w^2(n-1) ... w^{(n-1)^2} |     | a_{n-1} |
+//! ```
 //!
 //! When n is even, n=2k, we define two polynomials using the even and odd coefficients:
 //!
-//!     A_even(x) = \sum_0^{k-1} a_{2i} * x^i
-//!     
-//!     A_odd(x)  = \sum_0^{k-1} a_{2i+1} * x^i
+//! ```text
+//! A_even(x) = \sum_0^{k-1} a_{2i} * x^i
 //!
-//!     A(x) = A_even(x^2) + x*A_odd(x^2)
+//! A_odd(x)  = \sum_0^{k-1} a_{2i+1} * x^i
+//!
+//! A(x) = A_even(x^2) + x*A_odd(x^2)
+//! ```
 //!
 
 use crate::{

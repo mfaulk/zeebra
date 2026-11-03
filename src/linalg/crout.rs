@@ -8,7 +8,7 @@
 //! 1. Set the first column of L is the first column of A.
 //! 2. The first row of U is the first row of A divided by the first entry of L.
 //! 3. For each row i, starting with the second row, compute the i^th row of L and then the
-//!    i^th row of U using the following formulas:
+//!    i^th row of U using the formulas below.
 //!
 //! L_{ij} = a_{ij} - \sum_{k=1}^{j-1} L_{ik} U_{kj}
 //!
@@ -16,15 +16,19 @@
 //!
 //! Intuitively, if we look at the elements of L and U...
 //!
+//! ```text
 //!      | l_{00}    0       0    |           |   1  u_{01}  u_{02} |
 //! L =  | l_{10}  l_{11}    0    |     U =   |   0     1    u_{12} |
 //!      | l_{20}  l_{21}  l_{22} |           |   0     0      1    |
+//! ```
 //!
 //! Then the product A = LU must be
 //!
-//!      | l_{00}          l_{00}*u_{01}                  l_{00}*u_{02}                          |  
-//! A =  | l_{10}          l_{10}*u_{01} + l_{11}         l_{10}*u_{02} + l_{11}*u_{12}          |     
+//! ```text
+//!      | l_{00}          l_{00}*u_{01}                  l_{00}*u_{02}                          |
+//! A =  | l_{10}          l_{10}*u_{01} + l_{11}         l_{10}*u_{02} + l_{11}*u_{12}          |
 //!      | l_{20}          l_{20}*u_{01} + l_{21}         l_{20}*u_{02} + l_{21}*u_{12} + l_{22} |
+//! ```
 //!
 //! The algorithm is based on the observation that each expression depends only on the entries of
 //! L and U that are above and/or to the left. If solved in the correct order, this gives explicit
