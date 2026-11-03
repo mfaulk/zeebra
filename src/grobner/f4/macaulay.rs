@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    grobner::f4::symbolic::{MonicBasis, Preprocessed, PreprocessedRow},
+    grobner::f4::symbolic::{MonicBasis, Preprocessed, PreprocessedRow, RowKind},
     linalg::sparse::{SparseMatrix, SparseRow},
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
@@ -129,6 +129,46 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
             columns,
             rows: preprocessed.rows.clone(),
         })
+    }
+
+    /// Move the reducer multiples ahead of the pair rows, ascending by leading column, and report
+    /// where the pair rows now begin.
+    ///
+    /// Columns descend under the monomial order, so ascending leading column is descending leading
+    /// monomial and the prefix is upper triangular on its own leading columns. The pair rows keep
+    /// their arrival order relative to one another, so the arrangement is a function of the batch.
+    ///
+    /// Both halves of the matrix are permuted together — the coefficients and the provenance — so
+    /// [`MacaulayMatrix::row_origins`] still describes row `i`.
+    pub fn partition_reducers_first(&mut self) -> usize {
+        // A reducer row is nonzero, so `leading_column` is `Some`; the fallback keeps the key
+        // total rather than asserting here, which [`super::structured`] does with a better message.
+        let mut arrangement: Vec<usize> = (0..self.rows.len()).collect();
+        arrangement.sort_by_key(|&index| match self.rows[index].kind {
+            RowKind::Reducer => (
+                0,
+                self.matrix
+                    .row(index)
+                    .leading_column()
+                    .unwrap_or(usize::MAX),
+            ),
+            RowKind::PairComponent { .. } => (1, index),
+        });
+
+        let mut origins: Vec<PreprocessedRow<N>> = Vec::with_capacity(arrangement.len());
+        let mut coefficients: Vec<SparseRow<F>> = Vec::with_capacity(arrangement.len());
+        let matrix_rows = self.matrix.rows_mut();
+        for &index in &arrangement {
+            origins.push(self.rows[index]);
+            coefficients.push(std::mem::take(&mut matrix_rows[index]));
+        }
+        *self.matrix.rows_mut() = coefficients;
+        self.rows = origins;
+
+        self.rows
+            .iter()
+            .take_while(|row| row.kind == RowKind::Reducer)
+            .count()
     }
 
     /// The monomial labelling each column, descending under the order.

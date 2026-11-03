@@ -26,11 +26,11 @@ use crate::{
             macaulay::{BuildBudgetExceeded, MacaulayMatrix},
             options::{F4Error, F4Options, ReductionStrategy},
             statistics::{BatchStatistics, StageClock},
+            structured::{eliminate, BlockPlan},
             symbolic::{symbolic_preprocessing_with, MonicBasis, ReducerCache, RowKind},
         },
         pairs::CriticalPair,
     },
-    linalg::echelon::row_echelon_with,
     poly::MonomialOrder,
     FiniteField, MultivariatePolynomial,
 };
@@ -141,15 +141,21 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     // The one elimination call site, so that a structured path and a dense backend can be chosen
     // independently of each other and neither has to touch the other's files.
     let structured = matches!(options.reduction, ReductionStrategy::Structured);
-    let elimination = row_echelon_with(
+    let plan = match options.reduction {
+        ReductionStrategy::Unstructured => BlockPlan::Baseline,
+        ReductionStrategy::Structured => BlockPlan::ReducersFirstBlock,
+    };
+    let block = eliminate(
+        plan,
         options.elimination,
-        matrix.matrix_mut(),
+        &mut matrix,
         options.max_live_nonzeros,
     )
     .map_err(|nonzeros| F4Error::TooManyNonzeros {
         nonzeros,
         limit: options.max_live_nonzeros,
     })?;
+    let elimination = block.statistics;
     stages.elimination = clock.lap();
 
     // A pivot in a column no input row led with is a relation the basis did not have.
@@ -182,9 +188,9 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         divisor_scan_steps: preprocessed.counts.divisor_scan_steps,
         structured,
         // The unstructured path does not distinguish a pivot it found for free from one it worked
-        // for, so this is zero until the structured path reports it. Zero is the honest answer to
-        // "how many pivots did this elimination know in advance", not a missing measurement.
-        free_pivots: 0,
+        // for, so this is zero there. Zero is the honest answer to "how many pivots did this
+        // elimination know in advance", not a missing measurement.
+        free_pivots: block.free_pivots,
     };
 
     Ok(BatchOutcome {

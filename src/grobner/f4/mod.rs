@@ -25,6 +25,7 @@ pub mod observer;
 pub mod options;
 pub mod reduction;
 pub mod statistics;
+pub mod structured;
 pub mod symbolic;
 
 #[cfg(test)]
