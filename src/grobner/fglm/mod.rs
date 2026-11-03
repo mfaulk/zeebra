@@ -29,6 +29,6 @@ pub use errors::FglmError;
 pub use incremental_span::{Dependence, IncrementalSpan};
 pub use multiplication::MultiplicationOperator;
 pub use options::FglmOptions;
-pub use quotient_algebra::QuotientAlgebra;
+pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
 pub use quotient_basis::{classify_ideal, IdealClass, QuotientBasis};
-pub use statistics::FglmStatistics;
+pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};

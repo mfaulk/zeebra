@@ -1,3 +1,183 @@
+//! Counters and timings describing the work an FGLM conversion performed.
+//!
+//! The M17 statistics attributed the cost between the frontier, the operators, and the dependence
+//! test. That was enough to find the bottleneck — operator construction is 95% of katsura-7's
+//! conversion — and not enough to say what inside it to attack. These add the structure of the
+//! border, which is where the duplicated work lives, and a stage breakdown that separates monomial
+//! lookup from reduction from coordinate-vector assembly.
+
+use std::{mem::size_of, time::Duration};
+
+use crate::FiniteField;
+
+/// The shape of the border, and how much of the reduction work it duplicates.
+///
+/// `x_i b_j` is either standard, costing nothing, or on the border `∂B` and needing a normal form.
+/// The same border monomial can arise from several `(i, j)` pairs — `x*y` from both `x * y` and
+/// `y * x` — and M17 reduces it once per pair. The gap between
+/// [`border_columns`](Self::border_columns) and
+/// [`distinct_border_monomials`](Self::distinct_border_monomials) is the duplication that gap
+/// represents.
+///
+/// **Evidence for an optimization, not proof of one.** A high duplication rate bounds what
+/// deduplication can save; it does not say that reducing a border monomial is where the time
+/// goes. [`FglmStageTimings`] is for that.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct BorderStatistics {
+    /// `N * D`, the columns across all operators — one per variable per standard monomial.
+    pub operator_columns: usize,
+
+    /// Columns whose product `x_i b_j` is itself standard, so the column is a unit vector.
+    pub standard_columns: usize,
+
+    /// Columns whose product left the staircase and needed a normal form.
+    ///
+    /// `standard_columns + border_columns == operator_columns`.
+    pub border_columns: usize,
+
+    /// `|∂B|`, the distinct monomials among those products.
+    ///
+    /// Not the same as [`border_columns`](Self::border_columns), and the whole point of measuring
+    /// both.
+    pub distinct_border_monomials: usize,
+
+    /// Normal forms actually computed.
+    ///
+    /// Equals [`border_columns`](Self::border_columns) on the M17 path and
+    /// [`distinct_border_monomials`](Self::distinct_border_monomials) on a deduplicated one, which
+    /// is how a caller tells which path ran.
+    pub normal_form_calls: usize,
+}
+
+impl BorderStatistics {
+    /// Border columns beyond the first for their monomial: the reductions deduplication removes.
+    pub fn repeated_border_columns(&self) -> usize {
+        self.border_columns
+            .saturating_sub(self.distinct_border_monomials)
+    }
+
+    /// Repeated border columns as a fraction of all border columns, or `None` if there are none.
+    pub fn duplication_rate(&self) -> Option<f64> {
+        if self.border_columns == 0 {
+            return None;
+        }
+        Some(self.repeated_border_columns() as f64 / self.border_columns as f64)
+    }
+}
+
+/// Where a conversion's time went.
+///
+/// Zero throughout unless [`FglmOptions::measure_stages`](super::FglmOptions::measure_stages) is
+/// set, on the same reasoning as F4's [`StageTimings`](crate::grobner::f4::StageTimings): the
+/// operator loop runs `N * D` times and a clock read inside it is not free.
+///
+/// The stages partition the conversion and do not overlap, so [`Self::sum`] is comparable against
+/// the wall clock the caller measured.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FglmStageTimings {
+    /// Enumerating the standard monomials, i.e. [`QuotientBasis`](super::QuotientBasis).
+    pub quotient_basis: Duration,
+
+    /// Classifying each product `x_i b_j` as standard or on the border: the monomial multiply and
+    /// the basis lookup, and nothing else.
+    pub border_classification: Duration,
+
+    /// Reducing border monomials to normal form.
+    pub normal_forms: Duration,
+
+    /// Turning a normal form into a sorted coordinate vector.
+    ///
+    /// Separate from the reduction because it is a different kind of cost — hashing and sorting
+    /// rather than field arithmetic — and the two are addressed by different changes.
+    pub column_assembly: Duration,
+
+    /// The lex walk: the frontier, the operator applications, and the dependence test.
+    pub dependence: Duration,
+}
+
+impl FglmStageTimings {
+    /// Every stage added together.
+    pub fn sum(&self) -> Duration {
+        self.quotient_basis
+            + self.border_classification
+            + self.normal_forms
+            + self.column_assembly
+            + self.dependence
+    }
+
+    /// The three stages that build the multiplication operators.
+    ///
+    /// The quantity M17 measured at 36.2 ms of katsura-7's 38.1 ms conversion, now broken down.
+    pub fn operator_construction(&self) -> Duration {
+        self.border_classification + self.normal_forms + self.column_assembly
+    }
+}
+
+/// What the conversion's representations hold, counted three ways.
+///
+/// The three are different numbers and the milestone depends on not confusing them:
+///
+/// * **Entries** are mathematical nonzeros — a term of a normal form.
+/// * **Cells** are field-element slots a representation allocates, nonzero or not. A dense column
+///   of a mostly-zero operator costs `D` cells and few entries.
+/// * **Bytes** are what the allocation actually takes, including each entry's index and each
+///   `Vec`'s spare capacity.
+///
+/// [`FglmOptions`](super::FglmOptions)'s budgets are written in entries and cells. Bytes are
+/// reported, not budgeted, until M18-3 introduces a byte-aware budget.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FglmMemory {
+    /// Nonzero entries the `N` operators hold between them.
+    ///
+    /// What [`max_operator_entries`](super::FglmOptions::max_operator_entries) is enforced on.
+    pub operator_entries: usize,
+
+    /// Bytes the operators' representations occupy, as the representations themselves report.
+    pub operator_bytes: usize,
+
+    /// Field-element cells the dependence test's echelon rows hold: `2 * D^2` at full rank.
+    ///
+    /// What [`max_span_entries`](super::FglmOptions::max_span_entries) is enforced on — and
+    /// "entries" there means cells, since the blocks are dense.
+    pub span_cells: usize,
+
+    /// Field-element cells the retained accepted quotient vectors hold: `D^2` at full rank.
+    ///
+    /// **Not covered by any budget.** The conversion keeps every accepted vector so that a
+    /// candidate's class can be computed by one operator application, which is a third dense
+    /// `D x D` block beyond the span's two. Reported here so the omission is visible; closing it
+    /// is M18-4.
+    pub accepted_vector_cells: usize,
+
+    /// Bytes of the two dense blocks above, at `size_of::<F>()` a cell.
+    pub dense_block_bytes: usize,
+}
+
+impl FglmMemory {
+    /// Every byte figure above added together.
+    ///
+    /// **An estimate of what this crate stores, not a measurement of the process.** It ignores
+    /// allocator overhead, the source basis, every temporary, and F4's own peak while computing
+    /// the input. [`peak_resident_bytes`](crate::util::peak_resident_bytes) measures the process;
+    /// the two are reported side by side and are not interchangeable.
+    pub fn estimated_bytes(&self) -> usize {
+        self.operator_bytes + self.dense_block_bytes
+    }
+
+    /// The dense-block cell counts and bytes implied by a quotient dimension at full rank.
+    ///
+    /// `None` on arithmetic overflow, which `D` near `usize::MAX` would reach — a caller that
+    /// cannot represent the size should not report a wrapped one.
+    pub fn dense_blocks_for<F: FiniteField>(dimension: usize) -> Option<(usize, usize, usize)> {
+        let square = dimension.checked_mul(dimension)?;
+        let span_cells = square.checked_mul(2)?;
+        let bytes = span_cells
+            .checked_add(square)?
+            .checked_mul(size_of::<F>())?;
+        Some((span_cells, square, bytes))
+    }
+}
+
 /// What an FGLM conversion did.
 ///
 /// The quotient dimension is the figure to quote: FGLM's cost is `O(N * D^3)` with dense linear
@@ -15,6 +195,9 @@ pub struct FglmStatistics {
     pub target_basis_elements: usize,
 
     /// Entries the `N` multiplication operators hold between them.
+    ///
+    /// The same figure as [`FglmMemory::operator_entries`], kept at the top level because it is
+    /// what the operator budget is enforced on.
     pub operator_entries: usize,
 
     /// Candidate monomials taken off the frontier.
@@ -34,20 +217,103 @@ pub struct FglmStatistics {
 
     /// Row subtractions performed by the dependence test. Each touches `2 * D` entries.
     pub span_row_operations: usize,
+
+    /// The shape of the border the operators were built over.
+    pub border: BorderStatistics,
+
+    /// Where the time went, if the conversion was asked to measure.
+    pub timings: FglmStageTimings,
+
+    /// What the representations hold.
+    pub memory: FglmMemory,
 }
 
 impl FglmStatistics {
-    /// Bytes the conversion's representations needed, at 8 bytes per field element.
+    /// Bytes the conversion's representations needed.
     ///
-    /// The operators at 16 bytes an entry — a `usize` index and an element — plus the dependence
-    /// test's two `D`-column blocks at 8 bytes a cell.
-    ///
-    /// **An estimate of what this crate stores, not a measurement of the process.** It ignores
-    /// allocator overhead, the source basis, and F4's own peak while computing it. The same
-    /// distinction `FglmOptions` draws between representation limits and memory limits.
+    /// Delegates to [`FglmMemory::estimated_bytes`]; see there for what it does and does not count.
     pub fn estimated_bytes(&self) -> usize {
-        let operators = self.operator_entries * 16;
-        let span = 2 * self.quotient_dimension * self.quotient_dimension * 8;
-        operators + span
+        self.memory.estimated_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};
+    use crate::fields::Zp2147483647;
+    use std::{mem::size_of, time::Duration};
+
+    type F = Zp2147483647;
+
+    /// Repeated border columns are the border columns beyond one per distinct monomial.
+    #[test]
+    fn test_repeated_border_columns_is_the_excess_over_distinct() {
+        let border = BorderStatistics {
+            operator_columns: 448,
+            standard_columns: 168,
+            border_columns: 280,
+            distinct_border_monomials: 120,
+            normal_form_calls: 280,
+        };
+        assert_eq!(border.repeated_border_columns(), 160);
+        assert_eq!(border.duplication_rate(), Some(160.0 / 280.0));
+    }
+
+    /// A border with no nonstandard columns has no duplication rate rather than a rate of zero.
+    #[test]
+    fn test_a_border_free_operator_has_no_duplication_rate() {
+        let border = BorderStatistics {
+            operator_columns: 16,
+            standard_columns: 16,
+            ..BorderStatistics::default()
+        };
+        assert_eq!(border.repeated_border_columns(), 0);
+        assert_eq!(border.duplication_rate(), None);
+    }
+
+    /// The stage breakdown sums its parts, and operator construction is the three operator stages.
+    #[test]
+    fn test_the_stage_breakdown_sums_its_parts() {
+        let timings = FglmStageTimings {
+            quotient_basis: Duration::from_micros(100),
+            border_classification: Duration::from_micros(200),
+            normal_forms: Duration::from_micros(3_000),
+            column_assembly: Duration::from_micros(400),
+            dependence: Duration::from_micros(500),
+        };
+        assert_eq!(timings.sum(), Duration::from_micros(4_200));
+        assert_eq!(
+            timings.operator_construction(),
+            Duration::from_micros(3_600)
+        );
+    }
+
+    /// The dense blocks are `2 * D^2` span cells and `D^2` accepted-vector cells.
+    #[test]
+    fn test_the_dense_blocks_are_three_squares() {
+        let (span, accepted, bytes) = FglmMemory::dense_blocks_for::<F>(64).expect("representable");
+        assert_eq!(span, 2 * 64 * 64);
+        assert_eq!(accepted, 64 * 64);
+        assert_eq!(bytes, 3 * 64 * 64 * size_of::<F>());
+    }
+
+    /// A dimension whose square overflows is reported as unrepresentable, not wrapped.
+    #[test]
+    fn test_an_unrepresentable_dimension_has_no_block_size() {
+        assert_eq!(FglmMemory::dense_blocks_for::<F>(usize::MAX), None);
+    }
+
+    /// `estimated_bytes` adds the operators to the dense blocks and nothing else.
+    #[test]
+    fn test_estimated_bytes_adds_the_operators_to_the_dense_blocks() {
+        let statistics = FglmStatistics {
+            memory: FglmMemory {
+                operator_bytes: 4_096,
+                dense_block_bytes: 98_304,
+                ..FglmMemory::default()
+            },
+            ..FglmStatistics::default()
+        };
+        assert_eq!(statistics.estimated_bytes(), 102_400);
     }
 }

@@ -125,6 +125,8 @@ cargo run --release --example fglm_baseline        # which systems are zero-dime
 cargo run --release --example fglm_baseline -- cyclic-6   # one system per process
 cargo run --release --example fglm_operators      # how sparse the multiplication operators are
 cargo run --release --example fglm_conversion      # the FGLM pipeline against direct lex F4
+cargo run --release --example fglm_profile         # where a conversion's time and memory go
+cargo run --release --example fglm_profile -- katsura-7   # one system per process
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -176,6 +178,16 @@ positive-dimensional from the leading monomials of its grevlex basis, reports th
 `R/I` as a vector space, and times a lex basis against a grevlex one under both engines. It is the
 baseline for the order-conversion work; **cyclic-4 is positive-dimensional**, so FGLM does not
 apply to it, and that is measured rather than assumed.
+
+`fglm_profile` attributes a conversion's cost. One table is the shape of the border — how many of
+the `N * D` operator columns leave the standard monomials, and how many *distinct* monomials those
+are, whose gap bounds what deduplicating them could remove. The other is the stage breakdown
+(standard-monomial enumeration, border classification, normal forms, coordinate assembly, the lex
+walk) beside what the representations hold. It sets `FglmOptions::measure_stages`, which is off by
+default because the operator loop runs `N * D` times and a clock read inside it is not free. The
+byte figures are estimates of this crate's own representations;
+`zeebra::util::peak_resident_bytes` is the separate, process-wide measurement, and the two are not
+interchangeable.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),

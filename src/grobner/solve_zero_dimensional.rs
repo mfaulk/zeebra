@@ -450,7 +450,7 @@ fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, mem::size_of};
 
     use rand::{prelude::StdRng, SeedableRng};
 
@@ -1109,10 +1109,16 @@ mod tests {
         assert!(fglm.operator_entries > 0);
         assert!(fglm.span_row_operations > 0);
 
-        // The storage estimate is the operators plus the dependence test, and nothing else.
+        // The storage estimate is the operators' own bytes plus the three dense D x D blocks the
+        // conversion needs at full rank: the dependence test's two and the retained accepted
+        // vectors. M17 counted two blocks and priced the operators at a flat 16 bytes an entry,
+        // which undercounted both — the operators have a column spine and the accepted vectors
+        // were missing entirely.
+        assert_eq!(fglm.memory.span_cells, 2 * 16 * 16);
+        assert_eq!(fglm.memory.accepted_vector_cells, 16 * 16);
         assert_eq!(
             fglm.estimated_bytes(),
-            fglm.operator_entries * 16 + 2 * 16 * 16 * 8
+            fglm.memory.operator_bytes + 3 * 16 * 16 * size_of::<F>()
         );
     }
 

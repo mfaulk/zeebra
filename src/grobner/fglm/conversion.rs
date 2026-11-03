@@ -23,9 +23,10 @@ use std::{
 
 use crate::{
     grobner::{
+        f4::StageClock,
         fglm::{
             incremental_span::{Dependence, IncrementalSpan},
-            statistics::FglmStatistics,
+            statistics::{FglmMemory, FglmStatistics},
             FglmError, FglmOptions, QuotientAlgebra,
         },
         s_polynomial,
@@ -112,29 +113,39 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     // dependent on the empty span with no coefficients, and the relation that produces is `1` —
     // the correct lex basis. The walk then stops, because a dependent candidate enqueues no
     // children. A branch was written for this and removed when it proved to be dead.
-    let algebra = QuotientAlgebra::new(source_basis, source_order, options)?;
+    let (algebra, quotient_statistics) =
+        QuotientAlgebra::new_with_statistics(source_basis, source_order, options)?;
     let dimension = algebra.dimension();
     statistics.quotient_dimension = dimension;
-    statistics.operator_entries = (0..N)
-        .map(|i| algebra.operator(i).stored_entries())
-        .sum::<usize>();
+    statistics.border = quotient_statistics.border;
+    statistics.timings = quotient_statistics.timings;
+    statistics.operator_entries = algebra.operator_entries();
+    statistics.memory.operator_entries = statistics.operator_entries;
+    statistics.memory.operator_bytes = algebra.operator_bytes();
 
     // The span's two blocks are `2 * D^2` entries. Checked before allocating, since the size is a
     // function of the dimension alone — not discovered as it fills.
-    let span_entries = dimension
-        .checked_mul(dimension)
-        .and_then(|square| square.checked_mul(2))
+    //
+    // The accepted quotient vectors below are a third such block and are **not** checked here:
+    // `max_span_entries` has counted the span's two blocks since M17 and silently redefining it
+    // would make a budget mean one thing in one release and another in the next. The third block
+    // is reported in `statistics.memory` so the omission is visible. M18-4 closes it.
+    let (span_cells, accepted_cells, dense_bytes) = FglmMemory::dense_blocks_for::<F>(dimension)
         .ok_or(FglmError::SpanStorageExceeded {
             entries: usize::MAX,
             limit: options.max_span_entries,
         })?;
-    if span_entries > options.max_span_entries {
+    statistics.memory.span_cells = span_cells;
+    statistics.memory.accepted_vector_cells = accepted_cells;
+    statistics.memory.dense_block_bytes = dense_bytes;
+    if span_cells > options.max_span_entries {
         return Err(FglmError::SpanStorageExceeded {
-            entries: span_entries,
+            entries: span_cells,
             limit: options.max_span_entries,
         });
     }
 
+    let walk = StageClock::new(options.measure_stages);
     let mut span = IncrementalSpan::new(dimension);
     let mut accepted_monomials: Vec<Monomial<N>> = Vec::new();
     let mut accepted_vectors: Vec<Vec<F>> = Vec::new();
@@ -208,6 +219,7 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
 
     statistics.target_basis_elements = relations.len();
     statistics.span_row_operations = span.row_operations();
+    statistics.timings.dependence = walk.elapsed();
     Ok((relations, statistics))
 }
 
@@ -284,12 +296,13 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             buchberger, buchberger_with_criteria, f4,
-            fglm::{FglmError, FglmOptions},
+            fglm::{FglmError, FglmOptions, FglmStageTimings},
             reference::buchberger_reference,
             PairCriteria,
         },
         FiniteField, MonomialOrder, MultivariatePolynomial, One,
     };
+    use std::{mem::size_of, time::Duration};
 
     type F = Zp2147483647;
 
@@ -680,6 +693,148 @@ mod tests {
                 system,
                 s.candidates_considered,
                 1 + 2 * s.quotient_dimension
+            );
+        }
+    }
+
+    /// Every operator column is classified exactly once, as standard or as border.
+    #[test]
+    fn test_the_border_statistics_classify_every_column() {
+        let source_order = MonomialOrder::GradedReverseLexicographic;
+        for system in SYSTEMS {
+            let source = f4(&parse(system, ["x", "y"]), source_order).expect("within limits");
+            let (_, s) = fglm_to_lex_with_options(&source, source_order, &FglmOptions::unbounded())
+                .expect("convertible");
+
+            let border = s.border;
+            assert_eq!(
+                border.operator_columns,
+                2 * s.quotient_dimension,
+                "{:?}: N * D columns were not all seen",
+                system
+            );
+            assert_eq!(
+                border.standard_columns + border.border_columns,
+                border.operator_columns,
+                "{:?}: a column was neither standard nor on the border",
+                system
+            );
+            assert!(
+                border.distinct_border_monomials <= border.border_columns,
+                "{:?}: more distinct border monomials than border columns",
+                system
+            );
+            // The reference path reduces once per column, not once per monomial. That identity is
+            // what M18-1 changes, and it is asserted here so the change is visible rather than
+            // silent.
+            assert_eq!(
+                border.normal_form_calls, border.border_columns,
+                "{:?}: the reference path reduces once per border column",
+                system
+            );
+        }
+    }
+
+    /// Katsura-7's border really does repeat, which is the premise of deduplicating it.
+    ///
+    /// Asserted as a strict inequality on the system the milestone targets rather than as a
+    /// universal claim: a staircase can perfectly well have no repeated border monomial at all.
+    #[test]
+    fn test_the_border_repeats_on_katsura_7() {
+        let source_order = MonomialOrder::GradedReverseLexicographic;
+        let source = f4(&katsura::<7, F>(), source_order).expect("within limits");
+        let (_, s) = fglm_to_lex_with_options(&source, source_order, &FglmOptions::unbounded())
+            .expect("convertible");
+
+        assert_eq!(s.quotient_dimension, 64);
+        assert!(
+            s.border.distinct_border_monomials < s.border.border_columns,
+            "{} distinct border monomials in {} border columns is no duplication",
+            s.border.distinct_border_monomials,
+            s.border.border_columns
+        );
+        assert!(
+            s.border.repeated_border_columns() > 0,
+            "no repeated border column"
+        );
+        assert!(s.border.duplication_rate().expect("a border") > 0.0);
+    }
+
+    /// The memory account names three dense blocks and the operators' own bytes.
+    #[test]
+    fn test_the_memory_account_covers_all_three_dense_blocks() {
+        let source_order = MonomialOrder::GradedReverseLexicographic;
+        let source = f4(&katsura::<6, F>(), source_order).expect("within limits");
+        let (_, s) = fglm_to_lex_with_options(&source, source_order, &FglmOptions::unbounded())
+            .expect("convertible");
+
+        let d = s.quotient_dimension;
+        assert_eq!(d, 32);
+        assert_eq!(s.memory.span_cells, 2 * d * d);
+        assert_eq!(s.memory.accepted_vector_cells, d * d);
+        assert_eq!(s.memory.dense_block_bytes, 3 * d * d * size_of::<F>());
+        assert_eq!(s.memory.operator_entries, s.operator_entries);
+        assert!(
+            s.memory.operator_bytes > s.operator_entries * size_of::<(usize, F)>(),
+            "{} bytes does not cover {} entries plus a column spine",
+            s.memory.operator_bytes,
+            s.operator_entries
+        );
+        assert_eq!(
+            s.estimated_bytes(),
+            s.memory.operator_bytes + s.memory.dense_block_bytes
+        );
+    }
+
+    /// Stage timings are zero unless asked for, and account for most of the conversion when asked.
+    #[test]
+    fn test_the_stage_timings_are_off_by_default() {
+        let source_order = MonomialOrder::GradedReverseLexicographic;
+        let source = f4(&katsura::<5, F>(), source_order).expect("within limits");
+
+        let silent = FglmOptions::unbounded();
+        let (_, s) = fglm_to_lex_with_options(&source, source_order, &silent).expect("convertible");
+        assert_eq!(s.timings, FglmStageTimings::default());
+
+        let mut measured = FglmOptions::unbounded();
+        measured.measure_stages = true;
+        let (_, s) =
+            fglm_to_lex_with_options(&source, source_order, &measured).expect("convertible");
+        assert!(s.timings.sum() > Duration::ZERO, "nothing was measured");
+        assert!(
+            s.timings.normal_forms > Duration::ZERO,
+            "the border was reduced in no time at all"
+        );
+        assert!(
+            s.timings.dependence > Duration::ZERO,
+            "the lex walk took no time at all"
+        );
+        assert_eq!(
+            s.timings.operator_construction(),
+            s.timings.border_classification + s.timings.normal_forms + s.timings.column_assembly
+        );
+    }
+
+    /// Measuring does not change the answer.
+    #[test]
+    fn test_measuring_does_not_change_the_result() {
+        let source_order = MonomialOrder::GradedReverseLexicographic;
+        for system in SYSTEMS {
+            let source = f4(&parse(system, ["x", "y"]), source_order).expect("within limits");
+
+            let mut measured = FglmOptions::unbounded();
+            measured.measure_stages = true;
+            let (with, with_statistics) =
+                fglm_to_lex_with_options(&source, source_order, &measured).expect("convertible");
+            let (without, without_statistics) =
+                fglm_to_lex_with_options(&source, source_order, &FglmOptions::unbounded())
+                    .expect("convertible");
+
+            assert_eq!(with, without, "{:?}: measuring changed the basis", system);
+            assert_eq!(
+                with_statistics.border, without_statistics.border,
+                "{:?}: measuring changed the counters",
+                system
             );
         }
     }

@@ -6,6 +6,8 @@
 //! unit vector costing no storage and no reduction. A dense `D x D` matrix per variable would hold
 //! `N * D^2` field elements of which the great majority are structurally zero.
 
+use std::mem::size_of;
+
 use crate::FiniteField;
 
 /// Column `j` of an operator: where multiplication sends the `j`-th standard monomial.
@@ -98,6 +100,29 @@ impl<F: FiniteField> MultiplicationOperator<F> {
                 Column::Reduced(entries) => entries.len(),
             })
             .sum()
+    }
+
+    /// Bytes this operator's representation occupies, column spine included.
+    ///
+    /// Not the same as `stored_entries() * size_of::<(usize, F)>()`, in two directions: the spine
+    /// costs one `Column` per column whether it stores anything or not, and a `Vec` built by
+    /// `collect` can hold spare capacity beyond its length. Capacity rather than length is what
+    /// the allocator was asked for, so capacity is what is reported.
+    ///
+    /// Still an estimate of the representation and not a measurement of the process — it has no
+    /// way to see the allocator's own per-allocation overhead. See
+    /// [`FglmMemory`](super::FglmStatistics) for the three quantities this is one of.
+    pub fn stored_bytes(&self) -> usize {
+        let spine = self.columns.capacity() * size_of::<Column<F>>();
+        let heap: usize = self
+            .columns
+            .iter()
+            .map(|column| match column {
+                Column::Standard(_) => 0,
+                Column::Reduced(entries) => entries.capacity() * size_of::<(usize, F)>(),
+            })
+            .sum();
+        spine + heap
     }
 
     /// How many columns are unit vectors, i.e. products that stayed inside the staircase.

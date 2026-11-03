@@ -19,8 +19,8 @@ pub use f4::{
 };
 pub use fglm::{
     classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
-    FglmError, FglmOptions, FglmStatistics, IdealClass, MultiplicationOperator, QuotientAlgebra,
-    QuotientBasis,
+    BorderStatistics, FglmError, FglmMemory, FglmOptions, FglmStageTimings, FglmStatistics,
+    IdealClass, MultiplicationOperator, QuotientAlgebra, QuotientBasis, QuotientStatistics,
 };
 pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue};
 pub use s_polynomial::s_polynomial;
