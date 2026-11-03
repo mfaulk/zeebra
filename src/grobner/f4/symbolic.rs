@@ -73,11 +73,12 @@ impl Hasher for MonomialHasher {
     /// than the SipHash it replaced.
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
-        let mut words = bytes.chunks_exact(8);
-        for word in &mut words {
-            self.add(u64::from_le_bytes(word.try_into().expect("eight bytes")));
+        // `as_chunks` rather than `chunks_exact`: the chunk size is a constant, so the array
+        // length is known to the compiler and `from_le_bytes` needs no fallible conversion.
+        let (words, tail) = bytes.as_chunks::<8>();
+        for word in words {
+            self.add(u64::from_le_bytes(*word));
         }
-        let tail = words.remainder();
         if !tail.is_empty() {
             let mut padded = [0u8; 8];
             padded[..tail.len()].copy_from_slice(tail);
