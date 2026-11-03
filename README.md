@@ -296,6 +296,11 @@ let lex = fglm_to_lex(&grevlex, MonomialOrder::GradedReverseLexicographic).unwra
 assert_eq!(lex, f4(&system, MonomialOrder::Lexicographic).unwrap());
 ```
 
+The conversion is checked against **29 lexicographic bases computed by Singular**, committed as
+literals and regenerable with `Singular -q tools/reference_bases.sing`. Singular's `std` is
+Buchberger/slimgb lineage, so those references are independent of Zeebra's F4 in algorithm and not
+only in implementation. No external system is needed to run the tests.
+
 **`fglm_to_lex` trusts its input to be a Gröbner basis under the stated order, and returns a wrong
 basis rather than an error if it is not.** Use `fglm_to_lex_checked` for input of unknown
 provenance; it verifies Buchberger's criterion first, which costs 0.6x to 27x what computing the
