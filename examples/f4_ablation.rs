@@ -9,8 +9,9 @@
 //! One thing cannot be ablated, and saying so is part of the result: **M16-B's merged contribution
 //! is not option-gated.** What B shipped is a cheaper monomial hash inside symbolic preprocessing;
 //! it is unconditional and therefore present in every row below, baseline included. B's two
-//! *optional* strategies — `LargestLeadingMonomial` and `CacheMode::Store` — were both measured
-//! and rejected, and appear here only as the `b-rejected` row, which exists to show the rejection
+//! *optional* strategies were both measured and rejected. Reducer caching was rejected so
+//! thoroughly that the option was removed, so the `b-selection` row below measures the one
+//! remaining selectable rejection — the reducer-selection policy — and exists to show it losing
 //! rather than to be chosen.
 //!
 //! ```text
@@ -29,7 +30,7 @@ use zeebra::{
     fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
-        f4_with_options, CacheMode, F4Options, F4Statistics, PairCriteria, ReducerSelection,
+        f4_with_options, F4Options, F4Statistics, PairCriteria, ReducerSelection,
         ReductionStrategy,
     },
     linalg::Backend,
@@ -60,11 +61,10 @@ const CONFIGURATIONS: &[Configuration] = &[
         },
     },
     Configuration {
-        name: "b-rejected",
-        purpose: "M16-B's rejected options, kept to show the rejection",
+        name: "b-selection",
+        purpose: "M16-B's rejected reducer-selection policy, kept to show the rejection",
         options: |base| F4Options {
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
-            reducer_cache: CacheMode::Store,
             ..base
         },
     },
@@ -93,12 +93,11 @@ const CONFIGURATIONS: &[Configuration] = &[
         },
     },
     Configuration {
-        name: "A+b-rej",
+        name: "A+b-sel",
         purpose: "does a different reducer choice help structured elimination?",
         options: |base| F4Options {
             reduction: ReductionStrategy::Structured,
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
-            reducer_cache: CacheMode::Store,
             ..base
         },
     },
@@ -140,12 +139,11 @@ const CONFIGURATIONS: &[Configuration] = &[
         },
     },
     Configuration {
-        name: "A+b-rej+C+D",
+        name: "A+b-sel+C+D",
         purpose: "everything, including what was rejected",
         options: |base| F4Options {
             reduction: ReductionStrategy::Structured,
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
-            reducer_cache: CacheMode::Store,
             criteria: PairCriteria::ALL,
             elimination: Backend::Adaptive,
             ..base

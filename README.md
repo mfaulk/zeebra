@@ -287,15 +287,20 @@ monomial hash in symbolic preprocessing and the rewritten final interreduction a
 criterion is sound exactly when enabling it does not change the basis.
 
 With `default()`, **F4 is faster than `buchberger()` on every system and order measured** — 1.2x
-to 236x — and katsura-6 under grevlex, F4's worst case at 0.47x one milestone ago, is 3.6x.
+to 236x — and katsura-6 under grevlex, F4's worst case at 0.47x one milestone ago, is 3.8x.
 
 That comparison is between the two functions' defaults, and the two defaults are not
 algorithmically matched: the pair criteria are **shared machinery**, and `F4Options::recommended()`
 enables `PairCriteria::ALL` while `buchberger()` uses `PRODUCT_ONLY`. Give the classical engine the
-same criteria via `buchberger_with_criteria` and it speeds up 2.2x to 13.2x on its own; F4 then
-wins on thirteen of fourteen instances by 1.15x to 49x, and loses by 3% on cyclic-4 grevlex. That
-matched figure is the one that isolates F4's *matrix algorithm* from the critical-pair selection
-either engine can use.
+same criteria via `buchberger_with_criteria` and it speeds up 2.2x to 13.1x on its own; F4 then
+wins on fourteen of sixteen instances by 1.12x to 45x, and loses on two instances under 100
+microseconds where there is nothing to amortise. That matched figure is the one that isolates F4's
+*matrix algorithm* from the critical-pair selection either engine can use.
+
+The criteria also change what is *reachable*: katsura-7 is within `buchberger`'s range with them
+and was not without. The one instance that remains categorically F4's is **katsura-6 under lex** —
+the classical engine does not finish it in 900 seconds with every criterion enabled, and F4
+returns the same basis in 16 ms.
 
 `cargo run --release --example f4_milestone` reports both columns; §8.3 of
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md) has the analysis.

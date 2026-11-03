@@ -94,7 +94,7 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     pairs: &[CriticalPair<N>],
     order: MonomialOrder,
     options: &F4Options,
-    cache: &mut ReducerCache<N, F>,
+    cache: &mut ReducerCache<N>,
 ) -> Result<BatchOutcome<N, F>, F4Error> {
     let mut clock = StageClock::new(options.measure_stages);
     let mut stages = crate::grobner::f4::statistics::StageTimings::default();

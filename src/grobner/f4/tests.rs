@@ -966,7 +966,7 @@ fn test_every_configuration_agrees_with_the_baseline() {
                         ReducerSelection::FirstApplicable,
                         ReducerSelection::LargestLeadingMonomial,
                     ] {
-                        for reducer_cache in [CacheMode::Off, CacheMode::Count, CacheMode::Store] {
+                        for reducer_cache in [CacheMode::Off, CacheMode::Count] {
                             for criteria in [
                                 PairCriteria::NONE,
                                 PairCriteria::PRODUCT_ONLY,
@@ -1417,7 +1417,7 @@ fn test_reducer_selection_is_deterministic() {
             ReducerSelection::FirstApplicable,
             ReducerSelection::LargestLeadingMonomial,
         ] {
-            for reducer_cache in [CacheMode::Off, CacheMode::Count, CacheMode::Store] {
+            for reducer_cache in [CacheMode::Off, CacheMode::Count] {
                 let options = F4Options {
                     reducer_selection,
                     reducer_cache,

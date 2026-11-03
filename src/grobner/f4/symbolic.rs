@@ -26,7 +26,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     hash::{BuildHasher, Hasher},
 };
 
@@ -169,12 +169,20 @@ impl SymbolicCounts {
     }
 }
 
-/// What a [`ReducerCache`] does.
+/// Whether reducer multiples are tracked across batches.
 ///
-/// Three modes rather than a flag, because the question "would a cache pay?" has to be answerable
-/// *without* building one. [`CacheMode::Count`] answers it: it records which multiples were
-/// needed, so the repetition rate across batches is measurable at the cost of one monomial per
-/// distinct multiple and with no change whatsoever to what is computed.
+/// Two modes, and **neither serves a cached multiple** — which is the measured conclusion rather
+/// than an omission. [`CacheMode::Count`] exists because "would a cache pay?" has to be answerable
+/// without building one, and the answer turned out to be no: the repetition rate is high (43% to
+/// 95% of reducer multiples had been built in an earlier batch, so the recurrence the preceding
+/// milestone expected is real) and serving them is still slower, because a multiple's terms are
+/// the basis element's monomials each plus the multiplier — one integer addition per variable per
+/// term — against a hash of the key and a pointer chase to a heap vector. Implemented and
+/// measured, that made symbolic preprocessing 8% to 50% slower on every instance above a
+/// millisecond; see §7.2 of `docs/MILESTONE-F4-OPTIMIZATION.md`.
+///
+/// A `Store` variant existed and was removed: an option named for a behaviour it does not have is
+/// worse than no option. The implementation is in this file's history.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum CacheMode {
     /// Remember nothing. The baseline.
@@ -186,18 +194,6 @@ pub enum CacheMode {
     /// The measurement mode. Nothing is served from it, so the computation is bit-identical to
     /// [`CacheMode::Off`]; only the counters differ.
     Count,
-
-    /// Remember the built terms and serve them.
-    ///
-    /// Measured and not implemented. The repetition rate [`CacheMode::Count`] reports is high —
-    /// 43% to 95% of reducer multiples had been built in an earlier batch — so the recurrence the
-    /// preceding milestone expected is real. What it buys is not: a multiple's terms are the basis
-    /// element's monomials each plus the multiplier, which is one integer addition per variable per
-    /// term, and serving them instead costs a hash of the key and a pointer chase to a heap vector.
-    /// Implemented and measured, that made symbolic preprocessing 8% to 50% *slower* on every
-    /// instance above a millisecond. Behaves as [`CacheMode::Count`]; see section 7.2 of
-    /// `docs/MILESTONE-F4-OPTIMIZATION.md`.
-    Store,
 }
 
 /// Built reducer multiples, kept between batches.
@@ -212,14 +208,11 @@ pub enum CacheMode {
 /// row* is not: its column indices are relative to the batch's own column set, and no two batches
 /// have the same one. An implementation that expected to cache rows would find that out late.
 #[derive(Clone, Debug, Default)]
-pub struct ReducerCache<const N: usize, F: FiniteField> {
+pub struct ReducerCache<const N: usize> {
     mode: CacheMode,
 
     /// Every multiple needed so far, for the repetition measurement. Empty when off.
     seen: HashSet<(usize, Monomial<N>), BuildMonomialHasher>,
-
-    /// The built terms, under [`CacheMode::Store`] only.
-    terms: HashMap<(usize, Monomial<N>), Vec<(Monomial<N>, F)>, BuildMonomialHasher>,
 
     /// Multiples needed that had been needed before.
     repeats: usize,
@@ -228,12 +221,11 @@ pub struct ReducerCache<const N: usize, F: FiniteField> {
     firsts: usize,
 }
 
-impl<const N: usize, F: FiniteField> ReducerCache<N, F> {
+impl<const N: usize> ReducerCache<N> {
     pub fn new(mode: CacheMode) -> Self {
         Self {
             mode,
             seen: HashSet::default(),
-            terms: HashMap::default(),
             repeats: 0,
             firsts: 0,
         }
@@ -297,18 +289,6 @@ impl<const N: usize, F: FiniteField> ReducerCache<N, F> {
         }
     }
 
-    /// The stored terms of a multiple, under [`CacheMode::Store`].
-    pub fn terms(&self, key: &(usize, Monomial<N>)) -> Option<&[(Monomial<N>, F)]> {
-        self.terms.get(key).map(|terms| terms.as_slice())
-    }
-
-    /// Store the built terms of a multiple. Does nothing except under [`CacheMode::Store`].
-    pub fn store(&mut self, key: (usize, Monomial<N>), terms: Vec<(Monomial<N>, F)>) {
-        if self.mode == CacheMode::Store {
-            self.terms.insert(key, terms);
-        }
-    }
-
     /// Forget everything, keeping the mode and the counters.
     ///
     /// The bound a cache needs is on memory, and the basis grows throughout a computation, so an
@@ -317,7 +297,6 @@ impl<const N: usize, F: FiniteField> ReducerCache<N, F> {
     /// a bounded cache safe.
     pub fn clear(&mut self) {
         self.seen.clear();
-        self.terms.clear();
     }
 }
 
@@ -657,7 +636,7 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     pairs: &[CriticalPair<N>],
     max_rows: usize,
     selection: ReducerSelection,
-    cache: &mut ReducerCache<N, F>,
+    cache: &mut ReducerCache<N>,
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
     let mut counts = SymbolicCounts::default();
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
@@ -1176,7 +1155,7 @@ mod tests {
                     ReducerSelection::FirstApplicable,
                     ReducerSelection::LargestLeadingMonomial,
                 ] {
-                    for mode in [CacheMode::Off, CacheMode::Count, CacheMode::Store] {
+                    for mode in [CacheMode::Off, CacheMode::Count] {
                         let mut cache = ReducerCache::new(mode);
                         let context = format!(
                             "{:?} under {} {:?}/{:?}",
@@ -1256,7 +1235,7 @@ mod tests {
                 ReducerSelection::FirstApplicable,
                 ReducerSelection::LargestLeadingMonomial,
             ] {
-                let mut warm = ReducerCache::new(CacheMode::Store);
+                let mut warm = ReducerCache::new(CacheMode::Count);
                 let expected =
                     symbolic_preprocessing_with(&basis, &pairs, usize::MAX, selection, &mut warm)
                         .expect("unbounded");

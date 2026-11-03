@@ -139,12 +139,12 @@ pub struct F4Options {
     /// Which criteria may discard a critical pair before a matrix is built. See [`PairCriteria`].
     pub criteria: PairCriteria,
 
-    /// Whether reducer multiples are remembered between batches. See [`CacheMode`].
+    /// Whether reducer multiples are tracked between batches. See [`CacheMode`].
     ///
-    /// Whether caching pays depends on how often the same `(basis_index, multiplier)` recurs
-    /// across batches, which successive batches working at successive degrees give no reason to
-    /// expect. [`CacheMode::Count`] measures that without changing what is computed, and is the
-    /// configuration to run before [`CacheMode::Store`] is implemented at all.
+    /// **Nothing is served from this**, and that is the measured conclusion: the repetition rate
+    /// is high — 43% to 95% of multiples had been built in an earlier batch — and serving them is
+    /// still slower than rebuilding them, because rebuilding is one integer addition per variable
+    /// per term. [`CacheMode::Count`] measures the rate without changing what is computed.
     pub reducer_cache: CacheMode,
 
     /// Record how long each stage of each batch took, into [`super::F4Statistics::stages`].
@@ -188,8 +188,9 @@ impl F4Options {
     /// Two of M16's improvements are **not** here, because they are not options: a cheaper
     /// monomial hash in symbolic preprocessing and the rewritten final interreduction are
     /// unconditional and apply to [`F4Options::baseline`] too. The strategies that M16 measured
-    /// and *rejected* — [`ReducerSelection::LargestLeadingMonomial`] and [`CacheMode::Store`] —
-    /// are likewise absent, and remain selectable only so the rejection can be reproduced.
+    /// and *rejected* are likewise absent: [`ReducerSelection::LargestLeadingMonomial`] remains
+    /// selectable so its rejection can be reproduced, and reducer caching was removed outright
+    /// because an option named for a behaviour it does not have is worse than no option.
     ///
     /// Chosen from the ablation in `docs/MILESTONE-F4-OPTIMIZATION.md` §8.1, where this
     /// combination is the fastest of twelve on ten of eleven instances. On the eleventh,
@@ -388,7 +389,7 @@ mod tests {
                             reduction,
                             reducer_selection,
                             criteria,
-                            reducer_cache: CacheMode::Store,
+                            reducer_cache: CacheMode::Count,
                             measure_stages: true,
                             ..F4Options::baseline()
                         };

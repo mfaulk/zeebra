@@ -67,7 +67,7 @@ fn configuration(name: &str) -> Option<F4Options> {
         // measured before it is used, and `count` is how that is done.
         "b" => F4Options {
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
-            reducer_cache: CacheMode::Store,
+            reducer_cache: CacheMode::Count,
             ..base
         },
         "b-count" => F4Options {
@@ -91,7 +91,7 @@ fn configuration(name: &str) -> Option<F4Options> {
         "ab" => F4Options {
             reduction: ReductionStrategy::Structured,
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
-            reducer_cache: CacheMode::Store,
+            reducer_cache: CacheMode::Count,
             ..base
         },
         "ad" => F4Options {
@@ -112,7 +112,7 @@ fn configuration(name: &str) -> Option<F4Options> {
         "abcd" => F4Options {
             reduction: ReductionStrategy::Structured,
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
-            reducer_cache: CacheMode::Store,
+            reducer_cache: CacheMode::Count,
             criteria: PairCriteria::ALL,
             elimination: Backend::Adaptive,
             ..base

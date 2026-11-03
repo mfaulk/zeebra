@@ -64,17 +64,12 @@ fn header() {
 }
 
 /// The configurations compared: each policy with the cache off, and the cache alone.
-const CONFIGURATIONS: [(&str, ReducerSelection, CacheMode); 4] = [
+const CONFIGURATIONS: [(&str, ReducerSelection, CacheMode); 3] = [
     ("first", ReducerSelection::FirstApplicable, CacheMode::Off),
     (
         "first+count",
         ReducerSelection::FirstApplicable,
         CacheMode::Count,
-    ),
-    (
-        "first+store",
-        ReducerSelection::FirstApplicable,
-        CacheMode::Store,
     ),
     (
         "largest",

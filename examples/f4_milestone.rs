@@ -93,7 +93,8 @@ fn measure<const N: usize>(
     system: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
     rounds: usize,
-    try_buchberger: bool,
+    try_product: bool,
+    try_all: bool,
 ) -> Row {
     let recommended = F4Options::recommended();
     let baseline = F4Options::baseline();
@@ -110,9 +111,15 @@ fn measure<const N: usize>(
     });
     let (basis, _) = f4_with_options(system, order, &recommended).expect("within limits");
 
-    let (bb_product, bb_all) = if try_buchberger {
-        let product = time_buchberger(system, order, &PairCriteria::PRODUCT_ONLY, rounds);
-        let all = time_buchberger(system, order, &PairCriteria::ALL, rounds);
+    // Attempted separately, because the criteria change what is *reachable*: on katsura-7 the
+    // classical engine finishes in tens of milliseconds with them and not at all without.
+    let (bb_product, bb_all) = {
+        let product = try_product
+            .then(|| time_buchberger(system, order, &PairCriteria::PRODUCT_ONLY, rounds))
+            .flatten();
+        let all = try_all
+            .then(|| time_buchberger(system, order, &PairCriteria::ALL, rounds))
+            .flatten();
         // Both engines must return the same basis under either criteria setting: a criterion that
         // changed the answer would be a defect, so this is asserted rather than assumed.
         for (label, result) in [("product", &product), ("all", &all)] {
@@ -128,8 +135,6 @@ fn measure<const N: usize>(
             }
         }
         (product.map(|(t, _)| millis(t)), all.map(|(t, _)| millis(t)))
-    } else {
-        (None, None)
     };
 
     Row {
@@ -214,10 +219,24 @@ fn main() {
 
     let mut rows = Vec::new();
     for order in [LEX, GRLEX, GREVLEX] {
-        rows.push(measure::<4>("cyclic-4", &cyclic::<4, F>(), order, 5, true));
+        rows.push(measure::<4>(
+            "cyclic-4",
+            &cyclic::<4, F>(),
+            order,
+            5,
+            true,
+            true,
+        ));
     }
     for order in [LEX, GRLEX, GREVLEX] {
-        rows.push(measure::<5>("cyclic-5", &cyclic::<5, F>(), order, 3, true));
+        rows.push(measure::<5>(
+            "cyclic-5",
+            &cyclic::<5, F>(),
+            order,
+            3,
+            true,
+            true,
+        ));
     }
     for order in [LEX, GRLEX, GREVLEX] {
         rows.push(measure::<5>(
@@ -225,6 +244,7 @@ fn main() {
             &katsura::<5, F>(),
             order,
             3,
+            true,
             true,
         ));
     }
@@ -235,6 +255,7 @@ fn main() {
             order,
             3,
             true,
+            true,
         ));
     }
     let point = planted_point::<6>(9);
@@ -244,6 +265,7 @@ fn main() {
             &planted::<6, F>(&point),
             order,
             5,
+            true,
             true,
         ));
     }
@@ -258,19 +280,23 @@ fn main() {
     println!("Instances the preceding milestone reported as out of Buchberger's reach:");
     header();
     let hard_rows = vec![
-        measure::<6>("katsura-6", &katsura::<6, F>(), LEX, 2, hard),
-        measure::<7>("katsura-7", &katsura::<7, F>(), GRLEX, 2, hard),
-        measure::<7>("katsura-7", &katsura::<7, F>(), GREVLEX, 2, hard),
+        measure::<6>("katsura-6", &katsura::<6, F>(), LEX, 2, hard, hard),
+        measure::<7>("katsura-7", &katsura::<7, F>(), GRLEX, 2, hard, true),
+        measure::<7>("katsura-7", &katsura::<7, F>(), GREVLEX, 2, hard, true),
     ];
     for r in &hard_rows {
         print_row(r);
     }
+    println!();
+    println!("The criteria change what is *reachable*, not only what is fast: katsura-7 is within");
+    println!(
+        "the classical engine's range with them and was not without, which is why `bb all` is"
+    );
+    println!("attempted there by default. katsura-6 lex is not reachable either way — it exceeds");
+    println!("900 s with all criteria enabled.");
     if !hard {
         println!();
-        println!("(Buchberger not attempted on those three; pass `all` to try it under both");
-        println!(
-            "criteria settings, with a {} s budget per run.)",
-            BUCHBERGER_BUDGET.as_secs()
-        );
+        println!("(`bb product` not attempted on those three; pass `all` to try it, with a");
+        println!("{} s budget per run.)", BUCHBERGER_BUDGET.as_secs());
     }
 }

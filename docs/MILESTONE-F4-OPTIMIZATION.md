@@ -1677,64 +1677,62 @@ Comparing those two defaults therefore credits F4 with M16-C's work, which eithe
 
 | system | order | bb product | bb all | f4 base | f4 best | vs default | vs matched | M15 |
 |---|---|---|---|---|---|---|---|---|
-| cyclic-4 | lex | 0.19 | 0.07 | 0.18 | **0.06** | 2.93x | 1.15x | 1.05x |
-| cyclic-4 | grlex | 0.15 | 0.06 | 0.13 | **0.05** | 3.09x | 1.29x | 1.17x |
-| cyclic-4 | grevlex | 0.15 | **0.06** | 0.14 | 0.06 | 2.39x | **0.97x** | 1.02x |
-| cyclic-5 | lex | 52.96 | 4.00 | 21.21 | **2.64** | 20.03x | 1.51x | 1.97x |
-| cyclic-5 | grlex | 63.89 | 5.40 | 20.28 | **1.74** | 36.82x | 3.11x | 3.03x |
-| cyclic-5 | grevlex | 36.16 | 3.72 | 22.01 | **1.31** | 27.51x | 2.83x | 1.69x |
-| katsura-5 | lex | 176.94 | 37.10 | 10.88 | **0.75** | 235.68x | **49.41x** | 12.96x |
-| katsura-5 | grlex | 2.40 | 0.93 | 1.74 | **0.64** | 3.73x | 1.45x | 1.29x |
-| katsura-5 | grevlex | 1.30 | 0.75 | 1.67 | **0.63** | 2.07x | 1.21x | **0.72x** |
-| katsura-6 | grlex | 37.73 | 7.63 | 22.42 | **4.20** | 8.99x | 1.82x | 1.67x |
-| katsura-6 | grevlex | 12.81 | 4.50 | 26.26 | **3.54** | 3.62x | 1.27x | **0.47x** |
-| planted-6 | lex | 0.05 | 0.04 | 0.04 | **0.03** | 1.61x | 1.34x | 1.18x |
-| planted-6 | grlex | 0.04 | 0.03 | 0.03 | **0.03** | 1.20x | 1.18x | 1.07x |
-| planted-6 | grevlex | 0.04 | 0.03 | 0.03 | **0.03** | 1.20x | 1.18x | 1.08x |
+| cyclic-4 | lex | 0.18 | **0.08** | 0.18 | 0.08 | 2.20x | **0.90x** | 1.05x |
+| cyclic-4 | grlex | 0.15 | 0.06 | 0.13 | **0.05** | 3.07x | 1.27x | 1.17x |
+| cyclic-4 | grevlex | 0.15 | **0.06** | 0.14 | 0.07 | 2.32x | **0.96x** | 1.02x |
+| cyclic-5 | lex | 50.72 | 3.87 | 20.99 | **2.57** | 19.70x | 1.50x | 1.97x |
+| cyclic-5 | grlex | 55.64 | 4.76 | 17.84 | **1.51** | 36.94x | 3.16x | 3.03x |
+| cyclic-5 | grevlex | 33.87 | 3.24 | 20.01 | **1.39** | 24.28x | 2.32x | 1.69x |
+| katsura-5 | lex | 173.60 | 33.01 | 10.40 | **0.73** | 236.47x | **44.96x** | 12.96x |
+| katsura-5 | grlex | 2.36 | 0.93 | 1.73 | **0.63** | 3.74x | 1.47x | 1.29x |
+| katsura-5 | grevlex | 1.14 | 0.67 | 1.48 | **0.60** | 1.91x | 1.12x | **0.72x** |
+| katsura-6 | grlex | 34.79 | 7.42 | 20.74 | **3.88** | 8.98x | 1.91x | 1.67x |
+| katsura-6 | grevlex | 12.29 | 4.27 | 24.91 | **3.24** | 3.79x | 1.32x | **0.47x** |
+| planted-6 | lex | 0.05 | 0.04 | 0.04 | **0.03** | 1.58x | 1.31x | 1.18x |
+| planted-6 | grlex | 0.03 | 0.03 | 0.03 | **0.03** | 1.20x | 1.20x | 1.07x |
+| planted-6 | grevlex | 0.03 | 0.03 | 0.03 | **0.03** | 1.20x | 1.20x | 1.08x |
+| katsura-6 | lex | — | **—** | 436.16 | **16.22** | — | **—** | — |
+| katsura-7 | grlex | — | 84.16 | 467.65 | **41.38** | — | 2.03x | — |
+| katsura-7 | grevlex | — | 45.79 | 789.69 | **29.77** | — | 1.54x | — |
 
-**At each engine's default, F4 wins on all fourteen instances, by 1.20x to 235.68x.** At **matched
-criteria it wins on thirteen of fourteen, by 1.15x to 49.41x, and loses marginally on cyclic-4
-grevlex at 0.97x** — a 60-microsecond instance where the difference is a few percent of a
-sub-millisecond total.
+A dash under `bb product` on the last three rows means M15 established the instance as out of the
+classical engine's reach with that criterion, and it was not re-attempted. A dash under `bb all`
+means it does not finish with *every* criterion enabled either, within 900 s.
 
-Both numbers are true and they answer different questions. The second is the one to quote when
-asking what F4's *matrix algorithm* is worth, and it is substantially smaller: **the critical-pair
-criteria are the largest single contributor to the default-versus-default figure, and they are not
-specific to F4.** Giving them to the classical engine speeds it up by 2.2x to 13.2x on its own —
-cyclic-5 lex 52.96 ms to 4.00, katsura-5 lex 176.94 to 37.10, katsura-6 grevlex 12.81 to 4.50.
+**At each engine's default, F4 wins all fourteen paired instances, by 1.20x to 236x.** At
+**matched criteria it wins fourteen of sixteen, by 1.12x to 45.0x, and loses on two: cyclic-4 lex
+at 0.90x and cyclic-4 grevlex at 0.96x** — both under 100 microseconds, where the matrix
+machinery's fixed cost is not amortised by anything. Those two sit close enough to 1.0x that the
+ordering moves between runs; an earlier run had grevlex at 0.97x and lex at 1.15x.
+
+Both numbers are true and they answer different questions. **The second is the one to quote for
+what F4's matrix algorithm is worth, and it is much the smaller: the critical-pair criteria are the
+largest single contributor to the default-versus-default figure, and they are not specific to F4.**
+Giving them to the classical engine speeds it up by 2.2x to 13.1x on its own — cyclic-5 lex 50.72
+ms to 3.87, katsura-5 lex 173.60 to 33.01, katsura-6 grevlex 12.29 to 4.27.
+
+**The criteria also change what is *reachable*, which corrects M15's framing of its own result.**
+That report listed katsura-7 under both graded orders as instances Buchberger could not attempt.
+With the criteria it finishes them in **84 ms and 46 ms**, against F4's 41 ms and 30 ms — so F4's
+advantage there is **2.03x and 1.54x**, not the unbounded gap "F4 only" implied. The honest reading
+is that most of what made katsura-7 unreachable was pair selection, not the absence of batching.
+
+**One instance remains categorically F4's: katsura-6 under lex.** The classical engine does not
+finish it in 900 s *with every criterion enabled*, and F4 returns the same six-element basis in
+**16.22 ms**. That is the result that most supports the milestone's central criterion — it is a
+difference in what can be computed at all, not in how fast.
 
 The milestone's named target was katsura-6 under grevlex, where M15 recorded **0.47x** — F4 at
-30.2 ms against Buchberger's 14.1 ms, the worst paired result in that report. It is **3.62x** at
-each engine's default and **1.27x** at matched criteria. Either way the loss is gone, but the
-matched figure is the honest measure of how much of that came from the matrix algorithm: most of
-the 7.7x swing is the criteria, which M15's Buchberger did not have either.
+30.2 ms against Buchberger's 14.1 ms, the worst paired result in that report. It is **3.79x** at
+each engine's default and **1.32x** at matched criteria. Either way the loss is gone; the matched
+figure is the honest measure of how much came from the matrix algorithm, and most of the swing is
+the criteria, which M15's Buchberger did not have either.
 
 M15's accompanying claim — that "grevlex is the cheapest order for Buchberger and, at these sizes,
 the *worst* order for this F4 implementation" — no longer holds, and that *is* attributable to the
-matrix work: grevlex is now F4's **best** order on katsura-6 (3.54 ms against grlex's 4.20) and on
-katsura-7 (§8.2). The inversion M15 called "a direct consequence of the fill-in" went away when the
-fill-in did, and §8.4 is where that is measured.
-
-#### 8.3.1 The instances M15 could not pair
-
-M15 reported katsura-6 lex and katsura-7 as out of Buchberger's reach, measured with the product
-criterion alone. Since the criteria are shared, the honest question is whether the classical engine
-now reaches them, so that a dash in the table above means "does not finish" rather than "was not
-tried". `examples/buchberger_reach.rs` answers it one instance per invocation, because nothing
-inside a single `buchberger_with_criteria` call can be interrupted and an external timeout is the
-only sound way to bound it:
-
-```text
-timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
-```
-
-| system | order | Buchberger, all criteria | F4 recommended | F4 baseline |
-|---|---|---|---|---|
-| katsura-6 | lex | see below | **18.34** | 495.48 |
-| katsura-7 | grlex | see below | **40.31** | 568.10 |
-| katsura-7 | grevlex | see below | **32.82** | 932.32 |
-
-> Filled in from the `buchberger_reach` runs; a 900-second budget per instance.
+matrix work: grevlex is now F4's **best** order on katsura-6 (3.24 ms against grlex's 3.88) and on
+katsura-7 (29.77 against 41.38). The inversion M15 called "a direct consequence of the fill-in"
+went away when the fill-in did, and §8.4 is where that is measured.
 
 ### 8.4 Fill-in and memory
 
@@ -1847,15 +1845,20 @@ M16-0.
 ## 9. Definition of done, and what to do next
 
 Zeebra's F4 is faster than its classical Buchberger on every instance measured at each engine's
-default, and on thirteen of fourteen at **matched** critical-pair criteria — having been slower on
-five of thirteen at the start of the milestone. The instances the preceding milestone could not
-pair at all are 11–27x faster, and the one it named as the clearest cost in the whole report needs
-51x less peak memory. Every optimization is justified by a measurement taken before it was
-written, and three were rejected with their evidence preserved. That is the milestone.
+default, and on fourteen of sixteen at **matched** critical-pair criteria — having been slower on
+five of thirteen at the start of the milestone. Every instance is 1.2x to 153x faster than at
+M16-0, and the one M15 named as the clearest cost in the whole report needs 51x less peak memory.
+Every optimization is justified by a measurement taken before it was written, and three were
+rejected with their evidence preserved. That is the milestone.
 
-The matched comparison in §8.3 is the one to quote for what F4's *matrix algorithm* contributes:
-the critical-pair criteria are the largest single contributor to the default-versus-default figure
-and they are shared machinery, so most of that gap is M16-C rather than F4.
+Two qualifications belong in the summary rather than only in §8.3. **The critical-pair criteria
+are the largest single contributor and they are shared machinery**, so the matched column is the
+one to quote for what F4's *matrix algorithm* is worth: 1.12x to 45x, with two sub-100-microsecond
+losses. And the criteria changed what is *reachable*, not only what is fast — katsura-7 is now
+within the classical engine's range, where M15 reported it was not, so F4's margin there is 1.5x
+to 2.0x rather than unbounded. **katsura-6 under lex is the one instance that remains
+categorically F4's**: Buchberger does not finish it in 900 s with every criterion enabled, and F4
+returns the same basis in 16 ms.
 
 ### 9.1 Known limitations
 
