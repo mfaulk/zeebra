@@ -187,6 +187,15 @@ pub enum CacheMode {
     Count,
 
     /// Remember the built terms and serve them.
+    ///
+    /// Measured and not implemented. The repetition rate [`CacheMode::Count`] reports is high —
+    /// 43% to 95% of reducer multiples had been built in an earlier batch — so the recurrence the
+    /// preceding milestone expected is real. What it buys is not: a multiple's terms are the basis
+    /// element's monomials each plus the multiplier, which is one integer addition per variable per
+    /// term, and serving them instead costs a hash of the key and a pointer chase to a heap vector.
+    /// Implemented and measured, that made symbolic preprocessing 8% to 50% *slower* on every
+    /// instance above a millisecond. Behaves as [`CacheMode::Count`]; see section 7.2 of
+    /// `docs/MILESTONE-F4-OPTIMIZATION.md`.
     Store,
 }
 
