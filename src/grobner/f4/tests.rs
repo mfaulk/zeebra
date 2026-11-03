@@ -860,6 +860,7 @@ fn test_generous_limits_change_nothing() {
         max_matrix_columns: 10_000,
         max_live_nonzeros: 10_000_000,
         max_pairs_per_batch: Some(10_000),
+        ..F4Options::default()
     };
     assert_eq!(f4_with_options(&f, order, &options).unwrap().0, expected);
 }
@@ -894,4 +895,264 @@ fn test_f4_basis_retains_the_planted_solution() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The M16 option surface.
+//
+// A reduced Gröbner basis is unique for a given ideal and order, so every strategy selectable
+// through `F4Options` is required to return the *identical* sequence of polynomials. These tests
+// are what makes four concurrent optimization workstreams safe: whichever one changes what a
+// configuration does, the configuration still has to agree with the baseline.
+// ---------------------------------------------------------------------------------------------
+
+/// Every configuration of the option surface returns the baseline's basis exactly.
+///
+/// Stated over the whole cross product rather than one option at a time, so that a pair of
+/// optimizations which are each correct alone and wrong together is caught here rather than during
+/// integration.
+#[test]
+fn test_every_configuration_agrees_with_the_baseline() {
+    use crate::{
+        grobner::{CacheMode, PairCriteria, ReducerSelection, ReductionStrategy},
+        linalg::Backend,
+    };
+
+    let systems: Vec<Vec<MultivariatePolynomial<3, F>>> = vec![
+        system(&["x^2 + y", "x^2 + z"]),
+        system(&["x*z - y^2", "x^3 - z^2"]),
+        system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]),
+        system(&["x^2 + y + 1", "y^2 + z + 2", "z^2 + x + 3"]),
+    ];
+
+    for order in ALL_ORDERS {
+        for f in &systems {
+            let (expected, _) =
+                f4_with_options(f, order, &F4Options::baseline()).expect("within limits");
+
+            for elimination in [Backend::Sparse, Backend::Dense, Backend::Adaptive] {
+                for reduction in [
+                    ReductionStrategy::Unstructured,
+                    ReductionStrategy::Structured,
+                ] {
+                    for reducer_selection in [
+                        ReducerSelection::FirstApplicable,
+                        ReducerSelection::LargestLeadingMonomial,
+                    ] {
+                        for reducer_cache in [CacheMode::Off, CacheMode::Count, CacheMode::Store] {
+                            for criteria in [
+                                PairCriteria::NONE,
+                                PairCriteria::PRODUCT_ONLY,
+                                PairCriteria::ALL,
+                            ] {
+                                let options = F4Options {
+                                    elimination,
+                                    reduction,
+                                    reducer_selection,
+                                    reducer_cache,
+                                    criteria,
+                                    ..F4Options::baseline()
+                                };
+                                let (actual, _) =
+                                    f4_with_options(f, order, &options).expect("within limits");
+                                assert_eq!(
+                                    actual,
+                                    expected,
+                                    "{} under {:?}/{:?}/{:?}/{:?}/{:?}",
+                                    order.name(),
+                                    elimination,
+                                    reduction,
+                                    reducer_selection,
+                                    reducer_cache,
+                                    criteria
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A criterion is sound exactly when enabling it does not change the basis.
+///
+/// Checked on the benchmark families, over all three orders, against `PairCriteria::NONE` — which
+/// reduces every pair and so cannot be wrong for having discarded one. This is the test an unsound
+/// chain criterion has to fail.
+#[test]
+fn test_pair_criteria_do_not_change_the_basis() {
+    use crate::grobner::{buchberger_with_criteria, PairCriteria};
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        let katsura4 = katsura::<4, G>();
+        let cyclic4 = cyclic::<4, G>();
+
+        for (name, f) in [("katsura-4", &katsura4), ("cyclic-4", &cyclic4)] {
+            let reference = F4Options {
+                criteria: PairCriteria::NONE,
+                ..F4Options::baseline()
+            };
+            let (expected, _) = f4_with_options(f, order, &reference).expect("within limits");
+
+            for criteria in [PairCriteria::PRODUCT_ONLY, PairCriteria::ALL] {
+                let options = F4Options {
+                    criteria,
+                    ..F4Options::baseline()
+                };
+                let (actual, _) = f4_with_options(f, order, &options).expect("within limits");
+                assert_eq!(
+                    actual,
+                    expected,
+                    "{} under {} with {:?}",
+                    name,
+                    order.name(),
+                    criteria
+                );
+
+                // And the same for classical Buchberger, which shares the criteria.
+                let (classical, _) = buchberger_with_criteria(f, order, &criteria);
+                assert_eq!(
+                    classical,
+                    expected,
+                    "{} under {} with {:?}: Buchberger disagrees",
+                    name,
+                    order.name(),
+                    criteria
+                );
+            }
+        }
+    }
+}
+
+/// Stage measurement is off by default and records nothing, and on it records the stages.
+#[test]
+fn test_stage_measurement() {
+    type G = Zp2147483647;
+    let f = katsura::<5, G>();
+    let order = MonomialOrder::GradedReverseLexicographic;
+
+    let (_, off) = f4_with_options(&f, order, &F4Options::baseline()).expect("within limits");
+    assert_eq!(
+        off.stages,
+        Default::default(),
+        "the default path has no timing"
+    );
+    assert_eq!(off.total, std::time::Duration::ZERO);
+    assert_eq!(off.stage_coverage(), 0.0);
+
+    let options = F4Options {
+        measure_stages: true,
+        ..F4Options::baseline()
+    };
+    let (_, on) = f4_with_options(&f, order, &options).expect("within limits");
+    assert!(on.total > std::time::Duration::ZERO, "nothing was timed");
+    assert!(
+        on.stages.sum() > std::time::Duration::ZERO,
+        "no stage was timed"
+    );
+    assert!(
+        on.stages.sum() <= on.total,
+        "the stages {:?} exceed the total {:?}",
+        on.stages.sum(),
+        on.total
+    );
+    // The stages are the bulk of an F4 computation; if they were not, the breakdown would be
+    // measuring the wrong thing.
+    assert!(
+        on.stage_coverage() > 0.5,
+        "the stages account for only {:.0}% of the total",
+        on.stage_coverage() * 100.0
+    );
+}
+
+/// Measuring the stages does not change the basis.
+#[test]
+fn test_stage_measurement_does_not_change_the_result() {
+    type G = Zp2147483647;
+    for order in ALL_ORDERS {
+        let f = cyclic::<4, G>();
+        let (plain, _) = f4_with_options(&f, order, &F4Options::baseline()).expect("within limits");
+        let (timed, _) = f4_with_options(
+            &f,
+            order,
+            &F4Options {
+                measure_stages: true,
+                ..F4Options::baseline()
+            },
+        )
+        .expect("within limits");
+        assert_eq!(plain, timed, "{}", order.name());
+    }
+}
+
+/// The counting cache mode measures repetition without changing the computation.
+///
+/// This is the measurement that decides whether a reducer cache is worth building: if the
+/// repetition rate is low, caching has nothing to serve. The assertion here is only that counting
+/// is free of side effects — what the rate actually *is* is a measurement, not an invariant.
+#[test]
+fn test_counting_the_reducer_cache_changes_nothing() {
+    use crate::grobner::CacheMode;
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        let f = katsura::<5, G>();
+        let (plain, plain_statistics) =
+            f4_with_options(&f, order, &F4Options::baseline()).expect("within limits");
+        assert_eq!(
+            plain_statistics.reducer_rows_reused,
+            0,
+            "{}: nothing is recorded when the cache is off",
+            order.name()
+        );
+
+        let (counted, counted_statistics) = f4_with_options(
+            &f,
+            order,
+            &F4Options {
+                reducer_cache: CacheMode::Count,
+                ..F4Options::baseline()
+            },
+        )
+        .expect("within limits");
+
+        assert_eq!(plain, counted, "{}", order.name());
+        assert_eq!(
+            plain_statistics.reducer_rows,
+            counted_statistics.reducer_rows,
+            "{}: counting changed the matrices",
+            order.name()
+        );
+        assert!(
+            counted_statistics.reducer_rows_reused <= counted_statistics.reducer_rows,
+            "{}: more reuse than there were reducer rows",
+            order.name()
+        );
+    }
+}
+
+/// Divisor lookups are counted, and the scan really is linear in the basis size.
+///
+/// The counter exists to make "divisor lookup is a linear scan" a measurement rather than a claim,
+/// and to give an index something to beat. More than one step per query on a basis of several
+/// elements is what a scan looks like.
+#[test]
+fn test_divisor_lookups_are_counted() {
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (_, statistics) =
+        f4_with_options(&katsura::<5, G>(), order, &F4Options::baseline()).expect("within limits");
+
+    assert!(statistics.divisor_queries > 0, "no lookup was counted");
+    assert!(
+        statistics.divisor_scan_steps >= statistics.divisor_queries,
+        "a lookup cannot examine fewer than one element"
+    );
+    assert!(
+        statistics.divisor_scan_steps_per_query() > 1.0,
+        "a linear scan over a basis of several elements averages more than one step, got {:.2}",
+        statistics.divisor_scan_steps_per_query()
+    );
 }

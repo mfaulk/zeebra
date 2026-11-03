@@ -5,7 +5,112 @@
 //! reduction possible. These are the numbers that attribute the cost, and they are plain counters,
 //! so they belong in an example binary rather than in Criterion.
 
-use crate::linalg::sparse::EliminationStatistics;
+use std::time::{Duration, Instant};
+
+use crate::{grobner::pairs::CriterionCounts, linalg::sparse::EliminationStatistics};
+
+/// Where the time in a batch, or in a whole computation, went.
+///
+/// A total says a computation was slow. Only a breakdown says whether to attack preprocessing,
+/// construction, or the linear algebra — and, after a change, whether cost was removed or merely
+/// moved from one stage to another. Zero throughout unless
+/// [`F4Options::measure_stages`](super::F4Options::measure_stages) is set.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StageTimings {
+    /// Symbolic preprocessing: finding the rows the batch needs.
+    pub symbolic: Duration,
+
+    /// Macaulay matrix construction: the column mapping and writing the entries.
+    pub construction: Duration,
+
+    /// Elimination.
+    pub elimination: Duration,
+
+    /// Candidate extraction, including converting the surviving rows back to polynomials.
+    pub extraction: Duration,
+
+    /// The final interreduction: minimizing the basis and reducing each element modulo the rest.
+    ///
+    /// Not per batch — it happens once, after the pair queue empties — but reported here so that
+    /// it is inside [`StageTimings::sum`] and therefore inside the stage breakdown. It is here at
+    /// all because the first measurement taken with this instrumentation found it to be **84% of
+    /// katsura-6 under lex**, which no counter in the preceding milestone could have shown: that
+    /// instance builds 59 matrices and returns a six-element basis, so the cost is neither in the
+    /// matrices nor in the answer but in the reduction between them.
+    pub interreduction: Duration,
+}
+
+impl StageTimings {
+    /// Every stage added together.
+    ///
+    /// Still less than a computation's wall clock: pair selection and basis bookkeeping are
+    /// outside every stage. The difference is left visible rather than folded into one of them,
+    /// which is what [`F4Statistics::stage_coverage`] reports.
+    pub fn sum(&self) -> Duration {
+        self.symbolic + self.construction + self.elimination + self.extraction + self.interreduction
+    }
+
+    /// Fold another batch's timings into these.
+    pub fn add(&mut self, other: &Self) {
+        self.symbolic += other.symbolic;
+        self.construction += other.construction;
+        self.elimination += other.elimination;
+        self.extraction += other.extraction;
+        self.interreduction += other.interreduction;
+    }
+}
+
+/// A clock that is not read at all when measurement is off.
+///
+/// `Instant::now()` is a syscall-free read of a monotonic counter, but it is still tens of
+/// nanoseconds and it is a compiler fence. Holding an `Option` rather than a flag means the
+/// disabled path is a null check that branch prediction gets right every time, and that the clock
+/// read does not appear in the instruction stream of the measured code at all.
+#[derive(Clone, Copy, Debug)]
+pub struct StageClock {
+    /// When the clock was created, for [`StageClock::elapsed`]. `None` when disabled.
+    start: Option<Instant>,
+
+    /// When the current lap started.
+    lap: Option<Instant>,
+}
+
+impl StageClock {
+    /// A clock that measures only if `enabled`.
+    pub fn new(enabled: bool) -> Self {
+        let now = enabled.then(Instant::now);
+        Self {
+            start: now,
+            lap: now,
+        }
+    }
+
+    /// The time since the last `lap`, or since construction if there has not been one, and start
+    /// a new lap.
+    ///
+    /// Zero when disabled, so a caller adds it unconditionally rather than branching. Consecutive
+    /// laps partition the interval: they do not overlap and they leave no gap, so adding them up
+    /// gives the time from construction to the last lap.
+    pub fn lap(&mut self) -> Duration {
+        match self.lap.as_mut() {
+            Some(lap) => {
+                let now = Instant::now();
+                let elapsed = now.duration_since(*lap);
+                *lap = now;
+                elapsed
+            }
+            None => Duration::ZERO,
+        }
+    }
+
+    /// The time since construction. Laps do not reset it.
+    pub fn elapsed(&self) -> Duration {
+        match self.start {
+            Some(start) => start.elapsed(),
+            None => Duration::ZERO,
+        }
+    }
+}
 
 /// What one batch of critical pairs cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -30,6 +135,35 @@ pub struct BatchStatistics {
 
     /// New basis elements extracted, i.e. rows whose leading monomial was new.
     pub candidates: usize,
+
+    /// Where this batch's time went. Zero unless stage measurement is on.
+    pub stages: StageTimings,
+
+    /// Reducer rows whose built form came from a cache rather than being rebuilt.
+    ///
+    /// Zero unless reducer reuse is on. Reported next to [`BatchStatistics::reducer_rows`] because
+    /// the ratio of the two is the only thing that says whether caching was worth doing.
+    pub reducer_rows_reused: usize,
+
+    /// Divisor lookups symbolic preprocessing performed, i.e. monomials tested for reducibility.
+    pub divisor_queries: usize,
+
+    /// Basis elements examined across all those lookups.
+    ///
+    /// With a linear scan this is on the order of `divisor_queries` times the basis size; the
+    /// point of an index is to break that relationship, and this is the counter that shows whether
+    /// it did.
+    pub divisor_scan_steps: usize,
+
+    /// True if this batch was eliminated by the structured path rather than the one-pass echelon.
+    pub structured: bool,
+
+    /// Rows that were established as pivots without any row operation.
+    ///
+    /// For the structured path this is the reducer block, whose rows have distinct leading
+    /// monomials by construction. The unstructured path finds the same thing by accident where it
+    /// happens, so this is comparable between the two.
+    pub free_pivots: usize,
 }
 
 /// What a whole F4 computation cost.
@@ -39,7 +173,14 @@ pub struct F4Statistics {
     pub pairs_considered: usize,
 
     /// Pairs discarded by Buchberger's first criterion, without reaching a matrix.
+    ///
+    /// Kept as its own field rather than folded into [`F4Statistics::criteria`] because it is the
+    /// counter the preceding milestone's measurements are stated in, and a comparison against them
+    /// has to read the same number.
     pub pairs_eliminated_by_product_criterion: usize,
+
+    /// Pairs discarded, broken down by the criterion that discarded them.
+    pub criteria: CriterionCounts,
 
     /// Pairs that reached a matrix.
     pub pairs_reduced: usize,
@@ -112,6 +253,31 @@ pub struct F4Statistics {
 
     /// The largest number of terms in any basis element produced.
     pub max_terms: usize,
+
+    /// Summed over every batch: where the time went. Zero unless stage measurement is on.
+    pub stages: StageTimings,
+
+    /// The whole computation's wall clock, including the work outside any stage.
+    ///
+    /// Zero unless stage measurement is on. Reported so that `stages.sum()` can be compared
+    /// against it: what the stages do not account for is pair selection, basis bookkeeping, and
+    /// the final interreduction, and if that difference is large it is the thing to look at next.
+    pub total: Duration,
+
+    /// Summed over every batch: reducer rows served from a cache rather than rebuilt.
+    pub reducer_rows_reused: usize,
+
+    /// Summed over every batch: monomials tested for reducibility.
+    pub divisor_queries: usize,
+
+    /// Summed over every batch: basis elements examined across those tests.
+    pub divisor_scan_steps: usize,
+
+    /// Batches eliminated by the structured path.
+    pub structured_batches: usize,
+
+    /// Summed over every batch: pivots established without a row operation.
+    pub free_pivots: usize,
 }
 
 impl F4Statistics {
@@ -153,8 +319,53 @@ impl F4Statistics {
         self.pivot_inversions += batch.elimination.pivot_inversions;
         self.zero_rows += batch.elimination.zero_rows;
         self.reducer_rows += batch.reducer_rows;
+        self.stages.add(&batch.stages);
+        self.reducer_rows_reused += batch.reducer_rows_reused;
+        self.divisor_queries += batch.divisor_queries;
+        self.divisor_scan_steps += batch.divisor_scan_steps;
+        self.free_pivots += batch.free_pivots;
+        if batch.structured {
+            self.structured_batches += 1;
+        }
         if batch.candidates == 0 {
             self.empty_batches += 1;
+        }
+    }
+
+    /// The fraction of reducer rows that were served from a cache rather than rebuilt.
+    ///
+    /// Zero when nothing was cached, which is also the answer when caching is off. This is the
+    /// number that decides whether a reducer cache earns its complexity, and it should be measured
+    /// before one is built.
+    pub fn reducer_reuse_fraction(&self) -> f64 {
+        if self.reducer_rows == 0 {
+            0.0
+        } else {
+            self.reducer_rows_reused as f64 / self.reducer_rows as f64
+        }
+    }
+
+    /// Basis elements examined per divisor lookup, on average.
+    ///
+    /// One for a perfect index, and on the order of the basis size for a linear scan. Zero when no
+    /// lookup was counted.
+    pub fn divisor_scan_steps_per_query(&self) -> f64 {
+        if self.divisor_queries == 0 {
+            0.0
+        } else {
+            self.divisor_scan_steps as f64 / self.divisor_queries as f64
+        }
+    }
+
+    /// The share of the computation's wall clock the four stages account for.
+    ///
+    /// Zero when nothing was timed. Well below one means the cost is somewhere the stage
+    /// breakdown does not look — pair selection, basis bookkeeping, or interreduction.
+    pub fn stage_coverage(&self) -> f64 {
+        if self.total.is_zero() {
+            0.0
+        } else {
+            self.stages.sum().as_secs_f64() / self.total.as_secs_f64()
         }
     }
 
@@ -202,8 +413,9 @@ impl F4Statistics {
 
 #[cfg(test)]
 mod tests {
-    use super::{BatchStatistics, F4Statistics};
+    use super::{BatchStatistics, F4Statistics, StageClock, StageTimings};
     use crate::linalg::sparse::EliminationStatistics;
+    use std::time::Duration;
 
     /// Recording a batch accumulates the sums and raises the maxima.
     #[test]
@@ -225,6 +437,7 @@ mod tests {
                 pivot_inversions: 1,
             },
             candidates: 1,
+            ..Default::default()
         });
         statistics.record(&BatchStatistics {
             pairs: 1,
@@ -241,6 +454,7 @@ mod tests {
                 pivot_inversions: 0,
             },
             candidates: 0,
+            ..Default::default()
         });
 
         assert_eq!(statistics.batches, 2);
@@ -366,5 +580,121 @@ mod tests {
         statistics.pairs_reduced = 2;
         statistics.reducer_rows = 6;
         assert_eq!(statistics.reducer_row_fraction(), 0.6);
+    }
+
+    /// A disabled clock reports no time at all, so the measured path has none in it.
+    #[test]
+    fn test_a_disabled_clock_measures_nothing() {
+        let mut clock = StageClock::new(false);
+        for _ in 0..4 {
+            assert_eq!(clock.lap(), Duration::ZERO);
+        }
+        assert_eq!(clock.elapsed(), Duration::ZERO);
+    }
+
+    /// Consecutive laps partition the interval they cover: their sum is bounded by the total.
+    #[test]
+    fn test_laps_partition_the_elapsed_time() {
+        let mut clock = StageClock::new(true);
+
+        // Enough work that the clock has something to measure.
+        let mut sum = 0u64;
+        let mut laps = Duration::ZERO;
+        for round in 0..4u64 {
+            for i in 0..50_000u64 {
+                sum = sum.wrapping_add(i * round);
+            }
+            laps += clock.lap();
+        }
+        assert_ne!(sum, u64::MAX, "the work must not be optimized away");
+
+        let total = clock.elapsed();
+        assert!(laps > Duration::ZERO, "the clock measured nothing");
+        // The laps end at the last `lap` call, which is before `elapsed` was read, so the sum of
+        // the laps cannot exceed the total.
+        assert!(
+            laps <= total,
+            "laps {:?} exceeded the total {:?}",
+            laps,
+            total
+        );
+    }
+
+    /// Stage timings fold together and sum to their parts.
+    #[test]
+    fn test_stage_timings_accumulate() {
+        let one = StageTimings {
+            symbolic: Duration::from_micros(10),
+            construction: Duration::from_micros(20),
+            elimination: Duration::from_micros(30),
+            extraction: Duration::from_micros(40),
+            interreduction: Duration::from_micros(50),
+        };
+        assert_eq!(one.sum(), Duration::from_micros(150));
+
+        let mut total = StageTimings::default();
+        total.add(&one);
+        total.add(&one);
+        assert_eq!(total.symbolic, Duration::from_micros(20));
+        assert_eq!(total.interreduction, Duration::from_micros(100));
+        assert_eq!(total.sum(), Duration::from_micros(300));
+    }
+
+    /// Recording a batch accumulates the new per-stage and per-strategy counters too.
+    #[test]
+    fn test_record_accumulates_the_strategy_counters() {
+        let batch = |structured: bool| BatchStatistics {
+            reducer_rows: 10,
+            reducer_rows_reused: 4,
+            divisor_queries: 100,
+            divisor_scan_steps: 700,
+            structured,
+            free_pivots: 6,
+            stages: StageTimings {
+                symbolic: Duration::from_micros(5),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut statistics = F4Statistics::default();
+        statistics.record(&batch(true));
+        statistics.record(&batch(false));
+
+        assert_eq!(statistics.reducer_rows, 20);
+        assert_eq!(statistics.reducer_rows_reused, 8);
+        assert_eq!(statistics.reducer_reuse_fraction(), 0.4);
+        assert_eq!(statistics.divisor_queries, 200);
+        assert_eq!(statistics.divisor_scan_steps, 1400);
+        assert_eq!(statistics.divisor_scan_steps_per_query(), 7.0);
+        assert_eq!(statistics.structured_batches, 1, "one of the two");
+        assert_eq!(statistics.free_pivots, 12);
+        assert_eq!(statistics.stages.symbolic, Duration::from_micros(10));
+    }
+
+    /// The derived ratios are zero rather than NaN before anything has been measured.
+    #[test]
+    fn test_ratios_of_nothing() {
+        let statistics = F4Statistics::default();
+        assert_eq!(statistics.reducer_reuse_fraction(), 0.0);
+        assert_eq!(statistics.divisor_scan_steps_per_query(), 0.0);
+        assert_eq!(statistics.stage_coverage(), 0.0);
+    }
+
+    /// Stage coverage is the share of the total the four stages account for.
+    #[test]
+    fn test_stage_coverage() {
+        let statistics = F4Statistics {
+            stages: StageTimings {
+                symbolic: Duration::from_millis(1),
+                construction: Duration::from_millis(1),
+                elimination: Duration::from_millis(1),
+                extraction: Duration::from_millis(1),
+                interreduction: Duration::from_millis(0),
+            },
+            total: Duration::from_millis(5),
+            ..Default::default()
+        };
+        assert!((statistics.stage_coverage() - 0.8).abs() < 1e-12);
     }
 }

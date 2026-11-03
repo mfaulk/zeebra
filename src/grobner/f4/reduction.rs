@@ -24,13 +24,13 @@ use crate::{
     grobner::{
         f4::{
             macaulay::{BuildBudgetExceeded, MacaulayMatrix},
-            options::{F4Error, F4Options},
-            statistics::BatchStatistics,
-            symbolic::{symbolic_preprocessing_within, MonicBasis, RowKind},
+            options::{F4Error, F4Options, ReductionStrategy},
+            statistics::{BatchStatistics, StageClock},
+            symbolic::{symbolic_preprocessing_with, MonicBasis, ReducerCache, RowKind},
         },
         pairs::CriticalPair,
     },
-    linalg::sparse::row_echelon_within,
+    linalg::echelon::row_echelon_with,
     poly::MonomialOrder,
     FiniteField, MultivariatePolynomial,
 };
@@ -69,14 +69,51 @@ pub fn reduce_batch<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     options: &F4Options,
 ) -> Result<BatchOutcome<N, F>, F4Error> {
+    reduce_batch_in(
+        basis,
+        pairs,
+        order,
+        options,
+        &mut ReducerCache::new(options.reducer_cache),
+    )
+}
+
+/// As [`reduce_batch`], consulting and populating state carried between batches.
+///
+/// `cache` is the whole of F4's cross-batch state. It is a parameter rather than something
+/// ambient because it is the only thing that could make a batch's result depend on the batches
+/// before it, and "the result is a function of the input and the options" has to stay checkable.
+///
+/// The main loop calls this; [`reduce_batch`] is the same thing with a cache of its own, for a
+/// caller driving one batch in isolation.
+///
+/// # Errors
+/// As [`reduce_batch`].
+pub fn reduce_batch_in<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    order: MonomialOrder,
+    options: &F4Options,
+    cache: &mut ReducerCache<N, F>,
+) -> Result<BatchOutcome<N, F>, F4Error> {
+    let mut clock = StageClock::new(options.measure_stages);
+    let mut stages = crate::grobner::f4::statistics::StageTimings::default();
+
     // Every budget is enforced while the thing it bounds is being built, not after it exists.
     // Symbolic preprocessing discovers rows one at a time and matrix construction writes entries
     // one row at a time, so both can refuse to continue; checking afterwards would mean paying the
     // allocation in order to find out it was not allowed.
-    let preprocessed = symbolic_preprocessing_within(basis, pairs, options.max_matrix_rows)
-        .map_err(|exceeded| F4Error::TooManyRows {
-            limit: exceeded.limit,
-        })?;
+    let preprocessed = symbolic_preprocessing_with(
+        basis,
+        pairs,
+        options.max_matrix_rows,
+        options.reducer_selection,
+        cache,
+    )
+    .map_err(|exceeded| F4Error::TooManyRows {
+        limit: exceeded.limit,
+    })?;
+    stages.symbolic = clock.lap();
 
     let mut matrix = MacaulayMatrix::build_within(
         basis,
@@ -91,6 +128,7 @@ pub fn reduce_batch<const N: usize, F: FiniteField>(
             F4Error::TooManyNonzeros { nonzeros, limit }
         }
     })?;
+    stages.construction = clock.lap();
 
     let reducer_rows = preprocessed
         .rows
@@ -100,13 +138,19 @@ pub fn reduce_batch<const N: usize, F: FiniteField>(
     let rows = matrix.num_rows();
     let columns = matrix.num_columns();
 
-    let elimination =
-        row_echelon_within(matrix.matrix_mut(), options.max_live_nonzeros).map_err(|nonzeros| {
-            F4Error::TooManyNonzeros {
-                nonzeros,
-                limit: options.max_live_nonzeros,
-            }
-        })?;
+    // The one elimination call site, so that a structured path and a dense backend can be chosen
+    // independently of each other and neither has to touch the other's files.
+    let structured = matches!(options.reduction, ReductionStrategy::Structured);
+    let elimination = row_echelon_with(
+        options.elimination,
+        matrix.matrix_mut(),
+        options.max_live_nonzeros,
+    )
+    .map_err(|nonzeros| F4Error::TooManyNonzeros {
+        nonzeros,
+        limit: options.max_live_nonzeros,
+    })?;
+    stages.elimination = clock.lap();
 
     // A pivot in a column no input row led with is a relation the basis did not have.
     let mut candidates: Vec<MultivariatePolynomial<N, F>> = (0..matrix.num_rows())
@@ -123,6 +167,7 @@ pub fn reduce_batch<const N: usize, F: FiniteField>(
     // Echelon rows have distinct leading columns, so the leading monomials are distinct and this
     // is a total order on the candidates — which makes the output a function of the input.
     candidates.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
+    stages.extraction = clock.lap();
 
     let statistics = BatchStatistics {
         pairs: pairs.len(),
@@ -131,6 +176,15 @@ pub fn reduce_batch<const N: usize, F: FiniteField>(
         columns,
         elimination,
         candidates: candidates.len(),
+        stages,
+        reducer_rows_reused: preprocessed.counts.reducer_rows_reused,
+        divisor_queries: preprocessed.counts.divisor_queries,
+        divisor_scan_steps: preprocessed.counts.divisor_scan_steps,
+        structured,
+        // The unstructured path does not distinguish a pivot it found for free from one it worked
+        // for, so this is zero until the structured path reports it. Zero is the honest answer to
+        // "how many pivots did this elimination know in advance", not a missing measurement.
+        free_pivots: 0,
     };
 
     Ok(BatchOutcome {

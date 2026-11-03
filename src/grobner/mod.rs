@@ -8,8 +8,13 @@ pub mod reference;
 mod s_polynomial;
 mod solve;
 
-pub use buchberger::{buchberger, buchberger_with_statistics, Statistics};
-pub use f4::{f4, f4_with_options, F4Error, F4Options, F4Statistics};
-pub use pairs::{CriticalPair, PairQueue};
+pub use buchberger::{
+    buchberger, buchberger_with_criteria, buchberger_with_statistics, Statistics,
+};
+pub use f4::{
+    f4, f4_observed, f4_with_options, trace_batches, CacheMode, F4Error, F4Options, F4Statistics,
+    ReducerSelection, ReductionStrategy,
+};
+pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue};
 pub use s_polynomial::s_polynomial;
 pub use solve::solve;

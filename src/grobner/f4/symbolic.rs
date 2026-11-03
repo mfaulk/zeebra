@@ -24,12 +24,184 @@
 //!
 //! See Faugère (1999), Sec 2.1, where this is `SymbolicPreprocessing`.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
-    grobner::pairs::CriticalPair, poly::MonomialOrder, FiniteField, Monomial,
-    MultivariatePolynomial,
+    grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
+    poly::MonomialOrder,
+    FiniteField, Monomial, MultivariatePolynomial,
 };
+
+/// What one symbolic preprocessing pass cost.
+///
+/// The counters exist because the preceding milestone's bottleneck list is a set of hypotheses.
+/// "Divisor lookup is a linear scan" predicts [`SymbolicCounts::divisor_scan_steps`] grows with
+/// the basis size times [`SymbolicCounts::divisor_queries`]; "reducer multiples are rebuilt every
+/// batch" predicts nothing at all about whether the *same* multiple recurs, which is what
+/// [`SymbolicCounts::reducer_rows_reused`] is there to find out.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SymbolicCounts {
+    /// Monomials tested for reducibility.
+    pub divisor_queries: usize,
+
+    /// Basis elements examined across all those tests.
+    pub divisor_scan_steps: usize,
+
+    /// Reducer multiples whose built terms came from the cache rather than being recomputed.
+    pub reducer_rows_reused: usize,
+}
+
+impl SymbolicCounts {
+    /// Fold another pass's counters into these.
+    pub fn add(&mut self, other: &Self) {
+        self.divisor_queries += other.divisor_queries;
+        self.divisor_scan_steps += other.divisor_scan_steps;
+        self.reducer_rows_reused += other.reducer_rows_reused;
+    }
+}
+
+/// What a [`ReducerCache`] does.
+///
+/// Three modes rather than a flag, because the question "would a cache pay?" has to be answerable
+/// *without* building one. [`CacheMode::Count`] answers it: it records which multiples were
+/// needed, so the repetition rate across batches is measurable at the cost of one monomial per
+/// distinct multiple and with no change whatsoever to what is computed.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CacheMode {
+    /// Remember nothing. The baseline.
+    #[default]
+    Off,
+
+    /// Remember which multiples were needed, but not their terms.
+    ///
+    /// The measurement mode. Nothing is served from it, so the computation is bit-identical to
+    /// [`CacheMode::Off`]; only the counters differ.
+    Count,
+
+    /// Remember the built terms and serve them.
+    Store,
+}
+
+/// Built reducer multiples, kept between batches.
+///
+/// Cross-batch state is the one thing in F4 that can make a batch's output depend on what came
+/// before it, so it is passed explicitly rather than held anywhere ambient: "the result is a
+/// function of the input and the options" stays checkable only if every input appears in a
+/// signature.
+///
+/// What is cacheable is the **shifted terms** of a multiple — the basis element's monomials each
+/// multiplied by the multiplier, which is where the monomial arithmetic goes. The built *sparse
+/// row* is not: its column indices are relative to the batch's own column set, and no two batches
+/// have the same one. An implementation that expected to cache rows would find that out late.
+#[derive(Clone, Debug, Default)]
+pub struct ReducerCache<const N: usize, F: FiniteField> {
+    mode: CacheMode,
+
+    /// Every multiple needed so far, for the repetition measurement. Empty when off.
+    seen: HashSet<(usize, Monomial<N>)>,
+
+    /// The built terms, under [`CacheMode::Store`] only.
+    terms: HashMap<(usize, Monomial<N>), Vec<(Monomial<N>, F)>>,
+
+    /// Multiples needed that had been needed before.
+    repeats: usize,
+
+    /// Multiples needed for the first time.
+    firsts: usize,
+}
+
+impl<const N: usize, F: FiniteField> ReducerCache<N, F> {
+    pub fn new(mode: CacheMode) -> Self {
+        Self {
+            mode,
+            seen: HashSet::new(),
+            terms: HashMap::new(),
+            repeats: 0,
+            firsts: 0,
+        }
+    }
+
+    /// A cache that remembers nothing, for a caller that does not want one.
+    pub fn disabled() -> Self {
+        Self::new(CacheMode::Off)
+    }
+
+    /// A cache that measures repetition without serving anything.
+    pub fn counting() -> Self {
+        Self::new(CacheMode::Count)
+    }
+
+    pub fn mode(&self) -> CacheMode {
+        self.mode
+    }
+
+    /// The number of distinct multiples remembered.
+    pub fn len(&self) -> usize {
+        self.seen.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.seen.is_empty()
+    }
+
+    /// Note that a multiple is needed, and report whether it has been needed before.
+    ///
+    /// Always `false` under [`CacheMode::Off`], which records nothing — so the baseline pays a
+    /// branch and no allocation.
+    pub fn record(&mut self, key: (usize, Monomial<N>)) -> bool {
+        if self.mode == CacheMode::Off {
+            return false;
+        }
+        if self.seen.insert(key) {
+            self.firsts += 1;
+            false
+        } else {
+            self.repeats += 1;
+            true
+        }
+    }
+
+    /// Multiples needed that had been needed before, and multiples needed for the first time.
+    pub fn repeats_and_firsts(&self) -> (usize, usize) {
+        (self.repeats, self.firsts)
+    }
+
+    /// The share of needed multiples that had been built before.
+    ///
+    /// **This is the number that decides whether a reducer cache is worth building.** Zero when
+    /// nothing was recorded, which is also the answer under [`CacheMode::Off`].
+    pub fn repetition_rate(&self) -> f64 {
+        let total = self.repeats + self.firsts;
+        if total == 0 {
+            0.0
+        } else {
+            self.repeats as f64 / total as f64
+        }
+    }
+
+    /// The stored terms of a multiple, under [`CacheMode::Store`].
+    pub fn terms(&self, key: &(usize, Monomial<N>)) -> Option<&[(Monomial<N>, F)]> {
+        self.terms.get(key).map(|terms| terms.as_slice())
+    }
+
+    /// Store the built terms of a multiple. Does nothing except under [`CacheMode::Store`].
+    pub fn store(&mut self, key: (usize, Monomial<N>), terms: Vec<(Monomial<N>, F)>) {
+        if self.mode == CacheMode::Store {
+            self.terms.insert(key, terms);
+        }
+    }
+
+    /// Forget everything, keeping the mode and the counters.
+    ///
+    /// The bound a cache needs is on memory, and the basis grows throughout a computation, so an
+    /// implementation that caps itself has to be able to start over. Discarding the contents
+    /// cannot change a result — a miss is always recoverable by recomputing — which is what makes
+    /// a bounded cache safe.
+    pub fn clear(&mut self) {
+        self.seen.clear();
+        self.terms.clear();
+    }
+}
 
 /// A basis element with everything F4 reads repeatedly precomputed.
 ///
@@ -146,6 +318,38 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             })
     }
 
+    /// As [`MonicBasis::find_divisor`], under the given policy, counting the work.
+    ///
+    /// The frozen entry point for divisor lookup: an index or a filter goes behind this signature,
+    /// and [`MonicBasis::find_divisor`] stays as the linear scan it must agree with. Agreement is
+    /// not merely about returning *a* divisor — a different divisor is a different multiplier,
+    /// hence a different row, hence a different matrix — so a faster lookup under
+    /// [`ReducerSelection::FirstApplicable`] has to return the *same* divisor, and that is what the
+    /// differential test checks.
+    pub fn find_divisor_with(
+        &self,
+        monomial: &Monomial<N>,
+        selection: ReducerSelection,
+        counts: &mut SymbolicCounts,
+    ) -> Option<(usize, Monomial<N>)> {
+        counts.divisor_queries += 1;
+
+        match selection {
+            // The baseline: scan in index order and stop at the first hit. The scan step count is
+            // what an index has to beat, so it is counted exactly — elements examined, which is
+            // one more than the number rejected when the search succeeds.
+            ReducerSelection::FirstApplicable | ReducerSelection::LargestLeadingMonomial => {
+                for (index, element) in self.elements.iter().enumerate() {
+                    counts.divisor_scan_steps += 1;
+                    if let Some(quotient) = monomial.checked_div(&element.leading_monomial) {
+                        return Some((index, quotient));
+                    }
+                }
+                None
+            }
+        }
+    }
+
     /// True if some basis element's leading monomial divides `monomial`.
     pub fn is_top_reducible(&self, monomial: &Monomial<N>) -> bool {
         self.find_divisor(monomial).is_some()
@@ -217,6 +421,9 @@ pub struct Preprocessed<const N: usize> {
     /// This is the set candidate extraction tests against: a pivot whose monomial is in here is a
     /// relation the batch already represented, and only a pivot outside it is new.
     pub leading_monomials: HashSet<Monomial<N>>,
+
+    /// What finding those rows cost.
+    pub counts: SymbolicCounts,
 }
 
 impl<const N: usize> Preprocessed<N> {
@@ -260,6 +467,32 @@ pub fn symbolic_preprocessing_within<const N: usize, F: FiniteField>(
     pairs: &[CriticalPair<N>],
     max_rows: usize,
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
+    symbolic_preprocessing_with(
+        basis,
+        pairs,
+        max_rows,
+        ReducerSelection::FirstApplicable,
+        &mut ReducerCache::disabled(),
+    )
+}
+
+/// As [`symbolic_preprocessing_within`], under the given reducer-selection policy, consulting and
+/// populating `cache`.
+///
+/// The frozen entry point the F4 reduction step calls. `cache` carries whatever a reducer-reuse
+/// implementation keeps between batches; a disabled cache stores nothing and misses every lookup,
+/// which is also how repetition is *measured* before anything is cached.
+///
+/// # Errors
+/// As [`symbolic_preprocessing_within`].
+pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    max_rows: usize,
+    selection: ReducerSelection,
+    cache: &mut ReducerCache<N, F>,
+) -> Result<Preprocessed<N>, RowBudgetExceeded> {
+    let mut counts = SymbolicCounts::default();
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
@@ -302,10 +535,20 @@ pub fn symbolic_preprocessing_within<const N: usize, F: FiniteField>(
         if covered.contains(&monomial) {
             continue;
         }
-        let Some((basis_index, multiplier)) = basis.find_divisor(&monomial) else {
+        let Some((basis_index, multiplier)) =
+            basis.find_divisor_with(&monomial, selection, &mut counts)
+        else {
             // Irreducible: nothing in the matrix can reduce it, and nothing needs to.
             continue;
         };
+
+        // Recorded unconditionally, so that the repetition rate of `(basis_index, multiplier)`
+        // across batches is measurable in a mode that serves nothing and changes nothing. That
+        // measurement is the precondition for building a cache, not a consequence of having
+        // built one.
+        if cache.record((basis_index, multiplier)) {
+            counts.reducer_rows_reused += 1;
+        }
 
         if rows.len() == max_rows {
             return Err(RowBudgetExceeded { limit: max_rows });
@@ -325,6 +568,7 @@ pub fn symbolic_preprocessing_within<const N: usize, F: FiniteField>(
     Ok(Preprocessed {
         rows,
         leading_monomials: covered,
+        counts,
     })
 }
 

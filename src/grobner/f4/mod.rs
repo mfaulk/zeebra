@@ -21,6 +21,7 @@
 //! this implementation is built on.
 
 pub mod macaulay;
+pub mod observer;
 pub mod options;
 pub mod reduction;
 pub mod statistics;
@@ -30,18 +31,23 @@ pub mod symbolic;
 mod tests;
 
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
-pub use options::{F4Error, F4Options};
-pub use reduction::{reduce_batch, BatchOutcome};
-pub use statistics::{BatchStatistics, F4Statistics};
+pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
+pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy};
+pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
+pub use statistics::{BatchStatistics, F4Statistics, StageClock, StageTimings};
 pub use symbolic::{
-    symbolic_preprocessing, symbolic_preprocessing_within, MonicBasis, MonicElement, Preprocessed,
-    PreprocessedRow, RowBudgetExceeded, RowKind,
+    symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
+    MonicBasis, MonicElement, Preprocessed, PreprocessedRow, ReducerCache, RowBudgetExceeded,
+    RowKind, SymbolicCounts,
 };
 
 use crate::{
-    grobner::{buchberger::reduce_grobner_basis, pairs::are_relatively_prime, pairs::PairQueue},
+    grobner::{
+        buchberger::reduce_grobner_basis,
+        pairs::{CriterionCounts, PairQueue},
+    },
     poly::MonomialOrder,
-    FiniteField, MultivariatePolynomial,
+    FiniteField, Monomial, MultivariatePolynomial,
 };
 
 /// The reduced Gröbner basis for the given polynomials, with respect to the given monomial order.
@@ -68,7 +74,26 @@ pub fn f4_with_options<const N: usize, F: FiniteField>(
     order: MonomialOrder,
     options: &F4Options,
 ) -> Result<(Vec<MultivariatePolynomial<N, F>>, F4Statistics), F4Error> {
+    f4_observed(generators, order, options, &mut observer::Ignore)
+}
+
+/// As [`f4_with_options`], notifying `observer` of each batch before it is reduced.
+///
+/// The instrumentation entry point. Generic over the observer rather than taking a trait object,
+/// so that [`observer::Ignore`] — which every ordinary call uses — compiles to nothing. See
+/// [`observer`] for why measuring stages on real batches needs this rather than a reimplemented
+/// main loop.
+///
+/// # Errors
+/// As [`f4_with_options`].
+pub fn f4_observed<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+    observer: &mut O,
+) -> Result<(Vec<MultivariatePolynomial<N, F>>, F4Statistics), F4Error> {
     let mut statistics = F4Statistics::default();
+    let total_clock = StageClock::new(options.measure_stages);
 
     // A batch of no pairs makes no progress, so a zero limit is unsatisfiable rather than merely
     // strict. Rejected here, which is also what keeps `PairQueue::select_batch`'s precondition
@@ -101,7 +126,15 @@ pub fn f4_with_options<const N: usize, F: FiniteField>(
     check_basis_size(basis.len(), options)?;
 
     let mut monic = MonicBasis::new(&basis, order);
-    let mut pending = PairQueue::seeded(&basis, order);
+
+    // The leading monomials, maintained alongside the basis. Pair handling needs them and nothing
+    // else, and taking them from a polynomial is a scan of its whole term map — which the pair
+    // queue would otherwise repeat once per pair created.
+    let mut leads: Vec<Monomial<N>> = monic.leading_monomials().collect();
+
+    let mut criteria_counts = CriterionCounts::default();
+    let mut pending = PairQueue::seeded_from_leads(&leads, &options.criteria, &mut criteria_counts);
+    let mut cache = ReducerCache::new(options.reducer_cache);
 
     // Terminates because each batch either consumes pairs without adding any, or produces a
     // candidate whose leading monomial is outside the leading-term ideal of the current basis —
@@ -110,39 +143,31 @@ pub fn f4_with_options<const N: usize, F: FiniteField>(
     while !pending.is_empty() {
         let selected = pending.select_batch(options.max_pairs_per_batch);
         statistics.pairs_considered += selected.len();
+        for pair in &selected {
+            statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
+        }
 
-        // Buchberger's first criterion, applied pair by pair before the batch is built: a pair
-        // whose leading monomials are relatively prime contributes two rows that cancel to nothing
-        // new, so there is no reason to put them in the matrix.
-        let batch: Vec<_> = selected
-            .into_iter()
-            .filter(|pair| {
-                statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
-                let eliminated = are_relatively_prime(
-                    &monic.element(pair.left).leading_monomial,
-                    &monic.element(pair.right).leading_monomial,
-                );
-                if eliminated {
-                    statistics.pairs_eliminated_by_product_criterion += 1;
-                }
-                !eliminated
-            })
-            .collect();
+        // The pair criteria, applied before anything is built. A pair a criterion discards is one
+        // whose S-polynomial is guaranteed to reduce to zero modulo relations the computation
+        // already has, so there is no reason to put its rows in a matrix.
+        let batch = pending.filter_batch(selected, &leads, &options.criteria, &mut criteria_counts);
         if batch.is_empty() {
             continue;
         }
         statistics.pairs_reduced += batch.len();
 
         // Checked here rather than at the top of the loop, so the limit counts matrices actually
-        // built. A pass whose every pair is eliminated by the product criterion builds nothing and
-        // must not consume a batch's worth of budget.
+        // built. A pass whose every pair is eliminated by a criterion builds nothing and must not
+        // consume a batch's worth of budget.
         if let Some(limit) = options.max_batches {
             if statistics.batches >= limit {
                 return Err(F4Error::TooManyBatches { limit });
             }
         }
 
-        let outcome = reduce_batch(&monic, &batch, order, options)?;
+        observer.batch(&monic, &batch);
+
+        let outcome = reduce_batch_in(&monic, &batch, order, options, &mut cache)?;
         statistics.record(&outcome.statistics);
 
         for candidate in outcome.candidates {
@@ -150,17 +175,32 @@ pub fn f4_with_options<const N: usize, F: FiniteField>(
             let added = basis.len();
             // Already monic: elimination normalized every pivot to one.
             monic.push(&candidate, order);
+            leads.push(monic.element(added).leading_monomial);
             basis.push(candidate);
             statistics.elements_added += 1;
 
             check_basis_size(basis.len(), options)?;
 
             // Only the pairs involving the new element are new.
-            pending.push_pairs_with(&basis, added, order);
+            pending.push_pairs_from_leads(&leads, added, &options.criteria, &mut criteria_counts);
         }
     }
 
-    Ok((reduce_grobner_basis(&basis, order), statistics))
+    statistics.criteria = criteria_counts;
+    statistics.pairs_eliminated_by_product_criterion = criteria_counts.product;
+
+    // Timed separately: on katsura-6 under lex it is the majority of the computation, which no
+    // per-batch counter would have revealed — 59 matrices and a six-element answer, with the cost
+    // in the reduction between them.
+    let mut interreduction_clock = StageClock::new(options.measure_stages);
+    let reduced = reduce_grobner_basis(&basis, order);
+    statistics.stages.interreduction = interreduction_clock.lap();
+
+    // Read last, so that everything is inside the total. What the stages do not account for is
+    // pair selection and basis bookkeeping, which is what `stage_coverage` reports.
+    statistics.total = total_clock.elapsed();
+
+    Ok((reduced, statistics))
 }
 
 /// Reject a basis larger than `options` allows.
