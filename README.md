@@ -121,6 +121,7 @@ cargo run --release --example fglm_baseline        # which systems are zero-dime
                                                    # a lex basis costs against a grevlex one
 cargo run --release --example fglm_baseline -- cyclic-6   # one system per process
 cargo run --release --example fglm_operators      # how sparse the multiplication operators are
+cargo run --release --example fglm_conversion      # the FGLM pipeline against direct lex F4
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -270,6 +271,43 @@ That nilpotence is the point of keeping multiplicities: `<x^2, y^2>` has a singl
 and an operator with no eigenbasis. `cargo run --release --example fglm_operators` reports how much
 storage the operators need — 0.34% of a dense matrix on planted-8, but 57% on the katsura family,
 where the sparse representation does not pay for itself.
+
+### Monomial-order conversion (FGLM)
+
+`grobner::fglm_to_lex` converts a zero-dimensional Gröbner basis under any order into the
+lexicographic basis, by linear algebra over `R/I` rather than by another Gröbner computation. The
+point is that grevlex is usually much cheaper to compute than lex:
+
+```rust
+use zeebra::fields::Zp2147483647;
+use zeebra::grobner::{f4, fglm_to_lex};
+use zeebra::{MonomialOrder, MultivariatePolynomial};
+
+type F = Zp2147483647;
+let system: Vec<MultivariatePolynomial<2, F>> = ["x^2 - y", "y^3 - 1"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, ["x", "y"]).unwrap())
+    .collect();
+
+let grevlex = f4(&system, MonomialOrder::GradedReverseLexicographic).unwrap();
+let lex = fglm_to_lex(&grevlex, MonomialOrder::GradedReverseLexicographic).unwrap();
+
+// A reduced Gröbner basis is unique for an ideal and an order, so this is an equality of values.
+assert_eq!(lex, f4(&system, MonomialOrder::Lexicographic).unwrap());
+```
+
+**`fglm_to_lex` trusts its input to be a Gröbner basis under the stated order, and returns a wrong
+basis rather than an error if it is not.** Use `fglm_to_lex_checked` for input of unknown
+provenance; it verifies Buchberger's criterion first, which costs 0.6x to 27x what computing the
+basis cost, and that is why it is not the default. `grobner::is_grobner_basis` is the check on its
+own.
+
+Whether conversion is worth doing depends entirely on the system —
+`cargo run --release --example fglm_conversion` measures it. On cyclic-6 the pipeline is **7.4x**
+faster than direct lex F4, on katsura-6 **2.5x**, and on katsura-7 direct lex F4 produces **no
+basis at all** while the pipeline finishes in 68 ms. On the planted family it loses by up to
+**65x**. There is no automatic strategy selection, because there is not yet a heuristic that would
+make the right call on both ends of that range.
 
 ### F4
 

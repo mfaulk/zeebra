@@ -1,8 +1,8 @@
 # Milestone: FGLM and Zero-Dimensional Polynomial-System Solving
 
-**Status:** M17-2 complete. M17-0 design approved against the merged M16 code and baseline
-measured; classification, the quotient monomial basis, and the quotient algebra with its
-multiplication operators implemented.
+**Status:** M17-3 complete — the conversion works. Design approved against the merged M16 code,
+baseline measured, and classification, the quotient monomial basis, the quotient algebra, the
+incremental dependence test and the FGLM conversion all implemented and measured end to end.
 **Prerequisite:** M16 on `main` at `494c16e`, CI green. Satisfied.
 
 This document began as the M17-0 deliverable — the mathematical design, the API contracts, the
@@ -641,12 +641,20 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
 
 /// As `fglm_to_lex`, after verifying the precondition.
 ///
-/// Every S-polynomial of the input is reduced against it and must vanish. That costs what a
-/// Buchberger pass costs, which is why it is a separate entry point rather than the default.
+/// Every S-polynomial of the input is reduced against it and must vanish. That costs 0.6x to 27x
+/// what computing the basis cost (§10.2), which is why it is a separate entry point.
 pub fn fglm_to_lex_checked<const N: usize, F: FiniteField>(
     source_basis: &[MultivariatePolynomial<N, F>],
     source_order: MonomialOrder,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, FglmError>;
+
+/// Whether every S-polynomial of `basis` reduces to zero modulo it: Buchberger's criterion.
+///
+/// Public because the test corpus of §9 needs it as an oracle and the crate had no such helper.
+pub fn is_grobner_basis<const N: usize, F: FiniteField>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> bool;
 ```
 
 The target order is lex in M17 and is not a parameter. A `target_order` parameter would be a
@@ -886,13 +894,36 @@ Oracles, in increasing order of independence:
    membership holds both ways: each source polynomial reduces to zero modulo the target basis and
    each target polynomial reduces to zero modulo the source basis. A reduced Gröbner basis is
    unique per ideal and order, so after canonical sorting the comparison is exact equality.
-   *Note: the crate has no "is a Gröbner basis" helper today. M17-C adds one to `test_support`.*
+   *`grobner::is_grobner_basis` is this check, added by M17-C. It is public rather than in
+   `test_support` because a caller validating input of unknown provenance needs it too.*
 2. **Differential.** FGLM against direct lex `f4`, against `buchberger`, and against
    `buchberger_reference` on the small cases.
 3. **Committed external values.** Selected lex bases from SageMath, Singular, or Groebner.jl, as
-   literals. **No external algebra system at CI runtime.**
+   literals. **No external algebra system at CI runtime.** See §9.1 — this one is outstanding.
 4. **Exhaustive search.** Already the pattern in `solve.rs`'s own tests, over GF(5), GF(7), GF(13).
 5. **Planted witnesses.** Verified against the original generators, not against the basis.
+
+### 9.1 Two gaps, stated rather than left implicit
+
+**No external computer-algebra system was available**, so oracle 3 above is not satisfied. What is
+committed instead are two lex bases derived by hand — `<x^2 - y, y^3 - 1>`, which is already a lex
+Gröbner basis because its leading monomials `x^2` and `y^3` are coprime and the product criterion
+discards the only pair, and `<x^2, y^2>`, a monomial ideal and therefore its own reduced basis
+under every order. Everything else is checked against this crate's own three engines — `f4`,
+`buchberger`, and the deliberately naive `buchberger_reference` — plus Buchberger's criterion
+applied to the output and ideal membership in both directions. That is strong, and it is not
+*independent*: a misunderstanding shared by all three engines would survive it. Committing
+Sage-derived literals remains worth doing.
+
+**A non-Gröbner source gives a wrong answer, not an error.** The conversion works inside the
+quotient that the source's leading monomials describe. If that is not `R/I`, the walk still accepts
+exactly as many monomials as that space has dimensions, still finds dependences, and still emits a
+basis — of the wrong ideal. The design proposed detecting this by checking that the accepted count
+equals `D`; **that check cannot fire**, which was established by constructing four non-Gröbner
+inputs with pure-power leading monomials in every variable and observing all four return `Ok` with
+a basis that disagrees with direct lex F4. The check is now a `debug_assert` stating FGLM's theorem
+rather than a validation, and `fglm_to_lex_checked` — which verifies Buchberger's criterion up
+front — is the answer for input of unknown provenance. §10.2 prices it.
 
 ---
 
@@ -980,6 +1011,58 @@ that M17's new solver should be compared against lex F4, while the *existing* so
 independent speedup available to it that has nothing to do with FGLM. M16 §9.1 already records
 this.
 
+### 10.2 The conversion measured, end to end
+
+`cargo run --release --example fglm_conversion`, GF(2^31 - 1), fastest of three, both bases
+asserted equal wherever both exist. `pipeline` is `build + convert` — the grevlex basis plus the
+conversion — against `lex f4`, which is what it replaces.
+
+| system | D | build ms | algebra ms | convert ms | pipeline ms | lex f4 ms | pipeline vs direct | verify ms |
+|---|---|---|---|---|---|---|---|---|
+| cyclic-3 | 6 | 0.01 | 0.01 | 0.01 | 0.02 | 0.01 | 0.50x | 0.01 |
+| cyclic-5 | 70 | 1.48 | 1.90 | 2.14 | 3.62 | 2.58 | 0.71x | 4.37 |
+| cyclic-6 | 156 | 14.09 | 27.56 | 25.67 | 39.77 | 294.96 | **7.42x** | 130.89 |
+| katsura-3 | 4 | 0.03 | 0.01 | 0.01 | 0.04 | 0.02 | 0.50x | 0.02 |
+| katsura-4 | 8 | 0.11 | 0.06 | 0.07 | 0.18 | 0.11 | 0.61x | 0.15 |
+| katsura-5 | 16 | 0.60 | 0.46 | 0.50 | 1.10 | 0.84 | 0.76x | 2.34 |
+| katsura-6 | 32 | 3.66 | 3.43 | 3.60 | 7.26 | 18.23 | **2.51x** | 31.72 |
+| katsura-7 | 64 | 29.97 | 36.23 | 38.13 | 68.10 | **no basis** | **unbounded** | 869.29 |
+| planted-4 | 16 | 0.02 | 0.03 | 0.05 | 0.07 | 0.02 | 0.29x | 0.03 |
+| planted-6 | 64 | 0.03 | 0.28 | 0.40 | 0.44 | 0.03 | 0.07x | 0.09 |
+| planted-8 | 256 | 0.05 | 1.78 | 3.18 | 3.23 | 0.05 | **0.015x** | 0.20 |
+
+`algebra` is the quotient-algebra construction, which `convert` **includes** rather than adds to.
+`no basis` is `F4Error::TooManyNonzeros` at the default limit.
+
+**The M17-0 predictions held, including the one about losing.** §10.1 predicted from an operation
+count that FGLM would win on cyclic-6 and katsura-6, be the only route on katsura-7, be close on
+cyclic-5, and lose by orders of magnitude on planted-8. The measurement: 7.4x, 2.5x, the only
+route, 0.71x, and **0.015x — a 65x loss**. Three wins, eight losses, and the losses are not
+marginal.
+
+**katsura-7 is the result.** The whole pipeline takes 68 ms. Direct lex F4 returns no basis at the
+default limit and does not finish at a hundredfold limit in thirteen minutes (§10). The quotient
+algebra is 16,257 operator entries and the dependence test performs 2,335 row operations.
+
+**The quotient-algebra construction dominates the conversion, not the linear algebra.** On
+katsura-7 `algebra` is 36.2 ms of a 38.1 ms `convert`, so the frontier and the dependence test
+together are about 2 ms — the 2,335 row operations touch roughly 300,000 field elements, which is
+nothing. The cost is the `N * D` operator columns, each needing a `normal_form` against the source
+basis for the 72% of products that leave the staircase. **So the thing to optimize in M17-E is
+operator construction, and `O(N D^3)` is not where the time goes at these dimensions.** The
+`O(N D^3)` term would dominate at larger `D`; it does not dominate anywhere in this corpus.
+
+**cyclic-6's win is 7.4x, not the 22x its basis costs suggested.** §10's `lex f4 / grevlex` column
+was 22.2x, but the conversion costs 25.7 ms on top of the 14.1 ms basis, so the pipeline is 39.8 ms
+against 295 ms. The basis-cost ratio is an upper bound on the achievable speedup and not an
+estimate of it.
+
+**Verifying the source costs more than computing it.** 0.6x the basis computation on the smallest
+instances and **27x on katsura-7** — 869 ms against a 30 ms basis and a 38 ms conversion. This is
+what settles §8's open question about input validation in favour of a trusted default with an
+explicit checked entry point: unconditional verification would cost an order of magnitude more than
+the conversion it protects. §9.1 is the hazard that follows from that choice.
+
 ---
 
 ## 11. Sub-milestones and merge gates
@@ -989,8 +1072,8 @@ this.
 | M17-0 | this document, the corrected `benchmark_systems` doc comment, `examples/fglm_baseline.rs` | design reviewed, baseline reproducible | **merged**, `31b72c9` |
 | M17-1 | `classify_ideal`, `QuotientBasis` | correct classification on §9's cases, bounded enumeration | **done** |
 | M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms | **done** |
-| M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | next |
-| M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | |
+| M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | **done**, with one gap — §9.1 |
+| M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | next |
 | M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | |
 
 Each PR compiles and tests independently. The order is forced by the mathematics: each stage
