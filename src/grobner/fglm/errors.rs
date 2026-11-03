@@ -23,6 +23,19 @@ pub enum FglmError {
     /// after each column is built, so the overshoot is bounded by a single column.
     OperatorStorageExceeded { entries: usize, limit: usize },
 
+    /// The dependence test needed more entries than the limit allowed.
+    ///
+    /// Carries the count, which is known from `D` before anything is allocated.
+    SpanStorageExceeded { entries: usize, limit: usize },
+
+    /// The source was not a Gröbner basis under the order it was said to be one under.
+    ///
+    /// Detected, not assumed: the conversion accepts exactly `D` target standard monomials when
+    /// the source is a Gröbner basis, and a different count means the quotient the operators were
+    /// built over was not `R/I`. A caller wanting the precondition checked up front rather than
+    /// discovered should use the checked entry point.
+    NotAGrobnerBasis,
+
     /// More standard monomials than the limit allowed.
     ///
     /// Carries only the limit. Enumeration stops at the first crossing, so any count it could
@@ -42,6 +55,14 @@ impl Display for FglmError {
                 "the multiplication operators needed {} entries, over the limit of {}",
                 entries, limit
             ),
+            Self::SpanStorageExceeded { entries, limit } => write!(
+                f,
+                "the dependence test needed {} entries, over the limit of {}",
+                entries, limit
+            ),
+            Self::NotAGrobnerBasis => {
+                write!(f, "the source is not a Gröbner basis under the given order")
+            }
             Self::QuotientDimensionExceeded { limit } => write!(
                 f,
                 "the quotient algebra has more than the {} dimensions allowed",

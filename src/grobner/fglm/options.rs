@@ -20,6 +20,12 @@ pub struct FglmOptions {
     /// [`F4Options::max_live_nonzeros`](crate::grobner::F4Options::max_live_nonzeros). A column
     /// for a product that is itself a standard monomial stores none, which is the common case.
     pub max_operator_entries: usize,
+
+    /// Entries the dependence test's two blocks may hold, `2 * D^2` at full rank.
+    ///
+    /// Checked from `D` before the span is allocated rather than as it fills, because the space is
+    /// a function of the dimension alone.
+    pub max_span_entries: usize,
 }
 
 impl FglmOptions {
@@ -27,15 +33,19 @@ impl FglmOptions {
     /// enough to fail before exhausting a workstation.
     ///
     /// `max_quotient_dimension` of 4,096 is 26x the largest quotient dimension in the benchmark
-    /// corpus — cyclic-6's 156 — and the point at which the operators reach about 215 MB at a
-    /// tenth fill with eight variables, or 1.07 GB if every column were stored densely.
+    /// corpus, which is cyclic-6's 156. The enumeration itself is cheap at any such dimension, so
+    /// this limit is there to stop a walk that should not have started; the entry budgets below
+    /// are what bound memory.
     ///
     /// `max_operator_entries` of 20 million is about 320 MB at 16 bytes per entry, the same figure
-    /// and the same accounting as F4's live-nonzero budget.
+    /// and the same accounting as F4's live-nonzero budget. `max_span_entries` is the same number,
+    /// which `2 * D^2` reaches at `D` just over 3,160 — so on a sparse staircase the span is the
+    /// first of the three limits to bind, and on a dense one the operators are.
     pub fn recommended() -> Self {
         Self {
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
+            max_span_entries: 20_000_000,
         }
     }
 
@@ -47,6 +57,7 @@ impl FglmOptions {
         Self {
             max_quotient_dimension: usize::MAX,
             max_operator_entries: usize::MAX,
+            max_span_entries: usize::MAX,
         }
     }
 }
