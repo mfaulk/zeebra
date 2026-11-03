@@ -183,6 +183,8 @@ fn measure<const N: usize>(
                     ("over".to_string(), format!("{:.2}", millis(elapsed)))
                 }
                 Err(FglmError::PositiveDimensional) => ("—".to_string(), "—".to_string()),
+                // The enumeration builds no operators, so no other limit can fire here.
+                Err(other) => (format!("{:?}", other), "—".to_string()),
             };
             (Some(class), d, walk)
         }
