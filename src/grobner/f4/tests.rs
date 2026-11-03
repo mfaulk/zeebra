@@ -802,25 +802,52 @@ fn test_basis_size_limit_is_applied_after_normalization() {
 fn test_batch_limit_counts_matrices_not_passes() {
     for order in ALL_ORDERS {
         let f = system(&["x^2 - 1", "y^3 - 1", "z^2 - 1"]);
+
+        // Asserted for both configurations, because *which* criterion discards these pairs
+        // depends on the configuration while the consequence — no matrix is built — does not.
+        // Under the baseline, Buchberger's first criterion discards them after they are selected,
+        // so `pairs_eliminated_by_product_criterion` counts them. Under the default,
+        // Gebauer-Möller's criterion F discards them at insertion time and they are counted under
+        // `criteria.gebauer_moller`; `product` deliberately keeps meaning what the preceding
+        // milestone measured, so it stays zero. Either way `batches` is zero.
+        for (label, base) in [
+            ("baseline", F4Options::baseline()),
+            ("default", F4Options::default()),
+        ] {
+            let options = F4Options {
+                max_batches: Some(0),
+                ..base
+            };
+            let (basis, statistics) = f4_with_options(&f, order, &options)
+                .expect("a system needing no matrices should not need a batch budget");
+            assert_eq!(statistics.batches, 0, "{} {}", order.name(), label);
+            assert!(
+                statistics.criteria.total() >= 3,
+                "{} {}: the three pairs were not discarded",
+                order.name(),
+                label
+            );
+            assert_eq!(basis, buchberger(&f, order), "{} {}", order.name(), label);
+
+            // A system that does need a matrix still hits the limit.
+            let needs_a_matrix = system(&["x^2 + y", "x^2 + z"]);
+            assert_eq!(
+                f4_with_options(&needs_a_matrix, order, &options),
+                Err(F4Error::TooManyBatches { limit: 0 }),
+                "{} {}",
+                order.name(),
+                label
+            );
+        }
+
+        // And under the baseline specifically, it really is the product criterion.
         let options = F4Options {
             max_batches: Some(0),
-            ..F4Options::default()
+            ..F4Options::baseline()
         };
-        let (basis, statistics) = f4_with_options(&f, order, &options)
-            .expect("a system needing no matrices should not need a batch budget");
-        assert_eq!(statistics.batches, 0, "{}", order.name());
+        let (_, statistics) = f4_with_options(&f, order, &options).expect("no matrices needed");
         assert!(
             statistics.pairs_eliminated_by_product_criterion >= 3,
-            "{}",
-            order.name()
-        );
-        assert_eq!(basis, buchberger(&f, order), "{}", order.name());
-
-        // A system that does need a matrix still hits the limit.
-        let needs_a_matrix = system(&["x^2 + y", "x^2 + z"]);
-        assert_eq!(
-            f4_with_options(&needs_a_matrix, order, &options),
-            Err(F4Error::TooManyBatches { limit: 0 }),
             "{}",
             order.name()
         );

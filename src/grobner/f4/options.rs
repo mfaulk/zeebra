@@ -170,19 +170,45 @@ impl F4Options {
             measure_stages: false,
         }
     }
+
+    /// Every strategy the milestone's measurements justified.
+    ///
+    /// Structured elimination, all pair criteria, and the dense accumulator. This is what
+    /// [`F4Options::default`] is, and it is named separately so that a caller can say which
+    /// configuration it meant rather than inheriting whatever the default becomes next.
+    ///
+    /// Two of M16's improvements are **not** here, because they are not options: a cheaper
+    /// monomial hash in symbolic preprocessing and the rewritten final interreduction are
+    /// unconditional and apply to [`F4Options::baseline`] too. The strategies that M16 measured
+    /// and *rejected* — [`ReducerSelection::LargestLeadingMonomial`] and [`CacheMode::Store`] —
+    /// are likewise absent, and remain selectable only so the rejection can be reproduced.
+    ///
+    /// Chosen from the ablation in `docs/MILESTONE-F4-OPTIMIZATION.md` §9, where this combination
+    /// is the fastest of twelve on every instance measured and no component regresses any
+    /// instance it is added to.
+    pub fn recommended() -> Self {
+        Self {
+            elimination: Backend::Adaptive,
+            reduction: ReductionStrategy::Structured,
+            criteria: PairCriteria::ALL,
+            ..Self::baseline()
+        }
+    }
 }
 
 impl Default for F4Options {
     /// Limits high enough not to interfere with a computation that was going to finish, and low
-    /// enough to fail before exhausting a workstation.
+    /// enough to fail before exhausting a workstation, with every strategy the measurements
+    /// justified.
     ///
     /// `max_live_nonzeros` of 20 million is about 320 MB at 16 bytes per entry.
     ///
-    /// Currently identical to [`F4Options::baseline`]: the default path is the measured baseline
-    /// until the measurements justify moving it, which is a decision for the end of the milestone
-    /// rather than a side effect of landing an optimization.
+    /// This is [`F4Options::recommended`], **not** [`F4Options::baseline`]. The two were identical
+    /// until the ablation was run: an optimization milestone should not move its own default as a
+    /// side effect of landing an optimization, because then nothing has a fixed reference. The
+    /// default moved once, at the end, on the evidence.
     fn default() -> Self {
-        Self::baseline()
+        Self::recommended()
     }
 }
 
@@ -278,10 +304,39 @@ mod tests {
         assert!(options.max_live_nonzeros > 0);
     }
 
-    /// The default is the baseline, so the shipping path is the measured one.
+    /// The default is the recommended configuration, and the baseline remains reachable.
+    ///
+    /// Both halves matter. A caller who passes nothing gets what the measurements chose; a caller
+    /// reproducing the milestone's numbers can still ask for the configuration they were taken
+    /// against, which a default that absorbed the baseline would have made impossible.
     #[test]
-    fn test_default_is_the_baseline() {
-        assert_eq!(F4Options::default(), F4Options::baseline());
+    fn test_default_is_the_recommended_configuration() {
+        assert_eq!(F4Options::default(), F4Options::recommended());
+        assert_ne!(F4Options::default(), F4Options::baseline());
+    }
+
+    /// The recommended configuration selects what the ablation chose, and nothing it rejected.
+    #[test]
+    fn test_recommended_selects_what_was_measured() {
+        let options = F4Options::recommended();
+        assert_eq!(options.elimination, Backend::Adaptive);
+        assert_eq!(options.reduction, ReductionStrategy::Structured);
+        assert_eq!(options.criteria, PairCriteria::ALL);
+        // Rejected by measurement: a smaller multiplier enlarges the closure, and caching a
+        // multiple's terms costs more than rebuilding them even at a 95% repetition rate.
+        assert_eq!(options.reducer_selection, ReducerSelection::FirstApplicable);
+        assert_eq!(options.reducer_cache, CacheMode::Off);
+        // The shipping path still contains no timing.
+        assert!(!options.measure_stages);
+        // And only the strategies differ from the baseline; the budgets are untouched.
+        assert_eq!(
+            options.max_live_nonzeros,
+            F4Options::baseline().max_live_nonzeros
+        );
+        assert_eq!(
+            options.max_matrix_rows,
+            F4Options::baseline().max_matrix_rows
+        );
     }
 
     /// Every strategy field starts at the baseline value, and timing starts off.

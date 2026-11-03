@@ -99,6 +99,16 @@ fn configuration(name: &str) -> Option<F4Options> {
             elimination: Backend::Adaptive,
             ..base
         },
+        // What the milestone recommends. M16-B's merged contribution is a cheaper monomial hash,
+        // which is unconditional and so already in every configuration including `baseline`; its
+        // two *optional* strategies were measured and rejected, which is why they are not here.
+        "recommended" | "acd" => F4Options {
+            reduction: ReductionStrategy::Structured,
+            criteria: PairCriteria::ALL,
+            elimination: Backend::Adaptive,
+            ..base
+        },
+        // Everything, including what measurement rejected, for the ablation's sake.
         "abcd" => F4Options {
             reduction: ReductionStrategy::Structured,
             reducer_selection: ReducerSelection::LargestLeadingMonomial,
@@ -112,8 +122,19 @@ fn configuration(name: &str) -> Option<F4Options> {
     Some(options)
 }
 
-const CONFIGURATIONS: [&str; 10] = [
-    "baseline", "a", "b", "b-count", "c", "d", "d-dense", "ab", "ad", "abcd",
+const CONFIGURATIONS: [&str; 12] = [
+    "baseline",
+    "a",
+    "b",
+    "b-count",
+    "c",
+    "d",
+    "d-dense",
+    "ab",
+    "ad",
+    "acd",
+    "recommended",
+    "abcd",
 ];
 
 /// A deterministic random system: N quadratics in N variables. Same construction as the benchmark.

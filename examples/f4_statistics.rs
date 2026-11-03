@@ -43,7 +43,10 @@ fn report<const N: usize>(
     compare: bool,
 ) {
     for &(order_name, order) in orders {
-        let (basis, s) = match f4_with_options(system, order, &F4Options::default()) {
+        // `baseline()`, not `default()`: this table's columns are the ones
+        // `docs/MILESTONE-F4.md` §7.1 records, and comparing against them needs the
+        // configuration they were measured with. `f4_profile` reports the current default.
+        let (basis, s) = match f4_with_options(system, order, &F4Options::baseline()) {
             Ok(result) => result,
             Err(error) => {
                 println!("{:<12} {:<8} {}", name, order_name, error);
