@@ -49,3 +49,7 @@ harness = false
 [[bench]]
 name = "grobner"
 harness = false
+
+[[bench]]
+name = "f4_stages"
+harness = false

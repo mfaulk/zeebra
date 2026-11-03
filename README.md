@@ -62,11 +62,17 @@ algebra, and Gröbner basis computation:
 cargo bench                              # everything
 cargo bench --bench grobner              # one suite
 cargo bench --bench sparse_linear_algebra
+cargo bench --bench f4_stages
 ```
 
 `sparse_linear_algebra` runs sparse and dense elimination on identical matrices at several sizes
 and densities, because sparse storage is not unconditionally faster — above some density the
 bookkeeping costs more than the arithmetic it saves.
+
+`f4_stages` times F4's stages separately — symbolic preprocessing, matrix construction,
+elimination, and a whole batch — replaying the batches a real computation produced rather than
+synthetic ones. `grobner` says whether something got faster; `f4_stages` says whether a change
+removed cost or moved it from one stage to another.
 
 Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
 counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
@@ -75,11 +81,19 @@ reductions, basis size:
 ```sh
 cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
+cargo run --release --example f4_profile           # F4, cost attributed per stage
+cargo run --release --example f4_profile -- list   # the configurations available
 ```
 
 `f4_statistics` prints matrix dimensions, how many reductions each matrix absorbed, how much of
 each matrix was reduction scaffolding, and how much elimination filled it in. It asserts that the
 two engines agree wherever both can run.
+
+`f4_profile` prints where the time went: symbolic preprocessing, construction, elimination,
+candidate extraction, and the final interreduction, with the remainder shown as `other` so an
+unattributed cost cannot hide. It takes the name of a configuration — `baseline` by default — so
+the effect of one optimization can be read off against another's. The timing comes from
+`F4Options::measure_stages`, which reads a clock four times per batch and is off by default.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md) and
@@ -161,8 +175,32 @@ println!("{} batches, largest matrix {} x {}",
 `max_pairs_per_batch: Some(1)` reduces one S-polynomial per matrix, which is useful for isolating
 the effect of batching; the answer does not change, only the number and shape of the matrices.
 
+#### Choosing a strategy
+
+`F4Options` also selects *how* the computation is performed. A reduced Gröbner basis is unique for
+a given ideal and order, so **no strategy changes the answer** — only the cost. Each is a separate
+field rather than one "fast" switch, so that the contribution of each can be measured on its own:
+
+| Field | Choices | What it changes |
+|---|---|---|
+| `elimination` | `Backend::{Sparse, Dense, Adaptive}` | the representation elimination works in |
+| `reduction` | `ReductionStrategy::{Unstructured, Structured}` | whether reducer rows are established as pivots before the pair rows are reduced against them |
+| `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial |
+| `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
+| `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches; `Count` measures repetition without serving anything |
+| `measure_stages` | `bool` | whether `F4Statistics::stages` is populated |
+
+`F4Options::baseline()` names the configuration every optimization is measured against, and is
+kept available separately from `default()` so that a comparison stays meaningful after the default
+moves. `PairCriteria::NONE` reduces every pair, which is the reference the criteria are checked
+against: a criterion is sound exactly when enabling it does not change the basis.
+
 `grobner::solve` still uses `buchberger`. The sparse linear algebra F4 is built on is reusable on
-its own, as `linalg::sparse`.
+its own, as `linalg::sparse`; `linalg::echelon` is the backend-selecting interface over it.
+
+`grobner::trace_batches` runs a computation and returns every batch it reduced, each as the basis
+at the time plus the pairs selected. That is what lets a stage be benchmarked or counted on real
+input instead of on a synthetic approximation of it; `benches/f4_stages.rs` is built on it.
 
 Field elements reject non-canonical representatives on deserialization. Every value this crate
 serializes round-trips unchanged, but bytes encoding an integer outside `[0, P)` are an error
