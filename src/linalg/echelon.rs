@@ -18,7 +18,10 @@ use std::collections::HashMap;
 
 use crate::{
     linalg::{
-        dense::{dense_reduce_rows_against_pivots, dense_row_echelon},
+        dense::{
+            accumulated_reduce_rows_against_pivots, accumulated_row_echelon,
+            dense_reduce_rows_against_pivots, dense_row_echelon,
+        },
         sparse::{row_echelon_within, EliminationStatistics, SparseMatrix, SparseRow},
     },
     FiniteField,
@@ -43,11 +46,18 @@ pub enum Backend {
     /// bytes, and a dense backend's bytes are a property of the shape alone.
     Dense,
 
-    /// Chosen per matrix, or per row, from the density actually observed.
+    /// Sparse rows, reduced through a dense accumulator.
     ///
-    /// Currently the sparse path. A policy keyed on *global* density would be keyed on the wrong
-    /// quantity: an F4 matrix with thousands of columns can hold a few nearly dense rows and still
-    /// be a fraction of a percent dense overall.
+    /// The matrix stays sparse and only the row being reduced is made dense, so a row operation
+    /// costs the *pivot's* support rather than a sorted merge over both rows, and the buffer is one
+    /// row wide for the whole elimination. The mixed representation is what "adaptive" names here:
+    /// the choice is per role — pivot or work — rather than per matrix.
+    ///
+    /// Deliberately not keyed on a measured density, global or otherwise. §7.4 of
+    /// `docs/MILESTONE-F4-OPTIMIZATION.md` reports the distributions: on every instance measured,
+    /// no row and no 64x64 block ever exceeds 50% occupancy, so there is no threshold for a
+    /// density-keyed policy to find and a policy keyed on *global* density would be keyed on the
+    /// wrong quantity besides.
     Adaptive,
 }
 
@@ -68,7 +78,7 @@ pub fn row_echelon_with<F: FiniteField>(
     match backend {
         Backend::Sparse => row_echelon_within(matrix, max_nonzeros),
         Backend::Dense => dense_row_echelon(matrix, max_nonzeros),
-        Backend::Adaptive => row_echelon_within(matrix, max_nonzeros),
+        Backend::Adaptive => accumulated_row_echelon(matrix, max_nonzeros),
     }
 }
 
@@ -135,7 +145,7 @@ pub fn reduce_rows_against_pivots_with<F: FiniteField>(
             &mut statistics,
             max_nonzeros,
         )?,
-        Backend::Adaptive => sparse_reduce_rows_against_pivots(
+        Backend::Adaptive => accumulated_reduce_rows_against_pivots(
             matrix,
             split,
             &mut pivot_of_column,

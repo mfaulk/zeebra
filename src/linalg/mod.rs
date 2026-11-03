@@ -12,7 +12,7 @@ mod vector_ops;
 mod vector_scalar_ops;
 
 pub use crout::{crout_lu, crout_lu_pivoting};
-pub use dense::DenseRows;
+pub use dense::{DenseAccumulator, DenseRows};
 pub use echelon::{reduce_rows_against_pivots_with, row_echelon_with, Backend};
 pub use gauss_jordan::gauss_jordan_elimination;
 pub use matrix::*;
