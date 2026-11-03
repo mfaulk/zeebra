@@ -29,8 +29,8 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
-  slow-tests:
-    name: Slow tests (release)
+  release-tests:
+    name: Tests (release)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +38,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+
+      # The whole suite in release, not only the slow tests. `debug-assertions` and
+      # `overflow-checks` are off there, so a release build takes different paths through
+      # arithmetic and through every `debug_assert`-guarded invariant: monomial multiplication
+      # used to wrap rather than panic on exponent overflow, which the debug job could not see.
+      # Release is also the configuration every benchmark and measurement uses.
+      - name: Test (release)
+        run: cargo test --release --verbose
 
       # The `#[ignore]`d tests that are real but slow, named individually: a bare `--ignored`
       # would also pick up the four `unimplemented!()` placeholders, which panic by design.
