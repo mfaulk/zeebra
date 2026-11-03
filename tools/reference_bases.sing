@@ -1,0 +1,219 @@
+// Lexicographic Gröbner bases from Singular, emitted as Rust literals for Zeebra's test corpus.
+//
+// Run:
+//   Singular -q tools/reference_bases.sing > src/grobner/fglm/reference_bases.rs
+//
+// Why Singular: its `std` is Buchberger/slimgb lineage, so these references are independent of
+// Zeebra's F4 in *algorithm* and not only in implementation. A second F4 would agree with Zeebra's
+// partly because both implement F4, which is not what an oracle is for.
+//
+// Three conventions, each verified before this script was written rather than assumed:
+//
+//   * `lp` with variables declared `(x,y,...)` orders x > y > ..., and so does Zeebra's
+//     `MonomialOrder::Lexicographic` with `parse(s, ["x","y",...])`. Checked on <x*y-1, x-y>,
+//     whose lex basis is {x-y, y^2-1} under x > y and {y-x, x^2-1} under y > x.
+//   * `short=0` prints `x^2` and `2*x` rather than `x2` and `2x`. Zeebra's parser accepts the
+//     former and not the latter.
+//   * Coefficients print as the symmetric representative — `-y`, not `2147483646*y`, and
+//     `+1073741822` where the negative representative would be larger in absolute value. Every
+//     such value is below the prime, which is what Zeebra's parser requires.
+//
+// Each basis is additionally cross-checked against Singular's own `fglm`, which is a third
+// algorithm. A disagreement would mean the reference itself is unsound, so the script emits a
+// marker instead of the basis and reports a nonzero failure count at the end.
+//
+// Singular's prime-field characteristic must be below 2^31, so 2147483647 is the largest field
+// here. That is a property of Singular and not of the mathematics: see §9.1 of
+// docs/MILESTONE-FGLM-SOLVING.md for why evidence at these primes bears on the larger ones.
+
+// `fglm` requires its source to be a *reduced* standard basis, which `std` does not produce
+// unless asked. Without this the cross-check aborts on katsura-3 and katsura-4 with "The ideal
+// source has to be given by a reduced SB" rather than reporting a disagreement.
+option(redSB);
+
+int FAILURES = 0;
+
+proc joined(list items)
+{
+    string out = "";
+    int k;
+    for (k = 1; k <= size(items); k++)
+    {
+        if (k > 1) { out = out + ","; }
+        out = out + items[k];
+    }
+    return (out);
+}
+
+proc quoted(list items)
+{
+    string out = "";
+    int k;
+    for (k = 1; k <= size(items); k++)
+    {
+        if (k > 1) { out = out + ", "; }
+        out = out + "\"" + items[k] + "\"";
+    }
+    return (out);
+}
+
+proc quoted_ideal(ideal g)
+{
+    list items;
+    int k;
+    for (k = 1; k <= size(g); k++) { items = items + list(string(g[k])); }
+    return (quoted(items));
+}
+
+// Emit one Rust `ReferenceBasis`. The caller must be in a lex ring; `Rdp` is the same ring under
+// degrevlex, which exists so `fglm` has a source basis to convert for the cross-check.
+proc emit(string label, def Rdp, list vars, list gens)
+{
+    def Rlex = basering;
+    string j = joined(gens);
+
+    execute("ideal ii = " + j + ";");
+    ideal direct = std(ii);
+
+    setring Rdp;
+    execute("ideal jj = " + j + ";");
+    ideal source = std(jj);
+    setring Rlex;
+    ideal converted = fglm(Rdp, source);
+
+    if (size(reduce(direct, converted)) != 0 || size(reduce(converted, direct)) != 0)
+    {
+        printf("    // MISMATCH: Singular's own std and fglm disagree on %s", label);
+        FAILURES = FAILURES + 1;
+        return ();
+    }
+
+    printf("    ReferenceBasis {");
+    printf("        name: \"%s\",", label);
+    printf("        prime: %s,", char(basering));
+    printf("        variables: &[%s],", quoted(vars));
+    printf("        system: &[%s],", quoted(gens));
+    printf("        lex_basis: &[%s],", quoted_ideal(direct));
+    printf("    },");
+}
+
+printf("//! Lexicographic Gröbner bases computed by Singular, committed as literals.");
+printf("//!");
+printf("//! **Generated. Do not edit by hand.** Regenerate with");
+printf("//!");
+printf("//! ```text");
+printf("//! Singular -q tools/reference_bases.sing > src/grobner/fglm/reference_bases.rs");
+printf("//! ```");
+printf("//!");
+printf("//! Singular's `std` is Buchberger/slimgb lineage, so these are independent of Zeebra's F4");
+printf("//! in algorithm and not only in implementation. Every basis below was also checked against");
+printf("//! Singular's own `fglm` — a third algorithm — before being emitted.");
+printf("//!");
+printf("//! Singular build %s. See tools/reference_bases.sing for the conventions this relies on,", system("version"));
+printf("//! each of which was verified rather than assumed.");
+printf("");
+printf("/// One ideal and the lexicographic Gröbner basis Singular computed for it.");
+printf("pub(super) struct ReferenceBasis {");
+printf("    pub name: &'static str,");
+printf("    pub prime: u64,");
+printf("    pub variables: &'static [&'static str],");
+printf("    pub system: &'static [&'static str],");
+printf("    pub lex_basis: &'static [&'static str],");
+printf("}");
+printf("");
+
+// ---- two variables, GF(2^31 - 1) ------------------------------------------------------------
+
+ring R2dp = 2147483647,(x,y),dp;
+ring R2 = 2147483647,(x,y),lp;
+short = 0;
+list V2 = list("x", "y");
+
+printf("/// Two variables over GF(2^31 - 1).");
+printf("pub(super) const TWO_VARIABLE: &[ReferenceBasis] = &[");
+emit("x^2, y^2", R2dp, V2, list("x^2", "y^2"));
+emit("x^2-y, y^3-1", R2dp, V2, list("x^2-y", "y^3-1"));
+emit("x+y, x*y-1", R2dp, V2, list("x+y", "x*y-1"));
+emit("x^3-1, y-x^2", R2dp, V2, list("x^3-1", "y-x^2"));
+emit("(x-1)^2, y-x", R2dp, V2, list("x^2-2*x+1", "y-x"));
+emit("x^4-x, y^2-x", R2dp, V2, list("x^4-x", "y^2-x"));
+emit("x^2+y^2-1, x-y", R2dp, V2, list("x^2+y^2-1", "x-y"));
+emit("x^5-1, y^3-x", R2dp, V2, list("x^5-1", "y^3-x"));
+emit("x^2+1, y^2+1", R2dp, V2, list("x^2+1", "y^2+1"));
+emit("2*x-3, y^2-x", R2dp, V2, list("2*x-3", "y^2-x"));
+emit("x^6-1, y^4-x^2", R2dp, V2, list("x^6-1", "y^4-x^2"));
+printf("];");
+printf("");
+
+// ---- three variables, GF(2^31 - 1) ----------------------------------------------------------
+
+ring R3dp = 2147483647,(x,y,z),dp;
+ring R3 = 2147483647,(x,y,z),lp;
+short = 0;
+list V3 = list("x", "y", "z");
+
+printf("/// Three variables over GF(2^31 - 1).");
+printf("pub(super) const THREE_VARIABLE: &[ReferenceBasis] = &[");
+emit("cyclic-3", R3dp, V3, list("x+y+z", "x*y+y*z+x*z", "x*y*z-1"));
+emit("katsura-3", R3dp, V3, list("x^2+2*y^2+2*z^2-x", "2*x*y+2*y*z-y", "x+2*y+2*z-1"));
+emit("not in shape position", R3dp, V3, list("x^2-1", "y^2-1", "z-1"));
+emit("x^2-y, y^2-z, z^2-1", R3dp, V3, list("x^2-y", "y^2-z", "z^2-1"));
+emit("nonradical in three variables", R3dp, V3, list("x^2", "y^2", "z^2"));
+printf("];");
+printf("");
+
+// ---- four variables, GF(2^31 - 1) -----------------------------------------------------------
+
+ring R4dp = 2147483647,(x,y,z,w),dp;
+ring R4 = 2147483647,(x,y,z,w),lp;
+short = 0;
+list V4 = list("x", "y", "z", "w");
+
+printf("/// Four variables over GF(2^31 - 1).");
+printf("pub(super) const FOUR_VARIABLE: &[ReferenceBasis] = &[");
+emit("katsura-4", R4dp, V4,
+     list("x^2+2*y^2+2*z^2+2*w^2-x", "2*x*y+2*y*z+2*z*w-y", "2*x*z+y^2+2*y*w-z",
+          "x+2*y+2*z+2*w-1"));
+emit("planted-4 at (3,5,7,11)", R4dp, V4,
+     list("x^2+y^2-34", "x*y-15", "z^2+w^2-170", "z*w-77"));
+printf("];");
+printf("");
+
+// ---- the same algebra over smaller primes ---------------------------------------------------
+//
+// The staircase and the quotient dimension are properties of the ideal, not of the prime. Zeebra
+// agreeing with these *and* with its own results at primes Singular cannot reach is what carries
+// the evidence upward. Milestone document §9.1.
+
+ring R13dp = 13,(x,y),dp;
+ring R13 = 13,(x,y),lp;
+short = 0;
+printf("/// Two variables over GF(13).");
+printf("pub(super) const OVER_GF_13: &[ReferenceBasis] = &[");
+emit("x^2-y, y^3-1", R13dp, V2, list("x^2-y", "y^3-1"));
+emit("x^2, y^2", R13dp, V2, list("x^2", "y^2"));
+emit("x+y, x*y-1", R13dp, V2, list("x+y", "x*y-1"));
+emit("x^2+1, y-x", R13dp, V2, list("x^2+1", "y-x"));
+emit("2*x-3, y^2-x", R13dp, V2, list("2*x-3", "y^2-x"));
+printf("];");
+printf("");
+
+ring R65537dp = 65537,(x,y),dp;
+ring R65537 = 65537,(x,y),lp;
+short = 0;
+printf("/// Two variables over GF(65537).");
+printf("pub(super) const OVER_GF_65537: &[ReferenceBasis] = &[");
+emit("x^2-y, y^3-1", R65537dp, V2, list("x^2-y", "y^3-1"));
+emit("x^2, y^2", R65537dp, V2, list("x^2", "y^2"));
+emit("x+y, x*y-1", R65537dp, V2, list("x+y", "x*y-1"));
+emit("x^2+1, y-x", R65537dp, V2, list("x^2+1", "y-x"));
+emit("2*x-3, y^2-x", R65537dp, V2, list("2*x-3", "y^2-x"));
+printf("];");
+
+if (FAILURES > 0)
+{
+    printf("");
+    printf("// %s BASES WERE NOT EMITTED. See the mismatch markers above.", FAILURES);
+}
+
+exit;
