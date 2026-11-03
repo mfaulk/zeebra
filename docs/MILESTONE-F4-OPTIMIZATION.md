@@ -1561,46 +1561,68 @@ F4 still returns exactly what the naive textbook reference returns.
 `cargo run --release --example f4_ablation`. Speedup against this build's `F4Options::baseline()`,
 each figure the fastest of several runs.
 
-| configuration | cyc-4 lex | cyc-5 lex | cyc-5 grev | kat-5 lex | kat-5 grev | kat-6 grlex | kat-6 grev | kat-6 lex | kat-7 grlex | kat-7 grev |
-|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x |
-| A | 1.21x | 1.07x | 1.34x | 1.24x | 1.51x | 1.00x | 1.94x | 1.37x | 0.96x | 2.61x |
-| b-rejected | 1.12x | 1.08x | 0.47x | 0.96x | 0.70x | 0.64x | 0.45x | 0.95x | 0.44x | 0.31x |
-| C | 2.36x | 7.85x | 13.75x | 13.81x | 1.92x | 3.95x | 4.30x | 25.20x | 8.25x | 8.90x |
-| D | 1.16x | 1.60x | 1.62x | 1.24x | 1.17x | 1.54x | 1.51x | 1.60x | 1.83x | 2.09x |
-| d-dense | 1.06x | 0.89x | 0.85x | 0.90x | 0.92x | 0.90x | 0.73x | 0.70x | 0.68x | 0.48x |
-| A+C | 2.86x | 8.54x | 14.68x | 14.36x | 2.49x | 4.67x | 5.90x | 30.27x | 9.04x | 17.82x |
-| A+D | 1.35x | 1.82x | 2.43x | 1.68x | 1.77x | 1.83x | 3.87x | 2.63x | 2.44x | 8.68x |
-| C+D | 2.44x | 8.26x | 15.66x | 14.37x | 2.13x | 4.50x | 5.46x | 28.56x | 9.51x | 12.47x |
-| **A+C+D** | **3.05x** | **9.30x** | **17.23x** | 14.35x | **2.87x** | **5.49x** | **7.43x** | 30.81x | **12.79x** | **27.18x** |
-| A+b-rej+C+D | 2.96x | 9.42x | 12.91x | 14.95x | 2.02x | 5.33x | 4.61x | 31.51x | 10.86x | 16.01x |
+| configuration | cyc-4 lex | cyc-5 lex | cyc-5 grev | kat-5 lex | kat-5 grev | kat-6 grlex | kat-6 grev | pl-6 lex | kat-6 lex | kat-7 grlex | kat-7 grev |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x | 1.00x |
+| A | 1.24x | 1.13x | 1.41x | 1.23x | 1.48x | 0.96x | 2.04x | 1.07x | 1.32x | 0.89x | 2.34x |
+| b-rejected | 1.11x | 1.13x | 0.48x | 0.98x | 0.70x | 0.62x | 0.45x | 1.02x | 1.02x | 0.45x | 0.30x |
+| C | 2.42x | 7.33x | 12.69x | 13.54x | 1.87x | 3.66x | 4.08x | 1.31x | 25.97x | 6.66x | 8.02x |
+| D | 1.17x | 1.46x | 1.41x | 1.11x | 1.09x | 1.34x | 1.41x | 1.02x | 1.46x | 1.53x | 1.90x |
+| d-dense | 1.08x | 0.83x | 0.83x | 0.87x | 0.89x | 0.82x | 0.71x | 1.02x | 0.69x | 0.60x | **refused** |
+| A+b-rej | 1.31x | 1.06x | 0.56x | 1.21x | 0.79x | 0.58x | 0.61x | 1.09x | 1.35x | 0.39x | 0.39x |
+| A+C | 3.00x | 7.21x | 15.33x | 13.83x | 2.47x | 4.41x | 5.61x | 1.35x | **27.35x** | 8.56x | 14.79x |
+| A+D | 1.37x | 1.49x | 2.40x | 1.56x | 1.77x | 1.55x | 3.51x | 1.11x | 2.23x | 2.10x | 7.57x |
+| C+D | 2.54x | 6.63x | 15.94x | 13.83x | 2.04x | 4.19x | 4.87x | 1.31x | 23.99x | 8.73x | 11.10x |
+| **A+C+D** | **3.09x** | **7.98x** | **17.46x** | **14.36x** | **2.79x** | **5.28x** | **6.83x** | **1.37x** | 24.96x | **11.15x** | **24.42x** |
+| A+b-rej+C+D | 3.01x | 7.58x | 13.10x | 14.21x | 1.94x | 4.68x | 4.25x | 1.36x | 25.45x | 9.53x | 14.34x |
 
-**A+C+D is the fastest configuration on every instance**, and it exceeds every pair it contains.
-§7 of this plan predicted the opposite for one of the three interactions — that stronger pair
-criteria would eliminate the matrices structured elimination had been built to optimize. They do
-not conflict, because they act on different things: **C removes matrices, A makes each surviving
-matrix cheaper.** On katsura-7 grevlex, C alone is 8.90x and A alone 2.61x; A+C is 17.82x, which is
-*more* than their product would suggest, because A's sparser candidates also shrink the matrices C
-leaves behind.
+**A+C+D is the fastest configuration on ten of eleven instances**, and on those ten it exceeds
+every pair it contains. §7 of this plan predicted the opposite for one of the three interactions —
+that stronger pair criteria would eliminate the matrices structured elimination had been built to
+optimize. They do not conflict, because they act on different things: **C removes matrices, A makes
+each surviving matrix cheaper.** On katsura-7 grevlex, C alone is 8.02x and A alone 2.34x; A+C is
+14.79x, which is *more* than their product would suggest, because A's sparser candidates also
+shrink the matrices C leaves behind.
 
-The other two predicted interactions were real but benign. A+D (8.68x on katsura-7 grevlex) is
+**The exception is instructive rather than a defect.** On katsura-6 lex, A+C (27.35x) beats A+C+D
+(24.96x), and across two runs of the whole ablation the ordering of those two flipped — 30.27x
+against 30.81x in the first run, the other way in the second. The stage breakdown says why: with C
+enabled, elimination on that instance is **1.45 ms of A+C's 16.64 ms total, 9%**. D optimizes
+elimination, and it does still work there — the elimination column falls from 1.45 ms to 1.30 ms
+when D is added — but a gain of 0.15 ms inside a 17 ms total is below this harness's run-to-run
+variation. So **D's measurable contribution disappears exactly where C has already succeeded**,
+which is a real interaction and the one the ablation was built to find. It is not a reason to drop
+D: on the instances where elimination still dominates, D is worth 1.90x alone and takes A+C from
+14.79x to 24.42x.
+
+The other two predicted interactions were real but benign. A+D (7.57x on katsura-7 grevlex) is
 better than either alone despite A reducing peak live entries 22-fold — so a sparser matrix does
 not leave the dense accumulator with nothing to win, because the accumulator's advantage is in
 merge length per row operation rather than in density. And `d-dense` loses on nine of ten
-instances, which is the same conclusion §7.4 reached in isolation.
+instances it completes, which is the same conclusion §7.4 reached in isolation.
 
-**Two rows are not candidates.** `b-rejected` is M16-B's two optional strategies, kept so the
-rejection is reproducible: it is 0.31x to 0.47x on the grevlex instances and marginally positive on
-three lex ones. `A+b-rej+C+D` shows what including them would have cost — 16.01x instead of 27.18x
-on katsura-7 grevlex, about 40% of the win. It is marginally ahead on three lex instances
-(31.51x against 30.81x on katsura-6 lex), which is within run-to-run variation and does not survive
-as a recommendation.
+**`d-dense` is refused outright on katsura-7 grevlex, and that is the allocation guard working.**
+Its largest matrix is 6810 x 6862, which densifies to 46 730 220 cells — 374 MB — for a matrix
+holding 112 200 entries. `max_live_nonzeros` bounds *stored nonzeros*, and a dense representation
+has no zeros it can decline to store, so the dense backend converts the cell count into the
+budget's own unit before allocating and refuses with
+`TooManyNonzeros { nonzeros: 23365110, limit: 20000000 }`. Reproducing §7.4's figure for that
+instance needs a raised budget, deliberately: the default refusing it is the correct behaviour, and
+it is the only backend for which the entry budget was not already a memory bound.
+
+**Two rows are not candidates, and one of them measures less than its name suggests.**
+`b-rejected` sets `LargestLeadingMonomial` *and* `CacheMode::Store` — but `Store` was measured and
+not implemented, and behaves as `CacheMode::Count` (§7.2), so **what this row actually measures is
+the reducer-selection change alone**, with the cache contributing nothing but a counter. It is
+0.30x to 0.48x on the grevlex instances and marginally positive on three lex ones.
+`A+b-rej+C+D` shows what including it would have cost — 14.34x instead of 24.42x on katsura-7
+grevlex, about 40% of the win.
 
 **One thing the ablation cannot measure, and saying so is part of the result.** Two of M16's
 improvements are not option-gated: M16-B's cheaper monomial hash in symbolic preprocessing and
 M16-C's rewritten interreduction are unconditional, so they are inside *every* row above including
-the baseline. That is why this baseline's katsura-6 lex figure is around 500 ms where §6.2's was
-2963 ms. The ablation measures what the options contribute; §8.2 measures what the milestone
+the baseline. That is why this baseline's katsura-6 lex figure is around 455 ms where §6.2's was
+2986 ms. The ablation measures what the options contribute; §8.2 measures what the milestone
 contributed.
 
 ### 8.2 M16-0 against the recommended configuration
@@ -1637,41 +1659,82 @@ example at `recommended`. Milliseconds.
 **Every instance improved**, by between 1.2x and 152.9x. The smallest gains are on the instances
 that were already sub-millisecond, where fixed costs dominate and there is nothing to amortise.
 
-### 8.3 The headline target, and the order inversion
+### 8.3 F4 against Buchberger, at matched and at default criteria
 
-`cargo run --release --example f4_milestone`, both engines on identical inputs in one process, with
-the basis asserted equal between them wherever both can run. Milliseconds, fastest of several runs.
+`cargo run --release --example f4_milestone`, both engines on identical inputs in one process, the
+basis asserted equal between them wherever both can run. Milliseconds, fastest of several runs.
 
-| system | order | Buchberger | F4 baseline | F4 recommended | vs Buchberger | M15's figure |
-|---|---|---|---|---|---|---|
-| cyclic-4 | lex | 0.16 | 0.16 | **0.06** | 2.72x | 1.05x |
-| cyclic-4 | grlex | 0.13 | 0.11 | **0.04** | 3.11x | 1.17x |
-| cyclic-4 | grevlex | 0.14 | 0.12 | **0.06** | 2.37x | 1.02x |
-| cyclic-5 | lex | 45.91 | 19.37 | **2.28** | 20.10x | 1.97x |
-| cyclic-5 | grlex | 56.50 | 19.08 | **1.51** | 37.44x | 3.03x |
-| cyclic-5 | grevlex | 32.47 | 22.01 | **1.31** | 24.72x | 1.69x |
-| katsura-5 | lex | 162.07 | 12.37 | **0.84** | 193.23x | 12.96x |
-| katsura-5 | grlex | 2.08 | 1.71 | **0.62** | 3.38x | 1.29x |
-| katsura-5 | grevlex | 1.11 | 1.68 | **0.61** | 1.83x | **0.72x** |
-| katsura-6 | grlex | 34.55 | 21.89 | **4.02** | 8.59x | 1.67x |
-| katsura-6 | grevlex | 14.10 | 29.75 | **3.26** | **4.32x** | **0.47x** |
-| katsura-6 | lex | — | 495.48 | **18.34** | — | — |
-| katsura-7 | grlex | — | 568.10 | **40.31** | — | — |
-| katsura-7 | grevlex | — | 932.32 | **32.82** | — | — |
-| planted-6 | lex | 0.05 | 0.04 | **0.03** | 1.57x | 1.18x |
-| planted-6 | grlex | 0.03 | 0.03 | **0.03** | 1.19x | 1.07x |
-| planted-6 | grevlex | 0.03 | 0.03 | **0.03** | 1.17x | 1.08x |
+**Two comparisons, because the pair criteria are shared machinery.** `PairCriteria` is applied by
+*both* engines — `buchberger_with_criteria` exists for exactly that — but the two defaults differ:
+`F4Options::recommended()` enables `PairCriteria::ALL` while `buchberger()` uses `PRODUCT_ONLY`.
+Comparing those two defaults therefore credits F4 with M16-C's work, which either engine can use.
 
-**F4 is now faster than classical Buchberger on every instance under every order.** The preceding
-milestone lost on five of thirteen paired instances; the count is now zero.
+- **`vs default`** is what a caller gets from `f4(..)` against what they get from `buchberger(..)`.
+  It answers "which function should I call".
+- **`vs matched`** gives both engines `PairCriteria::ALL`. It isolates F4's **matrix algorithm** —
+  batching, symbolic preprocessing, structured elimination, the dense accumulator — from the
+  critical-pair selection. **This is the controlled comparison.**
+
+| system | order | bb product | bb all | f4 base | f4 best | vs default | vs matched | M15 |
+|---|---|---|---|---|---|---|---|---|
+| cyclic-4 | lex | 0.19 | 0.07 | 0.18 | **0.06** | 2.93x | 1.15x | 1.05x |
+| cyclic-4 | grlex | 0.15 | 0.06 | 0.13 | **0.05** | 3.09x | 1.29x | 1.17x |
+| cyclic-4 | grevlex | 0.15 | **0.06** | 0.14 | 0.06 | 2.39x | **0.97x** | 1.02x |
+| cyclic-5 | lex | 52.96 | 4.00 | 21.21 | **2.64** | 20.03x | 1.51x | 1.97x |
+| cyclic-5 | grlex | 63.89 | 5.40 | 20.28 | **1.74** | 36.82x | 3.11x | 3.03x |
+| cyclic-5 | grevlex | 36.16 | 3.72 | 22.01 | **1.31** | 27.51x | 2.83x | 1.69x |
+| katsura-5 | lex | 176.94 | 37.10 | 10.88 | **0.75** | 235.68x | **49.41x** | 12.96x |
+| katsura-5 | grlex | 2.40 | 0.93 | 1.74 | **0.64** | 3.73x | 1.45x | 1.29x |
+| katsura-5 | grevlex | 1.30 | 0.75 | 1.67 | **0.63** | 2.07x | 1.21x | **0.72x** |
+| katsura-6 | grlex | 37.73 | 7.63 | 22.42 | **4.20** | 8.99x | 1.82x | 1.67x |
+| katsura-6 | grevlex | 12.81 | 4.50 | 26.26 | **3.54** | 3.62x | 1.27x | **0.47x** |
+| planted-6 | lex | 0.05 | 0.04 | 0.04 | **0.03** | 1.61x | 1.34x | 1.18x |
+| planted-6 | grlex | 0.04 | 0.03 | 0.03 | **0.03** | 1.20x | 1.18x | 1.07x |
+| planted-6 | grevlex | 0.04 | 0.03 | 0.03 | **0.03** | 1.20x | 1.18x | 1.08x |
+
+**At each engine's default, F4 wins on all fourteen instances, by 1.20x to 235.68x.** At **matched
+criteria it wins on thirteen of fourteen, by 1.15x to 49.41x, and loses marginally on cyclic-4
+grevlex at 0.97x** — a 60-microsecond instance where the difference is a few percent of a
+sub-millisecond total.
+
+Both numbers are true and they answer different questions. The second is the one to quote when
+asking what F4's *matrix algorithm* is worth, and it is substantially smaller: **the critical-pair
+criteria are the largest single contributor to the default-versus-default figure, and they are not
+specific to F4.** Giving them to the classical engine speeds it up by 2.2x to 13.2x on its own —
+cyclic-5 lex 52.96 ms to 4.00, katsura-5 lex 176.94 to 37.10, katsura-6 grevlex 12.81 to 4.50.
 
 The milestone's named target was katsura-6 under grevlex, where M15 recorded **0.47x** — F4 at
-30.2 ms against Buchberger's 14.1 ms, the worst paired result in that report. It is now **4.32x**,
-a relative improvement of 9.2x. The accompanying claim in M15 §7.2 — that "grevlex is the cheapest
-order for Buchberger and, at these sizes, the *worst* order for this F4 implementation" — no longer
-holds: grevlex is now F4's **best** order on katsura-6 (3.26 ms against grlex's 4.02) and on
-katsura-7 (32.82 against 40.31). The inversion that report called "a direct consequence of the
-fill-in" went away when the fill-in did.
+30.2 ms against Buchberger's 14.1 ms, the worst paired result in that report. It is **3.62x** at
+each engine's default and **1.27x** at matched criteria. Either way the loss is gone, but the
+matched figure is the honest measure of how much of that came from the matrix algorithm: most of
+the 7.7x swing is the criteria, which M15's Buchberger did not have either.
+
+M15's accompanying claim — that "grevlex is the cheapest order for Buchberger and, at these sizes,
+the *worst* order for this F4 implementation" — no longer holds, and that *is* attributable to the
+matrix work: grevlex is now F4's **best** order on katsura-6 (3.54 ms against grlex's 4.20) and on
+katsura-7 (§8.2). The inversion M15 called "a direct consequence of the fill-in" went away when the
+fill-in did, and §8.4 is where that is measured.
+
+#### 8.3.1 The instances M15 could not pair
+
+M15 reported katsura-6 lex and katsura-7 as out of Buchberger's reach, measured with the product
+criterion alone. Since the criteria are shared, the honest question is whether the classical engine
+now reaches them, so that a dash in the table above means "does not finish" rather than "was not
+tried". `examples/buchberger_reach.rs` answers it one instance per invocation, because nothing
+inside a single `buchberger_with_criteria` call can be interrupted and an external timeout is the
+only sound way to bound it:
+
+```text
+timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
+```
+
+| system | order | Buchberger, all criteria | F4 recommended | F4 baseline |
+|---|---|---|---|---|
+| katsura-6 | lex | see below | **18.34** | 495.48 |
+| katsura-7 | grlex | see below | **40.31** | 568.10 |
+| katsura-7 | grevlex | see below | **32.82** | 932.32 |
+
+> Filled in from the `buchberger_reach` runs; a 900-second budget per instance.
 
 ### 8.4 Fill-in and memory
 
@@ -1775,7 +1838,7 @@ are the ones `MILESTONE-F4.md` §7.1 records, and comparing against them needs t
 | Structured elimination alone is 0.96x on katsura-7 grlex and 1.00x on katsura-6 grlex | Real. grlex builds more, sparser matrices, so there is less fill-in to avoid. Not a regression in the recommended configuration, where A+C+D is 12.79x and 5.49x on those instances. |
 | `Backend::Dense` is slower than `Backend::Sparse` everywhere | By design. It is the control the comparison needs, and §7.4's negative result is one of the milestone's deliverables. Not selected. |
 | `ReducerSelection::LargestLeadingMonomial` and `CacheMode::Store` are slower | Measured and rejected; not selected. Retained so §7.2's rejection is reproducible. |
-| `max_live_nonzeros` bounds entries, not bytes, so it does not bound `Backend::Dense`'s allocation | Documented on the variant rather than silently redefining the counter. A byte-aware budget is future work. |
+| `Backend::Dense` is refused outright on katsura-7 grevlex under the default budget | **Fixed during integration, and this is the fix working.** `max_live_nonzeros` bounds stored nonzeros, and a dense representation has no zeros it can decline to store, so a 0.4%-dense 6810 x 6862 matrix satisfied the entry budget and still needed 374 MB. The dense backend now converts the cell count into the budget's unit and refuses *before* allocating, so exhaustion is a recoverable `Err` for every backend. Reproducing §7.4's figure for that instance needs a raised budget. |
 | `batches` and `pairs_reduced` are not comparable between reduction strategies | Inherent: a different row arrangement produces different candidate polynomials and hence different later batches. Documented on `ReductionStrategy::Structured`. |
 
 No correctness regression, and no instance slower under the recommended configuration than under
@@ -1783,12 +1846,16 @@ M16-0.
 
 ## 9. Definition of done, and what to do next
 
-Zeebra's F4 is now faster than its classical Buchberger on every instance measured, under every
-monomial order, having been slower on five of thirteen at the start of the milestone. The
-instances the preceding milestone could not pair at all are 11–27x faster, and the one it named as
-the clearest cost in the whole report needs 51x less peak memory. Every optimization is justified
-by a measurement taken before it was written, and three were rejected with their evidence
-preserved. That is the milestone.
+Zeebra's F4 is faster than its classical Buchberger on every instance measured at each engine's
+default, and on thirteen of fourteen at **matched** critical-pair criteria — having been slower on
+five of thirteen at the start of the milestone. The instances the preceding milestone could not
+pair at all are 11–27x faster, and the one it named as the clearest cost in the whole report needs
+51x less peak memory. Every optimization is justified by a measurement taken before it was
+written, and three were rejected with their evidence preserved. That is the milestone.
+
+The matched comparison in §8.3 is the one to quote for what F4's *matrix algorithm* contributes:
+the critical-pair criteria are the largest single contributor to the default-versus-default figure
+and they are shared machinery, so most of that gap is M16-C rather than F4.
 
 ### 9.1 Known limitations
 
@@ -1803,9 +1870,11 @@ preserved. That is the milestone.
   density-switching policy and `Backend::Adaptive` reads no density at all.
 - **Still single-threaded**, in both construction and elimination, on a 64-core machine.
 - **No 128-bit field measurement**, unchanged from M15.
-- **`solve` still uses `buchberger`.** F4 is now the faster engine on every instance including the
-  small ones `solve` produces, so this should change — but `f4` returns a `Result` and `solve` does
-  not, and that is an API change rather than a performance one.
+- **`solve` still uses `buchberger`.** F4 is the faster engine on every instance at each engine's
+  default and on all but one at matched criteria, including the small ones `solve` produces, so
+  this should change — but `f4` returns a `Result` and `solve` does not, and that is an API change
+  rather than a performance one. Note that `solve` would also gain most of the same speedup just
+  from `buchberger_with_criteria(.., PairCriteria::ALL)`, which is a one-line change.
 - **`N` is still a const generic.**
 
 ### 9.2 Recommendations for the next milestone, in the order the measurements support
@@ -1817,8 +1886,10 @@ preserved. That is the milestone.
    are per-matrix costs paid 107 times where they used to be paid 59, and the column set of one
    batch overlaps the next. Interning monomials — which M16-B investigated and did not need for
    hashing — would be the natural approach, and this is where it would pay.
-3. **Switch `solve` to F4**, with whatever error handling the public API should have. F4 is now
-   faster on every instance, so the only question left is the signature.
+3. **Give `solve` the criteria, then switch it to F4.** The criteria are a one-line change to
+   `solve` and worth 2.2x to 13.2x on the classical engine by themselves, so that is the cheap
+   half. Switching the engine is worth a further 1.15x to 49x on top (§8.3, matched column); the
+   only open question there is the signature, since `f4` returns a `Result` and `solve` does not.
 4. **FGLM**, which M15 deferred and which is the natural next capability rather than an
    optimization: it converts a cheap grevlex basis into the lex basis solving needs, and grevlex is
    now F4's *best* order rather than its worst, which makes the conversion more attractive than it

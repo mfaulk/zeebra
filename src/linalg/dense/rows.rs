@@ -29,15 +29,15 @@ use crate::{
 /// Saturates rather than overflowing: `usize::MAX` entries means unbounded, and converting an
 /// unbounded budget into a smaller one would turn "no limit" into "refuse everything".
 fn licensed_cells<F: FiniteField>(max_nonzeros: usize) -> usize {
-    let entry = std::mem::size_of::<(usize, F)>();
-    let cell = std::mem::size_of::<F>().max(1);
-    max_nonzeros.saturating_mul(entry / cell.min(entry))
+    max_nonzeros.saturating_mul(cells_per_entry::<F>())
 }
 
 /// Refuse a densification that would exceed what `max_nonzeros` licenses, before allocating.
 ///
-/// `Err` carries the cell count, in the same currency the sparse path's `Err` uses — a count of
-/// live field elements — so a caller comparing the two reads one unit.
+/// `Err` carries the cell count **converted back into the budget's unit** — sparse entries — so
+/// that the count and the limit it is compared against are in the same currency. Reporting raw
+/// cells would put a cell count and an entry limit in one error message, which is the very unit
+/// confusion this check exists to resolve.
 fn check_dense_budget<F: FiniteField>(
     matrix: &SparseMatrix<F>,
     max_nonzeros: usize,
@@ -49,10 +49,19 @@ fn check_dense_budget<F: FiniteField>(
         .checked_mul(matrix.num_columns())
         .ok_or(usize::MAX)?;
     if cells <= licensed_cells::<F>(max_nonzeros) {
-        Ok(())
-    } else {
-        Err(cells)
+        return Ok(());
     }
+
+    // Round up, so a matrix needing a fraction over the budget is still reported as over it.
+    let per_entry = cells_per_entry::<F>();
+    Err(cells / per_entry + usize::from(cells % per_entry != 0))
+}
+
+/// Dense cells with the same byte cost as one sparse entry. At least one.
+fn cells_per_entry<F: FiniteField>() -> usize {
+    let entry = std::mem::size_of::<(usize, F)>();
+    let cell = std::mem::size_of::<F>().max(1);
+    (entry / cell.min(entry)).max(1)
 }
 
 /// A dense matrix of field elements, stored one row after another.
@@ -484,13 +493,20 @@ mod tests {
             licensed_cells::<Zp13>(2000) < 2000 * 2000,
             "the budget should not cover 4M cells"
         );
-        assert_eq!(check_dense_budget(&matrix, 2000), Err(2000 * 2000));
+        // Reported in the budget's unit, not in cells: 4M cells divided by the cells one entry's
+        // bytes buy. Whatever the field width, it must exceed the 2000-entry budget.
+        let reported = check_dense_budget(&matrix, 2000).expect_err("over budget");
+        assert_eq!(reported, 2000 * 2000 / super::cells_per_entry::<Zp13>());
+        assert!(
+            reported > 2000,
+            "the refusal must exceed the limit it names"
+        );
 
         // And the backend refuses rather than allocating it.
         let mut copy = matrix.clone();
         assert_eq!(
             super::dense_row_echelon(&mut copy, 2000),
-            Err(2000 * 2000),
+            Err(reported),
             "the dense path allocated a matrix the budget did not license"
         );
         assert_eq!(

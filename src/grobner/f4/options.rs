@@ -183,9 +183,12 @@ impl F4Options {
     /// and *rejected* — [`ReducerSelection::LargestLeadingMonomial`] and [`CacheMode::Store`] —
     /// are likewise absent, and remain selectable only so the rejection can be reproduced.
     ///
-    /// Chosen from the ablation in `docs/MILESTONE-F4-OPTIMIZATION.md` §9, where this combination
-    /// is the fastest of twelve on every instance measured and no component regresses any
-    /// instance it is added to.
+    /// Chosen from the ablation in `docs/MILESTONE-F4-OPTIMIZATION.md` §8.1, where this
+    /// combination is the fastest of twelve on ten of eleven instances. On the eleventh,
+    /// katsura-6 under lex, the criteria have already reduced elimination to 9% of the total, so
+    /// the dense accumulator's gain there is smaller than the harness's run-to-run variation and
+    /// the ordering against `Structured + ALL` alone flips between runs. It is still selected,
+    /// because on the instances where elimination dominates it is worth 1.9x on its own.
     pub fn recommended() -> Self {
         Self {
             elimination: Backend::Adaptive,

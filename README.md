@@ -21,7 +21,6 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Sparse Linear Algebra over Finite Fields
 - [x] F4 Grobner Bases
 - [x] Gebauer-Moller and chain criteria, structured elimination, adaptive linear algebra
-      (F4 is now faster than classical Buchberger on every system and order measured)
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -113,7 +112,8 @@ cargo run --release --example elimination_density  # how dense an F4 matrix real
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example f4_ablation          # every configuration, one table
-cargo run --release --example f4_milestone         # the recommended configuration vs Buchberger
+cargo run --release --example f4_milestone         # both engines, at matched and default criteria
+timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
 `f4_statistics` prints matrix dimensions, how many reductions each matrix absorbed, how much of
@@ -152,7 +152,11 @@ from it alone.
 `f4_ablation` runs twelve configurations over the corpus and asserts every one returns the
 baseline's basis, which is what establishes that the optimizations compose rather than conflict.
 `f4_milestone` is the headline comparison: both engines on identical inputs in one process, with
-the bases asserted equal wherever both can run.
+the bases asserted equal wherever both can run. It reports **two** ratios, because the pair
+criteria are shared machinery and the two functions' defaults do not match — see "Choosing a
+strategy" below. `buchberger_reach` runs the classical engine on one hard instance per invocation
+so an external timeout can bound it, which is how a dash in that table is shown to mean "does not
+finish" rather than "was not tried".
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
@@ -264,8 +268,9 @@ instances and a small loss under grlex. The per-order numbers are in
 There are two named configurations, and both are public on purpose:
 
 - **`F4Options::recommended()`**, which is what `default()` is — structured elimination, all pair
-  criteria, the dense accumulator. It is the fastest of twelve configurations on every instance
-  measured, and no component of it regresses any instance it is added to.
+  criteria, the dense accumulator. It is the fastest of twelve configurations on ten of eleven
+  instances measured; on the eleventh the criteria have already made elimination 9% of the total,
+  so the accumulator's gain there is smaller than run-to-run variation.
 - **`F4Options::baseline()`**, every strategy off. This is the configuration the measurements are
   taken against, and it is kept reachable so they can be reproduced; a default that absorbed its
   own reference would make the comparison impossible to repeat.
@@ -277,10 +282,19 @@ monomial hash in symbolic preprocessing and the rewritten final interreduction a
 `PairCriteria::NONE` reduces every pair, which is the reference the criteria are checked against: a
 criterion is sound exactly when enabling it does not change the basis.
 
-With `default()`, **F4 is faster than `buchberger` on every system and order measured** — from
-1.2x on the sub-millisecond instances to 193x on katsura-5 under lex, and 4.3x on katsura-6 under
-grevlex, which was F4's worst case at 0.47x one milestone ago. `cargo run --release --example
-f4_milestone` reproduces the comparison.
+With `default()`, **F4 is faster than `buchberger()` on every system and order measured** — 1.2x
+to 236x — and katsura-6 under grevlex, F4's worst case at 0.47x one milestone ago, is 3.6x.
+
+That comparison is between the two functions' defaults, and the two defaults are not
+algorithmically matched: the pair criteria are **shared machinery**, and `F4Options::recommended()`
+enables `PairCriteria::ALL` while `buchberger()` uses `PRODUCT_ONLY`. Give the classical engine the
+same criteria via `buchberger_with_criteria` and it speeds up 2.2x to 13.2x on its own; F4 then
+wins on thirteen of fourteen instances by 1.15x to 49x, and loses by 3% on cyclic-4 grevlex. That
+matched figure is the one that isolates F4's *matrix algorithm* from the critical-pair selection
+either engine can use.
+
+`cargo run --release --example f4_milestone` reports both columns; §8.3 of
+[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md) has the analysis.
 
 Every backend returns the identical matrix and the identical `EliminationStatistics`, so the choice
 is purely a cost one. `Backend::Adaptive` is the fastest on every instance measured — 1.2x to 2.0x
