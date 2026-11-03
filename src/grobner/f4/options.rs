@@ -36,7 +36,17 @@ pub enum ReductionStrategy {
 
     /// Reducer rows are established as pivots first, and the pair rows are reduced against them.
     ///
-    /// Not yet implemented; currently the unstructured path.
+    /// Reducer multiples have distinct leading monomials by construction, so putting them first
+    /// and in column order makes them a pivot set that needs no discovering and no reducing
+    /// against itself. This performs **more** row operations than the unstructured path, not
+    /// fewer, and far less fill-in: on katsura-7 grevlex it takes peak live entries from 1 390 812
+    /// to 63 087. See [`super::structured`] and `docs/MILESTONE-F4-OPTIMIZATION.md` §7.1.
+    ///
+    /// Row echelon form depends on the order the rows are taken in, so the two paths produce
+    /// different candidate *polynomials*. They cannot produce different leading monomials — pivot
+    /// columns are fixed by the columns' ranks — so the reduced basis is identical, which is
+    /// asserted. What is **not** comparable across the two paths is the trajectory: different
+    /// candidates make different later batches, so `batches` and `pairs_reduced` differ.
     Structured,
 }
 
