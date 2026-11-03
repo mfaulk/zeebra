@@ -101,6 +101,17 @@ impl<const N: usize> CriticalPair<N> {
     }
 }
 
+/// True if `a` divides `b`, i.e. `a`'s exponent of every variable is at most `b`'s.
+///
+/// `Monomial::checked_div` answers the same question but builds the quotient to do it. The
+/// criteria ask it of every basis element against every pair's lcm and never want the quotient.
+pub fn divides<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
+    a.exponents()
+        .iter()
+        .zip(b.exponents().iter())
+        .all(|(x, y)| x <= y)
+}
+
 /// True if two monomials share no variable, i.e. their lcm is their product.
 pub fn are_relatively_prime<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
     a.exponents()
