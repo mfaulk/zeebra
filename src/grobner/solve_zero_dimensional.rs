@@ -36,7 +36,7 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     grobner::{
         f4_with_options,
-        fglm::{classify_ideal, fglm_to_lex_with_options, FglmError, FglmOptions},
+        fglm::{classify_ideal, fglm_to_lex_with_options, FglmError, FglmOptions, FglmStatistics},
         solve::{candidate_values, is_nonzero_constant},
         F4Error, F4Options,
     },
@@ -96,6 +96,27 @@ impl SolveOptions {
             ..Self::default()
         }
     }
+}
+
+/// What a zero-dimensional solve did.
+///
+/// The figures `docs/MILESTONE-FGLM-SOLVING.md` §10.3 reports, so a caller can reproduce them
+/// without an instrumented build. `branches` is the one that is otherwise invisible: it is what
+/// [`SolveOptions::max_branches`] is enforced on, and the difference between finding one solution
+/// and finding all of them shows up here before it shows up in the clock.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SolveStatistics {
+    /// Elements of the lexicographic basis the search ran on.
+    pub lex_basis_elements: usize,
+
+    /// Candidate assignments tried, across the whole search.
+    pub branches: usize,
+
+    /// Distinct solutions returned.
+    pub solutions: usize,
+
+    /// What the conversion did, or `None` under [`SolveStrategy::DirectLexF4`].
+    pub fglm: Option<FglmStatistics>,
 }
 
 /// Why a zero-dimensional solve stopped without an answer.
@@ -179,18 +200,20 @@ pub fn solve_one<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
 ) -> Result<Option<[F; N]>, SolveError> {
-    solve_one_with_options(system, rng, &SolveOptions::default())
+    solve_one_with_options(system, rng, &SolveOptions::default()).map(|(found, _)| found)
 }
 
-/// As [`solve_one`], under the given strategy and budgets.
+/// As [`solve_one`], under the given strategy and budgets, additionally reporting the work done.
+#[allow(clippy::type_complexity)]
 pub fn solve_one_with_options<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
     options: &SolveOptions,
-) -> Result<Option<[F; N]>, SolveError> {
-    let basis = lex_basis(system, options)?;
-    let found = search(&basis, system, Stop::AtFirst, options, rng)?;
-    Ok(found.into_iter().next())
+) -> Result<(Option<[F; N]>, SolveStatistics), SolveError> {
+    let (basis, fglm) = lex_basis(system, options)?;
+    let (found, mut statistics) = search(&basis, system, Stop::AtFirst, options, rng)?;
+    statistics.fglm = fglm;
+    Ok((found.into_iter().next(), statistics))
 }
 
 /// Every distinct solution of `system` over `F`.
@@ -205,6 +228,7 @@ pub fn solve_zero_dimensional<const N: usize, F: FiniteField, R: RngCore + Crypt
     rng: &mut R,
 ) -> Result<Vec<[F; N]>, SolveError> {
     solve_zero_dimensional_with_options(system, rng, &SolveOptions::default())
+        .map(|(found, _)| found)
 }
 
 /// As [`solve_zero_dimensional`], under the given strategy and budgets.
@@ -216,9 +240,11 @@ pub fn solve_zero_dimensional_with_options<
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
     options: &SolveOptions,
-) -> Result<Vec<[F; N]>, SolveError> {
-    let basis = lex_basis(system, options)?;
-    search(&basis, system, Stop::AtEvery, options, rng)
+) -> Result<(Vec<[F; N]>, SolveStatistics), SolveError> {
+    let (basis, fglm) = lex_basis(system, options)?;
+    let (found, mut statistics) = search(&basis, system, Stop::AtEvery, options, rng)?;
+    statistics.fglm = fglm;
+    Ok((found, statistics))
 }
 
 /// The lexicographic Gröbner basis of a zero-dimensional system, by the chosen route.
@@ -226,10 +252,11 @@ pub fn solve_zero_dimensional_with_options<
 /// Zero-dimensionality is decided from whichever basis the strategy computes first, which is the
 /// grevlex one where there is a choice: classification is a question about leading monomials and
 /// costs the same under any order, so it is asked of the cheaper basis.
+#[allow(clippy::type_complexity)]
 fn lex_basis<const N: usize, F: FiniteField>(
     system: &[MultivariatePolynomial<N, F>],
     options: &SolveOptions,
-) -> Result<Vec<MultivariatePolynomial<N, F>>, SolveError> {
+) -> Result<(Vec<MultivariatePolynomial<N, F>>, Option<FglmStatistics>), SolveError> {
     match options.strategy {
         SolveStrategy::DirectLexF4 => {
             let lex = MonomialOrder::Lexicographic;
@@ -237,7 +264,7 @@ fn lex_basis<const N: usize, F: FiniteField>(
             if !classify_ideal(&basis, lex).is_finite_dimensional() {
                 return Err(SolveError::PositiveDimensional);
             }
-            Ok(basis)
+            Ok((basis, None))
         }
         SolveStrategy::GrevlexF4ThenFglm => {
             let source_order = MonomialOrder::GradedReverseLexicographic;
@@ -248,8 +275,9 @@ fn lex_basis<const N: usize, F: FiniteField>(
             if !classify_ideal(&source, source_order).is_finite_dimensional() {
                 return Err(SolveError::PositiveDimensional);
             }
-            let (basis, _) = fglm_to_lex_with_options(&source, source_order, &options.fglm)?;
-            Ok(basis)
+            let (basis, statistics) =
+                fglm_to_lex_with_options(&source, source_order, &options.fglm)?;
+            Ok((basis, Some(statistics)))
         }
     }
 }
@@ -286,10 +314,15 @@ fn search<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
     stop: Stop,
     options: &SolveOptions,
     rng: &mut R,
-) -> Result<Vec<[F; N]>, SolveError> {
+) -> Result<(Vec<[F; N]>, SolveStatistics), SolveError> {
+    let mut statistics = SolveStatistics {
+        lex_basis_elements: basis.len(),
+        ..SolveStatistics::default()
+    };
+
     // The unit ideal: the system is inconsistent, so there is nothing to search.
     if basis.iter().any(is_nonzero_constant) {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), statistics));
     }
 
     let mut budget = Budget {
@@ -327,7 +360,9 @@ fn search<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
         }
     }
 
-    Ok(solutions)
+    statistics.branches = budget.branches;
+    statistics.solutions = solutions.len();
+    Ok((solutions, statistics))
 }
 
 /// One level of the back-substitution.
@@ -419,6 +454,8 @@ mod tests {
 
     use rand::{prelude::StdRng, SeedableRng};
 
+    use rand::{CryptoRng, RngCore};
+
     use super::{
         solve_one, solve_one_with_options, solve_zero_dimensional,
         solve_zero_dimensional_with_options, SolveError, SolveOptions, SolveStrategy,
@@ -437,6 +474,24 @@ mod tests {
 
     const STRATEGIES: [SolveStrategy; 2] =
         [SolveStrategy::DirectLexF4, SolveStrategy::GrevlexF4ThenFglm];
+
+    /// `solve_one_with_options`, discarding the statistics. Most tests do not read them.
+    fn one<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+        system: &[MultivariatePolynomial<N, F>],
+        rng: &mut R,
+        options: &SolveOptions,
+    ) -> Result<Option<[F; N]>, SolveError> {
+        solve_one_with_options(system, rng, options).map(|(found, _)| found)
+    }
+
+    /// `solve_zero_dimensional_with_options`, discarding the statistics.
+    fn all<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+        system: &[MultivariatePolynomial<N, F>],
+        rng: &mut R,
+        options: &SolveOptions,
+    ) -> Result<Vec<[F; N]>, SolveError> {
+        solve_zero_dimensional_with_options(system, rng, options).map(|(found, _)| found)
+    }
 
     fn parse<const N: usize>(
         system: &[&str],
@@ -514,13 +569,12 @@ mod tests {
 
                 for strategy in STRATEGIES {
                     let options = SolveOptions::with_strategy(strategy);
-                    let found: HashSet<_> =
-                        solve_zero_dimensional_with_options(&f, &mut rng, &options)
-                            .unwrap_or_else(|e| {
-                                panic!("{:?} over GF({}) with {:?}: {}", system, P, strategy, e)
-                            })
-                            .into_iter()
-                            .collect();
+                    let found: HashSet<_> = all(&f, &mut rng, &options)
+                        .unwrap_or_else(|e| {
+                            panic!("{:?} over GF({}) with {:?}: {}", system, P, strategy, e)
+                        })
+                        .into_iter()
+                        .collect();
                     assert_eq!(
                         found, expected,
                         "{:?} over GF({}) with {:?}",
@@ -586,12 +640,12 @@ mod tests {
         for strategy in STRATEGIES {
             let options = SolveOptions::with_strategy(strategy);
             assert_eq!(
-                solve_one_with_options(&f, &mut rng, &options).expect("zero-dimensional"),
+                one(&f, &mut rng, &options).expect("zero-dimensional"),
                 None,
                 "{:?}",
                 strategy
             );
-            assert!(solve_zero_dimensional_with_options(&f, &mut rng, &options)
+            assert!(all(&f, &mut rng, &options)
                 .expect("zero-dimensional")
                 .is_empty());
         }
@@ -622,13 +676,8 @@ mod tests {
         let f = parse(&["x", "x - 1"], ["x", "y"]);
         for strategy in STRATEGIES {
             let options = SolveOptions::with_strategy(strategy);
-            assert_eq!(
-                solve_one_with_options(&f, &mut rng, &options).unwrap(),
-                None
-            );
-            assert!(solve_zero_dimensional_with_options(&f, &mut rng, &options)
-                .unwrap()
-                .is_empty());
+            assert_eq!(one(&f, &mut rng, &options).unwrap(), None);
+            assert!(all(&f, &mut rng, &options).unwrap().is_empty());
         }
     }
 
@@ -644,7 +693,7 @@ mod tests {
 
             let curve = parse(&["x*y - 1"], ["x", "y"]);
             assert_eq!(
-                solve_one_with_options(&curve, &mut rng, &options).unwrap_err(),
+                one(&curve, &mut rng, &options).unwrap_err(),
                 SolveError::PositiveDimensional,
                 "{:?}",
                 strategy
@@ -652,13 +701,13 @@ mod tests {
 
             let line = parse(&["x - y"], ["x", "y"]);
             assert_eq!(
-                solve_zero_dimensional_with_options(&line, &mut rng, &options).unwrap_err(),
+                all(&line, &mut rng, &options).unwrap_err(),
                 SolveError::PositiveDimensional
             );
 
             let cyclic_4 = cyclic::<4, F>();
             assert_eq!(
-                solve_one_with_options(&cyclic_4, &mut rng, &options).unwrap_err(),
+                one(&cyclic_4, &mut rng, &options).unwrap_err(),
                 SolveError::PositiveDimensional
             );
         }
@@ -727,7 +776,7 @@ mod tests {
 
                 for strategy in STRATEGIES {
                     let options = SolveOptions::with_strategy(strategy);
-                    let all = solve_zero_dimensional_with_options(&system, &mut rng, &options)
+                    let all = all(&system, &mut rng, &options)
                         .unwrap_or_else(|e| panic!("planted-{} with {:?}: {}", $n, strategy, e));
                     assert!(
                         all.contains(&expected),
@@ -737,7 +786,7 @@ mod tests {
                         all.len()
                     );
                     // And one solution is found without enumerating them all.
-                    let one = solve_one_with_options(&system, &mut rng, &options)
+                    let one = one(&system, &mut rng, &options)
                         .unwrap()
                         .expect("a solution exists");
                     for p in &system {
@@ -765,13 +814,13 @@ mod tests {
         macro_rules! check {
             ($system:expr, $name:literal) => {{
                 let system = $system;
-                let direct = solve_zero_dimensional_with_options(
+                let direct = all(
                     &system,
                     &mut rng,
                     &SolveOptions::with_strategy(SolveStrategy::DirectLexF4),
                 )
                 .unwrap_or_else(|e| panic!("{} direct: {}", $name, e));
-                let converted = solve_zero_dimensional_with_options(
+                let converted = all(
                     &system,
                     &mut rng,
                     &SolveOptions::with_strategy(SolveStrategy::GrevlexF4ThenFglm),
@@ -852,20 +901,20 @@ mod tests {
             ..SolveOptions::default()
         };
         assert_eq!(
-            solve_zero_dimensional_with_options(&f, &mut rng, &options).unwrap_err(),
+            all(&f, &mut rng, &options).unwrap_err(),
             SolveError::TooManyBranches { limit: 1 }
         );
 
         // A budget of zero forbids the first candidate, rather than being rejected as invalid.
         options.max_branches = Some(0);
         assert_eq!(
-            solve_one_with_options(&f, &mut rng, &options).unwrap_err(),
+            one(&f, &mut rng, &options).unwrap_err(),
             SolveError::TooManyBranches { limit: 0 }
         );
 
         // And a generous budget succeeds.
         options.max_branches = Some(1000);
-        assert!(solve_zero_dimensional_with_options(&f, &mut rng, &options).is_ok());
+        assert!(all(&f, &mut rng, &options).is_ok());
     }
 
     /// A solution budget below the true count is an error, not a truncated list.
@@ -885,7 +934,7 @@ mod tests {
         for limit in 0..9 {
             options.max_solutions = Some(limit);
             assert_eq!(
-                solve_zero_dimensional_with_options(&f, &mut rng, &options).unwrap_err(),
+                all(&f, &mut rng, &options).unwrap_err(),
                 SolveError::TooManySolutions { limit },
                 "a limit of {} should have been exceeded",
                 limit
@@ -893,7 +942,7 @@ mod tests {
         }
         options.max_solutions = Some(9);
         assert_eq!(
-            solve_zero_dimensional_with_options(&f, &mut rng, &options)
+            all(&f, &mut rng, &options)
                 .expect("exactly at the limit")
                 .len(),
             9
@@ -901,7 +950,7 @@ mod tests {
 
         // `solve_one` ignores the limit, since it stops at one by construction.
         options.max_solutions = Some(0);
-        assert!(solve_one_with_options(&f, &mut rng, &options)
+        assert!(one(&f, &mut rng, &options)
             .expect("the limit does not apply")
             .is_some());
     }
@@ -921,11 +970,11 @@ mod tests {
             ..SolveOptions::default()
         };
 
-        assert!(solve_one_with_options(&f, &mut rng, &options)
+        assert!(one(&f, &mut rng, &options)
             .expect("one solution is within four branches")
             .is_some());
         assert_eq!(
-            solve_zero_dimensional_with_options(&f, &mut rng, &options).unwrap_err(),
+            all(&f, &mut rng, &options).unwrap_err(),
             SolveError::TooManyBranches { limit: 4 },
             "all nine solutions should not fit in four branches"
         );
@@ -947,7 +996,7 @@ mod tests {
         let system = planted::<14, F>(&point);
 
         // The conversion refuses: 16384 standard monomials against a limit of 4096.
-        let converted = solve_one_with_options(
+        let converted = one(
             &system,
             &mut rng,
             &SolveOptions::with_strategy(SolveStrategy::GrevlexF4ThenFglm),
@@ -960,7 +1009,7 @@ mod tests {
 
         // The direct route solves it, and the planted point is the answer.
         let expected: [F; 14] = point.clone().try_into().unwrap();
-        let found = solve_one_with_options(
+        let found = one(
             &system,
             &mut rng,
             &SolveOptions::with_strategy(SolveStrategy::DirectLexF4),
@@ -988,14 +1037,14 @@ mod tests {
         let mut options = SolveOptions::with_strategy(SolveStrategy::GrevlexF4ThenFglm);
         options.fglm.max_quotient_dimension = 8;
         assert_eq!(
-            solve_one_with_options(&system, &mut rng, &options).unwrap_err(),
+            one(&system, &mut rng, &options).unwrap_err(),
             SolveError::Fglm(FglmError::QuotientDimensionExceeded { limit: 8 })
         );
 
         // The direct route is unaffected by a conversion limit, since it does not convert.
         let mut options = SolveOptions::with_strategy(SolveStrategy::DirectLexF4);
         options.fglm.max_quotient_dimension = 8;
-        assert!(solve_one_with_options(&system, &mut rng, &options).is_ok());
+        assert!(one(&system, &mut rng, &options).is_ok());
     }
 
     /// An F4 budget below what the basis needs surfaces as `SolveError::Grobner`.
@@ -1007,9 +1056,64 @@ mod tests {
         let mut options = SolveOptions::default();
         options.f4.max_matrix_rows = 2;
         assert!(matches!(
-            solve_one_with_options(&system, &mut rng, &options).unwrap_err(),
+            one(&system, &mut rng, &options).unwrap_err(),
             SolveError::Grobner(_)
         ));
+    }
+
+    /// The statistics account for the work, and show what the clock only implies.
+    ///
+    /// `<x^3 - 1, y^3 - 1>` has nine solutions and a search tree of 3 + 9 = 12 candidate
+    /// assignments: three roots for y, and three for x under each. Finding one solution charges
+    /// two branches — one value of y, one of x — so the ratio is six, before any timing is
+    /// involved.
+    #[test]
+    fn test_the_statistics_account_for_the_search() {
+        let mut rng = StdRng::seed_from_u64(79);
+        let f = parse(&["x^3 - 1", "y^3 - 1"], ["x", "y"]);
+        let options = SolveOptions::default();
+
+        let (every, all_statistics) =
+            solve_zero_dimensional_with_options(&f, &mut rng, &options).expect("zero-dimensional");
+        assert_eq!(all_statistics.solutions, every.len());
+        assert_eq!(all_statistics.solutions, 9);
+        assert_eq!(all_statistics.branches, 12);
+        assert_eq!(all_statistics.lex_basis_elements, f.len());
+        // The direct strategy converts nothing, so there is nothing to report.
+        assert_eq!(all_statistics.fglm, None);
+
+        let (first, one_statistics) =
+            solve_one_with_options(&f, &mut rng, &options).expect("zero-dimensional");
+        assert!(first.is_some());
+        assert_eq!(one_statistics.solutions, 1);
+        assert_eq!(
+            one_statistics.branches, 2,
+            "one solution costs one value of each variable"
+        );
+    }
+
+    /// Under the conversion strategy the statistics carry the quotient dimension and its cost.
+    #[test]
+    fn test_the_statistics_report_the_conversion() {
+        let mut rng = StdRng::seed_from_u64(83);
+        let options = SolveOptions::with_strategy(SolveStrategy::GrevlexF4ThenFglm);
+
+        let (_, statistics) =
+            solve_zero_dimensional_with_options(&katsura::<5, F>(), &mut rng, &options)
+                .expect("zero-dimensional");
+
+        let fglm = statistics.fglm.expect("the conversion ran");
+        assert_eq!(fglm.quotient_dimension, 16, "katsura-5 has D = 2^4");
+        assert_eq!(fglm.candidates_independent, 16);
+        assert_eq!(fglm.candidates_dependent, statistics.lex_basis_elements);
+        assert!(fglm.operator_entries > 0);
+        assert!(fglm.span_row_operations > 0);
+
+        // The storage estimate is the operators plus the dependence test, and nothing else.
+        assert_eq!(
+            fglm.estimated_bytes(),
+            fglm.operator_entries * 16 + 2 * 16 * 16 * 8
+        );
     }
 
     /// Returned solutions are distinct, with no deduplication step.
