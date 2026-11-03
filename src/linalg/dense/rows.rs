@@ -14,6 +14,47 @@ use crate::{
     FiniteField,
 };
 
+/// The dense cells a budget of `max_nonzeros` sparse entries licenses, at equal bytes.
+///
+/// A sparse entry is a column index and a field element; a dense cell is a field element alone.
+/// So the same byte budget buys `size_of::<(usize, F)>() / size_of::<F>()` times as many cells —
+/// typically three, for a 32-bit field on a 64-bit target.
+///
+/// This exists because `max_nonzeros` bounds *stored nonzeros*, and a dense representation has no
+/// zeros it can decline to store: a matrix that is a fraction of a percent dense satisfies the
+/// entry budget comfortably and still needs `rows x columns` field elements. katsura-7 grevlex's
+/// largest matrix holds 112 200 entries and would densify to 46.7 million cells — 374 MB — which
+/// is what makes the unit conversion necessary rather than pedantic.
+///
+/// Saturates rather than overflowing: `usize::MAX` entries means unbounded, and converting an
+/// unbounded budget into a smaller one would turn "no limit" into "refuse everything".
+fn licensed_cells<F: FiniteField>(max_nonzeros: usize) -> usize {
+    let entry = std::mem::size_of::<(usize, F)>();
+    let cell = std::mem::size_of::<F>().max(1);
+    max_nonzeros.saturating_mul(entry / cell.min(entry))
+}
+
+/// Refuse a densification that would exceed what `max_nonzeros` licenses, before allocating.
+///
+/// `Err` carries the cell count, in the same currency the sparse path's `Err` uses — a count of
+/// live field elements — so a caller comparing the two reads one unit.
+fn check_dense_budget<F: FiniteField>(
+    matrix: &SparseMatrix<F>,
+    max_nonzeros: usize,
+) -> Result<(), usize> {
+    // An overflowing cell count cannot be allocated on any machine, so it is refused with the
+    // largest count expressible rather than by panicking inside `from_sparse`.
+    let cells = matrix
+        .num_rows()
+        .checked_mul(matrix.num_columns())
+        .ok_or(usize::MAX)?;
+    if cells <= licensed_cells::<F>(max_nonzeros) {
+        Ok(())
+    } else {
+        Err(cells)
+    }
+}
+
 /// A dense matrix of field elements, stored one row after another.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DenseRows<F: FiniteField> {
@@ -304,9 +345,11 @@ fn two_rows_mut<F: FiniteField>(
 
 /// [`crate::linalg::row_echelon_with`] over dense rows.
 ///
-/// The budget is tested before the matrix is densified, so a refused elimination does not pay for
-/// a representation it is not going to use. On failure `matrix` is left as it arrived; the contract
-/// says the caller must not read it, and this backend has nothing partial to hand back.
+/// Both budgets are tested before the matrix is densified, so a refused elimination does not pay
+/// for a representation it is not going to use — and, more to the point, does not allocate a
+/// gigabyte in order to discover it was not allowed to. On failure `matrix` is left as it arrived;
+/// the contract says the caller must not read it, and this backend has nothing partial to hand
+/// back.
 pub(crate) fn dense_row_echelon<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     max_nonzeros: usize,
@@ -315,6 +358,7 @@ pub(crate) fn dense_row_echelon<F: FiniteField>(
     if initial_nonzeros > max_nonzeros {
         return Err(initial_nonzeros);
     }
+    check_dense_budget(matrix, max_nonzeros)?;
 
     let mut dense = DenseRows::from_sparse(matrix);
     let statistics = dense.row_echelon_within(max_nonzeros)?;
@@ -334,6 +378,7 @@ pub(crate) fn dense_reduce_rows_against_pivots<F: FiniteField>(
     statistics: &mut EliminationStatistics,
     max_nonzeros: usize,
 ) -> Result<(), usize> {
+    check_dense_budget(matrix, max_nonzeros)?;
     let mut dense = DenseRows::from_sparse(matrix);
     dense.reduce_rows_from(split, pivot_of_column, statistics, max_nonzeros)?;
     *matrix = dense.to_sparse();
@@ -342,6 +387,8 @@ pub(crate) fn dense_reduce_rows_against_pivots<F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
+    use super::{check_dense_budget, licensed_cells};
+
     use super::DenseRows;
     use crate::{
         fields::Zp13,
@@ -418,5 +465,74 @@ mod tests {
         let mut dense = DenseRows::from_sparse(&original);
         assert_eq!(dense.row_echelon_within(3), Err(4));
         assert_eq!(dense.to_sparse(), original, "no work should have been done");
+    }
+
+    /// A sparse matrix too wide to densify within the budget is refused before it is allocated.
+    ///
+    /// The shape here is the pathology the guard exists for: 0.04% dense, comfortably inside an
+    /// entry budget, and 4 million cells if densified.
+    #[test]
+    fn test_a_wide_sparse_matrix_is_refused_before_densifying() {
+        let rows: Vec<SparseRow<Zp13>> = (0..2000)
+            .map(|i| SparseRow::new(&[(i, Zp13::new(1))]))
+            .collect();
+        let matrix = SparseMatrix::new(2000, rows);
+        assert_eq!(matrix.nonzeros(), 2000);
+
+        // The entry budget is satisfied many times over; the cell count is not.
+        assert!(
+            licensed_cells::<Zp13>(2000) < 2000 * 2000,
+            "the budget should not cover 4M cells"
+        );
+        assert_eq!(check_dense_budget(&matrix, 2000), Err(2000 * 2000));
+
+        // And the backend refuses rather than allocating it.
+        let mut copy = matrix.clone();
+        assert_eq!(
+            super::dense_row_echelon(&mut copy, 2000),
+            Err(2000 * 2000),
+            "the dense path allocated a matrix the budget did not license"
+        );
+        assert_eq!(
+            copy, matrix,
+            "a refused elimination must not rewrite the matrix"
+        );
+    }
+
+    /// The licensed cell count converts the entry budget at equal bytes, not one for one.
+    ///
+    /// A sparse entry carries a column index as well as a coefficient, so the same bytes buy more
+    /// dense cells than sparse entries. Asserted as the ratio rather than a constant, because it
+    /// depends on the field's width.
+    #[test]
+    fn test_licensed_cells_converts_at_equal_bytes() {
+        let entry = std::mem::size_of::<(usize, Zp13)>();
+        let cell = std::mem::size_of::<Zp13>();
+        assert_eq!(licensed_cells::<Zp13>(1_000), 1_000 * (entry / cell));
+        assert!(
+            licensed_cells::<Zp13>(1_000) >= 1_000,
+            "a dense cell is never larger than a sparse entry"
+        );
+        // An unbounded budget stays unbounded: saturating here rather than overflowing is what
+        // keeps `usize::MAX` meaning "no limit" instead of "refuse everything".
+        assert_eq!(licensed_cells::<Zp13>(usize::MAX), usize::MAX);
+        assert_eq!(
+            check_dense_budget(&SparseMatrix::<Zp13>::zero(4, 4), usize::MAX),
+            Ok(())
+        );
+    }
+
+    /// A matrix that fits is accepted, so the guard does not refuse the ordinary case.
+    #[test]
+    fn test_a_matrix_within_the_budget_is_accepted() {
+        let matrix = SparseMatrix::new(
+            8,
+            (0..8)
+                .map(|i| SparseRow::new(&[(i, Zp13::new(1))]))
+                .collect(),
+        );
+        assert_eq!(check_dense_budget(&matrix, 64), Ok(()));
+        let mut copy = matrix.clone();
+        assert!(super::dense_row_echelon(&mut copy, 64).is_ok());
     }
 }
