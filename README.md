@@ -83,6 +83,8 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example pair_criteria        # what each pair criterion discards, F4
+cargo run --release --example pair_criteria -- buchberger
 ```
 
 `f4_statistics` prints matrix dimensions, how many reductions each matrix absorbed, how much of
@@ -121,7 +123,9 @@ Which order you pick matters: graded reverse lexicographic is usually cheapest, 
 is what makes a system easy to solve by back-substitution and can be dramatically more expensive.
 
 `buchberger_with_statistics` returns the same basis alongside counters describing the computation,
-which is useful for understanding cost on a hard system. `grobner::benchmark_systems` provides the
+which is useful for understanding cost on a hard system. `buchberger_with_criteria` additionally
+takes a `PairCriteria`, so the classical engine can be run under the same pair-elimination
+criteria as F4 — and compared against `PairCriteria::NONE`, which reduces every pair. `grobner::benchmark_systems` provides the
 standard `cyclic` and `katsura` families plus `planted`, which builds a zero-dimensional system
 around a solution you choose. `grobner::reference` holds a deliberately naive textbook
 implementation kept as a correctness oracle — use `buchberger` or `f4` for real work.
@@ -194,6 +198,16 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 kept available separately from `default()` so that a comparison stays meaningful after the default
 moves. `PairCriteria::NONE` reduces every pair, which is the reference the criteria are checked
 against: a criterion is sound exactly when enabling it does not change the basis.
+
+The three criteria are Buchberger's first criterion (`product`, relatively prime leading
+monomials), Buchberger's chain criterion (`chain`, applied when a batch is selected), and
+Gebauer–Möller pair-set minimization (`gebauer_moller`, applied as pairs are inserted). All three
+are available to both engines, and `examples/pair_criteria.rs` reports what each discards.
+Gebauer–Möller is the strongest of the three in F4 — on katsura-6 under lex it takes the pairs
+reduced from 4611 to 231 and the largest matrix from 1954 rows to 92 — and it subsumes what the
+chain criterion finds at selection time, so enabling both discards nothing more than enabling
+Gebauer–Möller alone. In the classical engine neither dominates: on katsura-5 under lex the chain
+criterion reduces fewer pairs than Gebauer–Möller does.
 
 `grobner::solve` still uses `buchberger`. The sparse linear algebra F4 is built on is reusable on
 its own, as `linalg::sparse`; `linalg::echelon` is the backend-selecting interface over it.

@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use crate::{
     grobner::{
-        pairs::{are_relatively_prime, divides, CriterionCounts, PairCriteria, PairQueue},
+        pairs::{divides, CriterionCounts, PairCriteria, PairQueue},
         s_polynomial::s_polynomial,
     },
     poly::MonomialOrder,
@@ -48,6 +48,14 @@ pub struct Statistics {
 
     /// The largest number of terms in any polynomial produced by a reduction.
     pub max_terms: usize,
+
+    /// Pairs discarded, per criterion.
+    ///
+    /// `pairs_eliminated_by_product_criterion` is `criteria.product`; the other two fields are
+    /// the only record of what the chain criterion and Gebauer–Möller did, and
+    /// `criteria.gebauer_moller` counts pairs that were never selected and so are not in
+    /// `pairs_considered` either.
+    pub criteria: CriterionCounts,
 }
 
 /// The reduced Gröbner basis for the given polynomials, with respect to the given monomial order.
@@ -113,12 +121,12 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
         statistics.pairs_considered += 1;
         statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
 
-        // Buchberger's first criterion. If the leading monomials share no variable, their lcm is
-        // their product and S(left, right) is guaranteed to reduce to zero modulo the two of
-        // them, so the reduction can be skipped without affecting the result.
-        if criteria.product && are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
-            counts.product += 1;
-            statistics.pairs_eliminated_by_product_criterion += 1;
+        // The selection-time criteria: Buchberger's first criterion and the chain criterion,
+        // both of which say S(left, right) is guaranteed to reduce to zero modulo relations the
+        // computation already has, so the reduction can be skipped without affecting the result.
+        let before = counts;
+        if pending.is_discarded(&pair, &leads, criteria, &mut counts) {
+            statistics.pairs_eliminated_by_product_criterion += counts.product - before.product;
             continue;
         }
 
@@ -145,6 +153,8 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
         // incremental: the textbook formulation rebuilds every pair on every pass.
         pending.push_pairs_from_leads(&leads, added, criteria, &mut counts);
     }
+
+    statistics.criteria = counts;
 
     (reduce_grobner_basis(&basis, order), statistics)
 }
@@ -281,8 +291,8 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
 mod tests {
     use crate::util::contains_duplicates;
     use crate::{
-        fields::Zp13, grobner::buchberger::buchberger, poly::MonomialOrder, FiniteField,
-        MultivariatePolynomial, One,
+        fields::Zp13, grobner::buchberger::buchberger, grobner::pairs::PairCriteria,
+        poly::MonomialOrder, FiniteField, MultivariatePolynomial, One,
     };
 
     #[test]
@@ -823,6 +833,295 @@ mod tests {
             );
             assert!(statistics.pairs_considered > 0, "{}", order.name());
         }
+    }
+
+    /// Every combination of the pair criteria, so a differential test covers all of them.
+    const CRITERIA_CONFIGURATIONS: [PairCriteria; 8] = [
+        PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: true,
+            chain: false,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: true,
+            chain: true,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: true,
+            chain: false,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: true,
+            chain: true,
+            gebauer_moller: true,
+        },
+    ];
+
+    /// The correctness corpus: hand-written systems, degenerate input, and benchmark families.
+    fn criteria_corpus() -> Vec<(String, Vec<MultivariatePolynomial<3, Zp13>>)> {
+        use crate::grobner::benchmark_systems::{cyclic, katsura};
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        let written: Vec<Vec<&str>> = vec![
+            vec!["x^2 - y"],
+            vec!["x + y + z"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x^2 + y^2 - 1", "x - y"],
+            vec!["x*y - 1", "x - y"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x^3 - 2*x*y", "x^2*y - 2*y^2 + x"],
+            vec!["x + y", "x^2 + z", "y*z - 1"],
+            vec!["x*y*z - 1", "x*y - z"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x^2 + y + 1", "y^2 + z + 2", "z^2 + x + 3"],
+            // Inconsistent, so the basis is {1}.
+            vec!["x", "x - 1"],
+            // Duplicated, a scalar multiple, and a generator already in the ideal.
+            vec!["x + y", "x + y", "y^2 - 1"],
+            vec!["x + y", "3*x + 3*y", "y^2 - 1"],
+            vec!["x + y", "y^2 - 1", "x*y + y^2"],
+            // The configuration the chain criterion is about: three leading monomials each
+            // dividing the lcm of the other two.
+            vec!["x - 1", "y - 2", "x*y - 3"],
+            // Relatively prime leading monomials, which the product criterion takes.
+            vec!["x^2", "y^3"],
+            vec!["x^2 - 1", "y^2 - 1", "z^2 - 1"],
+        ];
+
+        let mut corpus: Vec<(String, Vec<MultivariatePolynomial<3, F>>)> = written
+            .iter()
+            .map(|system| {
+                (
+                    format!("{:?}", system),
+                    system.iter().map(|s| parse(s)).collect(),
+                )
+            })
+            .collect();
+        corpus.push(("cyclic-3".into(), cyclic::<3, F>()));
+        corpus.push(("katsura-3".into(), katsura::<3, F>()));
+        corpus
+    }
+
+    /// Every combination of the criteria computes the basis the criteria-free reference computes.
+    #[test]
+    fn test_criteria_do_not_change_the_basis() {
+        use crate::grobner::buchberger_with_criteria;
+
+        for order in ALL_ORDERS {
+            for (name, f) in criteria_corpus() {
+                let (expected, _) =
+                    buchberger_with_criteria(&f, order, &CRITERIA_CONFIGURATIONS[0]);
+                for criteria in CRITERIA_CONFIGURATIONS {
+                    let (actual, _) = buchberger_with_criteria(&f, order, &criteria);
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{} under {} with {:?}",
+                        name,
+                        order.name(),
+                        criteria
+                    );
+                }
+            }
+        }
+    }
+
+    /// The criteria survive permuted, duplicated, scaled and redundant generators.
+    ///
+    /// An unsound criterion usually agrees on a fixed corpus and fails once the generator order
+    /// changes, because the order decides which pairs are handled before which.
+    #[test]
+    fn test_criteria_under_permuted_generators() {
+        use crate::grobner::buchberger_with_criteria;
+        type F = Zp13;
+
+        for order in ALL_ORDERS {
+            for (name, f) in criteria_corpus() {
+                let (expected, _) =
+                    buchberger_with_criteria(&f, order, &CRITERIA_CONFIGURATIONS[0]);
+
+                // Every rotation of the generators, the reversal, and the generators with the
+                // first one duplicated, doubled, and re-added as a redundant ideal member.
+                let mut variants: Vec<Vec<MultivariatePolynomial<3, F>>> = Vec::new();
+                for shift in 0..f.len() {
+                    variants.push(
+                        f.iter()
+                            .cycle()
+                            .skip(shift)
+                            .take(f.len())
+                            .cloned()
+                            .collect(),
+                    );
+                }
+                let mut reversed = f.clone();
+                reversed.reverse();
+                variants.push(reversed);
+                let mut duplicated = f.clone();
+                duplicated.push(f[0].clone());
+                variants.push(duplicated);
+                let mut scaled = f.clone();
+                scaled.push(f[0].scale(&(F::ONE + F::ONE + F::ONE)));
+                variants.push(scaled);
+                let mut redundant = f.clone();
+                redundant.push(&f[0] * &f[f.len() - 1]);
+                variants.push(redundant);
+
+                for variant in &variants {
+                    for criteria in CRITERIA_CONFIGURATIONS {
+                        let (actual, _) = buchberger_with_criteria(variant, order, &criteria);
+                        assert_eq!(
+                            actual,
+                            expected,
+                            "{} under {} with {:?}, generators {:?}",
+                            name,
+                            order.name(),
+                            criteria,
+                            variant
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Randomized systems over GF(7) and GF(13) agree with the criteria switched off.
+    #[test]
+    fn test_criteria_on_randomized_systems() {
+        use crate::{
+            fields::Zp7,
+            grobner::buchberger_with_criteria,
+            poly::{Monomial, MultivariatePolynomial as Poly},
+        };
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        /// Three sparse polynomials of degree at most two in three variables.
+        fn system<FF: FiniteField>(seed: u64) -> Vec<Poly<3, FF>> {
+            let mut rng = StdRng::seed_from_u64(seed);
+            (0..3)
+                .map(|_| {
+                    let terms: Vec<(Monomial<3>, FF)> = (0..4)
+                        .map(|_| {
+                            let mut exponents = [0u32; 3];
+                            exponents[rng.gen_range(0..3)] += 1;
+                            if rng.gen_bool(0.5) {
+                                exponents[rng.gen_range(0..3)] += 1;
+                            }
+                            (Monomial::new(&exponents), FF::random(&mut rng))
+                        })
+                        .collect();
+                    Poly::new(&terms)
+                })
+                .collect()
+        }
+
+        for seed in 0..24 {
+            for order in ALL_ORDERS {
+                let over_7: Vec<Poly<3, Zp7>> = system(seed);
+                let over_13: Vec<Poly<3, Zp13>> = system(seed + 1000);
+
+                let (expected_7, _) =
+                    buchberger_with_criteria(&over_7, order, &CRITERIA_CONFIGURATIONS[0]);
+                let (expected_13, _) =
+                    buchberger_with_criteria(&over_13, order, &CRITERIA_CONFIGURATIONS[0]);
+
+                for criteria in CRITERIA_CONFIGURATIONS {
+                    assert_eq!(
+                        buchberger_with_criteria(&over_7, order, &criteria).0,
+                        expected_7,
+                        "GF(7) seed {} under {} with {:?}",
+                        seed,
+                        order.name(),
+                        criteria
+                    );
+                    assert_eq!(
+                        buchberger_with_criteria(&over_13, order, &criteria).0,
+                        expected_13,
+                        "GF(13) seed {} under {} with {:?}",
+                        seed,
+                        order.name(),
+                        criteria
+                    );
+                }
+            }
+        }
+    }
+
+    /// Each criterion's counter is nonzero when that criterion is enabled and zero when it is not.
+    #[test]
+    fn test_criterion_counts_are_attributed() {
+        use crate::grobner::{benchmark_systems::katsura, buchberger_with_criteria, PairCriteria};
+        type F = Zp13;
+
+        let system = katsura::<3, F>();
+        let order = MonomialOrder::Lexicographic;
+
+        let (_, none) = buchberger_with_criteria(&system, order, &PairCriteria::NONE);
+        assert_eq!(none.criteria.total(), 0, "nothing should be discarded");
+
+        let (_, product) = buchberger_with_criteria(&system, order, &PairCriteria::PRODUCT_ONLY);
+        assert!(product.criteria.product > 0);
+        assert_eq!(product.criteria.chain, 0);
+        assert_eq!(product.criteria.gebauer_moller, 0);
+
+        let chain_only = PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: false,
+        };
+        let (_, chain) = buchberger_with_criteria(&system, order, &chain_only);
+        assert_eq!(chain.criteria.product, 0);
+        assert!(
+            chain.criteria.chain > 0,
+            "the chain criterion discarded nothing: {:?}",
+            chain
+        );
+        assert_eq!(chain.criteria.gebauer_moller, 0);
+
+        let gebauer_moller_only = PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: true,
+        };
+        let (_, gm) = buchberger_with_criteria(&system, order, &gebauer_moller_only);
+        assert_eq!(gm.criteria.product, 0);
+        assert_eq!(gm.criteria.chain, 0);
+        assert!(
+            gm.criteria.gebauer_moller > 0,
+            "Gebauer-Möller discarded nothing: {:?}",
+            gm
+        );
+
+        // Together they reduce the pairs actually reduced below what either manages alone.
+        let (_, all) = buchberger_with_criteria(&system, order, &PairCriteria::ALL);
+        assert!(all.pairs_reduced < product.pairs_reduced);
+        assert!(all.pairs_reduced <= chain.pairs_reduced);
+        assert!(all.pairs_reduced <= gm.pairs_reduced);
     }
 
     /// The interreduction as it was written before M16-C, kept as the differential oracle.
