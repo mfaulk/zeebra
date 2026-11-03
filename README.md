@@ -206,6 +206,39 @@ standard `cyclic` and `katsura` families plus `planted`, which builds a zero-dim
 around a solution you choose. `grobner::reference` holds a deliberately naive textbook
 implementation kept as a correctness oracle — use `buchberger` or `f4` for real work.
 
+### Zero-dimensional ideals
+
+A Gröbner basis says whether the quotient `R/I` is finite-dimensional, and if it is, what its
+monomial basis is. `grobner::classify_ideal` separates the unit ideal, a proper zero-dimensional
+ideal, and a positive-dimensional one; `grobner::QuotientBasis` enumerates the standard monomials —
+those divisible by no leading monomial — whose count is the quotient dimension `D`:
+
+```rust
+use zeebra::fields::Zp2147483647;
+use zeebra::grobner::{classify_ideal, f4, IdealClass, QuotientBasis};
+use zeebra::{MonomialOrder, MultivariatePolynomial};
+
+type F = Zp2147483647;
+let order = MonomialOrder::GradedReverseLexicographic;
+
+// <x^2, y^2>: one point over the algebraic closure, but a quotient of dimension four.
+let system: Vec<MultivariatePolynomial<2, F>> = ["x^2", "y^2"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, ["x", "y"]).unwrap())
+    .collect();
+let basis = f4(&system, order).unwrap();
+
+assert_eq!(classify_ideal(&basis, order), IdealClass::ZeroDimensional);
+let quotient = QuotientBasis::new(&basis, order, 1 << 20).unwrap();
+assert_eq!(quotient.dimension(), 4);      // 1, x, y, xy
+```
+
+`D` is the dimension of `R/I` as a vector space, **not** the Krull dimension: it counts the zeros
+over the algebraic closure with multiplicity, so it is an upper bound on the number of distinct
+points rather than a count of them. A positive-dimensional ideal is rejected with
+`FglmError::PositiveDimensional` before any enumeration, since the enumeration would not
+terminate, and the `max_dimension` argument bounds it otherwise.
+
 ### F4
 
 `grobner::f4` computes the same basis by Faugère's F4 algorithm, which replaces individual
