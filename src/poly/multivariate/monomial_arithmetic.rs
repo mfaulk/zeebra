@@ -11,7 +11,14 @@ impl<const N: usize> ops::Mul<&Monomial<N>> for &Monomial<N> {
     fn mul(self, rhs: &Monomial<N>) -> Self::Output {
         let mut exponents = [0u32; N];
         for i in 0..N {
-            exponents[i] = self.exponents[i] + rhs.exponents[i];
+            // Checked in every build, not only where `overflow-checks` is on. A wrapped exponent
+            // is not a large monomial, it is a *different* monomial, so a release build would
+            // silently compute in the wrong ring — and release is where this is called millions of
+            // times. The carry test costs a compare per variable against an add that is already
+            // there.
+            exponents[i] = self.exponents[i]
+                .checked_add(rhs.exponents[i])
+                .expect("monomial exponent overflow");
         }
 
         Monomial::new(&exponents)
@@ -59,8 +66,12 @@ mod tests {
     }
 
     /// Multiplying monomials adds exponents, which panics rather than wrapping on overflow.
+    ///
+    /// Regression test for a release-only defect: the addition used to be a plain `+`, so this
+    /// test passed in debug, where `overflow-checks` is on, and failed in release, where the
+    /// exponent wrapped and the product was a different monomial entirely.
     #[test]
-    #[should_panic(expected = "overflow")]
+    #[should_panic(expected = "monomial exponent overflow")]
     fn test_overflow_panics() {
         let a = Monomial::<3>::new(&[u32::MAX, 0, 0]);
         let b = Monomial::<3>::new(&[1, 0, 0]);
