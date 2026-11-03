@@ -36,6 +36,16 @@ Development checks, matching what CI enforces:
 ```sh
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
+cargo test --doc
+```
+
+CI resolves its toolchain to `stable`, which moves. A clippy run that is clean on an older stable
+is therefore **not** evidence that CI is clean — new lints arrive with new releases, and one did
+during this project's history. `rustup update stable` before trusting a clean run, or name the
+version explicitly:
+
+```sh
+rustup run stable cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 Some tests compare the optimized Gröbner engine against the naive reference implementation, or

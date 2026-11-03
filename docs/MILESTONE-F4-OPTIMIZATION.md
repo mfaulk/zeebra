@@ -372,7 +372,10 @@ choice cannot change a Gröbner basis: that is asserted end to end.
 ## 6. Baseline measurements
 
 Machine: AMD Ryzen Threadripper PRO 5995WX, 64 cores / 128 threads, 503 GB RAM.
-`rustc 1.97.0 (2d8144b78 2026-07-07)`, `cargo 1.97.0`. Release profile (`[profile.release]` is
+`rustc 1.97.0 (2d8144b78 2026-07-07)`, `cargo 1.97.0` — every measurement in this document, on
+both sides of every comparison, so the toolchain cancels. Note that CI resolves `stable`, which by
+the close of the milestone was 1.99.0: a clippy lint present there and absent locally reached a
+pull request, so the final verification was repeated under `cargo +1.99.0`. Release profile (`[profile.release]` is
 Cargo's default: `opt-level = 3`, `debug-assertions = false`, `overflow-checks = false`).
 Criterion 0.5 with `sample_size(10)`. GF(2^31 - 1) for performance, GF(7)/GF(13)/GF(541) and a
 64-bit prime for correctness.
