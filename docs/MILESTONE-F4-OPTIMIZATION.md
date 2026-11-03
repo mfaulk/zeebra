@@ -476,9 +476,69 @@ the gate on whether `CacheMode::Store` is implemented at all.
 ### 6.5 Wall clock
 
 From `cargo bench --bench grobner`, Criterion medians at sample size 10, both engines on identical
-inputs.
+inputs under the identical order, at the M16-0 commit. The `M15` columns are the same measurement
+from [`MILESTONE-F4.md`](MILESTONE-F4.md) §7.2 on the same machine, so the two are comparable and
+the difference is M16-0's own effect.
 
-> Measured at the M16-0 commit and recorded in §6.6 below.
+| system | order | Buchberger | F4 | F4 speedup | M15 Buchberger | M15 F4 |
+|---|---|---|---|---|---|---|
+| cyclic-3 | lex | 18.4 us | 18.3 us | 1.00x | 19.9 us | 19.2 us |
+| cyclic-3 | grlex | 18.3 us | 18.6 us | 0.98x | 20.3 us | 19.1 us |
+| cyclic-3 | grevlex | 18.3 us | 20.5 us | 0.89x | 20.6 us | 20.8 us |
+| cyclic-4 | lex | 175 us | 180 us | 0.97x | 189 us | 179 us |
+| cyclic-4 | grlex | 148 us | **132 us** | 1.12x | 156 us | 134 us |
+| cyclic-4 | grevlex | **138 us** | 150 us | 0.92x | 160 us | 158 us |
+| cyclic-5 | lex | 47.8 ms | **25.7 ms** | 1.86x | 53.3 ms | 27.1 ms |
+| cyclic-5 | grlex | 57.0 ms | **20.1 ms** | 2.83x | 64.3 ms | 21.2 ms |
+| cyclic-5 | grevlex | 34.2 ms | **21.6 ms** | 1.58x | 38.8 ms | 23.0 ms |
+| katsura-3 | lex | 38.2 us | 41.7 us | 0.92x | 42.5 us | 42.6 us |
+| katsura-3 | grlex | 29.5 us | 31.5 us | 0.93x | 32.4 us | 32.4 us |
+| katsura-3 | grevlex | 29.8 us | 30.9 us | 0.96x | 33.4 us | 33.6 us |
+| katsura-4 | lex | 719 us | **566 us** | 1.27x | 853 us | 567 us |
+| katsura-4 | grlex | **200 us** | 233 us | 0.86x | 225 us | 244 us |
+| katsura-4 | grevlex | **119 us** | 170 us | 0.70x | 136 us | 177 us |
+| katsura-5 | lex | 172 ms | **14.2 ms** | **12.1x** | 191 ms | 14.8 ms |
+| katsura-5 | grlex | 2.18 ms | **1.81 ms** | 1.20x | 2.47 ms | 1.92 ms |
+| katsura-5 | grevlex | **1.21 ms** | 1.69 ms | 0.71x | 1.31 ms | 1.82 ms |
+| katsura-6 | grlex | 36.0 ms | **22.8 ms** | 1.58x | 40.0 ms | 23.9 ms |
+| katsura-6 | grevlex | **12.8 ms** | 28.1 ms | **0.46x** | 14.1 ms | 30.2 ms |
+| random-3 | lex | 325 us | **278 us** | 1.17x | 362 us | 293 us |
+| random-3 | grlex | **48.1 us** | 55.2 us | 0.87x | 53.9 us | 58.0 us |
+| random-3 | grevlex | **32.2 us** | 41.3 us | 0.78x | 35.5 us | 42.7 us |
+| random-4 | lex | 31.1 ms | **8.04 ms** | **3.86x** | 33.8 ms | 8.46 ms |
+| random-4 | grlex | **748 us** | 771 us | 0.97x | 831 us | 805 us |
+| random-4 | grevlex | 993 us | **885 us** | 1.12x | 1.09 ms | 940 us |
+| planted-6 | lex | 53.4 us | **47.6 us** | 1.12x | 57.7 us | 48.8 us |
+| planted-6 | grlex | 35.9 us | 34.8 us | 1.03x | 39.6 us | 37.1 us |
+| planted-6 | grevlex | 36.1 us | 34.9 us | 1.04x | 41.1 us | 38.1 us |
+| planted-8 | lex | 77.4 us | **66.6 us** | 1.16x | 90.2 us | 72.9 us |
+| planted-8 | grlex | 58.8 us | 55.2 us | 1.07x | 66.0 us | 61.2 us |
+| planted-8 | grevlex | 57.7 us | 57.1 us | 1.01x | 66.6 us | 62.7 us |
+
+And the instances Buchberger does not finish here, from `grobner_f4_only`:
+
+| system | order | F4 | M15 F4 |
+|---|---|---|---|
+| katsura-6 | lex | 3.06 s | 3.19 s |
+| katsura-7 | grlex | 532 ms | 554 ms |
+| katsura-7 | grevlex | 809 ms | 898 ms |
+
+**M16-0 made both engines a few percent faster without changing the algorithm.** Every one of the
+36 paired figures is at or below its M15 counterpart: Buchberger by 4% to 16% (katsura-5 lex 191 ms
+to 172 ms, planted-8 lex 90.2 us to 77.4 us), F4 by 0% to 10% (katsura-7 grevlex 898 ms to 809 ms,
+katsura-6 grevlex 30.2 ms to 28.1 ms). That is the leading-monomial refactor: `leading_monomial` is
+a scan of a polynomial's whole term map, the queue asked for one per pair created, and Buchberger
+asked for two more per pair to apply the product criterion. Buchberger gains more than F4 because
+it creates pairs more often relative to the work it does per pair.
+
+It is also the only *performance* change in M16-0, and it was a side effect of an interface
+refactor rather than the point of it. The relative picture is unchanged: **katsura-6 grevlex is
+still the worst paired result at 0.46x**, and it remains the milestone's headline target.
+
+The three `grobner_f4_only` figures and the last few paired ones were measured while the four
+implementation agents were starting up on the same machine. They came out *faster* than M15 rather
+than slower, so the contamination was evidently small, but they are preliminary: §7 records an
+authoritative serial re-measurement taken with the machine quiet.
 
 ## 7. Results
 
