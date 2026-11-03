@@ -1426,3 +1426,301 @@ fn test_reducer_selection_is_deterministic() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// M16-A: structured elimination.
+// ---------------------------------------------------------------------------------------------
+
+/// Structured and unstructured elimination produce the same new leading monomials, the same rank,
+/// and the same span, on every batch of every corpus system under every order.
+///
+/// Replayed through `trace_batches`, so the matrices are the ones F4 really builds. Not exact
+/// equality of the candidate *polynomials*: a row echelon form is not unique, and both paths
+/// echelonize the same rows in different orders, so a pivot row can differ in the pivot columns to
+/// the right of its own. What cannot differ is the set of pivot columns — it is determined by the
+/// column ranks alone — and therefore the new leading monomials, nor the row space. Those are what
+/// candidate extraction reads and what the next batch sees, and the uniqueness of a reduced
+/// Gröbner basis turns them into the identical final answer.
+#[test]
+fn test_structured_elimination_agrees_batch_by_batch() {
+    use crate::grobner::{f4::reduce_batch, trace_batches, ReductionStrategy};
+
+    let unstructured = F4Options::baseline();
+    let structured = F4Options {
+        reduction: ReductionStrategy::Structured,
+        ..F4Options::baseline()
+    };
+
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let generators = system(&strings);
+            let (_, _, trace) =
+                trace_batches(&generators, order, &unstructured).expect("within limits");
+
+            for (index, batch) in trace.batches().iter().enumerate() {
+                let context = format!("{:?} under {}: batch {}", strings, order.name(), index);
+                let reference = reduce_batch(&batch.basis, &batch.pairs, order, &unstructured)
+                    .expect("within limits");
+                let actual = reduce_batch(&batch.basis, &batch.pairs, order, &structured)
+                    .expect("within limits");
+
+                let leads = |candidates: &[MultivariatePolynomial<3, F>]| -> Vec<_> {
+                    candidates
+                        .iter()
+                        .map(|p| p.leading_monomial(order))
+                        .collect()
+                };
+                assert_eq!(
+                    leads(&actual.candidates),
+                    leads(&reference.candidates),
+                    "{}: different new leading monomials",
+                    context
+                );
+                assert_eq!(
+                    actual.statistics.elimination.rank, reference.statistics.elimination.rank,
+                    "{}: different rank",
+                    context
+                );
+                assert_eq!(
+                    actual.statistics.elimination.zero_rows,
+                    reference.statistics.elimination.zero_rows,
+                    "{}: different dependencies",
+                    context
+                );
+
+                // The two candidate sets span the same space over the batch's basis, each way
+                // round, which is what makes the difference between them a change of
+                // representation rather than of content.
+                let basis_polynomials: Vec<MultivariatePolynomial<3, F>> = (0..batch.basis.len())
+                    .map(|element| {
+                        batch
+                            .basis
+                            .shifted_polynomial(element, &crate::Monomial::new(&[0, 0, 0]))
+                    })
+                    .collect();
+                for (left, right) in [
+                    (&actual.candidates, &reference.candidates),
+                    (&reference.candidates, &actual.candidates),
+                ] {
+                    let mut modulus = basis_polynomials.clone();
+                    modulus.extend(right.iter().cloned());
+                    for candidate in left {
+                        assert!(
+                            candidate.normal_form(&modulus, order).is_zero(),
+                            "{}: {} is not in the other path's span",
+                            context,
+                            candidate
+                        );
+                    }
+                }
+
+                assert_eq!(
+                    actual.statistics.free_pivots, actual.statistics.reducer_rows,
+                    "{}: the whole reducer block should have been free",
+                    context
+                );
+                assert_eq!(
+                    reference.statistics.free_pivots, 0,
+                    "{}: the unstructured path reports no free pivot",
+                    context
+                );
+            }
+        }
+    }
+}
+
+/// The same batch-by-batch agreement on the benchmark families, where the polynomials do diverge.
+///
+/// The three-variable corpus is small enough that the two echelon forms often coincide; these
+/// instances are where they do not, so this is the test that would catch a structured path whose
+/// candidates were wrong rather than merely differently represented.
+#[test]
+fn test_structured_elimination_agrees_batch_by_batch_on_the_benchmark_families() {
+    use crate::grobner::{f4::reduce_batch, trace_batches, ReductionStrategy};
+    type G = Zp2147483647;
+
+    fn check<const N: usize>(
+        name: &str,
+        generators: &[MultivariatePolynomial<N, G>],
+        order: MonomialOrder,
+    ) {
+        let unstructured = F4Options::baseline();
+        let structured = F4Options {
+            reduction: ReductionStrategy::Structured,
+            ..F4Options::baseline()
+        };
+        let (_, _, trace) = trace_batches(generators, order, &unstructured).expect("within limits");
+
+        for (index, batch) in trace.batches().iter().enumerate() {
+            let reference = reduce_batch(&batch.basis, &batch.pairs, order, &unstructured)
+                .expect("within limits");
+            let actual = reduce_batch(&batch.basis, &batch.pairs, order, &structured)
+                .expect("within limits");
+
+            let leads = |candidates: &[MultivariatePolynomial<N, G>]| -> Vec<_> {
+                candidates
+                    .iter()
+                    .map(|p| p.leading_monomial(order))
+                    .collect()
+            };
+            assert_eq!(
+                leads(&actual.candidates),
+                leads(&reference.candidates),
+                "{} under {}: batch {}",
+                name,
+                order.name(),
+                index
+            );
+            assert_eq!(
+                actual.statistics.elimination.rank,
+                reference.statistics.elimination.rank,
+                "{} under {}: batch {}",
+                name,
+                order.name(),
+                index
+            );
+        }
+    }
+
+    for order in ALL_ORDERS {
+        check("cyclic-4", &cyclic::<4, G>(), order);
+        check("katsura-4", &katsura::<4, G>(), order);
+        check("katsura-5", &katsura::<5, G>(), order);
+    }
+}
+
+/// Structured elimination returns the baseline's basis on the benchmark systems, in every order.
+#[test]
+fn test_structured_elimination_agrees_on_the_benchmark_systems() {
+    use crate::grobner::ReductionStrategy;
+    type G = Zp2147483647;
+
+    fn check<const N: usize>(
+        name: &str,
+        generators: &[MultivariatePolynomial<N, G>],
+        order: MonomialOrder,
+    ) {
+        let (expected, _) =
+            f4_with_options(generators, order, &F4Options::baseline()).expect("within limits");
+        let (actual, statistics) = f4_with_options(
+            generators,
+            order,
+            &F4Options {
+                reduction: ReductionStrategy::Structured,
+                ..F4Options::baseline()
+            },
+        )
+        .expect("within limits");
+
+        assert_eq!(actual, expected, "{} under {}", name, order.name());
+        assert_eq!(
+            statistics.structured_batches,
+            statistics.batches,
+            "{} under {}: every batch should have taken the structured path",
+            name,
+            order.name()
+        );
+        assert!(
+            statistics.free_pivots > 0,
+            "{} under {}: no pivot was taken for free",
+            name,
+            order.name()
+        );
+    }
+
+    for order in ALL_ORDERS {
+        check("cyclic-4", &cyclic::<4, G>(), order);
+        check("katsura-4", &katsura::<4, G>(), order);
+        check("katsura-5", &katsura::<5, G>(), order);
+    }
+}
+
+/// Structured elimination agrees with Buchberger, with a one-pair batch, and on degenerate input.
+#[test]
+fn test_structured_elimination_on_degenerate_batches() {
+    use crate::grobner::ReductionStrategy;
+
+    let cases: Vec<Vec<&str>> = vec![
+        // No reducer row at all: the two halves cover their own lcm and nothing else reduces.
+        vec!["x^2 + y", "x^2 + z"],
+        // Reduces entirely to zero: relatively prime leading monomials.
+        vec!["x^2 - 1", "y^3 - 1"],
+        // Several pairs sharing an lcm.
+        vec!["x^2 + y", "x^2 + z", "x^2 + y + z"],
+        // Many reducer rows.
+        vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+    ];
+
+    for order in ALL_ORDERS {
+        for strings in &cases {
+            let generators = system(strings);
+            let expected = buchberger(&generators, order);
+
+            for max_pairs_per_batch in [None, Some(1), Some(2)] {
+                let options = F4Options {
+                    reduction: ReductionStrategy::Structured,
+                    max_pairs_per_batch,
+                    ..F4Options::baseline()
+                };
+                let (actual, _) =
+                    f4_with_options(&generators, order, &options).expect("within limits");
+                assert_eq!(
+                    actual,
+                    expected,
+                    "{:?} under {} with {:?} pairs per batch",
+                    strings,
+                    order.name(),
+                    max_pairs_per_batch
+                );
+            }
+        }
+    }
+}
+
+/// Every resource limit is still refused on the structured path, and reported as its own error.
+#[test]
+fn test_structured_elimination_enforces_the_budgets() {
+    use crate::grobner::ReductionStrategy;
+
+    let order = MonomialOrder::Lexicographic;
+    let generators = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+    let structured = F4Options {
+        reduction: ReductionStrategy::Structured,
+        ..F4Options::baseline()
+    };
+
+    assert!(matches!(
+        f4_with_options(
+            &generators,
+            order,
+            &F4Options {
+                max_matrix_rows: 1,
+                ..structured.clone()
+            }
+        ),
+        Err(F4Error::TooManyRows { limit: 1 })
+    ));
+    assert!(matches!(
+        f4_with_options(
+            &generators,
+            order,
+            &F4Options {
+                max_matrix_columns: 1,
+                ..structured.clone()
+            }
+        ),
+        Err(F4Error::TooManyColumns { limit: 1 })
+    ));
+    assert!(matches!(
+        f4_with_options(
+            &generators,
+            order,
+            &F4Options {
+                max_live_nonzeros: 1,
+                ..structured.clone()
+            }
+        ),
+        Err(F4Error::TooManyNonzeros { limit: 1, .. })
+    ));
+    assert!(f4_with_options(&generators, order, &structured).is_ok());
+}

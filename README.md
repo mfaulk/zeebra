@@ -95,6 +95,7 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 ```
@@ -108,6 +109,13 @@ candidate extraction, and the final interreduction, with the remainder shown as 
 unattributed cost cannot hide. It takes the name of a configuration — `baseline` by default — so
 the effect of one optimization can be read off against another's. The timing comes from
 `F4Options::measure_stages`, which reads a clock four times per batch and is off by default.
+
+`f4_blocks` replays the batches a computation really built and eliminates each one four ways —
+rows as preprocessing produced them, reducer rows first, reducer rows taken as established pivots,
+and the same with the reducer block interreduced — reporting row operations, peak live nonzeros,
+final nonzeros, and time on the identical matrices. Holding the matrix fixed is the point: a
+change of row arrangement changes which candidates come out, hence every later batch, so the
+whole-computation effect and the per-elimination effect are different measurements.
 
 `elimination_density` reports the density a representation policy would have to read: the
 distribution of row densities as built and at each row's own peak during its reduction, the density
@@ -216,6 +224,15 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 | `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
 | `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches. `Count` measures repetition without serving anything; `Store` currently behaves as `Count`, because building a multiple's terms is an integer addition per variable per term and serving them from a map costs more than that even at a 95% hit rate |
 | `measure_stages` | `bool` | whether `F4Statistics::stages` is populated |
+
+`ReductionStrategy::Structured` exploits the fact that symbolic preprocessing gives every reducer
+multiple a distinct leading monomial, none of them a critical pair's lcm: putting those rows first,
+descending by leading monomial, makes the upper-left block unit upper triangular without any work,
+so elimination takes those pivots as given and never reduces the block against anything. It
+performs *more* row operations than the one-pass path and far less fill-in — on katsura-7 under
+grevlex, 8% of the baseline's peak live entries — which is a net win on the dense grevlex and lex
+instances and a small loss under grlex. The per-order numbers are in
+[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md) §7.1.
 
 `F4Options::baseline()` names the configuration every optimization is measured against, and is
 kept available separately from `default()` so that a comparison stays meaningful after the default

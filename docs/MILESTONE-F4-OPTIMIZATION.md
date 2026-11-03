@@ -545,6 +545,233 @@ authoritative serial re-measurement taken with the machine quiet.
 > Per-workstream results are appended here by A, B, C and D; the integrated result and the
 > ablation study by M16-I.
 
+### 7.1 M16-A — structured elimination
+
+`ReductionStrategy::Structured` arranges the Macaulay matrix with the reducer multiples first,
+ascending by leading column — which is descending by leading monomial, since the columns descend —
+and hands that prefix to `linalg::echelon::reduce_rows_against_pivots_with` as a set of pivots that
+is already established. The prefix is never read for a pivot scan, never normalized, and never
+reduced against anything.
+
+Implemented in `src/grobner/f4/structured.rs`, with the row permutation in
+`MacaulayMatrix::partition_reducers_first`. `examples/f4_blocks.rs` reproduces every number below.
+
+#### 7.1.1 The invariant holds, and it is checked rather than assumed
+
+> **Reducer-block invariant.** Every reducer multiple has a distinct leading monomial, and no
+> reducer multiple leads with a critical pair's lcm.
+
+Symbolic preprocessing establishes both halves: a reducer is added for a monomial only when that
+monomial is not yet covered, and adding it covers it, so no monomial gets two reducers; and every
+pair lcm is seeded as covered before the closure starts, so no lcm gets a reducer at all. Pair rows
+lead with their pair's lcm and nothing else does, which is why **two pairs sharing an lcm do not
+break the claim** — the duplicate leading monomials are both in the pair block, which is the part
+that gets eliminated.
+
+`structured::check_reducer_block` returns the violation as a value rather than panicking, so the
+invariant is checked in release as well as debug, and it is asserted directly on every batch of
+cyclic-4 and katsura-5 under all three orders. No batch anywhere in the corpus violates it.
+
+#### 7.1.2 The lever is the arrangement, not the function
+
+`BlockPlan::ReducersFirstEchelon` — the same arrangement put through a full `row_echelon` — records
+**identical** row operations and identical peak nonzeros to `ReducersFirstBlock` on every one of the
+23 instances. That confirms the fact `linalg::echelon`'s own
+`test_an_echelon_upper_block_makes_the_two_paths_agree` proves: an upper block that is already
+echelon is left alone by a full pass too, so the split-aware function by itself saves only the
+pivot-discovery scan, which does not show up in any counter and barely shows up in the clock. The
+saving is entirely in *not reducing the reducer rows against the pair rows*, which only the
+arrangement can prevent.
+
+#### 7.1.3 Row operations go up; fill-in collapses
+
+Replayed through `trace_batches`, so every plan eliminates the **identical** matrices and the
+comparison is of eliminations rather than of computations. `ops` is row operations summed over the
+batches, `peak` the largest live nonzero count any single batch reached, `fin` the final entries
+summed, `ms` the elimination time. Ratios against the baseline arrangement; below 1.00 is cheaper.
+
+| system | order | red% | ops:base | ops:blk | peak:base | pk:blk | fin:blk | ms:base | ms:blk |
+|---|---|---|---|---|---|---|---|---|---|
+| cyclic-4 | lex | 57.1 | 278 | 1.23 | 128 | 0.84 | 0.78 | 0.07 | 0.05 |
+| cyclic-4 | grlex | 54.2 | 243 | 1.31 | 180 | 0.93 | 0.84 | 0.04 | 0.03 |
+| cyclic-4 | grevlex | 59.3 | 231 | 1.54 | 204 | 1.00 | 0.91 | 0.05 | 0.03 |
+| cyclic-5 | lex | 71.8 | 58 164 | 1.17 | 13 993 | 0.55 | 0.39 | 15.66 | 9.98 |
+| cyclic-5 | grlex | 35.7 | 93 664 | 1.12 | 11 379 | 1.00 | 0.46 | 15.95 | 13.72 |
+| cyclic-5 | grevlex | 65.5 | 79 775 | 1.54 | 17 061 | 0.49 | 0.35 | 18.24 | 15.55 |
+| katsura-4 | lex | 70.5 | 824 | 1.17 | 567 | 0.68 | 0.56 | 0.23 | 0.11 |
+| katsura-4 | grlex | 69.8 | 418 | 1.16 | 405 | 0.87 | 0.75 | 0.09 | 0.05 |
+| katsura-4 | grevlex | 75.6 | 261 | 1.21 | 546 | 0.62 | 0.64 | 0.07 | 0.03 |
+| katsura-5 | lex | 72.9 | 27 922 | 1.15 | 9 285 | 0.65 | 0.40 | 6.97 | 4.51 |
+| katsura-5 | grlex | 73.7 | 4 039 | 1.31 | 3 126 | 0.66 | 0.62 | 0.77 | 0.63 |
+| katsura-5 | grevlex | 87.2 | 3 179 | 1.41 | 7 818 | 0.34 | 0.37 | 0.76 | 0.59 |
+| katsura-6 | lex | 77.5 | 792 478 | 1.11 | 151 624 | 0.43 | 0.28 | 410.4 | 265.2 |
+| katsura-6 | grlex | 77.9 | 50 043 | 1.57 | 34 746 | 0.44 | 0.46 | 15.3 | 18.0 |
+| katsura-6 | grevlex | 94.0 | 44 023 | 1.51 | 103 314 | **0.17** | 0.19 | 21.1 | 20.1 |
+| katsura-7 | grlex | 80.0 | 638 769 | 1.81 | 368 156 | 0.29 | 0.33 | 469.2 | 555.0 |
+| katsura-7 | grevlex | 95.9 | 608 356 | 1.83 | 1 390 812 | **0.08** | 0.11 | 806.0 | 931.0 |
+| random-4 | lex | 71.1 | 20 163 | 1.07 | 6 619 | 0.91 | 0.51 | 4.26 | 2.70 |
+| random-4 | grlex | 70.5 | 1 810 | 1.40 | 1 830 | 0.66 | 0.60 | 0.32 | 0.25 |
+| random-4 | grevlex | 67.8 | 2 207 | 1.51 | 2 294 | 0.60 | 0.54 | 0.38 | 0.34 |
+| planted-6 | lex | 27.3 | 24 | 1.00 | 42 | 0.95 | 0.88 | 0.01 | 0.01 |
+| planted-6 | grlex | 33.3 | 12 | 1.00 | 30 | 1.00 | 1.00 | 0.01 | 0.00 |
+| planted-6 | grevlex | 33.3 | 12 | 1.00 | 30 | 1.00 | 1.00 | 0.01 | 0.00 |
+
+**The hypothesis as stated in §5.1 is half wrong.** Block elimination does *not* "never have to
+discover `A`'s pivots and never fill in `A` or `B`" at no cost: row operations rise on every
+instance that has reducer rows at all, by 1.07x to 1.83x, and they rise *most* exactly where the
+reducer share is highest. The reason is structural rather than incidental. In the baseline
+arrangement a pair row stops descending at the first column no earlier pair row owns — frequently a
+column a reducer leads with — and becomes that column's pivot; the reducer row arriving later is
+then reduced against it. With the reducers first, that column is already owned, so the pair row
+keeps descending and pays another subtraction for each reducer column it passes through.
+
+**The fill-in claim is right, and larger than the reducer share suggested.** Peak live nonzeros fall
+to 0.08x on katsura-7 grevlex — 1.39 million entries to 111 thousand — 0.17x on katsura-6 grevlex,
+0.29x on katsura-7 grlex, and 0.43x on katsura-6 lex. Final nonzeros fall to 0.11x and 0.19x on the
+same two grevlex instances. 96% of katsura-7 grevlex's rows are reducer multiples; leaving them
+untouched leaves their original sparsity intact, and the baseline was filling all of it in for
+nothing.
+
+So the two claims pull in opposite directions, and more row operations on much shorter rows is a
+trade whose sign the counters cannot settle. §5.1's reject condition — "does not reduce row
+operations **or** peak nonzeros on the grevlex instances where the reducer share is highest" — is
+not met: peak nonzeros fall by 12x and 6x on exactly those instances.
+
+#### 7.1.4 End to end it wins on grevlex and lex, and loses on grlex
+
+From `cargo run --release --example f4_profile` against `-- a`, same machine, same session,
+sequential. Milliseconds. `red` is reducer rows over the whole computation, from the diagnostics
+table of the same runs.
+
+| system | order | base total | A total | speedup | base elim | A elim | base red | A red |
+|---|---|---|---|---|---|---|---|---|
+| cyclic-4 | lex | 0.28 | 0.26 | 1.08x | 0.07 | 0.06 | 117 | 117 |
+| cyclic-5 | lex | 29.0 | 26.2 | 1.11x | 14.2 | 12.1 | 4 823 | 6 537 |
+| cyclic-5 | grlex | 21.8 | 18.3 | 1.20x | 14.7 | 11.4 | 1 614 | 1 511 |
+| cyclic-5 | grevlex | 22.8 | 17.2 | 1.33x | 16.9 | 11.5 | 3 292 | 2 846 |
+| katsura-4 | lex | 0.64 | 0.60 | 1.07x | 0.23 | 0.14 | 292 | 292 |
+| katsura-5 | lex | 14.4 | 11.6 | 1.24x | 6.4 | 4.4 | 3 186 | 3 173 |
+| katsura-5 | grlex | 1.73 | 1.80 | 0.96x | 0.65 | 0.61 | 560 | 555 |
+| katsura-5 | grevlex | 1.88 | 1.28 | 1.47x | 0.72 | 0.39 | 666 | 534 |
+| katsura-6 | lex | 3056.6 | 1463.1 | **2.09x** | 367.6 | 268.4 | 31 816 | 32 031 |
+| katsura-6 | grlex | 24.6 | 25.5 | **0.96x** | 14.7 | 16.0 | 2 728 | 2 623 |
+| katsura-6 | grevlex | 30.9 | 15.1 | **2.05x** | 20.7 | 8.6 | 4 572 | 2 873 |
+| katsura-7 | grlex | 559.3 | 615.2 | **0.91x** | 455.6 | 514.6 | 12 388 | 12 000 |
+| katsura-7 | grevlex | 864.6 | 360.8 | **2.40x** | 754.0 | 300.1 | 25 908 | 13 964 |
+| random-4 | lex | 8.57 | 7.41 | 1.16x | 4.12 | 2.89 | 2 314 | 2 314 |
+| random-4 | grlex | 2.94 | 0.76 | — | 0.31 | 0.25 | 268 | 253 |
+| random-4 | grevlex | 0.98 | 0.94 | 1.04x | 0.38 | 0.34 | 295 | 294 |
+| planted-6 | lex | 0.07 | 0.07 | 1.00x | 0.01 | 0.01 | 9 | 9 |
+
+random-4 grlex has no speedup column because the baseline run's 2.94 ms is dominated by a 2.73 ms
+interreduction that does not reproduce; its elimination, 0.31 against 0.25, is the comparable
+number.
+
+Every wall-clock number in §7.1 was taken with three sibling workstreams active on the same
+machine, so the absolute milliseconds are contended and only the paired ratios — both
+configurations run back to back in one session — should be read. `cargo bench --bench grobner` was
+deliberately not run; the authoritative serial timing is the integrator's.
+
+**katsura-6 grevlex is the milestone's headline target and it is now level.** M15 recorded F4 at
+30.2 ms against Buchberger's 14.1 ms, a 0.47x loss. At 15.1 ms against the same baseline's 30.9 the
+2.05x the structured path gains is almost exactly the deficit, so the gap §1 of this document opens
+with should close — though confirming it needs Buchberger and F4 timed by the same instrument in
+the same session, which §7.1 does not do and the integrator's benchmark does. katsura-7 grevlex is
+2.40x faster and katsura-6 lex 2.09x faster. Repeated pairs put katsura-7 grevlex at
+327/336/357/361 ms against 830/849/865/904, and katsura-6 grevlex at 14.0/14.1/14.9/15.1 against
+27.5/28.8/29.3/30.9, so neither is noise.
+
+**On the two grevlex instances the whole-computation effect is larger than the per-elimination
+effect, for a reason that was not part of the hypothesis.** On the replayed batches the structured
+elimination of katsura-7 grevlex is 1.16x *slower*; over the whole computation it is 2.40x faster.
+The candidates the structured path emits are much sparser — final nonzeros 0.11x — so the basis
+elements it appends are smaller, so fewer and smaller reducer multiples are needed, so the next
+matrix is smaller. The reducer-row count over the computation falls from 25 908 to 13 964 on
+katsura-7 grevlex and from 4 572 to 2 873 on katsura-6 grevlex, which is why symbolic preprocessing
+(22.7 ms to 14.2) and construction (33.8 to 21.3) get faster too, in a workstream that touched
+neither stage. The arrangement compounds through the basis.
+
+That compounding is **specific to grevlex**, and the counters say so rather than being assumed.
+Under lex the reducer-row count does not fall at all — 31 816 to 32 031 on katsura-6, 2 314
+unchanged on random-4 — and on cyclic-5 lex it *rises*, 4 823 to 6 537, while the computation still
+gets 1.11x faster. So lex's wins are the cheaper elimination on its own (katsura-6 lex 367.6 ms to
+268.4) plus, on katsura-6 lex, a much cheaper final interreduction (2 579.6 ms to 1 069.3) that
+comes from a different pre-interreduction basis rather than from anything this workstream touched.
+Attributing katsura-6 lex's 2.09x to the elimination would be wrong; two thirds of its absolute
+saving is in `reduce_grobner_basis`, which is M16-C's file.
+
+**grlex regresses, and that is the honest result.** katsura-7 grlex is 0.91x and katsura-6 grlex
+0.96x — the elimination itself is 1.13x and 1.09x slower — and the reducer-row count barely moves,
+12 388 to 12 000 and 2 728 to 2 623, so there is no compounding to pay for the extra row
+operations. grlex builds more, sparser matrices, where the fill-in the arrangement avoids was not
+large enough to matter: pk:blk is 0.29x on katsura-7 grlex, but the absolute peak it is 0.29x of
+was already a quarter of grevlex's. This is a per-order effect, and the natural follow-up is a
+selection rule keyed on the reducer share or the observed fill-in — left to M16-D's adaptive work
+and M16-I's defaults rather than guessed at here.
+
+#### 7.1.5 Rejected: interreducing the reducer block
+
+Making the upper-left block the identity on its own columns — so a pair row needs one subtraction
+per reducer column instead of a chain of them — was implemented as `BlockPlan::InterreducedBlock`
+and **measured and rejected**. On the replayed batches it costs more row operations than the plain
+block on 17 of 23 instances (up to 2.18x the baseline on katsura-4 grlex), the same on the three
+planted-6 instances, and fewer on only cyclic-5 grevlex and the two katsura-7 instances. It costs
+more peak nonzeros than the plain block on every instance where the two differ at all — 0.32x
+against 0.08x on katsura-7 grevlex, 0.44x against 0.17x on katsura-6 grevlex.
+
+End to end it is worse than the plain block almost everywhere and worse than the baseline on
+several instances. Milliseconds; `base` and `blk` are the §7.1.4 run, `int` a separate run with the
+plan temporarily selected.
+
+| system | order | base | blk | int |
+|---|---|---|---|---|
+| cyclic-5 | lex | 29.0 | 26.2 | 32.6 |
+| katsura-5 | grlex | 1.73 | 1.80 | 2.80 |
+| katsura-6 | grlex | 24.6 | 25.5 | 39.0 |
+| katsura-6 | grevlex | 30.9 | 15.1 | 20.1 |
+| katsura-7 | grlex | 559.3 | 615.2 | 853.0 |
+| katsura-7 | grevlex | 864.6 | 360.8 | 389.3 |
+
+Its one win is on the replayed katsura-7 grevlex batches in isolation — 549 ms against 806 for the
+baseline arrangement and 931 for the plain block — and it does not survive being put in a
+computation, because the denser basis elements it produces undo it. The plan is kept behind the
+enum, documented as rejected, so the measurement can be re-run; nothing selects it.
+
+#### 7.1.6 A correctness finding: the candidate polynomials are not invariant, the basis is
+
+A row echelon form is not unique — it depends on the order the rows were processed in — so the two
+arrangements legitimately produce **different candidate polynomials** from the same matrix. A pivot
+row can differ in the pivot columns to the right of its own pivot. They happen to coincide on the
+three-variable corpus, on planted-6, and on two of the three cyclic-4 instances; everywhere else —
+cyclic-4 grlex upwards — they differ. `examples/f4_blocks.rs` reports this per instance in its
+`poly` column.
+
+What cannot differ is the set of pivot columns, which is fixed by the column ranks alone and
+therefore by the matrix rather than by the arrangement. The input leading monomials are the same
+set, so the **new** leading monomials are identical, which is exactly what candidate extraction
+tests and what the next batch sees. Asserted batch by batch over the whole corpus and over
+cyclic-4, katsura-4 and katsura-5, under all three orders, together with rank, dependency count,
+and mutual span containment.
+
+End to end the basis is identical, which is the acceptance test: a reduced Gröbner basis is unique.
+Note, though, that the *trajectory* is not — katsura-6 lex builds 61 matrices over 4 975 pairs
+structured against 59 over 4 611 unstructured — so `batches` and `pairs_reduced` are not comparable
+between the two paths, and a counter that assumes they are would be reading noise. The final
+interreduction on katsura-6 lex falls from 2 511–2 695 ms to 1 026–1 069 for the same reason: a
+different pre-interreduction basis, not a faster `reduce_grobner_basis`. That cost is M16-C's.
+
+#### 7.1.7 What this leaves
+
+`Unstructured` remains the default. Moving it is M16-I's decision and the grlex regression is the
+reason it should be made with the adaptive work in hand rather than now. `BatchStatistics::free_pivots`
+is populated with the reducer block's size on the structured path and stays zero on the
+unstructured one, as its documentation says.
+
+One interface note for the integrator: `ReductionStrategy::Structured`'s doc comment in the frozen
+`src/grobner/f4/options.rs` still reads "Not yet implemented; currently the unstructured path",
+which is now false. Correcting it is a one-line documentation change in a file this workstream does
+not own.
+
 ### 7.2 M16-B — symbolic preprocessing and monomial indexing
 
 All three hypotheses §5.2 names were implemented and measured. **All three were rejected**, two of
