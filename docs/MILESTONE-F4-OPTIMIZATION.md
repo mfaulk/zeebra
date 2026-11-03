@@ -725,6 +725,11 @@ effect.
   reversal of each generator list, a duplicated generator, a scalar multiple, a generator already
   in the ideal, inconsistent systems, and 24 randomized sparse quadratic systems over GF(7) and
   GF(13).
+- Every combination is also checked against `buchberger_reference`, the naive textbook
+  implementation, over all three orders. That matters because the criteria-free computation shares
+  the pair queue and the interreduction with the criteria-enabled one and the reference shares
+  nothing; katsura-3 under lex is covered by the slow `#[ignore]`d test, as it takes the reference
+  about two and a half minutes.
 - A regression test pins the unsound shortcut: three leading monomials each dividing the lcm of the
   other two, where naive lcm-divisibility fires on the first pair selected and the sound criterion
   must not.

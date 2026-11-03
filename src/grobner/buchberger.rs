@@ -952,6 +952,47 @@ mod tests {
         }
     }
 
+    /// Every combination of the criteria agrees with the naive textbook reference.
+    ///
+    /// The criteria-free computation shares the pair queue and the interreduction with the
+    /// criteria-enabled one, so agreeing with it is necessary but not sufficient. The reference
+    /// shares nothing.
+    #[test]
+    fn test_criteria_agree_with_the_reference() {
+        use crate::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            buchberger_with_criteria,
+            reference::buchberger_reference,
+        };
+        type F = Zp13;
+
+        // katsura-3 under lex takes the reference about two and a half minutes, so it is covered
+        // under the graded orders here and by the ignored slow test under lex.
+        for order in ALL_ORDERS {
+            let mut systems = criteria_corpus();
+            systems.retain(|(name, _)| name != "katsura-3");
+            if order != MonomialOrder::Lexicographic {
+                systems.push(("katsura-3".into(), katsura::<3, F>()));
+            }
+            systems.push(("cyclic-3".into(), cyclic::<3, F>()));
+
+            for (name, f) in systems {
+                let expected = buchberger_reference(&f, order);
+                for criteria in CRITERIA_CONFIGURATIONS {
+                    let (actual, _) = buchberger_with_criteria(&f, order, &criteria);
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{} under {} with {:?}",
+                        name,
+                        order.name(),
+                        criteria
+                    );
+                }
+            }
+        }
+    }
+
     /// The criteria survive permuted, duplicated, scaled and redundant generators.
     ///
     /// An unsound criterion usually agrees on a fixed corpus and fails once the generator order
