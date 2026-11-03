@@ -1,6 +1,7 @@
 # Milestone: FGLM and Zero-Dimensional Polynomial-System Solving
 
-**Status:** M17-3 complete — the conversion works and agrees with Singular on 29 reference bases. Design approved against the merged M16 code,
+**Status:** M17-4 complete — a system goes in and a verified solution comes out. The conversion
+agrees with Singular on 29 reference bases, and both solving routes are measured. Design approved against the merged M16 code,
 baseline measured, and classification, the quotient monomial basis, the quotient algebra, the
 incremental dependence test and the FGLM conversion all implemented and measured end to end.
 **Prerequisite:** M16 on `main` at `494c16e`, CI green. Satisfied.
@@ -710,6 +711,24 @@ functions go in `src/grobner/solve_zero_dimensional.rs`, a private module re-exp
 `solve_one` returns the **first** complete point found, and which point that is depends on the
 traversal order and on `rng`. It is not specified, and tests must not assume one.
 
+**There is no field-order limit, and that is a theorem rather than an omission.** `solve` has
+`MAX_FIELD_ORDER = 2^20` because a variable the basis does not constrain can only be covered by
+enumerating the field. For a zero-dimensional ideal no variable is ever unconstrained:
+zero-dimensionality gives `x_k^d` in `LT(I)`, so some basis element has `LM(g) = x_k^d`; under lex
+every monomial of `g` is at most `x_k^d` and therefore has exponent zero in `x_0 .. x_{k-1}`, so
+`g` lies in `F[x_k, ..., x_{N-1}]`; substituting the already-assigned deeper variables leaves a
+univariate polynomial in `x_k` whose leading coefficient is `g`'s, which is 1. So the constraint is
+always there, of degree at least one, and the field's size never enters the search. §10.3 solves
+over GF(2^31 - 1) throughout, two thousand times `solve`'s limit.
+
+Two cheap checks in the search — the mid-level contradiction test and the all-zero test at the leaf
+— **never fired on any system in the test corpus**, and are kept anyway. The argument that they are
+unreachable is not airtight: a basis element like `x*y - 1` degenerates to the nonzero constant
+`-1` if `y` is assigned zero, and `y` cannot be assigned zero only because a candidate value is
+always the coordinate of a genuine solution over the algebraic closure. That holds for a reduced
+lex basis of a zero-dimensional ideal and is not proved here, so the checks stay as a bound on the
+damage from a mistake in that reasoning.
+
 ---
 
 ## 7. Data structures, with their storage
@@ -1100,6 +1119,62 @@ what settles §8's open question about input validation in favour of a trusted d
 explicit checked entry point: unconditional verification would cost an order of magnitude more than
 the conversion it protects. §9.1 is the hazard that follows from that choice.
 
+### 10.3 Solving, measured
+
+`cargo run --release --example solve_one`, GF(2^31 - 1). `first` is time to one point, `all` to
+every distinct point.
+
+| system | route | first ms | all ms | result |
+|---|---|---|---|---|
+| planted-6 | direct | 0.88 | 6.42 | 64 points |
+| planted-6 | fglm | 1.35 | 6.86 | 64 points |
+| cyclic-3 | direct | 0.41 | 0.50 | 6 points |
+| katsura-3 | direct | 0.32 | 0.35 | 4 points |
+| katsura-4 | direct | 0.46 | 0.50 | 3 points |
+| katsura-5 | direct | 2.14 | 1.97 | 5 points |
+| katsura-6 | direct | 22.37 | 21.58 | 2 points |
+| katsura-6 | fglm | **10.47** | **10.44** | 2 points |
+| katsura-7 | direct | — | — | **no basis**: 20,003,295 live nonzeros over the 20,000,000 limit |
+| katsura-7 | fglm | **82.80** | 82.26 | 5 points |
+| planted-10 | direct | **1.23** | **100.77** | 1024 points |
+| planted-10 | fglm | 34.93 | 135.48 | 1024 points |
+| planted-12 | direct | **1.88** | **413.12** | 4096 points |
+| planted-12 | fglm | — | — | **no conversion**: the span needs 33,554,432 entries over 20,000,000 |
+| planted-14 | direct | **1.93** | **1602.98** | 16384 points |
+| planted-14 | fglm | — | — | **no conversion**: quotient dimension over the 4,096 limit |
+
+**Neither strategy dominates, and the failures are symmetric.** katsura-7 is solvable only by
+conversion; **planted-12 and planted-14 are solvable only directly**, because their quotient
+algebras have dimension 4096 and 16384 while their lex bases are trivial. Each route has a system
+at a comparable size that the other cannot do at the default limits. That is a stronger argument
+for keeping `SolveStrategy` explicit than §10.2's timing spread was, and it is why no heuristic is
+proposed: a heuristic would have to predict which *resource* runs out, not which is faster.
+
+`DirectLexF4` is the default because it is the conservative choice — it is what `solve` already
+does — and **not** because it is uniformly better. It is slower than conversion on katsura-6, by
+2.1x, which agrees with §10.2's 2.5x on the basis alone.
+
+**Time to one solution is nearly independent of how many there are.** It is dominated by the
+Gröbner basis; the search itself is almost free. Time to *all* solutions scales with the count, and
+the gap is the entire case for a separate `solve_one`:
+
+| system | points | first ms | all ms | ratio |
+|---|---|---|---|---|
+| katsura-6 | 2 | 22.37 | 21.58 | 1.0x |
+| planted-6 | 64 | 0.88 | 6.42 | 7x |
+| planted-10 | 1024 | 1.23 | 100.77 | 82x |
+| planted-12 | 4096 | 1.88 | 413.12 | 220x |
+| planted-14 | 16384 | 1.93 | 1602.98 | **830x** |
+
+So `solve_one` is not a convenience wrapper over `solve_zero_dimensional`; on a system with many
+solutions it is three orders of magnitude cheaper, and `first ms` barely moves across four
+instances whose solution counts span 256x.
+
+A smaller observation worth recording: the planted family's solution count **equals** its quotient
+dimension, `4^(N/2)` — 64, 1024, 4096, 16384. So those ideals are radical and every zero is
+rational, which is why they are a good witness corpus and a poor multiplicity corpus. The
+nonradical cases in §9 carry that part.
+
 ---
 
 ## 11. Sub-milestones and merge gates
@@ -1110,8 +1185,8 @@ the conversion it protects. §9.1 is the hazard that follows from that choice.
 | M17-1 | `classify_ideal`, `QuotientBasis` | correct classification on §9's cases, bounded enumeration | **done** |
 | M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms | **done** |
 | M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | **done** — 29 Singular bases, §9.1 |
-| M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | next |
-| M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | |
+| M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | **done** — §10.3 |
+| M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | next |
 
 Each PR compiles and tests independently. The order is forced by the mathematics: each stage
 establishes the invariant the next one assumes.
