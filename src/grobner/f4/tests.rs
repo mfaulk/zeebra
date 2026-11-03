@@ -1156,3 +1156,132 @@ fn test_divisor_lookups_are_counted() {
         statistics.divisor_scan_steps_per_query()
     );
 }
+
+/// Elimination backend choice does not change the basis, over the whole corpus and all orders.
+///
+/// `test_every_configuration_agrees_with_the_baseline` covers the option surface on four systems;
+/// this covers the backend alone on everything, because the backend is the one option that
+/// rewrites the matrix rather than selecting which matrix is built, and the matrices the corpus
+/// produces are the ones whose shapes differ most.
+#[test]
+fn test_elimination_backend_does_not_change_the_basis() {
+    use crate::linalg::Backend;
+
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            let (expected, _) =
+                f4_with_options(&f, order, &F4Options::baseline()).expect("within limits");
+
+            for elimination in [Backend::Dense, Backend::Adaptive] {
+                let options = F4Options {
+                    elimination,
+                    ..F4Options::baseline()
+                };
+                let (actual, _) = f4_with_options(&f, order, &options).expect("within limits");
+                assert_eq!(
+                    actual,
+                    expected,
+                    "{:?} changed the basis of {:?} under {}",
+                    elimination,
+                    strings,
+                    order.name()
+                );
+            }
+        }
+    }
+}
+
+/// Every backend returns the baseline's basis on the benchmark systems, over all three orders.
+///
+/// Larger than the corpus and with far more batches, so the matrices reach the shapes where a
+/// representation change could plausibly drift: katsura-5 grevlex peaks in the thousands of
+/// columns, and cyclic-4 lex is the one that fills in most.
+#[test]
+fn test_every_backend_agrees_on_the_benchmark_systems() {
+    use crate::linalg::Backend;
+
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        let katsura_expected = f4_with_options(&katsura::<5, G>(), order, &F4Options::baseline())
+            .expect("within limits")
+            .0;
+        let cyclic_expected = f4_with_options(&cyclic::<4, G>(), order, &F4Options::baseline())
+            .expect("within limits")
+            .0;
+
+        for elimination in [Backend::Dense, Backend::Adaptive] {
+            let options = F4Options {
+                elimination,
+                ..F4Options::baseline()
+            };
+            assert_eq!(
+                f4_with_options(&katsura::<5, G>(), order, &options)
+                    .expect("within limits")
+                    .0,
+                katsura_expected,
+                "katsura-5 under {:?}/{}",
+                elimination,
+                order.name()
+            );
+            assert_eq!(
+                f4_with_options(&cyclic::<4, G>(), order, &options)
+                    .expect("within limits")
+                    .0,
+                cyclic_expected,
+                "cyclic-4 under {:?}/{}",
+                elimination,
+                order.name()
+            );
+        }
+    }
+}
+
+/// Every backend reports the identical elimination statistics on real F4 batches.
+///
+/// The counters are what the budget and the fill-in measurements are read off, so a backend that
+/// agreed on the basis while counting differently would make `max_live_nonzeros` mean one thing
+/// under one representation and another under the next.
+#[test]
+fn test_every_backend_reports_the_same_elimination_statistics() {
+    use crate::{
+        grobner::{f4::macaulay::MacaulayMatrix, trace_batches},
+        linalg::{row_echelon_with, Backend},
+    };
+
+    type G = Zp2147483647;
+    let options = F4Options::baseline();
+
+    for order in ALL_ORDERS {
+        let (_, _, trace) =
+            trace_batches(&katsura::<5, G>(), order, &options).expect("within limits");
+
+        for batch in trace.batches() {
+            let Some(preprocessed) = crate::grobner::f4::symbolic::symbolic_preprocessing_with(
+                &batch.basis,
+                &batch.pairs,
+                options.max_matrix_rows,
+                options.reducer_selection,
+                &mut crate::grobner::f4::symbolic::ReducerCache::disabled(),
+            )
+            .ok() else {
+                continue;
+            };
+            let built = MacaulayMatrix::build(&batch.basis, &preprocessed, order);
+            let original = built.matrix().clone();
+
+            let mut reference = original.clone();
+            let expected = row_echelon_with(Backend::Sparse, &mut reference, usize::MAX)
+                .expect("unbounded cannot fail");
+
+            for backend in [Backend::Dense, Backend::Adaptive] {
+                let mut matrix = original.clone();
+                let statistics = row_echelon_with(backend, &mut matrix, usize::MAX)
+                    .expect("unbounded cannot fail");
+                assert_eq!(matrix, reference, "{:?} under {}", backend, order.name());
+                assert_eq!(statistics, expected, "{:?} under {}", backend, order.name());
+            }
+        }
+    }
+}

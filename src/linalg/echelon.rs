@@ -6,9 +6,10 @@
 //! its *density* can be developed independently of each other.
 //!
 //! [`Backend::Sparse`] is the implementation from the preceding milestone and the reference every
-//! other backend is checked against. The remaining variants are declared here so that the option
-//! surface is complete before the implementations exist; each currently delegates to the sparse
-//! path, which is documented per variant rather than left to be discovered.
+//! other backend is checked against. Every backend runs the *same* algorithm — leftmost nonzero
+//! column, first row to reach it, unit pivot, one inverse per pivot — so all three agree on the
+//! resulting matrix and on every counter in [`EliminationStatistics`], and a comparison between
+//! them measures storage and nothing else.
 //!
 //! `linalg` does not depend on `grobner`, and does not learn to. [`Backend`] is this module's own
 //! type; F4 holds one in its options.
@@ -16,7 +17,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    linalg::sparse::{row_echelon_within, EliminationStatistics, SparseMatrix, SparseRow},
+    linalg::{
+        dense::{dense_reduce_rows_against_pivots, dense_row_echelon},
+        sparse::{row_echelon_within, EliminationStatistics, SparseMatrix, SparseRow},
+    },
     FiniteField,
 };
 
@@ -31,12 +35,12 @@ pub enum Backend {
     #[default]
     Sparse,
 
-    /// Dense rows throughout.
+    /// Dense rows throughout: the matrix is densified, eliminated, and sparsified again.
     ///
-    /// Currently the sparse path. A dense row echelon with this module's contract — the same
-    /// leftmost-first pivot rule, the same unit-pivot normalization, one inverse per pivot — is
-    /// what makes a sparse/dense comparison mean anything, and is the first deliverable of the
-    /// linear-algebra workstream.
+    /// Exists so that a sparse/dense comparison measures storage rather than algorithm. It also
+    /// allocates `num_rows * num_columns` cells whatever the entry budget says, which is the one
+    /// respect in which the two backends are not comparable — the budget counts entries, not
+    /// bytes, and a dense backend's bytes are a property of the shape alone.
     Dense,
 
     /// Chosen per matrix, or per row, from the density actually observed.
@@ -62,9 +66,9 @@ pub fn row_echelon_with<F: FiniteField>(
     max_nonzeros: usize,
 ) -> Result<EliminationStatistics, usize> {
     match backend {
-        Backend::Sparse | Backend::Dense | Backend::Adaptive => {
-            row_echelon_within(matrix, max_nonzeros)
-        }
+        Backend::Sparse => row_echelon_within(matrix, max_nonzeros),
+        Backend::Dense => dense_row_echelon(matrix, max_nonzeros),
+        Backend::Adaptive => row_echelon_within(matrix, max_nonzeros),
     }
 }
 
@@ -95,19 +99,6 @@ pub fn reduce_rows_against_pivots_with<F: FiniteField>(
     split: usize,
     max_nonzeros: usize,
 ) -> Result<EliminationStatistics, usize> {
-    match backend {
-        Backend::Sparse | Backend::Dense | Backend::Adaptive => {
-            sparse_reduce_rows_against_pivots(matrix, split, max_nonzeros)
-        }
-    }
-}
-
-/// [`reduce_rows_against_pivots_with`] over sorted-vector sparse rows.
-fn sparse_reduce_rows_against_pivots<F: FiniteField>(
-    matrix: &mut SparseMatrix<F>,
-    split: usize,
-    max_nonzeros: usize,
-) -> Result<EliminationStatistics, usize> {
     assert!(
         split <= matrix.num_rows(),
         "a split of {} in a matrix of {} rows",
@@ -125,9 +116,52 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
         return Err(initial_nonzeros);
     }
 
-    // The pivots the caller supplied. Checked rather than trusted: a duplicated leading column
-    // would silently drop one of the two relations, which is the kind of wrong answer that looks
-    // like a correct one.
+    // Validated once, here, rather than once per backend: the preconditions are the interface's,
+    // not a representation's, and a second copy of them is a second chance to drift.
+    let mut pivot_of_column = upper_block_pivots(matrix, split, &mut statistics);
+
+    match backend {
+        Backend::Sparse => sparse_reduce_rows_against_pivots(
+            matrix,
+            split,
+            &mut pivot_of_column,
+            &mut statistics,
+            max_nonzeros,
+        )?,
+        Backend::Dense => dense_reduce_rows_against_pivots(
+            matrix,
+            split,
+            &mut pivot_of_column,
+            &mut statistics,
+            max_nonzeros,
+        )?,
+        Backend::Adaptive => sparse_reduce_rows_against_pivots(
+            matrix,
+            split,
+            &mut pivot_of_column,
+            &mut statistics,
+            max_nonzeros,
+        )?,
+    }
+
+    debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
+    debug_assert_eq!(statistics.rank, matrix.nonzero_rows());
+    debug_assert_eq!(statistics.rank + statistics.zero_rows, matrix.num_rows());
+    Ok(statistics)
+}
+
+/// The pivot map rows `[..split]` declare, with the preconditions enforced.
+///
+/// Checked rather than trusted: a duplicated leading column would silently drop one of the two
+/// relations, which is the kind of wrong answer that looks like a correct one.
+///
+/// # Panics
+/// If two upper rows lead with the same column, or if an upper row is not normalized.
+fn upper_block_pivots<F: FiniteField>(
+    matrix: &SparseMatrix<F>,
+    split: usize,
+    statistics: &mut EliminationStatistics,
+) -> HashMap<usize, usize> {
     let mut pivot_of_column: HashMap<usize, usize> = HashMap::with_capacity(split);
     for index in 0..split {
         let Some(column) = matrix.row(index).leading_column() else {
@@ -148,9 +182,19 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
         }
         statistics.rank += 1;
     }
+    pivot_of_column
+}
 
+/// [`reduce_rows_against_pivots_with`] over sorted-vector sparse rows.
+fn sparse_reduce_rows_against_pivots<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    split: usize,
+    pivot_of_column: &mut HashMap<usize, usize>,
+    statistics: &mut EliminationStatistics,
+    max_nonzeros: usize,
+) -> Result<(), usize> {
     // Nonzero entries held by the rows still in the matrix; the row being worked on is taken out.
-    let mut resident = initial_nonzeros;
+    let mut resident = statistics.initial_nonzeros;
     let mut scratch: Vec<(usize, F)> = Vec::new();
 
     for index in split..matrix.num_rows() {
@@ -194,19 +238,16 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
     }
 
     statistics.final_nonzeros = resident;
-    debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
-    debug_assert_eq!(statistics.rank, matrix.nonzero_rows());
-    debug_assert_eq!(statistics.rank + statistics.zero_rows, matrix.num_rows());
-    Ok(statistics)
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{reduce_rows_against_pivots_with, row_echelon_with, Backend};
     use crate::{
-        fields::{Zp13, Zp2147483647, Zp7},
+        fields::{Zp13, Zp18446744073709551557, Zp2147483647, Zp541, Zp7},
         linalg::sparse::{row_echelon, SparseMatrix, SparseRow},
-        FiniteField,
+        FiniteField, One,
     };
     use rand::{prelude::StdRng, Rng, SeedableRng};
 
@@ -455,5 +496,356 @@ mod tests {
             matrix.num_rows(),
             "every row is either a pivot or zero"
         );
+    }
+
+    /// The shapes a sparse/dense comparison has to cover, named so a failure says which one.
+    ///
+    /// Rectangular both ways, square, singular, rank-deficient by duplication, nearly empty,
+    /// completely full, and the fill-in case where a dense first row turns every two-entry row
+    /// into a full one — which is the shape that is supposed to favour dense storage.
+    fn comparison_cases<G: FiniteField>() -> Vec<(String, SparseMatrix<G>)> {
+        let mut cases: Vec<(String, SparseMatrix<G>)> = Vec::new();
+
+        for (rows, columns, density) in [
+            (12usize, 12usize, 0.3f64), // square
+            (24, 8, 0.4),               // tall
+            (8, 40, 0.3),               // wide
+            (16, 16, 0.02),             // sparse
+            (10, 10, 1.0),              // dense
+        ] {
+            cases.push((
+                format!("{}x{} at {}", rows, columns, density),
+                random_matrix(rows, columns, density, 17),
+            ));
+        }
+
+        // Singular: a square matrix whose last row is the sum of the first two.
+        let mut rows: Vec<SparseRow<G>> = vec![
+            SparseRow::new(&[(0, G::new(1)), (1, G::new(2)), (2, G::new(3))]),
+            SparseRow::new(&[(0, G::new(4)), (1, G::new(5)), (2, G::new(6))]),
+            SparseRow::new(&[(0, G::new(5)), (1, G::new(7)), (2, G::new(9))]),
+        ];
+        cases.push(("singular".to_string(), SparseMatrix::new(3, rows)));
+
+        // Rank-deficient by duplication: every row a multiple of the first.
+        rows = (1..=6)
+            .map(|k| SparseRow::new(&[(0, G::new(k)), (3, G::new(2 * k))]))
+            .collect();
+        cases.push(("rank one".to_string(), SparseMatrix::new(4, rows)));
+
+        // Fill-in heavy: a dense first row, then rows of two entries sharing column zero.
+        let width = 24;
+        rows = vec![SparseRow::new(
+            &(0..width).map(|c| (c, G::new(1))).collect::<Vec<_>>(),
+        )];
+        rows.extend((1..width).map(|i| SparseRow::new(&[(0, G::new(1)), (i, G::new(1))])));
+        cases.push(("fill-in".to_string(), SparseMatrix::new(width, rows)));
+
+        // Degenerate shapes, which have caught off-by-ones in both representations.
+        cases.push(("no rows".to_string(), SparseMatrix::zero(0, 7)));
+        cases.push(("no columns".to_string(), SparseMatrix::zero(5, 0)));
+        cases.push(("all zero".to_string(), SparseMatrix::zero(4, 6)));
+
+        cases
+    }
+
+    /// Every backend reproduces the sparse echelon and the dense rank, over five fields.
+    ///
+    /// Not merely the same rank and row space: the same pivot rule and the same normalization make
+    /// the resulting matrix a function of the input alone, so a disagreement anywhere means one
+    /// backend is running a different algorithm rather than a different representation.
+    #[test]
+    fn test_every_backend_agrees_on_every_shape_and_field() {
+        fn check<G: FiniteField>(field: &str) {
+            for (label, original) in comparison_cases::<G>() {
+                let mut expected = original.clone();
+                let reference = row_echelon(&mut expected);
+
+                if original.num_rows() > 0 && original.num_columns() > 0 {
+                    assert_eq!(
+                        reference.rank,
+                        original.to_dense().rank(),
+                        "{}/{}: rank disagrees with the dense implementation",
+                        field,
+                        label
+                    );
+                }
+
+                for backend in BACKENDS {
+                    let mut actual = original.clone();
+                    let statistics = row_echelon_with(backend, &mut actual, usize::MAX)
+                        .expect("unbounded cannot fail");
+                    assert_eq!(actual, expected, "{}/{}/{:?}", field, label, backend);
+                    assert_eq!(statistics, reference, "{}/{}/{:?}", field, label, backend);
+                }
+            }
+        }
+
+        check::<Zp7>("GF(7)");
+        check::<Zp13>("GF(13)");
+        check::<Zp541>("GF(541)");
+        check::<Zp2147483647>("GF(2^31-1)");
+        check::<Zp18446744073709551557>("GF(2^64-59)");
+    }
+
+    /// Every backend's echelon rows lie in the original row space, certified by an identity block.
+    ///
+    /// `[A | I]` is eliminated, so each resulting row carries the combination of original rows that
+    /// produced it. Multiplying that combination back out must reproduce the row, which puts the
+    /// result inside the original row space; equal ranks then make the two spaces equal.
+    #[test]
+    fn test_every_backend_preserves_the_row_space() {
+        let original: SparseMatrix<F> = random_matrix(9, 11, 0.4, 23);
+        let width = original.num_columns();
+
+        let augmented_rows: Vec<SparseRow<F>> = original
+            .rows()
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                let mut entries: Vec<(usize, F)> = row.entries().to_vec();
+                entries.push((width + index, F::ONE));
+                SparseRow::from_sorted_unchecked(entries)
+            })
+            .collect();
+        let augmented = SparseMatrix::new(width + original.num_rows(), augmented_rows);
+
+        let reference_rank = {
+            let mut matrix = original.clone();
+            row_echelon(&mut matrix).rank
+        };
+
+        for backend in BACKENDS {
+            let mut reduced = augmented.clone();
+            let statistics =
+                row_echelon_with(backend, &mut reduced, usize::MAX).expect("unbounded cannot fail");
+            // The identity block makes every augmented row independent, so the rank is the row
+            // count; the rank of the matrix part is what the certificate is checked against.
+            assert_eq!(
+                statistics.rank,
+                original.num_rows(),
+                "{:?}: an augmented row cannot vanish",
+                backend
+            );
+
+            let mut nonzero_left = 0;
+            for row in reduced.rows() {
+                let left: Vec<(usize, F)> = row
+                    .entries()
+                    .iter()
+                    .filter(|(column, _)| *column < width)
+                    .copied()
+                    .collect();
+                let combination: Vec<(usize, F)> = row
+                    .entries()
+                    .iter()
+                    .filter(|(column, _)| *column >= width)
+                    .map(|(column, coefficient)| (column - width, *coefficient))
+                    .collect();
+
+                let mut rebuilt: Vec<(usize, F)> = Vec::new();
+                for (index, coefficient) in &combination {
+                    for (column, entry) in original.row(*index).entries() {
+                        rebuilt.push((*column, *coefficient * *entry));
+                    }
+                }
+                assert_eq!(
+                    SparseRow::new(&rebuilt),
+                    SparseRow::from_sorted_unchecked(left.clone()),
+                    "{:?}: a row is not the combination its certificate claims",
+                    backend
+                );
+                if !left.is_empty() {
+                    nonzero_left += 1;
+                }
+            }
+            assert_eq!(
+                nonzero_left, reference_rank,
+                "{:?}: the row space has a different dimension",
+                backend
+            );
+        }
+    }
+
+    /// Every backend honours the split contract at zero, at the row count, and in between.
+    ///
+    /// The upper rows must be untouched, the lower rows reduced against them and normalized, and
+    /// the whole result equal to a full echelon of the same arrangement — which is the strongest
+    /// form of "the row space is unchanged" available, since the pivot rule makes the echelon form
+    /// a function of the input.
+    #[test]
+    fn test_every_backend_honours_the_split_contract() {
+        fn check<G: FiniteField>(field: &str) {
+            for (rows, columns, density) in
+                [(14usize, 18usize, 0.3f64), (20, 9, 0.5), (11, 11, 0.2)]
+            {
+                // An echelon arrangement, so that any prefix satisfies the precondition.
+                let mut prepared: SparseMatrix<G> = random_matrix(rows, columns, density, 29);
+                let _ = row_echelon(&mut prepared);
+                prepared.sort_rows_by_leading_column();
+
+                let mut full = prepared.clone();
+                let expected_statistics = row_echelon(&mut full);
+
+                for split in [0, prepared.num_rows() / 2, prepared.num_rows()] {
+                    for backend in BACKENDS {
+                        let mut actual = prepared.clone();
+                        let statistics = reduce_rows_against_pivots_with(
+                            backend,
+                            &mut actual,
+                            split,
+                            usize::MAX,
+                        )
+                        .expect("unbounded cannot fail");
+
+                        // The upper rows are left exactly where they were.
+                        for index in 0..split {
+                            assert_eq!(
+                                actual.row(index),
+                                prepared.row(index),
+                                "{}/{:?}: upper row {} was rewritten at split {}",
+                                field,
+                                backend,
+                                index,
+                                split
+                            );
+                        }
+                        assert_eq!(
+                            actual, full,
+                            "{}/{:?}: split {} disagrees with a full echelon",
+                            field, backend, split
+                        );
+                        assert_eq!(
+                            statistics, expected_statistics,
+                            "{}/{:?}: split {} disagrees on the work",
+                            field, backend, split
+                        );
+                    }
+                }
+            }
+        }
+
+        check::<Zp7>("GF(7)");
+        check::<Zp13>("GF(13)");
+        check::<Zp541>("GF(541)");
+        check::<Zp2147483647>("GF(2^31-1)");
+        check::<Zp18446744073709551557>("GF(2^64-59)");
+    }
+
+    /// Each backend is deterministic, and the adaptive one agrees with both fixed backends.
+    ///
+    /// Elimination over a finite field has no numerical stability to pivot for, so a backend that
+    /// answered differently on a second run would be reading something other than its input.
+    #[test]
+    fn test_every_backend_is_deterministic() {
+        let original: SparseMatrix<F> = random_matrix(18, 22, 0.35, 31);
+
+        let mut results = Vec::new();
+        for backend in BACKENDS {
+            let mut first = original.clone();
+            let first_statistics =
+                row_echelon_with(backend, &mut first, usize::MAX).expect("unbounded cannot fail");
+            for _ in 0..8 {
+                let mut again = original.clone();
+                let statistics = row_echelon_with(backend, &mut again, usize::MAX)
+                    .expect("unbounded cannot fail");
+                assert_eq!(again, first, "{:?} is not deterministic", backend);
+                assert_eq!(
+                    statistics, first_statistics,
+                    "{:?} is not deterministic",
+                    backend
+                );
+            }
+            results.push((first, first_statistics));
+        }
+
+        for (index, backend) in BACKENDS.iter().enumerate().skip(1) {
+            assert_eq!(results[index].0, results[0].0, "{:?}", backend);
+            assert_eq!(results[index].1, results[0].1, "{:?}", backend);
+        }
+    }
+
+    /// Every backend abandons the elimination when fill-in crosses the budget, mid-run.
+    ///
+    /// The budget has to refuse work while it is being consumed rather than report it afterwards,
+    /// and a dense backend's live count has to mean what the sparse one's means — the number of
+    /// field elements that are not zero — or the two budgets are not comparable.
+    #[test]
+    fn test_the_budget_is_enforced_mid_elimination() {
+        // A dense first row makes each two-entry row a full one, so the peak is far above both the
+        // input and the result.
+        let width = 20;
+        let mut rows: Vec<SparseRow<F>> = vec![SparseRow::new(
+            &(0..width).map(|c| (c, F::ONE)).collect::<Vec<_>>(),
+        )];
+        rows.extend((1..width).map(|i| SparseRow::new(&[(0, F::ONE), (i, F::ONE)])));
+        let original = SparseMatrix::new(width, rows);
+
+        let unbounded = row_echelon(&mut original.clone());
+        assert!(unbounded.peak_nonzeros > original.nonzeros(), "no fill-in");
+
+        for backend in BACKENDS {
+            let budget = unbounded.peak_nonzeros - 1;
+            let mut matrix = original.clone();
+            let observed = row_echelon_with(backend, &mut matrix, budget)
+                .expect_err("the budget should have been exceeded");
+            assert!(
+                observed > budget,
+                "{:?} reported {} for a budget of {}",
+                backend,
+                observed,
+                budget
+            );
+
+            // The same budget is enough when it covers the peak exactly.
+            let mut matrix = original.clone();
+            let statistics = row_echelon_with(backend, &mut matrix, unbounded.peak_nonzeros)
+                .expect("a budget at the peak is enough");
+            assert_eq!(statistics, unbounded, "{:?}", backend);
+        }
+    }
+
+    /// Every backend rejects a split beyond the row count.
+    #[test]
+    fn test_every_backend_rejects_a_split_beyond_the_row_count() {
+        for backend in BACKENDS {
+            let result = std::panic::catch_unwind(|| {
+                let mut matrix = matrix_of(&[&[(0, 1)], &[(1, 1)], &[(2, 1)]], 3);
+                let _ = reduce_rows_against_pivots_with(backend, &mut matrix, 5, usize::MAX);
+            });
+            assert!(
+                result.is_err(),
+                "{:?} accepted an impossible split",
+                backend
+            );
+        }
+    }
+
+    /// Every backend rejects an upper block whose rows do not satisfy the precondition.
+    #[test]
+    fn test_every_backend_rejects_a_malformed_upper_block() {
+        for backend in BACKENDS {
+            // Two upper rows leading with the same column.
+            let duplicated = std::panic::catch_unwind(|| {
+                let mut matrix = matrix_of(&[&[(0, 1), (1, 2)], &[(0, 1), (2, 3)]], 3);
+                let _ = reduce_rows_against_pivots_with(backend, &mut matrix, 2, usize::MAX);
+            });
+            assert!(
+                duplicated.is_err(),
+                "{:?} accepted duplicate upper pivots",
+                backend
+            );
+
+            // An upper pivot that is not one.
+            let unnormalized = std::panic::catch_unwind(|| {
+                let mut matrix = matrix_of(&[&[(0, 3), (1, 2)], &[(1, 1)]], 3);
+                let _ = reduce_rows_against_pivots_with(backend, &mut matrix, 1, usize::MAX);
+            });
+            assert!(
+                unnormalized.is_err(),
+                "{:?} accepted an unnormalized upper pivot",
+                backend
+            );
+        }
     }
 }
