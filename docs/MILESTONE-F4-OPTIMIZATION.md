@@ -485,6 +485,223 @@ inputs.
 > Per-workstream results are appended here by A, B, C and D; the integrated result and the
 > ablation study by M16-I.
 
+### 7.2 M16-B — symbolic preprocessing and monomial indexing
+
+All three hypotheses §5.2 names were implemented and measured. **All three were rejected**, two of
+them after the code that implements them had been written and benchmarked. What did pay was none of
+them: it was how a monomial is hashed, which is what the three measurements kept pointing at.
+
+The default configuration is unchanged — `ReducerSelection::FirstApplicable`, `CacheMode::Off` —
+and `f4` returns the identical basis under every selection policy, every cache mode and all three
+orders, which `test_every_configuration_agrees_with_the_baseline` asserts over the cross product.
+
+Measured on the §6 machine and toolchain, release profile, `cargo run --release --example
+f4_selection` and `--example f4_profile`. **Caveat:** three sibling workstreams were building and
+running on the same machine throughout, so every wall clock here is from an interleaved A/B of two
+binaries run back to back, five rounds, median reported — not from an idle machine. The counters
+(`reducers`, `rows`, `cols`, `peak nz`, `row ops`, `scan/q`, `reuse`) are deterministic and are not
+affected. The authoritative serial timing is the integrator's.
+
+#### 7.2.1 Rejected: smaller multipliers (`ReducerSelection::LargestLeadingMonomial`)
+
+Implemented as specified: the divisor whose leading monomial is largest under the order in force,
+ties broken by the smaller basis index — a tiebreaker that is needed, since two basis elements can
+lead with the same monomial, and is exercised by `test_find_largest_divisor_tiebreak`.
+
+The hypothesis was that the smallest multiplier introduces the fewest new monomials, so the closure
+and the matrix shrink. **It is the other way round on every instance that matters.**
+
+| system | order | reducers first → largest | largest matrix | peak nz | row ops | total/ms |
+|---|---|---|---|---|---|---|
+| cyclic-4 | lex | 117 → **105** | 28x29 → 26x26 | 128 → 106 | 278 → 252 | 0.25 → **0.17** |
+| cyclic-5 | lex | 4823 → **4550** | 565x351 → 532x337 | 13993 → 12200 | 58164 → 56522 | 27.9 → **25.2** |
+| cyclic-5 | grlex | 1614 → 1779 | 732x228 → 726x277 | 11379 → 12019 | 93664 → 98404 | 20.5 → 23.5 |
+| cyclic-5 | grevlex | 3292 → 4418 | 635x463 → 873x712 | 17061 → 55309 | 79775 → 114079 | 23.3 → 50.0 |
+| katsura-5 | lex | 3186 → 3186 | unchanged | unchanged | unchanged | 13.0 → 13.4 |
+| katsura-5 | grevlex | 666 → 842 | 278x291 → 390x403 | 7818 → 8907 | 3179 → 4334 | 1.63 → 2.19 |
+| katsura-6 | lex | 31816 → 31816 | unchanged | unchanged | unchanged | 3005 → 3177 |
+| katsura-6 | grlex | 2728 → 3913 | 644x674 → 1262x1292 | 34746 → 65129 | 50043 → 66236 | 22.1 → 36.7 |
+| katsura-6 | grevlex | 4572 → 6371 | 1388x1412 → 2593x2623 | 103314 → 209347 | 44023 → 63388 | 28.6 → 61.4 |
+| katsura-7 | grlex | 12388 → 22105 | 2450x2476 → 6946x7008 | 368156 → 1017564 | 638769 → 964997 | 544 → 1228 |
+| katsura-7 | grevlex | 25908 → **43453** | 6810x6862 → **16750x16812** | 1.39M → **3.06M** | 608356 → 1068505 | 887 → **3045** |
+
+katsura-7 under grevlex — the instance §6.2 identifies as the one to fix — gets a 68% larger
+closure, a 2.5x larger matrix, 2.2x the peak live entries and takes **3.4x as long**. The only wins
+are the lex instances of cyclic, where the closure shrinks 2–6% and the computation gets 7–10%
+shorter.
+
+The mechanism is visible once stated the right way round. The reducer row for a monomial `u` is
+`(u / LM(g)) * g`, and its leading monomial is `u` whichever `g` is chosen — the multiplier's size
+is not what the matrix pays for. What the matrix pays for is the row's *tail*, `(u / LM(g)) * t` for
+each tail monomial `t` of `g`. A small `g` low in the basis has a tail far below its own leading
+monomial, so dividing through by a large multiplier drops those monomials well down the order, where
+they are likelier to be irreducible or already covered. A large `g` has a tail close to `LM(g)`, so
+the tail of its multiple sits just below `u` — reducible, and each reducible monomial is another
+row. Choosing the largest divisor minimizes the multiplier and maximizes the fan-out.
+
+**Kept, not merged into the default.** The variant is reachable through `F4Options` because the
+option surface declares it and the ablation study needs it; `FirstApplicable` remains the default
+and the measurement above is why.
+
+#### 7.2.2 Rejected: a divisibility index (`src/grobner/f4/divisors.rs`, reverted)
+
+Built, tested against the reference scan, measured, and reverted in commit `fcf81df`. The structure
+grouped the leading monomials by total degree — necessary condition `deg LM <= deg u` — and gave
+first-applicable selection a precomputed ascending list of the indices at or below the query's
+degree, so the scan it replaced was restricted to a subsequence of itself in the same order. That
+construction is what makes the answer provably identical; a plainer walk over the degree groups is
+not, because a divisor found in a low-degree group does not license skipping a lower-indexed one
+above it — and measured, that walk examined **more** elements than the plain scan (katsura-6 lex
+47.2 → 48.5).
+
+It did reduce examinations, and it was still slower:
+
+| system | order | scan/q scan → index | symbolic/ms scan → index |
+|---|---|---|---|
+| cyclic-4 | grevlex | 4.7 → 3.8 | 0.05 → 0.05 |
+| cyclic-5 | lex | 19.8 → 17.9 | 3.26 → 3.27 |
+| cyclic-5 | grlex | 17.4 → 12.0 | 2.25 → 2.34 |
+| katsura-5 | lex | 21.6 → 19.6 | 2.27 → 2.30 |
+| katsura-6 | lex | **47.2 → 44.7** | 42.8 → 44.0 |
+| katsura-6 | grevlex | 5.7 → 5.3 | 2.40 → 2.48 |
+| katsura-7 | grlex | 22.0 → 20.5 | **23.9 → 28.4** |
+| katsura-7 | grevlex | 6.1 → 5.8 | **20.2 → 23.6** |
+
+The scan it replaced is sequential, and that is the whole of it. Examining elements `0, 1, 2, ...`
+walks one array in order and the prefetcher covers it; examining `0, 2, 5, 7, ...` reads the same
+array through an index list and can take a cache miss per skip. Fewer examinations bought more
+misses than they saved divisions.
+
+**And the divisions were never the cost.** katsura-6 under lex performs 33 758 divisor queries at
+47.2 elements each — 1.59 million divisibility tests, each a handful of integer comparisons — inside
+a stage that is 41 ms of a 3005 ms computation. Eliminating divisor lookup *entirely* would save
+about 1% of the symbolic stage's share of 1.4%. §6.3 reports the scan correctly and the scan is
+nonetheless not worth indexing; the two facts belong together.
+
+A support bitmask over the variables was measured alongside and also rejected: for these bases the
+mask rarely rejects, so it adds a word operation ahead of a `checked_div` that already exits on the
+first variable it fails.
+
+#### 7.2.3 Rejected: reducer reuse (`CacheMode::Store`, measured and not merged)
+
+`CacheMode::Count` first, as §5.2 requires, before anything was implemented. **The repetition rate
+is high** — the preceding milestone's expectation of recurrence was right:
+
+| system | order | reducer rows | reused | rate |
+|---|---|---|---|---|
+| cyclic-4 | lex | 117 | 34 | 29% |
+| cyclic-5 | lex | 4823 | 2796 | 58% |
+| cyclic-5 | grevlex | 3292 | 1417 | 43% |
+| katsura-4 | lex | 292 | 225 | 77% |
+| katsura-5 | lex | 3186 | 2841 | **89%** |
+| katsura-6 | lex | 31816 | 30169 | **95%** |
+| katsura-6 | grevlex | 4572 | 2763 | 60% |
+| katsura-7 | grlex | 12388 | 7974 | 64% |
+| katsura-7 | grevlex | 25908 | 16485 | 64% |
+| random-4 | lex | 2314 | 2077 | **90%** |
+
+So the gate §5.2 set is passed, and `CacheMode::Store` was implemented: the shifted terms of a
+multiple — not its sparse row, whose column indices belong to one batch's column set — stored and
+served. It is slower everywhere, at every one of those rates:
+
+| system | order | reuse | symbolic/ms off → count → store |
+|---|---|---|---|
+| cyclic-5 | lex | 58% | 1.60 → 1.72 → 1.89 |
+| katsura-5 | lex | 89% | 1.00 → 1.06 → 1.09 |
+| katsura-6 | lex | 95% | 20.3 → 21.8 → 21.9 |
+| katsura-6 | grevlex | 60% | 1.05 → 1.12 → 1.27 |
+| katsura-7 | grlex | 64% | 13.2 → 13.9 → 14.8 |
+| katsura-7 | grevlex | 64% | 9.9 → 11.8 → **14.9** |
+
+The rate was the wrong question. What a cache avoids is building a multiple's terms, and that is one
+integer addition per variable per term — a few nanoseconds for a monomial. Serving them instead
+costs a hash of `(basis_index, multiplier)` and a pointer chase to a heap vector, which is more.
+A 95% hit rate on work that cheap still loses. `Store` is left delegating to `Count`, and its doc
+comment records the measurement.
+
+#### 7.2.4 Merged: how a monomial is hashed
+
+The three rejections agree on where the stage's time actually is. It is not the divisor scan and it
+is not rebuilding multiples; it is the two hash-set operations the closure traversal performs for
+every monomial it meets — `examined.insert`, to handle no monomial twice, and `covered.contains`, to
+ask whether the invariant already holds there.
+
+`Monomial<N>` is `[u32; N]`, which the standard library hashes through `hash_slice` as one byte
+slice, under `SipHash-1-3`. SipHash is the default because it withstands adversarially chosen keys.
+These keys are monomials the computation produced itself, and a caller who can choose them can
+already choose the ideal, so the guarantee buys nothing here. A multiplicative word hash with a
+`splitmix64` finalizer replaces it:
+
+| system | order | symbolic/ms | total/ms |
+|---|---|---|---|
+| cyclic-4 | lex | 0.07 → 0.05 (−29%) | 0.30 → 0.25 |
+| cyclic-5 | lex | 3.22 → 1.64 (−49%) | 29.7 → 27.6 |
+| cyclic-5 | grlex | 2.25 → 1.19 (−47%) | 22.7 → 21.3 |
+| cyclic-5 | grevlex | 1.83 → 0.96 (−48%) | 24.0 → 23.3 |
+| katsura-4 | lex | 0.13 → 0.07 (−46%) | 0.63 → 0.56 |
+| katsura-5 | lex | 2.23 → 1.11 (−50%) | 15.3 → 14.1 |
+| katsura-5 | grevlex | 0.29 → 0.15 (−48%) | 1.91 → 1.74 |
+| katsura-6 | lex | 41.1 → 19.4 (−53%) | 2997 → 2988 |
+| katsura-6 | grlex | 2.40 → 1.25 (−48%) | 23.7 → 23.7 |
+| katsura-6 | grevlex | 2.34 → 1.06 (−55%) | 31.4 → 28.7 |
+| katsura-7 | grlex | 23.6 → 13.9 (−41%) | 559 → 512 |
+| katsura-7 | grevlex | 18.9 → 9.63 (−49%) | 904 → 851 |
+| random-4 | lex | 1.46 → 0.68 (−53%) | 8.42 → 7.29 |
+
+Symbolic preprocessing roughly halves — 25% to 55% off, about −50% on everything above a
+millisecond. The totals move 0% to 19%, which is what a stage worth 2–15% can contribute, and
+katsura-6 under lex barely moves at all because §6.2's interreduction finding owns 84% of it.
+
+Two details are load-bearing, and both were found by measuring rather than by reasoning:
+
+- **Without the finalizer it is twice as slow as SipHash.** The low bits of a multiplicative
+  accumulator depend only on the low bits of the key, and `hashbrown` takes the bucket index from
+  exactly those bits. Small exponent vectors collided enough to double the stage. Two shifts and a
+  multiply fix it. `test_monomial_hasher` compares the low-bit bucket spread against the standard
+  hasher so this cannot regress silently.
+- **A byte-at-a-time `write` is also slower than SipHash.** It is the hot path, because an integer
+  array arrives as one byte slice: 28 rounds for a seven-variable monomial. Eight bytes at a time is
+  the version that pays.
+
+Nothing about the computation changes. The hasher affects iteration order of nothing that is read in
+order: `Preprocessed::leading_monomials` is used only for membership, and the row sequence is built
+in the deterministic order the `VecDeque` traversal produces.
+
+#### 7.2.5 Tests added
+
+In `symbolic.rs`: the closure invariant asserted directly under every selection policy and every
+cache mode over the ten-system corpus and all three orders, and over both the widest and narrowest
+batch shapes; a differential test of each policy's dispatch against its reference scan over
+randomized bases and monomials, asserting the same index *and* the same quotient; a round trip of
+every constructed row against independently computed polynomial arithmetic; cache clearing not
+changing the rows; the largest-leading-monomial tiebreaker; and the hasher's agreement with equality
+and its low-bit spread. In `tests.rs`: identical basis under both policies against `buchberger` over
+the corpus, under permuted, duplicated and redundant generators, and determinism of the basis *and*
+the counters across repeated runs. 698 library tests pass in debug and in release, 8 ignored, up
+from 693 at the baseline.
+
+#### 7.2.6 Notes for the integrator
+
+- **One edit outside M16-B's column, since reverted.** Adding `src/grobner/f4/divisors.rs` required
+  `pub mod divisors;` in the frozen `f4/mod.rs`. The revert removed both, so `f4/mod.rs` is
+  byte-identical to the baseline on this branch. M16-A will need the same one-line addition for
+  `structured.rs`.
+- **`ReducerSelection::LargestLeadingMonomial`'s doc comment in `options.rs` says "Not yet
+  implemented; currently first-applicable", which is now false.** `options.rs` is frozen, so it was
+  left alone. It wants one line: the policy is implemented, and `FirstApplicable` is the default
+  because §7.2.1 measured the alternative as 3.4x slower on katsura-7 grevlex.
+- **The per-worktree `.cargo/config.toml` does not take effect.** The ambient environment sets
+  `CARGO_TARGET_DIR=/buildcache/cargo-target/interactive-mfaulk`, and an environment variable
+  overrides `[build] target-dir` in `.cargo/config.toml`. All four workstreams were therefore
+  sharing one target directory and overwriting each other's test binaries — which showed up as the
+  library test count changing between runs, at one point reporting M16-C's interreduction tests on
+  this branch. Every measurement and test run reported here was taken with `CARGO_TARGET_DIR` set
+  explicitly to the worktree. Anyone measuring on this machine has to do the same.
+- **`cargo test --doc` fails, at the baseline commit too.** `Cargo.toml` sets `[lib] doctest =
+  false`, so `cargo test` never runs them and nothing is broken; forcing them finds four untagged
+  code fences of prose in `src/fft/evaluate.rs` and `src/linalg/crout.rs` that `rustdoc` tries to
+  compile. Pre-existing and untouched here; worth `text` fences at some point outside M16.
+
 ## 8. References
 
 1. Faugère, J.-C. (1999). *A new efficient algorithm for computing Gröbner bases (F4)*. Journal of
