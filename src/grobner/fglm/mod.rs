@@ -9,7 +9,13 @@
 //! wrong choice are in `docs/MILESTONE-FGLM-SOLVING.md`.
 
 mod errors;
+mod multiplication;
+mod options;
+mod quotient_algebra;
 mod quotient_basis;
 
 pub use errors::FglmError;
+pub use multiplication::MultiplicationOperator;
+pub use options::FglmOptions;
+pub use quotient_algebra::QuotientAlgebra;
 pub use quotient_basis::{classify_ideal, IdealClass, QuotientBasis};
