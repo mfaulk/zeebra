@@ -50,8 +50,17 @@ Four other `#[ignore]`d tests are unimplemented placeholders for statistical dis
 and a rare division branch, and they panic if run. A bare `cargo test -- --ignored` therefore
 reports those four as failures; the commands above select the tests that are meant to pass.
 
-CI runs the two Gröbner engine-agreement tests among those in a separate release-mode job, so the
-cross-check against the naive reference implementation is enforced rather than merely available.
+CI runs the suite twice: once in debug, and once in release in a separate job that also runs the
+two Gröbner engine-agreement tests above. Both configurations are checked because a release build
+takes different paths — `debug-assertions` and `overflow-checks` are off, so every
+`debug_assert`-guarded invariant goes unchecked and integer arithmetic wraps instead of panicking.
+Release is also the configuration every benchmark uses, so
+
+```sh
+cargo test --release
+```
+
+is worth running locally before claiming a measurement.
 
 ### Benchmarks
 
