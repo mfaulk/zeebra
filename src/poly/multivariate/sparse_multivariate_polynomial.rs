@@ -218,7 +218,11 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 /// Display the polynomial in Sage-style.
 impl<const N: usize, F: FiniteField> Display for SparseMultiPoly<N, F> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO: handle the zero polynomial.
+        // The zero polynomial has no terms, and an empty string is not a reading of it. Every
+        // other polynomial has at least one term, so this is the only case needing a constant.
+        if self.is_zero() {
+            return write!(f, "0");
+        }
 
         let mut terms: Vec<_> = self.terms.iter().collect();
         let order = MonomialOrder::GradedLexicographic;
@@ -231,8 +235,12 @@ impl<const N: usize, F: FiniteField> Display for SparseMultiPoly<N, F> {
             } else {
                 write!(f, " + ")?;
             }
-            if c.is_one() && monomial.is_one() {
-                write!(f, "1")?;
+
+            // A constant term is its coefficient and nothing else. `Monomial::one` displays as
+            // the empty string — there are no variables to name — so writing the coefficient with
+            // a trailing `*` would leave a dangling operator.
+            if monomial.is_one() {
+                write!(f, "{}", c)?;
                 continue;
             }
             if !c.is_one() {
@@ -297,13 +305,45 @@ impl<const N: usize, F: FiniteField + 'static> Arbitrary for SparseMultiPoly<N, 
 mod tests {
     use crate::{
         fields::{PrimeFieldElement64, Zp65537},
-        identities::Zero,
+        identities::{One, Zero},
         poly::{
             multivariate::{sparse_multivariate_polynomial::SparseMultiPoly, term::Term},
             Monomial,
         },
         FiniteField,
     };
+
+    /// A constant term displays as its coefficient, with no dangling multiplication sign.
+    ///
+    /// `Monomial::one` displays as the empty string, since it names no variables, so a constant
+    /// term written as `coefficient * monomial` used to come out as `7*` — which is not a
+    /// polynomial, and appeared in every example's output and every assertion message.
+    #[test]
+    fn test_display_of_a_constant_term() {
+        type F = PrimeFieldElement64<337>;
+
+        let seven: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[(Monomial::one(), F::new(7))]);
+        assert_eq!(seven.to_string(), "7");
+
+        // The coefficient one is the one case that was already right.
+        let one: SparseMultiPoly<2, F> = SparseMultiPoly::one();
+        assert_eq!(one.to_string(), "1");
+
+        // And beside a non-constant term.
+        let shifted: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[
+            (Monomial::new(&[2, 0]), F::one()),
+            (Monomial::one(), F::new(336)),
+        ]);
+        assert_eq!(shifted.to_string(), "x_0^2 + 336");
+    }
+
+    /// The zero polynomial displays as `0`, not as nothing at all.
+    #[test]
+    fn test_display_of_the_zero_polynomial() {
+        type F = PrimeFieldElement64<337>;
+        let zero: SparseMultiPoly<3, F> = SparseMultiPoly::zero();
+        assert_eq!(zero.to_string(), "0");
+    }
 
     #[test]
     // Should omit terms with zero coefficient.
