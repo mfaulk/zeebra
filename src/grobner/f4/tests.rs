@@ -1285,3 +1285,144 @@ fn test_every_backend_reports_the_same_elimination_statistics() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// M16-B: reducer selection and the divisor index.
+// ---------------------------------------------------------------------------------------------
+
+/// Every reducer-selection policy returns the baseline's basis, and Buchberger's, on the corpus.
+#[test]
+fn test_reducer_selection_does_not_change_the_basis() {
+    use crate::grobner::ReducerSelection;
+
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            let expected = buchberger(&f, order);
+
+            for reducer_selection in [
+                ReducerSelection::FirstApplicable,
+                ReducerSelection::LargestLeadingMonomial,
+            ] {
+                let options = F4Options {
+                    reducer_selection,
+                    ..F4Options::baseline()
+                };
+                let (actual, _) = f4_with_options(&f, order, &options).expect("within limits");
+                assert_eq!(
+                    actual,
+                    expected,
+                    "{:?} under {} with {:?}",
+                    strings,
+                    order.name(),
+                    reducer_selection
+                );
+            }
+        }
+    }
+}
+
+/// Reducer selection survives permuted, duplicated, and redundant generators.
+///
+/// A selection policy is a function of the basis *order*, so permuting the generators permutes
+/// what it picks. The reduced basis is unique, so the answer must not move regardless.
+#[test]
+fn test_reducer_selection_under_permuted_and_redundant_generators() {
+    use crate::grobner::ReducerSelection;
+
+    for order in ALL_ORDERS {
+        let f = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+        let expected = buchberger(&f, order);
+
+        let variants: Vec<Vec<MultivariatePolynomial<3, F>>> = vec![
+            f.clone(),
+            // Permuted.
+            vec![f[3].clone(), f[1].clone(), f[0].clone(), f[2].clone()],
+            // Duplicated, and scaled by a unit.
+            vec![
+                f[0].clone(),
+                f[0].scale(&F::new(5)),
+                f[1].clone(),
+                f[2].clone(),
+                f[3].clone(),
+            ],
+            // Redundant: an element of the ideal that adds nothing.
+            vec![
+                f[0].clone(),
+                f[1].clone(),
+                f[2].clone(),
+                f[3].clone(),
+                &f[0] + &f[1],
+            ],
+        ];
+
+        for reducer_selection in [
+            ReducerSelection::FirstApplicable,
+            ReducerSelection::LargestLeadingMonomial,
+        ] {
+            for (which, variant) in variants.iter().enumerate() {
+                let options = F4Options {
+                    reducer_selection,
+                    ..F4Options::baseline()
+                };
+                let (actual, _) = f4_with_options(variant, order, &options).expect("within limits");
+                assert_eq!(
+                    actual,
+                    expected,
+                    "variant {} under {} with {:?}",
+                    which,
+                    order.name(),
+                    reducer_selection
+                );
+            }
+        }
+    }
+}
+
+/// Repeated runs of a configuration return the identical basis and the identical counters.
+#[test]
+fn test_reducer_selection_is_deterministic() {
+    use crate::grobner::{CacheMode, ReducerSelection};
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        for reducer_selection in [
+            ReducerSelection::FirstApplicable,
+            ReducerSelection::LargestLeadingMonomial,
+        ] {
+            for reducer_cache in [CacheMode::Off, CacheMode::Count, CacheMode::Store] {
+                let options = F4Options {
+                    reducer_selection,
+                    reducer_cache,
+                    ..F4Options::baseline()
+                };
+                let f = katsura::<4, G>();
+                let (first, first_statistics) =
+                    f4_with_options(&f, order, &options).expect("within limits");
+                for _ in 0..4 {
+                    let (again, again_statistics) =
+                        f4_with_options(&f, order, &options).expect("within limits");
+                    assert_eq!(first, again, "{}", order.name());
+                    assert_eq!(
+                        (
+                            first_statistics.reducer_rows,
+                            first_statistics.divisor_queries,
+                            first_statistics.divisor_scan_steps,
+                            first_statistics.max_matrix_rows,
+                            first_statistics.max_matrix_columns,
+                        ),
+                        (
+                            again_statistics.reducer_rows,
+                            again_statistics.divisor_queries,
+                            again_statistics.divisor_scan_steps,
+                            again_statistics.max_matrix_rows,
+                            again_statistics.max_matrix_columns,
+                        ),
+                        "{}: the counters moved between runs",
+                        order.name()
+                    );
+                }
+            }
+        }
+    }
+}

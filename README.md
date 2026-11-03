@@ -95,6 +95,7 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 ```
 
@@ -114,6 +115,12 @@ of the densest 64x64 blocks, and the three backends' elimination times with repr
 conversion in its own column. A global density of a fraction of a percent says nothing about
 either. `-- list` names the instances; the largest are excluded by default, because a dense
 representation of katsura-7 grevlex is 374 MB for a matrix holding 112k entries.
+
+`f4_selection` compares the two reducer-selection policies and the three cache modes against one
+common baseline, on one line each: the closure size, the largest matrix, the peak live entries, the
+row operations, the share of reducer multiples that had been needed before, and the stage times.
+`f4_profile`'s configurations bundle several options together, so neither effect can be attributed
+from it alone.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md) and
@@ -205,9 +212,9 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 |---|---|---|
 | `elimination` | `Backend::{Sparse, Dense, Adaptive}` | the representation elimination works in: sparse rows throughout, dense rows throughout, or sparse rows reduced through a dense accumulator |
 | `reduction` | `ReductionStrategy::{Unstructured, Structured}` | whether reducer rows are established as pivots before the pair rows are reduced against them |
-| `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial |
+| `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial. `FirstApplicable` is the default and the faster of the two: picking the largest divisor minimizes the multiplier but maximizes how much of the reducer's tail stays reducible, which grows the matrix |
 | `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
-| `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches; `Count` measures repetition without serving anything |
+| `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches. `Count` measures repetition without serving anything; `Store` currently behaves as `Count`, because building a multiple's terms is an integer addition per variable per term and serving them from a map costs more than that even at a 95% hit rate |
 | `measure_stages` | `bool` | whether `F4Statistics::stages` is populated |
 
 `F4Options::baseline()` names the configuration every optimization is measured against, and is

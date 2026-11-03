@@ -24,13 +24,121 @@
 //!
 //! See Faugère (1999), Sec 2.1, where this is `SymbolicPreprocessing`.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet, VecDeque},
+    hash::{BuildHasher, Hasher},
+};
 
 use crate::{
     grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
+
+/// A set of monomials, hashed the cheap way. See [`MonomialHasher`].
+pub type MonomialSet<const N: usize> = HashSet<Monomial<N>, BuildMonomialHasher>;
+
+/// A multiplicative hash over machine words, for keys that are a handful of integers.
+///
+/// A monomial is `[u32; N]`, and the closure traversal hashes one per monomial it meets — twice,
+/// once to decide whether the monomial has been examined and once to ask whether it is already
+/// covered. The standard library's `SipHash-1-3` is chosen to withstand adversarially chosen keys,
+/// and costs more per key than the work being guarded: the keys here are monomials the computation
+/// produced itself, and a caller who can choose them can already choose the ideal.
+///
+/// The construction is the one `rustc` uses for its own interned-key maps: rotate, xor the next
+/// word in, multiply by an odd constant.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MonomialHasher {
+    hash: u64,
+}
+
+/// An odd 64-bit constant with a well-mixed bit pattern, from `rustc`'s `FxHasher`.
+const HASH_MULTIPLIER: u64 = 0x517c_c1b7_2722_0a95;
+
+impl MonomialHasher {
+    #[inline]
+    fn add(&mut self, word: u64) {
+        self.hash = (self.hash.rotate_left(5) ^ word).wrapping_mul(HASH_MULTIPLIER);
+    }
+}
+
+impl Hasher for MonomialHasher {
+    /// Eight bytes at a time.
+    ///
+    /// This is the path a monomial actually takes: `[u32; N]` hashes through the standard library's
+    /// `hash_slice` for integers, which hands the whole exponent array over as one byte slice. A
+    /// byte-at-a-time loop here turns a 28-byte key into 28 rounds and was measured to be *slower*
+    /// than the SipHash it replaced.
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        let mut words = bytes.chunks_exact(8);
+        for word in &mut words {
+            self.add(u64::from_le_bytes(word.try_into().expect("eight bytes")));
+        }
+        let tail = words.remainder();
+        if !tail.is_empty() {
+            let mut padded = [0u8; 8];
+            padded[..tail.len()].copy_from_slice(tail);
+            self.add(u64::from_le_bytes(padded));
+        }
+    }
+
+    #[inline]
+    fn write_u8(&mut self, value: u8) {
+        self.add(value as u64);
+    }
+
+    #[inline]
+    fn write_u16(&mut self, value: u16) {
+        self.add(value as u64);
+    }
+
+    #[inline]
+    fn write_u32(&mut self, value: u32) {
+        self.add(value as u64);
+    }
+
+    #[inline]
+    fn write_u64(&mut self, value: u64) {
+        self.add(value);
+    }
+
+    #[inline]
+    fn write_usize(&mut self, value: usize) {
+        self.add(value as u64);
+    }
+
+    /// The accumulator, with its high entropy folded down.
+    ///
+    /// The fold is not optional. A multiplicative accumulator leaves the *low* bits of the product
+    /// depending only on the low bits of the inputs, and `hashbrown` takes the bucket index from
+    /// exactly those bits — so returning the accumulator raw makes small exponent vectors collide
+    /// in droves. Measured, it doubled the cost of the stage it was meant to cheapen. The finalizer
+    /// is `splitmix64`'s: two shifts and a multiply.
+    #[inline]
+    fn finish(&self) -> u64 {
+        let mut hash = self.hash;
+        hash ^= hash >> 32;
+        hash = hash.wrapping_mul(0xd6e8_feb8_6659_fd93);
+        hash ^= hash >> 32;
+        hash
+    }
+}
+
+/// Builds a [`MonomialHasher`].
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BuildMonomialHasher;
+
+impl BuildHasher for BuildMonomialHasher {
+    type Hasher = MonomialHasher;
+
+    #[inline]
+    fn build_hasher(&self) -> MonomialHasher {
+        MonomialHasher::default()
+    }
+}
 
 /// What one symbolic preprocessing pass cost.
 ///
@@ -79,6 +187,15 @@ pub enum CacheMode {
     Count,
 
     /// Remember the built terms and serve them.
+    ///
+    /// Measured and not implemented. The repetition rate [`CacheMode::Count`] reports is high —
+    /// 43% to 95% of reducer multiples had been built in an earlier batch — so the recurrence the
+    /// preceding milestone expected is real. What it buys is not: a multiple's terms are the basis
+    /// element's monomials each plus the multiplier, which is one integer addition per variable per
+    /// term, and serving them instead costs a hash of the key and a pointer chase to a heap vector.
+    /// Implemented and measured, that made symbolic preprocessing 8% to 50% *slower* on every
+    /// instance above a millisecond. Behaves as [`CacheMode::Count`]; see section 7.2 of
+    /// `docs/MILESTONE-F4-OPTIMIZATION.md`.
     Store,
 }
 
@@ -98,10 +215,10 @@ pub struct ReducerCache<const N: usize, F: FiniteField> {
     mode: CacheMode,
 
     /// Every multiple needed so far, for the repetition measurement. Empty when off.
-    seen: HashSet<(usize, Monomial<N>)>,
+    seen: HashSet<(usize, Monomial<N>), BuildMonomialHasher>,
 
     /// The built terms, under [`CacheMode::Store`] only.
-    terms: HashMap<(usize, Monomial<N>), Vec<(Monomial<N>, F)>>,
+    terms: HashMap<(usize, Monomial<N>), Vec<(Monomial<N>, F)>, BuildMonomialHasher>,
 
     /// Multiples needed that had been needed before.
     repeats: usize,
@@ -114,8 +231,8 @@ impl<const N: usize, F: FiniteField> ReducerCache<N, F> {
     pub fn new(mode: CacheMode) -> Self {
         Self {
             mode,
-            seen: HashSet::new(),
-            terms: HashMap::new(),
+            seen: HashSet::default(),
+            terms: HashMap::default(),
             repeats: 0,
             firsts: 0,
         }
@@ -224,6 +341,12 @@ pub struct MonicElement<const N: usize, F: FiniteField> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MonicBasis<const N: usize, F: FiniteField> {
     elements: Vec<MonicElement<N, F>>,
+
+    /// The order the leading monomials were taken under.
+    ///
+    /// Kept because reducer selection compares them: "the largest leading monomial that divides"
+    /// is not a question about exponent vectors alone.
+    order: MonomialOrder,
 }
 
 impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
@@ -236,7 +359,7 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
     /// # Panics
     /// If any element is the zero polynomial.
     pub fn new(basis: &[MultivariatePolynomial<N, F>], order: MonomialOrder) -> Self {
-        let elements = basis
+        let elements: Vec<MonicElement<N, F>> = basis
             .iter()
             .enumerate()
             .map(|(index, polynomial)| {
@@ -269,7 +392,12 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             })
             .collect();
 
-        Self { elements }
+        Self { elements, order }
+    }
+
+    /// The order the basis was prepared under.
+    pub fn order(&self) -> MonomialOrder {
+        self.order
     }
 
     pub fn len(&self) -> usize {
@@ -290,8 +418,16 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
     /// batch would re-sort every element's terms for nothing.
     ///
     /// # Panics
-    /// If the polynomial is zero.
+    /// If the polynomial is zero, or if `order` is not the order the basis was prepared under —
+    /// which would leave the recorded leading monomials disagreeing with each other.
     pub fn push(&mut self, polynomial: &MultivariatePolynomial<N, F>, order: MonomialOrder) {
+        assert_eq!(
+            order,
+            self.order,
+            "a basis prepared under {} cannot be extended under {}",
+            self.order.name(),
+            order.name()
+        );
         let appended = Self::new(std::slice::from_ref(polynomial), order);
         self.elements.extend(appended.elements);
     }
@@ -304,9 +440,8 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
     /// The first element, in index order, whose leading monomial divides `monomial`, with the
     /// quotient.
     ///
-    /// First-applicable is a deliberately simple reducer-selection policy. It only has to be
-    /// deterministic for the computation to be reproducible; preferring, say, the largest leading
-    /// monomial would give smaller multiples and is an optimization for a later milestone.
+    /// The reference scan for [`ReducerSelection::FirstApplicable`], which any faster lookup has to
+    /// agree with element for element.
     pub fn find_divisor(&self, monomial: &Monomial<N>) -> Option<(usize, Monomial<N>)> {
         self.elements
             .iter()
@@ -316,6 +451,37 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
                     .checked_div(&element.leading_monomial)
                     .map(|quotient| (index, quotient))
             })
+    }
+
+    /// The element whose leading monomial divides `monomial` and is largest under the basis's
+    /// order, with the quotient.
+    ///
+    /// The largest divisor gives the smallest multiplier, hence a multiple whose monomials are the
+    /// fewest steps above the ones already in the matrix — which is the whole hypothesis. Equal
+    /// leading monomials are broken by the smaller basis index, because "largest" alone is not a
+    /// total order on the basis and preprocessing has to be deterministic.
+    ///
+    /// The reference scan for [`ReducerSelection::LargestLeadingMonomial`].
+    pub fn find_largest_divisor(&self, monomial: &Monomial<N>) -> Option<(usize, Monomial<N>)> {
+        let mut best: Option<(usize, Monomial<N>)> = None;
+        for (index, element) in self.elements.iter().enumerate() {
+            let Some(quotient) = monomial.checked_div(&element.leading_monomial) else {
+                continue;
+            };
+            let beats_the_best = match best {
+                None => true,
+                Some((incumbent, _)) => {
+                    self.order.cmp(
+                        &element.leading_monomial,
+                        &self.elements[incumbent].leading_monomial,
+                    ) == Ordering::Greater
+                }
+            };
+            if beats_the_best {
+                best = Some((index, quotient));
+            }
+        }
+        best
     }
 
     /// As [`MonicBasis::find_divisor`], under the given policy, counting the work.
@@ -333,12 +499,8 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         counts: &mut SymbolicCounts,
     ) -> Option<(usize, Monomial<N>)> {
         counts.divisor_queries += 1;
-
         match selection {
-            // The baseline: scan in index order and stop at the first hit. The scan step count is
-            // what an index has to beat, so it is counted exactly — elements examined, which is
-            // one more than the number rejected when the search succeeds.
-            ReducerSelection::FirstApplicable | ReducerSelection::LargestLeadingMonomial => {
+            ReducerSelection::FirstApplicable => {
                 for (index, element) in self.elements.iter().enumerate() {
                     counts.divisor_scan_steps += 1;
                     if let Some(quotient) = monomial.checked_div(&element.leading_monomial) {
@@ -346,6 +508,10 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
                     }
                 }
                 None
+            }
+            ReducerSelection::LargestLeadingMonomial => {
+                counts.divisor_scan_steps += self.elements.len();
+                self.find_largest_divisor(monomial)
             }
         }
     }
@@ -420,7 +586,7 @@ pub struct Preprocessed<const N: usize> {
     ///
     /// This is the set candidate extraction tests against: a pivot whose monomial is in here is a
     /// relation the batch already represented, and only a pivot outside it is new.
-    pub leading_monomials: HashSet<Monomial<N>>,
+    pub leading_monomials: MonomialSet<N>,
 
     /// What finding those rows cost.
     pub counts: SymbolicCounts,
@@ -496,9 +662,9 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
-    let mut covered: HashSet<Monomial<N>> = HashSet::new();
+    let mut covered: MonomialSet<N> = MonomialSet::default();
     // Monomials already tested for reducibility, so no monomial is handled twice.
-    let mut examined: HashSet<Monomial<N>> = HashSet::new();
+    let mut examined: MonomialSet<N> = MonomialSet::default();
     let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
 
     // Both halves of each pair. Their common leading monomial is the lcm, which is therefore
@@ -581,18 +747,17 @@ pub struct RowBudgetExceeded {
 #[cfg(test)]
 mod tests {
     use super::{
-        symbolic_preprocessing, symbolic_preprocessing_within, MonicBasis, Preprocessed,
-        PreprocessedRow, RowBudgetExceeded, RowKind,
+        symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within,
+        BuildMonomialHasher, CacheMode, MonicBasis, MonomialSet, Preprocessed, PreprocessedRow,
+        ReducerCache, RowBudgetExceeded, RowKind, SymbolicCounts,
     };
     use crate::{
         fields::Zp13,
-        grobner::pairs::CriticalPair,
+        grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
         poly::MonomialOrder,
         util::contains_duplicates,
-        {Monomial, MultivariatePolynomial, One},
+        FiniteField, {Monomial, MultivariatePolynomial, One},
     };
-    use std::collections::HashSet;
-
     type F = Zp13;
     const VARS: [&str; 3] = ["x", "y", "z"];
     const ALL_ORDERS: [MonomialOrder; 3] = [
@@ -674,6 +839,65 @@ mod tests {
         );
     }
 
+    /// Largest-leading-monomial selection picks the biggest divisor, which is the smallest multiple.
+    #[test]
+    fn test_find_largest_divisor() {
+        let order = MonomialOrder::Lexicographic;
+        // LM(x*y + 1) = x*y at index 0 and LM(x^2 + 1) = x^2 at index 1, and x^2 > x*y under lex,
+        // so the two policies disagree about x^2*y: first-applicable takes index 0.
+        let basis = MonicBasis::new(&system(&["x*y + 1", "x^2 + 1"]), order);
+        let monomial = Monomial::new(&[2, 1, 0]);
+
+        assert_eq!(
+            basis.find_divisor(&monomial),
+            Some((0, Monomial::new(&[1, 0, 0])))
+        );
+        assert_eq!(
+            basis.find_largest_divisor(&monomial),
+            Some((1, Monomial::new(&[0, 1, 0])))
+        );
+        // Nothing divides y*z^2, under either policy.
+        assert_eq!(basis.find_largest_divisor(&Monomial::new(&[0, 1, 2])), None);
+    }
+
+    /// Equal largest leading monomials are broken by the smaller basis index.
+    #[test]
+    fn test_find_largest_divisor_tiebreak() {
+        for order in ALL_ORDERS {
+            // Both elements lead with x^2, so the policy has to fall back on the index.
+            let basis = MonicBasis::new(&system(&["x^2 + y", "x^2 + z"]), order);
+            assert_eq!(
+                basis.find_largest_divisor(&Monomial::new(&[2, 1, 0])),
+                Some((0, Monomial::new(&[0, 1, 0]))),
+                "{}",
+                order.name()
+            );
+        }
+    }
+
+    /// Each selection policy routes to its own reference scan, and counts one query per lookup.
+    #[test]
+    fn test_find_divisor_with_follows_the_policy() {
+        let order = MonomialOrder::Lexicographic;
+        let basis = MonicBasis::new(&system(&["x*y + 1", "x^2 + 1"]), order);
+        let monomial = Monomial::new(&[2, 1, 0]);
+
+        let mut counts = SymbolicCounts::default();
+        assert_eq!(
+            basis.find_divisor_with(&monomial, ReducerSelection::FirstApplicable, &mut counts),
+            basis.find_divisor(&monomial)
+        );
+        assert_eq!(
+            basis.find_divisor_with(
+                &monomial,
+                ReducerSelection::LargestLeadingMonomial,
+                &mut counts
+            ),
+            basis.find_largest_divisor(&monomial)
+        );
+        assert_eq!(counts.divisor_queries, 2);
+    }
+
     /// Divisor lookup returns the first applicable element and the quotient.
     #[test]
     fn test_find_divisor() {
@@ -722,7 +946,7 @@ mod tests {
         context: &str,
     ) {
         // The recorded set really is the set of row leading monomials.
-        let leads: HashSet<Monomial<3>> = (0..preprocessed.rows.len())
+        let leads: MonomialSet<3> = (0..preprocessed.rows.len())
             .map(|index| preprocessed.leading_monomial(basis, index))
             .collect();
         assert_eq!(
@@ -797,7 +1021,7 @@ mod tests {
             );
             assert_eq!(
                 preprocessed.leading_monomials,
-                HashSet::from([Monomial::new(&[2, 0, 0])]),
+                MonomialSet::from_iter([Monomial::new(&[2, 0, 0])]),
                 "{}",
                 order.name()
             );
@@ -906,6 +1130,253 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The systems the closure invariant is asserted over, matching the fixed corpus.
+    fn closure_corpus() -> Vec<Vec<&'static str>> {
+        vec![
+            vec!["x^2 + y", "x^2 + z"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x^3 - 2*x*y", "x^2*y - 2*y^2 + x"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x^2 + y^2 + z^2", "x*y + y*z"],
+            vec!["x^2 + y + 1", "y^2 + z + 2", "z^2 + x + 3"],
+            vec!["x^2 + y", "x^2 + z", "x^2 + y + z"],
+        ]
+    }
+
+    /// Every pair of the system, which is the widest batch a basis admits.
+    fn every_pair(
+        polynomials: &[MultivariatePolynomial<3, F>],
+        order: MonomialOrder,
+    ) -> Vec<CriticalPair<3>> {
+        let mut pairs = Vec::new();
+        for left in 0..polynomials.len() {
+            for right in (left + 1)..polynomials.len() {
+                pairs.push(CriticalPair::new(polynomials, left, right, order));
+            }
+        }
+        pairs
+    }
+
+    /// The closure invariant holds under every selection policy and every cache mode.
+    #[test]
+    fn test_closure_invariant_under_every_configuration() {
+        for order in ALL_ORDERS {
+            for strings in &closure_corpus() {
+                let polynomials = system(strings);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = every_pair(&polynomials, order);
+
+                for selection in [
+                    ReducerSelection::FirstApplicable,
+                    ReducerSelection::LargestLeadingMonomial,
+                ] {
+                    for mode in [CacheMode::Off, CacheMode::Count, CacheMode::Store] {
+                        let mut cache = ReducerCache::new(mode);
+                        let context = format!(
+                            "{:?} under {} {:?}/{:?}",
+                            strings,
+                            order.name(),
+                            selection,
+                            mode
+                        );
+
+                        let wide = symbolic_preprocessing_with(
+                            &basis,
+                            &pairs,
+                            usize::MAX,
+                            selection,
+                            &mut cache,
+                        )
+                        .expect("unbounded");
+                        assert_closure_invariant(&basis, &wide, &context);
+
+                        for pair in &pairs {
+                            let narrow = symbolic_preprocessing_with(
+                                &basis,
+                                std::slice::from_ref(pair),
+                                usize::MAX,
+                                selection,
+                                &mut cache,
+                            )
+                            .expect("unbounded");
+                            assert_closure_invariant(&basis, &narrow, &context);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Every row is the polynomial its multiplier and basis index say it is.
+    #[test]
+    fn test_rows_round_trip_through_polynomial_arithmetic() {
+        for order in ALL_ORDERS {
+            for strings in &closure_corpus() {
+                let polynomials = system(strings);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = every_pair(&polynomials, order);
+                let preprocessed = symbolic_preprocessing(&basis, &pairs);
+
+                for row in &preprocessed.rows {
+                    // The basis is monic, so the row is the scaled generator times the multiplier.
+                    let scaled = &polynomials[row.basis_index].scale(
+                        &polynomials[row.basis_index]
+                            .leading_coefficient(order)
+                            .inverse(),
+                    );
+                    let expected = scaled * &MultivariatePolynomial::from(row.multiplier);
+                    assert_eq!(
+                        basis.shifted_polynomial(row.basis_index, &row.multiplier),
+                        expected,
+                        "{:?} under {}: row {:?} is not its own polynomial",
+                        strings,
+                        order.name(),
+                        row
+                    );
+                }
+            }
+        }
+    }
+
+    /// A policy's selected divisor fixes the row set, which does not depend on the cache's contents.
+    #[test]
+    fn test_clearing_the_cache_does_not_change_the_rows() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let pairs = every_pair(&polynomials, order);
+
+            for selection in [
+                ReducerSelection::FirstApplicable,
+                ReducerSelection::LargestLeadingMonomial,
+            ] {
+                let mut warm = ReducerCache::new(CacheMode::Store);
+                let expected =
+                    symbolic_preprocessing_with(&basis, &pairs, usize::MAX, selection, &mut warm)
+                        .expect("unbounded");
+
+                // Run again against a warm cache, then against one cleared mid-flight.
+                for _ in 0..3 {
+                    let actual = symbolic_preprocessing_with(
+                        &basis,
+                        &pairs,
+                        usize::MAX,
+                        selection,
+                        &mut warm,
+                    )
+                    .expect("unbounded");
+                    assert_eq!(actual.rows, expected.rows, "{}", order.name());
+                }
+                warm.clear();
+                let after =
+                    symbolic_preprocessing_with(&basis, &pairs, usize::MAX, selection, &mut warm)
+                        .expect("unbounded");
+                assert_eq!(after.rows, expected.rows, "{}", order.name());
+            }
+        }
+    }
+
+    /// Each policy's dispatch returns exactly what its reference scan returns, over random bases.
+    ///
+    /// The differential test any faster lookup has to pass: agreement is not about returning *a*
+    /// divisor but *the* divisor, since a different divisor is a different multiplier and so a
+    /// different matrix row.
+    #[test]
+    fn test_dispatch_agrees_with_the_reference_scans() {
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(20260211);
+        for order in ALL_ORDERS {
+            for _ in 0..60 {
+                // Single-term generators, so the leading monomials are exactly what is drawn, from
+                // a small range so that equal leads and the tiebreaker both occur.
+                let size = rng.gen_range(1..=12);
+                let polynomials: Vec<MultivariatePolynomial<3, F>> = (0..size)
+                    .map(|_| {
+                        let exponents: Vec<u32> = (0..3).map(|_| rng.gen_range(0..=2)).collect();
+                        let mut lead = Monomial::<3>::new(&exponents);
+                        if lead.is_one() {
+                            lead = Monomial::new(&[1, 0, 0]);
+                        }
+                        MultivariatePolynomial::from(lead)
+                    })
+                    .collect();
+                let basis = MonicBasis::new(&polynomials, order);
+
+                for _ in 0..40 {
+                    let exponents: Vec<u32> = (0..3).map(|_| rng.gen_range(0..=4)).collect();
+                    let monomial = Monomial::<3>::new(&exponents);
+                    let mut counts = SymbolicCounts::default();
+                    assert_eq!(
+                        basis.find_divisor_with(
+                            &monomial,
+                            ReducerSelection::FirstApplicable,
+                            &mut counts
+                        ),
+                        basis.find_divisor(&monomial),
+                        "{}: first-applicable disagreed on {}",
+                        order.name(),
+                        monomial
+                    );
+                    assert_eq!(
+                        basis.find_divisor_with(
+                            &monomial,
+                            ReducerSelection::LargestLeadingMonomial,
+                            &mut counts
+                        ),
+                        basis.find_largest_divisor(&monomial),
+                        "{}: largest-leading-monomial disagreed on {}",
+                        order.name(),
+                        monomial
+                    );
+                }
+            }
+        }
+    }
+
+    /// The cheap monomial hasher agrees with equality, and is not degenerate on small exponents.
+    #[test]
+    fn test_monomial_hasher() {
+        use std::collections::hash_map::RandomState;
+        use std::hash::BuildHasher;
+
+        fn hash_of(monomial: &Monomial<4>) -> u64 {
+            BuildMonomialHasher.hash_one(monomial)
+        }
+
+        // Equal monomials hash equally, which is the only thing `Hash` actually requires.
+        let monomials: Vec<Monomial<4>> = (0..8)
+            .flat_map(|a| (0..8).map(move |b| Monomial::new(&[a, b, (a + b) % 5, 0])))
+            .collect();
+        for monomial in &monomials {
+            assert_eq!(
+                hash_of(monomial),
+                hash_of(&Monomial::new(monomial.exponents()))
+            );
+        }
+
+        // And distinctly: the low bits are what `hashbrown` buckets on, and an unfinalized
+        // multiplicative hash leaves them barely mixed. Compare bucket spread against the standard
+        // hasher on the same keys.
+        let mask = 63;
+        let mine: std::collections::HashSet<u64> =
+            monomials.iter().map(|m| hash_of(m) & mask).collect();
+        let standard = RandomState::new();
+        let theirs: std::collections::HashSet<u64> = monomials
+            .iter()
+            .map(|m| standard.hash_one(m) & mask)
+            .collect();
+        assert!(
+            mine.len() * 4 >= theirs.len() * 3,
+            "the low bits spread over {} buckets against the standard hasher's {}",
+            mine.len(),
+            theirs.len()
+        );
     }
 
     /// No row is duplicated: the same multiple is never added twice.
