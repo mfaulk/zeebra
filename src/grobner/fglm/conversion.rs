@@ -839,3 +839,133 @@ mod tests {
         assert_eq!(converted, f4(&generators, TARGET).expect("within limits"));
     }
 }
+
+/// Differential tests against lexicographic bases computed by Singular.
+///
+/// Separate from the module's own tests because the oracle is different in kind: everything there
+/// compares Zeebra against Zeebra, which is strong but shares whatever this crate misunderstands.
+/// Singular's `std` is Buchberger/slimgb lineage, so these are independent in algorithm.
+#[cfg(test)]
+mod singular_reference {
+    use super::{fglm_to_lex, TARGET};
+    use crate::{
+        fields::PrimeFieldElement64,
+        grobner::{f4, fglm::reference_bases},
+        MonomialOrder, MultivariatePolynomial,
+    };
+
+    const SOURCE: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
+
+    /// Convert each reference system from grevlex and compare against Singular's lex basis.
+    ///
+    /// Both sides are the unique reduced lex basis of the ideal, so this is an equality of values
+    /// once they are ordered the same way — Singular lists ascending by leading monomial and
+    /// Zeebra descending.
+    fn check<const N: usize, const P: u64>(cases: &[reference_bases::ReferenceBasis]) {
+        type Poly<const N: usize, const P: u64> = MultivariatePolynomial<N, PrimeFieldElement64<P>>;
+
+        assert!(
+            !cases.is_empty(),
+            "the reference table for this group is empty"
+        );
+
+        for case in cases {
+            assert_eq!(case.prime, P, "{} is over the wrong field", case.name);
+            let variables = <[&str; N]>::try_from(case.variables)
+                .unwrap_or_else(|_| panic!("{} has the wrong variable count", case.name));
+
+            let parse = |source: &str| -> Poly<N, P> {
+                MultivariatePolynomial::parse(source, variables)
+                    .unwrap_or_else(|e| panic!("{}: cannot parse {:?}: {}", case.name, source, e))
+            };
+
+            let system: Vec<Poly<N, P>> = case.system.iter().map(|s| parse(s)).collect();
+            let mut expected: Vec<Poly<N, P>> = case.lex_basis.iter().map(|s| parse(s)).collect();
+
+            let source = f4(&system, SOURCE).expect("within limits");
+            let converted = fglm_to_lex(&source, SOURCE).expect("convertible");
+
+            expected.sort_by(|a, b| {
+                TARGET.cmp(&b.leading_monomial(TARGET), &a.leading_monomial(TARGET))
+            });
+
+            assert_eq!(
+                converted, expected,
+                "{} over GF({}): the conversion disagrees with Singular",
+                case.name, P
+            );
+        }
+    }
+
+    /// Two-variable systems over GF(2^31 - 1), against Singular.
+    #[test]
+    fn test_two_variable_systems_agree_with_singular() {
+        check::<2, 2147483647>(reference_bases::TWO_VARIABLE);
+    }
+
+    /// Three-variable systems over GF(2^31 - 1), against Singular.
+    ///
+    /// Includes cyclic-3, katsura-3, a system not in shape position, and a nonradical one.
+    #[test]
+    fn test_three_variable_systems_agree_with_singular() {
+        check::<3, 2147483647>(reference_bases::THREE_VARIABLE);
+    }
+
+    /// Four-variable systems over GF(2^31 - 1), against Singular.
+    ///
+    /// katsura-4 and a planted system, the latter with a lex basis whose coefficients are large
+    /// enough that agreeing on them by accident is not a possibility.
+    #[test]
+    fn test_four_variable_systems_agree_with_singular() {
+        check::<4, 2147483647>(reference_bases::FOUR_VARIABLE);
+    }
+
+    /// The same algebra over GF(13) and GF(65537), against Singular.
+    ///
+    /// Singular's characteristic must be below 2^31, so it cannot check Zeebra at Goldilocks or
+    /// above. The staircase and the quotient dimension are properties of the ideal rather than of
+    /// the prime, so agreement here plus Zeebra's own cross-field agreement is what carries the
+    /// external evidence to the fields Singular cannot reach. See §9.1 of the milestone document.
+    #[test]
+    fn test_smaller_fields_agree_with_singular() {
+        check::<2, 13>(reference_bases::OVER_GF_13);
+        check::<2, 65537>(reference_bases::OVER_GF_65537);
+    }
+
+    /// Every reference system gives the same quotient dimension at every prime it is stated over.
+    ///
+    /// The cross-field consistency the argument above rests on, checked rather than asserted: the
+    /// four systems common to GF(13), GF(65537) and GF(2^31 - 1) must have identical quotient
+    /// dimensions, since D is a property of the ideal's staircase.
+    #[test]
+    fn test_the_quotient_dimension_is_the_same_at_every_prime() {
+        use crate::grobner::fglm::QuotientBasis;
+
+        fn dimension<const P: u64>(system: &[&str]) -> usize {
+            let polynomials: Vec<MultivariatePolynomial<2, PrimeFieldElement64<P>>> = system
+                .iter()
+                .map(|s| MultivariatePolynomial::parse(s, ["x", "y"]).unwrap())
+                .collect();
+            let basis = f4(&polynomials, SOURCE).expect("within limits");
+            QuotientBasis::new(&basis, SOURCE, usize::MAX)
+                .expect("finite")
+                .dimension()
+        }
+
+        for case in reference_bases::OVER_GF_13 {
+            let small = dimension::<13>(case.system);
+            let medium = dimension::<65537>(case.system);
+            let large = dimension::<2147483647>(case.system);
+            assert_eq!(
+                (small, medium),
+                (large, large),
+                "{} has quotient dimension {} over GF(13), {} over GF(65537) and {} over \
+                 GF(2^31 - 1)",
+                case.name,
+                small,
+                medium,
+                large
+            );
+        }
+    }
+}

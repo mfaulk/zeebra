@@ -17,6 +17,11 @@ mod quotient_algebra;
 mod quotient_basis;
 mod statistics;
 
+/// Lexicographic bases from Singular, for the differential tests. Test-only: it is reference data,
+/// not library code.
+#[cfg(test)]
+mod reference_bases;
+
 pub use conversion::{
     fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
 };
