@@ -4,8 +4,15 @@
 //! the library rather than in `benches/` lets the benchmarks and the tests that compare the
 //! optimized engine against the reference one work from a single definition.
 //!
-//! Both families are zero-dimensional, and both are stated explicitly below so a reader can check
-//! the formulation rather than trust it.
+//! Each family is stated explicitly below so a reader can check the formulation rather than trust
+//! it.
+//!
+//! **Not every instance is zero-dimensional.** Katsura-n is, and so is cyclic-n for squarefree n,
+//! but **cyclic-4 is positive-dimensional** — its grevlex leading-term ideal contains no power of
+//! the last variable. This matters to anything that assumes a finite quotient algebra, such as
+//! FGLM: see `docs/MILESTONE-FGLM-SOLVING.md` §10 for the classification of every instance here,
+//! measured from the leading monomials of a computed basis. A square system is not
+//! zero-dimensional merely for being square.
 
 use crate::{FiniteField, Monomial, MultivariatePolynomial};
 
@@ -164,9 +171,26 @@ mod tests {
     use super::{cyclic, katsura, planted};
     use rand::{prelude::StdRng, SeedableRng};
 
-    use crate::{fields::Zp2147483647, FiniteField, MultivariatePolynomial, Zero};
+    use crate::{
+        fields::Zp2147483647, grobner::f4, FiniteField, MonomialOrder, MultivariatePolynomial, Zero,
+    };
 
     type F = Zp2147483647;
+
+    /// Whether every variable has a positive pure power among the basis's leading monomials,
+    /// which for a proper ideal is equivalent to its quotient algebra being finite-dimensional.
+    fn has_a_pure_power_of_every_variable<const N: usize>(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+    ) -> bool {
+        let leading: Vec<_> = basis.iter().map(|p| p.leading_monomial(order)).collect();
+        (0..N).all(|i| {
+            leading.iter().any(|m| {
+                let e = m.exponents();
+                e[i] > 0 && e.iter().enumerate().all(|(j, v)| j == i || *v == 0)
+            })
+        })
+    }
 
     /// Cyclic-3 is the symmetric system `{x+y+z, xy+xz+yz, xyz-1}`.
     #[test]
@@ -277,6 +301,46 @@ mod tests {
             "the planted point is not among {:?}",
             solutions
         );
+    }
+
+    /// Cyclic-4 is positive-dimensional, which the module doc comment used to deny.
+    ///
+    /// Asserted from the leading monomials of its grevlex basis rather than cited: cyclic-n is
+    /// zero-dimensional only for squarefree n, and 4 is the first exception. Anything that needs a
+    /// finite quotient algebra, FGLM included, must reject this instance rather than assume it.
+    #[test]
+    fn test_cyclic_4_is_positive_dimensional() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&cyclic::<4, F>(), order).expect("within limits");
+        assert!(
+            !has_a_pure_power_of_every_variable(&basis, order),
+            "cyclic-4's leading-term ideal contains a pure power of every variable, so it would \
+             be zero-dimensional after all"
+        );
+    }
+
+    /// Cyclic-3, cyclic-5, and katsura-3 through -5 are zero-dimensional.
+    ///
+    /// The complement of the test above: the families are not uniformly one thing or the other,
+    /// so both halves of the claim are checked.
+    #[test]
+    fn test_the_zero_dimensional_instances_are_zero_dimensional() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        macro_rules! assert_zero_dimensional {
+            ($system:expr, $name:literal) => {{
+                let basis = f4(&$system, order).expect("within limits");
+                assert!(
+                    has_a_pure_power_of_every_variable(&basis, order),
+                    "{} has no pure power of some variable, so it is not zero-dimensional",
+                    $name
+                );
+            }};
+        }
+        assert_zero_dimensional!(cyclic::<3, F>(), "cyclic-3");
+        assert_zero_dimensional!(cyclic::<5, F>(), "cyclic-5");
+        assert_zero_dimensional!(katsura::<3, F>(), "katsura-3");
+        assert_zero_dimensional!(katsura::<4, F>(), "katsura-4");
+        assert_zero_dimensional!(katsura::<5, F>(), "katsura-5");
     }
 
     /// No generator is zero or constant, which would make a family trivially degenerate.

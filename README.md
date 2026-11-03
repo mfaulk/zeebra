@@ -117,6 +117,9 @@ cargo run --release --example pair_criteria        # what each pair criterion di
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example f4_ablation          # every configuration, one table
 cargo run --release --example f4_milestone         # both engines, at matched and default criteria
+cargo run --release --example fglm_baseline        # which systems are zero-dimensional, and what
+                                                   # a lex basis costs against a grevlex one
+cargo run --release --example fglm_baseline -- cyclic-6   # one system per process
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -162,10 +165,17 @@ strategy" below. `buchberger_reach` runs the classical engine on one hard instan
 so an external timeout can bound it, which is how a dash in that table is shown to mean "does not
 finish" rather than "was not tried".
 
+`fglm_baseline` classifies each benchmark system as unit, zero-dimensional, or
+positive-dimensional from the leading monomials of its grevlex basis, reports the dimension `D` of
+`R/I` as a vector space, and times a lex basis against a grevlex one under both engines. It is the
+baseline for the order-conversion work; **cyclic-4 is positive-dimensional**, so FGLM does not
+apply to it, and that is measured rather than assumed.
+
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
-[`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md), and
-[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md).
+[`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md),
+[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md), and
+[`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md).
 
 ## Gröbner Bases
 
