@@ -1,12 +1,13 @@
 # Milestone: FGLM and Zero-Dimensional Polynomial-System Solving
 
-**Status:** M17-0 complete — design approved against the merged M16 code, baseline measured.
+**Status:** M17-1 complete. M17-0 design approved against the merged M16 code and baseline
+measured; classification and the quotient monomial basis implemented.
 **Prerequisite:** M16 on `main` at `494c16e`, CI green. Satisfied.
 
-This document is the M17-0 deliverable: the mathematical design, the API contracts, the resource
-semantics, the test corpus, and the measured baseline the implementation will be judged against.
-It is written against the code as merged, not against the proposal — §3 records where the two
-differ.
+This document began as the M17-0 deliverable — the mathematical design, the API contracts, the
+resource semantics, the test corpus, and the measured baseline the implementation is judged
+against — and is kept current as each sub-milestone lands. It is written against the code as
+merged, not against the proposal; §3 records where the two differ, and §11 tracks what is done.
 
 ---
 
@@ -23,12 +24,13 @@ Buchberger, which is the most expensive way to get it.
 
 The measured case for the milestone is in §10. Two numbers from it:
 
-- **cyclic-6**: grevlex in 12.6 ms, lex in 288 ms with F4 and 378 ms with Buchberger. The source
-  basis costs **23x less** than the target one, and the quotient algebra it has to be converted
+- **cyclic-6**: grevlex in 13.5 ms, lex in 299 ms with F4 and 384 ms with Buchberger. The source
+  basis costs **22x less** than the target one, and the quotient algebra it has to be converted
   through has dimension 156.
-- **katsura-7**: grevlex in 29.4 ms, and **lex does not finish at all** at the default limits — it
-  crosses `max_live_nonzeros` at 20,003,295 live entries. Its quotient algebra has dimension
-  **64**, so the entire conversion fits in well under a megabyte.
+- **katsura-7**: grevlex in 30.5 ms, and **lex does not finish at all** — it crosses
+  `max_live_nonzeros` at 20,003,295 live entries at the default limit, and does not finish at a
+  hundredfold limit either. Its quotient algebra has dimension **64**, so the entire conversion
+  fits in well under a megabyte.
 
 katsura-7 is the milestone's central instance. It is not that FGLM would be faster there; it is
 that the direct route does not arrive.
@@ -396,9 +398,16 @@ The order of `accepted` is the traversal order, which is not a monomial order. T
 and the order alone. Determinism matters here: the coordinate vectors, the multiplication matrices
 and the statistics are all indexed by it.
 
-Cost: `O(D * N * |G|)` divisibility tests of `N` comparisons each. §10 measures it at 0.08 ms for
-cyclic-6's `D = 156`, against 12.6 ms for the basis it starts from — under 1%, so there is no case
-for a cleverer enumeration.
+Cost: `O(D * N * |G|)` divisibility tests of `N` comparisons each. §10 measures it at 0.09 ms for
+cyclic-6's `D = 156`, against 13.5 ms for the basis it starts from — under 1%, so there is no case
+for a cleverer enumeration, and M17-A did not build one.
+
+`max_dimension` does double duty. It is the resource limit, and it is also what makes a walk that
+should never have been started terminate: the pruning is the only thing bounding the frontier, so
+without the limit a caller who reached the walk with a positive-dimensional ideal would loop
+forever. The classification above is the real guard; the limit is the one that does not depend on
+the guard being right. Removing the pruning is the one mutation of this module that hangs the test
+suite rather than failing it, which is how that was established.
 
 ### 5.3 Multiplication operators — M17-B
 
@@ -521,6 +530,7 @@ constructors, and an error enum of crossed limits.
 /// What a Gröbner basis says about the dimension of the ideal it generates.
 pub enum IdealClass { Unit, ZeroDimensional, PositiveDimensional }
 
+/// `PositiveDimensional` covers the zero ideal, whose basis is empty — see §5.1.
 pub fn classify_ideal<const N: usize, F: FiniteField>(
     basis: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
@@ -537,8 +547,15 @@ impl<const N: usize> QuotientBasis<N> {
     ) -> Result<Self, FglmError>;
 
     pub fn dimension(&self) -> usize;
-    pub fn monomials(&self) -> &[Monomial<N>];
+    pub fn monomials(&self) -> &[Monomial<N>];       // ascending under `order`, so [0] is 1
     pub fn index_of(&self, monomial: &Monomial<N>) -> Option<usize>;
+    pub fn order(&self) -> MonomialOrder;
+    pub fn is_empty(&self) -> bool;                  // true exactly for the unit ideal
+}
+
+impl IdealClass {
+    /// `Unit` and `ZeroDimensional`, the two cases with a finite quotient.
+    pub fn is_finite_dimensional(&self) -> bool;
 }
 
 // ---- the quotient algebra ------------------------------------------------- M17-B
@@ -836,8 +853,8 @@ Oracles, in increasing order of independence:
 Buchberger at `PairCriteria::ALL`, fastest of five runs. Rows print as they are measured, so the
 hard instances can be run one per process.
 
-`D` is computed by the frontier walk of §5.2, which M17-A moves into the library; `walk ms` is that
-walk, timed separately from the basis it starts from. **The two engines' lex bases are asserted
+`D` comes from `QuotientBasis::new`; `walk ms` is that enumeration, timed separately from the
+basis it starts from. **The two engines' lex bases are asserted
 equal wherever both ran.**
 
 | system | ideal | D | grevlex ms | &#124;G&#124; | walk ms | lex f4 ms | &#124;G&#124; | lex bb ms | lex f4 / grevlex |
@@ -919,14 +936,14 @@ this.
 
 ## 11. Sub-milestones and merge gates
 
-| PR | content | gate |
-|---|---|---|
-| M17-0 | this document, the corrected `benchmark_systems` doc comment, `examples/fglm_baseline.rs` | design reviewed, baseline reproducible |
-| M17-1 | `classify_ideal`, `QuotientBasis` | correct classification on §9's cases, bounded enumeration |
-| M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms |
-| M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases |
-| M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced |
-| M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied |
+| PR | content | gate | status |
+|---|---|---|---|
+| M17-0 | this document, the corrected `benchmark_systems` doc comment, `examples/fglm_baseline.rs` | design reviewed, baseline reproducible | **merged**, `31b72c9` |
+| M17-1 | `classify_ideal`, `QuotientBasis` | correct classification on §9's cases, bounded enumeration | **done** |
+| M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms | next |
+| M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | |
+| M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | |
+| M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | |
 
 Each PR compiles and tests independently. The order is forced by the mathematics: each stage
 establishes the invariant the next one assumes.
