@@ -8,6 +8,7 @@ pub mod pairs;
 pub mod reference;
 mod s_polynomial;
 mod solve;
+mod solve_zero_dimensional;
 
 pub use buchberger::{
     buchberger, buchberger_with_criteria, buchberger_with_statistics, Statistics,
@@ -24,3 +25,7 @@ pub use fglm::{
 pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue};
 pub use s_polynomial::s_polynomial;
 pub use solve::solve;
+pub use solve_zero_dimensional::{
+    solve_one, solve_one_with_options, solve_zero_dimensional, solve_zero_dimensional_with_options,
+    SolveError, SolveOptions, SolveStrategy,
+};

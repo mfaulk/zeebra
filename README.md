@@ -122,6 +122,7 @@ cargo run --release --example fglm_baseline        # which systems are zero-dime
 cargo run --release --example fglm_baseline -- cyclic-6   # one system per process
 cargo run --release --example fglm_operators      # how sparse the multiplication operators are
 cargo run --release --example fglm_conversion      # the FGLM pipeline against direct lex F4
+cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -306,6 +307,53 @@ basis rather than an error if it is not.** Use `fglm_to_lex_checked` for input o
 provenance; it verifies Buchberger's criterion first, which costs 0.6x to 27x what computing the
 basis cost, and that is why it is not the default. `grobner::is_grobner_basis` is the check on its
 own.
+
+### Solving zero-dimensional systems
+
+`grobner::solve_one` finds one solution and stops; `grobner::solve_zero_dimensional` finds every
+distinct one. Both refuse a system that is not zero-dimensional rather than enumerating the field,
+and both report every failure as a `Result`:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::fields::Zp2147483647;
+use zeebra::grobner::{solve_one, SolveError};
+use zeebra::{MultivariatePolynomial, Zero};
+
+type F = Zp2147483647;
+let mut rng = StdRng::seed_from_u64(1);
+
+// Two equations, two unknowns, finitely many solutions.
+let system: Vec<MultivariatePolynomial<2, F>> = ["x^2 - 4", "y - x"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, ["x", "y"]).unwrap())
+    .collect();
+let point = solve_one(&system, &mut rng).unwrap().expect("a solution exists");
+assert!(system.iter().all(|p| p.eval(&point).is_zero()));
+
+// A curve has infinitely many solutions, so it is refused rather than enumerated.
+let curve: Vec<MultivariatePolynomial<2, F>> =
+    vec![MultivariatePolynomial::parse("x*y - 1", ["x", "y"]).unwrap()];
+assert_eq!(solve_one(&curve, &mut rng), Err(SolveError::PositiveDimensional));
+```
+
+`Ok(None)` means the system is zero-dimensional and has **no solution over the base field** — which
+is an answer, not a failure. `x^2 + 1` over GF(3) has quotient dimension two and no point in GF(3).
+Only `Err` means the computation could not be completed, and `SolveOptions` bounds it: search
+branches, returned solutions, and the F4 and FGLM limits underneath. An exceeded budget is an error
+rather than a truncated list.
+
+`solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
+and barely depends on how many solutions exist, while enumerating them all scales with the count —
+on a 14-variable system with 16384 solutions that is 1.9 ms against 1.6 s, a factor of **830**.
+
+The older `grobner::solve` is unchanged and still the right call for a positive-dimensional system,
+which it handles by enumerating the field.
+
+**Neither strategy dominates.** `SolveStrategy::GrevlexF4ThenFglm` is the only route to katsura-7,
+whose lex basis crosses F4's limits; `SolveStrategy::DirectLexF4`, the default, is the only route to
+planted-12 and planted-14, whose quotient algebras are too large to build. `cargo run --release
+--example solve_one` shows both failures.
 
 Whether conversion is worth doing depends entirely on the system —
 `cargo run --release --example fglm_conversion` measures it. On cyclic-6 the pipeline is **7.4x**

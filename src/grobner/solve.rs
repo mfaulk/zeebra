@@ -134,7 +134,10 @@ fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 /// A lex basis is triangular, so once the deeper variables are substituted at least one
 /// polynomial is usually univariate in this one. Its roots are the only possible values, which
 /// replaces a sweep of the whole field with a handful of candidates.
-fn candidate_values<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+///
+/// Shared with [`super::solve_zero_dimensional`], which needs the same candidates under a stricter
+/// contract: for a zero-dimensional ideal this never returns `None`. See that module for why.
+pub(crate) fn candidate_values<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
     basis: &[MultivariatePolynomial<N, F>],
     index: usize,
     rng: &mut R,
@@ -159,7 +162,7 @@ fn candidate_values<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 }
 
 /// `p` as a polynomial in variable `index` alone, or `None` if another variable appears in it.
-fn as_univariate<const N: usize, F: FiniteField>(
+pub(crate) fn as_univariate<const N: usize, F: FiniteField>(
     p: &MultivariatePolynomial<N, F>,
     index: usize,
 ) -> Option<UnivariatePolynomial<F>> {
@@ -201,7 +204,9 @@ fn enumerate_all<const N: usize, F: FiniteField>(
 }
 
 /// True if the polynomial is a constant other than zero, i.e. an unsatisfiable equation.
-fn is_nonzero_constant<const N: usize, F: FiniteField>(p: &MultivariatePolynomial<N, F>) -> bool {
+pub(crate) fn is_nonzero_constant<const N: usize, F: FiniteField>(
+    p: &MultivariatePolynomial<N, F>,
+) -> bool {
     p.is_constant() && !p.is_zero()
 }
 
