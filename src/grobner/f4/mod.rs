@@ -20,6 +20,7 @@
 //! Journal of Pure and Applied Algebra 139, 61-88, and `docs/MILESTONE-F4.md` for the invariants
 //! this implementation is built on.
 
+pub mod divisors;
 pub mod macaulay;
 pub mod observer;
 pub mod options;

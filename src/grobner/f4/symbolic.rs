@@ -30,7 +30,10 @@ use std::{
 };
 
 use crate::{
-    grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
+    grobner::{
+        f4::{divisors::DivisorIndex, options::ReducerSelection},
+        pairs::CriticalPair,
+    },
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
@@ -233,6 +236,9 @@ pub struct MonicBasis<const N: usize, F: FiniteField> {
     /// Kept because reducer selection compares them: "the largest leading monomial that divides"
     /// is not a question about exponent vectors alone.
     order: MonomialOrder,
+
+    /// The leading monomials, arranged for divisibility queries. See [`DivisorIndex`].
+    index: DivisorIndex<N>,
 }
 
 impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
@@ -278,7 +284,16 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             })
             .collect();
 
-        Self { elements, order }
+        let mut index = DivisorIndex::new(order);
+        for element in &elements {
+            index.push(element.leading_monomial);
+        }
+
+        Self {
+            elements,
+            order,
+            index,
+        }
     }
 
     /// The order the basis was prepared under.
@@ -315,6 +330,9 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             order.name()
         );
         let appended = Self::new(std::slice::from_ref(polynomial), order);
+        for element in &appended.elements {
+            self.index.push(element.leading_monomial);
+        }
         self.elements.extend(appended.elements);
     }
 
@@ -385,28 +403,12 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         counts: &mut SymbolicCounts,
     ) -> Option<(usize, Monomial<N>)> {
         counts.divisor_queries += 1;
-
-        match selection {
-            // Scan in index order and stop at the first hit. The scan step count is what an index
-            // has to beat, so it is counted exactly — elements examined, which is one more than
-            // the number rejected when the search succeeds.
-            ReducerSelection::FirstApplicable => {
-                for (index, element) in self.elements.iter().enumerate() {
-                    counts.divisor_scan_steps += 1;
-                    if let Some(quotient) = monomial.checked_div(&element.leading_monomial) {
-                        return Some((index, quotient));
-                    }
-                }
-                None
-            }
-
-            // No early exit: the largest divisor is not known until every element has been tested,
-            // which is the cost this policy trades for a smaller multiplier.
-            ReducerSelection::LargestLeadingMonomial => {
-                counts.divisor_scan_steps += self.elements.len();
-                self.find_largest_divisor(monomial)
-            }
-        }
+        self.index.find(
+            &self.elements,
+            monomial,
+            selection,
+            &mut counts.divisor_scan_steps,
+        )
     }
 
     /// True if some basis element's leading monomial divides `monomial`.
