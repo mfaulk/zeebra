@@ -55,3 +55,11 @@ harness = false
 [[bench]]
 name = "f4_stages"
 harness = false
+
+[[bench]]
+name = "fglm"
+harness = false
+
+[[bench]]
+name = "polynomial_solving"
+harness = false

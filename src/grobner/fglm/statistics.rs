@@ -35,3 +35,19 @@ pub struct FglmStatistics {
     /// Row subtractions performed by the dependence test. Each touches `2 * D` entries.
     pub span_row_operations: usize,
 }
+
+impl FglmStatistics {
+    /// Bytes the conversion's representations needed, at 8 bytes per field element.
+    ///
+    /// The operators at 16 bytes an entry — a `usize` index and an element — plus the dependence
+    /// test's two `D`-column blocks at 8 bytes a cell.
+    ///
+    /// **An estimate of what this crate stores, not a measurement of the process.** It ignores
+    /// allocator overhead, the source basis, and F4's own peak while computing it. The same
+    /// distinction `FglmOptions` draws between representation limits and memory limits.
+    pub fn estimated_bytes(&self) -> usize {
+        let operators = self.operator_entries * 16;
+        let span = 2 * self.quotient_dimension * self.quotient_dimension * 8;
+        operators + span
+    }
+}

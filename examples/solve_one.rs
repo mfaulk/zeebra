@@ -35,8 +35,14 @@ fn millis(d: Duration) -> f64 {
 
 /// What one strategy did with one system.
 enum Outcome {
-    /// Milliseconds to the first point, milliseconds to every point, and how many there were.
-    Solved { first: f64, all: f64, count: usize },
+    /// Timings, the point count, and the branches each search charged.
+    Solved {
+        first: f64,
+        all: f64,
+        count: usize,
+        first_branches: usize,
+        all_branches: usize,
+    },
     /// No point over the base field. Not a failure — the ideal can still be zero-dimensional.
     NoBaseFieldPoint { millis: f64 },
     /// A limit was crossed, or the system is out of scope.
@@ -60,6 +66,18 @@ impl Outcome {
         }
     }
 
+    /// Branches charged finding one point, against finding all of them.
+    fn branches(&self) -> String {
+        match self {
+            Self::Solved {
+                first_branches,
+                all_branches,
+                ..
+            } => format!("{} / {}", first_branches, all_branches),
+            _ => "—".to_string(),
+        }
+    }
+
     fn verdict(&self) -> String {
         match self {
             Self::Solved { count, .. } => format!("{} points", count),
@@ -79,8 +97,8 @@ fn attempt<const N: usize>(
     let mut rng = StdRng::seed_from_u64(seed);
 
     let at = Instant::now();
-    let one = match solve_one_with_options(system, &mut rng, &options) {
-        Ok(found) => found,
+    let (one, one_statistics) = match solve_one_with_options(system, &mut rng, &options) {
+        Ok(result) => result,
         Err(e) => return Outcome::Failed(e.to_string()),
     };
     let first = millis(at.elapsed());
@@ -100,16 +118,19 @@ fn attempt<const N: usize>(
     }
 
     let at = Instant::now();
-    let all = match solve_zero_dimensional_with_options(system, &mut rng, &options) {
-        Ok(found) => found,
-        Err(e) => return Outcome::Failed(e.to_string()),
-    };
+    let (all, all_statistics) =
+        match solve_zero_dimensional_with_options(system, &mut rng, &options) {
+            Ok(result) => result,
+            Err(e) => return Outcome::Failed(e.to_string()),
+        };
     let every = millis(at.elapsed());
 
     Outcome::Solved {
         first,
         all: every,
         count: all.len(),
+        first_branches: one_statistics.branches,
+        all_branches: all_statistics.branches,
     }
 }
 
@@ -120,11 +141,12 @@ fn report<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>], s
     ] {
         let outcome = attempt(system, strategy, seed);
         println!(
-            "| {:<11} | {:<6} | {:>11} | {:>11} | {:<34} |",
+            "| {:<11} | {:<6} | {:>11} | {:>11} | {:>15} | {:<34} |",
             name,
             label,
             outcome.first(),
             outcome.all(),
+            outcome.branches(),
             outcome.verdict(),
         );
     }
@@ -132,15 +154,16 @@ fn report<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>], s
 
 fn header() {
     println!(
-        "| {:<11} | {:<6} | {:>11} | {:>11} | {:<34} |",
-        "system", "route", "first ms", "all ms", "result"
+        "| {:<11} | {:<6} | {:>11} | {:>11} | {:>15} | {:<34} |",
+        "system", "route", "first ms", "all ms", "branches 1/all", "result"
     );
     println!(
-        "|{}|{}|{}|{}|{}|",
+        "|{}|{}|{}|{}|{}|{}|",
         "-".repeat(13),
         "-".repeat(8),
         "-".repeat(13),
         "-".repeat(13),
+        "-".repeat(17),
         "-".repeat(36)
     );
 }
@@ -170,6 +193,9 @@ fn main() {
     let point: Vec<F> = (0..14).map(|i| F::new(2 * i as u64 + 3)).collect();
     report("planted-14", &planted::<14, F>(&point), 10);
 
+    println!();
+    println!("`branches 1/all` is candidate assignments charged, which separates the search's");
+    println!("own cost from the Gröbner basis in front of it.");
     println!();
     println!("`first ms` is time to one point, `all ms` to every distinct point. The two are");
     println!("close on most rows because the Gröbner basis dominates and the search is almost");

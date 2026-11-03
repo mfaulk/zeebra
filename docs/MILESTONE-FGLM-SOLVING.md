@@ -1,7 +1,9 @@
 # Milestone: FGLM and Zero-Dimensional Polynomial-System Solving
 
-**Status:** M17-4 complete — a system goes in and a verified solution comes out. The conversion
-agrees with Singular on 29 reference bases, and both solving routes are measured. Design approved against the merged M16 code,
+**Status:** M17 complete. A system goes in and a verified solution comes out, by either of two
+routes, under budgets that fail with a structured error. The conversion agrees with direct lex F4,
+with both classical engines, and with 29 bases from Singular. §14 is the report; §12 marks each
+acceptance criterion, including the two that are not met. Design approved against the merged M16 code,
 baseline measured, and classification, the quotient monomial basis, the quotient algebra, the
 incremental dependence test and the FGLM conversion all implemented and measured end to end.
 **Prerequisite:** M16 on `main` at `494c16e`, CI green. Satisfied.
@@ -1175,6 +1177,32 @@ dimension, `4^(N/2)` — 64, 1024, 4096, 16384. So those ideals are radical and 
 rational, which is why they are a good witness corpus and a poor multiplicity corpus. The
 nonradical cases in §9 carry that part.
 
+### 10.4 Branch counts, which say it without a clock
+
+`SolveStatistics::branches` counts candidate assignments tried. From the same run:
+
+| system | N | points | branches for one | branches for all |
+|---|---|---|---|---|
+| katsura-3 | 3 | 4 | 3 | 12 |
+| cyclic-3 | 3 | 6 | 3 | 15 |
+| katsura-6 | 6 | 2 | 6 | 12 |
+| katsura-7 | 7 | 5 | 7 | 35 |
+| planted-6 | 6 | 64 | 6 | 168 |
+| planted-10 | 10 | 1024 | 10 | 2,728 |
+| planted-12 | 12 | 4096 | 12 | 10,920 |
+| planted-14 | 14 | 16384 | 14 | 43,688 |
+
+**Finding one solution costs exactly `N` branches on every instance in the corpus, and finding all
+of them costs about 2.7 times the solution count.** So the search's own cost for one point is
+linear in the variable count and *independent of how many solutions exist* — which is the same
+conclusion §10.3 reached from the clock, obtained without timing anything.
+
+One honest consequence: `N` branches means **no backtracking happened on any corpus instance** —
+the first candidate at every level extended to a full point every time. Backtracking is exercised
+by a constructed case instead, `<y^2 - 1, x^2 - y - 1>` over GF(5), where `y = 1` leads to
+`x^2 = 2` with no root in the field. The corpus does not happen to contain a system that needs it,
+and saying so is better than implying the 14 above is evidence that it works.
+
 ---
 
 ## 11. Sub-milestones and merge gates
@@ -1186,7 +1214,7 @@ nonradical cases in §9 carry that part.
 | M17-2 | `QuotientAlgebra`, `MultiplicationOperator` | operators commute, generators vanish, columns agree with normal forms | **done** |
 | M17-3 | `IncrementalSpan`, `fglm_to_lex` | exact equality with direct lex F4 and with the committed external bases | **done** — 29 Singular bases, §9.1 |
 | M17-4 | `solve_one`, `solve_zero_dimensional` | exhaustive-search and planted-witness agreement, budgets enforced | **done** — §10.3 |
-| M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | next |
+| M17-5 | benchmarks and the milestone report | measurements reproducible, §12 satisfied | **done** — §12, §14 |
 
 Each PR compiles and tests independently. The order is forced by the mathematics: each stage
 establishes the invariant the next one assumes.
@@ -1198,28 +1226,73 @@ verifier can proceed in parallel once this document is approved.
 
 ## 12. Acceptance criteria
 
-**Correctness.** Classification correct on every case in §9, including the unit ideal and the zero
-ideal. Standard monomials are the quotient basis, deterministic, and bounded. Operators agree with
-normal forms and commute. Dependence coefficients verified by reconstruction. FGLM preserves the
-ideal in both directions and preserves multiplicities. Output is the unique reduced lex basis.
-Positive-dimensional input is rejected before any unbounded enumeration.
+Each criterion from M17-0, with where it is met or why it is not.
 
-**Solving.** `solve_one` finds a point when one exists and backtracks when it must. `Ok(None)` and
-`Err` are never confused. All-solutions is complete or an error, never truncated. Points verified
-against the original generators. `grobner::solve` unchanged. Every new entry point bounded.
+### Mathematical correctness
 
-**Engineering.** Stable Rust. F4 and Buchberger APIs untouched. Polynomial representation
-unchanged. No external algebra system in CI. Fast tests in ordinary CI, the heavy differential
-comparisons in the release job. `cargo fmt --check` and `cargo clippy --all-targets --all-features`
-clean.
+- [x] **Classification correct on every case in §9**, unit ideal and zero ideal included.
+      `classify_ideal`, tested across all three orders.
+- [x] **Standard monomials are the quotient basis**, deterministic and bounded. Also checked to be
+      closed downwards, and `D` checked to be independent of the monomial order — a real
+      cross-check, since the monomial *sets* differ between lex and grevlex.
+- [x] **Operators agree with normal forms and commute.** Each column compared against an
+      independently computed `normal_form`, not against `coordinates`, which would reuse the same
+      reduction.
+- [x] **Dependence coefficients verified by reconstruction**, on every reported dependence, and the
+      rank compared against textbook dense Gaussian elimination.
+- [x] **FGLM preserves the ideal**, checked in both directions by reduction as well as by equality
+      of reduced bases.
+- [x] **Multiplicities preserved.** `<x^2, y^2>` converts to `{x^2, y^2}` and explicitly not to
+      `{x, y}`; `T_x` is nonzero and nilpotent, so the nonradical structure survives in the
+      operators too.
+- [x] **Output is the unique reduced lex basis**, with monicity and reducedness asserted term by
+      term — and **no interreduction pass**, for the reason argued in §5.5.
+- [x] **Agrees with direct lex F4** from all three source orders, with `buchberger`, with the naive
+      `buchberger_reference`, and with **29 Singular bases** (§9.1).
+- [x] **Positive-dimensional input rejected before any unbounded enumeration**, cyclic-4 included.
 
-**Performance.** All three pipelines measured on identical inputs: lex Buchberger, lex F4, and
-grevlex F4 plus FGLM. Conversion timed separately from basis computation. `D`, operator storage and
-linear-algebra counts recorded. Time to first solution and to all solutions reported separately.
-**Cases where FGLM loses are documented rather than omitted** — a universal speedup is not the
-criterion and will not be obtained. Resource-limit behaviour verified.
+### Solving
 
----
+- [x] **`solve_one` finds a point when one exists**, and **backtracks** when it must (§10.4 names
+      the constructed case, since the corpus does not need it).
+- [x] **`Ok(None)` and `Err` are never confused.** `x^2 + 1` over GF(3) is zero-dimensional with
+      quotient dimension two and no base-field point, and that is `Ok(None)`.
+- [x] **All-solutions is complete or an error**, never truncated.
+- [x] **Points verified against the original generators**, not against any basis derived from them.
+- [x] **`grobner::solve` unchanged** — signature, semantics, and its panic on a free variable over a
+      large field — with a test that the two agree on zero-dimensional systems.
+- [x] **Every new entry point bounded**, and each budget tested as a structured error.
+
+### Engineering
+
+- [x] Stable Rust. F4 and Buchberger APIs untouched. Polynomial representation unchanged.
+- [x] **No external algebra system at CI runtime.** Singular is a development-time tool; its output
+      is committed as literals and regenerable with one command.
+- [x] Fast tests in ordinary CI; the release job runs the same suite in release.
+- [x] `cargo fmt --all --check` and `cargo clippy --all-targets --all-features -- -D warnings`
+      clean.
+- [ ] **Not met: there is no independent confirmation above 2^31.** Singular's characteristic must
+      be a prime below 2^31, and msolve and giac share that ceiling. §9.1 states what the corpus
+      can and cannot transfer.
+
+### Performance
+
+- [x] **All three pipelines measured on identical inputs** — lex Buchberger (§10), lex F4, and
+      grevlex F4 plus FGLM (§10.2) — with the bases asserted equal wherever both exist.
+- [x] **Conversion timed separately from basis computation**, and its stages separately again,
+      which is how the quotient-algebra construction was found to dominate.
+- [x] **`D`, operator storage, and linear-algebra counts recorded**, in `FglmStatistics` and in
+      `examples/fglm_operators`.
+- [x] **Time to first solution and to all solutions reported separately** (§10.3), and the branch
+      counts behind them (§10.4).
+- [x] **Cases where FGLM loses are documented** — eight of eleven instances in §10.2, by up to 65x,
+      and two systems it cannot convert at all in §10.3.
+- [x] Resource-limit behaviour verified for every option.
+- [ ] **Partly met: memory is estimated, not measured.** `FglmStatistics::estimated_bytes` reports
+      what the conversion stores; process memory is not instrumented, exactly as M16 reported peak
+      live nonzeros rather than RSS. §8's distinction between representation limits and memory
+      limits is the reason, not an excuse — but it does mean no figure here bounds what a
+      conversion will actually cost a machine.
 
 ## 13. Risks
 
@@ -1235,7 +1308,59 @@ criterion and will not be obtained. Resource-limit behaviour verified.
 
 ---
 
-## 14. References
+## 14. Definition of done, and what to do next
+
+Zeebra can take a zero-dimensional polynomial system over a supported finite field and return a
+verified solution, by either of two routes, under budgets that fail with a structured error rather
+than a panic or a partial answer. The conversion agrees with direct lex F4, with both classical
+engines, and with 29 bases from an independent computer-algebra system. **That is the milestone.**
+
+The result worth quoting is **katsura-7**: 68 ms for the conversion pipeline and 91 ms to a
+verified solution, where direct lex F4 returns no basis at its default limit and does not finish at
+a hundredfold limit in thirteen minutes. The milestone's value is a capability, not a speedup — on
+eight of eleven instances the direct route is faster, by up to 65x.
+
+### 14.1 Known limitations
+
+- **The quotient-algebra construction dominates the conversion**, not the linear algebra: 36 ms of
+  katsura-7's 38 ms. The `O(N D^3)` term that the design was budgeted around does not dominate
+  anywhere in this corpus.
+- **The sparse operator representation does not pay on the katsura family.** 56–59% fill at 16
+  bytes an entry against 8 bytes a dense cell, so a dense matrix would be smaller there, while on
+  planted-8 the sparse form wins by 146x. No per-operator choice is made.
+- **No independent oracle above 2^31**, and no free system can provide one. §9.1.
+- **`fglm_to_lex` returns a wrong basis, not an error, on a non-Gröbner input.** Verification costs
+  0.6x to 27x what computing the basis cost, so it is opt-in. §9.1.
+- **No automatic strategy selection**, and §10.3 is the reason: each route has a system at a
+  comparable size the other cannot do, so a heuristic would have to predict which *resource* runs
+  out.
+- **`grobner::solve` still uses `buchberger`** and still has no `Result`. M16 §9.1 recorded this and
+  it is unchanged; the new entry points are a separate API rather than a migration.
+- **Single-threaded**, like everything else in the crate.
+- **No 128-bit field measurement**, unchanged from M15 and M16.
+- **`N` is still a const generic.**
+- **The corpus does not exercise backtracking.** §10.4.
+
+### 14.2 Recommendations for the next milestone, in the order the measurements support
+
+1. **Operator construction**, which is 95% of the conversion on katsura-7. The cost is `N * D`
+   columns, 72% of which need a `normal_form` against the source basis. Reducing many monomials
+   against one basis at once is the shape F4 already exploits for its Macaulay matrices, and
+   nothing here does.
+2. **A dense or hybrid operator column**, chosen per operator from the measured fill. §7.2 has the
+   evidence and deliberately does not act on it.
+3. **A strategy heuristic keyed on `D`**, which is now cheap to obtain — a grevlex basis plus the
+   standard monomial walk is under 1% of the conversion. The open question is not whether `D`
+   predicts the winner but whether it predicts *reachability*, which is what §10.3 showed matters.
+4. **Give `solve` the criteria, then switch it to F4.** Still the cheap half of M16 §9.2's third
+   recommendation, still untouched, and now with a fallible sibling to migrate toward.
+5. **Sparse FGLM**, Faugère and Mou (2017), which exploits the structure of the multiplication
+   matrices rather than treating them as dense maps. Out of scope for M17 by design, and the
+   natural successor once operator construction is faster.
+6. **Larger prime fields**, where the project's longer-term workloads live and where no external
+   oracle exists.
+
+## 15. References
 
 1. Faugère, J.-C., Gianni, P., Lazard, D., Mora, T. (1993). *Efficient Computation of
    Zero-dimensional Gröbner Bases by Change of Ordering.* Journal of Symbolic Computation 16(4),
@@ -1246,7 +1371,9 @@ criterion and will not be obtained. Resource-limit behaviour verified.
    538–569. <https://doi.org/10.1016/j.jsc.2016.07.025> — out of scope for M17.
 4. Macaulay2, *FGLM — Compute Gröbner bases via the FGLM algorithm.*
    <https://macaulay2.com/doc/Macaulay2-1.25.05/share/doc/Macaulay2/FGLM/html/index.html>
-5. The preceding milestones: [`MILESTONE-F4.md`](MILESTONE-F4.md) and
+5. Singular 4.4.1, <https://www.singular.uni-kl.de/> — the reference bases of §9.1, generated by
+   `tools/reference_bases.sing`. Read as an oracle only; no code is taken from it.
+6. The preceding milestones: [`MILESTONE-F4.md`](MILESTONE-F4.md) and
    [`MILESTONE-F4-OPTIMIZATION.md`](MILESTONE-F4-OPTIMIZATION.md), whose §9.2 ranks FGLM fourth
    among the next milestone's candidates and explains why grevlex becoming F4's best order made it
    more attractive than it was.

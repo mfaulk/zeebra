@@ -21,6 +21,7 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Sparse Linear Algebra over Finite Fields
 - [x] F4 Grobner Bases
 - [x] Gebauer-Moller and chain criteria, structured elimination, adaptive linear algebra
+- [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -87,6 +88,8 @@ cargo bench                              # everything
 cargo bench --bench grobner              # one suite
 cargo bench --bench sparse_linear_algebra
 cargo bench --bench f4_stages
+cargo bench --bench fglm                 # order conversion: stages, pipeline, verification
+cargo bench --bench polynomial_solving   # one solution against all of them, both routes
 ```
 
 `sparse_linear_algebra` has two groups, and the difference between them matters. `sparse_linalg`
