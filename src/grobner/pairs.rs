@@ -15,7 +15,10 @@
 //! [`PairCriteria`] — are statements about the leading-term ideal, so they need the whole basis's
 //! leading monomials at once and nothing else.
 
-use std::{cmp::Reverse, collections::BinaryHeap};
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashSet},
+};
 
 use crate::{poly::MonomialOrder, FiniteField, Monomial, MultivariatePolynomial};
 
@@ -101,6 +104,17 @@ impl<const N: usize> CriticalPair<N> {
     }
 }
 
+/// True if `a` divides `b`, i.e. `a`'s exponent of every variable is at most `b`'s.
+///
+/// `Monomial::checked_div` answers the same question but builds the quotient to do it. The
+/// criteria ask it of every basis element against every pair's lcm and never want the quotient.
+pub fn divides<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
+    a.exponents()
+        .iter()
+        .zip(b.exponents().iter())
+        .all(|(x, y)| x <= y)
+}
+
 /// True if two monomials share no variable, i.e. their lcm is their product.
 pub fn are_relatively_prime<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) -> bool {
     a.exponents()
@@ -133,13 +147,13 @@ pub struct PairCriteria {
     /// lcm alone is not a sufficient condition, and acting on it alone returns an incomplete basis
     /// that a fixed test corpus will often fail to notice.
     ///
-    /// Not yet implemented; the flag exists so that the option surface is complete before the
-    /// implementation lands. Setting it currently changes nothing.
+    /// Applied when a batch is selected, by [`PairQueue::filter_batch`] and
+    /// [`PairQueue::is_discarded`]. See those for the exact condition and its citation.
     pub chain: bool,
 
     /// Gebauer–Möller pair-set minimization, applied as pairs are inserted.
     ///
-    /// Not yet implemented, as [`PairCriteria::chain`].
+    /// See [`PairQueue::push_pairs_from_leads`] for the three conditions and their citation.
     pub gebauer_moller: bool,
 }
 
@@ -188,7 +202,12 @@ pub struct CriterionCounts {
     /// Discarded by the chain criterion.
     pub chain: usize,
 
-    /// Discarded by Gebauer–Möller, i.e. never inserted into the queue.
+    /// Discarded by Gebauer–Möller: never inserted into the queue, or removed from it unselected.
+    ///
+    /// Includes Gebauer–Möller's criterion F, which is Buchberger's first criterion applied to a
+    /// new pair at insertion time. It is counted here rather than under `product` so that
+    /// `product` keeps meaning what the baseline measured — pairs eliminated after being
+    /// selected — and so that `pairs_considered` still bounds it.
     pub gebauer_moller: usize,
 }
 
@@ -211,10 +230,35 @@ impl CriterionCounts {
 /// A min-heap, so adding the pairs of a newly found basis element costs a logarithmic insertion
 /// each rather than a rescan of every pair. This is what makes pair processing incremental: the
 /// textbook formulation rebuilds every pair on every pass.
+/// A pair's identity: its two basis indices, smaller first.
+type PairKey = (usize, usize);
+
 #[derive(Debug, Clone, Default)]
 pub struct PairQueue<const N: usize> {
     // `Reverse` turns the max-heap into a min-heap.
     pending: BinaryHeap<Reverse<CriticalPair<N>>>,
+
+    /// Pairs Gebauer–Möller removed from the pending set, whose heap entry is still there.
+    ///
+    /// A binary heap cannot delete an interior element, and rebuilding it per removal would make
+    /// insertion quadratic. The entry is instead left in place and skipped when it reaches the
+    /// top, which is the standard lazy deletion. Empty unless Gebauer–Möller is enabled.
+    removed: HashSet<PairKey>,
+
+    /// Pairs that have been selected and whose batch has been processed.
+    ///
+    /// This is the chain criterion's "already handled". See [`PairQueue::is_discarded`] for why it
+    /// is this set and not "absent from the pending set". Empty unless the chain criterion is
+    /// enabled, since nothing else reads it.
+    handled: HashSet<PairKey>,
+
+    /// Pairs in the pending set: heap entries less the lazily deleted ones.
+    live: usize,
+
+    /// Whether to record handled pairs, which only the chain criterion needs.
+    ///
+    /// Set from the criteria the queue is driven with, which are fixed for a computation.
+    track_handled: bool,
 }
 
 impl<const N: usize> PairQueue<N> {
@@ -222,6 +266,10 @@ impl<const N: usize> PairQueue<N> {
     pub fn new() -> Self {
         Self {
             pending: BinaryHeap::new(),
+            removed: HashSet::new(),
+            handled: HashSet::new(),
+            live: 0,
+            track_handled: false,
         }
     }
 
@@ -256,12 +304,12 @@ impl<const N: usize> PairQueue<N> {
 
     /// True if no pairs remain.
     pub fn is_empty(&self) -> bool {
-        self.pending.is_empty()
+        self.live == 0
     }
 
     /// The number of pairs waiting.
     pub fn len(&self) -> usize {
-        self.pending.len()
+        self.live
     }
 
     /// Add the pairs of the basis element at `added` with every element before it.
@@ -290,6 +338,32 @@ impl<const N: usize> PairQueue<N> {
     /// can compare the new element's pairs against one another.
     ///
     /// The baseline inserts every pair. `counts.gebauer_moller` records how many were not.
+    ///
+    /// # Gebauer–Möller
+    ///
+    /// Gebauer, R., Möller, H. M. (1988), *On an installation of Buchberger's algorithm*, J.
+    /// Symbolic Computation 6, 275–286, criteria B, M and F; as installed in Becker, T.,
+    /// Weispfenning, V., *Gröbner Bases*, Algorithm 5.5 (`UPDATE`). Writing `h` for the element
+    /// just added and `B` for the pending set, with all three conditions on leading monomials:
+    ///
+    /// - **B**, applied to the pairs already pending. Discard `(g1, g2)` when `LM(h)` divides
+    ///   `lcm(LM g1, LM g2)` and `lcm(LM g1, LM h)` and `lcm(LM h, LM g2)` both *differ* from it.
+    ///   This is Buchberger's chain criterion with `h` as the witness, and the two inequalities
+    ///   are what make it sound without any bookkeeping: together with the divisibility they say
+    ///   both witness lcms divide `lcm(LM g1, LM g2)` strictly, so the justification descends in
+    ///   a well-founded order and cannot be circular. Dropping either inequality is the classic
+    ///   unsound shortcut.
+    /// - **M**, applied to the new pairs `(h, g)`. Keep only pairs whose lcm is minimal under
+    ///   divisibility among the new pairs: discard `(h, g)` when another new pair's lcm divides
+    ///   `lcm(LM h, LM g)`. The asymmetry between the not-yet-examined candidates and the already
+    ///   accepted ones is what keeps exactly one pair per lcm when several are equal.
+    /// - **F**, applied to the new pairs that survived M. Discard `(h, g)` when `LM(h)` and
+    ///   `LM(g)` are relatively prime. Such a pair is admitted to the intermediate set first, so
+    ///   that it can block another pair with the same lcm under M, and only then discarded —
+    ///   which is why F is a second pass and not part of the first test.
+    ///
+    /// F is Buchberger's first criterion, so it is applied only when
+    /// [`PairCriteria::product`] is also set. Keeping a pair is never unsound, only slower.
     pub fn push_pairs_from_leads(
         &mut self,
         leads: &[Monomial<N>],
@@ -297,19 +371,99 @@ impl<const N: usize> PairQueue<N> {
         criteria: &PairCriteria,
         counts: &mut CriterionCounts,
     ) {
-        // Named so that the baseline's "nothing is discarded here" is visible as a decision rather
-        // than as an omission, and so that the implementation has a place to go.
-        let _ = (criteria, &mut *counts);
+        // The chain criterion is the only reader of the handled set, so it is only recorded when
+        // the computation asked for it.
+        self.track_handled |= criteria.chain;
 
+        if !criteria.gebauer_moller {
+            for existing in 0..added {
+                self.push(CriticalPair::from_leads(leads, existing, added));
+            }
+            return;
+        }
+
+        let lead_h = leads[added];
+
+        // Criterion B. Applied to the old pairs before the new ones are inserted, as published:
+        // a new pair (g, h) has lcm(LM g, LM h) = lcm(LM g, LM h), so the equality guard would
+        // keep it regardless, but following the published order keeps the two sets distinct.
+        let stale: Vec<PairKey> = self
+            .pending
+            .iter()
+            .filter(|Reverse(pair)| !self.removed.contains(&(pair.left, pair.right)))
+            .filter(|Reverse(pair)| {
+                divides(&lead_h, &pair.lcm)
+                    && Monomial::lcm(&leads[pair.left], &lead_h) != pair.lcm
+                    && Monomial::lcm(&lead_h, &leads[pair.right]) != pair.lcm
+            })
+            .map(|Reverse(pair)| (pair.left, pair.right))
+            .collect();
+        for key in stale {
+            self.removed.insert(key);
+            self.live -= 1;
+            counts.gebauer_moller += 1;
+        }
+
+        // Criterion M. `accepted` holds the indices `g` whose pair with `h` survived, in the order
+        // they were examined, which is the published algorithm's intermediate set `D`.
+        let mut accepted: Vec<usize> = Vec::new();
         for existing in 0..added {
-            self.pending
-                .push(Reverse(CriticalPair::from_leads(leads, existing, added)));
+            if are_relatively_prime(&lead_h, &leads[existing]) {
+                accepted.push(existing);
+                continue;
+            }
+
+            let lcm = Monomial::lcm(&lead_h, &leads[existing]);
+            let blocked = ((existing + 1)..added)
+                .chain(accepted.iter().copied())
+                .any(|other| divides(&Monomial::lcm(&lead_h, &leads[other]), &lcm));
+
+            if blocked {
+                counts.gebauer_moller += 1;
+            } else {
+                accepted.push(existing);
+            }
+        }
+
+        // Criterion F.
+        for existing in accepted {
+            if criteria.product && are_relatively_prime(&lead_h, &leads[existing]) {
+                counts.gebauer_moller += 1;
+                continue;
+            }
+            self.push(CriticalPair::from_leads(leads, existing, added));
+        }
+    }
+
+    /// Insert a pair into the pending set.
+    fn push(&mut self, pair: CriticalPair<N>) {
+        self.live += 1;
+        self.pending.push(Reverse(pair));
+    }
+
+    /// Drop lazily deleted entries from the top of the heap, so that the top is a pending pair.
+    fn drop_stale_top(&mut self) {
+        while !self.removed.is_empty() {
+            let Some(Reverse(top)) = self.pending.peek() else {
+                return;
+            };
+            let key = (top.left, top.right);
+            if !self.removed.remove(&key) {
+                return;
+            }
+            self.pending.pop();
         }
     }
 
     /// The next pair, of minimum lcm degree.
     pub fn pop(&mut self) -> Option<CriticalPair<N>> {
-        self.pending.pop().map(|Reverse(pair)| pair)
+        self.drop_stale_top();
+        let Reverse(pair) = self.pending.pop()?;
+        self.live -= 1;
+        if self.track_handled {
+            self.handled.insert((pair.left, pair.right));
+        }
+        Some(pair)
     }
 
     /// Every remaining pair of minimum lcm degree, up to `limit` of them.
@@ -332,6 +486,7 @@ impl<const N: usize> PairQueue<N> {
         let mut batch = vec![first];
 
         while limit.is_none_or(|limit| batch.len() < limit) {
+            self.drop_stale_top();
             match self.pending.peek() {
                 Some(Reverse(next)) if next.degree == degree => {
                     batch.push(self.pop().expect("peeked at a pair that is there"));
@@ -358,35 +513,113 @@ impl<const N: usize> PairQueue<N> {
         criteria: &PairCriteria,
         counts: &mut CriterionCounts,
     ) -> Vec<CriticalPair<N>> {
+        // The pairs of this batch have been selected but not yet reduced, so none of them is a
+        // witness for another: see `is_discarded`. Only the chain criterion reads the set.
+        let in_batch: HashSet<PairKey> = if criteria.chain {
+            batch.iter().map(|pair| (pair.left, pair.right)).collect()
+        } else {
+            HashSet::new()
+        };
+
         batch
             .into_iter()
-            .filter(|pair| {
-                // Buchberger's first criterion. The leading monomials share no variable, so their
-                // lcm is their product and the S-polynomial is guaranteed to reduce to zero modulo
-                // the two of them: there is no reason to put either half in a matrix.
-                if criteria.product && are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
-                    counts.product += 1;
-                    return false;
-                }
-
-                // The chain criterion belongs here, and must test the handled-pairs condition and
-                // not only divisibility of the lcm.
-                if criteria.chain {
-                    // Not yet implemented; the flag changes nothing rather than changing something
-                    // unsound.
-                }
-
-                true
-            })
+            .filter(|pair| !self.discards(pair, leads, criteria, counts, &in_batch))
             .collect()
+    }
+
+    /// Discard the given selected pair if an enabled criterion proves it redundant.
+    ///
+    /// The one-pair-at-a-time form of [`PairQueue::filter_batch`], for an engine that selects one
+    /// pair at a time. The pair must already have been popped.
+    pub fn is_discarded(
+        &self,
+        pair: &CriticalPair<N>,
+        leads: &[Monomial<N>],
+        criteria: &PairCriteria,
+        counts: &mut CriterionCounts,
+    ) -> bool {
+        self.discards(pair, leads, criteria, counts, &HashSet::new())
+    }
+
+    /// The selection-time criteria. `in_batch` holds pairs selected alongside `pair`.
+    ///
+    /// # The chain criterion
+    ///
+    /// Buchberger's chain criterion, in the form Cox, Little and O'Shea state as
+    /// `Criterion(f_i, f_j, B)` in *Ideals, Varieties, and Algorithms* Sec 2.10: the pair
+    /// `(i, j)` is discarded when there is a `k` outside `{i, j}` with `LM(f_k)` dividing
+    /// `lcm(LM f_i, LM f_j)` **and** neither `(i, k)` nor `(k, j)` in the pair set `B`. The
+    /// soundness is Sec 2.9's chain lemma: if `S(f_i, f_k)` and `S(f_k, f_j)` have standard
+    /// representations then so does `S(f_i, f_j)`. Divisibility of the lcm alone does not imply
+    /// that and discarding on it returns an incomplete basis.
+    ///
+    /// "In `B`" is read here as "not yet selected and processed", which is stronger than "absent
+    /// from the pending set", and deliberately:
+    ///
+    /// - A pair selected in the same batch has been removed from the pending set but not yet
+    ///   reduced. Three pairs on one another's lcms could then each be discarded on the strength
+    ///   of the other two, and none of the three would ever be reduced. `in_batch` excludes them.
+    /// - A pair Gebauer–Möller removed is absent from the pending set but was never reduced, and
+    ///   its own redundancy is justified by two pairs that are still pending. Letting it witness
+    ///   one of those would close the loop. Only popped pairs enter `handled`, so it cannot.
+    ///
+    /// With Gebauer–Möller off, every pair leaves the pending set by being selected, so the two
+    /// readings coincide and this is exactly the published criterion. The invariant both
+    /// installations maintain is the same one: every pair not in `B` has a standard representation
+    /// modulo the final basis, justified either by a pair processed strictly earlier or by pairs
+    /// whose lcm divides its own strictly.
+    fn discards(
+        &self,
+        pair: &CriticalPair<N>,
+        leads: &[Monomial<N>],
+        criteria: &PairCriteria,
+        counts: &mut CriterionCounts,
+        in_batch: &HashSet<PairKey>,
+    ) -> bool {
+        // Buchberger's first criterion. The leading monomials share no variable, so their lcm is
+        // their product and the S-polynomial is guaranteed to reduce to zero modulo the two of
+        // them: there is no reason to put either half in a matrix.
+        if criteria.product && are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
+            counts.product += 1;
+            return true;
+        }
+
+        if criteria.chain && self.chain_witness(pair, leads, in_batch).is_some() {
+            counts.chain += 1;
+            return true;
+        }
+
+        false
+    }
+
+    /// The index of an element witnessing the chain criterion for `pair`, if there is one.
+    fn chain_witness(
+        &self,
+        pair: &CriticalPair<N>,
+        leads: &[Monomial<N>],
+        in_batch: &HashSet<PairKey>,
+    ) -> Option<usize> {
+        (0..leads.len()).find(|&k| {
+            k != pair.left
+                && k != pair.right
+                && divides(&leads[k], &pair.lcm)
+                && self.is_handled(pair.left, k, in_batch)
+                && self.is_handled(pair.right, k, in_batch)
+        })
+    }
+
+    /// True if the pair of `a` and `b` has been selected and its batch processed.
+    fn is_handled(&self, a: usize, b: usize, in_batch: &HashSet<PairKey>) -> bool {
+        let key = (a.min(b), a.max(b));
+        self.handled.contains(&key) && !in_batch.contains(&key)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        are_relatively_prime, leading_monomials, CriterionCounts, CriticalPair, PairCriteria,
-        PairQueue,
+        are_relatively_prime, divides, leading_monomials, CriterionCounts, CriticalPair,
+        PairCriteria, PairQueue,
     };
     use crate::{fields::Zp13, poly::MonomialOrder, Monomial, MultivariatePolynomial};
 
@@ -668,6 +901,203 @@ mod tests {
             }
         );
         assert_eq!(total.total(), 11);
+    }
+
+    const CHAIN_ONLY: PairCriteria = PairCriteria {
+        product: false,
+        chain: true,
+        gebauer_moller: false,
+    };
+
+    const GEBAUER_MOLLER_ONLY: PairCriteria = PairCriteria {
+        product: false,
+        chain: false,
+        gebauer_moller: true,
+    };
+
+    fn monomials<const N: usize>(exponents: &[[u32; N]]) -> Vec<Monomial<N>> {
+        exponents.iter().map(|e| Monomial::new(e)).collect()
+    }
+
+    fn drain<const N: usize>(mut queue: PairQueue<N>) -> Vec<(usize, usize)> {
+        let mut keys = Vec::new();
+        while let Some(pair) = queue.pop() {
+            keys.push((pair.left, pair.right));
+        }
+        keys
+    }
+
+    /// The chain criterion discards a pair once both of its witness's pairs have been handled.
+    #[test]
+    fn test_chain_criterion_discards_a_pair_with_handled_witnesses() {
+        // Leading monomials x, y, x*y. Every pair has lcm x*y, and each element's leading
+        // monomial divides it, so each pair has the other two as its chain witness — which is
+        // exactly the configuration that distinguishes the criterion from the unsound shortcut.
+        let leads = monomials::<3>(&[[1, 0, 0], [0, 1, 0], [1, 1, 0]]);
+        let mut counts = CriterionCounts::default();
+        let mut queue = PairQueue::seeded_from_leads(&leads, &CHAIN_ONLY, &mut counts);
+
+        let mut kept = Vec::new();
+        while let Some(pair) = queue.pop() {
+            if !queue.is_discarded(&pair, &leads, &CHAIN_ONLY, &mut counts) {
+                kept.push((pair.left, pair.right));
+            }
+        }
+
+        // (0,1) and (0,2) are handled first and so have no witness yet; (1,2) is discarded on the
+        // strength of element 0, whose pairs with 1 and with 2 are both handled by then.
+        assert_eq!(kept, vec![(0, 1), (0, 2)]);
+        assert_eq!(counts.chain, 1);
+        assert_eq!(counts.product, 0);
+        assert_eq!(counts.gebauer_moller, 0);
+    }
+
+    /// Divisibility of the lcm alone does not discard a pair: the witness's own pairs must be
+    /// handled first.
+    ///
+    /// Regression test for the unsound shortcut. Element 2's leading monomial x*y divides the lcm
+    /// of the very first pair selected, so a criterion testing only divisibility would discard it
+    /// and return an incomplete basis.
+    #[test]
+    fn test_chain_criterion_requires_the_witness_pairs_to_be_handled() {
+        let leads = monomials::<3>(&[[1, 0, 0], [0, 1, 0], [1, 1, 0]]);
+        let mut counts = CriterionCounts::default();
+        let mut queue = PairQueue::seeded_from_leads(&leads, &CHAIN_ONLY, &mut counts);
+
+        let first = queue.pop().expect("three pairs were seeded");
+        assert_eq!((first.left, first.right), (0, 1));
+        assert!(divides(&leads[2], &first.lcm), "the shortcut would fire");
+        assert!(
+            !queue.is_discarded(&first, &leads, &CHAIN_ONLY, &mut counts),
+            "the first pair selected has no handled witness and must not be discarded"
+        );
+        assert_eq!(counts.chain, 0);
+    }
+
+    /// Pairs of the batch being selected do not count as handled.
+    #[test]
+    fn test_chain_criterion_does_not_use_pairs_from_the_same_batch() {
+        // All three pairs have lcm x*y, so they are selected as one batch. None of them has been
+        // reduced yet, so none can witness another: discarding all three would leave every
+        // S-polynomial of the three unreduced.
+        let leads = monomials::<3>(&[[1, 0, 0], [0, 1, 0], [1, 1, 0]]);
+        let mut counts = CriterionCounts::default();
+        let mut queue = PairQueue::seeded_from_leads(&leads, &CHAIN_ONLY, &mut counts);
+
+        let batch = queue.select_batch(None);
+        assert_eq!(batch.len(), 3);
+        let kept = queue.filter_batch(batch, &leads, &CHAIN_ONLY, &mut counts);
+        assert_eq!(kept.len(), 3);
+        assert_eq!(counts.chain, 0);
+    }
+
+    /// The chain criterion discards nothing when it is switched off, leaving the product
+    /// criterion's eliminations alone.
+    #[test]
+    fn test_chain_criterion_is_inert_when_disabled() {
+        let leads = monomials::<3>(&[[1, 0, 0], [0, 1, 0], [1, 1, 0]]);
+        let mut counts = CriterionCounts::default();
+        let mut queue =
+            PairQueue::seeded_from_leads(&leads, &PairCriteria::PRODUCT_ONLY, &mut counts);
+
+        let mut reduced = 0;
+        while let Some(pair) = queue.pop() {
+            if !queue.is_discarded(&pair, &leads, &PairCriteria::PRODUCT_ONLY, &mut counts) {
+                reduced += 1;
+            }
+        }
+        // x and y are relatively prime, so (0,1) goes to the product criterion; (1,2) is the pair
+        // the chain criterion would have taken, and it is reduced here.
+        assert_eq!(reduced, 2);
+        assert_eq!(counts.product, 1);
+        assert_eq!(counts.chain, 0);
+    }
+
+    /// Gebauer–Möller's criterion M keeps one new pair per lcm, and criterion B keeps an old pair
+    /// whose lcm one of the new pairs reproduces.
+    #[test]
+    fn test_gebauer_moller_keeps_one_new_pair_per_lcm() {
+        // Leading monomials x*z, x*y*z, y*z. Pairing y*z with each of the first two gives lcm
+        // x*y*z both times, so one of the two is redundant. The existing pair (0,1) also has lcm
+        // x*y*z, which y*z divides — but lcm(x*z, y*z) is that same monomial, so criterion B's
+        // equality guard keeps it.
+        let leads = monomials::<3>(&[[1, 0, 1], [1, 1, 1], [0, 1, 1]]);
+
+        let mut counts = CriterionCounts::default();
+        let queue = PairQueue::seeded_from_leads(&leads, &GEBAUER_MOLLER_ONLY, &mut counts);
+        assert_eq!(drain(queue), vec![(0, 1), (1, 2)]);
+        assert_eq!(counts.gebauer_moller, 1);
+
+        // Without the criterion all three pairs are inserted.
+        let mut counts = CriterionCounts::default();
+        let queue = PairQueue::seeded_from_leads(&leads, &PairCriteria::NONE, &mut counts);
+        assert_eq!(queue.len(), 3);
+        assert_eq!(counts.total(), 0);
+    }
+
+    /// Gebauer–Möller's criterion F discards a new pair with relatively prime leading monomials,
+    /// and only when the product criterion is enabled.
+    #[test]
+    fn test_gebauer_moller_discards_a_relatively_prime_new_pair() {
+        let leads = monomials::<3>(&[[1, 0, 0], [0, 1, 0]]);
+
+        let mut counts = CriterionCounts::default();
+        let queue = PairQueue::seeded_from_leads(&leads, &PairCriteria::ALL, &mut counts);
+        assert!(queue.is_empty(), "the only pair is relatively prime");
+        assert_eq!(counts.gebauer_moller, 1);
+
+        // Criterion F is Buchberger's first criterion, so it is only applied when that is on.
+        let mut counts = CriterionCounts::default();
+        let queue = PairQueue::seeded_from_leads(&leads, &GEBAUER_MOLLER_ONLY, &mut counts);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(counts.total(), 0);
+    }
+
+    /// Gebauer–Möller's criterion B discards an already pending pair that the new element makes
+    /// redundant, and the queue's length follows.
+    #[test]
+    fn test_gebauer_moller_discards_a_pending_pair() {
+        // Leading monomials x^2*z, y^2*z, x*y. The pair (0,1) has lcm x^2*y^2*z, which x*y
+        // divides, and lcm(x^2*z, x*y) = x^2*y*z and lcm(x*y, y^2*z) = x*y^2*z are both strictly
+        // smaller — so the chain criterion applies and the pair never has to be selected.
+        let leads = monomials::<3>(&[[2, 0, 1], [0, 2, 1], [1, 1, 0]]);
+
+        let mut counts = CriterionCounts::default();
+        let mut queue = PairQueue::new();
+        queue.push_pairs_from_leads(&leads, 1, &GEBAUER_MOLLER_ONLY, &mut counts);
+        assert_eq!(queue.len(), 1);
+        queue.push_pairs_from_leads(&leads, 2, &GEBAUER_MOLLER_ONLY, &mut counts);
+
+        assert_eq!(counts.gebauer_moller, 1);
+        assert_eq!(queue.len(), 2, "the pending pair was not removed");
+        // Both remaining pairs have lcm degree four, so the tiebreak on the lcm decides: the
+        // removed pair (0,1) is not among them, which is what this asserts.
+        assert_eq!(drain(queue), vec![(1, 2), (0, 2)]);
+    }
+
+    /// Gebauer–Möller is deterministic: the same leading monomials give the same queue.
+    #[test]
+    fn test_gebauer_moller_is_deterministic() {
+        let leads = monomials::<3>(&[
+            [2, 0, 1],
+            [0, 2, 1],
+            [1, 1, 0],
+            [1, 0, 2],
+            [0, 1, 1],
+            [3, 0, 0],
+        ]);
+
+        let queue_of = || {
+            let mut counts = CriterionCounts::default();
+            let queue = PairQueue::seeded_from_leads(&leads, &PairCriteria::ALL, &mut counts);
+            (drain(queue), counts)
+        };
+
+        let first = queue_of();
+        assert!(first.1.gebauer_moller > 0, "nothing was discarded");
+        for _ in 0..8 {
+            assert_eq!(queue_of(), first);
+        }
     }
 
     /// Selection is deterministic: the same basis gives the same batches, in the same order.

@@ -34,6 +34,9 @@ fn report<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>]) {
             elements_added,
             max_pair_degree,
             max_terms,
+            // Reported by `examples/pair_criteria.rs`, which compares configurations; this table
+            // is the baseline's one-criterion summary and keeps its columns.
+            criteria: _,
         } = s;
         // Share of pairs skipped without any reduction, the payoff of the product criterion.
         let share = if pairs_considered == 0 {

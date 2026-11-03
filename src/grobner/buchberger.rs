@@ -11,9 +11,11 @@
 //!
 //! See Sec 2.7 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea.
 
+use std::collections::HashMap;
+
 use crate::{
     grobner::{
-        pairs::{are_relatively_prime, CriterionCounts, PairCriteria, PairQueue},
+        pairs::{divides, CriterionCounts, PairCriteria, PairQueue},
         s_polynomial::s_polynomial,
     },
     poly::MonomialOrder,
@@ -46,6 +48,14 @@ pub struct Statistics {
 
     /// The largest number of terms in any polynomial produced by a reduction.
     pub max_terms: usize,
+
+    /// Pairs discarded, per criterion.
+    ///
+    /// `pairs_eliminated_by_product_criterion` is `criteria.product`; the other two fields are
+    /// the only record of what the chain criterion and Gebauer–Möller did, and
+    /// `criteria.gebauer_moller` counts pairs that were never selected and so are not in
+    /// `pairs_considered` either.
+    pub criteria: CriterionCounts,
 }
 
 /// The reduced Gröbner basis for the given polynomials, with respect to the given monomial order.
@@ -111,12 +121,12 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
         statistics.pairs_considered += 1;
         statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
 
-        // Buchberger's first criterion. If the leading monomials share no variable, their lcm is
-        // their product and S(left, right) is guaranteed to reduce to zero modulo the two of
-        // them, so the reduction can be skipped without affecting the result.
-        if criteria.product && are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
-            counts.product += 1;
-            statistics.pairs_eliminated_by_product_criterion += 1;
+        // The selection-time criteria: Buchberger's first criterion and the chain criterion,
+        // both of which say S(left, right) is guaranteed to reduce to zero modulo relations the
+        // computation already has, so the reduction can be skipped without affecting the result.
+        let before = counts;
+        if pending.is_discarded(&pair, &leads, criteria, &mut counts) {
+            statistics.pairs_eliminated_by_product_criterion += counts.product - before.product;
             continue;
         }
 
@@ -144,10 +154,12 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
         pending.push_pairs_from_leads(&leads, added, criteria, &mut counts);
     }
 
+    statistics.criteria = counts;
+
     (reduce_grobner_basis(&basis, order), statistics)
 }
 
-/// Finds a minimal Grobner basis.
+/// Finds a minimal Grobner basis, paired with the leading monomial of each element kept.
 ///
 /// # Arguments
 /// * `g` - A Grobner basis.
@@ -156,18 +168,31 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
 /// A minimal Grobner basis has two properties:
 /// 2. The leading coefficient of each polynomial is 1.
 /// 1. No leading term of any polynomial in the basis is divisible by the leading term of any other polynomial in the basis.
+///
+/// The leading monomials are returned rather than recomputed because taking one is a scan of a
+/// polynomial's whole term map, and both this function and its caller need all of them.
 fn minimize_grobner_basis<const N: usize, F: FiniteField>(
     g: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
-) -> Vec<MultivariatePolynomial<N, F>> {
+) -> Vec<(Monomial<N>, MultivariatePolynomial<N, F>)> {
     // Scale each polynomial to have leading coefficient 1, dropping zeros and duplicates.
     // First-occurrence order is preserved, so the outcome does not depend on hashing.
-    let mut monic: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(g.len());
+    //
+    // Two polynomials can only be equal if their leading monomial and term count agree, so a
+    // candidate is compared against the elements that share both and not against every element
+    // kept so far. The full scan was a polynomial equality per element per element.
+    let mut monic: Vec<(Monomial<N>, MultivariatePolynomial<N, F>)> = Vec::with_capacity(g.len());
+    let mut by_shape: HashMap<(Monomial<N>, usize), Vec<usize>> = HashMap::new();
     for p in g.iter().filter(|p| !p.is_zero()) {
+        let lead = p.leading_monomial(order);
         let scaled = p.scale(&p.leading_coefficient(order).inverse());
-        if !monic.contains(&scaled) {
-            monic.push(scaled);
+        let shape = (lead, scaled.terms().len());
+        let same_shape = by_shape.entry(shape).or_default();
+        if same_shape.iter().any(|&i| monic[i].1 == scaled) {
+            continue;
         }
+        same_shape.push(monic.len());
+        monic.push((lead, scaled));
     }
 
     // Drop any element whose leading term is divisible by another's, which is exactly
@@ -178,15 +203,11 @@ fn minimize_grobner_basis<const N: usize, F: FiniteField>(
     // surviving element depend on iteration order.
     let mut keep = vec![true; monic.len()];
     for i in 0..monic.len() {
-        let lead_i = monic[i].leading_monomial(order);
         for j in 0..monic.len() {
             if i == j || !keep[j] {
                 continue;
             }
-            if lead_i
-                .checked_div(&monic[j].leading_monomial(order))
-                .is_some()
-            {
+            if divides(&monic[j].0, &monic[i].0) {
                 keep[i] = false;
                 break;
             }
@@ -197,7 +218,7 @@ fn minimize_grobner_basis<const N: usize, F: FiniteField>(
         .into_iter()
         .zip(keep)
         .filter(|(_, keep)| *keep)
-        .map(|(p, _)| p)
+        .map(|(element, _)| element)
         .collect()
 }
 
@@ -213,39 +234,56 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
     g: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
-    let minimal: Vec<_> = minimize_grobner_basis(g, order);
+    let mut minimal = minimize_grobner_basis(g, order);
 
-    // Replace each p by its remainder on division by the others. Deleting p instead would drop a
-    // generator and leave a set that no longer generates the ideal: a *non-leading* monomial of p
-    // lying in <LT(G \ {p})> means p needs reducing, not discarding.
+    // Ascending by leading monomial, which is the whole optimization.
     //
-    // The remainder is never zero, and the basis stays minimal: p's leading term is not divisible
-    // by any other leading term, so division never cancels it.
-    let mut reduced: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(minimal.len());
-    for (i, p) in minimal.iter().enumerate() {
-        let others: Vec<MultivariatePolynomial<N, F>> = minimal
-            .iter()
-            .enumerate()
-            .filter(|(j, _)| *j != i)
-            .map(|(_, q)| q.clone())
-            .collect();
-        if others.is_empty() {
-            reduced.push(p.clone());
-            continue;
+    // Each element is replaced by its remainder on division by the others, and a divisor's *tail*
+    // is what gets substituted in. Reducing in ascending order and writing each remainder back in
+    // place means every divisor whose leading monomial is below the element's has already been
+    // reduced, so the substitution introduces monomials that are already in normal form instead of
+    // monomials that have to be reduced again through the whole basis. On katsura-6 under lex —
+    // whose basis is in shape position, five linear elements over one univariate of degree 32 —
+    // that is the difference between 2.5 seconds and a millisecond: reducing x1's tail against an
+    // unreduced x2 substituted 31 terms that each needed reducing against an unreduced x3, and so
+    // on down the chain.
+    //
+    // Neither the order nor the in-place update can change the result. A remainder r is congruent
+    // to its element modulo the ideal, has the element's leading monomial — minimization left it
+    // divisible by no other leading monomial, so division never cancels it — and has no monomial
+    // divisible by any other element's leading monomial. Two elements with those three properties
+    // differ by an ideal member all of whose monomials are irreducible, which is zero. So r is
+    // determined by the element's leading monomial alone, and in particular does not depend on
+    // which divisor was applied first or on whether a divisor's tail had been reduced yet: those
+    // only change how many steps the reduction takes. Reducing an element also never changes its
+    // leading monomial, which is all that divisibility is tested against.
+    minimal.sort_by(|a, b| order.cmp(&a.0, &b.0));
+    let mut reduced: Vec<MultivariatePolynomial<N, F>> =
+        minimal.into_iter().map(|(_, p)| p).collect();
+
+    // The element being reduced is swapped to the end so that the others are a contiguous slice,
+    // which is what `normal_form` takes. The alternative, and what this replaced, is to clone all
+    // `n - 1` of them once per element before computing anything.
+    let last = reduced.len().saturating_sub(1);
+    if reduced.len() > 1 {
+        for i in 0..reduced.len() {
+            reduced.swap(i, last);
+            let p = std::mem::take(&mut reduced[last]);
+            let remainder = p.normal_form(&reduced[..last], order);
+            debug_assert!(
+                !remainder.is_zero(),
+                "reducing a minimal basis element cannot cancel its leading term"
+            );
+            reduced[last] = remainder;
+            reduced.swap(i, last);
         }
-        let remainder = p.normal_form(&others, order);
-        debug_assert!(
-            !remainder.is_zero(),
-            "reducing a minimal basis element cannot cancel its leading term"
-        );
-        reduced.push(remainder);
     }
 
-    // Sort by leading monomial, descending, so the basis is returned in a canonical order.
+    // Descending by leading monomial, so the basis is returned in a canonical order.
     // Minimization leaves the leading monomials distinct, so this is a total order on the
     // result, and a reduced Gröbner basis is unique as a set — which makes the sequence unique
     // too. Without this the order came from `HashSet` iteration and varied between runs.
-    reduced.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
+    reduced.reverse();
     reduced
 }
 
@@ -253,8 +291,8 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
 mod tests {
     use crate::util::contains_duplicates;
     use crate::{
-        fields::Zp13, grobner::buchberger::buchberger, poly::MonomialOrder, FiniteField,
-        MultivariatePolynomial, One,
+        fields::Zp13, grobner::buchberger::buchberger, grobner::pairs::PairCriteria,
+        poly::MonomialOrder, FiniteField, MultivariatePolynomial, One,
     };
 
     #[test]
@@ -794,6 +832,588 @@ mod tests {
                 order.name()
             );
             assert!(statistics.pairs_considered > 0, "{}", order.name());
+        }
+    }
+
+    /// Every combination of the pair criteria, so a differential test covers all of them.
+    const CRITERIA_CONFIGURATIONS: [PairCriteria; 8] = [
+        PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: true,
+            chain: false,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: true,
+            chain: true,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: true,
+            chain: false,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: true,
+            chain: true,
+            gebauer_moller: true,
+        },
+    ];
+
+    /// The correctness corpus: hand-written systems, degenerate input, and benchmark families.
+    fn criteria_corpus() -> Vec<(String, Vec<MultivariatePolynomial<3, Zp13>>)> {
+        use crate::grobner::benchmark_systems::{cyclic, katsura};
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        let written: Vec<Vec<&str>> = vec![
+            vec!["x^2 - y"],
+            vec!["x + y + z"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^2 - y", "x*y - 1"],
+            vec!["x^2 + y^2 - 1", "x - y"],
+            vec!["x*y - 1", "x - y"],
+            vec!["x^2*y + x", "x*y^2 + y"],
+            vec!["x^3 - 2*x*y", "x^2*y - 2*y^2 + x"],
+            vec!["x + y", "x^2 + z", "y*z - 1"],
+            vec!["x*y*z - 1", "x*y - z"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x^2 + y + 1", "y^2 + z + 2", "z^2 + x + 3"],
+            // Inconsistent, so the basis is {1}.
+            vec!["x", "x - 1"],
+            // Duplicated, a scalar multiple, and a generator already in the ideal.
+            vec!["x + y", "x + y", "y^2 - 1"],
+            vec!["x + y", "3*x + 3*y", "y^2 - 1"],
+            vec!["x + y", "y^2 - 1", "x*y + y^2"],
+            // The configuration the chain criterion is about: three leading monomials each
+            // dividing the lcm of the other two.
+            vec!["x - 1", "y - 2", "x*y - 3"],
+            // Relatively prime leading monomials, which the product criterion takes.
+            vec!["x^2", "y^3"],
+            vec!["x^2 - 1", "y^2 - 1", "z^2 - 1"],
+        ];
+
+        let mut corpus: Vec<(String, Vec<MultivariatePolynomial<3, F>>)> = written
+            .iter()
+            .map(|system| {
+                (
+                    format!("{:?}", system),
+                    system.iter().map(|s| parse(s)).collect(),
+                )
+            })
+            .collect();
+        corpus.push(("cyclic-3".into(), cyclic::<3, F>()));
+        corpus.push(("katsura-3".into(), katsura::<3, F>()));
+        corpus
+    }
+
+    /// Every combination of the criteria computes the basis the criteria-free reference computes.
+    #[test]
+    fn test_criteria_do_not_change_the_basis() {
+        use crate::grobner::buchberger_with_criteria;
+
+        for order in ALL_ORDERS {
+            for (name, f) in criteria_corpus() {
+                let (expected, _) =
+                    buchberger_with_criteria(&f, order, &CRITERIA_CONFIGURATIONS[0]);
+                for criteria in CRITERIA_CONFIGURATIONS {
+                    let (actual, _) = buchberger_with_criteria(&f, order, &criteria);
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{} under {} with {:?}",
+                        name,
+                        order.name(),
+                        criteria
+                    );
+                }
+            }
+        }
+    }
+
+    /// Every combination of the criteria agrees with the naive textbook reference.
+    ///
+    /// The criteria-free computation shares the pair queue and the interreduction with the
+    /// criteria-enabled one, so agreeing with it is necessary but not sufficient. The reference
+    /// shares nothing.
+    #[test]
+    fn test_criteria_agree_with_the_reference() {
+        use crate::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            buchberger_with_criteria,
+            reference::buchberger_reference,
+        };
+        type F = Zp13;
+
+        // katsura-3 under lex takes the reference about two and a half minutes, so it is covered
+        // under the graded orders here and by the ignored slow test under lex.
+        for order in ALL_ORDERS {
+            let mut systems = criteria_corpus();
+            systems.retain(|(name, _)| name != "katsura-3");
+            if order != MonomialOrder::Lexicographic {
+                systems.push(("katsura-3".into(), katsura::<3, F>()));
+            }
+            systems.push(("cyclic-3".into(), cyclic::<3, F>()));
+
+            for (name, f) in systems {
+                let expected = buchberger_reference(&f, order);
+                for criteria in CRITERIA_CONFIGURATIONS {
+                    let (actual, _) = buchberger_with_criteria(&f, order, &criteria);
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{} under {} with {:?}",
+                        name,
+                        order.name(),
+                        criteria
+                    );
+                }
+            }
+        }
+    }
+
+    /// The criteria survive permuted, duplicated, scaled and redundant generators.
+    ///
+    /// An unsound criterion usually agrees on a fixed corpus and fails once the generator order
+    /// changes, because the order decides which pairs are handled before which.
+    #[test]
+    fn test_criteria_under_permuted_generators() {
+        use crate::grobner::buchberger_with_criteria;
+        type F = Zp13;
+
+        for order in ALL_ORDERS {
+            for (name, f) in criteria_corpus() {
+                let (expected, _) =
+                    buchberger_with_criteria(&f, order, &CRITERIA_CONFIGURATIONS[0]);
+
+                // Every rotation of the generators, the reversal, and the generators with the
+                // first one duplicated, doubled, and re-added as a redundant ideal member.
+                let mut variants: Vec<Vec<MultivariatePolynomial<3, F>>> = Vec::new();
+                for shift in 0..f.len() {
+                    variants.push(
+                        f.iter()
+                            .cycle()
+                            .skip(shift)
+                            .take(f.len())
+                            .cloned()
+                            .collect(),
+                    );
+                }
+                let mut reversed = f.clone();
+                reversed.reverse();
+                variants.push(reversed);
+                let mut duplicated = f.clone();
+                duplicated.push(f[0].clone());
+                variants.push(duplicated);
+                let mut scaled = f.clone();
+                scaled.push(f[0].scale(&(F::ONE + F::ONE + F::ONE)));
+                variants.push(scaled);
+                let mut redundant = f.clone();
+                redundant.push(&f[0] * &f[f.len() - 1]);
+                variants.push(redundant);
+
+                for variant in &variants {
+                    for criteria in CRITERIA_CONFIGURATIONS {
+                        let (actual, _) = buchberger_with_criteria(variant, order, &criteria);
+                        assert_eq!(
+                            actual,
+                            expected,
+                            "{} under {} with {:?}, generators {:?}",
+                            name,
+                            order.name(),
+                            criteria,
+                            variant
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Randomized systems over GF(7) and GF(13) agree with the criteria switched off.
+    #[test]
+    fn test_criteria_on_randomized_systems() {
+        use crate::{
+            fields::Zp7,
+            grobner::buchberger_with_criteria,
+            poly::{Monomial, MultivariatePolynomial as Poly},
+        };
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        /// Three sparse polynomials of degree at most two in three variables.
+        fn system<FF: FiniteField>(seed: u64) -> Vec<Poly<3, FF>> {
+            let mut rng = StdRng::seed_from_u64(seed);
+            (0..3)
+                .map(|_| {
+                    let terms: Vec<(Monomial<3>, FF)> = (0..4)
+                        .map(|_| {
+                            let mut exponents = [0u32; 3];
+                            exponents[rng.gen_range(0..3)] += 1;
+                            if rng.gen_bool(0.5) {
+                                exponents[rng.gen_range(0..3)] += 1;
+                            }
+                            (Monomial::new(&exponents), FF::random(&mut rng))
+                        })
+                        .collect();
+                    Poly::new(&terms)
+                })
+                .collect()
+        }
+
+        for seed in 0..24 {
+            for order in ALL_ORDERS {
+                let over_7: Vec<Poly<3, Zp7>> = system(seed);
+                let over_13: Vec<Poly<3, Zp13>> = system(seed + 1000);
+
+                let (expected_7, _) =
+                    buchberger_with_criteria(&over_7, order, &CRITERIA_CONFIGURATIONS[0]);
+                let (expected_13, _) =
+                    buchberger_with_criteria(&over_13, order, &CRITERIA_CONFIGURATIONS[0]);
+
+                for criteria in CRITERIA_CONFIGURATIONS {
+                    assert_eq!(
+                        buchberger_with_criteria(&over_7, order, &criteria).0,
+                        expected_7,
+                        "GF(7) seed {} under {} with {:?}",
+                        seed,
+                        order.name(),
+                        criteria
+                    );
+                    assert_eq!(
+                        buchberger_with_criteria(&over_13, order, &criteria).0,
+                        expected_13,
+                        "GF(13) seed {} under {} with {:?}",
+                        seed,
+                        order.name(),
+                        criteria
+                    );
+                }
+            }
+        }
+    }
+
+    /// Each criterion's counter is nonzero when that criterion is enabled and zero when it is not.
+    #[test]
+    fn test_criterion_counts_are_attributed() {
+        use crate::grobner::{benchmark_systems::katsura, buchberger_with_criteria, PairCriteria};
+        type F = Zp13;
+
+        let system = katsura::<3, F>();
+        let order = MonomialOrder::Lexicographic;
+
+        let (_, none) = buchberger_with_criteria(&system, order, &PairCriteria::NONE);
+        assert_eq!(none.criteria.total(), 0, "nothing should be discarded");
+
+        let (_, product) = buchberger_with_criteria(&system, order, &PairCriteria::PRODUCT_ONLY);
+        assert!(product.criteria.product > 0);
+        assert_eq!(product.criteria.chain, 0);
+        assert_eq!(product.criteria.gebauer_moller, 0);
+
+        let chain_only = PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: false,
+        };
+        let (_, chain) = buchberger_with_criteria(&system, order, &chain_only);
+        assert_eq!(chain.criteria.product, 0);
+        assert!(
+            chain.criteria.chain > 0,
+            "the chain criterion discarded nothing: {:?}",
+            chain
+        );
+        assert_eq!(chain.criteria.gebauer_moller, 0);
+
+        let gebauer_moller_only = PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: true,
+        };
+        let (_, gm) = buchberger_with_criteria(&system, order, &gebauer_moller_only);
+        assert_eq!(gm.criteria.product, 0);
+        assert_eq!(gm.criteria.chain, 0);
+        assert!(
+            gm.criteria.gebauer_moller > 0,
+            "Gebauer-Möller discarded nothing: {:?}",
+            gm
+        );
+
+        // Together they reduce the pairs actually reduced below what either manages alone.
+        let (_, all) = buchberger_with_criteria(&system, order, &PairCriteria::ALL);
+        assert!(all.pairs_reduced < product.pairs_reduced);
+        assert!(all.pairs_reduced <= chain.pairs_reduced);
+        assert!(all.pairs_reduced <= gm.pairs_reduced);
+    }
+
+    /// The interreduction as it was written before M16-C, kept as the differential oracle.
+    ///
+    /// Deliberately the naive formulation: minimize by comparing every element against every
+    /// element kept so far, then reduce each element against a freshly cloned copy of all the
+    /// others, in whatever order minimization left them. The optimized implementation must return
+    /// exactly this, which is the only thing that makes the optimization safe.
+    fn reduce_grobner_basis_reference<const N: usize, F: FiniteField>(
+        g: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+    ) -> Vec<MultivariatePolynomial<N, F>> {
+        let mut monic: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(g.len());
+        for p in g.iter().filter(|p| !p.is_zero()) {
+            let scaled = p.scale(&p.leading_coefficient(order).inverse());
+            if !monic.contains(&scaled) {
+                monic.push(scaled);
+            }
+        }
+
+        let mut keep = vec![true; monic.len()];
+        for i in 0..monic.len() {
+            let lead_i = monic[i].leading_monomial(order);
+            for j in 0..monic.len() {
+                if i == j || !keep[j] {
+                    continue;
+                }
+                if lead_i
+                    .checked_div(&monic[j].leading_monomial(order))
+                    .is_some()
+                {
+                    keep[i] = false;
+                    break;
+                }
+            }
+        }
+
+        let minimal: Vec<MultivariatePolynomial<N, F>> = monic
+            .into_iter()
+            .zip(keep)
+            .filter(|(_, keep)| *keep)
+            .map(|(p, _)| p)
+            .collect();
+
+        let mut reduced: Vec<MultivariatePolynomial<N, F>> = Vec::with_capacity(minimal.len());
+        for (i, p) in minimal.iter().enumerate() {
+            let others: Vec<MultivariatePolynomial<N, F>> = minimal
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, q)| q.clone())
+                .collect();
+            if others.is_empty() {
+                reduced.push(p.clone());
+                continue;
+            }
+            reduced.push(p.normal_form(&others, order));
+        }
+
+        reduced.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
+        reduced
+    }
+
+    /// The optimized interreduction returns exactly what the naive one does, element for element.
+    #[test]
+    fn test_interreduction_agrees_with_the_naive_formulation() {
+        use crate::grobner::{
+            benchmark_systems::{cyclic, katsura},
+            buchberger::reduce_grobner_basis,
+            pairs::{are_relatively_prime, CriterionCounts, PairCriteria, PairQueue},
+            s_polynomial::s_polynomial,
+        };
+        type F = Zp13;
+
+        // The pre-interreduction basis, which is the input the interreduction actually sees: much
+        // longer than the answer, with duplicates and redundant elements still in it.
+        fn raw_basis<const N: usize, F: FiniteField>(
+            f: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) -> Vec<MultivariatePolynomial<N, F>> {
+            let mut basis: Vec<MultivariatePolynomial<N, F>> = Vec::new();
+            for p in f.iter().filter(|p| !p.is_zero()) {
+                let monic = p.scale(&p.leading_coefficient(order).inverse());
+                if !basis.contains(&monic) {
+                    basis.push(monic);
+                }
+            }
+            let mut leads: Vec<_> = basis.iter().map(|p| p.leading_monomial(order)).collect();
+            let mut counts = CriterionCounts::default();
+            let criteria = PairCriteria::PRODUCT_ONLY;
+            let mut pending = PairQueue::seeded_from_leads(&leads, &criteria, &mut counts);
+            while let Some(pair) = pending.pop() {
+                if are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
+                    continue;
+                }
+                let s = s_polynomial(&basis[pair.left], &basis[pair.right], order);
+                let remainder = s.normal_form(&basis, order);
+                if remainder.is_zero() {
+                    continue;
+                }
+                let monic = remainder.scale(&remainder.leading_coefficient(order).inverse());
+                let added = basis.len();
+                leads.push(monic.leading_monomial(order));
+                basis.push(monic);
+                pending.push_pairs_from_leads(&leads, added, &criteria, &mut counts);
+            }
+            basis
+        }
+
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        let mut corpus: Vec<Vec<MultivariatePolynomial<3, F>>> = vec![
+            vec![parse("x^2 - y")],
+            vec![
+                parse("x + y + z"),
+                parse("x*y + x*z + y*z"),
+                parse("x*y*z - 1"),
+            ],
+            vec![parse("x^2 - y"), parse("x*y - 1")],
+            vec![parse("x*z - y^2"), parse("x^3 - z^2")],
+            vec![parse("x^2*y + x"), parse("x*y^2 + y")],
+            vec![
+                parse("x + y"),
+                parse("x + y"),
+                parse("3*x + 3*y"),
+                parse("y^2 - 1"),
+            ],
+            vec![parse("x"), parse("x - 1")],
+        ];
+        corpus.push(cyclic::<3, F>());
+        corpus.push(katsura::<3, F>());
+
+        for order in ALL_ORDERS {
+            for f in &corpus {
+                let raw = raw_basis(f, order);
+                assert_eq!(
+                    reduce_grobner_basis(&raw, order),
+                    reduce_grobner_basis_reference(&raw, order),
+                    "{} on a {}-element pre-interreduction basis",
+                    order.name(),
+                    raw.len()
+                );
+            }
+
+            // Degenerate inputs the two must also agree on.
+            let zero = MultivariatePolynomial::<3, F>::zero();
+            for raw in [
+                vec![],
+                vec![zero.clone()],
+                vec![parse("x^2 - y")],
+                // Equal leading monomials, so minimization has to break a tie.
+                vec![parse("x^2 - y"), parse("x^2 - z"), parse("x^2 - y")],
+                // Interleaved duplicates, which is the case the deduplication has to preserve.
+                vec![
+                    parse("x^2 - y"),
+                    parse("x^2 - z"),
+                    parse("x^2 - y"),
+                    parse("y - 1"),
+                ],
+            ] {
+                assert_eq!(
+                    reduce_grobner_basis(&raw, order),
+                    reduce_grobner_basis_reference(&raw, order),
+                    "{} on {:?}",
+                    order.name(),
+                    raw
+                );
+            }
+        }
+    }
+
+    /// The interreduction establishes the properties it is defined by: monic, minimal, reduced,
+    /// and canonically ordered.
+    #[test]
+    fn test_interreduction_establishes_its_properties() {
+        use crate::grobner::{benchmark_systems::katsura, buchberger::reduce_grobner_basis};
+        type F = Zp13;
+        let vars = ["x", "y", "z"];
+        let parse = |s: &str| MultivariatePolynomial::<3, F>::parse(s, vars).unwrap();
+
+        for order in ALL_ORDERS {
+            let mut inputs: Vec<Vec<MultivariatePolynomial<3, F>>> = vec![
+                vec![parse("x^2 - y"), parse("x^2 - y"), parse("3*x^2 - 3*y")],
+                vec![parse("x + y"), parse("x^2 + y^2"), parse("x^3 - 1")],
+            ];
+            inputs.push(buchberger(&katsura::<3, F>(), order));
+
+            for input in &inputs {
+                let basis = reduce_grobner_basis(input, order);
+
+                for p in &basis {
+                    assert_eq!(p.leading_coefficient(order), F::ONE, "{} is not monic", p);
+                }
+
+                // Minimal: no leading monomial divides another's.
+                for (i, p) in basis.iter().enumerate() {
+                    for (j, q) in basis.iter().enumerate() {
+                        if i == j {
+                            continue;
+                        }
+                        assert!(
+                            p.leading_monomial(order)
+                                .checked_div(&q.leading_monomial(order))
+                                .is_none(),
+                            "{} has a leading monomial divisible by {}'s",
+                            p,
+                            q
+                        );
+                    }
+                }
+
+                // Reduced: no monomial of one element is divisible by another's leading monomial.
+                for (i, p) in basis.iter().enumerate() {
+                    for m in p.terms().keys() {
+                        for (j, q) in basis.iter().enumerate() {
+                            if i == j {
+                                continue;
+                            }
+                            assert!(
+                                m.checked_div(&q.leading_monomial(order)).is_none(),
+                                "monomial {:?} of {} is reducible by {}",
+                                m.exponents(),
+                                p,
+                                q
+                            );
+                        }
+                    }
+                }
+
+                // Canonically ordered: strictly decreasing leading monomials.
+                for window in basis.windows(2) {
+                    assert_eq!(
+                        order.cmp(
+                            &window[0].leading_monomial(order),
+                            &window[1].leading_monomial(order)
+                        ),
+                        std::cmp::Ordering::Greater,
+                        "{}: not sorted by leading monomial",
+                        order.name()
+                    );
+                }
+
+                // Idempotent, which is what makes the output canonical rather than merely tidy.
+                assert_eq!(
+                    reduce_grobner_basis(&basis, order),
+                    basis,
+                    "{}: reducing a reduced basis changed it",
+                    order.name()
+                );
+            }
         }
     }
 

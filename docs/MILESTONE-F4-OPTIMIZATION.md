@@ -1312,3 +1312,250 @@ decision, and the number it needs is in §7.4.5.
 
 Published algorithm descriptions are the primary references. Existing implementations are read for
 architecture and performance strategy, under their own licenses; no code is copied.
+
+### 7.3 M16-C — critical-pair criteria and interreduction
+
+Two deliverables, reported separately because they are independent changes to the same workstream's
+files. Counters are deterministic and are the primary evidence. Wall clock was taken on the §6
+machine in release, but **three sibling workstreams were building on it concurrently**, so the
+times below are indicative and the integrator's serial run is authoritative. The counters are not
+affected by that.
+
+Measured at `20b6602` on `feat/m16-pair-criteria`, against the `a11cbab` M16-0 baseline.
+
+#### 7.3.1 The interreduction
+
+§6.2 found `reduce_grobner_basis` to be 2479 ms of katsura-6 lex's 2963 ms. **None of the cost was
+in the three suspects §5.3.1 named.** Instrumenting the function directly:
+
+| | katsura-6 lex |
+|---|---|
+| pre-interreduction basis | 113 elements, 3660 terms |
+| minimal basis | 6 elements, 174 terms |
+| `minimize_grobner_basis` | 0.5 ms |
+| the interreduction loop | 2534 ms |
+
+So the quadratic deduplication and the double `leading_monomial` scan together account for 0.02% of
+it, and the cloned divisor slice cannot account for anything: there are six polynomials of 174
+terms to clone. All of the cost is two calls to `normal_form`, one of 1.27 s each:
+
+```text
+ELEM 0 lead=x1   7 terms -> 33 terms in 1.272936527s
+ELEM 1 lead=x2  32 terms -> 32 terms in 1.271073570s
+ELEM 2 lead=x3  35 terms -> 32 terms in  22.750310ms
+ELEM 3 lead=x4  36 terms -> 32 terms in 374.489000µs
+ELEM 4 lead=x5  32 terms -> 32 terms in  11.873000µs
+ELEM 5 lead=x6^32                      in   9.819000µs
+```
+
+The cause is substitution depth, not basis size. That basis is in shape position: five elements
+with linear leading monomials over one univariate of degree 32. Reducing the tail of the `x1`
+element against an **unreduced** `x2` element substitutes 31 terms, each of which then has to be
+reduced against an unreduced `x3` element, and so on down the chain — and the elements were being
+reduced in descending leading-monomial order, which is the worst possible one.
+
+**The fix is to interreduce in ascending leading-monomial order, writing each remainder back in
+place.** Every divisor below the element being reduced is then already fully reduced, so a
+substitution introduces monomials that are already in normal form. The element being reduced is
+swapped to the end of the vector so that the others are a contiguous slice, which removes the clone
+as well and needs no change to `normal_form`'s interface.
+
+This cannot change the answer, and the argument is worth stating because it is what makes the
+reordering safe. A remainder `r` is congruent to its element modulo the ideal, has that element's
+leading monomial — minimization left it divisible by no other leading monomial, so division cannot
+cancel it — and has no monomial divisible by any other element's leading monomial. Two elements
+with those three properties differ by an ideal member all of whose monomials are irreducible, which
+is zero. So `r` depends only on the element's leading monomial, and not on which divisor was
+applied first or on whether a divisor's tail had been reduced yet; those change only how many steps
+the reduction takes. Reducing an element never changes its leading monomial, which is all that
+divisibility is tested against.
+
+Interreduction, milliseconds, baseline criteria in both columns:
+
+| system | order | M16-0 | M16-C | |
+|---|---|---|---|---|
+| cyclic-5 | lex | 6.09 | 0.37 | 16.5x |
+| cyclic-5 | grlex | 0.87 | 0.65 | |
+| katsura-5 | lex | 2.16 | 0.16 | 13.5x |
+| **katsura-6** | **lex** | **2479.28** | **1.04** | **2384x** |
+| katsura-6 | grlex | 2.00 | 1.75 | |
+| katsura-6 | grevlex | 2.83 | 2.54 | |
+| katsura-7 | grlex | 32.37 | 29.12 | |
+| katsura-7 | grevlex | 45.30 | 39.85 | |
+
+katsura-6 lex as a whole goes from 2963 ms to 520 ms. The instances that barely move are the ones
+whose minimal basis is large — katsura-7 grlex returns 64 elements and 4663 terms — where the
+reduction is work that genuinely has to be done rather than work done twice. Interreduction is
+still the largest single stage on those two instances after the criteria are enabled.
+
+Both engines call this function, so classical Buchberger gets the same improvement; its *result*
+does not move, which the existing reference-agreement tests and a new differential test against the
+naive formulation both check.
+
+The minimization was also cleaned up — leading monomials taken once rather than once per
+comparison, and duplicates compared only against elements sharing a leading monomial and term
+count — but on the evidence above that is tidiness, not a measured win, and it is reported as such.
+
+#### 7.3.2 The criteria
+
+Buchberger's chain criterion at selection time and Gebauer–Möller pair-set minimization at
+insertion time, both in `pairs.rs` and so available to both engines, each behind its own flag.
+
+**The soundness conditions, as implemented.** The chain criterion is Cox, Little and O'Shea's
+`Criterion(f_i, f_j, B)` (*Ideals, Varieties, and Algorithms* §2.10): discard `(i, j)` when some
+`k ∉ {i, j}` has `LM(f_k)` dividing `lcm(LM f_i, LM f_j)` **and** neither `(i, k)` nor `(k, j)` is
+in `B`. Gebauer–Möller is the published installation (Gebauer & Möller 1988, criteria B, M and F;
+Becker & Weispfenning, *Gröbner Bases*, Algorithm 5.5 `UPDATE`): B discards a pending `(g1, g2)`
+when `LM(h)` divides its lcm and **both** `lcm(LM g1, LM h)` and `lcm(LM h, LM g2)` differ from it;
+M keeps one new pair per lcm under divisibility; F drops a relatively prime new pair *after* it has
+served as an lcm representative under M, which is why F is a second pass.
+
+Two points where the implementation is deliberately stronger than a naive reading, both stated in
+the code:
+
+1. "In `B`" is read as **"selected and processed"**, not "absent from the pending set". A pair
+   selected in the same F4 batch has left the pending set but has not been reduced, and three pairs
+   on one another's lcms could then each be discarded on the strength of the other two. A pair
+   Gebauer–Möller removed is likewise absent from the pending set, and its own redundancy is
+   justified by two pairs that are still pending — letting it witness one of those closes the loop.
+   With Gebauer–Möller off, every pair leaves the pending set by being selected, so the two
+   readings coincide and this is exactly the published criterion.
+2. Gebauer–Möller's criterion F is Buchberger's first criterion, so it is applied only when
+   `PairCriteria::product` is also set, and its eliminations are counted under `gebauer_moller` so
+   that `product` keeps meaning what the baseline measured.
+
+The invariant both installations maintain is the same: every pair not in `B` has a standard
+representation modulo the final basis, justified either by a pair processed strictly earlier or by
+pairs whose lcm divides its own strictly. That is what makes the justification well-founded rather
+than circular, and it is why (1) is not optional.
+
+**F4: pairs reduced, matrices built, largest matrix.** From
+`cargo run --release --example pair_criteria`. `product` is the measured baseline. `chain` is
+product plus the chain criterion; `gm` is product plus Gebauer–Möller; `all` is all three.
+
+| system | order | criteria | batches | reduced | prod | chain | gm | max rows | ms |
+|---|---|---|---|---|---|---|---|---|---|
+| cyclic-5 | lex | product | 32 | 948 | 180 | 0 | 0 | 565 | 23.6 |
+| cyclic-5 | lex | chain | 23 | 212 | 187 | 777 | 0 | 160 | 4.8 |
+| cyclic-5 | lex | gm | 24 | 106 | 0 | 0 | 1169 | 161 | 3.7 |
+| cyclic-5 | grevlex | product | 22 | 868 | 167 | 0 | 0 | 635 | 25.5 |
+| cyclic-5 | grevlex | chain | 14 | 204 | 167 | 664 | 0 | 161 | 3.2 |
+| cyclic-5 | grevlex | gm | 14 | 116 | 0 | 0 | 919 | 110 | 2.0 |
+| katsura-5 | lex | product | 29 | 593 | 353 | 0 | 0 | 381 | 13.8 |
+| katsura-5 | lex | chain | 19 | 188 | 353 | 405 | 0 | 166 | 4.6 |
+| katsura-5 | lex | gm | 20 | 50 | 0 | 0 | 896 | 38 | 0.9 |
+| katsura-6 | lex | product | 59 | 4611 | 1717 | 0 | 0 | 1954 | 556.8 |
+| katsura-6 | lex | chain | 38 | 785 | 1648 | 3345 | 0 | 790 | 68.9 |
+| katsura-6 | lex | gm | 107 | 231 | 0 | 0 | 20884 | 92 | 23.2 |
+| katsura-6 | grlex | product | 9 | 387 | 279 | 0 | 0 | 644 | 26.3 |
+| katsura-6 | grlex | chain | 6 | 214 | 279 | 173 | 0 | 378 | 9.9 |
+| katsura-6 | grlex | gm | 6 | 103 | 0 | 0 | 563 | 353 | 6.5 |
+| katsura-6 | grevlex | product | 8 | 147 | 129 | 0 | 0 | 1388 | 33.1 |
+| katsura-6 | grevlex | chain | 6 | 93 | 129 | 54 | 0 | 754 | 9.4 |
+| katsura-6 | grevlex | gm | 6 | 68 | 0 | 0 | 208 | 670 | 6.9 |
+| katsura-7 | grlex | product | 11 | 1553 | 862 | 0 | 0 | 2450 | 573.8 |
+| katsura-7 | grlex | chain | 7 | 616 | 862 | 937 | 0 | 1046 | 122.3 |
+| katsura-7 | grlex | gm | 7 | 264 | 0 | 0 | 2151 | 1051 | 76.8 |
+| katsura-7 | grevlex | product | 10 | 555 | 348 | 0 | 0 | 6810 | 928.2 |
+| katsura-7 | grevlex | chain | 7 | 243 | 348 | 312 | 0 | 2817 | 146.7 |
+| katsura-7 | grevlex | gm | 7 | 166 | 0 | 0 | 737 | 2633 | 110.9 |
+
+Both criteria pay on every instance, and they pay in the currency the hypothesis named: fewer
+matrices, and smaller ones. Gebauer–Möller is the stronger of the two throughout, and
+**`all` is identical to `gm` in every row** — `chain` is 0 whenever Gebauer–Möller is on. That is
+the expected consequence of §7.3.2 (1): a pair Gebauer–Möller removed never becomes a chain
+witness, and the pair set Gebauer–Möller maintains is already lcm-minimal, so the selection-time
+criterion has nothing left to find. The chain criterion earns its place as the criterion that works
+without insertion-time bookkeeping, not as an addition to Gebauer–Möller.
+
+katsura-6 lex is the one row where Gebauer–Möller *increases* the batch count, 59 to 107. It is
+building many more, far smaller matrices — 92 rows against 1954 — and is 24x faster for it.
+
+**Classical Buchberger.** From `cargo run --release --example pair_criteria -- buchberger`.
+
+| system | order | criteria | considered | reduced | zero | prod | chain | gm | ms |
+|---|---|---|---|---|---|---|---|---|---|
+| katsura-4 | lex | product | 153 | 84 | 70 | 69 | 0 | 0 | 1.1 |
+| katsura-4 | lex | chain | 153 | 25 | 11 | 69 | 59 | 0 | 0.4 |
+| katsura-4 | lex | gm | 16 | 16 | 2 | 0 | 0 | 137 | 0.2 |
+| katsura-5 | lex | product | 2415 | 1790 | 1725 | 625 | 0 | 0 | 184.2 |
+| katsura-5 | lex | chain | 3240 | 134 | 58 | 813 | 2293 | 0 | 12.4 |
+| katsura-5 | lex | gm | 162 | 162 | 5 | 0 | 0 | 12879 | 35.7 |
+| katsura-5 | grevlex | product | 105 | 49 | 39 | 56 | 0 | 0 | 1.3 |
+| katsura-5 | grevlex | chain | 105 | 33 | 23 | 56 | 16 | 0 | 0.8 |
+| katsura-5 | grevlex | gm | 30 | 30 | 20 | 0 | 0 | 75 | 0.8 |
+| cyclic-5 | grlex | product | 1653 | 1454 | 1401 | 199 | 0 | 0 | 63.6 |
+| cyclic-5 | grlex | chain | 1653 | 144 | 91 | 199 | 1310 | 0 | 5.6 |
+| cyclic-5 | grlex | gm | 147 | 147 | 94 | 0 | 0 | 1506 | 5.5 |
+| katsura-6 | grlex | product | 666 | 387 | 356 | 279 | 0 | 0 | 37.6 |
+| katsura-6 | grlex | chain | 666 | 133 | 102 | 279 | 254 | 0 | 11.0 |
+| katsura-6 | grevlex | product | 276 | 147 | 129 | 129 | 0 | 0 | 14.5 |
+| katsura-6 | grevlex | chain | 276 | 73 | 55 | 129 | 74 | 0 | 5.4 |
+
+In the classical engine **neither criterion dominates**: on katsura-5 lex the chain criterion
+reduces 134 pairs to Gebauer–Möller's 162 and is 2.9x faster, because Gebauer–Möller's criterion B
+rescans the pending set on every insertion and that set is longest under lex. Elsewhere
+Gebauer–Möller wins. Zero reductions — the pairs Buchberger pays full price to discover are
+useless — fall from 1725 to 58 on katsura-5 lex, which is the clearest statement of what these
+criteria are for.
+
+**Combined, against the M16-0 baseline.** Both deliverables, from
+`cargo run --release --example f4_profile -- c` against §6.2. Total milliseconds.
+
+| system | order | M16-0 | M16-C | |
+|---|---|---|---|---|
+| cyclic-5 | lex | 29.97 | 3.85 | 7.8x |
+| cyclic-5 | grevlex | 25.31 | 1.97 | 12.8x |
+| katsura-5 | lex | 15.64 | 1.02 | 15.3x |
+| **katsura-6** | **lex** | **2963.26** | **23.36** | **127x** |
+| katsura-6 | grlex | 22.69 | 6.85 | 3.3x |
+| katsura-6 | grevlex | 27.01 | 7.66 | 3.5x |
+| katsura-7 | grlex | 509.23 | 76.41 | 6.7x |
+| katsura-7 | grevlex | 896.32 | 105.86 | 8.5x |
+| random-4 | lex | 7.73 | 1.03 | 7.5x |
+
+**This moves the bottleneck, which the other workstreams should know.** §6.2's headline was that
+elimination is 65–88% of the computation. With the criteria enabled it is 2.84 ms of katsura-6 lex's
+23.36 — 12% — and symbolic preprocessing is now the largest stage there at 6.95 ms. On katsura-7
+the ranking is unchanged and elimination is still 41–51%, with interreduction second. The criteria
+do not make elimination faster; they remove rows, which makes the matrices small enough that the
+other stages matter.
+
+**Defaults are unchanged.** `F4Options::default()` and `PairCriteria::default()` are still the
+measured baseline, per §4.1: M16-I moves the default deliberately. On this evidence the
+configuration to move it to is `PairCriteria::ALL`, which is `gebauer_moller` plus `product` in
+effect.
+
+#### 7.3.3 Correctness
+
+- Every one of the eight criteria combinations returns the criteria-free computation's basis
+  exactly, in **both** engines, over all three orders: the 22-system corpus, every rotation and the
+  reversal of each generator list, a duplicated generator, a scalar multiple, a generator already
+  in the ideal, inconsistent systems, and 24 randomized sparse quadratic systems over GF(7) and
+  GF(13).
+- Every combination is also checked against `buchberger_reference`, the naive textbook
+  implementation, over all three orders. That matters because the criteria-free computation shares
+  the pair queue and the interreduction with the criteria-enabled one and the reference shares
+  nothing; katsura-3 under lex is covered by the slow `#[ignore]`d test, as it takes the reference
+  about two and a half minutes.
+- A regression test pins the unsound shortcut: three leading monomials each dividing the lcm of the
+  other two, where naive lcm-divisibility fires on the first pair selected and the sound criterion
+  must not.
+- Hand-verified unit tests assert *which* criterion eliminated a pair, one per Gebauer–Möller
+  condition.
+- The interreduction is checked against the naive formulation element for element, on
+  pre-interreduction bases rather than on finished ones, plus the four properties it is defined by
+  and idempotence.
+- `test_pair_criteria_do_not_change_the_basis`,
+  `test_every_configuration_agrees_with_the_baseline`, and both slow `#[ignore]`d
+  engine-agreement tests pass unchanged. 703 tests pass in debug and release.
+
+#### 7.3.4 Notes for the integrator
+
+- `Statistics` (classical Buchberger) gained a `criteria: CriterionCounts` field, which forced a
+  one-line addition to the exhaustive destructuring pattern in `examples/grobner_statistics.rs`.
+  That is the only edit to existing content in an append-only file.
+- `examples/pair_criteria.rs` is new and reports the tables above.
+- No interface change is needed outside M16-C's files. In particular `normal_form` was left alone:
+  swapping the element under reduction to the end of the vector makes the other elements a
+  contiguous slice, so the clone §5.3.1 identified can be removed without touching `src/poly`.

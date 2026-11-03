@@ -1724,3 +1724,173 @@ fn test_structured_elimination_enforces_the_budgets() {
     ));
     assert!(f4_with_options(&generators, order, &structured).is_ok());
 }
+
+/// Every combination of the pair criteria returns the baseline's basis, in both engines, over
+/// permuted and redundant generators.
+///
+/// M16-C. The combinations matter individually: the chain criterion and Gebauer–Möller are
+/// separate installations of the same theorem, so a configuration where only one is enabled
+/// exercises a justification path the other hides. The permutations matter because an unsound
+/// criterion usually agrees on a fixed corpus and fails once the generator order decides which
+/// pairs are handled before which.
+#[test]
+fn test_each_criterion_combination_agrees_with_the_baseline() {
+    use crate::grobner::{buchberger_with_criteria, PairCriteria};
+
+    const COMBINATIONS: [PairCriteria; 8] = [
+        PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: true,
+            chain: false,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: false,
+            chain: false,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: true,
+            chain: true,
+            gebauer_moller: false,
+        },
+        PairCriteria {
+            product: true,
+            chain: false,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: false,
+            chain: true,
+            gebauer_moller: true,
+        },
+        PairCriteria {
+            product: true,
+            chain: true,
+            gebauer_moller: true,
+        },
+    ];
+
+    let mut systems: Vec<(String, Vec<MultivariatePolynomial<3, F>>)> = vec![
+        ("x^2+y, x^2+z".into(), system(&["x^2 + y", "x^2 + z"])),
+        ("xz-y^2".into(), system(&["x*z - y^2", "x^3 - z^2"])),
+        (
+            "four".into(),
+            system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]),
+        ),
+        (
+            "cyclic-ish".into(),
+            system(&["x^2 + y + 1", "y^2 + z + 2", "z^2 + x + 3"]),
+        ),
+        // Each leading monomial divides the lcm of the other two, which is what the chain
+        // criterion is about.
+        ("chain".into(), system(&["x - 1", "y - 2", "x*y - 3"])),
+        ("cyclic-3".into(), cyclic::<3, F>()),
+        ("katsura-3".into(), katsura::<3, F>()),
+    ];
+
+    // Permutations and redundant generators of each system, which is where an unsound criterion
+    // shows up.
+    let mut variants: Vec<(String, Vec<MultivariatePolynomial<3, F>>)> = Vec::new();
+    for (name, f) in &systems {
+        let mut reversed = f.clone();
+        reversed.reverse();
+        variants.push((format!("{} reversed", name), reversed));
+        variants.push((
+            format!("{} rotated", name),
+            f.iter().cycle().skip(1).take(f.len()).cloned().collect(),
+        ));
+        let mut duplicated = f.clone();
+        duplicated.push(f[0].clone());
+        variants.push((format!("{} duplicated", name), duplicated));
+        let mut redundant = f.clone();
+        redundant.push(&f[0] * &f[f.len() - 1]);
+        variants.push((format!("{} redundant", name), redundant));
+    }
+    systems.append(&mut variants);
+
+    for order in ALL_ORDERS {
+        for (name, f) in &systems {
+            let baseline = F4Options {
+                criteria: COMBINATIONS[0],
+                ..F4Options::baseline()
+            };
+            let (expected, _) = f4_with_options(f, order, &baseline).expect("within limits");
+
+            for criteria in COMBINATIONS {
+                let options = F4Options {
+                    criteria,
+                    ..F4Options::baseline()
+                };
+                let (actual, _) = f4_with_options(f, order, &options).expect("within limits");
+                assert_eq!(
+                    actual,
+                    expected,
+                    "{} under {} with {:?}",
+                    name,
+                    order.name(),
+                    criteria
+                );
+
+                let (classical, _) = buchberger_with_criteria(f, order, &criteria);
+                assert_eq!(
+                    classical,
+                    expected,
+                    "{} under {} with {:?}: Buchberger disagrees",
+                    name,
+                    order.name(),
+                    criteria
+                );
+            }
+        }
+    }
+}
+
+/// The criteria reduce the matrices F4 builds without changing the basis, on a larger system.
+///
+/// M16-C. The gate on the criteria is "fewer matrices built", so it is asserted rather than only
+/// reported, and alongside the equality that makes the saving legitimate.
+#[test]
+fn test_criteria_reduce_the_matrices_built() {
+    use crate::grobner::PairCriteria;
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        let system = katsura::<5, G>();
+
+        let baseline = F4Options {
+            criteria: PairCriteria::PRODUCT_ONLY,
+            ..F4Options::baseline()
+        };
+        let (expected, before) = f4_with_options(&system, order, &baseline).expect("within limits");
+
+        let options = F4Options {
+            criteria: PairCriteria::ALL,
+            ..F4Options::baseline()
+        };
+        let (actual, after) = f4_with_options(&system, order, &options).expect("within limits");
+
+        assert_eq!(actual, expected, "{}", order.name());
+        assert!(
+            after.pairs_reduced < before.pairs_reduced,
+            "{}: {} pairs reduced with the criteria, {} without",
+            order.name(),
+            after.pairs_reduced,
+            before.pairs_reduced
+        );
+        assert!(
+            after.criteria.chain + after.criteria.gebauer_moller > 0,
+            "{}: neither new criterion discarded anything",
+            order.name()
+        );
+    }
+}
