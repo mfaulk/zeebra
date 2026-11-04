@@ -1,7 +1,9 @@
 # Milestone: Large Prime Fields and Cryptographic Algebra Readiness
 
-**Status:** M20-0 complete (audit, backend choice, baselines, architecture); M20-A landed (the
-`KnownOrder` split). Next is M20-B, the `ark-ff` adapter.
+**Status:** M20-0, M20-A, M20-B and M20-D landed. The milestone's primary demonstration passes
+over both target fields: a planted zero-dimensional system goes through F4, the quotient algebra,
+FGLM and `solve_one`, and the returned point is verified against the original system. Remaining:
+M20-C's byte-accounted resource limits, and M20-E's benchmark corpus.
 **Prerequisites:** M18 merged; M19 complete on `m19-field-arithmetic` but **not yet on `main`**
 (`main` carries only the M19-0/M19-A merge). M20 branches from the merged M19.
 
@@ -75,70 +77,96 @@ Only one of these is a design problem. The rest are a newtype with derives and t
 invocations — which is why §3 proposes the smallest change that unblocks the one real conflict,
 and leaves `Ring`'s `Arbitrary` bound alone (§3.4).
 
-## 2. Backend choice: `ark-ff` 0.6, scalar fields declared locally
+The right-hand columns record the `ark-ff` evaluation as it stood; §2 explains why the field was
+implemented in-crate instead. The left-hand column is what matters either way — it is the list
+`PrimeFieldElement256` had to satisfy, and `Display`, serde, `Arbitrary` and the borrowed-operand
+variants were owed regardless of where the arithmetic came from.
 
-Measured, not inferred. All figures from an AMD Ryzen Threadripper PRO 5995WX, `rustc 1.97.0`,
-`--release` with the crate's `lto = "fat"` / `codegen-units = 1`, `-C target-cpu=native`.
+## 2. Backend: implemented in-crate, with `ark-ff` as a test oracle
 
-### 2.1 `ark-ff` against `ff`/`bls12_381`
+**Decided:** the 254/255-bit field is zeebra's own code. `ark-ff` is a **dev-dependency only**,
+used as a differential oracle in the role Singular already plays for Gröbner bases. Nothing
+third-party ships.
+
+Two reasons, one standing and one measured. The standing one is that every other primitive in
+this crate is hand-written — big integers, Montgomery prime fields, binary and extension fields,
+integer factoring — and large-field arithmetic sits in the hot path of everything M20 and after
+is built on, including representation changes a third-party trait would make awkward. The
+measured one is §2.2: the gap to hand-written assembly is small enough that owning the code costs
+little.
+
+An external backend was also never dependency-only. It needs a local newtype plus `FiniteField`,
+`KnownOrder`, `Arbitrary`, serde and the borrowed-operand macros regardless, so a good part of
+the work was owed either way.
+
+Measurement conditions throughout: AMD Ryzen Threadripper PRO 5995WX, `rustc 1.97.0`, `--release`
+with the crate's `lto = "fat"` / `codegen-units = 1`, `-C target-cpu=native`.
+
+### 2.1 Why `ark-ff` is the oracle, and not `ff`/`bls12_381`
 
 `bls12_381::Scalar` (zkcrypto, `ff` 0.14) **does not implement `Hash`**, which `FiniteField`
 requires and which `SparseMultiPoly` uses (`sparse_multivariate_polynomial.rs:256` hand-writes
-`Hash` over its coefficients). `ark-ff`'s `Fp` does. `ff` 0.14 also pulls `rand_core` 0.9+,
-against zeebra's rand 0.8 / `rand_core` 0.6 — the version split §18 of the plan anticipated.
-`ark-std` 0.6 depends on **rand 0.8.8**, so `UniformRand::rand(&mut rng)` takes zeebra's own
-`R: RngCore + CryptoRng` with no adaptation layer.
+`Hash` over its coefficients). `ark-ff`'s `Fp` does. `ff` 0.14 also pulls `rand_core` 0.9+
+against zeebra's rand 0.8 / `rand_core` 0.6 — the version split §18 of the plan anticipated —
+whereas `ark-std` 0.6 is on rand 0.8.8.
 
-`ark-ff` is the primary provider. No second production backend.
+Those were the criteria for a *shipped* backend and they decided the comparison before the
+decision changed. They still apply to an oracle: it must be instantiable over exactly these two
+fields and comparable without an adaptation layer.
 
-### 2.2 Declare the two fields locally, don't depend on the curve crates
+The oracle declares the two fields from their decimal moduli through `ark-ff`'s `MontConfig`
+derive rather than depending on `ark-bn254` and `ark-bls12-381`, which pull `ark-ec` and the
+whole curve stack unconditionally even under `--no-default-features --features scalar_field`
+(111 packages against 76). Elliptic curves and pairings are out of scope, and a test oracle
+should not drag them in.
 
-`ark-bn254` and `ark-bls12-381` both depend on `ark-ec` unconditionally, even under
-`--no-default-features --features scalar_field`: 111 packages in the lock file, and elliptic
-curves and pairings are explicitly out of scope. Declaring the moduli with `ark-ff`'s
-`MontConfig` derive gives both fields from `ark-ff` alone — 30 packages total, **+25 over
-zeebra's current 51** — and puts the modulus in zeebra's own source where a test can check it
-against the published value:
+`test_the_oracle_is_over_the_same_fields` asserts that `ark-ff` derived the same modulus limbs
+this crate compiled in. Without it, agreement on arithmetic would only show that two
+implementations agree over *some* field.
 
-```rust
-#[derive(MontConfig)]
-#[modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"]
-#[generator = "5"]
-pub struct Bn254FrConfig;
-pub type Bn254Fr = Fp256<MontBackend<Bn254FrConfig, 4>>;
-```
+### 2.2 What the in-crate field costs against hand-written assembly
 
-Verified: BN254 `Fr` modulus is 254 bits, BLS12-381 `Fr` is 255, both `size_of == 32`,
-two-adicity 28 and 32 respectively (so `root_of_unity` remains available for FFT sizes up to
-2^28 / 2^32 — a bonus, not a requirement).
+A prototype measured before committing to the decision, against `ark-ff` with its `asm` feature
+on, in the loop shape `benches/field_arithmetic.rs` uses:
 
-Enable `ark-ff`'s `asm` feature. Measured on BN254 `Fr`: multiplication 20.6 ns with it against
-21.6 ns without, inversion 3.58 µs against 4.02 µs. Small but free, and it works on stable.
+| BN254 `Fr`, ns/op | mul | add | sub |
+|---|---:|---:|---:|
+| `ark-ff`, hand-written asm | 17.25 | 2.18 | 2.61 |
+| zeebra prototype | 20.96 | 5.74 | 4.92 |
+| ratio | **1.22x** | 2.64x | 1.89x |
 
-### 2.3 Sampling and serialization are already canonical
+Two things were learned while tuning that the shipped code reflects:
 
-Two of the plan's explicit hazards (§7.2, §7.3) turn out to be handled by the backend, which the
-adapter must preserve rather than reimplement:
+- **Masking the conditional subtraction instead of branching made `add` slower** — 6.78 ns to
+  8.80 ns. The branch predicts well enough and the mask lengthens the dependency chain. The
+  comment in `montgomery_256::mul` records this so it is not re-tried.
+- **The carry chain must be `carrying_add`, not two `overflowing_add`s joined by `||`.** That one
+  change took `add` from 6.78 ns to 5.74 ns and `sub` from 7.41 to 4.92. `Ux64` already uses the
+  carrying operations; the first draft did not.
 
-- **Uniform sampling is unbiased.** `ark-ff`'s `Standard` distribution for `Fp`
-  (`fields/models/fp/mod.rs:525`) masks the unused high bits and rejects any draw `>= MODULUS`,
-  looping until one lands in range. It does place the random limbs directly as the *Montgomery*
-  representation, which looks wrong and is not: `r ↦ r·R⁻¹ mod p` is a bijection on `[0,p)`, so
-  uniform in the Montgomery domain is uniform in the canonical one. Zeebra's `random` wraps this
-  rather than rolling its own rejection loop.
-- **Serialization is the canonical residue.** `CanonicalSerialize for Fp` writes
-  `self.into_bigint()`, not the internal limbs, so the Montgomery-leak hazard does not arise.
-  The adapter's serde impl goes over those canonical little-endian bytes, and the deserializer
-  rejects any encoding `>= p` — matching the `reduced_residue` guard
-  `PrimeFieldElement128` already applies (`prime_field_128.rs:36`). A reducing constructor, if
-  wanted, is a separately named one.
+### 2.3 The two hazards the plan called out, and what was done
 
-### 2.4 Risk accepted
+§7.2 and §7.3 of the plan warn about Montgomery leakage in serialization and about biased
+sampling. Implementing the field means both are this crate's problem rather than a backend's:
 
-`ark-ff` 0.6's `MontConfig` derive emits an `unexpected_cfgs` warning in the dependent crate.
-CI runs `cargo clippy --all-targets --all-features -- -D warnings`, so M20-B must confirm the
-warning does not escalate there, and add `#[allow(unexpected_cfgs)]` on the declaring module if
-it does.
+- **Serialization is the canonical residue.** `Serialize` writes `canonical_limbs()`, never the
+  stored Montgomery value, so the encoding does not depend on an internal representation choice
+  and round-trips against any other implementation of the field.
+  `test_serialization_is_the_canonical_residue` pins it on a value — seven encodes as seven.
+  Deserialization rejects any encoding at or above p rather than reducing it, matching the
+  `reduced_residue` guard `PrimeFieldElement128` already applies; `from_limbs_reduced` is the
+  separately named constructor for when reduction is what is wanted.
+- **Sampling is masked rejection, not reduction.** Reducing a uniform 256-bit draw modulo a
+  254-bit prime would favour the low residues. `test_random_is_unbiased_in_the_low_bits` runs a
+  chi-squared test over 16 buckets of the low limb across 200,000 draws, which is exactly where
+  that bias would appear.
+
+### 2.4 Risk, resolved
+
+`ark-ff` 0.6's `MontConfig` derive does emit an `unexpected_cfgs` warning in the dependent crate,
+as anticipated. CI runs `cargo clippy --all-targets --all-features -- -D warnings`, so it would
+have failed the build. It is confined to the test module that declares the oracle, which carries
+an `#[allow(unexpected_cfgs)]` with a comment saying why.
 
 ## 3. Architecture: split the cardinality out of `FiniteField` — landed
 
@@ -252,94 +280,84 @@ result. The assertions are a sanity check; the content of the test is that it co
 `F: KnownOrder` to `f4` was tried and breaks it, along with three sites in `f4/tests.rs`, so the
 property is pinned rather than merely documented.
 
-`roots` and `factorize` still take their exponents as `u128`, through one helper:
+`roots` and `factorize` took their exponents as `u128` for the length of M20-A, through one
+helper that failed loudly for a wider field. M20-D replaced it; see §5.1.
 
-```rust
-// src/poly/univariate/pow_mod.rs
-pub(crate) fn field_order<F: KnownOrder>() -> u128 {
-    F::order_u128().expect(
-        "root finding and factorization take the field order as a u128; a wider field needs \
-         limb-exponent modular arithmetic",
-    )
-}
-```
+### 3.5 What M20-A did *not* solve, and M20-D did
 
-One place to fail, one message naming what is missing, and one place for M20-D to replace.
-
-### 3.5 What this does *not* solve
-
-Nothing here makes `roots` work. §1's four files still need wide exponents, and the solving
-pipeline goes straight through them:
+M20-A left `roots` unable to run over a wide field, and the solving pipeline goes straight
+through it:
 
 ```
 solve_zero_dimensional → search → candidate_values (solve.rs:157)
                                 → roots (roots.rs:54) → pow_mod(x, F::order(), f)
 ```
 
-So wide-field root finding is a **mandatory integration gate**, as the plan's closing note
-argues. A Gröbner basis over BN254 that cannot produce a solution does not meet the objective.
+So wide-field root finding was a **mandatory integration gate**, as the plan's closing note
+argued. A Gröbner basis over BN254 that cannot produce a solution does not meet the objective.
+That gate is now passed — `test_the_whole_pipeline_over_bn254_fr` and its BLS12-381 twin take a
+planted system through F4, FGLM and `solve_one` and re-evaluate the returned point against the
+original system.
 
-## 4. Baselines
+## 4. Measurements
 
-### 4.1 Field arithmetic, existing fields
+### 4.1 Field arithmetic, every field in the crate
 
 `cargo bench --bench field_arithmetic`, 256 operations per iteration, divided out. `p31` =
-`Zp2147483647`, `p64` = `Zp18446744073709551557`, `p68` = `PrimeFieldElement128<221360928884514619393>`
-(3·2^66+1, 68 bits).
+`Zp2147483647`, `p64` = `Zp18446744073709551557`, `p68` =
+`PrimeFieldElement128<221360928884514619393>` (3·2^66+1).
 
 | field | width | mul | add | sub | inverse |
 |---|---:|---:|---:|---:|---:|
-| p31 | 31 | 1.76 ns | 1.06 ns | 0.99 ns | 252 ns |
-| p64 | 64 | 1.76 ns | 1.02 ns | 1.01 ns | 562 ns |
-| p68 | 68 | **134.8 ns** | 2.09 ns | 1.89 ns | **18.4 µs** |
+| p31 | 31 | 1.76 ns | 1.10 ns | 0.95 ns | 246 ns |
+| p64 | 64 | 1.71 ns | 1.05 ns | 0.97 ns | 509 ns |
+| p68 | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
+| BN254 `Fr` | 254 | 18.71 ns | 3.69 ns | 3.41 ns | 3.77 µs |
+| BLS12-381 `Fr` | 255 | 19.34 ns | 3.52 ns | 3.27 ns | 3.97 µs |
 
-### 4.2 The candidate wide fields
+Three things worth stating plainly:
 
-Same loop shape, same operand count, same `black_box` placement as the bench above, run outside
-Criterion. Treat as indicative to one significant figure, not as Criterion intervals; M20-E
-re-measures these inside the real harness.
+1. **A 254-bit multiply is 7.0x faster than the crate's own 68-bit multiply**, and inversion is
+   4.7x faster. `PrimeFieldElement128` reduces a 256-bit product by allocating software long
+   division; the new field reduces with CIOS and allocates nothing. The milestone's framing — that
+   wide fields cost more — holds against the 64-bit Montgomery fields (10.9x on multiply) and is
+   inverted against the 68-bit one. **Any "cost of width" claim has to name its baseline.**
+2. **Inversion is 202 multiplies.** Pivot normalization over a wide field should multiply by a
+   precomputed inverse, never divide per entry. Batch inversion is worth measuring.
+3. **Addition is only 3.5x a 64-bit addition, while multiplication is 11x.** A computation
+   dominated by row updates will degrade less than the multiply ratio suggests.
 
-| field | width | mul | add | sub | inverse |
-|---|---:|---:|---:|---:|---:|
-| BN254 `Fr` | 254 | 20.6 ns | 2.42 ns | 2.90 ns | 3.58 µs |
-| BLS12-381 `Fr` | 255 | 20.1 ns | 2.43 ns | 2.39 ns | 3.62 µs |
+### 4.2 Against hand-written assembly
 
-Two things fall out of this table that the plan did not anticipate:
+`ark-ff` with `asm`, at BN254 `Fr`: 17.25 ns multiply, 3.58 µs inverse. Against this crate's
+18.71 ns and 3.77 µs, that is **1.08x on multiply and 1.05x on inversion**.
 
-1. **A 254-bit `ark-ff` multiply is 6.5× faster than zeebra's existing 68-bit multiply.**
-   `PrimeFieldElement128` reduces by software long division; `ark-ff` uses Montgomery. The
-   milestone's framing — that wide fields will be slower — holds against the 64-bit fields
-   (12×) and is inverted against the 68-bit one. Any "cost of width" claim must say which
-   baseline it means.
-2. **Inversion is ~174 multiplications.** Pivot normalization over a wide field should multiply
-   by a precomputed inverse, never divide per entry, and batch inversion is worth measuring in
-   M20-C. (`ark-ff`'s `inverse` is already a Euclidean one, not exponentiation — the 3.58 µs is
-   not a `pow(q-2)` artifact.)
+Caveat the comparison rather than quoting the ratio alone: the zeebra figures above are Criterion,
+the `ark-ff` ones were taken in a hand-rolled loop of the same shape (256 operands,
+`acc += a[i] * b[i]`) because `ark-ff` is a dev-dependency and has no bench target here. The two
+harnesses agree to a few percent on the same code, so the ratio is indicative, not matched. The
+honest claim is that the gap is small — not that it is exactly 8%.
 
-### 4.3 Baselines still to take
+### 4.3 Still to measure
 
-The F4/FGLM/solving baselines of §5.3 of the plan are **not** recorded here: they must be taken
-on the merged M19, and M19 is not on `main` yet. Taking them against this worktree would date
-them immediately. The commands are unchanged from M19:
-
-```
-cargo bench --bench grobner
-cargo bench --bench f4_stages
-cargo bench --bench fglm
-cargo bench --bench polynomial_solving
-```
+- **F4, FGLM and end-to-end solving over the wide fields.** The correctness tests run on systems
+  small enough to be instant; nothing here yet says what a cryptographically interesting system
+  costs. That is M20-E.
+- **Byte-accounted resource limits.** `size_of::<(usize, F)>()` is 40 bytes for a wide field
+  against 16 for a 64-bit one, so the same nonzero-entry budget admits 2.5x the memory. F4's
+  budget is still counted in entries only. FGLM already has `max_operator_bytes`.
+- **F4/FGLM baselines on the merged M19.** M19 is still not on `main`.
 
 ### 4.4 Dependency and build cost
 
 | | packages (normal + build) |
 |---|---:|
-| zeebra today | 51 |
-| `+ ark-ff` with locally declared fields | 76 |
+| zeebra, shipped | **51 — unchanged** |
+| `+ ark-ff` as a dev-dependency | 76 at test time |
 | `+ ark-bn254`/`ark-bls12-381` instead | 111+ |
 
-`num-bigint` for the arithmetic oracle (§11.1 of the plan) is a **dev-dependency** and does not
-enter the figures above. Note `ark-ff` already carries `num-bigint` 0.4 internally, so the oracle
-must be a separate direct dev-dependency to be genuinely independent of the backend.
+The shipped dependency count did not move, which was the point of implementing the field rather
+than adapting one.
 
 ## 5. Revised sub-milestone plan
 
@@ -349,13 +367,13 @@ The structure of the plan survives; the sizes change.
 |---|---|---|
 | **M20-0** | This document | done |
 | **M20-A** | `KnownOrder` split, `inverse` required | **done**, and much smaller than planned — 16 bound edits, none in the core |
-| **M20-B** | `ark-ff` adapter newtype, BN254 + BLS12-381 `Fr`, oracle property tests | as planned |
-| **M20-C** | F4/Buchberger/quotient/FGLM over both fields; byte-accounted limits | as planned, but expect **no code changes** in the core — it is a test-and-measure sub-milestone |
-| **M20-D** | Limb-exponent `pow_mod`, Frobenius, `roots`, `factorize`, `solve_one` | **the critical path**, and the real risk |
+| **M20-B** | `PrimeFieldElement256`, BN254 + BLS12-381 `Fr`, oracle tests | **done**, but implemented in-crate rather than adapted — see §2 |
+| **M20-C** | F4/Buchberger/quotient/FGLM over both fields; byte-accounted limits | **partly done** — the core needed no changes at all, as predicted; the end-to-end test passes over BN254. Byte accounting outstanding |
+| **M20-D** | Limb-exponent `pow_mod`, Frobenius, `roots`, `factorize`, `solve_one` | **done** — one new function and five call-site changes; see §5.1 |
 | **M20-E** | Crypto corpus, oracle, measurements | as planned, starts now |
 | **M20-I** | Integration, benchmarks, report | as planned |
 
-### 5.1 M20-D, concretely
+### 5.1 M20-D, as landed
 
 `pow_mod` keeps its `u128` signature as a wrapper over a limb-slice form:
 
@@ -367,24 +385,43 @@ pub fn pow_mod<F: FiniteField>(base: &P<F>, exponent: u128, modulus: &P<F>) -> P
 pub fn pow_mod_limbs<F: FiniteField>(base: &P<F>, exponent: &[u64], modulus: &P<F>) -> P<F>;
 ```
 
-Square-and-multiply over the limbs' bits, high limb first, costs `O(log q)` polynomial
-multiplications and never materializes degree q — exactly what the existing loop does, with the
-bit source swapped. `roots` then calls `pow_mod_limbs(&x, F::order_limbs(), f)` and is done:
-**no other change to the root-finding algorithm.**
+Square-and-multiply over the exponent's bits, stopping at the highest set bit so that trailing
+zero limbs cost nothing and a caller may pass a fixed-width order unpadded. `O(log q)` polynomial
+multiplications, never materializing degree q — the existing loop with the bit source swapped.
+`roots` then calls `pow_mod_limbs(&x, F::order_limbs(), f)` and needs **no other change**.
 
-`factorize` needs more care. `(q-1)/2` becomes a limb subtract-one and a one-bit right shift;
-`frobenius_norm` and `frobenius_iterated` take `&[u64]` instead of `u128`;
-`F::characteristic() == 2` becomes a `characteristic_limbs() == [2]` check; `trace_to_gf2`'s
-`order().trailing_zeros()` is characteristic-two only and so never runs for a prime field, but
-must still compile. `prime_divisors(n)` operates on the *degree* `n`, not on q, so it is
-untouched — §9.4's "do not factor q-1" is already satisfied.
+Note the bound: `pow_mod_limbs` is on `FiniteField`, not `KnownOrder`. The exponent is a
+parameter, so the function itself has no opinion about where it came from.
 
-### 5.2 Parallelism
+`factorize` needed more:
 
-Phase 1 (M20-A) is sequential and owns `src/fields/finite_field.rs` and `src/rings/mod.rs`.
-After it lands, M20-B (adapter), M20-D (univariate) and M20-E (corpus) are independent; M20-C
-depends on M20-B only. That matches §14 of the plan, with M20-C demoted from implementation to
-validation.
+| Was | Is |
+|---|---|
+| `let q = F::order()` (`u128`) | `let q = F::order_limbs()` (`&'static [u64]`) |
+| `pow_mod(.., (q - 1) / 2, ..)` | `pow_mod_limbs(.., &half_of_q_minus_one::<F>(), ..)` — subtract one, shift right one bit across the limbs |
+| `frobenius_iterated(.., q: u128, ..)` | `q: &[u64]` |
+| `frobenius_norm` reading `F::order()` | reads `F::order_limbs()` |
+| `F::order().trailing_zeros()` in `trace_to_gf2` | `characteristic_two_degree::<F>()`, the single set bit's index across limbs |
+
+`half_of_q_minus_one` asserts that q is odd, which is what makes the halving exact — in
+characteristic two the splitter takes the trace branch instead and never reaches it.
+`prime_divisors(n)` operates on the *degree* n, not on q, so it is untouched: §9.4's "do not
+factor q - 1" was already satisfied.
+
+What this buys, tested: `roots` recovers planted roots over both target fields, including a
+39-digit one and `p - 1`; `pow_mod_limbs` is checked against the `u128` form where both apply and
+against 192 explicit squarings where only it applies; and `solve_one` returns a verified point
+over both fields.
+
+### 5.2 How the dependencies actually ran
+
+The plan's §14 expected M20-B, M20-D and M20-E to proceed in parallel after M20-A. In the event
+the order was strictly sequential and each step was small enough that parallelism would have cost
+more in coordination than it saved: M20-A was 16 bound edits, M20-B two new modules, M20-D one new
+function and five call-site changes. The reason is §1 — the audit found far less coupling than the
+plan assumed, so there was less work to divide.
+
+M20-E is genuinely independent and still outstanding.
 
 ## 6. Defects found during the audit
 
@@ -413,17 +450,49 @@ Neither is M20 work; both are in the code M20 touches.
 
 2. **No field type overrides `inverse`.** Every inversion in the crate is `pow(q-2)`: 252 ns on a
    31-bit field where `ark-ff` does 254 bits in 3.58 µs by binary extended Euclid, and 18.4 µs on
-   the 68-bit field. M19 territory, not M20's, but §4.2 is the measurement that motivates it.
+   the 68-bit field. M19 territory, not M20's, but §4.1 is the measurement that motivates it.
 
-## 7. Open decisions
+### 6.1 What the in-crate field is made of
 
-1. ~~Approve the `KnownOrder` split over a new `AlgebraField`~~ — approved, landed (§3).
-2. ~~`inverse` as a required method~~ — approved; it is the one public break (§3.1).
-3. **Locally declared moduli over `ark-bn254`/`ark-bls12-381`** (§2.2), accepting that the
-   moduli are then zeebra's responsibility to get right, checked by test against the published
-   constants. Still open; M20-B decides.
-4. Whether to re-base `PrimeFieldElement128` on `ark-ff` once the adapter exists, given §4.2.
-   Out of M20's scope as written; worth an issue.
+For a reader who wants to find the code rather than the argument:
+
+| File | Contents |
+|---|---|
+| `src/fields/montgomery_256.rs` | `n_prime`, `power_of_two_mod_p` (the `const fn` that gives `R` and `R^2` by doubling, since `multi_word_div` allocates and so cannot run in a constant), CIOS `mul`, `add`, `sub`, `halve`, and the binary extended Euclid `inverse` |
+| `src/fields/prime_field_256.rs` | `PrimeModulus256`, `PrimeFieldElement256`, the canonical/reduced constructors, byte and decimal conversion, serde, `Arbitrary`, masked rejection sampling, `FiniteField`, `KnownOrder`, and the two moduli |
+| `src/poly/univariate/pow_mod.rs` | `pow_mod_limbs` and the `pow_mod` wrapper |
+| `src/poly/univariate/factorize.rs` | `half_of_q_minus_one`, `characteristic_two_degree`, and the limb-exponent call sites |
+
+`inverse` seeds the loop with `R^2 mod p` rather than with one, which is what makes the result
+come out already in Montgomery form — the invariant carried through is `a*b = u*R^2` and
+`a*c = -v*R^2` modulo p, so when `u` reaches one, `b` holds `a^{-1} * R`. That is worth stating
+because it looks like a bug otherwise.
+
+## 7. Decisions, and what is left open
+
+Settled:
+
+1. ~~`KnownOrder` split over a new `AlgebraField`~~ — landed (§3).
+2. ~~`inverse` as a required method~~ — landed; the one public break (§3.1).
+3. ~~Where the 254-bit arithmetic comes from~~ — **implemented in-crate**, with `ark-ff` as a
+   dev-dependency oracle (§2). The moduli are therefore zeebra's responsibility, checked by test
+   against the published decimals.
+
+Open:
+
+4. **Re-base `PrimeFieldElement128` on `montgomery_256`, or retire it.** §4.1 is the argument:
+   its multiply is 130.6 ns against 18.71 ns for a field four times as wide, because it allocates
+   and long-divides. The 4-limb code generalizes to 2 limbs with no new mathematics. The one
+   obstacle is that `PrimeFieldElement128` takes its modulus as a `const P: u128` generic while
+   `PrimeFieldElement256` takes a trait, so converting changes its public shape. Worth an issue;
+   out of M20's scope as written.
+5. **Byte-accounted resource limits** (§4.3). F4's budget is still counted in entries, and a
+   wide-field entry is 2.5x the bytes of a 64-bit one. M20-C.
+6. **Whether a generator is ever needed over a wide field.** `primitive_element` and
+   `root_of_unity` are `unimplemented!()` for `PrimeFieldElement256`, since finding one means
+   factoring a 254-bit `q - 1`. Nothing in the crate needs them, and the FFT's uses are
+   test-only. If an FFT over a wide field is ever wanted, the two-adic root of unity is derivable
+   from the field's two-adicity without factoring — 28 for BN254, 32 for BLS12-381.
 
 ## 8. Acceptance criteria
 
@@ -443,15 +512,42 @@ Neither is M20 work; both are in the code M20 touches.
 ### M20-A
 
 - [x] Existing field types compile through the new abstraction, with unchanged arithmetic and
-      serialization behaviour — the suite is 979 lib tests and 14 doc tests, all passing, same
-      count as before the split plus the new ones
+      serialization behaviour
 - [x] The algebraic core is instantiable with a coefficient type that has no cardinality, pinned
       by a test that fails to compile otherwise (§3.4)
 - [x] Small-field algorithms return identical results; the Singular differential fixtures pass
       unchanged
-- [x] No duplicated wide-field Gröbner implementation introduced — there is no second
-      implementation of anything
-- [x] The public break documented, in the README's `FiniteField` and `KnownOrder` section and in
-      §3.1
-- [ ] Instantiated with a field whose order exceeds `u128` — M20-B, which is the first point at
+- [x] No duplicated wide-field Gröbner implementation introduced
+- [x] The public break documented, in the README and in §3.1
+- [x] Instantiated with a field whose order exceeds `u128` — done in M20-B
+
+### M20-B
+
+- [x] BN254 `Fr` and BLS12-381 `Fr` usable as coefficient types
+- [x] Arithmetic agrees with an independent implementation — 20,000 random cases per field on
+      add, sub, mul, square, negate, invert and divide, plus the nine edge pairs over
+      {0, 1, p-1}, against `ark-ff` as a dev-dependency
+- [x] Both moduli checked against the published decimals **without** the oracle, and the oracle
+      separately confirmed to be over the same two fields
+- [x] Uniform sampling correctly defined — masked rejection, with a chi-squared test on the low
+      bits where reduction would show a bias
+- [x] Canonical serialization and parsing tested; non-canonical encodings rejected by both the
+      constructor and the deserializer; a separately named reducing constructor provided
+- [x] Field elements satisfy the polynomial and linear-algebra types' requirements
+- [x] No new multiprecision arithmetic engine — `montgomery_256` is 4-limb Montgomery, not a
+      general bignum, and the existing `BigUInt` handles decimal conversion at the boundary
+- [x] Fixed-width, stack-allocated representation: `size_of::<Bn254Fr>() == 32`, nothing on the
+      heap in the hot path
+
+### M20-D
+
+- [x] Wide-exponent modular polynomial arithmetic correct — checked against the `u128` form where
+      both apply, and against explicit repeated squaring beyond it
+- [x] Root finding supports both target fields
+- [x] `solve_one` recovers a known witness over both fields, verified against the original system
+- [x] No-solution stays distinct from a resource error — `Ok(None)` for a system with no
+      base-field point, tested with a non-square found by search rather than assumed
+- [x] The complete F4 → FGLM → solving pipeline works
+- [x] No enumeration of a 254-bit field occurs; `solve.rs`'s enumerator fails closed on a field
+      too wide to measure
       which such a field exists
