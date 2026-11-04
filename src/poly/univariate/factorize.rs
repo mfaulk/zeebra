@@ -19,9 +19,46 @@
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    poly::univariate::{gcd, pow_mod, pow_mod::field_order, Polynomial, UnivariatePolynomial},
+    poly::univariate::{gcd, pow_mod, pow_mod::pow_mod_limbs, Polynomial, UnivariatePolynomial},
     FiniteField, KnownOrder,
 };
+
+/// `(q - 1) / 2`, as little-endian limbs.
+///
+/// The exponent equal-degree splitting raises to in odd characteristic. `q` is odd there, so
+/// `q - 1` is even and the halving is exact — a shift, not a division.
+///
+/// # Panics
+/// Panics in characteristic two, where `(q - 1) / 2` is not an integer and the splitter uses the
+/// trace instead.
+fn half_of_q_minus_one<F: KnownOrder>() -> Vec<u64> {
+    let mut limbs = F::order_limbs().to_vec();
+    assert_eq!(limbs[0] & 1, 1, "q must be odd for (q - 1) / 2 to be exact");
+    limbs[0] -= 1;
+
+    // One right shift across the limbs, high to low.
+    let mut carry = 0u64;
+    for limb in limbs.iter_mut().rev() {
+        let next_carry = *limb & 1;
+        *limb = (*limb >> 1) | (carry << 63);
+        carry = next_carry;
+    }
+    limbs
+}
+
+/// `m` where `q = 2^m`, for a field of characteristic two.
+///
+/// The limb walk is defensive rather than exercised: every characteristic-two field in this crate
+/// is a `BinaryFieldElement`, whose modulus is a `u64`, so `m <= 63` and the order occupies one
+/// limb. A wider one would still be read correctly.
+fn characteristic_two_degree<F: KnownOrder>() -> u32 {
+    let limbs = F::order_limbs();
+    let position = limbs
+        .iter()
+        .position(|&limb| limb != 0)
+        .expect("a field order is at least two");
+    position as u32 * 64 + limbs[position].trailing_zeros()
+}
 
 /// Each splitting attempt succeeds with probability near one half, so exhausting this many means
 /// a defect rather than bad luck. Failing loudly beats looping forever.
@@ -47,7 +84,7 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
     let monic = make_monic(f);
     let total_degree = monic.degree();
     let x = variable::<F>();
-    let q = field_order::<F>();
+    let q = F::order_limbs();
 
     let mut factors: Vec<(UnivariatePolynomial<F>, usize)> = Vec::new();
     let mut accounted = 0u32;
@@ -59,7 +96,7 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
 
     // x^(q^d), built by applying the Frobenius map repeatedly. Computing q^d as an integer would
     // overflow for even modest q and d.
-    let mut x_to_the_q_to_the_d = pow_mod(&x, q, &monic);
+    let mut x_to_the_q_to_the_d = pow_mod_limbs(&x, q, &monic);
 
     for d in 1..=total_degree {
         // The distinct irreducible factors of f whose degree divides d.
@@ -87,7 +124,7 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
             break;
         }
 
-        x_to_the_q_to_the_d = pow_mod(&x_to_the_q_to_the_d, q, &monic);
+        x_to_the_q_to_the_d = pow_mod_limbs(&x_to_the_q_to_the_d, q, &monic);
     }
 
     debug_assert_eq!(
@@ -120,7 +157,7 @@ pub fn is_irreducible<F: KnownOrder>(f: &UnivariatePolynomial<F>) -> bool {
 
     let monic = make_monic(f);
     let x = variable::<F>();
-    let q = field_order::<F>();
+    let q = F::order_limbs();
 
     if frobenius_iterated(&x, n, q, &monic) != x {
         return false;
@@ -141,12 +178,12 @@ pub fn is_irreducible<F: KnownOrder>(f: &UnivariatePolynomial<F>) -> bool {
 fn frobenius_iterated<F: KnownOrder>(
     base: &UnivariatePolynomial<F>,
     times: u32,
-    q: u128,
+    q: &[u64],
     modulus: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
     let mut result = base.div(modulus).1;
     for _ in 0..times {
-        result = pow_mod(&result, q, modulus);
+        result = pow_mod_limbs(&result, q, modulus);
     }
     result
 }
@@ -190,7 +227,7 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
             // The target is h^((q^d - 1)/2). Writing (q^d - 1)/2 as
             // ((q - 1)/2) * (1 + q + ... + q^(d-1)) turns it into the norm raised to (q - 1)/2,
             // both of which are computable: the exponent itself would overflow.
-            &pow_mod(&frobenius_norm(&h, g, d), (field_order::<F>() - 1) / 2, g)
+            &pow_mod_limbs(&frobenius_norm(&h, g, d), &half_of_q_minus_one::<F>(), g)
                 - &UnivariatePolynomial::one()
         };
 
@@ -217,11 +254,11 @@ fn frobenius_norm<F: KnownOrder>(
     g: &UnivariatePolynomial<F>,
     d: u32,
 ) -> UnivariatePolynomial<F> {
-    let q = field_order::<F>();
+    let q = F::order_limbs();
     let mut term = h.div(g).1;
     let mut norm = term.clone();
     for _ in 1..d {
-        term = pow_mod(&term, q, g);
+        term = pow_mod_limbs(&term, q, g);
         norm = (&norm * &term).div(g).1;
     }
     norm
@@ -234,7 +271,7 @@ pub(crate) fn trace_to_gf2<F: KnownOrder>(
     d: u32,
 ) -> UnivariatePolynomial<F> {
     // q = 2^m, so m is the position of its single set bit.
-    let m = field_order::<F>().trailing_zeros();
+    let m = characteristic_two_degree::<F>();
     let mut term = h.div(g).1;
     let mut sum = term.clone();
     for _ in 1..(m * d) {
@@ -314,7 +351,9 @@ mod tests {
         fields::PrimeFieldElement64,
         identities::Zero,
         poly::univariate::{
-            factorize::{factorize, is_irreducible},
+            factorize::{
+                characteristic_two_degree, factorize, half_of_q_minus_one, is_irreducible,
+            },
             roots, Polynomial, UnivariatePolynomial,
         },
         FiniteField,
@@ -551,5 +590,99 @@ mod tests {
             &UnivariatePolynomial::<PrimeFieldElement64<7>>::zero(),
             &mut rng,
         );
+    }
+
+    /// `(q - 1) / 2` is right for a one-limb order, where it is checkable by hand.
+    #[test]
+    fn test_half_of_q_minus_one_on_a_narrow_order() {
+        assert_eq!(half_of_q_minus_one::<PrimeFieldElement64<7>>(), vec![3]);
+        assert_eq!(half_of_q_minus_one::<PrimeFieldElement64<13>>(), vec![6]);
+        assert_eq!(
+            half_of_q_minus_one::<PrimeFieldElement64<2147483647>>(),
+            vec![1073741823]
+        );
+    }
+
+    /// `(q - 1) / 2` shifts across the limb boundary rather than within one limb.
+    ///
+    /// For BN254, `(p - 1) / 2` has a low limb that can only be right if the bit carried down
+    /// from the second limb was shifted in.
+    #[test]
+    fn test_half_of_q_minus_one_shifts_across_limbs() {
+        use crate::fields::{Bn254Fr, Bn254FrModulus, PrimeModulus256};
+
+        let halved = half_of_q_minus_one::<Bn254Fr>();
+
+        // Reconstruct 2 * halved + 1 and check it is the modulus.
+        let mut doubled = [0u64; 4];
+        let mut carry = 0u64;
+        for (i, limb) in halved.iter().enumerate() {
+            doubled[i] = (limb << 1) | carry;
+            carry = limb >> 63;
+        }
+        assert_eq!(carry, 0, "(p - 1) / 2 must double without overflow");
+        doubled[0] |= 1;
+        assert_eq!(doubled, Bn254FrModulus::MODULUS);
+    }
+
+    /// `(q - 1) / 2` refuses an even order, where the halving would not be exact.
+    #[test]
+    #[should_panic(expected = "q must be odd")]
+    fn test_half_of_q_minus_one_rejects_characteristic_two() {
+        let _ = half_of_q_minus_one::<PrimeFieldElement64<2>>();
+    }
+
+    /// `m` is recovered from `q = 2^m`.
+    ///
+    /// GF(2) is the only characteristic-two field reachable from here — `BinaryFieldElement` and
+    /// `ExtensionFieldElement` are both crate-private to `fields` — so the cross-limb arithmetic
+    /// is covered by `half_of_q_minus_one`'s test instead. See the function's own note on why it
+    /// cannot arise for a characteristic-two field in this crate anyway.
+    #[test]
+    fn test_characteristic_two_degree_reads_the_single_set_bit() {
+        assert_eq!(characteristic_two_degree::<PrimeFieldElement64<2>>(), 1);
+    }
+
+    /// Factorization works over a 254-bit field, with the factors recovered as planted.
+    ///
+    /// Exercises the odd-characteristic splitter at a width where `(q - 1) / 2` and `q^d` are
+    /// both beyond a `u128`, which is the whole point of the limb exponents.
+    #[test]
+    fn test_factorize_over_bn254_fr() {
+        use crate::{fields::Bn254Fr, identities::One};
+
+        // (x - 3)(x - a)(x^2 + x + 1), with `a` wide. The quadratic is irreducible over GF(p)
+        // exactly when p is not 1 mod 3; whichever it is, the product of the degrees must come
+        // back to the total degree and the product of the factors must be the input.
+        let a = <Bn254Fr as FiniteField>::from_str("31415926535897932384626433832795028841")
+            .expect("valid decimal");
+        let linear_three =
+            UnivariatePolynomial::new(&[Bn254Fr::zero() - Bn254Fr::new(3), Bn254Fr::one()]);
+        let linear_a = UnivariatePolynomial::new(&[Bn254Fr::zero() - a, Bn254Fr::one()]);
+        let quadratic =
+            UnivariatePolynomial::new(&[Bn254Fr::one(), Bn254Fr::one(), Bn254Fr::one()]);
+        let f = &(&linear_three * &linear_a) * &quadratic;
+
+        let mut rng = StdRng::seed_from_u64(21);
+        let factors = factorize(&f, &mut rng);
+
+        // Every factor is irreducible, and their product with multiplicity is f.
+        let mut product = UnivariatePolynomial::<Bn254Fr>::one();
+        let mut total_degree = 0;
+        for (factor, multiplicity) in &factors {
+            assert!(is_irreducible(factor), "{factor} must be irreducible");
+            for _ in 0..*multiplicity {
+                product = &product * factor;
+                total_degree += factor.degree();
+            }
+        }
+        assert_eq!(total_degree, f.degree());
+        assert_eq!(product, f, "the factors must multiply back to f");
+
+        // The two planted linear factors are among them.
+        let found: Vec<&UnivariatePolynomial<Bn254Fr>> =
+            factors.iter().map(|(factor, _)| factor).collect();
+        assert!(found.contains(&&linear_three), "x - 3 must be a factor");
+        assert!(found.contains(&&linear_a), "x - a must be a factor");
     }
 }

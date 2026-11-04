@@ -10,21 +10,8 @@
 
 use crate::{
     poly::univariate::{Polynomial, UnivariatePolynomial},
-    FiniteField, KnownOrder,
+    FiniteField,
 };
-
-/// The order q of F as a `u128`.
-///
-/// The univariate algorithms exponentiate by q, q - 1 and q^d, and `pow_mod` takes its exponent
-/// as a `u128`. Until that exponent becomes a limb slice, a field whose order is wider than a
-/// `u128` cannot be factored or have its roots found, and this is where it says so rather than
-/// computing with a truncated order.
-pub(crate) fn field_order<F: KnownOrder>() -> u128 {
-    F::order_u128().expect(
-        "root finding and factorization take the field order as a u128; a wider field needs \
-         limb-exponent modular arithmetic",
-    )
-}
 
 /// `base^exponent mod modulus`, by square-and-multiply.
 ///
@@ -35,6 +22,26 @@ pub fn pow_mod<F: FiniteField>(
     exponent: u128,
     modulus: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
+    pow_mod_limbs(base, &[exponent as u64, (exponent >> 64) as u64], modulus)
+}
+
+/// `base^exponent mod modulus`, with the exponent as little-endian 64-bit limbs.
+///
+/// The exponents root finding and factorization need are q, `q - 1` and `(q - 1) / 2`, none of
+/// which fits in a machine integer for a 254-bit field. Limbs carry all of them, and the cost is
+/// unchanged: one squaring per bit of the exponent, so `O(log q)` polynomial multiplications
+/// rather than anything proportional to q itself.
+///
+/// Trailing zero limbs cost nothing — the loop stops at the highest set bit — so a caller may
+/// pass a fixed-width order without padding the work.
+///
+/// # Panics
+/// Panics if `modulus` is the zero polynomial.
+pub fn pow_mod_limbs<F: FiniteField>(
+    base: &UnivariatePolynomial<F>,
+    exponent: &[u64],
+    modulus: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
     assert!(
         !modulus.is_zero(),
         "the modulus must be a nonzero polynomial"
@@ -43,20 +50,38 @@ pub fn pow_mod<F: FiniteField>(
     // Reducing the identity is not redundant: modulo a nonzero constant, F[x]/(c) is the zero
     // ring, where 1 and 0 coincide. Starting from an unreduced `one` would wrongly report 1.
     let mut result = reduce(&UnivariatePolynomial::one(), modulus);
-    let mut square = reduce(base, modulus);
-    let mut exponent = exponent;
 
-    while exponent > 0 {
-        if exponent & 1 == 1 {
+    let Some(highest) = highest_set_bit(exponent) else {
+        // A zero exponent leaves the identity, reduced.
+        return result;
+    };
+
+    let mut square = reduce(base, modulus);
+    for index in 0..=highest {
+        if bit(exponent, index) {
             result = reduce(&(&result * &square), modulus);
         }
-        exponent >>= 1;
-        if exponent > 0 {
+        // The last squaring would be discarded, and for a wide exponent it is not cheap.
+        if index < highest {
             square = reduce(&(&square * &square), modulus);
         }
     }
 
     result
+}
+
+/// Bit `index` of `limbs`, counted from the least significant bit of the least significant limb.
+#[inline]
+fn bit(limbs: &[u64], index: usize) -> bool {
+    limbs[index / 64] >> (index % 64) & 1 == 1
+}
+
+/// The index of the highest set bit of `limbs`, or `None` if `limbs` is zero.
+fn highest_set_bit(limbs: &[u64]) -> Option<usize> {
+    limbs
+        .iter()
+        .rposition(|&limb| limb != 0)
+        .map(|position| position * 64 + (63 - limbs[position].leading_zeros() as usize))
 }
 
 /// The remainder of `p` on division by `modulus`.
@@ -72,7 +97,10 @@ mod tests {
     use crate::{
         fields::PrimeFieldElement64,
         identities::Zero,
-        poly::univariate::{pow_mod::pow_mod, Polynomial, UnivariatePolynomial},
+        poly::univariate::{
+            pow_mod::{pow_mod, pow_mod_limbs},
+            Polynomial, UnivariatePolynomial,
+        },
         FiniteField,
     };
 
@@ -202,5 +230,62 @@ mod tests {
     #[should_panic(expected = "modulus must be a nonzero polynomial")]
     fn test_pow_mod_by_zero_panics() {
         let _ = pow_mod(&poly(&[1, 1]), 3, &UnivariatePolynomial::zero());
+    }
+
+    /// The limb form agrees with the `u128` one, which is the contract the wrapper rests on.
+    #[test]
+    fn test_pow_mod_limbs_agrees_with_the_u128_exponent() {
+        let modulus = poly(&[6, 1, 1, 1]);
+        let base = poly(&[2, 3, 1]);
+        for exponent in [0u128, 1, 2, 3, 17, 64, 255, 1 << 40, u64::MAX as u128] {
+            let limbs = [exponent as u64, (exponent >> 64) as u64];
+            assert_eq!(
+                pow_mod(&base, exponent, &modulus),
+                pow_mod_limbs(&base, &limbs, &modulus),
+                "exponent {exponent}"
+            );
+        }
+    }
+
+    /// An exponent above 2^128, which the `u128` form cannot express at all.
+    ///
+    /// `base^(2^192)` is reached by squaring 192 times, so it is checkable against a loop that
+    /// does exactly that without going through the limb bit-walk.
+    #[test]
+    fn test_pow_mod_limbs_handles_an_exponent_beyond_u128() {
+        let modulus = poly(&[6, 1, 1, 1]);
+        let base = poly(&[2, 3, 1]);
+
+        // 2^192 as limbs: the fourth limb's lowest bit.
+        let exponent = [0u64, 0, 0, 1];
+
+        let mut expected = base.div(&modulus).1;
+        for _ in 0..192 {
+            expected = (&expected * &expected).div(&modulus).1;
+        }
+        assert_eq!(pow_mod_limbs(&base, &exponent, &modulus), expected);
+    }
+
+    /// Trailing zero limbs do not change the result, so a fixed-width order needs no trimming.
+    #[test]
+    fn test_trailing_zero_limbs_are_ignored() {
+        let modulus = poly(&[6, 1, 1, 1]);
+        let base = poly(&[2, 3, 1]);
+        let expected = pow_mod_limbs(&base, &[37], &modulus);
+        for padded in [vec![37u64, 0], vec![37, 0, 0], vec![37, 0, 0, 0, 0]] {
+            assert_eq!(pow_mod_limbs(&base, &padded, &modulus), expected);
+        }
+    }
+
+    /// A zero exponent gives the identity, reduced — including modulo a constant.
+    #[test]
+    fn test_a_zero_exponent_gives_the_reduced_identity() {
+        let base = poly(&[2, 3, 1]);
+        assert_eq!(
+            pow_mod_limbs(&base, &[0, 0, 0, 0], &poly(&[6, 1, 1, 1])),
+            UnivariatePolynomial::one()
+        );
+        // Modulo a nonzero constant the quotient ring is trivial, so 1 and 0 coincide.
+        assert!(pow_mod_limbs(&base, &[0], &poly(&[3])).is_zero());
     }
 }
