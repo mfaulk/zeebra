@@ -273,6 +273,20 @@ impl<F: FiniteField> DenseRows<F> {
     }
 
     /// `row[target] -= factor * row[source]`, over the source's span.
+    ///
+    /// The loop body is branch-free, which is what lets a compiler widen it. Two branches used to
+    /// be here and both were removable without changing a single counter:
+    ///
+    /// An early `continue` skipped a zero `scaled`. Subtracting zero leaves `after == before`, so
+    /// the store is a no-op and neither transition below fires — running the body anyway gives the
+    /// same cells and the same counts. The branch bought one subtraction and one store on a zero
+    /// source cell and cost a mispredictable test on every cell.
+    ///
+    /// A two-predicate `match` maintained the nonzero count. It is now the same two predicates
+    /// combined with `&` rather than `&&`, so neither operand is short-circuited and the
+    /// increments are a zero-extension of a flag rather than a jump. The arithmetic is unchanged:
+    /// a cell gains a nonzero exactly when it was zero and is not, and loses one exactly when it
+    /// was not zero and now is.
     fn subtract_scaled(&mut self, target: usize, source: usize, factor: F) {
         debug_assert_ne!(target, source, "a row cannot be its own pivot");
         let start = self.lead[source];
@@ -284,18 +298,14 @@ impl<F: FiniteField> DenseRows<F> {
             let (target_cells, source_cells) =
                 two_rows_mut(&mut self.cells, self.num_columns, target, source);
             for column in start..end {
-                let scaled = factor * source_cells[column];
-                if scaled.is_zero() {
-                    continue;
-                }
                 let before = target_cells[column];
-                let after = before - scaled;
+                let after = before - factor * source_cells[column];
                 target_cells[column] = after;
-                match (before.is_zero(), after.is_zero()) {
-                    (true, false) => gained += 1,
-                    (false, true) => lost += 1,
-                    _ => {}
-                }
+
+                let was_zero = before.is_zero();
+                let is_zero = after.is_zero();
+                gained += usize::from(was_zero & !is_zero);
+                lost += usize::from(!was_zero & is_zero);
             }
         }
 
@@ -308,6 +318,11 @@ impl<F: FiniteField> DenseRows<F> {
     ///
     /// One inverse for the row, not one division per cell: `inverse` is a modular exponentiation
     /// of about log2(q) multiplications.
+    ///
+    /// Scaling is unconditional. Skipping a zero cell was a branch that saved a multiplication and
+    /// prevented the loop from being widened; zero times anything is zero, so the test decided
+    /// nothing. Scaling cannot change which cells are zero either, since `inverse` is nonzero and
+    /// a field has no zero divisors, so no count is affected.
     fn normalize(&mut self, index: usize) -> bool {
         let lead = self.lead[index];
         if lead >= self.num_columns {
@@ -320,10 +335,7 @@ impl<F: FiniteField> DenseRows<F> {
         }
         let inverse = coefficient.inverse();
         for column in lead..self.tail[index] {
-            let cell = &mut self.cells[base + column];
-            if !cell.is_zero() {
-                *cell *= inverse;
-            }
+            self.cells[base + column] *= inverse;
         }
         debug_assert_eq!(self.cells[base + lead], F::ONE);
         true
@@ -404,6 +416,7 @@ mod tests {
         linalg::sparse::{row_echelon, SparseMatrix, SparseRow},
         FiniteField,
     };
+    use rand::{prelude::StdRng, Rng, SeedableRng};
 
     type F = Zp13;
 
@@ -465,6 +478,100 @@ mod tests {
         let statistics = dense.row_echelon_within(usize::MAX).expect("unbounded");
         assert_eq!(dense.to_sparse(), expected);
         assert_eq!(statistics, reference);
+    }
+
+    /// The dense echelon agrees with the sparse one on random matrices, matrix and statistics both.
+    ///
+    /// The single hand-written case above does not exercise the counting hard enough. `nonzeros`
+    /// is maintained incrementally by `subtract_scaled`, which infers each row's nonzero count
+    /// from the transitions it observes rather than recounting, and `peak_nonzeros` is sampled off
+    /// that running total. A miscount is invisible in the matrix and shows up only in the
+    /// statistics, so both are compared here, against the sparse path as the oracle, over a range
+    /// of shapes and densities.
+    ///
+    /// Low densities matter most: they put long runs of zeros inside a row's `lead..tail` span,
+    /// which is the case where an entry contributes nothing and the counting has to agree that it
+    /// contributed nothing.
+    #[test]
+    fn test_dense_echelon_matches_the_sparse_one_on_random_matrices() {
+        let mut rng = StdRng::seed_from_u64(0x5EED_1234);
+
+        for &(num_rows, num_columns) in &[(1, 1), (3, 5), (8, 8), (12, 7), (7, 12), (20, 24)] {
+            // A density of 1 in 13 leaves wide zero runs; 12 in 13 leaves almost none.
+            for &density in &[1u32, 2, 4, 8, 12] {
+                for _trial in 0..24 {
+                    let rows: Vec<SparseRow<F>> = (0..num_rows)
+                        .map(|_| {
+                            let mut entries: Vec<(usize, F)> = Vec::new();
+                            for column in 0..num_columns {
+                                if rng.gen_ratio(density, 13) {
+                                    // A zero coefficient would not be stored by a sparse row, so
+                                    // the generator must not produce one.
+                                    entries.push((column, F::new(rng.gen_range(1..13))));
+                                }
+                            }
+                            SparseRow::new(&entries)
+                        })
+                        .collect();
+                    let original = SparseMatrix::new(num_columns, rows);
+
+                    let mut expected = original.clone();
+                    let reference = row_echelon(&mut expected);
+
+                    let mut dense = DenseRows::from_sparse(&original);
+                    let statistics = dense.row_echelon_within(usize::MAX).expect("unbounded");
+
+                    assert_eq!(
+                        dense.to_sparse(),
+                        expected,
+                        "matrices disagree at {}x{} density {}/13",
+                        num_rows,
+                        num_columns,
+                        density
+                    );
+                    assert_eq!(
+                        statistics, reference,
+                        "statistics disagree at {}x{} density {}/13",
+                        num_rows, num_columns, density
+                    );
+                }
+            }
+        }
+    }
+
+    /// `nonzeros` after a chain of subtractions equals a recount of the row, not an estimate.
+    ///
+    /// `subtract_scaled` is the only thing that maintains the count, and it is the function this
+    /// pins: the invariant it has to preserve is that the stored count equals what counting the
+    /// row's nonzero cells would give. `to_sparse` asserts exactly that in a debug build, so
+    /// round-tripping is the recount.
+    #[test]
+    fn test_the_nonzero_count_survives_cancellation() {
+        // Row 1 is a multiple of row 0, so eliminating drives it to the zero row — every entry
+        // cancels, which is the transition `subtract_scaled` has to count as a loss.
+        let original = matrix_of(
+            &[
+                &[(0, 1), (2, 5), (4, 7)],
+                &[(0, 3), (2, 2), (4, 8)],
+                &[(0, 1), (1, 1), (2, 5), (3, 1), (4, 7)],
+                &[(1, 4), (3, 9)],
+            ],
+            5,
+        );
+
+        let mut expected = original.clone();
+        let reference = row_echelon(&mut expected);
+
+        let mut dense = DenseRows::from_sparse(&original);
+        let statistics = dense.row_echelon_within(usize::MAX).expect("unbounded");
+
+        // `to_sparse` debug-asserts the stored count against the cells it actually finds.
+        assert_eq!(dense.to_sparse(), expected);
+        assert_eq!(statistics, reference);
+        assert!(
+            reference.zero_rows > 0,
+            "the fixture should produce a zero row"
+        );
     }
 
     /// A budget below the input count is refused before any cell is touched.
