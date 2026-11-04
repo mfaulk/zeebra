@@ -1,0 +1,16 @@
+# The `ci` profile exists for one behavioral difference from the default: `fail-fast = false`.
+# A run that stops at the first failure hides how many tests a change actually broke, which is
+# the thing worth knowing when a Gröbner engine regresses and takes a dozen differential
+# fixtures with it.
+
+[profile.ci]
+fail-fast = false
+
+# Report-only: with no `terminate-after`, crossing the period logs a SLOW line and nothing else.
+# The threshold has to clear the two `#[ignore]`d engine-agreement tests, which are the slowest
+# thing CI runs by two orders of magnitude: ~108s locally under `ci-release`, and more on a
+# shared runner. 300s leaves room for that without a passing run reporting SLOW every time.
+slow-timeout = "300s"
+
+[profile.ci.junit]
+path = "junit.xml"
