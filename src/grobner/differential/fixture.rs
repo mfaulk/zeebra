@@ -83,7 +83,15 @@ impl DifferentialFixture {
 /// Emitted rather than written by hand, and marked as such: a fixture edited by hand is no longer
 /// a record of what an independent implementation said, which is the only thing that makes it
 /// worth committing.
-pub fn emit_fixture_module(cases: &[DifferentialCase], singular_version: &str) -> String {
+///
+/// `sweep_flags` goes into the regeneration command in the header. It must be the flags the sweep
+/// actually ran with — the tool's defaults regenerate a *different* table, so a header quoting
+/// them would leave the committed one unreproducible.
+pub fn emit_fixture_module(
+    cases: &[DifferentialCase],
+    singular_version: &str,
+    sweep_flags: &str,
+) -> String {
     let mut out = String::new();
 
     out.push_str("//! Oracle answers recorded from Singular, committed as literals.\n");
@@ -92,6 +100,9 @@ pub fn emit_fixture_module(cases: &[DifferentialCase], singular_version: &str) -
     out.push_str("//!\n");
     out.push_str("//! ```text\n");
     out.push_str("//! cargo run --release --bin zeebra-differential -- \\\n");
+    for line in wrapped_flags(sweep_flags, 84) {
+        out.push_str(&format!("//!     {} \\\n", line));
+    }
     out.push_str("//!     --fixtures src/grobner/differential/fixtures.rs\n");
     out.push_str("//! ```\n");
     out.push_str("//!\n");
@@ -115,6 +126,37 @@ pub fn emit_fixture_module(cases: &[DifferentialCase], singular_version: &str) -
     }
     out.push_str("];\n");
     out
+}
+
+/// `flags` broken into lines of at most `width` characters, a `--flag value` pair at a time.
+///
+/// Neither a flag nor its value is ever split off on its own, so a pair longer than `width` takes
+/// a line to itself rather than a line that reads as a flag with no argument.
+fn wrapped_flags(flags: &str, width: usize) -> Vec<String> {
+    // `--flag value` as one unit. A bare `--flag` keeps its own unit, which is what a boolean flag
+    // like `--keep-files` is.
+    let mut units: Vec<String> = Vec::new();
+    for token in flags.split_whitespace() {
+        match units.last_mut() {
+            Some(unit) if !token.starts_with("--") && !unit.contains(' ') => {
+                unit.push(' ');
+                unit.push_str(token);
+            }
+            _ => units.push(token.to_string()),
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    for unit in units {
+        match lines.last_mut() {
+            Some(line) if line.len() + 1 + unit.len() <= width => {
+                line.push(' ');
+                line.push_str(&unit);
+            }
+            _ => lines.push(unit),
+        }
+    }
+    lines
 }
 
 /// One case as a `DifferentialFixture` literal, indented for a table.
@@ -234,7 +276,7 @@ mod tests {
     /// An emitted module names every field of every case.
     #[test]
     fn test_the_emitted_module_names_every_field() {
-        let emitted = emit_fixture_module(&[case()], "44105");
+        let emitted = emit_fixture_module(&[case()], "44105", "--systems 48");
         for field in [
             "name:",
             "characteristic:",
@@ -252,6 +294,24 @@ mod tests {
         assert!(emitted.contains("Singular build 44105"));
     }
 
+    /// The regeneration command in the header names the sweep that produced the table.
+    ///
+    /// A header quoting the tool's *default* flags cannot regenerate a table swept at any other
+    /// seed or shape, and a fixture table nobody can reproduce is data of unknown provenance.
+    #[test]
+    fn test_the_emitted_header_reproduces_the_sweep() {
+        let emitted = emit_fixture_module(
+            &[case()],
+            "44105",
+            "--seed 777 --systems 240 --max-degree 4",
+        );
+        assert!(
+            emitted.contains("--seed 777 --systems 240 --max-degree 4"),
+            "the header does not name the sweep's flags"
+        );
+        assert!(emitted.contains("--fixtures src/grobner/differential/fixtures.rs"));
+    }
+
     /// A positive-dimensional case emits `None` for the dimension rather than a sentinel number.
     #[test]
     fn test_a_positive_dimensional_case_emits_none() {
@@ -259,9 +319,22 @@ mod tests {
         positive.quotient_dimension = None;
         positive.standard_monomials.clear();
         positive.border_normal_forms.clear();
-        let emitted = emit_fixture_module(&[positive], "44105");
+        let emitted = emit_fixture_module(&[positive], "44105", "--systems 48");
         assert!(emitted.contains("quotient_dimension: None"));
         assert!(emitted.contains("standard_monomials: &[]"));
+    }
+
+    /// Flags wrap a `--flag value` pair at a time, and an over-long pair keeps its own line.
+    #[test]
+    fn test_flags_wrap_without_splitting_a_flag_from_its_value() {
+        assert_eq!(
+            super::wrapped_flags("--seed 777 --systems 240 --max-degree 4", 26),
+            vec!["--seed 777 --systems 240", "--max-degree 4"]
+        );
+        assert_eq!(
+            super::wrapped_flags("--characteristics 2,3,7,13,65537,2147483647 --quiet", 8),
+            vec!["--characteristics 2,3,7,13,65537,2147483647", "--quiet"]
+        );
     }
 
     /// Strings are emitted as Rust literals, escaped.

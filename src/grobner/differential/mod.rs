@@ -106,7 +106,7 @@ mod tests {
     /// Every committed fixture agrees under every operator-construction strategy.
     ///
     /// The strategies are asserted equal to each other in `quotient_algebra.rs`; this asserts each
-    /// separately equal to *Singular*, over 96 ideals and six fields. Two implementations agreeing
+    /// separately equal to *Singular*, over 240 ideals and six fields. Two implementations agreeing
     /// with each other and both being wrong is the thing an external oracle is for.
     #[test]
     fn test_every_fixture_agrees_under_every_strategy() {
@@ -138,7 +138,7 @@ mod tests {
     /// The shape-form route ran, and agreed, on a substantial share of the fixtures.
     ///
     /// `verify_recorded` skips the shape check where the ideal is not in shape position, which is a
-    /// correct answer — so without this the check could be skipped on all 96 cases and the suite
+    /// correct answer — so without this the check could be skipped on all 240 cases and the suite
     /// would still be green. This asserts it was exercised against Singular, and reports what
     /// fraction of the corpus the prototype covers.
     #[test]
@@ -357,10 +357,13 @@ mod tests {
     /// ring would otherwise agree or disagree for reasons that have nothing to do with the ideal.
     #[test]
     fn test_verifying_a_case_in_the_wrong_ring_is_rejected() {
+        // Two variables, and over neither of the fields it is about to be checked over: a case
+        // verified in a ring it *is* stated over would agree, which would make the assertions
+        // below pass or fail on which fixture happened to come first in the table.
         let case = FIXTURES
             .iter()
-            .find(|f| f.variables.len() == 2)
-            .expect("a two-variable fixture")
+            .find(|f| f.variables.len() == 2 && f.characteristic != 7 && f.characteristic != 13)
+            .expect("a two-variable fixture over neither GF(7) nor GF(13)")
             .to_case();
 
         assert_eq!(
@@ -521,6 +524,6 @@ mod tests {
     /// The shape the committed fixtures were generated at. Changing either invalidates the
     /// regeneration above, which is why `test_the_harness_path_agrees_against_a_recorded_oracle`
     /// asserts that at least one fixture could be reproduced.
-    const DEFAULT_MAX_DEGREE: u32 = 3;
-    const DEFAULT_MAX_TERMS: usize = 4;
+    const DEFAULT_MAX_DEGREE: u32 = 4;
+    const DEFAULT_MAX_TERMS: usize = 5;
 }
