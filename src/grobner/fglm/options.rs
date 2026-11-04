@@ -6,6 +6,12 @@
 ///
 /// Every limit is on the **representation** — monomials enumerated, entries stored. None of them
 /// is a process-memory limit, and none accounts for allocator overhead.
+///
+/// # Source compatibility
+/// Every field is public, so a downstream struct literal naming all of them stops compiling when
+/// a field is added. Construct from [`FglmOptions::recommended`], [`FglmOptions::unbounded`], or
+/// [`Default`] and assign the fields that matter, which is what this crate's own callers do and
+/// what survives a new field.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FglmOptions {
     /// Standard monomials enumerated before the computation is abandoned.
@@ -26,6 +32,18 @@ pub struct FglmOptions {
     /// Checked from `D` before the span is allocated rather than as it fills, because the space is
     /// a function of the dimension alone.
     pub max_span_entries: usize,
+
+    /// Whether to fill in [`FglmStageTimings`](super::FglmStatistics).
+    ///
+    /// Off by default, and not merely out of caution: the operator loop runs `N * D` times and
+    /// reads the clock several times per column, which on a system where most columns are unit
+    /// vectors is a measurable fraction of what the loop does. The same trade-off, and the same
+    /// [`StageClock`](crate::grobner::f4::StageClock), as
+    /// [`F4Options::measure_stages`](crate::grobner::F4Options::measure_stages).
+    ///
+    /// The counters in [`FglmStatistics`](super::FglmStatistics) are collected either way. Only
+    /// the durations depend on this.
+    pub measure_stages: bool,
 }
 
 impl FglmOptions {
@@ -46,6 +64,7 @@ impl FglmOptions {
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
             max_span_entries: 20_000_000,
+            measure_stages: false,
         }
     }
 
@@ -58,6 +77,7 @@ impl FglmOptions {
             max_quotient_dimension: usize::MAX,
             max_operator_entries: usize::MAX,
             max_span_entries: usize::MAX,
+            measure_stages: false,
         }
     }
 }

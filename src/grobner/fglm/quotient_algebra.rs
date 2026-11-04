@@ -5,13 +5,33 @@
 //! provided, because the conversion never performs one: it starts from the class of 1 and reaches
 //! every candidate monomial by applying one variable at a time.
 
+use std::collections::HashSet;
+
 use crate::{
-    grobner::fglm::{
-        multiplication::{MultiplicationOperator, OperatorBuilder},
-        FglmError, FglmOptions, QuotientBasis,
+    grobner::{
+        f4::StageClock,
+        fglm::{
+            multiplication::{MultiplicationOperator, OperatorBuilder},
+            statistics::{BorderStatistics, FglmStageTimings},
+            FglmError, FglmOptions, QuotientBasis,
+        },
     },
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
+
+/// What building the quotient algebra did: the shape of the border, and where the time went.
+///
+/// The durations are zero unless [`FglmOptions::measure_stages`] was set; the counters are
+/// collected either way.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct QuotientStatistics {
+    /// How many products stayed standard, how many did not, and how many of those repeated.
+    pub border: BorderStatistics,
+
+    /// The construction stages. [`FglmStageTimings::dependence`] is not one of them and stays
+    /// zero: nothing here performs the lex walk.
+    pub timings: FglmStageTimings,
+}
 
 /// `R/I` as a `D`-dimensional `F`-vector space, with the `N` multiplication operators.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -46,11 +66,33 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         order: MonomialOrder,
         options: &FglmOptions,
     ) -> Result<Self, FglmError> {
+        Self::new_with_statistics(basis, order, options).map(|(algebra, _)| algebra)
+    }
+
+    /// As [`Self::new`], additionally reporting the border's shape and the construction's stages.
+    ///
+    /// The counters cost one hash-set insert per nonstandard column, which is why they are always
+    /// collected rather than gated: against a normal form it is nothing, and `N * D` of them is
+    /// well under a millisecond at every dimension in the benchmark corpus.
+    pub fn new_with_statistics(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+        options: &FglmOptions,
+    ) -> Result<(Self, QuotientStatistics), FglmError> {
+        let mut clock = StageClock::new(options.measure_stages);
+        let mut statistics = QuotientStatistics::default();
+
         let quotient = QuotientBasis::new(basis, order, options.max_quotient_dimension)?;
         let dimension = quotient.dimension();
+        statistics.timings.quotient_basis = clock.lap();
 
         let mut operators = Vec::with_capacity(N);
         let mut entries = 0usize;
+
+        // The distinct border monomials, so that the duplication M18-1 removes can be quantified
+        // before it is removed. Reducing each one once is *not* what this does: the normal form
+        // below is computed per column, exactly as M17 computed it.
+        let mut border: HashSet<Monomial<N>> = HashSet::new();
 
         for i in 0..N {
             let mut builder = OperatorBuilder::with_capacity(dimension);
@@ -58,14 +100,29 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
                 // No overflow is reachable: a standard monomial's exponents are below their
                 // variables' pure powers, and this raises one of them by one.
                 let product = *monomial * Monomial::univariate(i, 1);
+                let standard = quotient.index_of(&product);
+                statistics.border.operator_columns += 1;
 
-                if let Some(index) = quotient.index_of(&product) {
+                if let Some(index) = standard {
+                    statistics.border.standard_columns += 1;
                     builder.push_standard(index);
+                    statistics.timings.border_classification += clock.lap();
                     continue;
                 }
 
+                statistics.border.border_columns += 1;
+                if border.insert(product) {
+                    statistics.border.distinct_border_monomials += 1;
+                }
+                statistics.timings.border_classification += clock.lap();
+
                 let term = MultivariatePolynomial::new(&[(product, F::one())]);
-                let column = coordinates_of_normal_form(&term.normal_form(basis, order), &quotient);
+                let reduced = term.normal_form(basis, order);
+                statistics.border.normal_form_calls += 1;
+                statistics.timings.normal_forms += clock.lap();
+
+                let column = coordinates_of_normal_form(&reduced, &quotient);
+                statistics.timings.column_assembly += clock.lap();
 
                 entries = entries.checked_add(column.len()).ok_or(
                     FglmError::OperatorStorageExceeded {
@@ -84,11 +141,35 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             operators.push(builder.finish());
         }
 
-        Ok(Self {
-            basis: quotient,
-            operators,
-            source: basis.to_vec(),
-        })
+        // So that the stages partition the construction rather than leaving a tail outside all of
+        // them. What is in this lap is the last operator's `finish`, which is a move.
+        statistics.timings.column_assembly += clock.lap();
+
+        Ok((
+            Self {
+                basis: quotient,
+                operators,
+                source: basis.to_vec(),
+            },
+            statistics,
+        ))
+    }
+
+    /// Entries the `N` operators hold between them.
+    pub fn operator_entries(&self) -> usize {
+        self.operators
+            .iter()
+            .map(MultiplicationOperator::stored_entries)
+            .sum()
+    }
+
+    /// Bytes the `N` operators' representations occupy. See
+    /// [`MultiplicationOperator::stored_bytes`] for what that does and does not include.
+    pub fn operator_bytes(&self) -> usize {
+        self.operators
+            .iter()
+            .map(MultiplicationOperator::stored_bytes)
+            .sum()
     }
 
     /// `D = dim_F(R/I)`.
@@ -606,7 +687,7 @@ mod tests {
     /// entries run from **58% of dense on the katsura family down to 0.34% on planted-8**. So the
     /// sparse columns are worth 1.7x on one family and 290x on another, and at 16 bytes an entry
     /// against 8 bytes a dense cell they do not pay at all on katsura. That is a storage question
-    /// for M17-E, not a correctness one; what is asserted here is only what holds everywhere.
+    /// for M18-3, not a correctness one; what is asserted here is only what holds everywhere.
     #[test]
     fn test_both_column_kinds_occur_and_beat_a_dense_matrix() {
         let order = MonomialOrder::GradedReverseLexicographic;

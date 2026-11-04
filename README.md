@@ -22,6 +22,7 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] F4 Grobner Bases
 - [x] Gebauer-Moller and chain criteria, structured elimination, adaptive linear algebra
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
+- [x] Differential testing of the zero-dimensional pipeline against Singular
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -60,6 +61,15 @@ suite stays fast, and need release mode to finish in reasonable time:
 cargo test --release -- --ignored test_optimized_agrees_with_reference_on_slow_systems
 cargo test --release -- --ignored test_f4_on_larger_systems
 cargo test --release -- --ignored test_factorization
+```
+
+One more is `#[ignore]`d because it needs a local Singular installation rather than because it is
+slow. A test that silently passed when its oracle is absent would be worse than no test, so it is
+opt-in:
+
+```sh
+cargo test --release --lib -- --ignored --exact \
+    grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
 Four other `#[ignore]`d tests are unimplemented placeholders for statistical distribution checks
@@ -125,6 +135,8 @@ cargo run --release --example fglm_baseline        # which systems are zero-dime
 cargo run --release --example fglm_baseline -- cyclic-6   # one system per process
 cargo run --release --example fglm_operators      # how sparse the multiplication operators are
 cargo run --release --example fglm_conversion      # the FGLM pipeline against direct lex F4
+cargo run --release --example fglm_profile         # where a conversion's time and memory go
+cargo run --release --example fglm_profile -- katsura-7   # one system per process
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -177,11 +189,22 @@ positive-dimensional from the leading monomials of its grevlex basis, reports th
 baseline for the order-conversion work; **cyclic-4 is positive-dimensional**, so FGLM does not
 apply to it, and that is measured rather than assumed.
 
+`fglm_profile` attributes a conversion's cost. One table is the shape of the border — how many of
+the `N * D` operator columns leave the standard monomials, and how many *distinct* monomials those
+are, whose gap bounds what deduplicating them could remove. The other is the stage breakdown
+(standard-monomial enumeration, border classification, normal forms, coordinate assembly, the lex
+walk) beside what the representations hold. It sets `FglmOptions::measure_stages`, which is off by
+default because the operator loop runs `N * D` times and a clock read inside it is not free. The
+byte figures are estimates of this crate's own representations;
+`zeebra::util::peak_resident_bytes` is the separate, process-wide measurement, and the two are not
+interchangeable.
+
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
 [`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md),
-[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md), and
-[`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md).
+[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md),
+[`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md), and
+[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md).
 
 ## Gröbner Bases
 
@@ -303,13 +326,66 @@ assert_eq!(lex, f4(&system, MonomialOrder::Lexicographic).unwrap());
 The conversion is checked against **29 lexicographic bases computed by Singular**, committed as
 literals and regenerable with `Singular -q tools/reference_bases.sing`. Singular's `std` is
 Buchberger/slimgb lineage, so those references are independent of Zeebra's F4 in algorithm and not
-only in implementation. No external system is needed to run the tests.
+only in implementation. No external system is needed to run the tests. A further **96 recorded
+cases** check every intermediate result rather than only the final basis — see "Differential
+testing against Singular" below.
 
 **`fglm_to_lex` trusts its input to be a Gröbner basis under the stated order, and returns a wrong
 basis rather than an error if it is not.** Use `fglm_to_lex_checked` for input of unknown
 provenance; it verifies Buchberger's criterion first, which costs 0.6x to 27x what computing the
 basis cost, and that is why it is not the default. `grobner::is_grobner_basis` is the check on its
 own.
+
+### Differential testing against Singular
+
+`zeebra-differential` generates deterministic polynomial systems, asks a local Singular about each
+one, and compares **every intermediate result** — not only the lex basis:
+
+```sh
+cargo run --release --bin zeebra-differential -- --help
+cargo run --release --bin zeebra-differential -- --systems 500
+cargo run --release --bin zeebra-differential -- --systems 96 --seed 777 \
+    --fixtures src/grobner/differential/fixtures.rs   # regenerate the committed cases
+```
+
+The comparison runs outwards from the source basis and stops at the first disagreement, so what it
+reports is the earliest thing that differs rather than everything downstream of it:
+
+| check | Zeebra | Singular |
+|---|---|---|
+| source basis | `f4` under grevlex | `std` in a `dp` ring |
+| quotient dimension | `QuotientBasis` | `vdim` |
+| standard monomials | `QuotientBasis::monomials` | `kbase` |
+| border normal forms | `normal_form` of each `u` in `∂B` | `reduce(u, G)` |
+| operator columns | each column of each `T_i` | the normal form of the monomial it stands for |
+| lex basis | `fglm_to_lex` | `std` in an `lp` ring, cross-checked against Singular's own `fglm` |
+
+**Multiplication-operator columns are compared individually.** Each has a precise mathematical
+answer, so a wrong column is caught directly rather than only when it happens to change the lex
+basis. On a 500-system sweep over GF(2), GF(3), GF(7), GF(13), GF(65537) and GF(2^31 - 1) in two to
+five variables, every system agreed: 195 zero-dimensional, 193 unit ideals, and 112
+positive-dimensional ideals that both sides rejected.
+
+**An oracle that did not answer is never agreement.** Singular exits 0 after a script error, so a
+successful exit proves nothing: every run must reach an end-of-script marker *and* have printed no
+error line, and a timeout, a missing binary, a characteristic above Singular's `2^31` limit, or an
+answer Singular's own `fglm` contradicts each make the sweep exit non-zero.
+
+A failing case is written out as a fixture literal, shrunk first — generators dropped, terms
+dropped, coefficients flattened, exponents lowered — while it keeps failing *the same* check. The
+original system and its seed are kept beside the shrunk one, since a shrunk system is no longer
+what the seed generates.
+
+**CI needs no Singular.** A sweep's agreeing cases are emitted as Rust literals into
+`src/grobner/differential/fixtures.rs`, and an ordinary test replays the same comparison against
+them — a table of constants where the subprocess was. A separate test corrupts a fixture six ways
+and requires each to be detected, so a passing table is evidence rather than an absence of
+checking. The live sweep is also available as an `#[ignore]`d test:
+
+```sh
+cargo test --release --lib -- --ignored --exact \
+    grobner::differential::tests::test_a_live_sweep_against_singular_agrees
+```
 
 ### Solving zero-dimensional systems
 

@@ -11,6 +11,12 @@
 //! sparse form only saves memory below 50% fill — which holds on two of the three families here
 //! and not on the third.
 //!
+//! **`bytes won` below counts entries, not allocations**, and the two differ: the columns also cost
+//! one 24-byte `Column` each, and a `Vec` of this element type allocates four slots at a minimum
+//! even to hold one. On the planted family that slack is 41% of what the operators really occupy.
+//! `cargo run --release --example fglm_profile` reports the allocated figure; this reports the
+//! mathematical one. See §3.5 of `docs/MILESTONE-FGLM-SCALABILITY.md`.
+//!
 //! ```text
 //! cargo run --release --example fglm_operators
 //! ```
