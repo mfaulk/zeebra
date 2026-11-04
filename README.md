@@ -137,6 +137,7 @@ cargo run --release --example fglm_operators      # how sparse the multiplicatio
 cargo run --release --example fglm_conversion      # the FGLM pipeline against direct lex F4
 cargo run --release --example fglm_profile         # where a conversion's time and memory go
 cargo run --release --example fglm_profile -- katsura-7   # one system per process
+cargo run --release --example fglm_border          # what deduplicating the border is worth
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -198,6 +199,13 @@ default because the operator loop runs `N * D` times and a clock read inside it 
 byte figures are estimates of this crate's own representations;
 `zeebra::util::peak_resident_bytes` is the separate, process-wide measurement, and the two are not
 interchangeable.
+
+`fglm_border` prices the two `OperatorConstruction` strategies against each other on the same
+prepared source basis, having first asserted that they build identical operators. It also answers,
+with its own measurement rather than by inference, whether the one-term polynomial built per border
+reduction is worth avoiding: 0.07% to 0.38% of the reduction it precedes on the families where
+reduction dominates, so no. `cargo bench --bench fglm -- fglm_operator_construction` is the same
+comparison under Criterion.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
@@ -335,6 +343,33 @@ basis rather than an error if it is not.** Use `fglm_to_lex_checked` for input o
 provenance; it verifies Buchberger's criterion first, which costs 0.6x to 27x what computing the
 basis cost, and that is why it is not the default. `grobner::is_grobner_basis` is the check on its
 own.
+
+#### Building the multiplication operators
+
+Column `j` of the operator `T_i` is the normal form of `x_i b_j`, and almost all of a conversion is
+computing those: **95% of katsura-7's**, measured. But the products `x_i b_j` that leave the
+standard monomials are not distinct — `x*y` is reached from both `x * y` and `y * x` — and between a
+fifth and a third of them repeat a monomial some other column already reduced.
+`FglmOptions::operator_construction` chooses whether to notice:
+
+```rust
+use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction};
+
+// One normal form per nonstandard column. The default, and the reference.
+let per_column = FglmOptions::default();
+
+// One normal form per *distinct* border monomial, reused by every column that reaches it.
+let deduplicated = FglmOptions::default()
+    .with_operator_construction(OperatorConstruction::DeduplicatedBorder);
+```
+
+The two build **identical operators**, which the tests assert by comparing whole `QuotientAlgebra`
+values rather than the lex bases they lead to. Deduplication takes katsura-7's conversion from
+39.0 ms to 27.7 ms and cyclic-6's from 27.8 ms to 19.3 ms, gains 1.04x to 1.08x on the planted
+family where the lex walk dominates instead, and is slower on nothing in the corpus. It is not yet
+the default: `docs/MILESTONE-FGLM-SCALABILITY.md` §5.6 explains why that waits for the integration
+ablation. `FglmOptions::baseline()` names the M17 configuration, so a measurement has something
+fixed to be quoted against.
 
 ### Differential testing against Singular
 

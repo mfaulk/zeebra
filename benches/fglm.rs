@@ -1,6 +1,6 @@
 //! Monomial-order conversion: the FGLM pipeline against a direct lexicographic basis.
 //!
-//! Three groups, answering three different questions.
+//! Four groups, answering four different questions.
 //!
 //! `stages` times the conversion's parts separately — standard monomial enumeration, quotient
 //! algebra construction, and the whole conversion — on a source basis computed outside the timed
@@ -10,6 +10,10 @@
 //! `pipeline` times what a caller actually pays: a grevlex basis plus conversion, against a lex
 //! basis computed directly. Both include the Gröbner computation, so the two figures are
 //! comparable; a reduced basis is unique, so they produce the same answer.
+//!
+//! `operator_construction` times each `OperatorConstruction` strategy against the others, on one
+//! prepared source basis, having first asserted outside the timed region that they build the same
+//! operators. It is where M18-1's claim is kept honest.
 //!
 //! `verification` times `is_grobner_basis`, which is what `fglm_to_lex_checked` adds over
 //! `fglm_to_lex`. It is in its own group because it is not part of either pipeline — it is the
@@ -26,7 +30,10 @@ use zeebra::{
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         f4,
-        fglm::{fglm_to_lex, is_grobner_basis, FglmOptions, QuotientAlgebra, QuotientBasis},
+        fglm::{
+            fglm_to_lex, fglm_to_lex_with_options, is_grobner_basis, FglmOptions,
+            OperatorConstruction, QuotientAlgebra, QuotientBasis,
+        },
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
@@ -108,6 +115,64 @@ fn bench_pipeline<const N: usize>(
     group.finish();
 }
 
+/// Each operator-construction strategy, on the same prepared source basis.
+///
+/// The ablation M18-1 is justified by, as a Criterion comparison rather than a fastest-of-three:
+/// the strategies differ by a third at most, which is within the range where a single timing run
+/// can mislead. `examples/fglm_border.rs` reports the same comparison with the border counters
+/// beside it, and asserts the two strategies agree before printing anything.
+fn bench_operator_construction<const N: usize>(
+    c: &mut Criterion,
+    name: &str,
+    system: &[MultivariatePolynomial<N, F>],
+) {
+    let source = f4(system, SOURCE).expect("within limits");
+
+    // Equality outside the timed region, so a benchmark cannot report a speedup for computing a
+    // different answer.
+    let reference = QuotientAlgebra::new(
+        &source,
+        SOURCE,
+        &FglmOptions::unbounded().with_operator_construction(OperatorConstruction::PerColumn),
+    )
+    .expect("finite");
+    let deduplicated = QuotientAlgebra::new(
+        &source,
+        SOURCE,
+        &FglmOptions::unbounded()
+            .with_operator_construction(OperatorConstruction::DeduplicatedBorder),
+    )
+    .expect("finite");
+    assert_eq!(reference, deduplicated, "{}: the strategies disagree", name);
+
+    let mut group = c.benchmark_group("fglm_operator_construction");
+    for construction in [
+        OperatorConstruction::PerColumn,
+        OperatorConstruction::DeduplicatedBorder,
+    ] {
+        let options = FglmOptions::unbounded().with_operator_construction(construction);
+        let label = match construction {
+            OperatorConstruction::PerColumn => "per_column",
+            OperatorConstruction::DeduplicatedBorder => "deduplicated_border",
+        };
+        group.bench_with_input(BenchmarkId::new(label, name), &source, |b, s| {
+            b.iter(|| {
+                QuotientAlgebra::new(black_box(s), SOURCE, &options).expect("finite");
+            })
+        });
+        group.bench_with_input(
+            BenchmarkId::new(format!("{}_conversion", label), name),
+            &source,
+            |b, s| {
+                b.iter(|| {
+                    fglm_to_lex_with_options(black_box(s), SOURCE, &options).expect("convertible");
+                })
+            },
+        );
+    }
+    group.finish();
+}
+
 /// The price of `fglm_to_lex_checked` over `fglm_to_lex`.
 fn bench_verification<const N: usize>(
     c: &mut Criterion,
@@ -156,6 +221,19 @@ fn pipeline(c: &mut Criterion) {
     bench_pipeline(c, "planted-8", &planted::<8, F>(&planted_point::<8>()));
 }
 
+/// katsura and cyclic are where reduction dominates, so they are where deduplication can show.
+/// The planted family is here because it is where it cannot: the lex walk is most of its
+/// conversion, and a strategy chosen from katsura alone would be chosen on partial evidence.
+fn operator_construction(c: &mut Criterion) {
+    bench_operator_construction(c, "katsura-5", &katsura::<5, F>());
+    bench_operator_construction(c, "katsura-6", &katsura::<6, F>());
+    bench_operator_construction(c, "katsura-7", &katsura::<7, F>());
+    bench_operator_construction(c, "cyclic-5", &cyclic::<5, F>());
+    bench_operator_construction(c, "cyclic-6", &cyclic::<6, F>());
+    bench_operator_construction(c, "planted-6", &planted::<6, F>(&planted_point::<6>()));
+    bench_operator_construction(c, "planted-8", &planted::<8, F>(&planted_point::<8>()));
+}
+
 fn verification(c: &mut Criterion) {
     bench_verification(c, "cyclic-5", &cyclic::<5, F>());
     bench_verification(c, "cyclic-6", &cyclic::<6, F>());
@@ -164,5 +242,5 @@ fn verification(c: &mut Criterion) {
     bench_verification(c, "katsura-7", &katsura::<7, F>());
 }
 
-criterion_group!(fglm, stages, pipeline, verification);
+criterion_group!(fglm, stages, pipeline, operator_construction, verification);
 criterion_main!(fglm);

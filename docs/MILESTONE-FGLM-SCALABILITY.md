@@ -1,6 +1,6 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
-**Status:** in progress — M18-0 complete
+**Status:** in progress — M18-0 and M18-1 complete
 **Prerequisite:** M17, merged at `7c2fef7`
 **Objective:** make quotient-algebra construction faster and FGLM's memory smaller, without
 changing a single answer
@@ -24,7 +24,7 @@ pipeline first, then investigate whether its scaling limit can be surpassed at a
 | | deliverable | state |
 |---|---|---|
 | M18-0 | profiling baseline, and differential testing against Singular | **complete** |
-| M18-1 | border indexing, and deduplicated normal forms | not started |
+| M18-1 | border indexing, and deduplicated normal forms | **complete** |
 | M18-2 | batched border reduction | not started |
 | M18-3 | adaptive sparse/dense multiplication operators | not started |
 | M18-4 | incremental-span memory, and a sparse-FGLM feasibility spike | not started |
@@ -32,6 +32,9 @@ pipeline first, then investigate whether its scaling limit can be surpassed at a
 
 M18-3 and M18-4 are independent of M18-1 and M18-2 and of each other. All four depend on M18-0,
 because none of them may be merged without evidence that it changed no answer.
+
+**M18-1's result:** katsura-7's conversion from **39.0 ms to 27.7 ms**, cyclic-6's from 27.8 ms to
+19.3 ms, nothing regressed, and no answer changed. §5.
 
 ---
 
@@ -385,7 +388,147 @@ oracle path on request without ever depending on it.
 
 ---
 
-## 5. Acceptance criteria
+## 5. M18-1: border indexing and deduplicated normal forms
+
+### 5.1 What was built
+
+Two things that used to be one. `BorderIndex` answers *where does this column point* — a
+`ColumnTarget` per `(i, j)`, either a standard monomial's index or an index into the distinct
+border monomials — and performs no field arithmetic at all. Reducing a border monomial is then a
+separate question, asked once per column or once per monomial according to
+`FglmOptions::operator_construction`:
+
+* `OperatorConstruction::PerColumn` — M17's behaviour, kept as the reference and as the default.
+* `OperatorConstruction::DeduplicatedBorder` — one normal form per distinct border monomial.
+
+**Both strategies build the index**, so an ablation between them is an ablation of the sharing and
+of nothing else: the classification, the reduction routine, and the coordinate assembly are
+literally the same code. `FglmOptions::baseline()` names the M17 configuration so that every later
+measurement has something fixed to be quoted against.
+
+Each column still owns its own coordinate vector — the shared answers are *cloned* into the
+operators, not reference-counted. So this strategy changes the time and leaves the storage exactly
+where M17 had it, which is what makes the two comparable. Sharing a column's representation is
+M18-3's question.
+
+### 5.2 What it is worth
+
+Criterion, same machine and methodology as §3.1, on a source basis prepared outside the timed
+region:
+
+| system | `D` | `\|∂B\|` | dup % | algebra, per-column | algebra, dedup | won | conversion, per-column | conversion, dedup | won |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 16 | 44 | 24.1 | 416 µs | 318 µs | 1.31x | 455 µs | 362 µs | 1.26x |
+| katsura-6 | 32 | 100 | 27.5 | 3.21 ms | 2.39 ms | 1.34x | 3.53 ms | 2.58 ms | 1.37x |
+| katsura-7 | 64 | 223 | 31.0 | **34.43 ms** | **24.34 ms** | **1.41x** | **39.02 ms** | **27.67 ms** | **1.41x** |
+| cyclic-5 | 70 | 157 | 22.3 | 1.74 ms | 1.36 ms | 1.28x | 1.94 ms | 1.60 ms | 1.21x |
+| cyclic-6 | 156 | 386 | 31.6 | 25.96 ms | 17.68 ms | 1.47x | 27.76 ms | 19.29 ms | 1.44x |
+| planted-6 | 64 | 192 | 20.0 | 274 µs | 242 µs | 1.13x | 394 µs | 381 µs | 1.04x |
+| planted-8 | 256 | 1,024 | 20.0 | 1.74 ms | 1.56 ms | 1.12x | 3.04 ms | 2.80 ms | 1.08x |
+
+`cargo bench --bench fglm -- fglm_operator_construction`. The same comparison with the border
+counters beside it, and with planted-10 included, is
+`cargo run --release --example fglm_border`; its fastest-of-three figures agree with these to
+within 5%.
+
+**Katsura-7's conversion goes from 39.0 ms to 27.7 ms.** That is the milestone's headline so far,
+and it is the whole of M18-1: no new algorithm, no change to any answer, just not reducing the same
+monomial twice. Cyclic-6 does slightly better at 1.44x.
+
+**Nothing regressed.** The planted family gains least — 1.04x to 1.08x on the conversion, because
+the lex walk is most of what it does — but it does gain, and the construction itself is 1.12x to
+1.13x faster there too. There is no instance in the corpus where deduplication is slower.
+
+### 5.3 Two hypotheses, both refuted
+
+The baseline raised two worries. Both were measured and neither held.
+
+**"Repeated border monomials are cheap, so the duplication rate overstates the saving."** The
+argument was that a monomial reached from two directions sits low in the order, which correlates
+with a short reduction — so removing 31% of the *reductions* might remove much less than 31% of the
+*time*. Against the ratio of reductions removed:
+
+| system | reductions, per-column | reductions, dedup | ratio | measured speedup of the reduction stage |
+|---|---:|---:|---:|---:|
+| katsura-5 | 58 | 44 | 1.32x | 1.37x |
+| katsura-6 | 138 | 100 | 1.38x | 1.36x |
+| katsura-7 | 323 | 223 | 1.45x | 1.37x |
+| cyclic-5 | 202 | 157 | 1.29x | 1.28x |
+| cyclic-6 | 564 | 386 | 1.46x | 1.45x |
+| planted-8 | 1,280 | 1,024 | 1.25x | 1.24x |
+
+The measured speedup tracks the call-count ratio to within a few percent throughout, and on
+katsura-5 slightly exceeds it. **Repeated border monomials cost about what the others do.** The
+duplication rate is a usable estimate of the saving after all, which is a cheap counter predicting
+an expensive quantity — worth knowing for M18-2.
+
+**"The one-term `MultivariatePolynomial` per reduction is worth a specialized entry point"** —
+§5.3 of the proposal. Both loops below walk the same border monomials in the same order; the first
+stops at the polynomial, the second reduces it:
+
+| system | construct | construct and reduce | construct's share |
+|---|---:|---:|---:|
+| katsura-6 | 0.008 ms | 2.077 ms | 0.38% |
+| katsura-7 | 0.016 ms | 22.498 ms | **0.07%** |
+| cyclic-6 | 0.029 ms | 15.190 ms | 0.19% |
+| planted-8 | 0.077 ms | 0.981 ms | 7.83% |
+| planted-10 | 0.403 ms | 7.158 ms | 5.63% |
+
+**Rejected.** On the families where reduction dominates a conversion it is 0.07% to 0.38% of the
+reduction, so a monomial-accepting entry point would buy nothing worth the second reduction path it
+would create. The share is larger on the planted family only because the reductions there are
+nearly trivial — and reduction is a quarter of planted-10's conversion, so 5.6% of it is 1.4% of
+the whole. `normal_form` remains the only reduction in this module.
+
+### 5.4 The resource budget under the new strategy
+
+The shared vectors are allocated before any column exists, so `max_operator_entries` is checked
+**as they fill** rather than only when the columns are pushed. That check is sound in the direction
+that matters: every distinct border monomial appears in at least one column, so the shared entries
+never exceed the operators' own, and the early check can never reject a system the reference path
+would have accepted. Tested at the tight boundary — a budget of exactly what a system needs is
+accepted by both strategies, and one entry less is rejected by both.
+
+What does change is the **peak**: under deduplication the construction holds the shared vectors and
+the operators at once, so its peak is up to twice the budget where the reference path's is exactly
+the budget. The bound is provable rather than measured, and it is the honest cost of the strategy.
+
+### 5.5 Correctness
+
+* `QuotientAlgebra` derives `PartialEq`, so the strategies are compared as **whole values** — every
+  column of every operator — rather than through the lex basis they lead to. A wrong column that
+  happened not to change the final basis would pass the weaker check and fails this one. Run over
+  three monomial orders, eight two-variable systems, two three-variable systems, katsura-5,
+  katsura-6, cyclic-5 and planted-6.
+* The lex bases are additionally compared end to end, over three orders, GF(7) and GF(2^31 - 1), and
+  the benchmark corpus — together with `span_row_operations` and `operator_entries`, so a strategy
+  that reached the same answer by doing different linear algebra would be caught.
+* **All 96 committed differential fixtures are verified under every strategy**, which is each one
+  separately compared against Singular rather than against the other. Two implementations agreeing
+  with each other and both being wrong is what an external oracle is for.
+* A live sweep of 500 random systems under `--operator-construction deduplicated-border`, over
+  GF(2) through GF(2^31 - 1) in two to five variables: 0 disagreements, 0 oracle failures.
+* `BorderIndex` has its own tests: every column classified exactly as `QuotientBasis::index_of`
+  classifies its product, repeated border monomials carrying one index, the border distinct and
+  descending under the order, the border disjoint from the basis, the index reproducible, and the
+  unit ideal having no border at all.
+
+### 5.6 The default has not changed
+
+`FglmOptions::default()` is still `PerColumn`. Deduplication is measured faster on every instance in
+the corpus, agrees everywhere, and stores the same amount — so this is sequencing, not doubt: §12 of
+the proposal asks for defaults to be chosen from the integration ablation in M18-5, when M18-2's
+batched reduction and M18-3's representations can be weighed against it at the same time. A caller
+who wants it now writes
+
+```rust
+let options = FglmOptions::default()
+    .with_operator_construction(OperatorConstruction::DeduplicatedBorder);
+```
+
+---
+
+## 6. Acceptance criteria
 
 ### M18-0 — validation infrastructure
 
@@ -400,11 +543,11 @@ oracle path on request without ever depending on it.
 
 ### M18-1 — border deduplication
 
-- [ ] Unique border monomials enumerated correctly.
-- [ ] Repeated border products deduplicated.
-- [ ] Normal forms agree with M17.
-- [ ] Operator columns agree exactly.
-- [ ] Performance and duplication rate measured.
+- [x] Unique border monomials enumerated correctly — `BorderIndex`, §5.1, with its own tests.
+- [x] Repeated border products deduplicated — `OperatorConstruction::DeduplicatedBorder`.
+- [x] Normal forms agree with M17 — §5.5, and all 96 fixtures under both strategies.
+- [x] Operator columns agree exactly — whole-`QuotientAlgebra` equality, §5.5.
+- [x] Performance and duplication rate measured — §5.2, and the two refuted hypotheses in §5.3.
 
 ### M18-2 — batched reduction
 
@@ -450,7 +593,7 @@ oracle path on request without ever depending on it.
 
 ---
 
-## 6. Compatibility
+## 7. Compatibility
 
 `FglmOptions` gained `measure_stages` and `FglmStatistics` gained `border`, `timings` and `memory`.
 Both structs have public fields, so a downstream struct literal naming every field stops compiling.
@@ -464,9 +607,13 @@ quotient vectors were missing entirely. No resource budget changed.
 
 `QuotientAlgebra::new_with_statistics` is new; `new` delegates to it and is unchanged.
 
+M18-1 added `FglmOptions::operator_construction`, the same source-compatibility note applying. It
+also added `FglmOptions::baseline()` and `FglmOptions::with_operator_construction`, and the public
+`BorderIndex` and `ColumnTarget`. `FglmOptions::default()` is unchanged — see §5.6.
+
 ---
 
-## 7. References
+## 8. References
 
 1. Faugère, J.-C., Gianni, P., Lazard, D., Mora, T. (1993). *Efficient Computation of
    Zero-dimensional Gröbner Bases by Change of Ordering.* J. Symbolic Computation 16(4), 329–344.
