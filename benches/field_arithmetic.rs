@@ -21,7 +21,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
-    fields::{PrimeFieldElement128, Zp18446744073709551557, Zp2147483647},
+    fields::{Bls12_381Fr, Bn254Fr, PrimeFieldElement128, Zp18446744073709551557, Zp2147483647},
     FiniteField,
 };
 
@@ -168,6 +168,10 @@ fn benches(c: &mut Criterion) {
     bench_field::<Zp2147483647>(c, "p31");
     bench_field::<Zp18446744073709551557>(c, "p64");
     bench_field::<Zp128>(c, "p68");
+    // The cryptographic scalar fields. Named by width so the ordering in the report matches the
+    // ordering of the moduli.
+    bench_field::<Bn254Fr>(c, "p254_bn254");
+    bench_field::<Bls12_381Fr>(c, "p255_bls12_381");
 }
 
 criterion_group!(field_arithmetic, benches);

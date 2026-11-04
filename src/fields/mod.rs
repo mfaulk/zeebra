@@ -4,11 +4,17 @@ mod binary_field;
 mod extension_field;
 mod finite_field;
 mod irreducible_polynomials;
+mod montgomery_256;
 mod prime_field_128;
+mod prime_field_256;
 mod prime_field_64;
 
 pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
 pub use prime_field_128::PrimeFieldElement128;
+pub use prime_field_256::{
+    Bls12_381Fr, Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256,
+    PrimeModulus256, BLS12_381_FR_MODULUS_DECIMAL, BN254_FR_MODULUS_DECIMAL,
+};
 pub use prime_field_64::PrimeFieldElement64;
 
 // === 64-bit prime fields ===
