@@ -92,23 +92,21 @@ impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
     }
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         // Sample a value uniformly in 0..P by rejection sampling.
-        let mask_low: u64;
-        let mask_high: u64;
-        let num_zero_bits = P.leading_zeros();
-        if num_zero_bits <= 64 {
-            mask_high = u64::MAX.checked_shr(num_zero_bits).unwrap_or(0);
-            mask_low = u64::MAX;
-        } else {
-            mask_high = 0;
-            mask_low = u64::MAX.checked_shr(num_zero_bits).unwrap_or(0);
-        }
+        // Rejection sampling over the bits P occupies, so at most half of all draws are rejected.
+        //
+        // The mask is taken over the full 128 bits rather than assembled from two 64-bit halves.
+        // `u64::MAX >> s` has no value for `s >= 64`, and the halved version reached for exactly
+        // that: every modulus below 2^64 left more than 64 leading zero bits, the shift was
+        // `checked_shr`'d to `None`, and the resulting zero mask made `random` return zero on
+        // every draw.
+        let mask = u128::MAX >> P.leading_zeros();
 
         loop {
-            let rand_low = (rng.next_u64() & mask_low) as u128;
-            let rand_high = (rng.next_u64() & mask_high) as u128;
-            let val = (rand_high << 64) + rand_low;
-            if val <= P {
-                return Self::new(val);
+            let value = (((rng.next_u64() as u128) << 64) | rng.next_u64() as u128) & mask;
+            // Strictly below P: the representative is then already reduced, and accepting P
+            // itself would map it to zero and draw zero twice as often as any other residue.
+            if value < P {
+                return Self { value };
             }
         }
     }
@@ -323,13 +321,44 @@ mod tests {
         }
     }
 
-    #[ignore]
+    /// Sampling is uniform over the whole field: a chi-squared test over every residue.
     #[test]
-    // random() should sample a field element uniformly at random.
     fn test_random_distribution() {
-        // Randomly sampled values should not be statistically differentiable from a sequence of
-        // truly random values sampled from Uniform[0,P). Perform something like Chi-squared test.
-        unimplemented!()
+        const P: u128 = 61;
+        const DRAWS: usize = 200_000;
+
+        let mut rng = StdRng::seed_from_u64(20);
+        let mut counts = [0usize; P as usize];
+        for _ in 0..DRAWS {
+            counts[PrimeFieldElement128::<P>::random(&mut rng).value() as usize] += 1;
+        }
+
+        let expected = DRAWS as f64 / P as f64;
+        let chi_squared: f64 = counts
+            .iter()
+            .map(|&count| {
+                let deviation = count as f64 - expected;
+                deviation * deviation / expected
+            })
+            .sum();
+
+        // 99.6 is the 0.999 quantile of chi-squared with 60 degrees of freedom, so a uniform
+        // sampler fails this once in a thousand seeds — and the seed is fixed.
+        assert!(
+            chi_squared < 99.6,
+            "chi-squared {chi_squared:.1} over {P} residues: {counts:?}"
+        );
+    }
+
+    /// Every sampled representative is already reduced, which `random` must uphold directly.
+    #[test]
+    fn test_random_is_reduced() {
+        const P: u128 = 221360928884514619393;
+        let mut rng = StdRng::seed_from_u64(21);
+        for _ in 0..10_000 {
+            let value = PrimeFieldElement128::<P>::random(&mut rng).value();
+            assert!(value < P, "{value} is not a reduced residue modulo {P}");
+        }
     }
 
     proptest! {
