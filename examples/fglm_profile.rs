@@ -161,13 +161,15 @@ fn stage_row(row: &Row) {
 
 fn storage_header() {
     println!(
-        "| {:<11} | {:>5} | {:>9} | {:>11} | {:>11} | {:>11} |",
-        "system", "D", "entries", "operator kB", "blocks kB", "blocks/ops",
+        "| {:<11} | {:>5} | {:>9} | {:>9} | {:>9} | {:>11} | {:>11} | {:>11} |",
+        "system", "D", "entries", "cells", "dense col", "operator kB", "blocks kB", "blocks/ops",
     );
     println!(
-        "|{}|{}|{}|{}|{}|{}|",
+        "|{}|{}|{}|{}|{}|{}|{}|{}|",
         "-".repeat(13),
         "-".repeat(7),
+        "-".repeat(11),
+        "-".repeat(11),
         "-".repeat(11),
         "-".repeat(13),
         "-".repeat(13),
@@ -178,10 +180,12 @@ fn storage_header() {
 fn storage_row(row: &Row) {
     let m = row.statistics.memory;
     println!(
-        "| {:<11} | {:>5} | {:>9} | {:>11.1} | {:>11.1} | {:>10.1}x |",
+        "| {:<11} | {:>5} | {:>9} | {:>9} | {:>9} | {:>11.1} | {:>11.1} | {:>10.1}x |",
         row.name,
         row.statistics.quotient_dimension,
         m.operator_entries,
+        m.operator_cells,
+        m.dense_columns,
         kilobytes(m.operator_bytes),
         kilobytes(m.dense_block_bytes),
         m.dense_block_bytes as f64 / m.operator_bytes as f64,
@@ -267,8 +271,11 @@ fn main() {
     }
 
     println!();
-    println!("`entries` is the operators' mathematical nonzeros; `operator kB` is what their");
-    println!("columns actually hold, each Vec's spare capacity and the per-column spine included.");
+    println!("`entries` is the operators' mathematical nonzeros and `cells` the field-element");
+    println!("slots allocated, which differ only where a column is held densely — `dense col`");
+    println!(
+        "counts those. `operator kB` is what the columns hold, the per-column spine included."
+    );
     println!("`blocks kB` is the three dense D x D blocks the conversion needs at full rank — the");
     println!("dependence test's two and the retained accepted vectors, which no budget covers.");
     println!("Both are estimates of representations, not measurements of the process.");

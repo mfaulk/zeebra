@@ -138,6 +138,7 @@ cargo run --release --example fglm_conversion      # the FGLM pipeline against d
 cargo run --release --example fglm_profile         # where a conversion's time and memory go
 cargo run --release --example fglm_profile -- katsura-7   # one system per process
 cargo run --release --example fglm_border          # what deduplicating the border is worth
+cargo run --release --example fglm_storage         # operator representations, stored and applied
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -206,6 +207,12 @@ with its own measurement rather than by inference, whether the one-term polynomi
 reduction is worth avoiding: 0.07% to 0.38% of the reduction it precedes on the families where
 reduction dominates, so no. `cargo bench --bench fglm -- fglm_operator_construction` is the same
 comparison under Criterion.
+
+`fglm_storage` reports the operator representations three ways: bytes under each strategy, which are
+exact; operator *application*, on a unit input and a dense one, because the sparse path skips a zero
+input coordinate and the dense path does not; and the whole conversion, where the difference turns
+out to be under 1%. `cargo bench --bench fglm -- fglm_operator_application` is the application half
+under Criterion.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
@@ -370,6 +377,33 @@ family where the lex walk dominates instead, and is slower on nothing in the cor
 the default: `docs/MILESTONE-FGLM-SCALABILITY.md` §5.6 explains why that waits for the integration
 ablation. `FglmOptions::baseline()` names the M17 configuration, so a measurement has something
 fixed to be quoted against.
+
+#### Storing the multiplication operators
+
+A column that leaves the staircase is not necessarily sparse. Measured, a reduced column holds **79%
+of `D` on katsura-7 and 0.14% on planted-10** — and a sparse entry carries an index as well as a
+coefficient, so it costs twice a dense cell and only saves below half fill.
+`FglmOptions::operator_storage` chooses, **per column**:
+
+```rust
+use zeebra::grobner::fglm::{FglmOptions, OperatorStorage};
+
+// `(index, coefficient)` pairs for every reduced column. The default, and the reference.
+let sparse = FglmOptions::default();
+
+// Whichever of the two allocates fewer bytes, decided column by column.
+let adaptive = FglmOptions::default().with_operator_storage(OperatorStorage::Adaptive);
+```
+
+On katsura-7 the operators go from 264.5 kB to **163.6 kB**, and `Adaptive` beats *both* extremes
+there — 163.6 against sparse's 264.5 and an all-dense 172.0 — which only a per-column choice can do.
+On the planted family it declines every column and is sparse exactly. All-dense is kept as a
+strategy to show that it is ruinous rather than to be used: planted-10 would need 51 MB where it
+needs 380 kB.
+
+`max_operator_bytes` is a second budget beside `max_operator_entries`, not a redefinition of it:
+entries are mathematical nonzeros and bytes are allocations, and the two diverge once a column is
+held densely.
 
 ### Differential testing against Singular
 

@@ -55,6 +55,10 @@ impl DifferentialFixture {
             characteristic: self.characteristic,
             variables: self.variables.iter().map(|v| v.to_string()).collect(),
             system: self.system.iter().map(|s| s.to_string()).collect(),
+            // A fixture inherits the oracle-input check from the sweep that produced it: a case
+            // only becomes a fixture after agreeing, and agreeing includes having been read
+            // correctly. Recording the echo again would double the `system` field for nothing.
+            oracle_system: None,
             quotient_dimension: self.quotient_dimension,
             grevlex_basis: self.grevlex_basis.iter().map(|s| s.to_string()).collect(),
             standard_monomials: self
@@ -206,6 +210,7 @@ mod tests {
             standard_monomials: vec!["x1".to_string(), "1".to_string()],
             border_normal_forms: vec![("x1^2".to_string(), "1".to_string())],
             lex_basis: Some(vec!["x2-x1".to_string(), "x1^2-1".to_string()]),
+            oracle_system: None,
         }
     }
 

@@ -47,6 +47,16 @@ pub enum Check {
     /// The case was stated over a different field than the one it is being checked in.
     Field,
 
+    /// The oracle read a different system than it was sent.
+    ///
+    /// A finding about the *interface*, not about either implementation's mathematics, and the
+    /// first thing checked because nothing after it means anything if it fails. It is not
+    /// hypothetical: Singular sums bare integer literals in 32-bit arithmetic before coercing them
+    /// into the ring, so at `p = 2^31 - 1` a polynomial with two constant terms reads back as a
+    /// different polynomial. The generator now emits canonical polynomials, and this verifies that
+    /// rather than trusting it.
+    OracleInput,
+
     /// Zeebra's grevlex Gröbner basis against the oracle's.
     SourceBasis,
 
@@ -75,6 +85,7 @@ impl Check {
         match self {
             Self::Parse => "parse",
             Self::Field => "field",
+            Self::OracleInput => "oracle-input",
             Self::SourceBasis => "source-basis",
             Self::QuotientDimension => "quotient-dimension",
             Self::StandardMonomials => "standard-monomials",
@@ -139,6 +150,13 @@ pub struct DifferentialCase {
 
     /// The generators of the ideal.
     pub system: Vec<String>,
+
+    /// The generators as the oracle echoed them back, if it was asked.
+    ///
+    /// `None` for a recorded fixture, which inherits the check from the sweep that produced it;
+    /// always `Some` from a live oracle. Compared against [`Self::system`] as *polynomials* rather
+    /// than as text, since an oracle is entitled to print the same polynomial differently.
+    pub oracle_system: Option<Vec<String>>,
 
     /// `dim R/I` per the oracle, or `None` if the oracle called the ideal positive-dimensional.
     ///
@@ -213,6 +231,45 @@ pub fn verify_case<const N: usize, F: FiniteField>(
         .collect::<Result<_, _>>()?;
 
     let mut agreement = Agreement::default();
+
+    // ---- what the oracle read ---------------------------------------------------------------
+    //
+    // First, because nothing after it means anything if the two sides are not discussing the same
+    // ideal.
+    //
+    // Compared as *polynomials*, canonically rendered and sorted, and with zero generators dropped
+    // from both sides. Three conventions an oracle is entitled to and none of which changes the
+    // ideal: printing `x1-887778612` for what was sent as `1259705035+x1`, listing the generators
+    // in its own order, and dropping a zero generator — `<0, f>` is `<f>`, and Singular's `size`
+    // does not count one.
+
+    if let Some(echoed) = &case.oracle_system {
+        let canonical = |sources: &[String]| -> Result<Vec<String>, Disagreement> {
+            let mut rendered: Vec<String> = Vec::new();
+            for source in sources {
+                let polynomial = parse(source)?;
+                if polynomial.is_zero() {
+                    continue;
+                }
+                rendered.push(polynomial_to_string(&polynomial, &names, SOURCE_ORDER));
+            }
+            rendered.sort();
+            Ok(rendered)
+        };
+
+        let sent = canonical(&case.system)?;
+        let read = canonical(echoed)?;
+        if sent != read {
+            return Err(fail(
+                Check::OracleInput,
+                format!(
+                    "sent [{}] and the oracle read [{}]",
+                    sent.join(", "),
+                    read.join(", ")
+                ),
+            ));
+        }
+    }
 
     // ---- the source basis -------------------------------------------------------------------
 

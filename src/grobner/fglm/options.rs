@@ -23,6 +23,37 @@ pub enum OperatorConstruction {
     DeduplicatedBorder,
 }
 
+/// How a reduced multiplication-operator column is stored.
+///
+/// A storage choice and nothing more: every variant must give the same columns, the same
+/// applications, and the same nonzero counts. Only the cells and the bytes may differ.
+///
+/// The crossover is real inside the benchmark corpus rather than hypothetical. A reduced column
+/// holds 79% of `D` on katsura-7 and 0.14% on planted-10, and a sparse entry costs an index as well
+/// as a coefficient — so neither representation wins everywhere and nor does any whole-operator
+/// choice. See §7 of `docs/MILESTONE-FGLM-SCALABILITY.md`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum OperatorStorage {
+    /// Every reduced column as `(index, coefficient)` pairs, as M17 did. The reference.
+    #[default]
+    Sparse,
+
+    /// Each column in whichever of the two allocates fewer bytes.
+    ///
+    /// Decided **per column**, not per operator: different columns of one operator have
+    /// substantially different densities, so a whole-operator choice would be wrong for some of
+    /// them by construction. A column with no entries is always the sparse side, so a zero column
+    /// still allocates nothing.
+    Adaptive,
+
+    /// Every reduced column as `D` coefficients.
+    ///
+    /// For measurement: it is the wrong choice on most of the corpus, and exists so that the
+    /// adaptive policy can be shown to be better than either extreme rather than just better than
+    /// one.
+    Dense,
+}
+
 /// Limits on what an FGLM computation may build, and which strategies to use.
 ///
 /// Separate from [`F4Options`](crate::grobner::F4Options) rather than merged into it: the source
@@ -74,6 +105,24 @@ pub struct FglmOptions {
     ///
     /// Does not change the answer. See [`OperatorConstruction`].
     pub operator_construction: OperatorConstruction,
+
+    /// How to store the multiplication operators' columns.
+    ///
+    /// Does not change the answer. See [`OperatorStorage`].
+    pub operator_storage: OperatorStorage,
+
+    /// Bytes the operators' column heaps may occupy, summed over all `N` operators.
+    ///
+    /// **A second budget rather than a redefinition of
+    /// [`max_operator_entries`](Self::max_operator_entries).** Entries are mathematical nonzeros
+    /// and bytes are allocations, and under [`OperatorStorage::Dense`] the two diverge by a factor
+    /// of `D / entries per column`. Changing what the older limit counted would have made every
+    /// figure recorded against it ambiguous, so this is added beside it and both are enforced.
+    ///
+    /// Counts the column heaps and not the `N * D` column spine, which is a function of the
+    /// dimension alone and is therefore already bounded by
+    /// [`max_quotient_dimension`](Self::max_quotient_dimension).
+    pub max_operator_bytes: usize,
 }
 
 impl FglmOptions {
@@ -89,13 +138,20 @@ impl FglmOptions {
     /// and the same accounting as F4's live-nonzero budget. `max_span_entries` is the same number,
     /// which `2 * D^2` reaches at `D` just over 3,160 — so on a sparse staircase the span is the
     /// first of the three limits to bind, and on a dense one the operators are.
+    ///
+    /// `max_operator_bytes` of 320 MB is the same quantity of memory the entry budget describes,
+    /// stated in the unit that is actually allocated. The two bind together under
+    /// [`OperatorStorage::Sparse`] and the byte budget binds first under
+    /// [`OperatorStorage::Dense`], which is the point of having it.
     pub fn recommended() -> Self {
         Self {
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
             max_span_entries: 20_000_000,
+            max_operator_bytes: 320_000_000,
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
+            operator_storage: OperatorStorage::Sparse,
         }
     }
 
@@ -108,8 +164,10 @@ impl FglmOptions {
             max_quotient_dimension: usize::MAX,
             max_operator_entries: usize::MAX,
             max_span_entries: usize::MAX,
+            max_operator_bytes: usize::MAX,
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
+            operator_storage: OperatorStorage::Sparse,
         }
     }
 
@@ -124,8 +182,10 @@ impl FglmOptions {
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
             max_span_entries: 20_000_000,
+            max_operator_bytes: 320_000_000,
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
+            operator_storage: OperatorStorage::Sparse,
         }
     }
 
@@ -135,6 +195,14 @@ impl FglmOptions {
     pub fn with_operator_construction(self, operator_construction: OperatorConstruction) -> Self {
         Self {
             operator_construction,
+            ..self
+        }
+    }
+
+    /// These options with a different operator-storage strategy.
+    pub fn with_operator_storage(self, operator_storage: OperatorStorage) -> Self {
+        Self {
+            operator_storage,
             ..self
         }
     }

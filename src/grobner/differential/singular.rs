@@ -227,6 +227,7 @@ impl SingularOracle {
         };
 
         let vdim = integer("@vdim")?;
+        let oracle_system = collect(&output, "@gen", integer("@gensize")?, "@gen")?;
         let grevlex_basis = collect(&output, "@gb", integer("@gbsize")?, "@gb")?;
         let lex_basis = collect(&output, "@lex", integer("@lexsize")?, "@lex")?;
 
@@ -281,6 +282,7 @@ impl SingularOracle {
             characteristic: query.characteristic,
             variables: query.variables.iter().map(|v| v.to_string()).collect(),
             system: query.system.to_vec(),
+            oracle_system: Some(oracle_system),
             quotient_dimension,
             grevlex_basis,
             standard_monomials,
@@ -307,19 +309,24 @@ impl SingularOracle {
         script.push_str(&format!("ring Rsrc = {},({}),dp;\n", p, vars));
         script.push_str("short = 0;\n");
         script.push_str(&format!("ideal I = {};\n", generators));
+        // Echoed before anything is computed from it. An oracle that read the system differently
+        // has not disagreed about mathematics, and nothing it says afterwards means anything — so
+        // what it read is the first thing the comparison checks. See `Check::OracleInput`.
+        script.push_str("printf(\"@gensize %s\", ncols(I));\n");
+        script.push_str("for (k = 1; k <= ncols(I); k++) { printf(\"@gen %s\", I[k]); }\n");
         script.push_str("ideal G = std(I);\n");
         script.push_str("vd = vdim(G);\n");
         script.push_str("printf(\"@vdim %s\", vd);\n");
-        script.push_str("printf(\"@gbsize %s\", size(G));\n");
-        script.push_str("for (k = 1; k <= size(G); k++) { printf(\"@gb %s\", G[k]); }\n");
+        script.push_str("printf(\"@gbsize %s\", ncols(G));\n");
+        script.push_str("for (k = 1; k <= ncols(G); k++) { printf(\"@gb %s\", G[k]); }\n");
 
         // Guarded: `kbase` on a positive-dimensional ideal does not error, it returns something
         // that is not a basis of a finite quotient. Asking only when `vdim` says the quotient is
         // finite is what keeps the answer meaningful.
         script.push_str("if (vd >= 0)\n{\n");
         script.push_str("  ideal B = kbase(G);\n");
-        script.push_str("  printf(\"@kbasesize %s\", size(B));\n");
-        script.push_str("  for (k = 1; k <= size(B); k++) { printf(\"@kbase %s\", B[k]); }\n");
+        script.push_str("  printf(\"@kbasesize %s\", ncols(B));\n");
+        script.push_str("  for (k = 1; k <= ncols(B); k++) { printf(\"@kbase %s\", B[k]); }\n");
         for monomial in query.border_monomials {
             script.push_str(&format!(
                 "  printf(\"@nf %s ; %s\", \"{}\", reduce({}, G));\n",
@@ -331,13 +338,14 @@ impl SingularOracle {
         script.push_str(&format!("ring Rlex = {},({}),lp;\n", p, vars));
         script.push_str("short = 0;\n");
         script.push_str("ideal Glex = std(fetch(Rsrc, I));\n");
-        script.push_str("printf(\"@lexsize %s\", size(Glex));\n");
-        script.push_str("for (k = 1; k <= size(Glex); k++) { printf(\"@lex %s\", Glex[k]); }\n");
+        script.push_str("printf(\"@lexsize %s\", ncols(Glex));\n");
+        script.push_str("for (k = 1; k <= ncols(Glex); k++) { printf(\"@lex %s\", Glex[k]); }\n");
         script.push_str("if (vd >= 0)\n{\n");
         script.push_str("  ideal Gfglm = fglm(Rsrc, G);\n");
-        script.push_str("  printf(\"@fglmsize %s\", size(Gfglm));\n");
-        script
-            .push_str("  for (k = 1; k <= size(Gfglm); k++) { printf(\"@fglm %s\", Gfglm[k]); }\n");
+        script.push_str("  printf(\"@fglmsize %s\", ncols(Gfglm));\n");
+        script.push_str(
+            "  for (k = 1; k <= ncols(Gfglm); k++) { printf(\"@fglm %s\", Gfglm[k]); }\n",
+        );
         script.push_str("}\n");
         script.push_str("printf(\"@done\");\nexit;\n");
         script
@@ -461,12 +469,20 @@ fn markers<'a>(output: &'a str, name: &str) -> Vec<&'a str> {
         .collect()
 }
 
-/// `expected` values of a marker, or an error naming the marker whose count was wrong.
+/// `expected` lines of a marker, with zeros dropped, or an error if the count was wrong.
 ///
-/// The size Singular reported and the number of lines it printed must agree. They can differ for a
-/// reason worth catching: `printf("%s", ideal)` on an empty ideal prints `0`, so a list whose
-/// elements were printed individually is the only kind whose emptiness is unambiguous — and that
-/// is only true if the count is checked.
+/// The slot count Singular reported and the number of lines it printed must agree. They can differ
+/// for a reason worth catching: `printf("%s", ideal)` on an empty ideal prints `0`, so a list whose
+/// elements were printed individually is the only kind whose emptiness is unambiguous — and that is
+/// only true if the count is checked.
+///
+/// **Zeros are dropped, after the count has been checked.** The count is `ncols` and not `size`,
+/// because those differ: `size` counts an ideal's *non-zero* generators and `ncols` its slots, so
+/// `ideal I = 0, x1^2` has `size` 1 and `ncols` 2 with `I[1]` the zero — and a loop bounded by
+/// `size` prints the zero and skips `x1^2`. Found by the harness's own oracle-input check, on seed
+/// 55915 over GF(2). Iterating the slots keeps the count meaningful; dropping the zeros afterwards
+/// is right because none of these lists — a generating set, a reduced basis, a monomial basis — has
+/// a zero as a meaningful element.
 fn collect(
     output: &str,
     name: &str,
@@ -488,7 +504,11 @@ fn collect(
             ),
         });
     }
-    Ok(values.into_iter().map(str::to_string).collect())
+    Ok(values
+        .into_iter()
+        .filter(|value| *value != "0")
+        .map(str::to_string)
+        .collect())
 }
 
 /// A list of polynomial strings, sorted, for comparing two of Singular's own answers.
@@ -556,6 +576,24 @@ mod tests {
             collect("@kbasesize 0\n", "@kbase", 0, "@kbase"),
             Ok(Vec::new())
         );
+    }
+
+    /// A zero slot is dropped, after the count has been checked against it.
+    ///
+    /// `ideal I = 0, x1^2` has two slots and one non-zero generator, and Singular's `size` reports
+    /// the second — so the slots are what is iterated and the zeros are removed afterwards.
+    #[test]
+    fn test_a_zero_slot_is_dropped_after_the_count_is_checked() {
+        let output = "@gensize 2\n@gen 0\n@gen x1^2\n";
+        assert_eq!(
+            collect(output, "@gen", 2, "@gensize"),
+            Ok(vec!["x1^2".to_string()])
+        );
+        // The count is against the slots, so a list whose zero was not printed is still an error.
+        assert!(matches!(
+            collect("@gensize 2\n@gen x1^2\n", "@gen", 2, "@gensize"),
+            Err(OracleError::Unparsable { .. })
+        ));
     }
 
     /// A negative reported size is an error rather than a wrapped length.

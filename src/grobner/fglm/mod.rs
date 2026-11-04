@@ -30,7 +30,7 @@ pub use conversion::{
 pub use errors::FglmError;
 pub use incremental_span::{Dependence, IncrementalSpan};
 pub use multiplication::MultiplicationOperator;
-pub use options::{FglmOptions, OperatorConstruction};
+pub use options::{FglmOptions, OperatorConstruction, OperatorStorage};
 pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
 pub use quotient_basis::{classify_ideal, IdealClass, QuotientBasis};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};

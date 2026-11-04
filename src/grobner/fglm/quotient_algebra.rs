@@ -141,9 +141,10 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
 
         let mut operators = Vec::with_capacity(N);
         let mut entries = 0usize;
+        let mut bytes = 0usize;
 
         for i in 0..N {
-            let mut builder = OperatorBuilder::with_capacity(dimension);
+            let mut builder = OperatorBuilder::new(dimension, options.operator_storage);
             for target in index.column_targets(i) {
                 let column = match *target {
                     ColumnTarget::Standard(standard) => {
@@ -166,6 +167,8 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
                     },
                 };
 
+                // Nonzeros, which is the older budget's unit. Counted from the column before it is
+                // stored, so it does not depend on the representation chosen for it.
                 entries = entries.checked_add(column.len()).ok_or(
                     FglmError::OperatorStorageExceeded {
                         entries: usize::MAX,
@@ -178,7 +181,22 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
                         limit: options.max_operator_entries,
                     });
                 }
-                builder.push_reduced(column);
+
+                // Bytes, which does depend on it: `push_reduced` reports what it stored, so the
+                // budget is enforced on the allocation that happened rather than on a model of it.
+                let stored = builder.push_reduced(column);
+                bytes = bytes
+                    .checked_add(stored)
+                    .ok_or(FglmError::OperatorBytesExceeded {
+                        bytes: usize::MAX,
+                        limit: options.max_operator_bytes,
+                    })?;
+                if bytes > options.max_operator_bytes {
+                    return Err(FglmError::OperatorBytesExceeded {
+                        bytes,
+                        limit: options.max_operator_bytes,
+                    });
+                }
             }
             operators.push(builder.finish());
         }
@@ -205,12 +223,28 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             .sum()
     }
 
+    /// Field-element cells the `N` operators' columns allocate, zero or not.
+    pub fn operator_cells(&self) -> usize {
+        self.operators
+            .iter()
+            .map(MultiplicationOperator::stored_cells)
+            .sum()
+    }
+
     /// Bytes the `N` operators' representations occupy. See
     /// [`MultiplicationOperator::stored_bytes`] for what that does and does not include.
     pub fn operator_bytes(&self) -> usize {
         self.operators
             .iter()
             .map(MultiplicationOperator::stored_bytes)
+            .sum()
+    }
+
+    /// Of the `N * D` columns, how many are held densely.
+    pub fn dense_columns(&self) -> usize {
+        self.operators
+            .iter()
+            .map(MultiplicationOperator::dense_columns)
             .sum()
     }
 
@@ -342,19 +376,21 @@ fn coordinates_of_normal_form<const N: usize, F: FiniteField>(
     normal_form: &MultivariatePolynomial<N, F>,
     quotient: &QuotientBasis<N>,
 ) -> Vec<(usize, F)> {
-    let mut entries: Vec<(usize, F)> = normal_form
-        .terms()
-        .iter()
-        .map(|(monomial, coefficient)| {
-            let index = quotient.index_of(monomial).unwrap_or_else(|| {
-                panic!(
-                    "{} survived reduction but is not a standard monomial",
-                    monomial
-                )
-            });
-            (index, *coefficient)
-        })
-        .collect();
+    // `with_capacity` and not `collect`. A `HashMap`'s iterator is not `TrustedLen`, so `collect`
+    // goes through the growth path, whose minimum non-zero allocation is **four** elements for this
+    // element size — and a planted system's typical reduced column holds one. Measured, that slack
+    // was 41% of planted-10's whole operator storage. `with_capacity` allocates exactly.
+    let terms = normal_form.terms();
+    let mut entries: Vec<(usize, F)> = Vec::with_capacity(terms.len());
+    entries.extend(terms.iter().map(|(monomial, coefficient)| {
+        let index = quotient.index_of(monomial).unwrap_or_else(|| {
+            panic!(
+                "{} survived reduction but is not a standard monomial",
+                monomial
+            )
+        });
+        (index, *coefficient)
+    }));
     entries.sort_unstable_by_key(|(index, _)| *index);
     entries
 }
@@ -367,7 +403,7 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             f4,
-            fglm::{FglmError, FglmOptions, OperatorConstruction},
+            fglm::{FglmError, FglmOptions, OperatorConstruction, OperatorStorage},
         },
         FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
@@ -977,6 +1013,233 @@ mod tests {
                 ),
             }
         }
+    }
+
+    /// Every storage strategy gives the same operators, observably.
+    ///
+    /// Not a `QuotientAlgebra` equality, and deliberately so: the representations differ, so the
+    /// values differ, which is why they are compared through what a caller can see — every column,
+    /// every application, and the nonzero count — rather than through the bytes they happen to
+    /// occupy.
+    #[test]
+    fn test_the_storage_strategies_agree() {
+        const STORAGES: [OperatorStorage; 3] = [
+            OperatorStorage::Sparse,
+            OperatorStorage::Adaptive,
+            OperatorStorage::Dense,
+        ];
+
+        fn check<const N: usize>(
+            name: &str,
+            system: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) {
+            let basis = f4(system, order).expect("within limits");
+            let reference = QuotientAlgebra::new(
+                &basis,
+                order,
+                &FglmOptions::unbounded().with_operator_storage(OperatorStorage::Sparse),
+            )
+            .expect("finite");
+            let d = reference.dimension();
+
+            // Weights with every coordinate nonzero and all distinct, so a dropped or duplicated
+            // column cannot cancel out, plus the unit vectors the conversion actually uses.
+            let dense: Vec<F> = (0..d).map(|j| F::new(j as u64 + 1)).collect();
+
+            for storage in STORAGES {
+                let algebra = QuotientAlgebra::new(
+                    &basis,
+                    order,
+                    &FglmOptions::unbounded().with_operator_storage(storage),
+                )
+                .expect("finite");
+
+                assert_eq!(
+                    algebra.operator_entries(),
+                    reference.operator_entries(),
+                    "{} under {:?}: {:?} found a different number of nonzeros",
+                    name,
+                    order,
+                    storage
+                );
+
+                for i in 0..N {
+                    for j in 0..d {
+                        assert_eq!(
+                            algebra.operator(i).column(j),
+                            reference.operator(i).column(j),
+                            "{} under {:?}: {:?} disagrees on column {} of T_{}",
+                            name,
+                            order,
+                            storage,
+                            j,
+                            i
+                        );
+                        assert_eq!(
+                            algebra.multiply_by_variable(i, &unit(&algebra, j)),
+                            reference.multiply_by_variable(i, &unit(&reference, j)),
+                            "{} under {:?}: {:?} disagrees applying T_{} to e_{}",
+                            name,
+                            order,
+                            storage,
+                            i,
+                            j
+                        );
+                    }
+                    assert_eq!(
+                        algebra.multiply_by_variable(i, &dense),
+                        reference.multiply_by_variable(i, &dense),
+                        "{} under {:?}: {:?} disagrees applying T_{} to a dense vector",
+                        name,
+                        order,
+                        storage,
+                        i
+                    );
+                }
+            }
+        }
+
+        for order in ORDERS {
+            for system in SYSTEMS {
+                check(system[0], &parse(system, ["x", "y"]), order);
+            }
+            check("katsura-3", &katsura::<3, F>(), order);
+        }
+
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        check("katsura-5", &katsura::<5, F>(), grevlex);
+        check("katsura-6", &katsura::<6, F>(), grevlex);
+        check("cyclic-5", &cyclic::<5, F>(), grevlex);
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        check("planted-6", &planted::<6, F>(&point), grevlex);
+    }
+
+    /// Adaptive storage is never larger than either extreme, and is strictly smaller than one of
+    /// them on each family.
+    ///
+    /// The claim the strategy exists for. It is a per-column minimum, so being no worse than both
+    /// is structural; being *better* than both on some instance is what makes it worth having, and
+    /// that depends on the corpus containing columns on each side of the crossover.
+    #[test]
+    fn test_adaptive_storage_is_never_the_larger_choice() {
+        fn bytes<const N: usize>(
+            system: &[MultivariatePolynomial<N, F>],
+            storage: OperatorStorage,
+        ) -> usize {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let basis = f4(system, order).expect("within limits");
+            QuotientAlgebra::new(
+                &basis,
+                order,
+                &FglmOptions::unbounded().with_operator_storage(storage),
+            )
+            .expect("finite")
+            .operator_bytes()
+        }
+
+        fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>]) {
+            let sparse = bytes(system, OperatorStorage::Sparse);
+            let adaptive = bytes(system, OperatorStorage::Adaptive);
+            let dense = bytes(system, OperatorStorage::Dense);
+
+            assert!(
+                adaptive <= sparse,
+                "{}: adaptive is {} bytes against sparse's {}",
+                name,
+                adaptive,
+                sparse
+            );
+            assert!(
+                adaptive <= dense,
+                "{}: adaptive is {} bytes against dense's {}",
+                name,
+                adaptive,
+                dense
+            );
+        }
+
+        // katsura's reduced columns are dense enough that the dense form is smaller, so adaptive
+        // must beat sparse there.
+        let katsura_7 = katsura::<7, F>();
+        check("katsura-7", &katsura_7);
+        assert!(
+            bytes(&katsura_7, OperatorStorage::Adaptive)
+                < bytes(&katsura_7, OperatorStorage::Sparse),
+            "katsura-7's columns are dense enough that adaptive should beat sparse"
+        );
+
+        // The planted family's columns hold about one entry each, so adaptive must beat dense and
+        // must match sparse exactly — it should pick sparse for every column.
+        let point: Vec<F> = (0..8).map(|i| F::new(2 * i as u64 + 3)).collect();
+        let planted_8 = planted::<8, F>(&point);
+        check("planted-8", &planted_8);
+        assert_eq!(
+            bytes(&planted_8, OperatorStorage::Adaptive),
+            bytes(&planted_8, OperatorStorage::Sparse),
+            "planted-8 has no column dense enough to be worth holding densely"
+        );
+        assert!(
+            bytes(&planted_8, OperatorStorage::Adaptive)
+                < bytes(&planted_8, OperatorStorage::Dense),
+            "a dense planted-8 should be much larger"
+        );
+
+        check("cyclic-6", &cyclic::<6, F>());
+    }
+
+    /// The byte budget fires on bytes, where the entry budget would not have.
+    ///
+    /// The reason it is a second limit and not a redefinition of the first: under dense storage the
+    /// same nonzeros occupy `D` cells, so a budget written in entries cannot see the difference.
+    #[test]
+    fn test_the_operator_byte_budget_is_enforced() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        // planted-6, not katsura: katsura's columns are 81% full, so holding them densely is
+        // *smaller* and there would be no overshoot for a budget to catch. A planted column holds
+        // about one entry of 64, which is where the dense form is ruinous.
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        let basis = f4(&planted::<6, F>(&point), order).expect("within limits");
+
+        let sparse = FglmOptions::unbounded().with_operator_storage(OperatorStorage::Sparse);
+        let dense = FglmOptions::unbounded().with_operator_storage(OperatorStorage::Dense);
+        let sparse_bytes = QuotientAlgebra::new(&basis, order, &sparse)
+            .expect("finite")
+            .operator_bytes();
+        let dense_bytes = QuotientAlgebra::new(&basis, order, &dense)
+            .expect("finite")
+            .operator_bytes();
+        assert!(
+            dense_bytes > sparse_bytes,
+            "planted-6 held densely should be larger: {} against {}",
+            dense_bytes,
+            sparse_bytes
+        );
+
+        // A budget that the sparse form fits inside and the dense form does not, with the *entry*
+        // budget unbounded throughout — so what fires can only be the byte budget.
+        let mut limited = dense;
+        limited.max_operator_bytes = sparse_bytes;
+        match QuotientAlgebra::new(&basis, order, &limited) {
+            Err(FglmError::OperatorBytesExceeded { bytes, limit }) => {
+                assert_eq!(limit, sparse_bytes);
+                assert!(bytes > limit, "{} should be over {}", bytes, limit);
+            }
+            other => panic!("expected a byte-budget error, got ok = {}", other.is_ok()),
+        }
+
+        let mut generous = limited;
+        generous.operator_storage = OperatorStorage::Sparse;
+        assert!(
+            QuotientAlgebra::new(&basis, order, &generous).is_ok(),
+            "the sparse form should fit inside a budget set from its own size"
+        );
     }
 
     /// A budget set to exactly what a system needs is enough for every strategy.
