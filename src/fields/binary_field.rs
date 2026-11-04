@@ -192,12 +192,11 @@ impl<const P: u64> ops::Mul<Self> for &BinaryFieldElement<P> {
 
     fn mul(self, rhs: Self) -> Self::Output {
         let product = multiply_polynomials(self.coefficients, rhs.coefficients);
-
-        // Divide by an irreducible polynomial, yielding a quotient and a remainder.
-        // Product is defined as the remainder.
-        let (_quotient, remainder) = long_divide(product, P);
+        // The product modulo the irreducible polynomial. Barrett rather than `long_divide`, whose
+        // loop runs once per degree the product must come down; the two agree on every product
+        // this field can form, which `tests::test_barrett_agrees_with_long_division` checks.
         Self::Output {
-            coefficients: remainder,
+            coefficients: barrett_reduce::<P>(product),
         }
     }
 }
@@ -238,7 +237,49 @@ impl<const P: u64> Arbitrary for BinaryFieldElement<P> {
 }
 
 /// Multiply the coefficient bit patterns for two polynomials in GF(2).
+///
+/// Carry-less multiplication is a single instruction on any x86-64 part with `pclmulqdq`, which
+/// is not implied by the `x86-64-v3` floor this crate builds against — it arrived with the AES-NI
+/// generation and is not part of any of the microarchitecture levels. So the choice is made at run
+/// time, from a cached feature probe, and [`multiply_polynomials_scalar`] remains for everything
+/// else.
 fn multiply_polynomials(a: u64, b: u64) -> u128 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::arch::is_x86_feature_detected!("pclmulqdq") {
+            // SAFETY: guarded by the feature probe immediately above.
+            return unsafe { multiply_polynomials_pclmulqdq(a, b) };
+        }
+    }
+    multiply_polynomials_scalar(a, b)
+}
+
+/// One `PCLMULQDQ` in place of the bit-at-a-time loop.
+///
+/// # Safety
+/// The caller must have established that the target supports `pclmulqdq`.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "pclmulqdq")]
+unsafe fn multiply_polynomials_pclmulqdq(a: u64, b: u64) -> u128 {
+    use std::arch::x86_64::{__m128i, _mm_clmulepi64_si128, _mm_set_epi64x, _mm_storeu_si128};
+
+    let left = _mm_set_epi64x(0, a as i64);
+    let right = _mm_set_epi64x(0, b as i64);
+    // Immediate 0x00 selects the low quadword of each operand.
+    let product = _mm_clmulepi64_si128(left, right, 0x00);
+
+    // Stored rather than extracted with `_mm_extract_epi64`, which would pull in SSE4.1 on top of
+    // the one feature this function actually needs.
+    let mut halves = [0u64; 2];
+    _mm_storeu_si128(halves.as_mut_ptr() as *mut __m128i, product);
+    ((halves[1] as u128) << 64) | halves[0] as u128
+}
+
+/// Carry-less multiplication, one bit of `a` at a time.
+///
+/// The fallback for targets without `pclmulqdq`, and the oracle the accelerated path is tested
+/// against.
+fn multiply_polynomials_scalar(a: u64, b: u64) -> u128 {
     let b = b as u128;
     let mut result = 0;
     // If the i^th bit of a is 1, shift b left by i, and xor the shifted b into result.
@@ -250,11 +291,77 @@ fn multiply_polynomials(a: u64, b: u64) -> u128 {
     result
 }
 
+/// `floor(x^(2m) / P)` for a modulus `P` of degree m: the Barrett reduction constant.
+///
+/// Computed by the same long division [`long_divide`] performs, but at compile time, so the two
+/// agree by construction — `tests::test_the_barrett_constant_is_the_quotient_long_division_gives`
+/// checks that they do.
+///
+/// The quotient has degree exactly m, so it needs m + 1 bits and fits a `u64` for every m up to
+/// 63, which is the largest degree a `u64` modulus can have.
+const fn barrett_constant(p: u64) -> u64 {
+    let m = modulus_degree(p);
+    let divisor = p as u128;
+    let mut remainder: u128 = 1u128 << (2 * m);
+    let mut quotient: u64 = 0;
+    let mut shift = m;
+    loop {
+        if (remainder >> (m + shift)) & 1 == 1 {
+            quotient |= 1u64 << shift;
+            remainder ^= divisor << shift;
+        }
+        if shift == 0 {
+            break;
+        }
+        shift -= 1;
+    }
+    quotient
+}
+
+/// The degree of a nonzero modulus bit pattern.
+const fn modulus_degree(p: u64) -> u32 {
+    63 - p.leading_zeros()
+}
+
+/// `product mod P`, by Barrett reduction rather than long division.
+///
+/// Three carry-less multiplications and two shifts, in place of a loop that runs once per degree
+/// the product has to come down — up to m iterations, each recomputing a leading-zero count.
+///
+/// Requires `deg(product) < 2m`, which holds for every product this field can form: an element is
+/// a pattern below `2^m`, so its degree is at most m - 1 and a product of two has degree at most
+/// 2m - 2. The patterns in `[2^m, P)` have degree m and would break that bound, which is exactly
+/// why `new` rejects them rather than merely requiring a pattern below P.
+fn barrett_reduce<const P: u64>(product: u128) -> u64 {
+    let m = modulus_degree(P);
+    debug_assert!(
+        product == 0 || degree_u128(product) < 2 * m,
+        "a product of degree {} cannot be Barrett reduced modulo a degree-{} polynomial",
+        degree_u128(product),
+        m
+    );
+
+    // q1 = floor(product / x^m), of degree below m, so it fits a u64.
+    let q1 = (product >> m) as u64;
+    // q3 = floor(q1 * mu / x^m), the quotient estimate.
+    let q3 = (multiply_polynomials(q1, barrett_constant(P)) >> m) as u64;
+    // product - q3*P, which over GF(2) is an exclusive or. Only the low m bits survive; m is at
+    // most 63 for a u64 modulus, so the mask cannot overflow.
+    let mask = (1u64 << m) - 1;
+    ((product ^ multiply_polynomials(q3, P)) as u64) & mask
+}
+
 /// Divide dividend by divisor. Return the quotient and remainder.
+///
+/// Retained as the oracle for [`barrett_reduce`] and [`barrett_constant`], which replaced it on
+/// the multiplication path. It has no caller outside the tests, and it carries no precondition on
+/// the numerator's degree, which is what makes it the reference the Barrett path is checked
+/// against rather than something to ship beside it.
 ///
 /// # Arguments
 /// * `numerator` - Bit pattern of numerator polynomial.
 /// * `denominator` - Bit pattern of denominator polynomial.
+#[cfg(test)]
 fn long_divide(numerator: u128, denominator: u64) -> (u64, u64) {
     assert_ne!(denominator, 0, "division by the zero polynomial");
     let denominator = denominator as u128;
@@ -310,12 +417,116 @@ mod tests {
         fields::{
             binary_field::num_elements,
             binary_field::{
-                degree_u128, degree_u64, long_divide, multiply_polynomials, BinaryFieldElement,
+                barrett_constant, barrett_reduce, degree_u128, degree_u64, long_divide,
+                modulus_degree, multiply_polynomials, multiply_polynomials_scalar,
+                BinaryFieldElement,
             },
             irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X_1},
         },
         FiniteField,
     };
+    use rand::{Rng, SeedableRng};
+
+    /// A deterministic stream of operand pairs reduced for a degree-m modulus.
+    fn operand_pairs(m: u32, count: usize, seed: u64) -> Vec<(u64, u64)> {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        let mask = if m >= 64 { u64::MAX } else { (1u64 << m) - 1 };
+        (0..count)
+            .map(|_| (rng.gen::<u64>() & mask, rng.gen::<u64>() & mask))
+            .collect()
+    }
+
+    /// The accelerated carry-less multiply agrees with the bit-at-a-time fallback.
+    ///
+    /// Both paths are exercised here whatever the host supports: `multiply_polynomials` takes the
+    /// accelerated route when the CPU has `pclmulqdq`, and `multiply_polynomials_scalar` is called
+    /// directly, so a machine with the instruction still tests the fallback it would otherwise
+    /// never run.
+    #[test]
+    fn test_carry_less_multiplication_agrees_with_the_scalar_fallback() {
+        // The top bits matter most: a carry-less implementation fails differently from a loop, and
+        // the full-width cases are where the 128-bit result is actually filled.
+        let edges: [u64; 8] = [
+            0,
+            1,
+            2,
+            u64::MAX,
+            1 << 63,
+            (1 << 63) | 1,
+            0xFFFF_FFFF,
+            0xAAAA_AAAA_AAAA_AAAA,
+        ];
+        for a in edges {
+            for b in edges {
+                assert_eq!(
+                    multiply_polynomials(a, b),
+                    multiply_polynomials_scalar(a, b),
+                    "{a:#x} * {b:#x}"
+                );
+            }
+        }
+
+        for (a, b) in operand_pairs(64, 4096, 0xC14) {
+            assert_eq!(
+                multiply_polynomials(a, b),
+                multiply_polynomials_scalar(a, b),
+                "{a:#x} * {b:#x}"
+            );
+        }
+    }
+
+    /// The Barrett constant is the quotient long division gives for `x^(2m) / P`.
+    ///
+    /// `barrett_constant` is a compile-time reimplementation of the same division `long_divide`
+    /// performs, so the two must agree; a wrong constant is a silently wrong product, not a panic.
+    #[test]
+    fn test_the_barrett_constant_is_the_quotient_long_division_gives() {
+        for p in [X5_X2_1, X8_X4_X3_X_1, X63_X_1, 0b11, 0b111, 0b1011] {
+            let m = modulus_degree(p);
+            let (quotient, _remainder) = long_divide(1u128 << (2 * m), p);
+            assert_eq!(
+                barrett_constant(p),
+                quotient,
+                "modulus {p:#x} of degree {m}"
+            );
+        }
+    }
+
+    /// Barrett reduction agrees with long division on every product this field can form.
+    ///
+    /// `long_divide` is the oracle: it is the algorithm the multiply used before, and it has no
+    /// precondition on the product's degree. Operands are masked to below 2^m, which is the
+    /// invariant `new` enforces and the precondition Barrett relies on.
+    #[test]
+    fn test_barrett_agrees_with_long_division() {
+        fn check<const P: u64>(count: usize, seed: u64) {
+            let m = modulus_degree(P);
+            for (a, b) in operand_pairs(m, count, seed) {
+                let product = multiply_polynomials(a, b);
+                let (_quotient, expected) = long_divide(product, P);
+                assert_eq!(
+                    barrett_reduce::<P>(product),
+                    expected,
+                    "modulus {P:#x}: {a:#x} * {b:#x}"
+                );
+            }
+        }
+
+        check::<X5_X2_1>(4096, 1);
+        check::<X8_X4_X3_X_1>(4096, 2);
+        // Degree 63, where the product fills 125 bits and the constant needs all 64.
+        check::<X63_X_1>(4096, 3);
+
+        // Exhaustive over GF(2^5), which is small enough to enumerate completely.
+        let m = modulus_degree(X5_X2_1);
+        for a in 0..(1u64 << m) {
+            for b in 0..(1u64 << m) {
+                let product = multiply_polynomials(a, b);
+                let (_quotient, expected) = long_divide(product, X5_X2_1);
+                assert_eq!(barrett_reduce::<X5_X2_1>(product), expected, "{a} * {b}");
+            }
+        }
+    }
 
     /// GF(2^5) modulo x^5 + x^2 + 1, whose 32 elements are the patterns below 2^5.
     type F32 = BinaryFieldElement<X5_X2_1>;
