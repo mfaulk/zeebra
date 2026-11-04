@@ -139,6 +139,7 @@ cargo run --release --example fglm_profile         # where a conversion's time a
 cargo run --release --example fglm_profile -- katsura-7   # one system per process
 cargo run --release --example fglm_border          # what deduplicating the border is worth
 cargo run --release --example fglm_storage         # operator representations, stored and applied
+cargo run --release --example fglm_shape           # shape position, and what that route would save
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -207,6 +208,20 @@ with its own measurement rather than by inference, whether the one-term polynomi
 reduction is worth avoiding: 0.07% to 0.38% of the reduction it precedes on the families where
 reduction dominates, so no. `cargo bench --bench fglm -- fglm_operator_construction` is the same
 comparison under Criterion.
+
+`fglm_shape` is M18-4's research spike, measured. `grobner::fglm::shape` detects **shape
+position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and
+where the last variable qualifies it produces the lex basis `p(t), x_0 - h_0(t), ...` from that
+variable's Krylov sequence, with no monomial walk and without retaining the accepted quotient
+vectors. The whole katsura family qualifies and nothing else in the corpus does; 26 of 38
+zero-dimensional differential fixtures do, and the route is checked against Singular on every one.
+
+Detection is **algebraic, not a count of solutions**: `<x - 1, (y - 1)^2>` has one point, dimension
+two, and is in shape position, while `<x^2, y^2>` has one point, dimension four, and is not. The
+output is verified before it is returned — every polynomial's class in `R/I` must be zero, which
+with the leading monomials proves it is the reduced lex basis — so nothing probabilistic is
+exposed. It is public and tested but not a `FglmOptions` strategy; `docs/MILESTONE-FGLM-SCALABILITY.md`
+§7.5 is the **no-go** on a full sparse-FGLM milestone and the measurements behind it.
 
 `fglm_storage` reports the operator representations three ways: bytes under each strategy, which are
 exact; operator *application*, on a unit input and a dense one, because the sparse path skips a zero

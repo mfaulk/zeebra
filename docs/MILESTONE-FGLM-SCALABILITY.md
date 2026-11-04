@@ -1,6 +1,6 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
-**Status:** in progress — M18-0, M18-1 and M18-3 complete
+**Status:** in progress — M18-0, M18-1, M18-3 and M18-4 complete
 **Prerequisite:** M17, merged at `7c2fef7`
 **Objective:** make quotient-algebra construction faster and FGLM's memory smaller, without
 changing a single answer
@@ -27,7 +27,7 @@ pipeline first, then investigate whether its scaling limit can be surpassed at a
 | M18-1 | border indexing, and deduplicated normal forms | **complete** |
 | M18-2 | batched border reduction | not started |
 | M18-3 | adaptive sparse/dense multiplication operators | **complete** |
-| M18-4 | incremental-span memory, and a sparse-FGLM feasibility spike | not started |
+| M18-4 | incremental-span memory, and a sparse-FGLM feasibility spike | **complete** |
 | M18-5 | integration, ablations, and this document's conclusion | not started |
 
 M18-3 and M18-4 are independent of M18-1 and M18-2 and of each other. All four depend on M18-0,
@@ -39,6 +39,10 @@ because none of them may be merged without evidence that it changed no answer.
 **M18-3's result:** katsura-7's operators from **264.5 kB to 163.6 kB** and planted-10's from
 640.0 kB to **380.0 kB**, by two unrelated changes — an adaptive per-column representation and an
 exact one. §6.
+
+**M18-4's result:** the dependence test's dense blocks 1.20x smaller, and a **no-go** on a full
+sparse-FGLM milestone. The decisive measurement: the systems where classical FGLM's memory is the
+problem are exactly the systems the shape-position route cannot convert. §7.
 
 ---
 
@@ -744,7 +748,179 @@ it.
 
 ---
 
-## 7. Acceptance criteria
+## 7. M18-4: FGLM's memory, and the sparse-FGLM spike
+
+Two deliverables with nothing in common except the quantity they are about. The first is an
+optimization; the second is a research question with a verified prototype and a **no-go**.
+
+### 7.1 The combination block is triangular
+
+`IncrementalSpan` carries two blocks per echelon row: the row's `D` coordinates, and its expression
+in terms of the accepted vectors. M17 padded the second to `D` as well.
+
+It does not need to be. A row inserted when the accepted rank is `r` is a combination of the `r + 1`
+vectors accepted up to and including the one that produced it — it **cannot** involve one accepted
+afterwards, so coefficients beyond `r` are structurally zero. Summed over the rows:
+
+| block | M17 | now |
+|---|---:|---:|
+| coordinates | `D^2` | `D^2` |
+| combinations | `D^2` | `D (D + 1) / 2` |
+| accepted vectors | `D^2`, uncounted | `D^2` |
+| **total** | `3 D^2` | `2 D^2 + D (D + 1) / 2` |
+
+A quarter off the span, exactly, with nothing traded: the padding was zeros. Measured:
+
+| system | `D` | M17 dense blocks | now | won |
+|---|---:|---:|---:|---:|
+| katsura-7 | 64 | 96.0 kB | 80.2 kB | 1.20x |
+| cyclic-6 | 156 | 570.4 kB | 475.9 kB | 1.20x |
+| planted-8 | 256 | 1,536.0 kB | 1,281.0 kB | 1.20x |
+| planted-10 | 1,024 | 24,576.0 kB | **20,484.0 kB** | 1.20x |
+
+The coefficients a dependence reports must still be exact over the **original** accepted vectors —
+§8.2 of the proposal calls that correctness-critical, and it is the thing a triangular block could
+break. Tested on a Vandermonde basis, where there is no structure for an error to hide behind.
+
+### 7.2 `max_span_entries` now counts all three blocks
+
+It counted two of them and priced both as squares, so at `D = 16` it budgeted 512 cells where the
+conversion allocates 648. **A budget cannot protect memory it does not know about**, and §8.1 of the
+proposal asks for all substantial arrays to be recorded and budgeted — so the limit's meaning has
+changed. Loudly: the option's documentation says so, the error's value changed in a test that
+states the arithmetic, and `FglmMemory` reports each block separately so a figure quoted against the
+old meaning can be recomputed. Checked arithmetic throughout, since a budget computed from a
+wrapped product is no budget.
+
+### 7.3 The sparse-FGLM spike: shape position
+
+`fglm::shape` detects shape position and, where it holds, produces the lex basis from one variable's
+Krylov sequence. `cargo run --release --example fglm_shape`.
+
+**Which systems are in shape position:**
+
+| system | `N` | `D` | degree of `x_{N-1}` | separating variables | shape basis |
+|---|---:|---:|---:|---|---|
+| katsura-3 | 3 | 4 | 4 | `x_0, x_2` | yes |
+| katsura-4 | 4 | 8 | 8 | `x_0, x_3` | yes |
+| katsura-5 | 5 | 16 | 16 | `x_0, x_4` | yes |
+| katsura-6 | 6 | 32 | 32 | `x_0, x_5` | yes |
+| katsura-7 | 7 | 64 | 64 | `x_0, x_6` | yes |
+| cyclic-3 | 3 | 6 | 3 | none | no |
+| cyclic-5 | 5 | 70 | 15 | none | no |
+| cyclic-6 | 6 | 156 | 48 | none | no |
+| planted-4 | 4 | 16 | 4 | none | no |
+| planted-6 | 6 | 64 | 4 | none | no |
+| planted-8 | 8 | 256 | 4 | none | no |
+
+The whole katsura family, and nothing else. On the random differential corpus, **26 of the 38
+zero-dimensional fixtures** are in shape position and the shape route agrees with Singular on every
+one of them — that check runs in every sweep and on every fixture, not only in the module's own
+tests.
+
+**Detection is algebraic, not a solution count.** What is tested is whether `1, t, ..., t^{D-1}` are
+independent. `<x - 1, (y - 1)^2>` has one point over the base field, quotient dimension two, and
+*is* in shape position; `<x^2, y^2>` has one point, dimension four, and is not. A test that counted
+points would get both wrong.
+
+**What it costs:**
+
+| system | `D` | lex walk | shape route | route | classical, end to end | shape, end to end | end | classical cells | shape cells | cells |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| katsura-3 | 4 | 0.004 | 0.004 | 1.08x | 0.01 | 0.01 | 1.04x | 42 | 30 | 1.40x |
+| katsura-4 | 8 | 0.011 | 0.011 | 1.03x | 0.06 | 0.06 | 0.99x | 164 | 108 | 1.52x |
+| katsura-5 | 16 | 0.036 | 0.041 | 0.87x | 0.43 | 0.43 | 1.01x | 648 | 408 | 1.59x |
+| katsura-6 | 32 | 0.138 | 0.236 | 0.59x | 3.14 | 3.23 | 0.97x | 2,576 | 1,584 | 1.63x |
+| katsura-7 | 64 | 0.749 | 2.018 | **0.37x** | 37.54 | 37.90 | 0.99x | 10,272 | 6,240 | **1.65x** |
+
+Milliseconds. `lex walk` and `shape route` start from a prepared quotient algebra; the end-to-end
+columns include building it, which neither route can avoid.
+
+**The shape route is slower, and the reason is instructive.** It does `D` span reductions where the
+walk does about `D + |G|`, which is comparable — but the walk's vectors are the *classes of
+monomials*, which are sparse early on, and `reduce` skips a row whose pivot column is zero in the
+input. The powers of a single variable densify immediately, so the shape route pays close to the
+full `D^3 / 2` where the walk pays much less. At `D = 64` that is 2.7x.
+
+End to end it vanishes into a wash — 0.97x to 1.04x — because the operators are 90–96% of a
+conversion on this family. Which is the same observation §3.4 made, from the other side.
+
+### 7.4 Verification, and why it is not `normal_form`
+
+The prototype verifies its own output before returning it, deterministically. Two facts prove the
+result is the reduced lex basis:
+
+1. **Every polynomial is in `I`** — checked by evaluating it at the multiplication operators and
+   requiring the zero vector.
+2. **The leading monomials are `t^D` and `x_0, ..., x_{N-2}`** — true by construction, and the ideal
+   they generate has exactly `1, t, ..., t^{D-1}` as standard monomials, `D` of them.
+
+A set of polynomials in `I` whose leading monomials generate a monomial ideal of the same finite
+quotient dimension as `LT(I)` generates `LT(I)`, because a monomial ideal contained in another with
+equal quotient dimensions equals it. So the set is a Gröbner basis, and each element is monic with no
+term divisible by another's leading monomial, so it is the reduced one.
+
+**Reducing modulo the grevlex source basis would have been the obvious check and is the wrong one.**
+`p(t)` has degree `D` in one variable, which under grevlex is as far outside the staircase as a
+monomial gets. Tried: it did not finish on cyclic-6 in ten minutes. Avoiding exactly that reduction
+is why one converts bases at all. Evaluating at the operators is `O(N D)` operator applications,
+independent of the echelon form that produced the coefficients — cheaper *and* a real second
+opinion. The unit tests additionally reduce modulo the source basis on small systems, where it is
+affordable.
+
+Nothing here is probabilistic, so there is no certified-versus-conjectural distinction to expose.
+
+### 7.5 The deliverable: no-go, and why
+
+§8.6 of the proposal asks six questions.
+
+**1. Which benchmark systems meet the shape-position criterion?** The katsura family at every size,
+and nothing else in the corpus. 68% of the random differential fixtures.
+
+**2. How much work would a specialized converter save?** On time, none: it is 2.7x *slower* on the
+route at `D = 64` and a wash end to end. On memory, 1.65x fewer dense cells.
+
+**3. Can it recover the complete ideal, including multiplicities?** Yes, exactly and deterministically
+— it produces the reduced lex basis, which determines the ideal. Nonradical ideals in shape position
+convert correctly; nonradical ideals that are not are rejected rather than radicalized.
+
+**4. What verification would make a probabilistic approach safe to expose?** The one in §7.4, which
+is complete and costs `O(N D)` operator applications. A Wiedemann variant choosing a random linear
+form or a random separating element could reuse it unchanged, so such a variant could be exposed as
+certified rather than conjectural. This is the one unambiguously reusable result of the spike.
+
+**5. What memory limits would remain?** The echelon form, `D^2 + D (D + 1) / 2` cells. The shape
+route removes the accepted-vector block and nothing else, so it is still `O(D^2)`. Only replacing the
+echelon form — a scalar Krylov sequence of length `2D` plus Berlekamp–Massey — gets to `O(D)`, and
+Zeebra has no Berlekamp–Massey.
+
+**6. Is a full sparse-FGLM milestone justified? No.** Three measurements decide it, and the third is
+the one that matters:
+
+* **Where conversion is the only route, the cost is not the conversion.** Katsura-7's lex basis is
+  beyond F4's limits, so FGLM is the only way to it — and 96% of that conversion is reducing border
+  monomials, which sparse FGLM does not touch. M18-2's batched reduction is the lever there, not a
+  new dependence algorithm.
+* **Where the dense blocks dominate, the ideal is not in shape position.** planted-10's blocks are
+  54x its operators — and planted-10's last variable has a minimal polynomial of degree 4 in a
+  1,024-dimensional quotient. **The systems where memory is the problem are exactly the systems the
+  shape route cannot convert.** That is the decisive finding and it was not predictable from the
+  proposal.
+* **And on those systems one should not be converting at all.** planted-8's lex basis takes F4
+  **0.04 ms** directly, against a 2.8 ms conversion. M17 already made that the default; the memory
+  pressure in classical FGLM on the planted family is pressure on a route no caller should take.
+
+What is justified is what has been built: the shape detector and the verified shape converter, kept
+as `fglm::shape` — public, tested, validated against Singular on 26 ideals, and not wired into
+`FglmOptions` as a strategy. It is 1.65x less memory at a wash in time on the one family it covers,
+and it is the foundation a Berlekamp–Massey route would stand on if a workload with large
+shape-position quotients ever appears. Measuring whether the algebraic-hash systems that motivate
+this project's architecture are in shape position is the thing to do **before** committing to such a
+milestone, not after.
+
+---
+
+## 8. Acceptance criteria
 
 ### M18-0 — validation infrastructure
 
@@ -787,13 +963,18 @@ it.
 
 ### M18-4 — FGLM scalability
 
-- [ ] Actual incremental-span storage measured.
-- [ ] All substantial coordinate-vector storage accounted for.
-- [ ] Compact dependence representation evaluated.
-- [ ] Dependence coefficients remain exact.
-- [ ] Shape-position detection evaluated.
-- [ ] Sparse-FGLM spike documented with go/no-go criteria.
-- [ ] No unverified probabilistic result is exposed as certified output.
+- [x] Actual incremental-span storage measured — `IncrementalSpan::stored_cells`, §7.1.
+- [x] All substantial coordinate-vector storage accounted for — all three blocks, and
+      `max_span_entries` now budgets them, §7.2.
+- [x] Compact dependence representation evaluated — implemented, not merely evaluated: the
+      combination block is triangular, §7.1.
+- [x] Dependence coefficients remain exact — over the *original* accepted vectors, tested on a
+      Vandermonde basis, §7.1.
+- [x] Shape-position detection evaluated — `fglm::shape`, algebraic rather than from a solution
+      count, §7.3.
+- [x] Sparse-FGLM spike documented with go/no-go criteria — **no-go**, §7.5.
+- [x] No unverified probabilistic result is exposed as certified output — nothing in the prototype
+      is probabilistic, and its output is verified before it is returned, §7.4.
 
 ### M18-5 — integration
 
@@ -810,7 +991,7 @@ it.
 
 ---
 
-## 8. Compatibility
+## 9. Compatibility
 
 `FglmOptions` gained `measure_stages` and `FglmStatistics` gained `border`, `timings` and `memory`.
 Both structs have public fields, so a downstream struct literal naming every field stops compiling.
@@ -828,6 +1009,12 @@ M18-1 added `FglmOptions::operator_construction`, the same source-compatibility 
 also added `FglmOptions::baseline()` and `FglmOptions::with_operator_construction`, and the public
 `BorderIndex` and `ColumnTarget`. `FglmOptions::default()` is unchanged — see §5.6.
 
+M18-4 changed what `FglmOptions::max_span_entries` counts — see §7.2 — and added
+`IncrementalSpan::stored_cells` and `cells_at_full_rank`, and the `fglm::shape` module. The
+`Dependence` variants' `combination` and `coefficients` now have one entry per *accepted vector*
+rather than per dimension, which is a behaviour change for a downstream caller using
+`IncrementalSpan` directly; the conversion is the only caller in this crate.
+
 M18-3 added `FglmOptions::operator_storage` and `FglmOptions::max_operator_bytes`, the public
 `OperatorStorage` and `FglmOptions::with_operator_storage`, the `FglmError::OperatorBytesExceeded`
 variant, `FglmMemory::operator_cells` and `FglmMemory::dense_columns`, and
@@ -839,7 +1026,7 @@ unchanged — see §6.6.
 
 ---
 
-## 9. References
+## 10. References
 
 1. Faugère, J.-C., Gianni, P., Lazard, D., Mora, T. (1993). *Efficient Computation of
    Zero-dimensional Gröbner Bases by Change of Ordering.* J. Symbolic Computation 16(4), 329–344.
