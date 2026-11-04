@@ -2,6 +2,7 @@
 
 pub mod benchmark_systems;
 mod buchberger;
+pub mod differential;
 pub mod f4;
 pub mod fglm;
 pub mod pairs;
