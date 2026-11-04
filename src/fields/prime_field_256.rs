@@ -118,6 +118,12 @@ impl<M: PrimeModulus256> PrimeFieldElement256<M> {
     /// The order q = p, as limbs. See [`KnownOrder::order_limbs`].
     const ORDER_LIMBS: [u64; LIMBS] = M::MODULUS;
 
+    /// The index of the modulus' highest nonzero limb.
+    ///
+    /// Four for the two provided fields, lower for a narrower modulus. Anything that derives a
+    /// bit width from the modulus must go through this rather than assume `LIMBS - 1`.
+    const TOP_LIMB: usize = montgomery_256::highest_occupied_limb(&M::MODULUS);
+
     /// The element whose canonical residue is `limbs`, or `None` if `limbs` is not reduced.
     ///
     /// Rejecting rather than reducing: a value outside `[0,p)` did not come from this field, so it
@@ -206,8 +212,15 @@ impl<M: PrimeModulus256> Ring for PrimeFieldElement256<M> {}
 
 impl<M: PrimeModulus256> FiniteField for PrimeFieldElement256<M> {
     fn new(val: u64) -> Self {
-        // A u64 is always below a 254-bit modulus, so no reduction is needed.
-        Self::from_canonical_limbs([val, 0, 0, 0]).expect("a u64 is below a 254-bit modulus")
+        let limbs = [val, 0, 0, 0];
+        match Self::from_canonical_limbs(limbs) {
+            // The usual case: a u64 cannot reach a modulus of more than one limb.
+            Some(element) => element,
+            // A modulus small enough for a u64 to pass it needs real reduction. `new` is a
+            // constructor from a small integer and not on any hot path, so the `BigUInt`
+            // remainder is acceptable here.
+            None => Self::from_limbs_reduced(limbs),
+        }
     }
 
     fn from_str(value: &str) -> Result<Self, ParseFieldElementError> {
@@ -221,15 +234,20 @@ impl<M: PrimeModulus256> FiniteField for PrimeFieldElement256<M> {
         // Rejection sampling, masked down to the bit width of p so that fewer than half of all
         // draws are rejected. Reducing a uniform 256-bit integer modulo a 254-bit prime would
         // favour the low residues instead.
-        let top = M::MODULUS[LIMBS - 1];
-        let mask = u64::MAX >> top.leading_zeros();
+        //
+        // The mask comes from the highest *occupied* limb, and the limbs above it are left zero.
+        // Taking it from `MODULUS[LIMBS - 1]` unconditionally would shift by 64 for any modulus
+        // below 2^192 — an overflowing shift — and would draw into limbs the modulus cannot
+        // reach, so every draw would be rejected and the loop would not terminate.
+        let top = Self::TOP_LIMB;
+        let mask = u64::MAX >> M::MODULUS[top].leading_zeros();
 
         loop {
             let mut limbs = [0u64; LIMBS];
-            for limb in limbs.iter_mut() {
+            for limb in limbs.iter_mut().take(top + 1) {
                 *limb = rng.next_u64();
             }
-            limbs[LIMBS - 1] &= mask;
+            limbs[top] &= mask;
 
             if let Some(element) = Self::from_canonical_limbs(limbs) {
                 return element;
@@ -862,5 +880,281 @@ mod tests {
                 assert_eq!(b / a * a, b);
             }
         }
+    }
+
+    // === narrower moduli ===
+    //
+    // `PrimeModulus256` promises support for any odd prime of at most 256 bits, and the two
+    // provided fields both occupy all four limbs — so they cannot catch a width assumption. These
+    // three sit at one, two and three limbs.
+
+    /// GF(7), one limb. Small enough to check exhaustively against `PrimeFieldElement64`.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    struct Modulus7;
+    impl PrimeModulus256 for Modulus7 {
+        const MODULUS: [u64; LIMBS] = [7, 0, 0, 0];
+    }
+    type F7 = PrimeFieldElement256<Modulus7>;
+
+    /// The Mersenne prime 2^127 - 1, two limbs with the top limb's high bit clear.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    struct Mersenne127;
+    impl PrimeModulus256 for Mersenne127 {
+        const MODULUS: [u64; LIMBS] = [u64::MAX, u64::MAX >> 1, 0, 0];
+    }
+    type F127 = PrimeFieldElement256<Mersenne127>;
+
+    /// The NIST P-192 prime 2^192 - 2^64 - 1, three limbs with the top limb full.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    struct P192;
+    impl PrimeModulus256 for P192 {
+        const MODULUS: [u64; LIMBS] = [u64::MAX, u64::MAX - 1, u64::MAX, 0];
+    }
+    type F192 = PrimeFieldElement256<P192>;
+
+    /// The three narrow moduli are the values they are meant to be.
+    #[test]
+    fn test_the_narrow_moduli_are_as_intended() {
+        assert_eq!(F7::order_u128(), Some(7));
+        assert_eq!(F127::order_u128(), Some((1u128 << 127) - 1));
+        // 2^192 - 2^64 - 1 does not fit a u128, so check it through BigUInt instead.
+        assert_eq!(
+            BigUInt::new(&P192::MODULUS).to_string(),
+            "6277101735386680763835789423207666416083908700390324961279"
+        );
+
+        // And the limb width each one occupies, which is what the sampler and `new` turn on.
+        assert_eq!(F7::order_limbs().len(), 1);
+        assert_eq!(F127::order_limbs().len(), 2);
+        assert_eq!(F192::order_limbs().len(), 3);
+        assert_eq!(Bn254Fr::order_limbs().len(), 4);
+    }
+
+    /// `new` reduces a `u64` that reaches past a narrow modulus instead of panicking.
+    ///
+    /// Regression: `new` asserted that every `u64` is below the modulus, which holds only for a
+    /// modulus of more than one limb.
+    #[test]
+    fn test_new_reduces_past_a_narrow_modulus() {
+        assert_eq!(F7::new(8), F7::new(1));
+        assert_eq!(F7::new(7), F7::zero());
+        assert_eq!(F7::new(u64::MAX).canonical_limbs()[0], u64::MAX % 7);
+
+        // A modulus of two limbs or more is beyond any u64, so no reduction happens.
+        assert_eq!(F127::new(u64::MAX).canonical_limbs(), [u64::MAX, 0, 0, 0]);
+        assert_eq!(
+            Bn254Fr::new(u64::MAX).canonical_limbs(),
+            [u64::MAX, 0, 0, 0]
+        );
+    }
+
+    /// Sampling terminates and stays reduced at every modulus width.
+    ///
+    /// Regression: the mask was taken from `MODULUS[3]`, which is zero for any modulus below
+    /// 2^192 — an overflowing shift, and then a loop that rejects every draw.
+    #[test]
+    fn test_random_works_at_every_modulus_width() {
+        fn check<M: PrimeModulus256>(draws: usize) {
+            let mut rng = StdRng::seed_from_u64(31);
+            for _ in 0..draws {
+                let a = <PrimeFieldElement256<M> as FiniteField>::random(&mut rng);
+                assert!(
+                    montgomery_256::less_than(&a.canonical_limbs(), &M::MODULUS),
+                    "{a} is not reduced modulo {}",
+                    BigUInt::new(&M::MODULUS)
+                );
+            }
+        }
+
+        check::<Modulus7>(2_000);
+        check::<Mersenne127>(2_000);
+        check::<P192>(2_000);
+        check::<Bn254FrModulus>(2_000);
+    }
+
+    /// Sampling over GF(7) covers all seven residues and is roughly uniform.
+    #[test]
+    fn test_random_covers_a_tiny_field_uniformly() {
+        const DRAWS: usize = 70_000;
+        let mut rng = StdRng::seed_from_u64(32);
+        let mut counts = [0usize; 7];
+        for _ in 0..DRAWS {
+            counts[F7::random(&mut rng).canonical_limbs()[0] as usize] += 1;
+        }
+        assert!(counts.iter().all(|&c| c > 0), "every residue should appear");
+
+        let expected = DRAWS as f64 / 7.0;
+        let chi_squared: f64 = counts
+            .iter()
+            .map(|&c| {
+                let d = c as f64 - expected;
+                d * d / expected
+            })
+            .sum();
+        // 22.5 is the 0.999 quantile of chi-squared with 6 degrees of freedom.
+        assert!(
+            chi_squared < 22.5,
+            "chi-squared {chi_squared:.1}: {counts:?}"
+        );
+    }
+
+    /// Over GF(7) the 256-bit field agrees with the 64-bit one on every pair of residues.
+    ///
+    /// Two unrelated implementations — Montgomery over four limbs against Montgomery over one —
+    /// checked exhaustively rather than sampled.
+    #[test]
+    fn test_a_tiny_field_agrees_with_the_64_bit_implementation() {
+        type Narrow = crate::fields::PrimeFieldElement64<7>;
+
+        for a in 0u64..7 {
+            for b in 0u64..7 {
+                let (wide_a, wide_b) = (F7::new(a), F7::new(b));
+                let (narrow_a, narrow_b) = (Narrow::new(a), Narrow::new(b));
+
+                assert_eq!(
+                    (wide_a + wide_b).canonical_limbs()[0],
+                    (narrow_a + narrow_b).value(),
+                    "{a} + {b}"
+                );
+                assert_eq!(
+                    (wide_a - wide_b).canonical_limbs()[0],
+                    (narrow_a - narrow_b).value(),
+                    "{a} - {b}"
+                );
+                assert_eq!(
+                    (wide_a * wide_b).canonical_limbs()[0],
+                    (narrow_a * narrow_b).value(),
+                    "{a} * {b}"
+                );
+                if b != 0 {
+                    assert_eq!(
+                        wide_b.inverse().canonical_limbs()[0],
+                        narrow_b.inverse().value(),
+                        "1 / {b}"
+                    );
+                    assert_eq!(
+                        (wide_a / wide_b).canonical_limbs()[0],
+                        (narrow_a / narrow_b).value(),
+                        "{a} / {b}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Arithmetic at two and three limbs agrees with big-integer arithmetic modulo p.
+    ///
+    /// `BigUInt` is plain long arithmetic with no Montgomery form, so this is independent of the
+    /// representation under test — and independent of `ark-ff`, which cannot be instantiated at
+    /// these moduli without another `MontConfig`.
+    #[test]
+    fn test_narrow_arithmetic_agrees_with_big_integer_arithmetic() {
+        fn check<M: PrimeModulus256>(seed: u64, cases: usize) {
+            type Z<M> = PrimeFieldElement256<M>;
+            let modulus = BigUInt::new(&M::MODULUS);
+            let mut rng = StdRng::seed_from_u64(seed);
+
+            for i in 0..cases {
+                let a = <Z<M> as FiniteField>::random(&mut rng);
+                let b = <Z<M> as FiniteField>::random(&mut rng);
+                let (big_a, big_b) = (a.to_big_uint(), b.to_big_uint());
+
+                assert_eq!(
+                    (a + b).to_big_uint(),
+                    (&big_a + &big_b) % &modulus,
+                    "add, case {i}"
+                );
+                assert_eq!(
+                    (a * b).to_big_uint(),
+                    (&big_a * &big_b) % &modulus,
+                    "mul, case {i}"
+                );
+                // a - b, computed over the integers by adding p first to stay unsigned.
+                assert_eq!(
+                    (a - b).to_big_uint(),
+                    (&(&big_a + &modulus) - &big_b) % &modulus,
+                    "sub, case {i}"
+                );
+                if !a.is_zero() {
+                    assert_eq!(a * a.inverse(), Z::<M>::one(), "inverse, case {i}");
+                }
+            }
+        }
+
+        check::<Mersenne127>(33, 2_000);
+        check::<P192>(34, 2_000);
+    }
+
+    /// Canonical encoding round-trips and rejects out-of-range values at a narrow modulus too.
+    #[test]
+    fn test_narrow_canonical_encoding() {
+        let mut rng = StdRng::seed_from_u64(35);
+        for _ in 0..200 {
+            let a = F127::random(&mut rng);
+            let encoded = bincode::serialize(&a).expect("serializable");
+            assert_eq!(bincode::deserialize::<F127>(&encoded).ok(), Some(a));
+            assert_eq!(F127::try_from_bytes_le(&a.to_bytes_le()), Some(a));
+        }
+
+        // The modulus and everything above it are rejected, including values that occupy limbs
+        // the modulus does not.
+        for limbs in [
+            Mersenne127::MODULUS,
+            [u64::MAX, u64::MAX >> 1, 1, 0],
+            [0, 0, 0, 1],
+            [u64::MAX; LIMBS],
+        ] {
+            assert_eq!(F127::from_canonical_limbs(limbs), None, "{limbs:?}");
+        }
+    }
+
+    /// `from_str` and `Display` round-trip at a narrow modulus, reducing where they should.
+    #[test]
+    fn test_narrow_parsing_and_display() {
+        assert_eq!(
+            <F7 as FiniteField>::from_str("13")
+                .expect("valid")
+                .to_string(),
+            "6"
+        );
+        assert_eq!(
+            <F7 as FiniteField>::from_str("7").expect("valid"),
+            F7::zero()
+        );
+
+        let p127 = "170141183460469231731687303715884105727";
+        assert_eq!(
+            <F127 as FiniteField>::from_str(p127).expect("valid"),
+            F127::zero()
+        );
+        assert_eq!(
+            (-F127::one()).to_string(),
+            "170141183460469231731687303715884105726"
+        );
+    }
+
+    /// Root finding works over a narrow `PrimeFieldElement256`, whose order fits in a `u128`.
+    ///
+    /// The wide fields exercise the multi-limb exponent; this exercises the same code path at a
+    /// width where the answer can be checked by trying every element.
+    #[test]
+    fn test_roots_over_a_tiny_prime_field_256() {
+        use crate::{Polynomial, UnivariatePolynomial};
+
+        // x^2 - 2 over GF(7): 3^2 = 2 and 4^2 = 2, so the roots are 3 and 4.
+        let f = UnivariatePolynomial::<F7>::new(&[F7::zero() - F7::new(2), F7::zero(), F7::one()]);
+        let mut rng = StdRng::seed_from_u64(36);
+        let mut found: Vec<u64> = crate::roots(&f, &mut rng)
+            .into_iter()
+            .map(|r| r.canonical_limbs()[0])
+            .collect();
+        found.sort_unstable();
+        assert_eq!(found, vec![3, 4]);
+
+        // Cross-checked by evaluating at every element of the field.
+        let by_evaluation: Vec<u64> = (0u64..7)
+            .filter(|&c| f.eval(&F7::new(c)).is_zero())
+            .collect();
+        assert_eq!(found, by_evaluation);
     }
 }

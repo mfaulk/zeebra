@@ -419,6 +419,12 @@ impl PrimeModulus256 for MyModulus {
 type MyField = PrimeFieldElement256<MyModulus>;
 ```
 
+Any odd prime up to 256 bits works, not only one that fills all four limbs. A narrower modulus
+leaves its high limbs zero, and the bit width that `new` and `random` depend on is derived from the
+highest occupied limb rather than assumed — the tests cover moduli at one, two, three and four
+limbs, with GF(7) checked exhaustively against `PrimeFieldElement64<7>`. Below 2^128 the order
+fits a machine integer again, so `KnownOrder::order_u128` starts returning `Some`.
+
 `BN254_FR_MODULUS_DECIMAL` and `BLS12_381_FR_MODULUS_DECIMAL` are public so the compiled-in limbs
 can be checked against the published values, which the module's own tests do.
 

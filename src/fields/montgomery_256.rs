@@ -46,6 +46,24 @@ pub const fn less_than(a: &[u64; LIMBS], b: &[u64; LIMBS]) -> bool {
     false
 }
 
+/// The index of the highest nonzero limb of `modulus`.
+///
+/// A modulus narrower than 256 bits leaves high limbs zero, and anything deriving a bit width
+/// from the limbs has to ask which limb is the top one rather than assume it is the last.
+///
+/// # Panics
+/// Panics at compile time if `modulus` is zero, which is not an odd prime.
+pub const fn highest_occupied_limb(modulus: &[u64; LIMBS]) -> usize {
+    let mut i = LIMBS;
+    while i > 0 {
+        i -= 1;
+        if modulus[i] != 0 {
+            return i;
+        }
+    }
+    panic!("the modulus must be nonzero")
+}
+
 /// `a -= p`, wrapping. Correct only where `a >= p`, which every caller establishes.
 ///
 /// Spelled with `overflowing_sub` rather than `borrowing_sub` because this runs at compile time

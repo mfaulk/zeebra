@@ -423,9 +423,10 @@ plan assumed, so there was less work to divide.
 
 M20-E is genuinely independent and still outstanding.
 
-## 6. Defects found during the audit
+## 6. Defects found
 
-Neither is M20 work; both are in the code M20 touches.
+The first two came out of the audit and are in code M20 touches; the third is M20's own, found in
+review.
 
 1. **`PrimeFieldElement128::random` returned zero on every draw for any modulus below 2^64** —
    **fixed.** The sampler built its rejection mask from two 64-bit halves:
@@ -451,6 +452,25 @@ Neither is M20 work; both are in the code M20 touches.
 2. **No field type overrides `inverse`.** Every inversion in the crate is `pow(q-2)`: 252 ns on a
    31-bit field where `ark-ff` does 254 bits in 3.58 µs by binary extended Euclid, and 18.4 µs on
    the 68-bit field. M19 territory, not M20's, but §4.1 is the measurement that motivates it.
+
+3. **`PrimeFieldElement256` assumed its modulus filled all four limbs** — found in review of
+   PR #64, fixed. Two places read the width wrongly:
+
+   - `new(val: u64)` asserted that any `u64` is below the modulus. True for the two provided
+     fields at 254 and 255 bits, false for the one-limb moduli the trait also promises: `new(8)`
+     over GF(7) panicked instead of giving 1. It now reduces, through `BigUInt` on the path that
+     needs it — `new` is a constructor from a small integer, not a hot path.
+   - `random()` took its rejection mask from `MODULUS[LIMBS - 1]`. For any modulus below 2^192
+     that limb is zero, so `leading_zeros()` is 64 and the shift overflowed; past that, the draw
+     filled limbs the modulus cannot reach, so every draw would have been rejected and the loop
+     would not have terminated. The mask now comes from `highest_occupied_limb`, and the limbs
+     above it stay zero.
+
+   Neither could be caught by the two provided fields, which is the general lesson: a type
+   parameterized over a width needs a test at more than one width. The regression tests sit at
+   one, two, three and four limbs — GF(7) checked *exhaustively* against the unrelated
+   `PrimeFieldElement64<7>`, and 2^127-1 and the NIST P-192 prime against `BigUInt`'s plain long
+   arithmetic, which shares no Montgomery logic with the code under test.
 
 ### 6.1 What the in-crate field is made of
 
@@ -538,6 +558,8 @@ Open:
       general bignum, and the existing `BigUInt` handles decimal conversion at the boundary
 - [x] Fixed-width, stack-allocated representation: `size_of::<Bn254Fr>() == 32`, nothing on the
       heap in the hot path
+- [x] `PrimeModulus256`'s documented range — any odd prime up to 256 bits — actually works, with
+      tests at one, two, three and four limbs (§6, defect 3)
 
 ### M20-D
 
