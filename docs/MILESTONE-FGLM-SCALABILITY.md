@@ -1,6 +1,6 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
-**Status:** in progress — M18-0, M18-1, M18-3 and M18-4 complete
+**Status:** in progress — M18-0 through M18-4 complete; M18-5 outstanding
 **Prerequisite:** M17, merged at `7c2fef7`
 **Objective:** make quotient-algebra construction faster and FGLM's memory smaller, without
 changing a single answer
@@ -25,7 +25,7 @@ pipeline first, then investigate whether its scaling limit can be surpassed at a
 |---|---|---|
 | M18-0 | profiling baseline, and differential testing against Singular | **complete** |
 | M18-1 | border indexing, and deduplicated normal forms | **complete** |
-| M18-2 | batched border reduction | not started |
+| M18-2 | batched border reduction | **complete** |
 | M18-3 | adaptive sparse/dense multiplication operators | **complete** |
 | M18-4 | incremental-span memory, and a sparse-FGLM feasibility spike | **complete** |
 | M18-5 | integration, ablations, and this document's conclusion | not started |
@@ -36,13 +36,18 @@ because none of them may be merged without evidence that it changed no answer.
 **M18-1's result:** katsura-7's conversion from **39.0 ms to 27.7 ms**, cyclic-6's from 27.8 ms to
 19.3 ms, nothing regressed, and no answer changed. §5.
 
+**M18-2's result:** katsura-7's operator construction from **34.4 ms to 1.69 ms** and its whole
+conversion from **37.3 ms to 2.59 ms** — 14.4x — with nothing in the corpus regressing *at the
+recommended batch size*. An unbounded batch is 1.5x slower than the baseline on planted-10, which
+is why the size is bounded rather than the strategy abandoned. §6.
+
 **M18-3's result:** katsura-7's operators from **264.5 kB to 163.6 kB** and planted-10's from
 640.0 kB to **380.0 kB**, by two unrelated changes — an adaptive per-column representation and an
-exact one. §6.
+exact one. §7.
 
 **M18-4's result:** the dependence test's dense blocks 1.20x smaller, and a **no-go** on a full
 sparse-FGLM milestone. The decisive measurement: the systems where classical FGLM's memory is the
-problem are exactly the systems the shape-position route cannot convert. §7.
+problem are exactly the systems the shape-position route cannot convert. §8.
 
 ---
 
@@ -225,7 +230,7 @@ real figure, not against `entries * 16`.
 
 **This table is the M17 representation and M18-3 changed it.** The slack is gone — planted-10's
 operators are 380 kB rather than 640 — and the operator figures in §3.5 are therefore a record of
-what the baseline was, not of what the code does now. §6.1 has the before and after.
+what the baseline was, not of what the code does now. §7.1 has the before and after.
 
 **There are three dense blocks, and M17's accounting counted two.** The span holds a coordinate
 vector and a combination vector per echelon row; the conversion *additionally* retains every
@@ -594,9 +599,150 @@ let options = FglmOptions::default()
 
 ---
 
-## 6. M18-3: adaptive operator storage
+## 6. M18-2: batched border reduction
 
-### 6.1 Two separate changes
+The principal new algorithm in the milestone, and the only remaining lever on the family where
+conversion is the only route to a lex basis.
+
+### 6.1 What the scalar path spends its time on
+
+M18-1 removed the duplicated reductions. What is left is `|∂B|` independent normal forms, and each
+one, per step, searches the basis for a divisor of its leading monomial, builds the multiple, and
+subtracts it — through `MultivariatePolynomial`, which is a `HashMap<Monomial, F>`. The divisor
+search is repeated for every monomial every target happens to pass through, the multiple is rebuilt
+each time, and every coefficient touch is a hash lookup.
+
+F4's answer to the same shape of problem is to do the symbolic work for a batch once and the
+arithmetic over integer column indices. `OperatorConstruction::BatchedBorder` does that for border
+monomials.
+
+### 6.2 The closure, and why the targets cannot be echelonized
+
+Start from the batch's targets. For every monomial `m` seen, if some `LM(g)` divides `m`, add the
+reducer multiple `(m / LM(g)) * g` and look at its monomials too; stop when nothing new appears.
+Each reducible monomial then has **exactly one** reducer row, which leads at it and whose other
+monomials are strictly below it. Columns are the closure's monomials, descending.
+
+**The targets must not reduce one another**, and this is the one way the batch differs from an F4
+batch rather than a detail. An F4 matrix is echelonized: any row may become a pivot. Here each
+target has its own answer — `NF(u_1)` must not involve `u_2` — so the pivots are **fixed** before
+any target is touched, every pivot is a reducer multiple, and no target ever becomes one. That is
+also why `linalg::reduce_rows_against_pivots_with` is not what runs: its contract is to echelonize
+a lower block against an upper one, which for these targets would be the wrong computation rather
+than a slower one. §6.3 of the proposal anticipated exactly this.
+
+Reducing a target is then one descending pass over the columns: at each column with a nonzero,
+subtract that column's reducer row if it has one. Nothing can reintroduce a nonzero in a column
+already passed, because a reducer row leading at `c` has every other entry below `c`.
+
+**The pass cannot stop at the first standard column.** A standard monomial can be *larger* than a
+reducible one — with `G = {x^2, y^2}` under grevlex, `xy` is standard and `y^2 < xy` is not — so the
+scan runs to the end. Stopping early would leave reducible monomials in the remainder.
+
+### 6.3 What it is worth
+
+`cargo run --release --example fglm_border`, whole conversion, fastest of three, milliseconds:
+
+| system | `D` | `\|∂B\|` | per-column | dedup | batch 64 | batch ∞ | dedup | **batch 64** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 16 | 44 | 0.51 | 0.40 | 0.14 | 0.13 | 1.27x | **3.78x** |
+| katsura-6 | 32 | 100 | 3.56 | 2.70 | 0.52 | 0.50 | 1.32x | **6.85x** |
+| katsura-7 | 64 | 223 | 42.92 | 31.58 | **2.69** | 2.39 | 1.36x | **15.97x** |
+| cyclic-5 | 70 | 157 | 1.98 | 1.53 | 0.57 | 0.56 | 1.29x | **3.47x** |
+| cyclic-6 | 156 | 386 | 29.77 | 19.60 | **2.82** | 2.78 | 1.52x | **10.57x** |
+| planted-6 | 64 | 192 | 0.43 | 0.40 | 0.38 | 0.40 | 1.07x | 1.12x |
+| planted-8 | 256 | 1,024 | 3.40 | 3.28 | 2.86 | 3.51 | 1.04x | 1.19x |
+| planted-10 | 1,024 | 5,120 | 42.71 | 40.47 | 36.33 | 63.24 | 1.06x | 1.18x |
+
+Criterion, `cargo bench --bench fglm -- fglm_operator_construction`, on a prepared source basis:
+
+| system | operator construction, per-column | batched | won | whole conversion, per-column | batched | won |
+|---|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 427 µs | 80 µs | 5.3x | 456 µs | 123 µs | 3.7x |
+| katsura-6 | 3.25 ms | 322 µs | 10.1x | 3.41 ms | 519 µs | 6.6x |
+| katsura-7 | **34.43 ms** | **1.69 ms** | **20.3x** | **37.29 ms** | **2.59 ms** | **14.4x** |
+| cyclic-5 | 1.80 ms | 308 µs | 5.9x | 2.07 ms | 525 µs | 3.9x |
+| cyclic-6 | 25.14 ms | 1.48 ms | 17.0x | 26.57 ms | 2.70 ms | 9.8x |
+| planted-6 | 295 µs | 245 µs | 1.20x | 409 µs | 352 µs | 1.16x |
+| planted-8 | 1.93 ms | 1.40 ms | 1.38x | 2.85 ms | 2.51 ms | 1.14x |
+
+**Katsura-7's operator construction goes from 34.4 ms to 1.69 ms, and its whole conversion from
+37.3 ms to 2.59 ms.** That is the milestone's headline, and it is where it was predicted to be:
+§3.4 said 96% of that conversion was reducing border monomials and that nothing else was worth
+attacking.
+
+**Nothing regresses** — at the recommended batch size. That qualification is the interesting part.
+
+### 6.4 The batch size matters, and it points opposite ways
+
+| system | size 1 | 4 | 16 | 64 | unbounded |
+|---|---:|---:|---:|---:|---:|
+| katsura-6 | 1.95 | 0.95 | 0.68 | 0.53 | **0.50** |
+| katsura-7 | 14.11 | 5.68 | 3.40 | 2.71 | **2.33** |
+| cyclic-6 | 8.29 | 4.39 | 3.09 | 2.81 | **2.76** |
+| planted-8 | **2.07** | 2.10 | 2.17 | 2.26 | 3.10 |
+| planted-10 | **28.78** | 29.21 | 31.00 | 32.02 | 52.43 |
+
+Monotonic in both directions, and they are opposite directions. On katsura and cyclic, a bigger
+batch shares more closure and wins; on the planted family, a reduction is *one step*, so the closure
+and the per-target column scan are nearly all of the work and a bigger batch is pure overhead —
+unbounded is 1.5x **slower** than the M17 baseline on planted-10.
+
+So §6.6 of the proposal was right to insist a new path not become the default on the strength of
+katsura-7 alone. **The answer is not "keep the scalar path for sparse systems" but "bound the batch
+size":** 64 targets is within 13% of the best size on katsura and 11% on the planted family, and is
+faster than the scalar path on every system in the corpus. `BorderBatch::recommended()` uses it, and
+`BorderBatchSize::Unbounded` is kept for measurement and documented as the wrong choice on a sparse
+staircase.
+
+Automatic sizing is still deferred, as §6.5 asks. The figures above are what a policy would be keyed
+on, and 64 being safe everywhere is a weaker claim than knowing which systems want 1 and which want
+unbounded — that needs a predictor of reduction depth, which this milestone does not have.
+
+### 6.5 Resource limits and the fallback
+
+`BorderBatch` bounds a batch's closure: reducer rows, columns, and reducer entries. All three are
+checked **as the closure grows**, because it is discovered a row at a time and a batch that would
+need a million multiples must not allocate them all before anyone notices.
+`FglmError::BorderBatchExceeded` names which limit was crossed and its value, and deliberately not
+the size the closure would have reached — finding that out is the work being refused.
+
+`BatchOverflow` chooses what happens then, and **neither option drops a target**:
+
+* `Fail` returns the error and the caller decides.
+* `Scalar` reduces that batch's targets one at a time instead. The scalar path builds no closure, so
+  it cannot cross these limits — it is the fallback that always exists.
+  `BorderBatchStatistics::fallbacks` counts it, so a run that quietly took it is visible.
+
+Tested both ways: at a column limit of one every batch overflows, `Fail` returns
+`BorderBatchExceeded`, and `Scalar` finishes with `fallbacks == batches` and **the same operators as
+the reference path**.
+
+### 6.6 Correctness
+
+* **The closure invariant is tested directly**, as §6.4 of the proposal asks, rather than inferred
+  from the answers being right: every monomial a closure reaches is reducible exactly when the
+  closure has a row leading at it, over three orders and ten systems. A reducible monomial without a
+  row is one the reduction would leave in the remainder, which is how an incomplete closure fails.
+* **Every batch's remainders equal the scalar `normal_form`s**, target for target, at batch sizes 1,
+  4, 16, 64 and unbounded — so the answers are checked to be independent of how the targets were
+  grouped, against the reference the milestone names rather than against another batch.
+* **A target's answer does not depend on its batch**, which is §6.2's requirement stated as an
+  observable property: reducing `u` alone and reducing it beside every other border monomial agree,
+  and so does reducing the whole border in the opposite order. An implementation that let targets
+  become pivots would fail this.
+* Every remainder's monomials are standard, with no zero coefficients.
+* The lex basis is compared over the **cross product** of three construction strategies and three
+  storage strategies — nine configurations — and all 96 differential fixtures are verified under all
+  nine.
+* 900 live systems across three seeds, over GF(2) through GF(2^31 - 1), under
+  `--operator-construction batched-border`: 0 disagreements, 0 oracle failures.
+
+---
+
+## 7. M18-3: adaptive operator storage
+
+### 7.1 Two separate changes
 
 **The representation got smaller before it got adaptive.** §3.5 found that 41% of planted-10's
 operator bytes was `Vec`'s minimum allocation: a boxed slice is two words where a `Vec` is three,
@@ -625,7 +771,7 @@ entries come to.
 **Then the adaptive representation.** `OperatorStorage` chooses per column between
 `(index, coefficient)` pairs and `D` bare coefficients, by comparing what the two would allocate.
 
-### 6.2 What it is worth
+### 7.2 What it is worth
 
 `cargo run --release --example fglm_storage`. Exact figures, not timings: a boxed slice has no
 spare capacity, so these are the bytes allocated.
@@ -657,7 +803,7 @@ could not have reached it.
 planted-10 would need 51 MB where it needs 380 kB — 135x. §7.2 of the proposal asked whether a whole
 operator must be one or the other; the answer is a definite no.
 
-### 6.3 What it costs
+### 7.3 What it costs
 
 Storage is exact; application has to be measured, because the conversion applies an operator `O(D)`
 times and a representation that halves the memory and slows that down may not be worth having.
@@ -701,7 +847,7 @@ So the trade is: **1.62x less operator memory on katsura for a few percent of a 
 the critical path.** Worth taking, and not so decisively that it should be taken without the
 integration ablation seeing it beside M18-2 and M18-4.
 
-### 6.4 Byte-aware accounting and a second budget
+### 7.4 Byte-aware accounting and a second budget
 
 `FglmMemory` now distinguishes three quantities for the operators, because they are three numbers:
 
@@ -722,7 +868,7 @@ Tested where it matters: a budget sized from planted-6's sparse operators reject
 held densely, with the *entry* budget unbounded throughout — so what fires can only be the byte
 budget.
 
-### 6.5 Correctness
+### 7.5 Correctness
 
 * Every representation gives the same columns, the same applications on unit, sparse, dense and
   zero inputs, and the same nonzero count. Asserted at the column level in `multiplication.rs` and
@@ -739,21 +885,21 @@ budget.
 * A zero column allocates nothing under both `Sparse` and `Adaptive`, which is §7.2's requirement
   for a compact zero representation; the sparse form already was one.
 
-### 6.6 The default has not changed
+### 7.6 The default has not changed
 
 `FglmOptions::default()` is still `OperatorStorage::Sparse`, for the same reason the construction
-default is unchanged — see §5.6. The two representation changes in §6.1 are *not* behind a strategy
+default is unchanged — see §5.6. The two representation changes in §7.1 are *not* behind a strategy
 flag, because they are not strategies: they make the sparse representation smaller without changing
 it.
 
 ---
 
-## 7. M18-4: FGLM's memory, and the sparse-FGLM spike
+## 8. M18-4: FGLM's memory, and the sparse-FGLM spike
 
 Two deliverables with nothing in common except the quantity they are about. The first is an
 optimization; the second is a research question with a verified prototype and a **no-go**.
 
-### 7.1 The combination block is triangular
+### 8.1 The combination block is triangular
 
 `IncrementalSpan` carries two blocks per echelon row: the row's `D` coordinates, and its expression
 in terms of the accepted vectors. M17 padded the second to `D` as well.
@@ -782,7 +928,7 @@ The coefficients a dependence reports must still be exact over the **original** 
 §8.2 of the proposal calls that correctness-critical, and it is the thing a triangular block could
 break. Tested on a Vandermonde basis, where there is no structure for an error to hide behind.
 
-### 7.2 `max_span_entries` now counts all three blocks
+### 8.2 `max_span_entries` now counts all three blocks
 
 It counted two of them and priced both as squares, so at `D = 16` it budgeted 512 cells where the
 conversion allocates 648. **A budget cannot protect memory it does not know about**, and §8.1 of the
@@ -792,7 +938,7 @@ states the arithmetic, and `FglmMemory` reports each block separately so a figur
 old meaning can be recomputed. Checked arithmetic throughout, since a budget computed from a
 wrapped product is no budget.
 
-### 7.3 The sparse-FGLM spike: shape position
+### 8.3 The sparse-FGLM spike: shape position
 
 `fglm::shape` detects shape position and, where it holds, produces the lex basis from one variable's
 Krylov sequence. `cargo run --release --example fglm_shape`.
@@ -845,7 +991,7 @@ full `D^3 / 2` where the walk pays much less. At `D = 64` that is 2.7x.
 End to end it vanishes into a wash — 0.97x to 1.04x — because the operators are 90–96% of a
 conversion on this family. Which is the same observation §3.4 made, from the other side.
 
-### 7.4 Verification, and why it is not `normal_form`
+### 8.4 Verification, and why it is not `normal_form`
 
 The prototype verifies its own output before returning it, deterministically. Two facts prove the
 result is the reduced lex basis:
@@ -870,7 +1016,7 @@ affordable.
 
 Nothing here is probabilistic, so there is no certified-versus-conjectural distinction to expose.
 
-### 7.5 The deliverable: no-go, and why
+### 8.5 The deliverable: no-go, and why
 
 §8.6 of the proposal asks six questions.
 
@@ -884,7 +1030,7 @@ route at `D = 64` and a wash end to end. On memory, 1.65x fewer dense cells.
 — it produces the reduced lex basis, which determines the ideal. Nonradical ideals in shape position
 convert correctly; nonradical ideals that are not are rejected rather than radicalized.
 
-**4. What verification would make a probabilistic approach safe to expose?** The one in §7.4, which
+**4. What verification would make a probabilistic approach safe to expose?** The one in §8.4, which
 is complete and costs `O(N D)` operator applications. A Wiedemann variant choosing a random linear
 form or a random separating element could reuse it unchanged, so such a variant could be exposed as
 certified rather than conjectural. This is the one unambiguously reusable result of the spike.
@@ -920,7 +1066,7 @@ milestone, not after.
 
 ---
 
-## 8. Acceptance criteria
+## 9. Acceptance criteria
 
 ### M18-0 — validation infrastructure
 
@@ -943,13 +1089,15 @@ milestone, not after.
 
 ### M18-2 — batched reduction
 
-- [ ] Symbolic closure invariant tested.
-- [ ] Fixed reducer pivots implemented correctly.
-- [ ] Independent target normal forms preserved.
-- [ ] Batched results equal scalar results.
-- [ ] Matrix and resource limits enforced.
-- [ ] Batch-size performance measured.
-- [ ] Appropriate fallback strategy retained.
+- [x] Symbolic closure invariant tested — directly, not inferred, §6.6.
+- [x] Fixed reducer pivots implemented correctly — one row per reducible monomial, §6.2.
+- [x] Independent target normal forms preserved — and asserted as an observable property: a
+      target's answer is the same alone, beside the whole border, and in reverse order, §6.6.
+- [x] Batched results equal scalar results — at every batch size the proposal names, §6.6.
+- [x] Matrix and resource limits enforced — checked as the closure grows, §6.5.
+- [x] Batch-size performance measured — §6.4, and it decides the recommended size.
+- [x] Appropriate fallback strategy retained — `BatchOverflow`, and neither option drops a
+      target, §6.5.
 
 ### M18-3 — operator storage
 
@@ -991,7 +1139,7 @@ milestone, not after.
 
 ---
 
-## 9. Compatibility
+## 10. Compatibility
 
 `FglmOptions` gained `measure_stages` and `FglmStatistics` gained `border`, `timings` and `memory`.
 Both structs have public fields, so a downstream struct literal naming every field stops compiling.
@@ -1009,7 +1157,13 @@ M18-1 added `FglmOptions::operator_construction`, the same source-compatibility 
 also added `FglmOptions::baseline()` and `FglmOptions::with_operator_construction`, and the public
 `BorderIndex` and `ColumnTarget`. `FglmOptions::default()` is unchanged — see §5.6.
 
-M18-4 changed what `FglmOptions::max_span_entries` counts — see §7.2 — and added
+M18-2 added `OperatorConstruction::BatchedBorder`, `FglmOptions::border_batch` and
+`FglmOptions::with_border_batch`, the public `BorderBatch`, `BorderBatchSize`, `BatchOverflow` and
+`BorderBatchStatistics`, the `FglmError::BorderBatchExceeded` variant, `FglmStatistics::batches`,
+and `FglmStageTimings::border_symbolic`. The same note about exhaustive `match` on `FglmError`
+applies.
+
+M18-4 changed what `FglmOptions::max_span_entries` counts — see §8.2 — and added
 `IncrementalSpan::stored_cells` and `cells_at_full_rank`, and the `fglm::shape` module. The
 `Dependence` variants' `combination` and `coefficients` now have one entry per *accepted vector*
 rather than per dimension, which is a behaviour change for a downstream caller using
@@ -1022,11 +1176,11 @@ variant, `FglmMemory::operator_cells` and `FglmMemory::dense_columns`, and
 downstream exhaustive `match` on it stops compiling when a variant is added; the type has carried
 that property since M17 and its documentation says variants are added as the implementation becomes
 able to produce them. No existing variant changed meaning, and `FglmOptions::default()` is
-unchanged — see §6.6.
+unchanged — see §7.6.
 
 ---
 
-## 10. References
+## 11. References
 
 1. Faugère, J.-C., Gianni, P., Lazard, D., Mora, T. (1993). *Efficient Computation of
    Zero-dimensional Gröbner Bases by Change of Ordering.* J. Symbolic Computation 16(4), 329–344.

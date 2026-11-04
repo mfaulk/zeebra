@@ -8,7 +8,10 @@
 
 use std::{mem::size_of, time::Duration};
 
-use crate::{grobner::fglm::IncrementalSpan, FiniteField};
+use crate::{
+    grobner::fglm::{BorderBatchStatistics, IncrementalSpan},
+    FiniteField,
+};
 
 /// The shape of the border, and how much of the reduction work it duplicates.
 ///
@@ -82,8 +85,19 @@ pub struct FglmStageTimings {
     /// the basis lookup, and nothing else.
     pub border_classification: Duration,
 
-    /// Reducing border monomials to normal form.
+    /// Reducing border monomials to normal form, one at a time.
+    ///
+    /// Zero under [`OperatorConstruction::BatchedBorder`](super::OperatorConstruction), which
+    /// charges to [`Self::border_symbolic`] instead — except for a batch that fell back to the
+    /// scalar path, whose reductions land here.
     pub normal_forms: Duration,
+
+    /// Building a batch's symbolic closure and reducing its targets against it.
+    ///
+    /// Zero under the scalar strategies. One figure rather than two because the closure and the
+    /// reduction are one call: splitting them would mean a clock read between every batch's two
+    /// halves, and the batch count is small enough that a split would be mostly measurement.
+    pub border_symbolic: Duration,
 
     /// Turning a normal form into a sorted coordinate vector.
     ///
@@ -101,6 +115,7 @@ impl FglmStageTimings {
         self.quotient_basis
             + self.border_classification
             + self.normal_forms
+            + self.border_symbolic
             + self.column_assembly
             + self.dependence
     }
@@ -109,7 +124,7 @@ impl FglmStageTimings {
     ///
     /// The quantity M17 measured at 36.2 ms of katsura-7's 38.1 ms conversion, now broken down.
     pub fn operator_construction(&self) -> Duration {
-        self.border_classification + self.normal_forms + self.column_assembly
+        self.border_classification + self.normal_forms + self.border_symbolic + self.column_assembly
     }
 }
 
@@ -246,6 +261,9 @@ pub struct FglmStatistics {
 
     /// What the representations hold.
     pub memory: FglmMemory,
+
+    /// What the batched border reduction did, or zeros under the scalar strategies.
+    pub batches: BorderBatchStatistics,
 }
 
 impl FglmStatistics {
@@ -298,13 +316,14 @@ mod tests {
             quotient_basis: Duration::from_micros(100),
             border_classification: Duration::from_micros(200),
             normal_forms: Duration::from_micros(3_000),
+            border_symbolic: Duration::from_micros(70),
             column_assembly: Duration::from_micros(400),
             dependence: Duration::from_micros(500),
         };
-        assert_eq!(timings.sum(), Duration::from_micros(4_200));
+        assert_eq!(timings.sum(), Duration::from_micros(4_270));
         assert_eq!(
             timings.operator_construction(),
-            Duration::from_micros(3_600)
+            Duration::from_micros(3_670)
         );
     }
 

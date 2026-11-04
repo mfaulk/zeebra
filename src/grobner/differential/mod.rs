@@ -113,6 +113,7 @@ mod tests {
         for construction in [
             OperatorConstruction::PerColumn,
             OperatorConstruction::DeduplicatedBorder,
+            OperatorConstruction::BatchedBorder,
         ] {
             for storage in [
                 OperatorStorage::Sparse,

@@ -43,6 +43,19 @@ pub enum FglmError {
     /// discovered should use the checked entry point.
     NotAGrobnerBasis,
 
+    /// A batched border reduction's closure crossed one of its limits.
+    ///
+    /// Carries which limit by name and its value, and **not** the measured size: the closure is
+    /// discovered a row at a time and the work of finding out how large it would really have been
+    /// is the work being refused. See
+    /// [`BorderBatch`](crate::grobner::fglm::BorderBatch).
+    BorderBatchExceeded {
+        /// Which limit: `"columns"`, `"reducer rows"`, or `"reducer entries"`.
+        reason: &'static str,
+        /// Its value.
+        limit: usize,
+    },
+
     /// More standard monomials than the limit allowed.
     ///
     /// Carries only the limit. Enumeration stops at the first crossing, so any count it could
@@ -75,6 +88,11 @@ impl Display for FglmError {
             Self::NotAGrobnerBasis => {
                 write!(f, "the source is not a Gröbner basis under the given order")
             }
+            Self::BorderBatchExceeded { reason, limit } => write!(
+                f,
+                "a batched border reduction needed more {} than the limit of {}",
+                reason, limit
+            ),
             Self::QuotientDimensionExceeded { limit } => write!(
                 f,
                 "the quotient algebra has more than the {} dimensions allowed",

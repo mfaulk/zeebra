@@ -58,7 +58,8 @@ OPTIONS
     --max-terms <t>          Largest number of terms in a generated polynomial. Default: 4
     --timeout <seconds>      Per-system Singular time limit. Default: 30
     --operator-construction <s>
-                             per-column | deduplicated-border. Default: per-column
+                             per-column | deduplicated-border | batched-border.
+                             Default: per-column
     --operator-storage <s>   sparse | adaptive | dense. Default: sparse
     --minimize-attempts <n>  Shrink candidates per failing system, 0 to disable. Default: 40
     --minimize-seconds <s>   Wall-clock for shrinking one failing system. Default: 20
@@ -352,10 +353,11 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
                 sweep.fglm.operator_construction = match name.as_str() {
                     "per-column" => OperatorConstruction::PerColumn,
                     "deduplicated-border" => OperatorConstruction::DeduplicatedBorder,
+                    "batched-border" => OperatorConstruction::BatchedBorder,
                     other => {
                         return Err(format!(
-                            "{:?} is not an operator-construction strategy; use per-column or \
-                             deduplicated-border",
+                            "{:?} is not an operator-construction strategy; use per-column, \
+                             deduplicated-border or batched-border",
                             other
                         ))
                     }

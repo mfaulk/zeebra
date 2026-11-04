@@ -26,7 +26,7 @@
 //! polynomial from it by Berlekamp–Massey in `O(D)` memory. That is where the asymptotic win is,
 //! and Zeebra has no Berlekamp–Massey. This prototype keeps the dense echelon form, so it is
 //! `O(D^2)` memory like the classical algorithm — just a smaller constant and a simpler shape.
-//! §8.6 of the milestone document is the recommendation that follows.
+//! §8.5 of the milestone document is the recommendation that follows.
 //!
 //! # Nothing probabilistic is exposed
 //! [`shape_lex_basis`] verifies its own output before returning it, deterministically. See there.

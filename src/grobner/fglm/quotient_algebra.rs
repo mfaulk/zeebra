@@ -7,8 +7,9 @@
 
 use crate::{
     grobner::{
-        f4::StageClock,
+        f4::{MonicBasis, StageClock},
         fglm::{
+            batch::{self, BatchOverflow, BorderBatchStatistics},
             border::{BorderIndex, ColumnTarget},
             multiplication::{MultiplicationOperator, OperatorBuilder},
             options::OperatorConstruction,
@@ -31,6 +32,9 @@ pub struct QuotientStatistics {
     /// The construction stages. [`FglmStageTimings::dependence`] is not one of them and stays
     /// zero: nothing here performs the lex walk.
     pub timings: FglmStageTimings,
+
+    /// What the batched border reduction did, or zeros under the scalar strategies.
+    pub batches: BorderBatchStatistics,
 }
 
 /// `R/I` as a `D`-dimensional `F`-vector space, with the `N` multiplication operators.
@@ -111,33 +115,50 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
             OperatorConstruction::PerColumn => Vec::new(),
             OperatorConstruction::DeduplicatedBorder => {
                 let mut shared = Vec::with_capacity(index.monomials().len());
-                let mut shared_entries = 0usize;
                 for monomial in index.monomials() {
-                    let column = reduce_border_monomial(
+                    shared.push(reduce_border_monomial(
                         *monomial,
                         basis,
                         order,
                         &quotient,
                         &mut statistics,
                         &mut clock,
-                    );
-                    shared_entries = shared_entries.checked_add(column.len()).ok_or(
-                        FglmError::OperatorStorageExceeded {
-                            entries: usize::MAX,
-                            limit: options.max_operator_entries,
-                        },
-                    )?;
-                    if shared_entries > options.max_operator_entries {
-                        return Err(FglmError::OperatorStorageExceeded {
-                            entries: shared_entries,
-                            limit: options.max_operator_entries,
-                        });
-                    }
-                    shared.push(column);
+                    ));
                 }
                 shared
             }
+            OperatorConstruction::BatchedBorder => batched_border(
+                index.monomials(),
+                basis,
+                order,
+                &quotient,
+                options,
+                &mut statistics,
+                &mut clock,
+            )?,
         };
+
+        // The shared vectors exist before any column does, so the entry budget is checked **as
+        // they fill**. That is sound in the direction that matters: every distinct border monomial
+        // appears in at least one column, so the shared entries never exceed the operators' own,
+        // and the early check can never reject a system the per-column path would have accepted.
+        // What it does change is the peak — up to twice the budget where the per-column path's is
+        // exactly the budget, which is the honest cost of sharing.
+        let mut shared_entries = 0usize;
+        for column in &shared {
+            shared_entries = shared_entries.checked_add(column.len()).ok_or(
+                FglmError::OperatorStorageExceeded {
+                    entries: usize::MAX,
+                    limit: options.max_operator_entries,
+                },
+            )?;
+            if shared_entries > options.max_operator_entries {
+                return Err(FglmError::OperatorStorageExceeded {
+                    entries: shared_entries,
+                    limit: options.max_operator_entries,
+                });
+            }
+        }
 
         let mut operators = Vec::with_capacity(N);
         let mut entries = 0usize;
@@ -155,7 +176,8 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
                         // Cloned rather than shared behind a reference count: every column owning
                         // its own vector is what M17 stored, so this strategy changes the time and
                         // leaves the storage alone. Sharing the representation is M18-3's question.
-                        OperatorConstruction::DeduplicatedBorder => shared[border].clone(),
+                        OperatorConstruction::DeduplicatedBorder
+                        | OperatorConstruction::BatchedBorder => shared[border].clone(),
                         OperatorConstruction::PerColumn => reduce_border_monomial(
                             index.monomials()[border],
                             basis,
@@ -336,6 +358,94 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         let normal_form = p.normal_form(&self.source, self.basis.order());
         coordinates_of_normal_form(&normal_form, &self.basis)
     }
+}
+
+/// Every distinct border monomial's normal form, computed in batches.
+///
+/// The targets are the border monomials in the index's own descending order, chunked by
+/// [`BorderBatchSize`]. Each chunk builds its own symbolic closure and reduces its targets against
+/// that closure's fixed reducer pivots — so the sharing is within a chunk, which is what the knob
+/// trades.
+///
+/// A chunk that crosses a limit either fails or is reduced scalar-wise, per
+/// [`BatchOverflow`]. **No target is ever dropped**, which is why the fallback reduces the chunk's
+/// targets individually rather than returning fewer answers.
+#[allow(clippy::too_many_arguments)]
+fn batched_border<const N: usize, F: FiniteField>(
+    targets: &[Monomial<N>],
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    quotient: &QuotientBasis<N>,
+    options: &FglmOptions,
+    statistics: &mut QuotientStatistics,
+    clock: &mut StageClock,
+) -> Result<Vec<Vec<(usize, F)>>, FglmError> {
+    // Monic, with leading monomials precomputed, once for every batch. Zero elements are not valid
+    // divisors and `MonicBasis::new` rejects them, so they are filtered rather than passed on.
+    let nonzero: Vec<MultivariatePolynomial<N, F>> =
+        basis.iter().filter(|p| !p.is_zero()).cloned().collect();
+    let monic = MonicBasis::new(&nonzero, order);
+
+    let chunk = options.border_batch.size.chunk(targets.len());
+    let mut shared: Vec<Vec<(usize, F)>> = Vec::with_capacity(targets.len());
+
+    for group in targets.chunks(chunk) {
+        let outcome = batch::reduce_batch(group, &monic, order, &options.border_batch);
+        statistics.timings.border_symbolic += clock.lap();
+
+        let remainders = match outcome {
+            Ok((remainders, batch_statistics)) => {
+                batch::accumulate(&mut statistics.batches, &batch_statistics);
+                statistics.border.normal_form_calls += group.len();
+                remainders
+            }
+            Err(e) => match options.border_batch.on_overflow {
+                BatchOverflow::Fail => return Err(e),
+                // The scalar path builds no closure, so it cannot cross these limits. Counted, so
+                // a run that took it is not mistaken for one that did not need to.
+                BatchOverflow::Scalar => {
+                    statistics.batches.batches += 1;
+                    statistics.batches.fallbacks += 1;
+                    for monomial in group {
+                        shared.push(reduce_border_monomial(
+                            *monomial, basis, order, quotient, statistics, clock,
+                        ));
+                    }
+                    continue;
+                }
+            },
+        };
+
+        for remainder in remainders {
+            shared.push(coordinates_of_monomials(&remainder, quotient));
+        }
+        statistics.timings.column_assembly += clock.lap();
+    }
+
+    Ok(shared)
+}
+
+/// `(monomial, coefficient)` pairs as a coordinate vector, ascending by index.
+///
+/// # Panics
+/// If a monomial is not standard. Unreachable for a batch's remainder — the reduction runs until no
+/// reducible monomial is left — so reaching it means the closure was incomplete.
+fn coordinates_of_monomials<const N: usize, F: FiniteField>(
+    remainder: &[(Monomial<N>, F)],
+    quotient: &QuotientBasis<N>,
+) -> Vec<(usize, F)> {
+    let mut entries: Vec<(usize, F)> = Vec::with_capacity(remainder.len());
+    entries.extend(remainder.iter().map(|(monomial, coefficient)| {
+        let index = quotient.index_of(monomial).unwrap_or_else(|| {
+            panic!(
+                "{} survived a batched reduction but is not a standard monomial",
+                monomial
+            )
+        });
+        (index, *coefficient)
+    }));
+    entries.sort_unstable_by_key(|(index, _)| *index);
+    entries
 }
 
 /// One border monomial's normal form, as a sorted coordinate vector.
@@ -884,36 +994,41 @@ mod tests {
             let basis = f4(system, order).expect("within limits");
             let per_column = FglmOptions::unbounded()
                 .with_operator_construction(OperatorConstruction::PerColumn);
-            let deduplicated = FglmOptions::unbounded()
-                .with_operator_construction(OperatorConstruction::DeduplicatedBorder);
-
             let (reference, reference_statistics) =
                 QuotientAlgebra::new_with_statistics(&basis, order, &per_column).expect("finite");
-            let (optimized, optimized_statistics) =
-                QuotientAlgebra::new_with_statistics(&basis, order, &deduplicated).expect("finite");
 
-            assert_eq!(
-                reference, optimized,
-                "{} under {:?}: the strategies disagree",
-                name, order
-            );
-            // The classification is shared, so every border counter must match. Only the number
-            // of reductions may differ, and it is checked separately.
-            assert_eq!(
-                reference_statistics.border.operator_columns,
-                optimized_statistics.border.operator_columns
-            );
-            assert_eq!(
-                reference_statistics.border.distinct_border_monomials,
-                optimized_statistics.border.distinct_border_monomials
-            );
-            assert_eq!(
-                reference.operator_entries(),
-                optimized.operator_entries(),
-                "{} under {:?}: the strategies store different amounts",
-                name,
-                order
-            );
+            for construction in [
+                OperatorConstruction::DeduplicatedBorder,
+                OperatorConstruction::BatchedBorder,
+            ] {
+                let options = FglmOptions::unbounded().with_operator_construction(construction);
+                let (optimized, optimized_statistics) =
+                    QuotientAlgebra::new_with_statistics(&basis, order, &options).expect("finite");
+
+                assert_eq!(
+                    reference, optimized,
+                    "{} under {:?}: {:?} disagrees with the reference",
+                    name, order, construction
+                );
+                // The classification is shared, so every border counter must match. Only the
+                // number of reductions may differ, and it is checked separately.
+                assert_eq!(
+                    reference_statistics.border.operator_columns,
+                    optimized_statistics.border.operator_columns
+                );
+                assert_eq!(
+                    reference_statistics.border.distinct_border_monomials,
+                    optimized_statistics.border.distinct_border_monomials
+                );
+                assert_eq!(
+                    reference.operator_entries(),
+                    optimized.operator_entries(),
+                    "{} under {:?}: {:?} stores a different amount",
+                    name,
+                    order,
+                    construction
+                );
+            }
         }
 
         for order in ORDERS {
@@ -956,27 +1071,58 @@ mod tests {
             &FglmOptions::unbounded().with_operator_construction(OperatorConstruction::PerColumn),
         )
         .expect("finite");
-        let (_, optimized) = QuotientAlgebra::new_with_statistics(
-            &basis,
-            order,
-            &FglmOptions::unbounded()
-                .with_operator_construction(OperatorConstruction::DeduplicatedBorder),
-        )
-        .expect("finite");
-
         assert_eq!(
             reference.border.normal_form_calls, reference.border.border_columns,
             "the reference path should reduce once per border column"
         );
+
+        for construction in [
+            OperatorConstruction::DeduplicatedBorder,
+            OperatorConstruction::BatchedBorder,
+        ] {
+            let (_, optimized) = QuotientAlgebra::new_with_statistics(
+                &basis,
+                order,
+                &FglmOptions::unbounded().with_operator_construction(construction),
+            )
+            .expect("finite");
+
+            assert_eq!(
+                optimized.border.normal_form_calls, optimized.border.distinct_border_monomials,
+                "{:?} should reduce once per distinct border monomial",
+                construction
+            );
+            assert!(
+                optimized.border.normal_form_calls < reference.border.normal_form_calls,
+                "{:?}: {} reductions is no saving against {}",
+                construction,
+                optimized.border.normal_form_calls,
+                reference.border.normal_form_calls
+            );
+        }
+
+        // The batched path does its reductions inside a closure, so it reports a batch and the
+        // scalar paths do not.
+        let (_, batched) = QuotientAlgebra::new_with_statistics(
+            &basis,
+            order,
+            &FglmOptions::unbounded()
+                .with_operator_construction(OperatorConstruction::BatchedBorder),
+        )
+        .expect("finite");
+        assert_eq!(batched.batches.batches, 1, "one unbounded batch");
         assert_eq!(
-            optimized.border.normal_form_calls, optimized.border.distinct_border_monomials,
-            "the deduplicated path should reduce once per distinct border monomial"
+            batched.batches.fallbacks, 0,
+            "no batch should have fallen back"
         );
         assert!(
-            optimized.border.normal_form_calls < reference.border.normal_form_calls,
-            "{} reductions is no saving against {}",
-            optimized.border.normal_form_calls,
-            reference.border.normal_form_calls
+            batched.batches.reducer_rows > 0,
+            "an empty closure reduces nothing"
+        );
+        assert!(batched.batches.columns > batched.batches.reducer_rows);
+        assert_eq!(
+            reference.batches.batches, 0,
+            "the scalar path builds no batch"
         );
     }
 
@@ -993,6 +1139,7 @@ mod tests {
         for construction in [
             OperatorConstruction::PerColumn,
             OperatorConstruction::DeduplicatedBorder,
+            OperatorConstruction::BatchedBorder,
         ] {
             let mut options = FglmOptions::unbounded().with_operator_construction(construction);
             options.max_operator_entries = 4;
@@ -1260,6 +1407,7 @@ mod tests {
             for construction in [
                 OperatorConstruction::PerColumn,
                 OperatorConstruction::DeduplicatedBorder,
+                OperatorConstruction::BatchedBorder,
             ] {
                 let mut options = FglmOptions::unbounded().with_operator_construction(construction);
                 options.max_operator_entries = needed;
