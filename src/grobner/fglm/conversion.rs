@@ -119,6 +119,7 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     statistics.quotient_dimension = dimension;
     statistics.border = quotient_statistics.border;
     statistics.timings = quotient_statistics.timings;
+    statistics.batches = quotient_statistics.batches;
     statistics.operator_entries = algebra.operator_entries();
     statistics.memory.operator_entries = statistics.operator_entries;
     statistics.memory.operator_cells = algebra.operator_cells();
@@ -873,9 +874,10 @@ mod tests {
     /// narrower check.
     #[test]
     fn test_every_strategy_converts_to_the_same_basis() {
-        const CONSTRUCTIONS: [OperatorConstruction; 2] = [
+        const CONSTRUCTIONS: [OperatorConstruction; 3] = [
             OperatorConstruction::PerColumn,
             OperatorConstruction::DeduplicatedBorder,
+            OperatorConstruction::BatchedBorder,
         ];
         const STORAGES: [OperatorStorage; 3] = [
             OperatorStorage::Sparse,

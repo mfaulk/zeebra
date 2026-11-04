@@ -1,3 +1,5 @@
+use crate::grobner::fglm::BorderBatch;
+
 /// How the multiplication operators' columns are computed.
 ///
 /// Every variant must produce **the same operators**, entry for entry. They differ in how much
@@ -18,9 +20,21 @@ pub enum OperatorConstruction {
     ///
     /// Strictly fewer reductions than [`Self::PerColumn`] — between a fifth and a third fewer on
     /// the benchmark corpus — at the cost of holding `|∂B|` coordinate vectors at once. That is
-    /// not free and is measured rather than waved away: see §4 of
+    /// not free and is measured rather than waved away: see §5 of
     /// `docs/MILESTONE-FGLM-SCALABILITY.md`.
     DeduplicatedBorder,
+
+    /// Border monomials reduced in batches, sharing a symbolic closure and its reducer multiples.
+    ///
+    /// Deduplicated too — a batch's targets are the *distinct* border monomials — so this is
+    /// [`Self::DeduplicatedBorder`] with F4-style linear algebra where the scalar reductions were.
+    /// The closure is built once per batch and the arithmetic runs over integer column indices
+    /// rather than through a polynomial's hash map.
+    ///
+    /// **The targets do not reduce one another.** Each has its own normal form, so the pivots are
+    /// fixed before any target is touched and no target becomes one. See
+    /// [`batch`](super::batch) and [`BorderBatch`](super::BorderBatch) for the limits.
+    BatchedBorder,
 }
 
 /// How a reduced multiplication-operator column is stored.
@@ -134,6 +148,11 @@ pub struct FglmOptions {
     /// dimension alone and is therefore already bounded by
     /// [`max_quotient_dimension`](Self::max_quotient_dimension).
     pub max_operator_bytes: usize,
+
+    /// Batch size and limits for [`OperatorConstruction::BatchedBorder`].
+    ///
+    /// Ignored by every other strategy. See [`BorderBatch`].
+    pub border_batch: BorderBatch,
 }
 
 impl FglmOptions {
@@ -163,6 +182,7 @@ impl FglmOptions {
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
             operator_storage: OperatorStorage::Sparse,
+            border_batch: BorderBatch::recommended(),
         }
     }
 
@@ -179,6 +199,7 @@ impl FglmOptions {
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
             operator_storage: OperatorStorage::Sparse,
+            border_batch: BorderBatch::unbounded(),
         }
     }
 
@@ -197,6 +218,7 @@ impl FglmOptions {
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
             operator_storage: OperatorStorage::Sparse,
+            border_batch: BorderBatch::recommended(),
         }
     }
 
@@ -214,6 +236,14 @@ impl FglmOptions {
     pub fn with_operator_storage(self, operator_storage: OperatorStorage) -> Self {
         Self {
             operator_storage,
+            ..self
+        }
+    }
+
+    /// These options with different border-batch limits.
+    pub fn with_border_batch(self, border_batch: BorderBatch) -> Self {
+        Self {
+            border_batch,
             ..self
         }
     }

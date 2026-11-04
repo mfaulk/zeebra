@@ -35,7 +35,7 @@ use zeebra::{
         benchmark_systems::{cyclic, katsura, planted},
         f4,
         fglm::{
-            fglm_to_lex, fglm_to_lex_with_options, is_grobner_basis, FglmOptions,
+            fglm_to_lex, fglm_to_lex_with_options, is_grobner_basis, BorderBatch, FglmOptions,
             OperatorConstruction, OperatorStorage, QuotientAlgebra, QuotientBasis,
         },
     },
@@ -121,10 +121,9 @@ fn bench_pipeline<const N: usize>(
 
 /// Each operator-construction strategy, on the same prepared source basis.
 ///
-/// The ablation M18-1 is justified by, as a Criterion comparison rather than a fastest-of-three:
-/// the strategies differ by a third at most, which is within the range where a single timing run
-/// can mislead. `examples/fglm_border.rs` reports the same comparison with the border counters
-/// beside it, and asserts the two strategies agree before printing anything.
+/// The ablation M18-1 and M18-2 are justified by. `examples/fglm_border.rs` reports the same
+/// comparison with the border counters beside it, varies the batch size, and asserts the strategies
+/// agree before printing anything.
 fn bench_operator_construction<const N: usize>(
     c: &mut Criterion,
     name: &str,
@@ -140,24 +139,35 @@ fn bench_operator_construction<const N: usize>(
         &FglmOptions::unbounded().with_operator_construction(OperatorConstruction::PerColumn),
     )
     .expect("finite");
-    let deduplicated = QuotientAlgebra::new(
-        &source,
-        SOURCE,
-        &FglmOptions::unbounded()
-            .with_operator_construction(OperatorConstruction::DeduplicatedBorder),
-    )
-    .expect("finite");
-    assert_eq!(reference, deduplicated, "{}: the strategies disagree", name);
 
     let mut group = c.benchmark_group("fglm_operator_construction");
     for construction in [
         OperatorConstruction::PerColumn,
         OperatorConstruction::DeduplicatedBorder,
+        OperatorConstruction::BatchedBorder,
     ] {
-        let options = FglmOptions::unbounded().with_operator_construction(construction);
+        // `recommended()` rather than `unbounded()` for the batch: 64 targets is the size measured
+        // faster than the scalar path everywhere, and an unbounded batch is slower on the planted
+        // family. Benchmarking the strategy at a size it is not recommended at would measure the
+        // wrong thing.
+        let options = FglmOptions::unbounded()
+            .with_operator_construction(construction)
+            .with_border_batch(BorderBatch::recommended());
+
+        // Equality outside the timed region, so a benchmark cannot report a speedup for computing
+        // a different answer.
+        assert_eq!(
+            QuotientAlgebra::new(&source, SOURCE, &options).expect("finite"),
+            reference,
+            "{}: {:?} disagrees with the reference",
+            name,
+            construction
+        );
+
         let label = match construction {
             OperatorConstruction::PerColumn => "per_column",
             OperatorConstruction::DeduplicatedBorder => "deduplicated_border",
+            OperatorConstruction::BatchedBorder => "batched_border",
         };
         group.bench_with_input(BenchmarkId::new(label, name), &source, |b, s| {
             b.iter(|| {

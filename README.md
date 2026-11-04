@@ -202,8 +202,10 @@ byte figures are estimates of this crate's own representations;
 `zeebra::util::peak_resident_bytes` is the separate, process-wide measurement, and the two are not
 interchangeable.
 
-`fglm_border` prices the two `OperatorConstruction` strategies against each other on the same
-prepared source basis, having first asserted that they build identical operators. It also answers,
+`fglm_border` prices the three `OperatorConstruction` strategies against each other on the same
+prepared source basis, having first asserted that they build identical operators, and varies the
+batch size — which is the trade that decides the recommended default rather than being left to a
+guess. It also answers,
 with its own measurement rather than by inference, whether the one-term polynomial built per border
 reduction is worth avoiding: 0.07% to 0.38% of the reduction it precedes on the families where
 reduction dominates, so no. `cargo bench --bench fglm -- fglm_operator_construction` is the same
@@ -221,7 +223,7 @@ two, and is in shape position, while `<x^2, y^2>` has one point, dimension four,
 output is verified before it is returned — every polynomial's class in `R/I` must be zero, which
 with the leading monomials proves it is the reduced lex basis — so nothing probabilistic is
 exposed. It is public and tested but not a `FglmOptions` strategy; `docs/MILESTONE-FGLM-SCALABILITY.md`
-§7.5 is the **no-go** on a full sparse-FGLM milestone and the measurements behind it.
+§8.5 is the **no-go** on a full sparse-FGLM milestone and the measurements behind it.
 
 `fglm_storage` reports the operator representations three ways: bytes under each strategy, which are
 exact; operator *application*, on a unit input and a dense one, because the sparse path skips a zero
@@ -385,13 +387,44 @@ let deduplicated = FglmOptions::default()
     .with_operator_construction(OperatorConstruction::DeduplicatedBorder);
 ```
 
-The two build **identical operators**, which the tests assert by comparing whole `QuotientAlgebra`
-values rather than the lex bases they lead to. Deduplication takes katsura-7's conversion from
-39.0 ms to 27.7 ms and cyclic-6's from 27.8 ms to 19.3 ms, gains 1.04x to 1.08x on the planted
-family where the lex walk dominates instead, and is slower on nothing in the corpus. It is not yet
-the default: `docs/MILESTONE-FGLM-SCALABILITY.md` §5.6 explains why that waits for the integration
-ablation. `FglmOptions::baseline()` names the M17 configuration, so a measurement has something
-fixed to be quoted against.
+A third strategy shares more than the reductions:
+
+```rust
+use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction};
+
+// Border monomials reduced in batches against a shared symbolic closure, with the arithmetic over
+// integer column indices rather than through a polynomial's hash map.
+let batched = FglmOptions::default()
+    .with_operator_construction(OperatorConstruction::BatchedBorder);
+```
+
+All three build **identical operators**, which the tests assert by comparing whole
+`QuotientAlgebra` values rather than the lex bases they lead to. Measured on the whole conversion:
+
+| system | `D` | per-column | deduplicated | batched |
+|---|---:|---:|---:|---:|
+| katsura-6 | 32 | 3.56 ms | 2.70 ms | **0.52 ms** |
+| katsura-7 | 64 | 42.92 ms | 31.58 ms | **2.69 ms** |
+| cyclic-6 | 156 | 29.77 ms | 19.60 ms | **2.82 ms** |
+| planted-8 | 256 | 3.40 ms | 3.28 ms | 2.86 ms |
+| planted-10 | 1,024 | 42.71 ms | 40.47 ms | 36.33 ms |
+
+**Katsura-7's operator construction goes from 34.4 ms to 1.69 ms** under Criterion, a 20x change in
+the stage that was 96% of the conversion — and nothing in the corpus is slower.
+
+The batch *size* is what makes that last clause true. A bigger batch shares more closure and wins on
+katsura and cyclic; on the planted family a reduction is one step, so the closure is nearly all the
+work and a bigger batch is pure overhead — one unbounded batch is 1.5x **slower** than the scalar
+path on planted-10. `BorderBatch::recommended()` uses 64 targets, which is within 13% of the best
+size on both families and faster than scalar on every system.
+
+`BatchOverflow` decides what happens when a batch's closure crosses a limit, and neither option
+drops a target: `Fail` returns `FglmError::BorderBatchExceeded` naming the limit, and `Scalar`
+reduces that batch one target at a time and counts that it did.
+
+No strategy is the default yet: `docs/MILESTONE-FGLM-SCALABILITY.md` §5.6 explains why that waits
+for the integration ablation. `FglmOptions::baseline()` names the M17 configuration, so a
+measurement has something fixed to be quoted against.
 
 #### Storing the multiplication operators
 
