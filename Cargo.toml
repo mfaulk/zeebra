@@ -102,3 +102,38 @@ test = false
 [profile.release]
 lto = "fat"
 codegen-units = 1
+
+# The profile CI tests in, and nothing else. The release job exists because `debug-assertions`
+# and `overflow-checks` are off in release, so arithmetic wraps instead of panicking and every
+# `debug_assert`-guarded invariant goes unchecked; those come from `release` and are inherited
+# here, so what that job tests is unchanged. Fat LTO and a single codegen unit are not — they buy
+# inlining and reproducible measurements, and the job takes no measurements.
+#
+# They are most of its wall clock. `Swatinem/rust-cache` caches dependencies and never the crate
+# under test, so `zeebra` is relinked from scratch on every run: of the 321s the release test
+# step took, ~318s was that link.
+#
+# The settings below are a measured compromise, not an obvious choice, because the two costs pull
+# against each other. Dropping `codegen-units = 1` is what makes the build cheap, and it is also
+# what slows the two `#[ignore]`d engine-agreement tests down -- they are the one place where the
+# per-field-operation call overhead that LTO exists to remove actually shows up. Cold
+# `cargo test --no-run`, then those two tests, measured locally:
+#
+#     lto = "fat",  codegen-units = 1    392s    41.6s     <- `release`
+#     lto = false,  codegen-units = 1    248s    45.6s
+#     lto = false,  codegen-units = 16    48.8s  120.0s
+#     lto = "thin", codegen-units = 16    48.9s  107.6s    <- here
+#
+# So the inlining that those tests depend on comes from the single codegen unit and not from LTO:
+# this is one crate, and the field arithmetic being inlined is inside it, so there is little for
+# a cross-crate link step to do. Thin LTO is kept anyway because it costs nothing against `lto =
+# false` at 16 units and still recovers ~12s. The sum is what CI pays per run, and it is lowest
+# here -- 157s against 434s for `release`.
+#
+# Benchmarks deliberately do not use this. `cargo bench` resolves `[profile.bench]`, which
+# inherits `release`, so every number this project reports still comes from a fat-LTO build at one
+# codegen unit, and stays comparable with every number recorded before this profile existed.
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 16

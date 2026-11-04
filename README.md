@@ -119,10 +119,19 @@ cargo bench -- --test
 vacuously. A benchmark that stops *compiling* still breaks the `cargo build --all-targets` step in
 the pull-request jobs.
 
-The suite is not sharded across parallel jobs. Warm in release the 968 tests take 2.4s and the two
-slow `#[ignore]`d systems take 43.7s, of which 43.4s is a single test that no partitioning can
-divide; a shard would pay a checkout, a toolchain, a cache restore and a fat-LTO release build to
-split seconds of test execution.
+The release job builds under `[profile.ci-release]` rather than `release`. It inherits `release`,
+so `debug-assertions` and `overflow-checks` are off and the job tests exactly what it did before,
+but it drops the single codegen unit that makes a `release` build expensive — `Swatinem/rust-cache`
+caches dependencies and never the crate under test, so `zeebra` is relinked from scratch on every
+run, which was ~318s of a 321s step. Cargo.toml records the four configurations measured and why
+this one was chosen; it is a compromise, because the codegen setting that makes the build cheap
+also slows the two engine-agreement tests. Benchmarks are unaffected — `cargo bench` resolves
+`[profile.bench]`, which still inherits `release`, so every reported number stays comparable.
+
+The suite is not sharded across parallel jobs. Warm the 968 tests take under 3s and the two slow
+`#[ignore]`d systems dominate everything else, with all but 0.3s of that being a single test that
+no partitioning can divide; a shard would pay a checkout, a toolchain, a cache restore and a
+release build to split seconds of test execution.
 
 ### Build configuration
 

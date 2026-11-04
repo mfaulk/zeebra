@@ -77,12 +77,17 @@ jobs:
       # `overflow-checks` are off there, so a release build takes different paths through
       # arithmetic and through every `debug_assert`-guarded invariant: monomial multiplication
       # used to wrap rather than panic on exponent overflow, which the debug job could not see.
-      # Release is also the configuration every benchmark and measurement uses.
+      #
+      # `ci-release` rather than `release`: it inherits both of those settings, so this tests the
+      # same thing, and relaxes the codegen settings that had `zeebra` relinked from scratch for
+      # ~318s per run. That trade is not free — it makes the two engine-agreement tests below
+      # slower — so Cargo.toml records the configurations measured and the totals that chose this
+      # one. The benchmark job still builds with fat LTO at one codegen unit.
       - name: Test (release)
-        run: cargo nextest run --profile ci --release
+        run: cargo nextest run --profile ci --cargo-profile ci-release
 
       - name: Doc tests (release)
-        run: cargo test --release --doc --verbose
+        run: cargo test --profile ci-release --doc --verbose
 
       # The `#[ignore]`d tests that are real but slow, named individually: a bare
       # `--run-ignored=only` would also pick up the four `unimplemented!()` placeholders, which
@@ -91,7 +96,7 @@ jobs:
       # engine is impractical in a debug build.
       - name: Gröbner engines agree on the slow systems
         run: |
-          cargo nextest run --profile ci --release --lib --run-ignored=only \
+          cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
 
   bench-smoke:

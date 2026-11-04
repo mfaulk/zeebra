@@ -7,9 +7,10 @@
 fail-fast = false
 
 # Report-only: with no `terminate-after`, crossing the period logs a SLOW line and nothing else.
-# The two `#[ignore]`d systems take ~44s in release, so the threshold sits above them — a test
-# that crosses 120s has found a complexity blowup, not a slow machine.
-slow-timeout = "120s"
+# The threshold has to clear the two `#[ignore]`d engine-agreement tests, which are the slowest
+# thing CI runs by two orders of magnitude: ~108s locally under `ci-release`, and more on a
+# shared runner. 300s leaves room for that without a passing run reporting SLOW every time.
+slow-timeout = "300s"
 
 [profile.ci.junit]
 path = "junit.xml"
