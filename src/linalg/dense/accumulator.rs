@@ -129,6 +129,11 @@ impl<F: FiniteField> DenseAccumulator<F> {
     }
 
     /// Scale so the leading coefficient is one, reporting whether an inverse was needed.
+    ///
+    /// Scaling is unconditional, as in [`crate::linalg::dense::rows`]: zero times anything is
+    /// zero, so testing for a zero cell decided nothing and only kept the loop from being widened.
+    /// `inverse` is nonzero and a field has no zero divisors, so scaling cannot change which cells
+    /// are zero and `nonzeros` is unaffected.
     pub fn normalize(&mut self) -> bool {
         let Some(coefficient) = self.leading_coefficient() else {
             return false;
@@ -139,10 +144,7 @@ impl<F: FiniteField> DenseAccumulator<F> {
         // One inverse for the row, not one division per cell.
         let inverse = coefficient.inverse();
         for column in self.lead..self.tail {
-            let cell = &mut self.cells[column];
-            if !cell.is_zero() {
-                *cell *= inverse;
-            }
+            self.cells[column] *= inverse;
         }
         debug_assert_eq!(self.cells[self.lead], F::ONE);
         true
