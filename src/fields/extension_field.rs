@@ -342,42 +342,106 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ops::Mul<Self
 
     fn mul(self, rhs: Self) -> Self::Output {
         let p = P as u128;
+        let modulus = M::COEFFICIENTS;
 
-        // The schoolbook product of two polynomials of degree < N has degree < 2N - 1. A heap
-        // buffer is used because `[u64; 2 * N - 1]` would need const-expression arithmetic.
-        let mut product = vec![0u128; 2 * N - 1];
-        for i in 0..N {
-            let a = self.coefficients[i] as u128;
-            if a == 0 {
-                continue;
+        // The schoolbook product of two polynomials of degree < N has degree at most 2N - 2, so it
+        // needs 2N - 1 accumulators. They are held as two arrays of N rather than one of 2N - 1
+        // because `[u128; 2 * N - 1]` needs const-expression arithmetic while `[u128; N]` does
+        // not. Degree `d` lives in `low[d]` for `d < N` and in `high[d - N]` above it; `high`'s
+        // last slot is unused, which is cheaper than a heap allocation per multiplication.
+        let mut low = [0u128; N];
+        let mut high = [0u128; N];
+
+        if delayed_reduction_fits::<P, N>() {
+            // Every partial product is accumulated and each slot reduced once, rather than
+            // reducing after every multiply-add. `delayed_reduction_fits` is what licenses it: a
+            // slot takes at most N products of two residues, so the sum is below N(P-1)^2, and
+            // that bound is checked against `u128::MAX` at compile time.
+            for i in 0..N {
+                let a = self.coefficients[i] as u128;
+                if a == 0 {
+                    continue;
+                }
+                // Split rather than test `i + j < N` inside the loop: for `j` below `N - i` the
+                // product's degree is below N, and at or above it the degree is not.
+                let split = N - i;
+                for j in 0..split {
+                    low[i + j] += a * rhs.coefficients[j] as u128;
+                }
+                for j in split..N {
+                    high[i + j - N] += a * rhs.coefficients[j] as u128;
+                }
             }
-            for j in 0..N {
-                product[i + j] = (product[i + j] + a * rhs.coefficients[j] as u128) % p;
+            for slot in low.iter_mut().chain(high.iter_mut()) {
+                *slot %= p;
+            }
+        } else {
+            // P is large enough that two residues multiplied and accumulated could overflow a
+            // u128. Reduce after every multiply-add, which is what this did before delayed
+            // reduction existed. No modulus in this crate reaches here; see
+            // `delayed_reduction_fits`.
+            for i in 0..N {
+                let a = self.coefficients[i] as u128;
+                if a == 0 {
+                    continue;
+                }
+                let split = N - i;
+                for j in 0..split {
+                    low[i + j] = (low[i + j] + a * rhs.coefficients[j] as u128) % p;
+                }
+                for j in split..N {
+                    high[i + j - N] = (high[i + j - N] + a * rhs.coefficients[j] as u128) % p;
+                }
             }
         }
 
         // Reduce to degree < N. The modulus gives x^N = -(c_{N-1} x^{N-1} + ... + c_0), so each
         // term of degree i >= N folds down into the N coefficients below it. Working downwards
-        // means a folded term is itself reduced before it is reached.
-        let modulus = M::COEFFICIENTS;
-        for i in (N..product.len()).rev() {
-            let leading = product[i];
+        // means a folded term has itself been folded into before it is read.
+        //
+        // `leading` is reduced once here rather than the product being reduced once per term: it
+        // has to be below P before multiplying by a modulus coefficient, or that product could
+        // overflow. The targets are then accumulated without reduction, each taking at most N
+        // addends below P, so they stay below N*P and are reduced on the way out.
+        for i in (N..(2 * N).saturating_sub(1)).rev() {
+            let leading = high[i - N] % p;
+            high[i - N] = 0;
             if leading == 0 {
                 continue;
             }
-            product[i] = 0;
-            for j in 0..N {
-                let term = (leading * modulus[j] as u128) % p;
-                product[i - N + j] = (product[i - N + j] + p - term) % p;
+            // As above: the fold target `i - N + j` crosses N at `j = 2N - i`. The index into
+            // `high` is written `i + j - 2N` and not `i - 2N + j`: the value is non-negative
+            // because `j >= 2N - i` in this loop, but `i - 2N` alone underflows a `usize`.
+            let split = 2 * N - i;
+            for j in 0..split {
+                low[i - N + j] += p - (leading * modulus[j] as u128) % p;
+            }
+            for j in split..N {
+                high[i + j - 2 * N] += p - (leading * modulus[j] as u128) % p;
             }
         }
 
         let mut coefficients = [0u64; N];
-        for (coefficient, reduced) in coefficients.iter_mut().zip(product.iter()) {
-            *coefficient = *reduced as u64;
+        for (coefficient, accumulated) in coefficients.iter_mut().zip(low.iter()) {
+            *coefficient = (*accumulated % p) as u64;
         }
         ExtensionFieldElement::new(coefficients)
     }
+}
+
+/// Whether a slot can accumulate N products of two residues modulo P without overflowing a u128.
+///
+/// A residue is below P, so a product is at most `(P-1)^2`, and a coefficient of the schoolbook
+/// product takes at most N of them. `(P-1)^2` always fits — `P` is a `u64` — so only the final
+/// multiplication by N can overflow, which is the one checked.
+///
+/// Every modulus this crate declares is far inside the bound: the largest is P = 251 at N = 4.
+/// The predicate exists because the type is generic over `const P: u64`, so a caller may define an
+/// irreducible polynomial over a prime near 2^64, where two residues multiplied already fill a
+/// u128 and nothing may be accumulated on top.
+const fn delayed_reduction_fits<const P: u64, const N: usize>() -> bool {
+    let max_product = (P as u128 - 1) * (P as u128 - 1);
+    max_product.checked_mul(N as u128).is_some()
 }
 
 impl_mul_variants!([const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>], ExtensionFieldElement<P, N, M>);
@@ -433,6 +497,161 @@ mod tests {
         identities::{One, Zero},
         FiniteField,
     };
+
+    use super::delayed_reduction_fits;
+
+    /// x^2 + 1 over GF(2^31 - 1), for the large-coefficient multiplication tests.
+    ///
+    /// Not in `irreducible_polynomials`, which certifies its moduli by trial division — that
+    /// enumerates `p^d` candidates and is hopeless at this size. For this particular shape the
+    /// criterion is exact and cheap instead: `x^2 + 1` is irreducible over GF(p) exactly when -1
+    /// is a quadratic non-residue, which for odd p happens exactly when p = 3 (mod 4).
+    /// `test_the_mersenne_modulus_is_irreducible` asserts that congruence.
+    struct ModulusMersenne31Pow2;
+
+    const MERSENNE_31: u64 = 2147483647;
+
+    impl IrreduciblePolynomial<MERSENNE_31, 2> for ModulusMersenne31Pow2 {
+        const COEFFICIENTS: [u64; 2] = [1, 0];
+    }
+
+    type FM31x2 = ExtensionFieldElement<MERSENNE_31, 2, ModulusMersenne31Pow2>;
+
+    /// The large test modulus really is irreducible, by the p = 3 (mod 4) criterion.
+    #[test]
+    fn test_the_mersenne_modulus_is_irreducible() {
+        assert_eq!(
+            MERSENNE_31 % 4,
+            3,
+            "x^2 + 1 is reducible over GF(p) unless p = 3 (mod 4)"
+        );
+        assert_eq!(ModulusMersenne31Pow2::COEFFICIENTS, [1, 0], "not x^2 + 1");
+    }
+
+    /// The delayed-reduction bound admits every declared modulus and rejects what would overflow.
+    ///
+    /// The fast path accumulates N products of two residues in a u128 before reducing. This is the
+    /// predicate that decides whether that is safe, so it is tested directly rather than only
+    /// through its effect — a wrong answer in the permissive direction is a silent wrong result,
+    /// not a panic, once overflow checks are off in release.
+    #[test]
+    fn test_the_delayed_reduction_bound_is_exact() {
+        // Every modulus this crate declares, and the large test one.
+        assert!(delayed_reduction_fits::<3, 2>());
+        assert!(delayed_reduction_fits::<5, 3>());
+        assert!(delayed_reduction_fits::<13, 4>());
+        assert!(delayed_reduction_fits::<251, 4>());
+        assert!(delayed_reduction_fits::<2, 8>());
+        assert!(delayed_reduction_fits::<MERSENNE_31, 2>());
+
+        // A prime near 2^64 fills a u128 with one product, so nothing may be accumulated on top.
+        const BIG: u64 = 18446744073709551557;
+        assert!(!delayed_reduction_fits::<BIG, 2>());
+        assert!(!delayed_reduction_fits::<BIG, 4>());
+
+        // The boundary, at a P whose crossing point is a representable N. With P - 1 = 2^48 a
+        // single product is 2^96, so N can reach 2^32 - 1 before (P-1)^2 * N passes u128::MAX.
+        // (P - 1 = 2^32 would put the boundary at N = 2^64, which a usize cannot hold.)
+        const P_48: u64 = (1u64 << 48) + 1;
+        assert!(delayed_reduction_fits::<P_48, { (1usize << 32) - 1 }>());
+        assert!(!delayed_reduction_fits::<P_48, { 1usize << 32 }>());
+    }
+
+    /// Multiplication over a 31-bit prime agrees with a reference that reduces at every step.
+    ///
+    /// This is the test the delayed reduction has to pass. The oracle is the algorithm this
+    /// replaced: reduce after every multiply-add and after every fold term, which cannot overflow
+    /// and is therefore correct by construction but slow. Coefficients are driven to P-1, where a
+    /// single product is about 2^62 and two accumulated exceed any 64-bit accumulator — so a
+    /// reduction that was delayed too far shows up here rather than on the small moduli, whose
+    /// products fit in a handful of bits.
+    #[test]
+    fn test_multiplication_over_a_large_prime_matches_a_step_reducing_reference() {
+        /// The pre-delay algorithm, kept here as the oracle.
+        fn reference(a: [u64; 2], b: [u64; 2], p: u64, modulus: [u64; 2]) -> [u64; 2] {
+            let p = p as u128;
+            let mut product = [0u128; 3];
+            for (i, &ai) in a.iter().enumerate() {
+                for (j, &bj) in b.iter().enumerate() {
+                    product[i + j] = (product[i + j] + ai as u128 * bj as u128) % p;
+                }
+            }
+            for i in (2..product.len()).rev() {
+                let leading = product[i];
+                product[i] = 0;
+                if leading == 0 {
+                    continue;
+                }
+                for j in 0..2 {
+                    let term = (leading * modulus[j] as u128) % p;
+                    product[i - 2 + j] = (product[i - 2 + j] + p - term) % p;
+                }
+            }
+            [product[0] as u64, product[1] as u64]
+        }
+
+        let m = MERSENNE_31;
+        let cases: [[u64; 2]; 7] = [
+            [0, 0],
+            [1, 0],
+            [0, 1],
+            [m - 1, m - 1],
+            [m - 1, 1],
+            [1, m - 1],
+            [m / 2, m - 2],
+        ];
+
+        for a in cases {
+            for b in cases {
+                let expected = reference(a, b, m, ModulusMersenne31Pow2::COEFFICIENTS);
+                let product = FM31x2::new(a) * FM31x2::new(b);
+                assert_eq!(
+                    *product.coefficients(),
+                    expected,
+                    "({:?}) * ({:?}) over GF({}^2)",
+                    a,
+                    b,
+                    m
+                );
+            }
+        }
+    }
+
+    /// The field laws hold over the large prime, which is what a wrong fold would break.
+    ///
+    /// Agreeing with a reference on a fixed list does not prove the reduction is a ring
+    /// homomorphism; associativity and distributivity over random elements do, and they are
+    /// sensitive to the fold writing to the wrong coefficient.
+    #[test]
+    fn test_the_large_field_obeys_the_field_laws() {
+        let mut rng = StdRng::seed_from_u64(0xA11CE);
+        for _ in 0..512 {
+            let a = FM31x2::random(&mut rng);
+            let b = FM31x2::random(&mut rng);
+            let c = FM31x2::random(&mut rng);
+
+            assert_eq!(a * b, b * a, "multiplication is not commutative");
+            assert_eq!(
+                (a * b) * c,
+                a * (b * c),
+                "multiplication is not associative"
+            );
+            assert_eq!(
+                a * (b + c),
+                a * b + a * c,
+                "multiplication does not distribute"
+            );
+            assert_eq!(a * FM31x2::one(), a, "one is not the identity");
+            assert_eq!(
+                a * FM31x2::zero(),
+                FM31x2::zero(),
+                "zero does not annihilate"
+            );
+            if !a.is_zero() {
+                assert_eq!(a * a.inverse(), FM31x2::one(), "inverse is wrong");
+            }
+        }
+    }
 
     type F3x2 = ExtensionFieldElement<3, 2, Modulus3Pow2>;
     type F13x4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
