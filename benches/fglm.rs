@@ -1,6 +1,6 @@
 //! Monomial-order conversion: the FGLM pipeline against a direct lexicographic basis.
 //!
-//! Five groups, answering five different questions.
+//! Seven groups, answering seven different questions.
 //!
 //! `stages` times the conversion's parts separately — standard monomial enumeration, quotient
 //! algebra construction, and the whole conversion — on a source basis computed outside the timed
@@ -19,6 +19,15 @@
 //! and on a dense one. Storage itself is exact and needs no benchmark; what needs one is whether a
 //! representation that halves the memory also slows the thing the conversion does `O(D)` times.
 //!
+//! `dependence` times the lex walk's linear algebra on its own, by filling an `IncrementalSpan` to
+//! full rank and then testing dependent vectors against it. It is M18-4's benchmark: the
+//! triangular combination block is not option-gated, so there is nothing to ablate it against, and
+//! what a benchmark can do is keep the quantity it changed under measurement.
+//!
+//! `recommended` times the configuration a caller gets against `FglmOptions::baseline()`, which is
+//! M17's. It is the integration figure M18-5's ablation chose the defaults from, in a form that
+//! `cargo bench` can regress against.
+//!
 //! `verification` times `is_grobner_basis`, which is what `fglm_to_lex_checked` adds over
 //! `fglm_to_lex`. It is in its own group because it is not part of either pipeline — it is the
 //! price of not trusting the input, and on katsura-7 it exceeds the conversion it protects.
@@ -35,8 +44,9 @@ use zeebra::{
         benchmark_systems::{cyclic, katsura, planted},
         f4,
         fglm::{
-            fglm_to_lex, fglm_to_lex_with_options, is_grobner_basis, BorderBatch, FglmOptions,
-            OperatorConstruction, OperatorStorage, QuotientAlgebra, QuotientBasis,
+            fglm_to_lex, fglm_to_lex_with_options, is_grobner_basis, BorderBatch, Dependence,
+            FglmOptions, IncrementalSpan, OperatorConstruction, OperatorStorage, QuotientAlgebra,
+            QuotientBasis,
         },
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -264,6 +274,137 @@ fn bench_operator_storage<const N: usize>(
     group.finish();
 }
 
+/// The dependence test on its own: fill a span to full rank, then test dependent vectors.
+///
+/// The quantity M18-4 changed. A row's combination is `r + 1` coefficients at rank `r` where M17
+/// padded it to `D`, so the inner loop over the combination shortens as well as the allocation —
+/// which is why this is timed rather than only counted. It cannot be ablated: the triangular block
+/// is not behind an option, and the padded one no longer exists to compare against.
+///
+/// The vectors are dense and pseudo-random, which is the worst case for the test and not what the
+/// walk always hands it: an early candidate's quotient vector is often sparse. `D` stops at 256
+/// because filling a span is `O(D^3)` and a dimension of 1,024 would be seconds per iteration.
+fn bench_dependence(c: &mut Criterion, dimension: usize) {
+    use rand::{prelude::StdRng, SeedableRng};
+
+    // Generated once, outside the timed region, and from a fixed seed so that two runs of the
+    // benchmark are two measurements of the same work.
+    let mut rng = StdRng::seed_from_u64(0x5eed_1234);
+    let independent: Vec<Vec<F>> = (0..dimension)
+        .map(|_| (0..dimension).map(|_| F::random(&mut rng)).collect())
+        .collect();
+
+    // Probes for the second half: every vector of the dimension is dependent once the span is of
+    // full rank, which is exactly the state the lex walk spends most of its candidates in.
+    let probes: Vec<Vec<F>> = (0..16)
+        .map(|_| (0..dimension).map(|_| F::random(&mut rng)).collect())
+        .collect();
+
+    let mut group = c.benchmark_group("fglm_dependence");
+    let label = format!("d{}", dimension);
+
+    group.bench_with_input(
+        BenchmarkId::new("fill_to_full_rank", &label),
+        &independent,
+        |b, vectors| {
+            b.iter(|| {
+                let mut span = IncrementalSpan::<F>::new(dimension);
+                for v in vectors {
+                    match span.reduce(black_box(v)) {
+                        Dependence::Independent {
+                            residue,
+                            combination,
+                        } => span.insert(residue, combination),
+                        // Pseudo-random vectors in a field this large are independent with
+                        // probability 1 - O(D / p); a dependent one would mean the span was
+                        // already full, and silently skipping it would measure less work.
+                        Dependence::Dependent { .. } => unreachable!("a dependent random vector"),
+                    }
+                }
+                black_box(span.accepted());
+            })
+        },
+    );
+
+    // The span at full rank, built once: the probe timing is the test and not the filling.
+    let mut full = IncrementalSpan::<F>::new(dimension);
+    for v in &independent {
+        match full.reduce(v) {
+            Dependence::Independent {
+                residue,
+                combination,
+            } => full.insert(residue, combination),
+            Dependence::Dependent { .. } => unreachable!("a dependent random vector"),
+        }
+    }
+    assert_eq!(full.accepted(), dimension, "the span did not reach rank D");
+    assert_eq!(
+        full.stored_cells(),
+        IncrementalSpan::<F>::cells_at_full_rank(dimension).expect("representable"),
+        "the span stores something other than the triangular figure"
+    );
+
+    // The same span across every iteration rather than a clone per iteration: `reduce` leaves the
+    // rows alone — it only advances the operation counter — and cloning `D^2 + D (D + 1) / 2` cells
+    // inside the timed region would be measuring a memcpy.
+    group.bench_with_input(
+        BenchmarkId::new("test_dependent", &label),
+        &probes,
+        |b, vectors| {
+            b.iter(|| {
+                for v in vectors {
+                    black_box(matches!(
+                        full.reduce(black_box(v)),
+                        Dependence::Dependent { .. }
+                    ));
+                }
+            })
+        },
+    );
+    group.finish();
+}
+
+/// The configuration a caller gets, against M17's.
+///
+/// Both halves of the milestone's claim in one place: `recommended()` is `BatchedBorder` with
+/// `Adaptive` storage and `baseline()` is `PerColumn` with `Sparse`, and the lex bases are asserted
+/// equal outside the timed region. The ablation in `examples/fglm_ablation.rs` is where the
+/// defaults were chosen; this is the same comparison under Criterion, so a regression in it fails
+/// a `cargo bench` rather than waiting for someone to re-read a table.
+fn bench_recommended<const N: usize>(
+    c: &mut Criterion,
+    name: &str,
+    system: &[MultivariatePolynomial<N, F>],
+) {
+    let source = f4(system, SOURCE).expect("within limits");
+    let baseline = FglmOptions::baseline();
+    let recommended = FglmOptions::recommended();
+
+    let (reference, _) = fglm_to_lex_with_options(&source, SOURCE, &baseline).expect("convertible");
+    let (chosen, statistics) =
+        fglm_to_lex_with_options(&source, SOURCE, &recommended).expect("convertible");
+    assert_eq!(
+        reference, chosen,
+        "{}: the recommended configuration changed the lex basis",
+        name
+    );
+    assert_eq!(
+        statistics.batches.fallbacks, 0,
+        "{}: a batch fell back to the scalar path, so this is not the strategy it claims",
+        name
+    );
+
+    let mut group = c.benchmark_group("fglm_recommended");
+    for (label, options) in [("baseline", &baseline), ("recommended", &recommended)] {
+        group.bench_with_input(BenchmarkId::new(label, name), &source, |b, s| {
+            b.iter(|| {
+                fglm_to_lex_with_options(black_box(s), SOURCE, options).expect("convertible");
+            })
+        });
+    }
+    group.finish();
+}
+
 /// The price of `fglm_to_lex_checked` over `fglm_to_lex`.
 fn bench_verification<const N: usize>(
     c: &mut Criterion,
@@ -333,6 +474,21 @@ fn operator_storage(c: &mut Criterion) {
     bench_operator_storage(c, "planted-8", &planted::<8, F>(&planted_point::<8>()));
 }
 
+/// The quotient dimensions in the corpus: katsura-7's 64, cyclic-6's 156, planted-8's 256.
+fn dependence(c: &mut Criterion) {
+    bench_dependence(c, 64);
+    bench_dependence(c, 156);
+    bench_dependence(c, 256);
+}
+
+/// Both sides of the corpus: where reduction dominates, and where the lex walk does.
+fn recommended(c: &mut Criterion) {
+    bench_recommended(c, "katsura-6", &katsura::<6, F>());
+    bench_recommended(c, "katsura-7", &katsura::<7, F>());
+    bench_recommended(c, "cyclic-6", &cyclic::<6, F>());
+    bench_recommended(c, "planted-8", &planted::<8, F>(&planted_point::<8>()));
+}
+
 fn verification(c: &mut Criterion) {
     bench_verification(c, "cyclic-5", &cyclic::<5, F>());
     bench_verification(c, "cyclic-6", &cyclic::<6, F>());
@@ -347,6 +503,8 @@ criterion_group!(
     pipeline,
     operator_construction,
     operator_storage,
+    dependence,
+    recommended,
     verification
 );
 criterion_main!(fglm);
