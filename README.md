@@ -98,7 +98,8 @@ cargo bench                              # everything
 cargo bench --bench grobner              # one suite
 cargo bench --bench sparse_linear_algebra
 cargo bench --bench f4_stages
-cargo bench --bench fglm                 # order conversion: stages, pipeline, verification
+cargo bench --bench fglm                 # order conversion: stages, strategies, dependence,
+                                         # the recommended configuration, verification
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
 ```
 
@@ -140,6 +141,8 @@ cargo run --release --example fglm_profile -- katsura-7   # one system per proce
 cargo run --release --example fglm_border          # what deduplicating the border is worth
 cargo run --release --example fglm_storage         # operator representations, stored and applied
 cargo run --release --example fglm_shape           # shape position, and what that route would save
+cargo run --release --example fglm_ablation        # every strategy combination, one table
+cargo run --release --example fglm_ablation -- list
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -195,8 +198,11 @@ apply to it, and that is measured rather than assumed.
 `fglm_profile` attributes a conversion's cost. One table is the shape of the border — how many of
 the `N * D` operator columns leave the standard monomials, and how many *distinct* monomials those
 are, whose gap bounds what deduplicating them could remove. The other is the stage breakdown
-(standard-monomial enumeration, border classification, normal forms, coordinate assembly, the lex
-walk) beside what the representations hold. It sets `FglmOptions::measure_stages`, which is off by
+(standard-monomial enumeration, border classification, scalar normal forms, a batch's symbolic
+closure, coordinate assembly, the lex walk) beside what the representations hold. Scalar reduction
+and batched reduction are the same stage under two strategies, so one column is zero whenever the
+other is not and the reported share is of their sum. It profiles the shipped strategies, or M17's
+with `-- baseline`. It sets `FglmOptions::measure_stages`, which is off by
 default because the operator loop runs `N * D` times and a clock read inside it is not free. The
 byte figures are estimates of this crate's own representations;
 `zeebra::util::peak_resident_bytes` is the separate, process-wide measurement, and the two are not
@@ -215,7 +221,7 @@ comparison under Criterion.
 position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and
 where the last variable qualifies it produces the lex basis `p(t), x_0 - h_0(t), ...` from that
 variable's Krylov sequence, with no monomial walk and without retaining the accepted quotient
-vectors. The whole katsura family qualifies and nothing else in the corpus does; 26 of 38
+vectors. The whole katsura family qualifies and nothing else in the corpus does; 76 of 120
 zero-dimensional differential fixtures do, and the route is checked against Singular on every one.
 
 Detection is **algebraic, not a count of solutions**: `<x - 1, (y - 1)^2>` has one point, dimension
@@ -230,6 +236,17 @@ exact; operator *application*, on a unit input and a dense one, because the spar
 input coordinate and the dense path does not; and the whole conversion, where the difference turns
 out to be under 1%. `cargo bench --bench fglm -- fglm_operator_application` is the application half
 under Criterion.
+
+`fglm_ablation` runs every construction × storage combination on one source basis per system, with
+the lex basis and the operators' nonzero count asserted equal to the baseline's on every row, and
+reports time and memory side by side. **It is where the defaults came from.** The shipped
+configuration is at least as fast as M17's on every system in the corpus — 14.0x on katsura-7, 1.17x
+on planted-10 — and never stores more. Two changes cannot be ablated and the example says so: the
+compact sparse column and the triangular combination block are not strategies, so they are in every
+row including the baseline. `cargo bench --bench fglm -- fglm_recommended` is the same comparison
+under Criterion, and `fglm_profile` shows what that left behind: border reduction was 95% of
+katsura-7's conversion and is 52%, while planted-10's lex walk is 69% of its own and nothing in M18
+touched it.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
@@ -358,7 +375,7 @@ assert_eq!(lex, f4(&system, MonomialOrder::Lexicographic).unwrap());
 The conversion is checked against **29 lexicographic bases computed by Singular**, committed as
 literals and regenerable with `Singular -q tools/reference_bases.sing`. Singular's `std` is
 Buchberger/slimgb lineage, so those references are independent of Zeebra's F4 in algorithm and not
-only in implementation. No external system is needed to run the tests. A further **96 recorded
+only in implementation. No external system is needed to run the tests. A further **240 recorded
 cases** check every intermediate result rather than only the final basis — see "Differential
 testing against Singular" below.
 
@@ -379,8 +396,8 @@ fifth and a third of them repeat a monomial some other column already reduced.
 ```rust
 use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction};
 
-// One normal form per nonstandard column. The default, and the reference.
-let per_column = FglmOptions::default();
+// One normal form per nonstandard column: M17's strategy, kept as the reference.
+let per_column = FglmOptions::baseline();
 
 // One normal form per *distinct* border monomial, reused by every column that reaches it.
 let deduplicated = FglmOptions::default()
@@ -393,9 +410,9 @@ A third strategy shares more than the reductions:
 use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction};
 
 // Border monomials reduced in batches against a shared symbolic closure, with the arithmetic over
-// integer column indices rather than through a polynomial's hash map.
-let batched = FglmOptions::default()
-    .with_operator_construction(OperatorConstruction::BatchedBorder);
+// integer column indices rather than through a polynomial's hash map. The default since M18-5.
+let batched = FglmOptions::default();
+assert_eq!(batched.operator_construction, OperatorConstruction::BatchedBorder);
 ```
 
 All three build **identical operators**, which the tests assert by comparing whole
@@ -422,9 +439,10 @@ size on both families and faster than scalar on every system.
 drops a target: `Fail` returns `FglmError::BorderBatchExceeded` naming the limit, and `Scalar`
 reduces that batch one target at a time and counts that it did.
 
-No strategy is the default yet: `docs/MILESTONE-FGLM-SCALABILITY.md` §5.6 explains why that waits
-for the integration ablation. `FglmOptions::baseline()` names the M17 configuration, so a
-measurement has something fixed to be quoted against.
+**`BatchedBorder` at a batch of 64 is the default**, chosen from the integration ablation in
+`docs/MILESTONE-FGLM-SCALABILITY.md` §9 rather than from katsura-7 alone: it is the one strategy
+that is at least as fast as M17's on every system in the corpus. `FglmOptions::baseline()` names
+the M17 configuration, so a measurement still has something fixed to be quoted against.
 
 #### Storing the multiplication operators
 
@@ -436,11 +454,12 @@ coefficient, so it costs twice a dense cell and only saves below half fill.
 ```rust
 use zeebra::grobner::fglm::{FglmOptions, OperatorStorage};
 
-// `(index, coefficient)` pairs for every reduced column. The default, and the reference.
-let sparse = FglmOptions::default();
+// `(index, coefficient)` pairs for every reduced column: M17's representation, the reference.
+let sparse = FglmOptions::baseline();
 
-// Whichever of the two allocates fewer bytes, decided column by column.
-let adaptive = FglmOptions::default().with_operator_storage(OperatorStorage::Adaptive);
+// Whichever of the two allocates fewer bytes, decided column by column. The default since M18-5.
+let adaptive = FglmOptions::default();
+assert_eq!(adaptive.operator_storage, OperatorStorage::Adaptive);
 ```
 
 On katsura-7 the operators go from 264.5 kB to **163.6 kB**, and `Adaptive` beats *both* extremes
@@ -461,7 +480,8 @@ one, and compares **every intermediate result** — not only the lex basis:
 ```sh
 cargo run --release --bin zeebra-differential -- --help
 cargo run --release --bin zeebra-differential -- --systems 500
-cargo run --release --bin zeebra-differential -- --systems 96 --seed 777 \
+cargo run --release --bin zeebra-differential -- --seed 777 --systems 240 \
+    --max-degree 4 --max-terms 5 \
     --fixtures src/grobner/differential/fixtures.rs   # regenerate the committed cases
 ```
 
@@ -479,9 +499,10 @@ reports is the earliest thing that differs rather than everything downstream of 
 
 **Multiplication-operator columns are compared individually.** Each has a precise mathematical
 answer, so a wrong column is caught directly rather than only when it happens to change the lex
-basis. On a 500-system sweep over GF(2), GF(3), GF(7), GF(13), GF(65537) and GF(2^31 - 1) in two to
-five variables, every system agreed: 195 zero-dimensional, 193 unit ideals, and 112
-positive-dimensional ideals that both sides rejected.
+basis. On two 1,000-system sweeps under the shipped defaults, over GF(2), GF(3), GF(7), GF(13),
+GF(65537) and GF(2^31 - 1) in two to five variables, every system agreed: 949 zero-dimensional, 572
+unit ideals, and 479 positive-dimensional ideals that both sides rejected, with no oracle
+failures.
 
 **An oracle that did not answer is never agreement.** Singular exits 0 after a script error, so a
 successful exit proves nothing: every run must reach an end-of-script marker *and* have printed no
