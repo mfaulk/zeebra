@@ -1,6 +1,13 @@
 //! Prime-order finite field.
 //!
 //! For each prime p, the finite field F_p is defined to be the quotient ring Z/pZ.
+//!
+//! Elements are held in Montgomery form when P is odd, so that multiplication needs no division.
+//! `mul` used to compute `(a as u128 * b as u128) % P as u128`, and a const-generic modulus does
+//! not save that: LLVM does not strength-reduce a 128-bit remainder, so every multiplication
+//! compiled to a call to `__umodti3`, compiler-rt's software 128-bit division. Montgomery
+//! reduction replaces it with two multiplications and a shift. See [`montgomery`] for the
+//! representation and the invariant it carries.
 
 use std::{
     fmt::{Display, Formatter},
@@ -18,28 +25,135 @@ use crate::{
     FiniteField, ParseFieldElementError, Ring,
 };
 
+/// Montgomery arithmetic modulo an odd P, with R = 2^64.
+///
+/// An element `a` is stored as `a * R mod P`. The map is a ring isomorphism for addition and
+/// subtraction — `aR + bR = (a + b)R` — so those operations are untouched by the change of
+/// representation and are not duplicated here. Only multiplication and the conversions differ.
+///
+/// R = 2^64 requires `gcd(P, R) = 1`, which for a power of two means P must be odd. P = 2 is a
+/// legitimate modulus for this type and is used by the GF(2) Gröbner tests, so an even modulus
+/// keeps the wide-remainder path. [`uses_montgomery`] is the one predicate that decides, and
+/// because P is a const generic every branch on it folds away at compile time.
+mod montgomery {
+    /// Whether modulus `p` is represented in Montgomery form.
+    ///
+    /// Odd moduli only: R = 2^64 is not invertible modulo an even number.
+    pub const fn uses_montgomery(p: u64) -> bool {
+        p % 2 == 1
+    }
+
+    /// `-P^{-1} mod 2^64`, the factor that makes the low limb of `t + m*P` vanish.
+    ///
+    /// Newton's iteration for the inverse of an odd number modulo a power of two doubles the
+    /// number of correct bits each step: starting from one bit, six steps reach 64. Requires `p`
+    /// odd; for even `p` the result is meaningless but harmless, since every caller is guarded by
+    /// [`uses_montgomery`] and the arithmetic here only wraps.
+    pub const fn n_prime(p: u64) -> u64 {
+        let mut inverse: u64 = 1;
+        let mut step = 0;
+        while step < 6 {
+            // x <- x * (2 - p*x), which is exact modulo 2^(2k) when x is exact modulo 2^k.
+            inverse = inverse.wrapping_mul(2u64.wrapping_sub(p.wrapping_mul(inverse)));
+            step += 1;
+        }
+        inverse.wrapping_neg()
+    }
+
+    /// `R^2 mod P`, which converts a canonical residue into Montgomery form via one reduction.
+    ///
+    /// Computed as `(R mod P)^2 mod P` so the intermediate stays inside a `u128`: `R mod P` is
+    /// below 2^64, so its square is below 2^128. This runs at compile time, so the wide remainder
+    /// it uses costs nothing at run time.
+    pub const fn r2_mod_p(p: u64) -> u64 {
+        let r = ((1u128 << 64) % p as u128) as u64;
+        ((r as u128 * r as u128) % p as u128) as u64
+    }
+
+    /// Montgomery reduction: `t * R^{-1} mod P`, for `t < P * R`.
+    ///
+    /// `m` is chosen so that `t + m*P` is divisible by R, which makes the division by R a shift.
+    /// The quotient is below 2P, so one conditional subtraction finishes the reduction.
+    ///
+    /// `t + m*P` can need 129 bits when P is close to 2^64, which is why the addition is done with
+    /// `overflowing_add` rather than in a `u128` that would silently wrap. On overflow the true
+    /// sum is `2^128 + sum`, so the true quotient is `(sum >> 64) + 2^64`; that exceeds P, and
+    /// subtracting P brings it back below 2^64, which `wrapping_sub` computes exactly. The low 64
+    /// bits of the true sum are zero by construction, so the shift loses nothing.
+    #[inline(always)]
+    pub const fn redc<const P: u64>(t: u128) -> u64 {
+        let m = (t as u64).wrapping_mul(n_prime(P));
+        let (sum, carry) = t.overflowing_add(m as u128 * P as u128);
+        let high = (sum >> 64) as u64;
+        if carry {
+            // The quotient is 2^64 + high, which is above P; the difference fits in 64 bits.
+            high.wrapping_sub(P)
+        } else if high >= P {
+            high - P
+        } else {
+            high
+        }
+    }
+
+    /// `a * b * R^{-1} mod P`, which is the product in Montgomery form when both inputs are.
+    ///
+    /// `(aR)(bR) * R^{-1} = (ab)R`, so the representation is preserved.
+    #[inline(always)]
+    pub const fn mul<const P: u64>(a: u64, b: u64) -> u64 {
+        redc::<P>(a as u128 * b as u128)
+    }
+
+    /// A canonical residue in [0,P) to the internal representation.
+    #[inline(always)]
+    pub const fn to_internal<const P: u64>(canonical: u64) -> u64 {
+        if uses_montgomery(P) {
+            mul::<P>(canonical, r2_mod_p(P))
+        } else {
+            canonical
+        }
+    }
+
+    /// The internal representation back to a canonical residue in [0,P).
+    #[inline(always)]
+    pub const fn to_canonical<const P: u64>(internal: u64) -> u64 {
+        if uses_montgomery(P) {
+            redc::<P>(internal as u128)
+        } else {
+            internal
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
 /// Element of a prime field with prime modulus P.
 pub struct PrimeFieldElement64<const P: u64> {
-    /// The element's representative integer in [0,p-1].
+    /// The element's internal representation: `a * 2^64 mod P` for odd P, and the canonical
+    /// residue `a` for even P. [`value`](Self::value) converts back; nothing else should read this
+    /// field expecting a residue.
     ///
-    /// Private so that the reduced-residue invariant cannot be broken from outside: every
-    /// operation here assumes `value < P`, and `PartialEq` and `Hash` are derived over it, so an
-    /// unreduced value would compare unequal to the element it represents.
+    /// Private so that neither the reduced-residue invariant nor the choice of representation can
+    /// be broken from outside: every operation here assumes the stored value is below P, and
+    /// `PartialEq` and `Hash` are derived over it. Deriving them over the Montgomery form is
+    /// sound because the map is a bijection on [0,P), so two elements are equal in one
+    /// representation exactly when they are equal in the other.
     ///
     /// Deserialization is the one construction path that bypasses a constructor, so it validates
-    /// rather than trusting its input. Add and sub reduce by conditional subtraction, which
-    /// assumes the operands are already reduced: `sub` would pass an unreduced value straight
-    /// through, and `add` would still be unreduced for any input at or above 2P.
-    #[serde(deserialize_with = "reduced_residue::<_, P>")]
+    /// rather than trusting its input, and converts. Add and sub reduce by conditional
+    /// subtraction, which assumes the operands are already reduced: `sub` would pass an unreduced
+    /// value straight through, and `add` would still be unreduced for any input at or above 2P.
+    #[serde(
+        serialize_with = "canonical_residue::<_, P>",
+        deserialize_with = "reduced_residue::<_, P>"
+    )]
     value: u64,
 }
 
-/// Accepts a representative only if it is already reduced modulo P.
+/// Accepts a representative only if it is already reduced modulo P, then converts it.
 ///
 /// Rejecting rather than reducing: a value outside [0,P) did not come from this field, so it
 /// signals either corruption or a mismatched modulus, and silently reinterpreting it would hide
-/// that. Canonical values are unaffected, so this does not change the serialized format.
+/// that. The wire format is the canonical residue in both directions, so the representation change
+/// is invisible to a stored or transmitted element.
 fn reduced_residue<'de, D, const P: u64>(deserializer: D) -> Result<u64, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -50,29 +164,50 @@ where
             "{value} is not a reduced residue modulo {P}"
         )));
     }
-    Ok(value)
+    Ok(montgomery::to_internal::<P>(value))
+}
+
+/// Writes the canonical residue, whatever the internal representation is.
+///
+/// Paired with [`reduced_residue`] so that the serialized form is the mathematical value. Without
+/// this the derived implementation would emit the Montgomery form, which would both change the
+/// format and be rejected on the way back in by any peer that reduced differently.
+fn canonical_residue<S, const P: u64>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_u64(montgomery::to_canonical::<P>(*value))
 }
 
 impl<const P: u64> PrimeFieldElement64<P> {
     /// The element's representative integer in [0,p-1].
+    ///
+    /// For an odd modulus this is a Montgomery reduction, not a field read, so a hot loop should
+    /// hold field elements rather than call this per iteration.
     pub fn value(&self) -> u64 {
-        self.value
+        montgomery::to_canonical::<P>(self.value)
     }
 }
 
 impl<const P: u64> Zero for PrimeFieldElement64<P> {
+    // Zero is a fixed point of the Montgomery map, so this needs no conversion.
     const ZERO: Self = Self { value: 0 };
 }
 
 impl<const P: u64> One for PrimeFieldElement64<P> {
-    const ONE: Self = Self { value: 1 };
+    // One is not a fixed point: in Montgomery form it is R mod P.
+    const ONE: Self = Self {
+        value: montgomery::to_internal::<P>(1),
+    };
 }
 
 impl<const P: u64> Ring for PrimeFieldElement64<P> {}
 
 impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
     fn new(val: u64) -> Self {
-        Self { value: val % P }
+        Self {
+            value: montgomery::to_internal::<P>(val % P),
+        }
     }
 
     fn from_str(value: &str) -> Result<Self, ParseFieldElementError> {
@@ -83,7 +218,7 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         assert!(words.len() <= 1);
 
         Ok(Self {
-            value: *words.first().unwrap_or(&0),
+            value: montgomery::to_internal::<P>(*words.first().unwrap_or(&0)),
         })
     }
 
@@ -100,7 +235,9 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         // Convert generator to an integer in [0,P).
         assert!(generator <= n);
         let value = generator.as_le_words()[0];
-        Self { value }
+        Self {
+            value: montgomery::to_internal::<P>(value),
+        }
     }
 
     fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
@@ -124,7 +261,7 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
 /// Display
 impl<const P: u64> Display for PrimeFieldElement64<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "{}", self.value())
     }
 }
 
@@ -154,8 +291,15 @@ impl<const P: u64> ops::Mul<&PrimeFieldElement64<P>> for &PrimeFieldElement64<P>
     type Output = PrimeFieldElement64<P>;
 
     fn mul(self, rhs: &PrimeFieldElement64<P>) -> Self::Output {
-        let prod = self.value as u128 * rhs.value as u128;
-        let value = (prod % P as u128) as u64;
+        // Both operands carry the same factor of R, and Montgomery reduction removes exactly one
+        // of them, so the product is in the same representation as the inputs. The wide remainder
+        // survives only for an even modulus, where R is not invertible; that branch is on a const
+        // generic, so it is resolved at compile time and costs nothing here.
+        let value = if montgomery::uses_montgomery(P) {
+            montgomery::mul::<P>(self.value, rhs.value)
+        } else {
+            ((self.value as u128 * rhs.value as u128) % P as u128) as u64
+        };
         Self::Output { value }
     }
 }
@@ -229,11 +373,166 @@ mod tests {
 
     use crate::{
         fields::{
-            PrimeFieldElement64, Zp1091, Zp18446744073709551557, Zp2147483647, Zp541, Zp65537, Zp7,
+            PrimeFieldElement64, Zp1091, Zp13, Zp18446744069414584321, Zp18446744073709551557,
+            Zp2147483647, Zp541, Zp65537, Zp7,
         },
         identities::{One, Zero},
         FiniteField, ParseFieldElementError,
     };
+
+    /// Multiplication agrees with reducing the full 128-bit product by a wide remainder.
+    ///
+    /// The oracle is the textbook formula `(a * b) % P` in 128 bits. This is the characterization
+    /// test for the internal representation: Montgomery form changes what `value` holds, and the
+    /// only thing that must not change is what `value()` reports. Boundary values matter most —
+    /// with P near 2^64 the product spans the full 128 bits, which is where a reduction gets the
+    /// high limb wrong. An even modulus is included because Montgomery multiplication requires an
+    /// odd one, so GF(2) exercises the fallback rather than the fast path.
+    #[test]
+    fn test_multiplication_matches_wide_reduction() {
+        fn check<const P: u64>(values: &[u64]) {
+            for &a in values {
+                for &b in values {
+                    let (x, y) = (
+                        PrimeFieldElement64::<P>::new(a),
+                        PrimeFieldElement64::<P>::new(b),
+                    );
+                    let expected = ((x.value() as u128 * y.value() as u128) % P as u128) as u64;
+                    assert_eq!(
+                        (x * y).value(),
+                        expected,
+                        "P = {}: {} * {}",
+                        P,
+                        x.value(),
+                        y.value()
+                    );
+                }
+            }
+        }
+
+        // Exhaustive over small fields, including an even modulus for the fallback path.
+        check::<2>(&[0, 1]);
+        check::<3>(&(0..3).collect::<Vec<_>>());
+        let small: Vec<u64> = (0..7).collect();
+        check::<7>(&small);
+        let small: Vec<u64> = (0..13).collect();
+        check::<13>(&small);
+
+        // Goldilocks, 2^64 - 2^32 + 1.
+        const GOLDILOCKS: u64 = 18446744069414584321;
+        check::<GOLDILOCKS>(&[
+            0,
+            1,
+            2,
+            0xFFFF_FFFF,
+            1 << 32,
+            GOLDILOCKS / 2,
+            GOLDILOCKS - 2,
+            GOLDILOCKS - 1,
+        ]);
+
+        // The largest 64-bit prime, where the product uses the full 128 bits.
+        const BIG: u64 = 18446744073709551557;
+        check::<BIG>(&[0, 1, 2, BIG / 2, BIG - 3, BIG - 2, BIG - 1]);
+
+        // 2^31 - 1, where the product stays inside 62 bits.
+        check::<2147483647>(&[0, 1, 2, 1073741823, 2147483645, 2147483646]);
+    }
+
+    proptest! {
+        /// Multiplication matches the wide-reduction oracle over random input, near the boundary.
+        #[test]
+        fn test_multiplication_matches_wide_reduction_randomly(a in any::<u64>(), b in any::<u64>()) {
+            const BIG: u64 = 18446744073709551557;
+            let (x, y) = (PrimeFieldElement64::<BIG>::new(a), PrimeFieldElement64::<BIG>::new(b));
+            let expected = ((x.value() as u128 * y.value() as u128) % BIG as u128) as u64;
+            prop_assert_eq!((x * y).value(), expected);
+
+            const GOLDILOCKS: u64 = 18446744069414584321;
+            let (x, y) = (
+                PrimeFieldElement64::<GOLDILOCKS>::new(a),
+                PrimeFieldElement64::<GOLDILOCKS>::new(b),
+            );
+            let expected = ((x.value() as u128 * y.value() as u128) % GOLDILOCKS as u128) as u64;
+            prop_assert_eq!((x * y).value(), expected);
+        }
+    }
+
+    /// The serialized bytes are the canonical residue, not whatever the internal representation is.
+    ///
+    /// The round-trip test below would pass even if the wire format silently became Montgomery
+    /// form, because it only checks that encoding and decoding compose to the identity. This pins
+    /// the bytes themselves against a plain `u64`, so a representation change cannot leak into the
+    /// format a stored or transmitted element uses.
+    #[test]
+    fn test_the_wire_format_is_the_canonical_residue() {
+        // 7 mod 13 is 7, and Montgomery form of 7 mod 13 is not 7, so the two disagree.
+        assert_eq!(
+            bincode::serialize(&Zp13::new(7)).unwrap(),
+            bincode::serialize(&7u64).unwrap()
+        );
+
+        // Goldilocks, where the canonical value and the Montgomery value both span 64 bits.
+        let value = 0xDEAD_BEEF_0000_1234u64;
+        assert_eq!(
+            bincode::serialize(&Zp18446744069414584321::new(value)).unwrap(),
+            bincode::serialize(&value).unwrap()
+        );
+
+        // One is the case most likely to leak: in Montgomery form it is R mod P, not 1.
+        assert_eq!(
+            bincode::serialize(&Zp13::one()).unwrap(),
+            bincode::serialize(&1u64).unwrap()
+        );
+        assert_eq!(
+            bincode::serialize(&Zp13::zero()).unwrap(),
+            bincode::serialize(&0u64).unwrap()
+        );
+    }
+
+    /// `Display` shows the canonical residue, not the internal representation.
+    #[test]
+    fn test_display_shows_the_canonical_residue() {
+        assert_eq!(format!("{}", Zp13::new(7)), "7");
+        assert_eq!(format!("{}", Zp13::one()), "1");
+        assert_eq!(format!("{}", Zp13::zero()), "0");
+        assert_eq!(format!("{}", Zp13::new(20)), "7");
+    }
+
+    /// Elements built by different routes compare and hash as the same element.
+    ///
+    /// Every construction path has to agree on the representation. A path that forgot to convert
+    /// would still produce a reduced-looking value, so equality across paths is what catches it.
+    #[test]
+    fn test_construction_paths_agree() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        fn hash_of<T: Hash>(value: &T) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let direct = Zp13::new(7);
+        let wrapped = Zp13::new(20); // 20 = 7 mod 13
+        let parsed = Zp13::from_str("7").unwrap();
+        let summed = Zp13::new(3) + Zp13::new(4);
+        let decoded: Zp13 = bincode::deserialize(&bincode::serialize(&direct).unwrap()).unwrap();
+
+        for other in [wrapped, parsed, summed, decoded] {
+            assert_eq!(direct, other);
+            assert_eq!(hash_of(&direct), hash_of(&other));
+            assert_eq!(direct.value(), other.value());
+        }
+
+        // One and zero are identities under the operations, in whatever representation.
+        assert!(Zp13::one().is_one());
+        assert!(Zp13::zero().is_zero());
+        assert_eq!(Zp13::new(7) * Zp13::one(), Zp13::new(7));
+        assert_eq!(Zp13::new(7) + Zp13::zero(), Zp13::new(7));
+        assert_eq!(Zp13::new(7) * Zp13::new(7).inverse(), Zp13::one());
+    }
 
     /// Deserializing an unreduced representative is rejected rather than admitted.
     #[test]
@@ -449,12 +748,14 @@ mod tests {
     fn test_pow() {
         type Zp = Zp2147483647;
 
+        // `value()` rather than the private field: the expected numbers are canonical residues,
+        // and the field holds the Montgomery form.
         let a = Zp::new(827376);
         assert_eq!(a.pow(1), a);
-        assert_eq!(a.pow(2).value, 1651245630);
-        assert_eq!(a.pow(7).value, 1787801728);
-        assert_eq!(a.pow(43).value, 263804505);
-        assert_eq!(a.pow(196).value, 1889125610);
+        assert_eq!(a.pow(2).value(), 1651245630);
+        assert_eq!(a.pow(7).value(), 1787801728);
+        assert_eq!(a.pow(43).value(), 263804505);
+        assert_eq!(a.pow(196).value(), 1889125610);
     }
 
     #[test]

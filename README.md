@@ -88,6 +88,37 @@ cargo test --release
 
 is worth running locally before claiming a measurement.
 
+### Build configuration
+
+`.cargo/config.toml` sets an instruction-set floor of `x86-64-v3` — the Haswell/Excavator feature
+level, which brings AVX2, BMI2, FMA, LZCNT and MOVBE — for `x86_64` targets. `[profile.release]`
+in `Cargo.toml` turns on fat link-time optimization and a single codegen unit.
+
+Both exist for measurement. Field arithmetic is a handful of small generic functions called from
+inner loops in other modules, so without cross-codegen-unit inlining the elimination kernels pay a
+function call per field operation. A single codegen unit also makes benchmarks reproducible: with
+the default of 16, moving code between modules repartitions the crate and can shift a measurement
+for reasons unrelated to the change. The cost is build time.
+
+`x86-64-v3` rather than `native`: `native` makes a build artifact depend on the machine that
+produced it, so the same commit benchmarks differently on two machines. To measure with everything
+the local CPU has:
+
+```sh
+RUSTFLAGS="-C target-cpu=native" cargo bench
+```
+
+Note that `RUSTFLAGS` **replaces** the flags in `.cargo/config.toml` rather than adding to them —
+cargo takes the first source it finds and does not merge them. Repeat any flag that is still
+wanted. This is also why the CI workflow states `-C target-cpu=x86-64-v3` in its `RUSTFLAGS`
+alongside `-D warnings`: setting only the latter would silently drop the ISA floor and build CI at
+the baseline x86-64 level.
+
+**A consumer of this crate inherits none of this.** `.cargo/config.toml` applies only when cargo
+is invoked with this directory as the working directory, and profile settings come from the
+workspace being built. A downstream build gets whatever that build configures, so a dependent
+crate wanting these settings must set them itself.
+
 ### Benchmarks
 
 Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense and sparse linear
@@ -235,8 +266,31 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
 [`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md),
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md),
-[`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md), and
-[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md).
+[`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md),
+[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md), and
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md).
+
+## Finite Fields
+
+`PrimeFieldElement64<P>` holds elements in **Montgomery form** when `P` is odd, storing
+`a * 2^64 mod P` rather than `a`. This is an internal representation and is not observable through
+the public API: `value()`, `Display`, and the serialized form all give the canonical residue in
+`[0, P)`, and the serialized bytes are unchanged by it.
+
+The reason is that multiplication used to compute `(a as u128 * b as u128) % P as u128`. A
+const-generic modulus does not save that — LLVM does not strength-reduce a 128-bit remainder, so
+every field multiplication compiled to a call to `__umodti3`, compiler-rt's *software* 128-bit
+division. Montgomery reduction replaces the division with two multiplications and a shift.
+
+Two consequences worth knowing:
+
+- `value()` is a Montgomery reduction, not a field read. A hot loop should hold field elements and
+  convert at the boundary rather than call `value()` per iteration.
+- `P = 2` is supported and keeps the wide-remainder path, because `2^64` is not invertible modulo
+  an even number. The branch is on a const generic, so it is resolved at compile time.
+
+`PrimeFieldElement128<P>` still reduces a 256-bit product by software long division. It is not yet
+converted.
 
 ## Gröbner Bases
 
