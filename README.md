@@ -45,6 +45,20 @@ The Rust examples in this file are **compiled and run** by `cargo test --doc`, t
 `cfg(doctest)` item in `src/lib.rs`, so they cannot drift from the API they document. Blocks that
 are illustrative rather than executable are fenced `text`.
 
+CI runs the tests under [cargo-nextest](https://nexte.st) rather than the built-in harness, which
+gives a process per test instead of a thread per test: a test that aborts or segfaults is reported
+as that one test failing instead of taking the whole binary's results down with it. `--profile ci`
+comes from `.config/nextest.toml` and turns off fail-fast, so a run reports every failure rather
+than stopping at the first. `cargo test` remains fine for local use; to match CI exactly:
+
+```sh
+cargo install cargo-nextest --locked
+cargo nextest run --profile ci
+```
+
+Nextest cannot run doc examples — rustdoc owns that path — so `cargo test --doc` stays a separate
+step in every job that wants them.
+
 CI resolves its toolchain to `stable`, which moves. A clippy run that is clean on an older stable
 is therefore **not** evidence that CI is clean — new lints arrive with new releases, and one did
 during this project's history. `rustup update stable` before trusting a clean run, or name the
@@ -88,6 +102,27 @@ cargo test --release
 ```
 
 is worth running locally before claiming a measurement.
+
+A third job runs the benchmarks, on pushes to main and on manual dispatch only. The benchmark
+targets are declared `test = false`, which keeps them out of `cargo test`: a `[[bench]]` target
+defaults to `test = true`, so a bare `cargo test` linked all eight criterion binaries under fat
+LTO and executed all 455 cases. That took 168s of the 180s a warm `cargo test --release` spent,
+against 2.4s for the 968 tests and 8.9s for the doc examples. Smoke-testing the benchmarks is
+still worth doing — it catches one that panics rather than merely failing to compile — so it moved
+to its own job rather than being dropped:
+
+```sh
+cargo bench -- --test
+```
+
+`cargo bench -- --test` and not `cargo test --benches`, which now selects nothing and would pass
+vacuously. A benchmark that stops *compiling* still breaks the `cargo build --all-targets` step in
+the pull-request jobs.
+
+The suite is not sharded across parallel jobs. Warm in release the 968 tests take 2.4s and the two
+slow `#[ignore]`d systems take 43.7s, of which 43.4s is a single test that no partitioning can
+divide; a shard would pay a checkout, a toolchain, a cache restore and a fat-LTO release build to
+split seconds of test execution.
 
 ### Build configuration
 

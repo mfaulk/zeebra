@@ -1,0 +1,15 @@
+# The `ci` profile exists for one behavioral difference from the default: `fail-fast = false`.
+# A run that stops at the first failure hides how many tests a change actually broke, which is
+# the thing worth knowing when a Gröbner engine regresses and takes a dozen differential
+# fixtures with it.
+
+[profile.ci]
+fail-fast = false
+
+# Report-only: with no `terminate-after`, crossing the period logs a SLOW line and nothing else.
+# The two `#[ignore]`d systems take ~44s in release, so the threshold sits above them — a test
+# that crosses 120s has found a complexity blowup, not a slow machine.
+slow-timeout = "120s"
+
+[profile.ci.junit]
+path = "junit.xml"

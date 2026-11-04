@@ -7,6 +7,8 @@ on:
   # each one based on the previous, and a base-branch filter would leave all but the first
   # unchecked.
   pull_request:
+  # So the benchmark job, which pull requests skip, can be run against a branch on demand.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,6 +19,24 @@ env:
   # baseline x86-64 level while every local build used v3. The two must be kept in step.
   RUSTFLAGS: -D warnings -C target-cpu=x86-64-v3
 
+# The test suite runs under cargo-nextest rather than the built-in harness: a process per test
+# instead of a thread per test, so a test that aborts or segfaults is reported as that one test
+# failing instead of taking the whole binary's results with it. `--profile ci` comes from
+# `.config/nextest.toml` and sets `fail-fast = false`, so a run reports every failure.
+#
+# Nextest does not run doc examples — it has no way to, as rustdoc owns that path. Every job
+# that wants them therefore keeps a separate `cargo test --doc` step, which is the only
+# remaining use of the built-in harness. Dropping it would silently un-cover the thirteen
+# examples that `[lib] doctest = true` exists to run.
+#
+# The suite is not sharded, and `--partition` is deliberately absent. Measured warm in release:
+# 968 tests in 2.4s, 13 doc examples in 8.9s, and the two `#[ignore]`d systems in 43.7s — of
+# which 43.4s is a single test that no partitioning can divide. A shard costs a checkout, a
+# toolchain, a cache restore, and a release build under `lto = "fat"` with `codegen-units = 1`,
+# which is minutes, to split seconds of test execution. If the suite ever grows a long tail of
+# individually slow tests, add `--partition count:${{ matrix.shard }}/N` to the nextest step
+# over a `matrix.shard` of `[1, 2, ... N]`; until then it would make every job slower.
+
 jobs:
   test:
     name: Build and test
@@ -26,17 +46,18 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: taiki-e/install-action@nextest
+
       - uses: Swatinem/rust-cache@v2
 
+      # `--all-targets` covers the benchmarks, which `test = false` keeps out of the test run
+      # but which still have to compile.
       - name: Build
         run: cargo build --all-targets --verbose
 
       - name: Test
-        run: cargo test --verbose
+        run: cargo nextest run --profile ci
 
-      # These were disabled by `[lib] doctest = false`, which made this job green and vacuous:
-      # the crate had no executable doc examples at all. It now runs six — the README's five
-      # public-API examples, via the `cfg(doctest)` item in `lib.rs`, plus `F4Options`.
       - name: Doc tests
         run: cargo test --doc --verbose
 
@@ -48,6 +69,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: taiki-e/install-action@nextest
+
       - uses: Swatinem/rust-cache@v2
 
       # The whole suite in release, not only the slow tests. `debug-assertions` and
@@ -56,16 +79,43 @@ jobs:
       # used to wrap rather than panic on exponent overflow, which the debug job could not see.
       # Release is also the configuration every benchmark and measurement uses.
       - name: Test (release)
-        run: cargo test --release --verbose
+        run: cargo nextest run --profile ci --release
 
-      # The `#[ignore]`d tests that are real but slow, named individually: a bare `--ignored`
-      # would also pick up the four `unimplemented!()` placeholders, which panic by design.
-      # Release mode is required — the naive reference engine is impractical in a debug build.
+      - name: Doc tests (release)
+        run: cargo test --release --doc --verbose
+
+      # The `#[ignore]`d tests that are real but slow, named individually: a bare
+      # `--run-ignored=only` would also pick up the four `unimplemented!()` placeholders, which
+      # panic by design. `test(=...)` is an exact match, so a renamed test fails the filter
+      # rather than silently matching nothing. Release mode is required — the naive reference
+      # engine is impractical in a debug build.
       - name: Gröbner engines agree on the slow systems
         run: |
-          cargo test --release --lib -- --ignored --exact \
-            grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems \
-            grobner::f4::tests::test_f4_on_larger_systems
+          cargo nextest run --profile ci --release --lib --run-ignored=only \
+            -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
+
+  bench-smoke:
+    name: Benchmarks run
+    # Pushes to main and manual runs only. Criterion's `--test` mode executes all 455 benchmark
+    # cases once each, which is ~40s warm on a fast machine and several minutes on a shared
+    # runner. That is worth paying after a merge, where latency does not block anything, and not
+    # on every pull request. A benchmark that stops *compiling* still breaks the `--all-targets`
+    # build in the jobs above, on every pull request; this job is what catches one that compiles
+    # and then panics.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # `cargo bench -- --test`, not `cargo test --benches`: with `test = false` on the benchmark
+      # targets the latter now selects nothing and would pass vacuously. This runs each case once
+      # and takes no measurements.
+      - name: Benchmarks execute without panicking
+        run: cargo bench -- --test
 
   format:
     name: Format

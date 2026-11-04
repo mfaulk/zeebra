@@ -32,37 +32,58 @@ serde_arrays = "0.1.0"
 bincode = "1.3.3"
 criterion = { version = "0.5", features = ["html_reports"] }
 
+# `test = false` on every benchmark, for CI wall-clock. A `[[bench]]` target defaults to `test =
+# true`, so a bare `cargo test` builds each criterion binary and runs it with `--test`, which
+# executes every benchmark once. That smoke test is worth having — it catches a benchmark that
+# panics rather than merely failing to compile — but it is not a test of the library, and it
+# dominated the suite. Measured warm in release: `cargo test --release` took 180s before this
+# change and 11.6s after, against 2.4s for the 968 tests and 8.9s for the 13 doc examples. The
+# ~168s was the eight benchmarks, split between linking them under `lto = "fat"` with
+# `codegen-units = 1` — eight whole-crate LTO links — and executing 455 cases. It is now a
+# separate CI job running `cargo bench -- --test` on pushes to main, off the pull-request path.
+#
+# `--all-targets` still builds these, so a benchmark that stops compiling still breaks every job
+# that uses it; `test = false` governs only whether `cargo test` runs them.
+
 [[bench]]
 name = "field_arithmetic"
 harness = false
+test = false
 
 [[bench]]
 name = "sparse_polynomial"
 harness = false
+test = false
 
 [[bench]]
 name = "linear_algebra"
 harness = false
+test = false
 
 [[bench]]
 name = "sparse_linear_algebra"
 harness = false
+test = false
 
 [[bench]]
 name = "grobner"
 harness = false
+test = false
 
 [[bench]]
 name = "f4_stages"
 harness = false
+test = false
 
 [[bench]]
 name = "fglm"
 harness = false
+test = false
 
 [[bench]]
 name = "polynomial_solving"
 harness = false
+test = false
 
 # Field arithmetic is a handful of small generic functions — `mul`, `add`, `is_zero` — called from
 # inner loops in other modules. Without cross-codegen-unit inlining the elimination kernels pay a
