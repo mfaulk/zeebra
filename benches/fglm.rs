@@ -1,6 +1,6 @@
 //! Monomial-order conversion: the FGLM pipeline against a direct lexicographic basis.
 //!
-//! Four groups, answering four different questions.
+//! Five groups, answering five different questions.
 //!
 //! `stages` times the conversion's parts separately — standard monomial enumeration, quotient
 //! algebra construction, and the whole conversion — on a source basis computed outside the timed
@@ -14,6 +14,10 @@
 //! `operator_construction` times each `OperatorConstruction` strategy against the others, on one
 //! prepared source basis, having first asserted outside the timed region that they build the same
 //! operators. It is where M18-1's claim is kept honest.
+//!
+//! `operator_storage` times operator *application* under each `OperatorStorage`, on a unit input
+//! and on a dense one. Storage itself is exact and needs no benchmark; what needs one is whether a
+//! representation that halves the memory also slows the thing the conversion does `O(D)` times.
 //!
 //! `verification` times `is_grobner_basis`, which is what `fglm_to_lex_checked` adds over
 //! `fglm_to_lex`. It is in its own group because it is not part of either pipeline — it is the
@@ -32,7 +36,7 @@ use zeebra::{
         f4,
         fglm::{
             fglm_to_lex, fglm_to_lex_with_options, is_grobner_basis, FglmOptions,
-            OperatorConstruction, QuotientAlgebra, QuotientBasis,
+            OperatorConstruction, OperatorStorage, QuotientAlgebra, QuotientBasis,
         },
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -173,6 +177,83 @@ fn bench_operator_construction<const N: usize>(
     group.finish();
 }
 
+/// Each operator-storage strategy, stored and applied.
+///
+/// Storage is exact and needs no benchmark; what needs one is the *application*, because a
+/// representation that halves the memory and slows the thing the conversion does `O(D)` times may
+/// not be worth having. Timed on two inputs: a unit vector, as the lex walk starts with, and a
+/// vector with every coordinate nonzero, as it ends with. The sparse path skips a zero input
+/// coordinate and the dense path still walks `D` cells, so the two inputs need not agree.
+fn bench_operator_storage<const N: usize>(
+    c: &mut Criterion,
+    name: &str,
+    system: &[MultivariatePolynomial<N, F>],
+) {
+    let source = f4(system, SOURCE).expect("within limits");
+
+    let algebras: Vec<(OperatorStorage, QuotientAlgebra<N, F>)> = [
+        OperatorStorage::Sparse,
+        OperatorStorage::Adaptive,
+        OperatorStorage::Dense,
+    ]
+    .into_iter()
+    .map(|storage| {
+        let algebra = QuotientAlgebra::new(
+            &source,
+            SOURCE,
+            &FglmOptions::unbounded().with_operator_storage(storage),
+        )
+        .expect("finite");
+        (storage, algebra)
+    })
+    .collect();
+
+    // Equality outside the timed region: the representations differ, so the *values* differ, and
+    // what must agree is every column.
+    let d = algebras[0].1.dimension();
+    for (storage, algebra) in &algebras[1..] {
+        for i in 0..N {
+            for j in 0..d {
+                assert_eq!(
+                    algebra.operator(i).column(j),
+                    algebras[0].1.operator(i).column(j),
+                    "{}: {:?} disagrees on column {} of T_{}",
+                    name,
+                    storage,
+                    j,
+                    i
+                );
+            }
+        }
+    }
+
+    let unit = algebras[0].1.one();
+    let full: Vec<F> = (0..d).map(|j| F::new(j as u64 + 1)).collect();
+
+    let mut group = c.benchmark_group("fglm_operator_application");
+    for (storage, algebra) in &algebras {
+        let label = match storage {
+            OperatorStorage::Sparse => "sparse",
+            OperatorStorage::Adaptive => "adaptive",
+            OperatorStorage::Dense => "dense",
+        };
+        for (input, vector) in [("unit", &unit), ("full", &full)] {
+            group.bench_with_input(
+                BenchmarkId::new(format!("{}_{}", label, input), name),
+                vector,
+                |b, v| {
+                    b.iter(|| {
+                        for i in 0..N {
+                            black_box(algebra.operator(i).apply(black_box(v)));
+                        }
+                    })
+                },
+            );
+        }
+    }
+    group.finish();
+}
+
 /// The price of `fglm_to_lex_checked` over `fglm_to_lex`.
 fn bench_verification<const N: usize>(
     c: &mut Criterion,
@@ -234,6 +315,14 @@ fn operator_construction(c: &mut Criterion) {
     bench_operator_construction(c, "planted-8", &planted::<8, F>(&planted_point::<8>()));
 }
 
+/// The systems the storage ablation runs on: one family on each side of the half-fill crossover.
+fn operator_storage(c: &mut Criterion) {
+    bench_operator_storage(c, "katsura-6", &katsura::<6, F>());
+    bench_operator_storage(c, "katsura-7", &katsura::<7, F>());
+    bench_operator_storage(c, "cyclic-6", &cyclic::<6, F>());
+    bench_operator_storage(c, "planted-8", &planted::<8, F>(&planted_point::<8>()));
+}
+
 fn verification(c: &mut Criterion) {
     bench_verification(c, "cyclic-5", &cyclic::<5, F>());
     bench_verification(c, "cyclic-6", &cyclic::<6, F>());
@@ -242,5 +331,12 @@ fn verification(c: &mut Criterion) {
     bench_verification(c, "katsura-7", &katsura::<7, F>());
 }
 
-criterion_group!(fglm, stages, pipeline, operator_construction, verification);
+criterion_group!(
+    fglm,
+    stages,
+    pipeline,
+    operator_construction,
+    operator_storage,
+    verification
+);
 criterion_main!(fglm);

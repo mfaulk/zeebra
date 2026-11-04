@@ -132,8 +132,23 @@ pub struct FglmMemory {
     /// What [`max_operator_entries`](super::FglmOptions::max_operator_entries) is enforced on.
     pub operator_entries: usize,
 
+    /// Field-element cells the operators' columns allocate, zero or not.
+    ///
+    /// Equals [`Self::operator_entries`] while every reduced column is sparse, and exceeds it
+    /// wherever one is dense: a dense column allocates `D` cells for however many nonzeros it has.
+    /// The gap is what [`OperatorStorage`](super::OperatorStorage) trades away in exchange for not
+    /// storing an index per entry.
+    pub operator_cells: usize,
+
     /// Bytes the operators' representations occupy, as the representations themselves report.
+    ///
+    /// What [`max_operator_bytes`](super::FglmOptions::max_operator_bytes) is enforced on, plus the
+    /// `N * D` column spine, which that budget does not count because it is a function of the
+    /// dimension alone.
     pub operator_bytes: usize,
+
+    /// Of the `N * D` columns, how many are held densely.
+    pub dense_columns: usize,
 
     /// Field-element cells the dependence test's echelon rows hold: `2 * D^2` at full rank.
     ///

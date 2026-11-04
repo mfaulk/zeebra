@@ -20,7 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction};
+use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction, OperatorStorage};
 
 use zeebra::grobner::differential::{
     check::{SUPPORTED_CHARACTERISTICS, SUPPORTED_VARIABLES},
@@ -59,6 +59,7 @@ OPTIONS
     --timeout <seconds>      Per-system Singular time limit. Default: 30
     --operator-construction <s>
                              per-column | deduplicated-border. Default: per-column
+    --operator-storage <s>   sparse | adaptive | dense. Default: sparse
     --minimize-attempts <n>  Shrink candidates per failing system, 0 to disable. Default: 40
     --minimize-seconds <s>   Wall-clock for shrinking one failing system. Default: 20
     --fixtures <path>        Write the agreeing cases as a Rust fixture module.
@@ -124,8 +125,8 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
         arguments.sweep.max_terms
     );
     println!(
-        "# operator construction: {:?}",
-        arguments.sweep.fglm.operator_construction
+        "# operator construction: {:?}, storage: {:?}",
+        arguments.sweep.fglm.operator_construction, arguments.sweep.fglm.operator_storage
     );
     println!("# scratch in {}", oracle.work_dir().display());
     println!();
@@ -331,6 +332,21 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
             "--max-degree" => sweep.max_degree = number(&value()?, flag)?,
             "--max-terms" => sweep.max_terms = number(&value()?, flag)?,
             "--timeout" => timeout = Duration::from_secs(number(&value()?, flag)?),
+            "--operator-storage" => {
+                let name = value()?;
+                sweep.fglm.operator_storage = match name.as_str() {
+                    "sparse" => OperatorStorage::Sparse,
+                    "adaptive" => OperatorStorage::Adaptive,
+                    "dense" => OperatorStorage::Dense,
+                    other => {
+                        return Err(format!(
+                            "{:?} is not an operator-storage strategy; use sparse, adaptive or \
+                             dense",
+                            other
+                        ))
+                    }
+                };
+            }
             "--operator-construction" => {
                 let name = value()?;
                 sweep.fglm.operator_construction = match name.as_str() {

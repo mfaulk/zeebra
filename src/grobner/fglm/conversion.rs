@@ -121,7 +121,9 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     statistics.timings = quotient_statistics.timings;
     statistics.operator_entries = algebra.operator_entries();
     statistics.memory.operator_entries = statistics.operator_entries;
+    statistics.memory.operator_cells = algebra.operator_cells();
     statistics.memory.operator_bytes = algebra.operator_bytes();
+    statistics.memory.dense_columns = algebra.dense_columns();
 
     // The span's two blocks are `2 * D^2` entries. Checked before allocating, since the size is a
     // function of the dimension alone — not discovered as it fills.
@@ -296,7 +298,9 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             buchberger, buchberger_with_criteria, f4,
-            fglm::{FglmError, FglmOptions, FglmStageTimings, OperatorConstruction},
+            fglm::{
+                FglmError, FglmOptions, FglmStageTimings, OperatorConstruction, OperatorStorage,
+            },
             reference::buchberger_reference,
             PairCriteria,
         },
@@ -847,9 +851,14 @@ mod tests {
     /// narrower check.
     #[test]
     fn test_every_strategy_converts_to_the_same_basis() {
-        const STRATEGIES: [OperatorConstruction; 2] = [
+        const CONSTRUCTIONS: [OperatorConstruction; 2] = [
             OperatorConstruction::PerColumn,
             OperatorConstruction::DeduplicatedBorder,
+        ];
+        const STORAGES: [OperatorStorage; 3] = [
+            OperatorStorage::Sparse,
+            OperatorStorage::Adaptive,
+            OperatorStorage::Dense,
         ];
 
         fn check<const N: usize, const P: u64>(
@@ -858,20 +867,28 @@ mod tests {
             source_order: MonomialOrder,
         ) {
             let source = f4(system, source_order).expect("within limits");
+
+            // The cross product, not one axis at a time: a construction strategy and a storage
+            // strategy could each be right alone and wrong together.
             let mut answers = Vec::new();
-            for strategy in STRATEGIES {
-                let options = FglmOptions::unbounded().with_operator_construction(strategy);
-                let (basis, statistics) =
-                    fglm_to_lex_with_options(&source, source_order, &options).expect("convertible");
-                answers.push((strategy, basis, statistics));
+            for construction in CONSTRUCTIONS {
+                for storage in STORAGES {
+                    let options = FglmOptions::unbounded()
+                        .with_operator_construction(construction)
+                        .with_operator_storage(storage);
+                    let (basis, statistics) =
+                        fglm_to_lex_with_options(&source, source_order, &options)
+                            .expect("convertible");
+                    answers.push(((construction, storage), basis, statistics));
+                }
             }
 
             let (_, reference, reference_statistics) = &answers[0];
             for (strategy, basis, statistics) in &answers[1..] {
                 assert_eq!(
                     basis, reference,
-                    "{} over GF({}) under {:?}: {:?} disagrees with {:?}",
-                    name, P, source_order, strategy, STRATEGIES[0]
+                    "{} over GF({}) under {:?}: {:?} disagrees with the reference",
+                    name, P, source_order, strategy
                 );
                 // The conversion downstream of the operators must be identical too, not merely
                 // arrive at the same answer by a different route.
@@ -880,9 +897,11 @@ mod tests {
                     "{} over GF({}): {:?} did different linear algebra",
                     name, P, strategy
                 );
+                // Nonzeros, which no strategy may change. Cells and bytes are expected to differ,
+                // and are compared in `quotient_algebra.rs` instead.
                 assert_eq!(
                     statistics.operator_entries, reference_statistics.operator_entries,
-                    "{} over GF({}): {:?} stored a different amount",
+                    "{} over GF({}): {:?} found a different number of nonzeros",
                     name, P, strategy
                 );
             }

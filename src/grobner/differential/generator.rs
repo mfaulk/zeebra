@@ -85,57 +85,60 @@ impl GeneratedSystem {
     /// A pseudorandom system, determined entirely by `seed`, `shape` and `characteristic`.
     ///
     /// The draws are taken in a fixed order that does not depend on the characteristic, so two
-    /// primes give the same exponents and the same term count for a seed. Only the coefficients
-    /// differ, and only because they are reduced into the field.
+    /// primes draw the same monomials and the same term count for a seed — see
+    /// [`Self::drawn_monomials`]. The *generated* monomials can still differ between primes,
+    /// because two terms on one monomial are merged and their coefficients can cancel modulo one
+    /// characteristic and not another.
     ///
     /// # Panics
     /// If `characteristic` is below 2, or `shape.variables` is zero, or `shape.max_terms` is zero.
     pub fn generate(seed: u64, shape: SystemShape, characteristic: u64) -> Self {
         assert!(characteristic >= 2, "a field has at least two elements");
-        assert!(shape.variables > 0, "a system has at least one variable");
-        assert!(shape.max_terms > 0, "a polynomial has at least one term");
 
-        let mut rng = StdRng::seed_from_u64(seed);
-        let variables: Vec<String> = (1..=shape.variables).map(|i| format!("x{}", i)).collect();
-
-        let mut polynomials = Vec::with_capacity(shape.variables);
-        for _ in 0..shape.variables {
-            let terms = rng.gen_range(1..=shape.max_terms);
-            let mut polynomial: Vec<GeneratedTerm> = Vec::with_capacity(terms);
-            for _ in 0..terms {
-                // Degree first, then distributed over the variables: drawing each exponent
-                // independently and rejecting what overshoots would make the number of draws
-                // depend on the rejections, and so on the seed in a way that is hard to reason
-                // about when minimizing.
-                let degree = rng.gen_range(0..=shape.max_degree);
-                let mut exponents = vec![0u32; shape.variables];
-                for _ in 0..degree {
-                    let variable = rng.gen_range(0..shape.variables);
-                    exponents[variable] += 1;
-                }
-
-                // One fixed-width draw and then a reduction, rather than `gen_range`: a range's
-                // rejection sampling consumes a number of bytes that depends on the range, which
-                // would make the *monomials* downstream of it depend on the characteristic. The
-                // resulting modulo bias is of no consequence to a test input.
-                //
-                // Never zero: a zero coefficient is an absent term, and a generator that silently
-                // has fewer terms than the draw said makes minimization harder to interpret.
-                let coefficient = 1 + rng.gen::<u64>() % (characteristic - 1);
-                polynomial.push(GeneratedTerm {
-                    exponents,
-                    coefficient,
-                });
-            }
-            polynomials.push(polynomial);
-        }
+        let polynomials = draw(seed, shape)
+            .into_iter()
+            .map(|polynomial| {
+                let reduced: Vec<GeneratedTerm> = polynomial
+                    .into_iter()
+                    .map(|(exponents, coefficient)| GeneratedTerm {
+                        exponents,
+                        // Never zero: a zero coefficient is an absent term, and a generator that
+                        // silently has fewer terms than the draw said makes minimization harder to
+                        // interpret.
+                        coefficient: 1 + coefficient % (characteristic - 1),
+                    })
+                    .collect();
+                merge(reduced, characteristic)
+            })
+            .collect();
 
         Self {
             seed,
             characteristic,
-            variables,
+            variables: (1..=shape.variables).map(|i| format!("x{}", i)).collect(),
             polynomials,
         }
+    }
+
+    /// The monomials a seed and a shape draw, before any field is chosen.
+    ///
+    /// Takes no characteristic, which is the point: it is what makes "this ideal has the same
+    /// quotient dimension over GF(13) and over GF(2^31 - 1)" a statement about one system. A
+    /// generated polynomial's monomials are these with the merged-and-cancelled ones removed, so
+    /// they are a sub-multiset of these and nothing more can be said without the characteristic.
+    ///
+    /// # Panics
+    /// As [`Self::generate`], for the shape.
+    pub fn drawn_monomials(seed: u64, shape: SystemShape) -> Vec<Vec<Vec<u32>>> {
+        draw(seed, shape)
+            .into_iter()
+            .map(|polynomial| {
+                polynomial
+                    .into_iter()
+                    .map(|(exponents, _)| exponents)
+                    .collect()
+            })
+            .collect()
     }
 
     /// The variable names, as the slices both parsers want.
@@ -161,6 +164,18 @@ impl GeneratedSystem {
                     .join("+")
             })
             .collect()
+    }
+
+    /// Whether every generator has distinct monomials, i.e. is canonical.
+    ///
+    /// The invariant [`Self::generate`] establishes and minimization preserves, since every shrink
+    /// removes or lowers something rather than adding a monomial.
+    pub fn is_canonical(&self) -> bool {
+        self.polynomials.iter().all(|polynomial| {
+            let distinct: std::collections::HashSet<&Vec<u32>> =
+                polynomial.iter().map(|term| &term.exponents).collect();
+            distinct.len() == polynomial.len()
+        })
     }
 
     /// A stable name for this system, for reports and fixture files.
@@ -189,9 +204,78 @@ impl GeneratedSystem {
     }
 }
 
+/// The raw draws for a seed and a shape: exponents, and an unreduced `u64` per coefficient.
+///
+/// The one place the random stream is consumed, so that [`GeneratedSystem::generate`] and
+/// [`GeneratedSystem::drawn_monomials`] cannot drift. The coefficient draw is fixed-width on
+/// purpose: `gen_range` rejection-samples, consuming a number of bytes that depends on the range,
+/// which would make every monomial drawn *after* it depend on the characteristic.
+///
+/// # Panics
+/// If `shape.variables` is zero, or `shape.max_terms` is zero.
+fn draw(seed: u64, shape: SystemShape) -> Vec<Vec<(Vec<u32>, u64)>> {
+    assert!(shape.variables > 0, "a system has at least one variable");
+    assert!(shape.max_terms > 0, "a polynomial has at least one term");
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut polynomials = Vec::with_capacity(shape.variables);
+
+    for _ in 0..shape.variables {
+        let terms = rng.gen_range(1..=shape.max_terms);
+        let mut polynomial: Vec<(Vec<u32>, u64)> = Vec::with_capacity(terms);
+        for _ in 0..terms {
+            // Degree first, then distributed over the variables: drawing each exponent
+            // independently and rejecting what overshoots would make the number of draws depend on
+            // the rejections, and so on the seed in a way that is hard to reason about when
+            // minimizing.
+            let degree = rng.gen_range(0..=shape.max_degree);
+            let mut exponents = vec![0u32; shape.variables];
+            for _ in 0..degree {
+                let variable = rng.gen_range(0..shape.variables);
+                exponents[variable] += 1;
+            }
+            polynomial.push((exponents, rng.gen::<u64>()));
+        }
+        polynomials.push(polynomial);
+    }
+
+    polynomials
+}
+
+/// Terms with the same monomial summed, in first-occurrence order, zeros dropped.
+///
+/// **Not cosmetic.** Two terms on the same monomial are two integer literals in the text, and
+/// Singular sums bare integer literals in 32-bit arithmetic before coercing them into the ring: at
+/// `p = 2^31 - 1`, `1870573936+1536614746+x1` reads back as `x1-887778614` where the ring sum is
+/// `x1-887778612`. Zeebra's parser merges the terms and gets the second. So an unmerged polynomial
+/// is a *different ideal* on the two sides, through no fault of either implementation.
+///
+/// Found by the harness itself, on seed 55770 over GF(2^31 - 1). The oracle-input check in
+/// [`comparison`](super::comparison) is the belt to this brace — it verifies that Singular read the
+/// system it was sent rather than trusting that it did.
+fn merge(terms: Vec<GeneratedTerm>, characteristic: u64) -> Vec<GeneratedTerm> {
+    let mut merged: Vec<GeneratedTerm> = Vec::with_capacity(terms.len());
+    for term in terms {
+        match merged
+            .iter_mut()
+            .find(|existing| existing.exponents == term.exponents)
+        {
+            // Both coefficients are below the characteristic, so the sum is below twice it and
+            // cannot overflow a `u64` for any characteristic this crate's prime fields accept.
+            Some(existing) => {
+                existing.coefficient = (existing.coefficient + term.coefficient) % characteristic
+            }
+            None => merged.push(term),
+        }
+    }
+    // A merge can cancel a monomial out entirely, and a zero coefficient is an absent term.
+    merged.retain(|term| term.coefficient != 0);
+    merged
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{GeneratedSystem, GeneratedTerm, SystemShape};
+    use super::{merge, GeneratedSystem, GeneratedTerm, SystemShape};
     use crate::{
         fields::{Zp13, Zp2147483647},
         MultivariatePolynomial,
@@ -226,23 +310,78 @@ mod tests {
         );
     }
 
-    /// Changing the characteristic changes only the coefficients, not the monomials.
+    /// The monomials a seed draws do not depend on the characteristic.
     ///
-    /// The property that makes a cross-field comparison a statement about one system.
+    /// The property that makes a cross-field comparison a statement about one system. Stated on the
+    /// *draws* rather than on the generated polynomials, because merging can cancel a monomial
+    /// modulo one characteristic and not another — which the next test shows really happens.
     #[test]
-    fn test_the_monomials_do_not_depend_on_the_characteristic() {
-        for seed in 0..32 {
-            let small = GeneratedSystem::generate(seed, SHAPE, 13);
-            let large = GeneratedSystem::generate(seed, SHAPE, 2147483647);
-            assert_eq!(small.variables, large.variables);
-            let exponents = |s: &GeneratedSystem| -> Vec<Vec<Vec<u32>>> {
-                s.polynomials
-                    .iter()
-                    .map(|p| p.iter().map(|t| t.exponents.clone()).collect())
-                    .collect()
-            };
-            assert_eq!(exponents(&small), exponents(&large), "seed {}", seed);
+    fn test_the_drawn_monomials_do_not_depend_on_the_characteristic() {
+        for seed in 0..64 {
+            let drawn = GeneratedSystem::drawn_monomials(seed, SHAPE);
+            for characteristic in [2u64, 3, 7, 13, 65537, 2147483647] {
+                let system = GeneratedSystem::generate(seed, SHAPE, characteristic);
+
+                // Every generated monomial was drawn, and nothing was drawn twice that is not
+                // merged: so the generated monomials are the drawn ones less the cancellations.
+                for (generated, drawn) in system.polynomials.iter().zip(&drawn) {
+                    for term in generated {
+                        assert!(
+                            drawn.contains(&term.exponents),
+                            "seed {} over GF({}): {:?} was not drawn",
+                            seed,
+                            characteristic,
+                            term.exponents
+                        );
+                    }
+                    assert!(
+                        generated.len() <= drawn.len(),
+                        "seed {} over GF({}): more terms than were drawn",
+                        seed,
+                        characteristic
+                    );
+                }
+            }
         }
+    }
+
+    /// Merging really does cancel at a small characteristic and not at a large one.
+    ///
+    /// Asserted so that the weaker claim above is known to be the strongest one available, rather
+    /// than a hedge against something that never happens. Over GF(2) two draws on one monomial
+    /// cancel half the time; over GF(2^31 - 1) it takes a one-in-two-billion coincidence.
+    #[test]
+    fn test_cancellation_depends_on_the_characteristic() {
+        // Distinct drawn monomials, not drawn terms: merging two terms on one monomial reduces the
+        // count at every characteristic, and what varies is only whether the merged coefficient is
+        // zero. Counting raw terms would measure the merging and call it cancellation.
+        let cancelled = |characteristic: u64| -> usize {
+            (0..256)
+                .map(|seed| {
+                    let distinct: usize = GeneratedSystem::drawn_monomials(seed, SHAPE)
+                        .iter()
+                        .map(|polynomial| {
+                            polynomial
+                                .iter()
+                                .collect::<std::collections::HashSet<&Vec<u32>>>()
+                                .len()
+                        })
+                        .sum();
+                    let generated = GeneratedSystem::generate(seed, SHAPE, characteristic).terms();
+                    distinct - generated
+                })
+                .sum()
+        };
+
+        assert!(
+            cancelled(2) > 0,
+            "no draw cancelled over GF(2), so the weaker claim is untested"
+        );
+        assert_eq!(
+            cancelled(2147483647),
+            0,
+            "a coincidence modulo 2^31 - 1 would be remarkable"
+        );
     }
 
     /// Every coefficient is a nonzero residue, so no term is secretly absent.
@@ -362,5 +501,92 @@ mod tests {
         for term in system.polynomials.iter().flatten() {
             assert_eq!(term.coefficient, 1);
         }
+    }
+
+    /// Every generated polynomial has distinct monomials.
+    ///
+    /// Not a tidiness property. Two terms on one monomial are two integer literals in the text, and
+    /// Singular sums bare literals in 32-bit arithmetic before coercing them into the ring — so at
+    /// `p = 2^31 - 1` an unmerged polynomial is a different ideal on the two sides. See `merge`.
+    #[test]
+    fn test_every_generated_polynomial_is_canonical() {
+        for characteristic in [2u64, 3, 7, 13, 65537, 2147483647] {
+            for seed in 0..64 {
+                let system = GeneratedSystem::generate(seed, SHAPE, characteristic);
+                assert!(
+                    system.is_canonical(),
+                    "seed {} over GF({}) has a repeated monomial: {:?}",
+                    seed,
+                    characteristic,
+                    system.render()
+                );
+            }
+        }
+    }
+
+    /// Merging sums coefficients on a shared monomial, in first-occurrence order.
+    #[test]
+    fn test_merging_sums_a_shared_monomial() {
+        let terms = vec![
+            GeneratedTerm {
+                exponents: vec![1, 0],
+                coefficient: 3,
+            },
+            GeneratedTerm {
+                exponents: vec![0, 0],
+                coefficient: 5,
+            },
+            GeneratedTerm {
+                exponents: vec![1, 0],
+                coefficient: 4,
+            },
+        ];
+        let merged = merge(terms, 13);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].exponents, vec![1, 0]);
+        assert_eq!(merged[0].coefficient, 7);
+        assert_eq!(merged[1].exponents, vec![0, 0]);
+        assert_eq!(merged[1].coefficient, 5);
+    }
+
+    /// A merge that cancels drops the term rather than leaving a zero coefficient.
+    #[test]
+    fn test_merging_drops_a_cancelled_term() {
+        let terms = vec![
+            GeneratedTerm {
+                exponents: vec![1, 0],
+                coefficient: 6,
+            },
+            GeneratedTerm {
+                exponents: vec![1, 0],
+                coefficient: 7,
+            },
+        ];
+        assert!(merge(terms, 13).is_empty());
+    }
+
+    /// The reconstruction a minimized failure's name implies still produces a canonical system.
+    ///
+    /// Shrinking only removes or lowers, so it cannot create a repeated monomial — but lowering an
+    /// exponent *can* make two terms share one, which is the one case worth checking.
+    #[test]
+    fn test_lowering_an_exponent_can_collide_and_is_not_merged() {
+        // Deliberate, and documented rather than fixed: a shrunk system is no longer canonical, and
+        // the oracle-input check is what protects a comparison made on one. The generator's
+        // guarantee is about what it generates.
+        let mut system = GeneratedSystem::generate(3, SHAPE, 13);
+        system.polynomials[0] = vec![
+            GeneratedTerm {
+                exponents: vec![2, 0, 0],
+                coefficient: 1,
+            },
+            GeneratedTerm {
+                exponents: vec![1, 0, 0],
+                coefficient: 1,
+            },
+        ];
+        assert!(system.is_canonical());
+        system.polynomials[0][0].exponents[0] -= 1;
+        assert!(!system.is_canonical());
     }
 }

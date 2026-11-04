@@ -23,6 +23,13 @@ pub enum FglmError {
     /// after each column is built, so the overshoot is bounded by a single column.
     OperatorStorageExceeded { entries: usize, limit: usize },
 
+    /// The multiplication operators' columns needed more bytes than the limit allowed.
+    ///
+    /// Distinct from [`Self::OperatorStorageExceeded`], which counts mathematical nonzeros. The two
+    /// diverge once a column is held densely: the same nonzeros then occupy `D` cells. Carries the
+    /// count as well as the limit, bounded by one column's overshoot for the same reason.
+    OperatorBytesExceeded { bytes: usize, limit: usize },
+
     /// The dependence test needed more entries than the limit allowed.
     ///
     /// Carries the count, which is known from `D` before anything is allocated.
@@ -54,6 +61,11 @@ impl Display for FglmError {
                 f,
                 "the multiplication operators needed {} entries, over the limit of {}",
                 entries, limit
+            ),
+            Self::OperatorBytesExceeded { bytes, limit } => write!(
+                f,
+                "the multiplication operators needed {} bytes, over the limit of {}",
+                bytes, limit
             ),
             Self::SpanStorageExceeded { entries, limit } => write!(
                 f,

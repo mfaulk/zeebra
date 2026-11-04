@@ -1,6 +1,6 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
-**Status:** in progress — M18-0 and M18-1 complete
+**Status:** in progress — M18-0, M18-1 and M18-3 complete
 **Prerequisite:** M17, merged at `7c2fef7`
 **Objective:** make quotient-algebra construction faster and FGLM's memory smaller, without
 changing a single answer
@@ -26,7 +26,7 @@ pipeline first, then investigate whether its scaling limit can be surpassed at a
 | M18-0 | profiling baseline, and differential testing against Singular | **complete** |
 | M18-1 | border indexing, and deduplicated normal forms | **complete** |
 | M18-2 | batched border reduction | not started |
-| M18-3 | adaptive sparse/dense multiplication operators | not started |
+| M18-3 | adaptive sparse/dense multiplication operators | **complete** |
 | M18-4 | incremental-span memory, and a sparse-FGLM feasibility spike | not started |
 | M18-5 | integration, ablations, and this document's conclusion | not started |
 
@@ -35,6 +35,10 @@ because none of them may be merged without evidence that it changed no answer.
 
 **M18-1's result:** katsura-7's conversion from **39.0 ms to 27.7 ms**, cyclic-6's from 27.8 ms to
 19.3 ms, nothing regressed, and no answer changed. §5.
+
+**M18-3's result:** katsura-7's operators from **264.5 kB to 163.6 kB** and planted-10's from
+640.0 kB to **380.0 kB**, by two unrelated changes — an adaptive per-column representation and an
+exact one. §6.
 
 ---
 
@@ -197,7 +201,7 @@ plus the F4 computations that produced their inputs — which is a ceiling on al
 attribution to any one conversion.
 
 **`operator_bytes` is not `entries * 16`, and on the planted family it is not close.** Broken down
-(`size_of::<Column<F>>()` is 24, `size_of::<(usize, F)>()` is 16):
+(`size_of::<Column<F>>()` was 24 at the time of this measurement, `size_of::<(usize, F)>()` is 16):
 
 | system | total bytes | entries | column spine | spare `Vec` capacity |
 |---|---:|---:|---:|---:|
@@ -214,6 +218,10 @@ dense alternative is not obviously worse here: a dense column of `D = 1024` elem
 against the 64 bytes a one-entry sparse column actually costs, so on this family sparse wins
 decisively even at four times the slots it needs — but the comparison has to be made against the
 real figure, not against `entries * 16`.
+
+**This table is the M17 representation and M18-3 changed it.** The slack is gone — planted-10's
+operators are 380 kB rather than 640 — and the operator figures in §3.5 are therefore a record of
+what the baseline was, not of what the code does now. §6.1 has the before and after.
 
 **There are three dense blocks, and M17's accounting counted two.** The span holds a coordinate
 vector and a combination vector per echelon row; the conversion *additionally* retains every
@@ -243,6 +251,7 @@ it alone is more useful than reporting all of them.
 
 | check | Zeebra | Singular |
 |---|---|---|
+| oracle input | the system as sent | the ideal echoed back before anything is computed |
 | source basis | `f4` under grevlex | `std` in a `dp` ring |
 | quotient dimension | `QuotientBasis` | `vdim` |
 | standard monomials | `QuotientBasis::monomials` | `kbase` |
@@ -281,6 +290,11 @@ Each was verified before being relied on, not assumed:
 * Each list element is printed on its own marked line. Printing a whole ideal at once would need
   splitting on a separator, and `printf("%s", ideal)` prints `0` for the *empty* ideal — so a
   reported size is also checked against the number of lines, which makes emptiness unambiguous.
+* An integer literal in a `poly` expression must stand alone: Singular sums bare literals in
+  32-bit arithmetic before coercing them into the ring, so two constant terms are a different
+  polynomial on the two sides. §4.6.
+* A list is iterated by `ncols` and not `size`: those differ for an ideal with a zero generator.
+  §4.6.
 * Singular's prime characteristic must be below `2^31`, so GF(2^31 - 1) is the largest field the
   oracle reaches. §9.1 of `MILESTONE-FGLM-SOLVING.md` sets out why evidence at these primes bears
   on the larger ones; the generator helps that argument by drawing its exponents from a
@@ -310,16 +324,20 @@ as a pass:
 
 ### 4.4 Results
 
-500 systems, seed 12345, two to five variables, degree at most 3, at most 4 terms per generator,
-cycling through GF(2), GF(3), GF(7), GF(13), GF(65537) and GF(2^31 - 1). 34.5 seconds.
+500 systems, two to five variables, degree at most 3, at most 4 terms per generator, cycling
+through GF(2), GF(3), GF(7), GF(13), GF(65537) and GF(2^31 - 1). About 34 seconds per sweep.
 
-| outcome | systems |
-|---|---:|
-| agreed, zero-dimensional | 195 |
-| agreed, unit ideal | 193 |
-| agreed, positive-dimensional and rejected by both | 112 |
-| disagreed | 0 |
-| oracle did not answer | 0 |
+| outcome | seed 12345 | seed 55555 |
+|---|---:|---:|
+| agreed, zero-dimensional | 195 | 199 |
+| agreed, unit ideal | 193 | 189 |
+| agreed, positive-dimensional and rejected by both | 112 | 112 |
+| disagreed | 0 | 0 |
+| oracle did not answer | 0 | 0 |
+
+Four seeds times both construction strategies — 1,920 system-checks — are clean, as is a sweep
+under `--operator-storage adaptive`. Every strategy this milestone adds has been pointed at the
+oracle rather than only at the reference implementation.
 
 The three classes matter. A harness that only ever saw zero-dimensional ideals would not check that
 Zeebra rejects a positive-dimensional one for the same reason Singular does, and the unit ideal is
@@ -349,7 +367,51 @@ and the lex basis — and requires each to be caught by the check named after it
 that a case with *no* recorded lex basis for a zero-dimensional ideal is a gap rather than an
 agreement.
 
-### 4.6 Minimization
+### 4.6 What it found first: two faults in its own oracle interface
+
+Pointed at a fresh seed during M18-3, the harness reported a **source-basis** disagreement — the
+one check that would mean a bug in F4, which M18 does not touch. It was not. Both faults were in
+the interface between the harness and Singular, and finding them is what the harness is for:
+neither would have been visible from a final lex basis.
+
+**Singular sums bare integer literals in 32-bit arithmetic before coercing them into the ring.**
+Minimized to one generator over GF(2^31 - 1):
+
+```text
+ideal I = 1870573936+1536614746+x1;   // Singular reads  x1-887778614
+ideal J = 1259705035+x1;              // Singular reads  x1-887778612
+```
+
+The two constants sum to 1259705035 modulo `p`; `-887778614` is the 32-bit signed wrap of their
+integer sum, 3407188682. Multiplied by a variable the same coefficients are handled correctly —
+`1870573936*x2+1536614746*x2` reads back as `-887778612*x2` — so it is specifically a sum of
+*literals* in a `poly` expression. Zeebra's parser merges the terms and gets the ring answer, so an
+unmerged polynomial was a **different ideal on the two sides**, through no fault of either
+implementation.
+
+The generator now merges terms on a shared monomial, which is what a polynomial should be anyway.
+
+**`size` and `ncols` are different things for a Singular ideal.** `size` counts the *non-zero*
+generators and `ncols` counts the slots, so `ideal I = 0, x1^2` has `size` 1, `ncols` 2, and `I[1]`
+is the zero — and a loop bounded by `size` prints the zero and **skips `x1^2`**. Every list the
+script emits was looped that way. The zero generator that exposed it came from the merge above
+cancelling a GF(2) polynomial to nothing.
+
+The loops are now bounded by `ncols`, the reported count is `ncols`, and zeros are dropped *after*
+the count has been checked — so a lost line is still an error while a meaningless zero is not an
+element.
+
+**And the check that caught the second fault is the one the first fault motivated.** Singular now
+echoes the ideal back before computing anything from it, and `Check::OracleInput` compares what it
+read against what it was sent — as polynomials, sorted, with zeros dropped, since an oracle is
+entitled to print `x1-887778612` for `1259705035+x1`, to list generators in its own order, and to
+drop a zero generator. It runs first, because nothing after it means anything if the two sides are
+not discussing the same ideal.
+
+A fixture records `oracle_system: None` and inherits the check from the sweep that produced it: a
+case only becomes a fixture after agreeing, and agreeing includes having been read correctly.
+
+### 4.7 Minimization
 
 A failing system is shrunk by four reductions, largest first: drop a generator, drop a term, flatten
 a coefficient to one, lower an exponent. A candidate is accepted only if it still fails **the same
@@ -361,7 +423,7 @@ invocation and an unbounded search on a large failing system can take longer tha
 found it. **The original system and its seed are always kept beside the shrunk one**, since a shrunk
 system is no longer what the seed generates.
 
-### 4.7 CI needs no Singular
+### 4.8 CI needs no Singular
 
 A sweep's agreeing cases are emitted as Rust literals into
 `src/grobner/differential/fixtures.rs` — the same convention `reference_bases.rs` already uses, for
@@ -377,7 +439,7 @@ large-prime two-variable unit ideals would otherwise pass while checking almost 
 The live sweep is additionally an `#[ignore]`d test, so that `cargo test` can exercise the real
 oracle path on request without ever depending on it.
 
-### 4.8 What the harness does not reach
+### 4.9 What the harness does not reach
 
 * **Characteristics above `2^31`.** Singular's limit, not Zeebra's. Unchanged from M17.
 * **Large systems.** The generator makes small random systems, where the interesting thing is
@@ -528,7 +590,161 @@ let options = FglmOptions::default()
 
 ---
 
-## 6. Acceptance criteria
+## 6. M18-3: adaptive operator storage
+
+### 6.1 Two separate changes
+
+**The representation got smaller before it got adaptive.** §3.5 found that 41% of planted-10's
+operator bytes was `Vec`'s minimum allocation: a boxed slice is two words where a `Vec` is three,
+and a `Vec` built by `collect` from a `HashMap`'s iterator — which is not `TrustedLen` — takes the
+growth path, whose minimum non-zero allocation is **four** elements for a 16-byte element type. A
+planted column holds one.
+
+So the columns are now built with `Vec::with_capacity(len)` and stored as `Box<[_]>`. Neither is an
+algorithmic change and both are pure wins:
+
+| system | `D` | M17 representation | M18-3, still sparse | won |
+|---|---:|---:|---:|---:|
+| katsura-7 | 64 | 264.5 kB | 264.5 kB | 1.00x |
+| cyclic-5 | 70 | 40.5 kB | 40.4 kB | 1.00x |
+| cyclic-6 | 156 | 222.7 kB | 222.7 kB | 1.00x |
+| planted-6 | 64 | 24.0 kB | 14.2 kB | 1.69x |
+| planted-8 | 256 | 128.0 kB | 76.0 kB | 1.68x |
+| planted-10 | 1,024 | 640.0 kB | **380.0 kB** | **1.68x** |
+
+Katsura is untouched because its columns hold fifty entries, well past the point where `collect`
+allocates exactly. The planted family gains two thirds of its operator storage back. The boxed
+slice is also what keeps `Column` at three words after a third variant was added — a four-word
+`Column` would have cost planted-10 another 80 kB of spine, which is more than that instance's
+entries come to.
+
+**Then the adaptive representation.** `OperatorStorage` chooses per column between
+`(index, coefficient)` pairs and `D` bare coefficients, by comparing what the two would allocate.
+
+### 6.2 What it is worth
+
+`cargo run --release --example fglm_storage`. Exact figures, not timings: a boxed slice has no
+spare capacity, so these are the bytes allocated.
+
+| system | `D` | reduced columns | fill % | `Sparse` | `Adaptive` | `Dense` | dense of | won |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 16 | 58 | 80.9 | 13.6 kB | **9.0 kB** | 9.1 kB | 53 | 1.52x |
+| katsura-6 | 32 | 138 | 80.6 | 60.1 kB | **37.7 kB** | 39.0 kB | 123 | 1.59x |
+| katsura-7 | 64 | 323 | 78.6 | 264.5 kB | **163.6 kB** | 172.0 kB | 276 | **1.62x** |
+| cyclic-5 | 70 | 202 | 14.6 | 40.4 kB | 40.4 kB | 118.7 kB | 0 | 1.00x |
+| cyclic-6 | 156 | 564 | 14.6 | 222.7 kB | 222.7 kB | 709.3 kB | 0 | 1.00x |
+| planted-6 | 64 | 240 | 2.2 | 14.2 kB | 14.2 kB | 129.0 kB | 0 | 1.00x |
+| planted-8 | 256 | 1,280 | 0.5 | 76.0 kB | 76.0 kB | 2,608.0 kB | 0 | 1.00x |
+| planted-10 | 1,024 | 6,400 | 0.1 | 380.0 kB | 380.0 kB | 51,440.0 kB | 0 | 1.00x |
+
+Three things this table settles.
+
+**The crossover is inside the corpus.** A reduced column holds 79–81% of `D` on katsura and 0.1–2%
+on the planted family. There is no single representation that is right for both, and that is the
+justification for the strategy existing at all — not an assumption about what sparse matrices are
+usually like.
+
+**`Adaptive` beats *both* extremes on katsura**, at 9.0 kB against sparse's 13.6 and dense's 9.1.
+That is only possible because the choice is per column: katsura-5 has 58 reduced columns of which 53
+are dense enough to be worth holding densely and five are not. A per-operator or per-crate choice
+could not have reached it.
+
+**`Dense` everywhere is ruinous, and the strategy exists to show that rather than to be used.**
+planted-10 would need 51 MB where it needs 380 kB — 135x. §7.2 of the proposal asked whether a whole
+operator must be one or the other; the answer is a definite no.
+
+### 6.3 What it costs
+
+Storage is exact; application has to be measured, because the conversion applies an operator `O(D)`
+times and a representation that halves the memory and slows that down may not be worth having.
+
+`cargo bench --bench fglm -- fglm_operator_application`, in microseconds for all `N` operators
+applied once:
+
+| system | `Sparse`, unit | `Adaptive`, unit | `Dense`, unit | `Sparse`, dense | `Adaptive`, dense | `Dense`, dense |
+|---|---:|---:|---:|---:|---:|---:|
+| katsura-6 | 0.173 | 0.177 | 0.240 | 9.31 | 9.62 | 10.49 |
+| katsura-7 | 0.371 | 0.370 | 0.500 | 43.78 | 44.73 | 49.76 |
+| cyclic-6 | 0.731 | 0.767 | 1.100 | 33.63 | 32.91 | 203.15 |
+| planted-8 | 1.504 | 1.487 | 1.457 | 7.05 | 6.95 | **753.50** |
+
+A unit input is what the lex walk starts with and a dense one what it ends with, and the sparse path
+skips a zero input coordinate where the dense path still walks `D` cells — so the two inputs are
+genuinely different questions.
+
+**`Adaptive` is slower than `Sparse` on katsura's dense-vector application, and only there.** The
+two harnesses disagree about how much: Criterion says 2.2% on katsura-7, and
+`examples/fglm_storage.rs`'s fastest-of-three says 10–14% across repeated runs. They agree on the
+direction and on the reason — a 79%-full dense column does `D` multiplications where the sparse form
+does 0.79 `D`, and an index lookup is cheaper than a multiplication. Where `Adaptive` picks sparse
+for every column, it is `Sparse` and the figures are noise around equality.
+
+**At the level a caller pays it makes no difference.** The whole conversion under each storage,
+fastest of three:
+
+| system | `Sparse` | `Adaptive` | `Dense` |
+|---|---:|---:|---:|
+| katsura-6 | 3.59 ms | 3.59 ms | 3.59 ms |
+| katsura-7 | 42.52 ms | 42.58 ms | 41.96 ms |
+| cyclic-6 | 28.36 ms | 28.38 ms | 27.94 ms |
+| planted-8 | 3.26 ms | 3.24 ms | 4.13 ms |
+
+Within 1% throughout except dense planted-8, which is 27% slower. Operator application is simply
+not where a conversion's time goes — reduction is on katsura and the span's row operations are on
+planted — so a 2% change to it does not survive to the total.
+
+So the trade is: **1.62x less operator memory on katsura for a few percent of a cost that is not on
+the critical path.** Worth taking, and not so decisively that it should be taken without the
+integration ablation seeing it beside M18-2 and M18-4.
+
+### 6.4 Byte-aware accounting and a second budget
+
+`FglmMemory` now distinguishes three quantities for the operators, because they are three numbers:
+
+* `operator_entries` — mathematical nonzeros. Unchanged in meaning, and **no strategy may change
+  it**, which the tests assert.
+* `operator_cells` — field-element slots allocated. Equal to the entries while every column is
+  sparse, and larger wherever one is dense.
+* `operator_bytes` — what the representations actually take, now exact for the heaps since a boxed
+  slice has no capacity to diverge from its length.
+
+`max_operator_bytes` is a **new budget beside** `max_operator_entries`, not a redefinition of it.
+Under dense storage the same nonzeros occupy `D` cells, so a budget written in entries cannot see
+the difference — and changing what the older limit counted would have made every figure recorded
+against it ambiguous. `FglmError::OperatorBytesExceeded` is its error, and it is enforced from what
+the builder reports having stored rather than from a model of what it should have stored.
+
+Tested where it matters: a budget sized from planted-6's sparse operators rejects the same system
+held densely, with the *entry* budget unbounded throughout — so what fires can only be the byte
+budget.
+
+### 6.5 Correctness
+
+* Every representation gives the same columns, the same applications on unit, sparse, dense and
+  zero inputs, and the same nonzero count. Asserted at the column level in `multiplication.rs` and
+  over three orders, ten systems, katsura-5/6, cyclic-5 and planted-6 in `quotient_algebra.rs`.
+  **Not** a `QuotientAlgebra` equality — the representations differ, so the values differ, and
+  comparing them through what a caller can observe is the point.
+* The lex basis is compared over the **cross product** of construction and storage, six
+  configurations, because a construction strategy and a storage strategy could each be right alone
+  and wrong together.
+* All 96 differential fixtures are verified under all six configurations, each against Singular.
+* `Adaptive` is asserted no larger than either extreme on every family, strictly smaller than
+  `Sparse` on katsura-7, and exactly equal to `Sparse` on planted-8 — the last being the claim that
+  it correctly declines to hold a 0.5%-full column densely.
+* A zero column allocates nothing under both `Sparse` and `Adaptive`, which is §7.2's requirement
+  for a compact zero representation; the sparse form already was one.
+
+### 6.6 The default has not changed
+
+`FglmOptions::default()` is still `OperatorStorage::Sparse`, for the same reason the construction
+default is unchanged — see §5.6. The two representation changes in §6.1 are *not* behind a strategy
+flag, because they are not strategies: they make the sparse representation smaller without changing
+it.
+
+---
+
+## 7. Acceptance criteria
 
 ### M18-0 — validation infrastructure
 
@@ -561,12 +777,13 @@ let options = FglmOptions::default()
 
 ### M18-3 — operator storage
 
-- [ ] Standard, sparse, and dense columns supported.
-- [ ] Adaptive selection supported where justified.
-- [ ] All representations agree exactly.
-- [ ] Operator application benchmarked separately.
-- [ ] Byte-aware accounting introduced.
-- [ ] Resource limits apply across representations.
+- [x] Standard, sparse, and dense columns supported — `Column`, §6.1.
+- [x] Adaptive selection supported where justified — per column, from bytes, §6.2.
+- [x] All representations agree exactly — §6.5, including the cross product with M18-1.
+- [x] Operator application benchmarked separately — §6.3, on unit and dense inputs.
+- [x] Byte-aware accounting introduced — `operator_cells` and exact `operator_bytes`, §6.4.
+- [x] Resource limits apply across representations — `max_operator_bytes` beside the entry
+      budget, §6.4.
 
 ### M18-4 — FGLM scalability
 
@@ -593,7 +810,7 @@ let options = FglmOptions::default()
 
 ---
 
-## 7. Compatibility
+## 8. Compatibility
 
 `FglmOptions` gained `measure_stages` and `FglmStatistics` gained `border`, `timings` and `memory`.
 Both structs have public fields, so a downstream struct literal naming every field stops compiling.
@@ -611,9 +828,18 @@ M18-1 added `FglmOptions::operator_construction`, the same source-compatibility 
 also added `FglmOptions::baseline()` and `FglmOptions::with_operator_construction`, and the public
 `BorderIndex` and `ColumnTarget`. `FglmOptions::default()` is unchanged — see §5.6.
 
+M18-3 added `FglmOptions::operator_storage` and `FglmOptions::max_operator_bytes`, the public
+`OperatorStorage` and `FglmOptions::with_operator_storage`, the `FglmError::OperatorBytesExceeded`
+variant, `FglmMemory::operator_cells` and `FglmMemory::dense_columns`, and
+`MultiplicationOperator::stored_cells` and `dense_columns`. **`FglmError` is a public enum**, so a
+downstream exhaustive `match` on it stops compiling when a variant is added; the type has carried
+that property since M17 and its documentation says variants are added as the implementation becomes
+able to produce them. No existing variant changed meaning, and `FglmOptions::default()` is
+unchanged — see §6.6.
+
 ---
 
-## 8. References
+## 9. References
 
 1. Faugère, J.-C., Gianni, P., Lazard, D., Mora, T. (1993). *Efficient Computation of
    Zero-dimensional Gröbner Bases by Change of Ordering.* J. Symbolic Computation 16(4), 329–344.

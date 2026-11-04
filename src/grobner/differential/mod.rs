@@ -65,7 +65,7 @@ mod tests {
     };
     use crate::{
         fields::{Zp13, Zp7},
-        grobner::fglm::{FglmOptions, OperatorConstruction},
+        grobner::fglm::{FglmOptions, OperatorConstruction, OperatorStorage},
     };
 
     /// An oracle that answers from a recorded table and refuses anything else.
@@ -114,13 +114,21 @@ mod tests {
             OperatorConstruction::PerColumn,
             OperatorConstruction::DeduplicatedBorder,
         ] {
-            let options = FglmOptions::unbounded().with_operator_construction(construction);
-            for fixture in FIXTURES {
-                if let Err(disagreement) = verify_recorded(&fixture.to_case(), &options) {
-                    panic!(
-                        "{} under {:?}: {}",
-                        fixture.name, construction, disagreement
-                    );
+            for storage in [
+                OperatorStorage::Sparse,
+                OperatorStorage::Adaptive,
+                OperatorStorage::Dense,
+            ] {
+                let options = FglmOptions::unbounded()
+                    .with_operator_construction(construction)
+                    .with_operator_storage(storage);
+                for fixture in FIXTURES {
+                    if let Err(disagreement) = verify_recorded(&fixture.to_case(), &options) {
+                        panic!(
+                            "{} under {:?} and {:?}: {}",
+                            fixture.name, construction, storage, disagreement
+                        );
+                    }
                 }
             }
         }
