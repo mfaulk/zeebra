@@ -16,6 +16,7 @@ mod multiplication;
 mod options;
 mod quotient_algebra;
 mod quotient_basis;
+pub mod shape;
 mod statistics;
 
 /// Lexicographic bases from Singular, for the differential tests. Test-only: it is reference data,
@@ -33,4 +34,5 @@ pub use multiplication::MultiplicationOperator;
 pub use options::{FglmOptions, OperatorConstruction, OperatorStorage};
 pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
 pub use quotient_basis::{classify_ideal, IdealClass, QuotientBasis};
+pub use shape::{separating_variables, shape_lex_basis, shape_report, ShapeError, ShapeReport};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};

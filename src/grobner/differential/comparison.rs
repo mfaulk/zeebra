@@ -19,8 +19,8 @@ use crate::{
     grobner::{
         f4_with_options,
         fglm::{
-            fglm_to_lex_with_options, BorderIndex, FglmError, FglmOptions, QuotientAlgebra,
-            QuotientBasis,
+            fglm_to_lex_with_options, shape_lex_basis, BorderIndex, FglmError, FglmOptions,
+            QuotientAlgebra, QuotientBasis, ShapeError,
         },
         F4Options,
     },
@@ -77,6 +77,13 @@ pub enum Check {
 
     /// The lex basis against the oracle's.
     LexBasis,
+
+    /// The shape-form lex basis against the oracle's, where the ideal is in shape position.
+    ///
+    /// M18-4's prototype route, validated by every sweep and every fixture rather than only by its
+    /// own tests. Skipped — not failed — where the last variable does not generate the quotient
+    /// algebra, which is a correct answer and not an absence of one.
+    ShapeBasis,
 }
 
 impl Check {
@@ -93,6 +100,7 @@ impl Check {
             Self::BorderNormalForm => "border-normal-form",
             Self::OperatorColumn => "operator-column",
             Self::LexBasis => "lex-basis",
+            Self::ShapeBasis => "shape-basis",
         }
     }
 }
@@ -130,6 +138,12 @@ pub struct Agreement {
 
     /// Elements in the agreed lex basis, or `None` if there was no conversion to compare.
     pub lex_basis_elements: Option<usize>,
+
+    /// Whether the shape-form route also agreed, or `None` if the ideal is not in shape position.
+    ///
+    /// `Some(false)` is impossible: a disagreement is a [`Check::ShapeBasis`] failure, not a
+    /// recorded one.
+    pub shape_basis_agreed: Option<bool>,
 }
 
 /// Everything an oracle said about one ideal.
@@ -504,6 +518,25 @@ pub fn verify_case<const N: usize, F: FiniteField>(
         Check::LexBasis,
     )?;
     agreement.lex_basis_elements = Some(zeebra_lex.len());
+
+    // ---- the shape-form route ----------------------------------------------------------------
+    //
+    // M18-4's prototype, checked against the oracle rather than only against classical FGLM. Not
+    // being in shape position is a correct answer, so it is a skip and not a failure.
+
+    match shape_lex_basis(&algebra) {
+        Ok(shape) => {
+            compare_bases(&shape, &oracle_lex, TARGET_ORDER, &names, Check::ShapeBasis)?;
+            agreement.shape_basis_agreed = Some(true);
+        }
+        Err(ShapeError::NotSeparating { .. }) => {}
+        Err(e) => {
+            return Err(fail(
+                Check::ShapeBasis,
+                format!("the shape route failed where it should not: {}", e),
+            ))
+        }
+    }
 
     Ok(agreement)
 }

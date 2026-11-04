@@ -8,7 +8,7 @@
 
 use std::{mem::size_of, time::Duration};
 
-use crate::FiniteField;
+use crate::{grobner::fglm::IncrementalSpan, FiniteField};
 
 /// The shape of the border, and how much of the reduction work it duplicates.
 ///
@@ -150,21 +150,21 @@ pub struct FglmMemory {
     /// Of the `N * D` columns, how many are held densely.
     pub dense_columns: usize,
 
-    /// Field-element cells the dependence test's echelon rows hold: `2 * D^2` at full rank.
+    /// Field-element cells the dependence test's echelon rows hold.
     ///
-    /// What [`max_span_entries`](super::FglmOptions::max_span_entries) is enforced on — and
-    /// "entries" there means cells, since the blocks are dense.
+    /// `D^2 + D (D + 1) / 2` at full rank: a `D`-coordinate vector per row, and a combination of
+    /// `r + 1` coefficients for the row at `r`. M17 padded every combination to `D` and so held
+    /// `2 D^2`; the padding was zeros. See [`IncrementalSpan`](super::IncrementalSpan).
     pub span_cells: usize,
 
     /// Field-element cells the retained accepted quotient vectors hold: `D^2` at full rank.
     ///
-    /// **Not covered by any budget.** The conversion keeps every accepted vector so that a
-    /// candidate's class can be computed by one operator application, which is a third dense
-    /// `D x D` block beyond the span's two. Reported here so the omission is visible; closing it
-    /// is M18-4.
+    /// The conversion keeps every accepted vector so that a candidate's class costs one operator
+    /// application instead of a reduction. It is a third dense block beyond the span's two, and
+    /// M17's accounting omitted it entirely.
     pub accepted_vector_cells: usize,
 
-    /// Bytes of the two dense blocks above, at `size_of::<F>()` a cell.
+    /// Bytes of the dense blocks above, at `size_of::<F>()` a cell.
     pub dense_block_bytes: usize,
 }
 
@@ -179,17 +179,22 @@ impl FglmMemory {
         self.operator_bytes + self.dense_block_bytes
     }
 
-    /// The dense-block cell counts and bytes implied by a quotient dimension at full rank.
+    /// The dense cells a conversion of this dimension needs at full rank, and their bytes.
     ///
-    /// `None` on arithmetic overflow, which `D` near `usize::MAX` would reach — a caller that
-    /// cannot represent the size should not report a wrapped one.
+    /// Returns `(span cells, accepted-vector cells, bytes of both)`. The span's figure is
+    /// [`IncrementalSpan::cells_at_full_rank`](super::IncrementalSpan::cells_at_full_rank) —
+    /// `D^2 + D (D + 1) / 2`, the triangular combination block included — and the accepted vectors
+    /// are `D^2`.
+    ///
+    /// `None` on arithmetic overflow, which `D` near `usize::MAX` would reach: a budget computed
+    /// from a wrapped product would be no budget at all.
     pub fn dense_blocks_for<F: FiniteField>(dimension: usize) -> Option<(usize, usize, usize)> {
-        let square = dimension.checked_mul(dimension)?;
-        let span_cells = square.checked_mul(2)?;
+        let span_cells = IncrementalSpan::<F>::cells_at_full_rank(dimension)?;
+        let accepted_cells = dimension.checked_mul(dimension)?;
         let bytes = span_cells
-            .checked_add(square)?
+            .checked_add(accepted_cells)?
             .checked_mul(size_of::<F>())?;
-        Some((span_cells, square, bytes))
+        Some((span_cells, accepted_cells, bytes))
     }
 }
 
@@ -303,13 +308,18 @@ mod tests {
         );
     }
 
-    /// The dense blocks are `2 * D^2` span cells and `D^2` accepted-vector cells.
+    /// The span is a square plus a triangle, and the accepted vectors are a square.
     #[test]
-    fn test_the_dense_blocks_are_three_squares() {
+    fn test_the_dense_blocks_are_a_square_a_triangle_and_a_square() {
         let (span, accepted, bytes) = FglmMemory::dense_blocks_for::<F>(64).expect("representable");
-        assert_eq!(span, 2 * 64 * 64);
+        assert_eq!(span, 64 * 64 + 64 * 65 / 2, "coordinates plus combinations");
         assert_eq!(accepted, 64 * 64);
-        assert_eq!(bytes, 3 * 64 * 64 * size_of::<F>());
+        assert_eq!(bytes, (span + accepted) * size_of::<F>());
+
+        // M17 counted two square blocks and omitted the third; the truth is 15% less than three
+        // squares, because the combination block is triangular.
+        assert!(span + accepted < 3 * 64 * 64);
+        assert!(span < 2 * 64 * 64);
     }
 
     /// A dimension whose square overflows is reported as unrepresentable, not wrapped.

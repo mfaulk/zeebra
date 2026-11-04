@@ -134,6 +134,41 @@ mod tests {
         }
     }
 
+    /// The shape-form route ran, and agreed, on a substantial share of the fixtures.
+    ///
+    /// `verify_recorded` skips the shape check where the ideal is not in shape position, which is a
+    /// correct answer — so without this the check could be skipped on all 96 cases and the suite
+    /// would still be green. This asserts it was exercised against Singular, and reports what
+    /// fraction of the corpus the prototype covers.
+    #[test]
+    fn test_the_shape_route_agrees_where_it_applies() {
+        let options = FglmOptions::unbounded();
+        let mut zero_dimensional = 0;
+        let mut in_shape_position = 0;
+
+        for fixture in FIXTURES {
+            let case = fixture.to_case();
+            let agreement = verify_recorded(&case, &options)
+                .unwrap_or_else(|disagreement| panic!("{}: {}", fixture.name, disagreement));
+
+            if matches!(agreement.quotient_dimension, Some(d) if d > 0) {
+                zero_dimensional += 1;
+                if agreement.shape_basis_agreed == Some(true) {
+                    in_shape_position += 1;
+                }
+            }
+        }
+
+        assert!(zero_dimensional > 0, "no fixture has a nonzero quotient");
+        assert!(
+            in_shape_position * 2 >= zero_dimensional,
+            "the shape route ran on only {} of {} zero-dimensional fixtures, which is too few to \
+             be evidence",
+            in_shape_position,
+            zero_dimensional
+        );
+    }
+
     /// The fixtures cover every characteristic and variable count the harness supports.
     ///
     /// A table that happened to hold only large-prime two-variable cases would pass the test above

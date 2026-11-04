@@ -1109,16 +1109,18 @@ mod tests {
         assert!(fglm.operator_entries > 0);
         assert!(fglm.span_row_operations > 0);
 
-        // The storage estimate is the operators' own bytes plus the three dense D x D blocks the
-        // conversion needs at full rank: the dependence test's two and the retained accepted
-        // vectors. M17 counted two blocks and priced the operators at a flat 16 bytes an entry,
-        // which undercounted both — the operators have a column spine and the accepted vectors
+        // The storage estimate is the operators' own bytes plus every dense block the dependence
+        // machinery needs at full rank: the span's `D` coordinates per row, its *triangular*
+        // combination block, and the retained accepted vectors. M17 counted two square blocks and
+        // priced the operators at a flat 16 bytes an entry, which was wrong in three ways — the
+        // operators have a column spine, the combinations are triangular, and the accepted vectors
         // were missing entirely.
-        assert_eq!(fglm.memory.span_cells, 2 * 16 * 16);
+        assert_eq!(fglm.memory.span_cells, 16 * 16 + 16 * 17 / 2);
         assert_eq!(fglm.memory.accepted_vector_cells, 16 * 16);
         assert_eq!(
             fglm.estimated_bytes(),
-            fglm.memory.operator_bytes + 3 * 16 * 16 * size_of::<F>()
+            fglm.memory.operator_bytes
+                + (fglm.memory.span_cells + fglm.memory.accepted_vector_cells) * size_of::<F>()
         );
     }
 
