@@ -1,0 +1,24 @@
+# Build configuration for development and measurement in this repository.
+#
+# This file applies only when cargo is invoked with this directory as the working directory. It is
+# not inherited by crates that depend on `zeebra`, so nothing here constrains a consumer; a
+# downstream build gets whatever that build configures. See the README section "Build
+# configuration" for what a consumer does and does not inherit.
+#
+# `x86-64-v3` rather than `native`: v3 is the Haswell/Excavator feature level (AVX2, BMI2, FMA,
+# LZCNT, MOVBE), which is the floor the SIMD work in M19 targets. `native` would make a build
+# artifact depend on the machine that produced it, so the same commit would benchmark differently
+# on two machines for reasons that have nothing to do with the commit. Pinning the level keeps
+# measurements comparable across machines and across CI runs.
+#
+# To measure with everything the local CPU has, override on the command line. The RUSTFLAGS
+# environment variable REPLACES the flags below rather than adding to them, so repeat any flag
+# that is still wanted:
+#
+#   RUSTFLAGS="-C target-cpu=native" cargo bench
+#
+# Scoped by `cfg(target_arch)` and not set in `[build]`: `-C target-cpu=x86-64-v3` is not a valid
+# CPU name on aarch64, so an unscoped setting would break a cross build rather than merely fail to
+# help it.
+[target.'cfg(target_arch = "x86_64")']
+rustflags = ["-C", "target-cpu=x86-64-v3"]
