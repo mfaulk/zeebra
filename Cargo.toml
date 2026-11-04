@@ -63,3 +63,21 @@ harness = false
 [[bench]]
 name = "polynomial_solving"
 harness = false
+
+# Field arithmetic is a handful of small generic functions — `mul`, `add`, `is_zero` — called from
+# inner loops in other modules. Without cross-codegen-unit inlining the elimination kernels pay a
+# call per field operation, which is the case link-time optimization exists for. `codegen-units =
+# 1` for the same reason and to make benchmark numbers reproducible: the default of 16 partitions
+# the crate differently as code moves between modules, so an unrelated edit can shift a
+# measurement.
+#
+# `[profile.bench]` is deliberately not restated: `bench` inherits `release`, including these
+# overrides. Verified with `cargo build --profile bench -v`, which shows `-C lto` and
+# `-C codegen-units=1`.
+#
+# This costs build time. It is accepted because every number this project reports is taken in
+# release, so the release profile is the measurement instrument and should not differ from what
+# is shipped.
+[profile.release]
+lto = "fat"
+codegen-units = 1

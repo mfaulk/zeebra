@@ -10,7 +10,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
+  # `-C target-cpu` is repeated here on purpose. `.cargo/config.toml` sets it for local builds,
+  # but the RUSTFLAGS environment variable REPLACES `target.*.rustflags` rather than adding to
+  # it — cargo takes the first source it finds and does not merge them. Setting only `-D
+  # warnings` here would therefore drop the ISA floor silently, and CI would build at the
+  # baseline x86-64 level while every local build used v3. The two must be kept in step.
+  RUSTFLAGS: -D warnings -C target-cpu=x86-64-v3
 
 jobs:
   test:
