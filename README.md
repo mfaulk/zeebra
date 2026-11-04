@@ -87,9 +87,10 @@ cargo test --release --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
-Four other `#[ignore]`d tests are unimplemented placeholders for statistical distribution checks
-and a rare division branch, and they panic if run. A bare `cargo test -- --ignored` therefore
-reports those four as failures; the commands above select the tests that are meant to pass.
+Two other `#[ignore]`d tests are unimplemented placeholders — a `BigUInt` sampling distribution
+check and a rare division branch — and they panic if run. A bare `cargo test -- --ignored`
+therefore reports those two as failures; the commands above select the tests that are meant to
+pass.
 
 CI runs the suite twice: once in debug, and once in release in a separate job that also runs the
 two Gröbner engine-agreement tests above. Both configurations are checked because a release build
@@ -329,8 +330,9 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md),
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md),
 [`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md),
-[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md), and
-[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md).
+[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md),
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md), and
+[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md).
 
 ## Finite Fields
 
@@ -364,6 +366,42 @@ whole computation, because both modules are private and no bench target can reac
 - `ExtensionFieldElement<P, N, M>` reduces once per output coefficient instead of once per partial
   product, O(N) instead of O(N^2), under a compile-time overflow bound; the per-multiplication heap
   allocation is gone.
+
+### `FiniteField` and `KnownOrder`
+
+A coefficient type implements `FiniteField`: arithmetic, inversion, parsing, uniform sampling,
+`new`, and exponentiation by a `u128`. The field's *order* is not there. It lives in a separate
+trait:
+
+```rust
+use zeebra::{fields::Zp2147483647, KnownOrder};
+
+assert_eq!(Zp2147483647::order_limbs(), &[2147483647]);
+assert_eq!(Zp2147483647::order_u128(), Some(2147483647));
+```
+
+`KnownOrder` gives the order q and the characteristic p as little-endian 64-bit limbs — a width
+that covers 64-, 128- and 256-bit orders without allocating — plus `order_u128` and
+`characteristic_u128` for callers that need a machine integer and can fail without one, and
+`primitive_element` and `root_of_unity`. For an extension field q = p^k, so the order and the
+characteristic are genuinely different; both are reported.
+
+The split is there because a 254-bit prime field has no order that fits in a machine integer, and
+because **nothing in the algebraic core asks for one**: the multivariate polynomials, the linear
+algebra, F4, FGLM and Buchberger are all generic over `FiniteField` alone. Only root finding,
+factorization and enumerating the field itself need `KnownOrder`, and they say so in their bounds.
+`grobner::mod`'s `test_the_grobner_stack_needs_no_field_cardinality` fails to compile if that
+stops being true.
+
+Every field type in the crate implements both traits. Two consequences for anything generic over
+`F: FiniteField`:
+
+- `F::order()` and `F::characteristic()` are gone. Add `F: KnownOrder` and call `order_limbs()`,
+  or `order_u128()` where the old `u128` is what you want.
+- `inverse()` is a required method rather than a provided one. Its only sensible default was
+  `a^(q-2)`, which needs the order; a field whose order does not fit in a `u128` cannot have it.
+
+`docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 
 ## Gröbner Bases
 

@@ -40,7 +40,7 @@ use crate::{
         solve::{candidate_values, is_nonzero_constant},
         F4Error, F4Options,
     },
-    FiniteField, MonomialOrder, MultivariatePolynomial,
+    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
 
 /// Which route to the lexicographic basis solving needs.
@@ -196,7 +196,7 @@ impl From<FglmError> for SolveError {
 /// # Errors
 /// [`SolveError::PositiveDimensional`] if the system is not zero-dimensional, or a resource variant
 /// if a limit in [`SolveOptions::default`] is crossed. Having no solution is `Ok(None)`.
-pub fn solve_one<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+pub fn solve_one<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
 ) -> Result<Option<[F; N]>, SolveError> {
@@ -205,7 +205,7 @@ pub fn solve_one<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 
 /// As [`solve_one`], under the given strategy and budgets, additionally reporting the work done.
 #[allow(clippy::type_complexity)]
-pub fn solve_one_with_options<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+pub fn solve_one_with_options<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
     options: &SolveOptions,
@@ -223,7 +223,7 @@ pub fn solve_one_with_options<const N: usize, F: FiniteField, R: RngCore + Crypt
 ///
 /// # Errors
 /// As [`solve_one`], plus [`SolveError::TooManySolutions`]. The result is never a truncated list.
-pub fn solve_zero_dimensional<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+pub fn solve_zero_dimensional<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
 ) -> Result<Vec<[F; N]>, SolveError> {
@@ -234,7 +234,7 @@ pub fn solve_zero_dimensional<const N: usize, F: FiniteField, R: RngCore + Crypt
 /// As [`solve_zero_dimensional`], under the given strategy and budgets.
 pub fn solve_zero_dimensional_with_options<
     const N: usize,
-    F: FiniteField,
+    F: KnownOrder,
     R: RngCore + CryptoRng,
 >(
     system: &[MultivariatePolynomial<N, F>],
@@ -308,7 +308,7 @@ impl Budget {
 }
 
 /// Assign variables from the last backwards, collecting the points that satisfy the whole basis.
-fn search<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+fn search<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     basis: &[MultivariatePolynomial<N, F>],
     system: &[MultivariatePolynomial<N, F>],
     stop: Stop,
@@ -369,7 +369,7 @@ fn search<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 ///
 /// `basis` always has the already-assigned variables substituted in, so at the deepest level every
 /// polynomial is a constant.
-fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+fn extend<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     basis: &[MultivariatePolynomial<N, F>],
     remaining: usize,
     assignment: &mut [F; N],
@@ -467,7 +467,7 @@ mod tests {
             fglm::FglmError,
             solve,
         },
-        FiniteField, MultivariatePolynomial, One, Zero,
+        FiniteField, KnownOrder, MultivariatePolynomial, One, Zero,
     };
 
     type F = Zp2147483647;
@@ -476,7 +476,7 @@ mod tests {
         [SolveStrategy::DirectLexF4, SolveStrategy::GrevlexF4ThenFglm];
 
     /// `solve_one_with_options`, discarding the statistics. Most tests do not read them.
-    fn one<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+    fn one<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         system: &[MultivariatePolynomial<N, F>],
         rng: &mut R,
         options: &SolveOptions,
@@ -485,7 +485,7 @@ mod tests {
     }
 
     /// `solve_zero_dimensional_with_options`, discarding the statistics.
-    fn all<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+    fn all<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         system: &[MultivariatePolynomial<N, F>],
         rng: &mut R,
         options: &SolveOptions,

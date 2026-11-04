@@ -7,7 +7,7 @@ mod irreducible_polynomials;
 mod prime_field_128;
 mod prime_field_64;
 
-pub use finite_field::{FiniteField, ParseFieldElementError};
+pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
 pub use prime_field_128::PrimeFieldElement128;
 pub use prime_field_64::PrimeFieldElement64;
 

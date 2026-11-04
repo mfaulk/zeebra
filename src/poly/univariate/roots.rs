@@ -22,9 +22,10 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     poly::univariate::{
-        factorize::separate_equal_degree, gcd, pow_mod, Polynomial, UnivariatePolynomial,
+        factorize::separate_equal_degree, gcd, pow_mod, pow_mod::field_order, Polynomial,
+        UnivariatePolynomial,
     },
-    FiniteField,
+    KnownOrder,
 };
 
 /// The distinct roots of `f` in F, in unspecified order.
@@ -34,7 +35,7 @@ use crate::{
 ///
 /// # Panics
 /// Panics if `f` is the zero polynomial, every element of which is a root.
-pub fn roots<F: FiniteField, R: RngCore + CryptoRng>(
+pub fn roots<F: KnownOrder, R: RngCore + CryptoRng>(
     f: &UnivariatePolynomial<F>,
     rng: &mut R,
 ) -> Vec<F> {
@@ -51,7 +52,7 @@ pub fn roots<F: FiniteField, R: RngCore + CryptoRng>(
     // gcd(f, x^q - x) keeps exactly the distinct roots of f that lie in F. `x^q` is reduced
     // modulo f as it is built, since materializing it would need q coefficients.
     let x = UnivariatePolynomial::new(&[F::zero(), F::one()]);
-    let x_to_the_q = pow_mod(&x, F::order(), f);
+    let x_to_the_q = pow_mod(&x, field_order::<F>(), f);
     let linear_part = gcd(f, &(&x_to_the_q - &x));
 
     // A constant gcd means f shares no linear factor with x^q - x, i.e. has no root in F.

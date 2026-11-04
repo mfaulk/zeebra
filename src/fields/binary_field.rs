@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants};
 
 use crate::{
+    fields::{trim_limbs, KnownOrder},
     identities::{One, Zero},
     FiniteField, ParseFieldElementError, Ring,
 };
@@ -128,19 +129,39 @@ impl<const P: u64> FiniteField for BinaryFieldElement<P> {
 
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         // Generate a random m-bit coefficient bit pattern.
-        let mask = Self::order() as u64 - 1; // The low-order m bits are set.
+        let mask = Self::ORDER as u64 - 1; // The low-order m bits are set.
         let coefficients = rng.next_u64() & mask;
         Self::new(coefficients)
     }
 
-    fn order() -> u128 {
-        // 2^m where m is determined by the degree of the modulus polynomial.
-        let m = 63 - P.leading_zeros();
-        2u128.pow(m)
+    fn inverse(&self) -> Self {
+        assert_ne!(
+            *self,
+            Self::zero(),
+            "The zero element does not have a multiplicative inverse."
+        );
+        self.pow(Self::ORDER - 2)
+    }
+}
+
+impl<const P: u64> BinaryFieldElement<P> {
+    /// 2^m, where m is the degree of the modulus polynomial P.
+    const ORDER: u128 = 2u128.pow(63 - P.leading_zeros());
+
+    /// See [`KnownOrder::order_limbs`].
+    const ORDER_LIMBS: [u64; 2] = [Self::ORDER as u64, (Self::ORDER >> 64) as u64];
+
+    /// Characteristic two. See [`KnownOrder::characteristic_limbs`].
+    const CHARACTERISTIC_LIMBS: [u64; 1] = [2];
+}
+
+impl<const P: u64> KnownOrder for BinaryFieldElement<P> {
+    fn order_limbs() -> &'static [u64] {
+        trim_limbs(&Self::ORDER_LIMBS)
     }
 
-    fn characteristic() -> u128 {
-        2
+    fn characteristic_limbs() -> &'static [u64] {
+        trim_limbs(&Self::CHARACTERISTIC_LIMBS)
     }
 }
 
@@ -230,7 +251,7 @@ impl<const P: u64> Arbitrary for BinaryFieldElement<P> {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         // Every bit pattern below the field's order is a distinct element. The modulus has degree
         // m, so it is at least 2^m = order, and `new`'s `coefficients < P` assertion holds.
-        (0u64..Self::order() as u64).prop_map(Self::new).boxed()
+        (0u64..Self::ORDER as u64).prop_map(Self::new).boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -423,7 +444,7 @@ mod tests {
             },
             irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X_1},
         },
-        FiniteField,
+        FiniteField, KnownOrder,
     };
     use rand::{Rng, SeedableRng};
 
@@ -537,7 +558,10 @@ mod tests {
         // X5_X2_1 is 0b100101 = 37, of degree 5, so GF(2^5) has 32 elements.
         assert_eq!(num_elements::<X5_X2_1>(), 32);
         assert!(num_elements::<X5_X2_1>() < X5_X2_1);
-        assert_eq!(num_elements::<X5_X2_1>() as u128, F32::order());
+        assert_eq!(
+            num_elements::<X5_X2_1>() as u128,
+            F32::order_u128().unwrap()
+        );
     }
 
     /// Deserializing a bit pattern of degree at or above the modulus' is rejected.
@@ -750,7 +774,10 @@ mod tests {
         // sage K.order
         // 256
 
-        assert_eq!(BinaryFieldElement::<X8_X4_X3_X_1>::order(), 256);
+        assert_eq!(
+            BinaryFieldElement::<X8_X4_X3_X_1>::order_u128().unwrap(),
+            256
+        );
     }
 
     #[test]
@@ -873,9 +900,9 @@ mod tests {
         assert_eq!((a * b) / b, a);
     }
 
-    fn frobenius_fixes_every_element<F: FiniteField>(a: F) {
+    fn frobenius_fixes_every_element<F: KnownOrder>(a: F) {
         // a^(2^m) = a for every a in GF(2^m), since the multiplicative group has order 2^m - 1.
-        assert_eq!(a.pow(F::order()), a);
+        assert_eq!(a.pow(F::order_u128().unwrap()), a);
     }
 
     fn products_stay_within_the_field<const P: u64>(
@@ -884,7 +911,7 @@ mod tests {
     ) {
         // Reduction by the modulus must bring the product's degree back below m.
         let product = a * b;
-        assert!((product.coefficients as u128) < BinaryFieldElement::<P>::order());
+        assert!((product.coefficients as u128) < BinaryFieldElement::<P>::order_u128().unwrap());
     }
 
     proptest! {
@@ -1045,7 +1072,7 @@ mod tests {
 
         for v in &values {
             assert!(
-                (v.coefficients as u128) < Gf256::order(),
+                (v.coefficients as u128) < Gf256::order_u128().unwrap(),
                 "{:?} is not reduced",
                 v
             );
@@ -1064,26 +1091,26 @@ mod tests {
         let g = Gf32::primitive_element(&mut rng);
         let mut seen = HashSet::new();
         let mut x = Gf32::one();
-        for _ in 0..(Gf32::order() - 1) {
+        for _ in 0..(Gf32::order_u128().unwrap() - 1) {
             x *= g;
             seen.insert(x);
         }
-        assert_eq!(seen.len() as u128, Gf32::order() - 1);
+        assert_eq!(seen.len() as u128, Gf32::order_u128().unwrap() - 1);
         assert!(!seen.contains(&Gf32::zero()));
 
         let g = Gf256::primitive_element(&mut rng);
         let mut seen = HashSet::new();
         let mut x = Gf256::one();
-        for _ in 0..(Gf256::order() - 1) {
+        for _ in 0..(Gf256::order_u128().unwrap() - 1) {
             x *= g;
             seen.insert(x);
         }
-        assert_eq!(seen.len() as u128, Gf256::order() - 1);
+        assert_eq!(seen.len() as u128, Gf256::order_u128().unwrap() - 1);
 
         // GF(2^63) is far too large to enumerate, so check the order against each prime divisor
         // of q - 1 = 2^63 - 1 = 7^2 * 73 * 127 * 337 * 92737 * 649657.
         let g = Gf2Pow63::primitive_element(&mut rng);
-        let group_order = Gf2Pow63::order() - 1;
+        let group_order = Gf2Pow63::order_u128().unwrap() - 1;
         assert_eq!(g.pow(group_order), Gf2Pow63::one());
         for r in [7u128, 73, 127, 337, 92737, 649657] {
             assert_eq!(group_order % r, 0, "{} should divide {}", r, group_order);

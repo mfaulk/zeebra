@@ -36,7 +36,8 @@ this milestone is specific to any application.
   cannot vary at runtime. This blocks benchmark families parameterized by n without macro
   instantiation, and is a genuine constraint on F4 (section 9.1).
 - **`FiniteField::order() -> u128`** caps field order at 128 bits, so 254–255-bit fields are
-  unreachable (section 9.3).
+  unreachable (section 9.3). *Resolved in M20-A: the order moved to `KnownOrder` as little-endian
+  limbs. See `docs/MILESTONE-LARGE-PRIME-FIELDS.md`.*
 - **`ExtensionFieldElement` and `BinaryFieldElement` are crate-private** with no external users.
 - Seven tests remain `#[ignore]`d. Three are real but slow — two large integer factorizations and
   the comparison against the naive reference engine — and pass under
@@ -528,6 +529,10 @@ the lex basis to the back-substitution and root finding already in place. The so
 need not change.
 
 ### 9.3 Larger prime fields
+
+*Superseded by `docs/MILESTONE-LARGE-PRIME-FIELDS.md`, which audited this and took a different
+path: rather than widening `order()`, M20-A moved it out of `FiniteField` entirely, because the
+algebraic core turned out never to call it. The analysis below is what was believed at the time.*
 
 `FiniteField::order() -> u128` is the binding constraint: a 254-bit field cannot report its order.
 The trait also assumes `Copy` elements, which suits small fields and fights larger ones.

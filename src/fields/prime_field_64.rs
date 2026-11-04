@@ -19,6 +19,7 @@ use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    fields::{trim_limbs, KnownOrder},
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
     integers::{big_uint::BigUInt, factor, find_generator},
@@ -227,6 +228,31 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
         Self::new(value)
     }
 
+    fn inverse(&self) -> Self {
+        assert_ne!(
+            *self,
+            Self::zero(),
+            "The zero element does not have a multiplicative inverse."
+        );
+        self.pow(P as u128 - 2)
+    }
+}
+
+impl<const P: u64> PrimeFieldElement64<P> {
+    /// The order q = p of the field, as little-endian limbs. See [`KnownOrder::order_limbs`].
+    const ORDER_LIMBS: [u64; 1] = [P];
+}
+
+impl<const P: u64> KnownOrder for PrimeFieldElement64<P> {
+    fn order_limbs() -> &'static [u64] {
+        trim_limbs(&Self::ORDER_LIMBS)
+    }
+
+    fn characteristic_limbs() -> &'static [u64] {
+        // Prime order, so q = p and k = 1.
+        trim_limbs(&Self::ORDER_LIMBS)
+    }
+
     fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         // See Algorithm 4.80 of Handbook of Applied Cryptography.
         let n = BigUInt::new_from_u64(P - 1);
@@ -242,19 +268,11 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
 
     fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
         // n must divide the group order.
-        let group_order = Self::order() - 1;
+        let group_order = P as u128 - 1;
         assert_eq!(group_order % n as u128, 0, "n must divide the group order.");
 
         let x = Self::primitive_element(rng);
         x.pow(group_order / n as u128)
-    }
-
-    fn order() -> u128 {
-        P as u128
-    }
-
-    fn characteristic() -> u128 {
-        P as u128
     }
 }
 
@@ -377,7 +395,7 @@ mod tests {
             Zp2147483647, Zp541, Zp65537, Zp7,
         },
         identities::{One, Zero},
-        FiniteField, ParseFieldElementError,
+        FiniteField, KnownOrder, ParseFieldElementError,
     };
 
     /// Multiplication agrees with reducing the full 128-bit product by a wide remainder.
@@ -613,11 +631,33 @@ mod tests {
         }
     }
 
-    #[ignore]
+    /// Sampling is uniform over the whole field: a chi-squared test over every residue.
     #[test]
-    // random() should sample a field element uniformly at random.
     fn test_random_distribution() {
-        unimplemented!()
+        const P: u64 = 61;
+        const DRAWS: usize = 200_000;
+
+        let mut rng = StdRng::seed_from_u64(20);
+        let mut counts = [0usize; P as usize];
+        for _ in 0..DRAWS {
+            counts[PrimeFieldElement64::<P>::random(&mut rng).value() as usize] += 1;
+        }
+
+        let expected = DRAWS as f64 / P as f64;
+        let chi_squared: f64 = counts
+            .iter()
+            .map(|&count| {
+                let deviation = count as f64 - expected;
+                deviation * deviation / expected
+            })
+            .sum();
+
+        // 99.6 is the 0.999 quantile of chi-squared with 60 degrees of freedom, so a uniform
+        // sampler fails this once in a thousand seeds — and the seed is fixed.
+        assert!(
+            chi_squared < 99.6,
+            "chi-squared {chi_squared:.1} over {P} residues: {counts:?}"
+        );
     }
 
     // A non-zero element times its inverse must be 1.

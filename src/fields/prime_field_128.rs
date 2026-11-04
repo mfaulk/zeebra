@@ -15,6 +15,7 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    fields::{trim_limbs, KnownOrder},
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
     integers::{big_uint::BigUInt, factor, find_generator, utils::u128_from_parts, U256},
@@ -91,7 +92,6 @@ impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
         Ok(Self { value })
     }
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        // Sample a value uniformly in 0..P by rejection sampling.
         // Rejection sampling over the bits P occupies, so at most half of all draws are rejected.
         //
         // The mask is taken over the full 128 bits rather than assembled from two 64-bit halves.
@@ -111,6 +111,31 @@ impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
         }
     }
 
+    fn inverse(&self) -> Self {
+        assert_ne!(
+            *self,
+            Self::zero(),
+            "The zero element does not have a multiplicative inverse."
+        );
+        self.pow(P - 2)
+    }
+}
+
+impl<const P: u128> PrimeFieldElement128<P> {
+    /// The order q = p of the field, as little-endian limbs. See [`KnownOrder::order_limbs`].
+    const ORDER_LIMBS: [u64; 2] = [P as u64, (P >> 64) as u64];
+}
+
+impl<const P: u128> KnownOrder for PrimeFieldElement128<P> {
+    fn order_limbs() -> &'static [u64] {
+        trim_limbs(&Self::ORDER_LIMBS)
+    }
+
+    fn characteristic_limbs() -> &'static [u64] {
+        // Prime order, so q = p and k = 1.
+        trim_limbs(&Self::ORDER_LIMBS)
+    }
+
     fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         // See Algorithm 4.80 of Handbook of Applied Cryptography.
         let n = BigUInt::new_from_u128(P - 1);
@@ -128,19 +153,11 @@ impl<const P: u128> FiniteField for PrimeFieldElement128<P> {
 
     fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
         // n must divide the group order.
-        let group_order = Self::order() - 1;
+        let group_order = P - 1;
         assert_eq!(group_order % n as u128, 0);
 
         let x = Self::primitive_element(rng);
         x.pow(group_order / n as u128)
-    }
-
-    fn order() -> u128 {
-        P
-    }
-
-    fn characteristic() -> u128 {
-        P
     }
 }
 
@@ -250,7 +267,7 @@ mod tests {
 
     use crate::{
         fields::{PrimeFieldElement128, Zp221360928884514619393, Zp541},
-        FiniteField, One, Zero,
+        FiniteField, KnownOrder, One, Zero,
     };
 
     /// A small 128-bit-backed field. Note `Zp541` is the 64-bit type, not this one.

@@ -24,7 +24,7 @@ use crate::{
         },
         F4Options,
     },
-    FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
+    FiniteField, KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
 use super::text::{monomial_to_string, polynomial_to_string};
@@ -204,19 +204,21 @@ pub struct DifferentialCase {
 /// The first [`Check`] that disagreed, with the two answers in the detail. Includes
 /// [`Check::Parse`] and [`Check::Field`], which are defects in the case rather than findings about
 /// Zeebra, so that neither is mistaken for agreement.
-pub fn verify_case<const N: usize, F: FiniteField>(
+pub fn verify_case<const N: usize, F: KnownOrder>(
     case: &DifferentialCase,
     options: &FglmOptions,
 ) -> Result<Agreement, Disagreement> {
     let fail = |check: Check, detail: String| Disagreement { check, detail };
 
-    if u128::from(case.characteristic) != F::characteristic() {
+    // Singular's fixtures are over small prime fields, so a characteristic that does not fit in
+    // a u128 cannot be the one the case was generated over.
+    if Some(u128::from(case.characteristic)) != F::characteristic_u128() {
         return Err(fail(
             Check::Field,
             format!(
-                "the case is over GF({}) and is being checked over GF({})",
+                "the case is over GF({}) and is being checked over a field of characteristic {:?}",
                 case.characteristic,
-                F::characteristic()
+                F::characteristic_limbs()
             ),
         ));
     }

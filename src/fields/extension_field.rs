@@ -27,6 +27,7 @@ use serde::{
 use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants};
 
 use crate::{
+    fields::{trim_limbs, KnownOrder},
     identities::{One, Zero},
     FiniteField, ParseFieldElementError, Ring,
 };
@@ -259,13 +260,41 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
         }
     }
 
-    fn order() -> u128 {
-        // TODO: p^n can be larger than u128
-        (P as u128).pow(N as u32)
+    fn inverse(&self) -> Self {
+        assert_ne!(
+            *self,
+            Self::zero(),
+            "The zero element does not have a multiplicative inverse."
+        );
+        self.pow(Self::ORDER - 2)
+    }
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ExtensionFieldElement<P, N, M> {
+    /// q = p^N.
+    ///
+    /// A `u128` still, as `order` was: an extension whose order exceeds that is a compile error
+    /// here rather than the silent overflow it used to be at run time. Widening this is not what
+    /// the wide prime fields need, so it is left until an extension field asks for it.
+    const ORDER: u128 = (P as u128).pow(N as u32);
+
+    /// See [`KnownOrder::order_limbs`].
+    const ORDER_LIMBS: [u64; 2] = [Self::ORDER as u64, (Self::ORDER >> 64) as u64];
+
+    /// See [`KnownOrder::characteristic_limbs`].
+    const CHARACTERISTIC_LIMBS: [u64; 1] = [P];
+}
+
+impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> KnownOrder
+    for ExtensionFieldElement<P, N, M>
+{
+    fn order_limbs() -> &'static [u64] {
+        trim_limbs(&Self::ORDER_LIMBS)
     }
 
-    fn characteristic() -> u128 {
-        P as u128
+    fn characteristic_limbs() -> &'static [u64] {
+        // q = p^N with N > 1, so the characteristic is genuinely not the order.
+        trim_limbs(&Self::CHARACTERISTIC_LIMBS)
     }
 }
 
@@ -495,7 +524,7 @@ mod tests {
             },
         },
         identities::{One, Zero},
-        FiniteField,
+        FiniteField, KnownOrder,
     };
 
     use super::delayed_reduction_fits;
@@ -832,9 +861,9 @@ mod tests {
         assert_eq!((a * b) / b, a);
     }
 
-    fn frobenius_fixes_every_element<F: FiniteField>(a: F) {
+    fn frobenius_fixes_every_element<F: KnownOrder>(a: F) {
         // a^(p^n) = a for every a in GF(p^n).
-        assert_eq!(a.pow(F::order()), a);
+        assert_eq!(a.pow(F::order_u128().unwrap()), a);
     }
 
     fn coefficients_stay_reduced<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>>(
@@ -1042,28 +1071,28 @@ mod tests {
         let g = F3x2::primitive_element(&mut rng);
         let mut seen = std::collections::HashSet::new();
         let mut x = F3x2::one();
-        for _ in 0..(F3x2::order() - 1) {
+        for _ in 0..(F3x2::order_u128().unwrap() - 1) {
             x *= g;
             seen.insert(x);
         }
-        assert_eq!(seen.len() as u128, F3x2::order() - 1);
+        assert_eq!(seen.len() as u128, F3x2::order_u128().unwrap() - 1);
         assert!(!seen.contains(&F3x2::zero()));
-        assert_eq!(g.pow(F3x2::order() - 1), F3x2::one());
+        assert_eq!(g.pow(F3x2::order_u128().unwrap() - 1), F3x2::one());
 
         // GF(125) likewise.
         let g = F5x3::primitive_element(&mut rng);
         let mut seen = std::collections::HashSet::new();
         let mut x = F5x3::one();
-        for _ in 0..(F5x3::order() - 1) {
+        for _ in 0..(F5x3::order_u128().unwrap() - 1) {
             x *= g;
             seen.insert(x);
         }
-        assert_eq!(seen.len() as u128, F5x3::order() - 1);
+        assert_eq!(seen.len() as u128, F5x3::order_u128().unwrap() - 1);
 
         // GF(13^4) is too large to enumerate, so check the order via the prime divisors of
         // q - 1: a generator must not be killed by any proper divisor.
         let g = F13x4::primitive_element(&mut rng);
-        let group_order = F13x4::order() - 1;
+        let group_order = F13x4::order_u128().unwrap() - 1;
         assert_eq!(g.pow(group_order), F13x4::one());
         for r in [2u128, 3, 5, 7, 17] {
             assert_eq!(group_order % r, 0, "{} should divide {}", r, group_order);

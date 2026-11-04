@@ -10,8 +10,21 @@
 
 use crate::{
     poly::univariate::{Polynomial, UnivariatePolynomial},
-    FiniteField,
+    FiniteField, KnownOrder,
 };
+
+/// The order q of F as a `u128`.
+///
+/// The univariate algorithms exponentiate by q, q - 1 and q^d, and `pow_mod` takes its exponent
+/// as a `u128`. Until that exponent becomes a limb slice, a field whose order is wider than a
+/// `u128` cannot be factored or have its roots found, and this is where it says so rather than
+/// computing with a truncated order.
+pub(crate) fn field_order<F: KnownOrder>() -> u128 {
+    F::order_u128().expect(
+        "root finding and factorization take the field order as a u128; a wider field needs \
+         limb-exponent modular arithmetic",
+    )
+}
 
 /// `base^exponent mod modulus`, by square-and-multiply.
 ///

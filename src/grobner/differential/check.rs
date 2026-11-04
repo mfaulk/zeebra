@@ -12,7 +12,7 @@ use crate::{
         fglm::{BorderIndex, FglmError, FglmOptions, QuotientBasis},
         F4Options,
     },
-    FiniteField, MultivariatePolynomial,
+    KnownOrder, MultivariatePolynomial,
 };
 
 use super::{
@@ -104,7 +104,7 @@ impl SystemOutcome {
 /// the ones found here. That is deliberate duplication: it keeps `verify_case` runnable against a
 /// committed fixture with no oracle present, so CI exercises the same comparison code this does.
 /// The systems are small enough that computing a basis twice costs nothing worth saving.
-pub fn check_system<const N: usize, F: FiniteField>(
+pub fn check_system<const N: usize, F: KnownOrder>(
     system: &GeneratedSystem,
     oracle: &mut impl Oracle,
     options: &FglmOptions,

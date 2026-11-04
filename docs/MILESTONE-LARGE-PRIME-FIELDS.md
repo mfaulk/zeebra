@@ -1,7 +1,7 @@
 # Milestone: Large Prime Fields and Cryptographic Algebra Readiness
 
-**Status:** M20-0 complete (audit, backend choice, baselines, architecture) — awaiting approval
-before M20-A changes generic bounds.
+**Status:** M20-0 complete (audit, backend choice, baselines, architecture); M20-A landed (the
+`KnownOrder` split). Next is M20-B, the `ark-ff` adapter.
 **Prerequisites:** M18 merged; M19 complete on `m19-field-arithmetic` but **not yet on `main`**
 (`main` carries only the M19-0/M19-A merge). M20 branches from the merged M19.
 
@@ -140,7 +140,7 @@ CI runs `cargo clippy --all-targets --all-features -- -D warnings`, so M20-B mus
 warning does not escalate there, and add `#[allow(unexpected_cfgs)]` on the declaring module if
 it does.
 
-## 3. Architecture: split the cardinality out of `FiniteField`
+## 3. Architecture: split the cardinality out of `FiniteField` — landed
 
 The plan (§6.1) proposes a new minimal `AlgebraField` plus a compatibility blanket impl, and
 migrating generic bounds across the crate. Given §1's finding, that buys nothing the cheaper
@@ -148,11 +148,11 @@ change does not, and costs 253 bound edits plus a coherence problem (a blanket
 `impl<T: FiniteField> AlgebraField for T` conflicts with any direct impl for the wide-field
 adapter — the plan's own §6.3 warning).
 
-**Recommended instead:** leave `FiniteField` as the one coefficient trait and move the
-cardinality out of it.
+**Done instead:** `FiniteField` stays the one coefficient trait, and the cardinality moves out of
+it.
 
 ```rust
-// src/fields/finite_field.rs — unchanged except for what leaves
+// src/fields/finite_field.rs — unchanged except for what left
 pub trait FiniteField: Ring + /* …operators, Hash, Serde, Display… */ {
     fn new(val: u64) -> Self;
     fn from_str(value: &str) -> Result<Self, ParseFieldElementError>;
@@ -163,41 +163,64 @@ pub trait FiniteField: Ring + /* …operators, Hash, Serde, Display… */ {
     fn checked_div(&self, rhs: &Self) -> Option<Self>;
 }
 
-/// A finite field whose order and characteristic are known as little-endian 64-bit limbs.
-///
-/// Separate from `FiniteField` because the algebraic core never needs it: only root finding,
-/// factorization and field enumeration do.
 pub trait KnownOrder: FiniteField {
     /// q = p^k, little-endian limbs, no trailing zero limb.
     fn order_limbs() -> &'static [u64];
-    /// p, little-endian limbs.
+    /// p, little-endian limbs. Not the order unless k = 1.
     fn characteristic_limbs() -> &'static [u64];
 
-    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self;
-    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self;
+    /// For the callers that need a machine integer and may fail without one.
+    fn order_u128() -> Option<u128> { /* from the limbs */ }
+    fn characteristic_u128() -> Option<u128> { /* from the limbs */ }
 
-    /// q as a `u128`, or `None` if it does not fit. For the call sites that genuinely need a
-    /// machine integer — `MAX_FIELD_ORDER`, the Singular fixture check.
-    fn order_u128() -> Option<u128>;
+    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self { /* HAC 4.80 */ }
+    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self { /* … */ }
 }
 ```
 
-Consequences:
+`&'static [u64]` with no allocation and no fixed width: an implementation holds its order in an
+associated const array — which may depend on a const generic, and `&Self::ORDER_LIMBS` promotes
+to `'static` — and passes it through `trim_limbs` to drop the trailing zero limb.
 
-- **Zero bound edits in `poly/multivariate`, `linalg`, `grobner/f4`, `grobner/fglm`,
-  `grobner/buchberger`.** They already require exactly what they use.
-- `roots`, `factorize`, `is_irreducible` gain `F: KnownOrder`. `solve` (the brute-force
-  extension in `solve.rs`) and the differential harness gain it too, and stay small-field by
-  construction rather than by assertion.
-- `inverse` becomes a **required** method. That is the breaking change, and it is the point: the
-  current provided body is the thing that cannot exist for a wide field. All four existing field
-  types get a one-line `fn inverse(&self) -> Self { self.pow(Self::order_u128().unwrap() - 2) }`
-  moved out of the trait, preserving behaviour exactly; the adapter delegates to
-  `ark_ff::Field::inverse`.
-- Limbs, not a `BigUInt`: `order_limbs()` returning `&'static [u64]` costs no allocation, and
-  `pow_mod` consumes it as a bit iterator (§5.1).
-- `k` is preserved. `order_limbs` is q = p^k and `characteristic_limbs` is p; the extension and
-  binary fields keep the distinction they have now.
+```rust
+impl<const P: u128> PrimeFieldElement128<P> {
+    const ORDER_LIMBS: [u64; 2] = [P as u64, (P >> 64) as u64];
+}
+
+impl<const P: u128> KnownOrder for PrimeFieldElement128<P> {
+    fn order_limbs() -> &'static [u64] { trim_limbs(&Self::ORDER_LIMBS) }
+    // ...
+}
+```
+
+What it cost, measured against the plan's estimate of ~253 bound edits:
+
+| | sites |
+|---|---:|
+| `poly/multivariate`, `linalg`, `grobner/f4`, `grobner/fglm`, `buchberger`, `pairs`, `s_polynomial` | **0** |
+| `FiniteField` → `KnownOrder` bounds, non-test | 16 |
+| `KnownOrder` impls (the four field types) | 4 |
+| `inverse` bodies moved out of the trait | 4 |
+
+The 16 are `roots`; `factorize`, `is_irreducible` and the Frobenius/splitting helpers they share;
+`solve` and its enumeration helpers; the `solve_one` / `solve_zero_dimensional` pipeline, which
+reaches `roots` through `candidate_values`; `verify_case` and `check_system` in the differential
+harness. Nothing else.
+
+Two corrections to §3 as first written:
+
+1. **The solving pipeline needs `KnownOrder`, not just the small-field enumerator.**
+   `solve_zero_dimensional → search → candidate_values → roots` is a hard dependency, so
+   `solve_one` carries the bound permanently. That is not a restriction on wide fields — the
+   adapter implements `KnownOrder` too — but it does make M20-D a gate rather than a polish step.
+2. **`solve.rs` stays small-field by assertion, not by construction.** Its `MAX_FIELD_ORDER` check
+   is now `F::order_u128().is_some_and(|q| q <= MAX_FIELD_ORDER)`, which fails closed for a field
+   too wide to measure, but it is still a runtime check.
+
+`k` is preserved: `order_limbs` is q = p^k and `characteristic_limbs` is p, so the extension and
+binary fields keep the distinction. `BinaryFieldElement` reports characteristic `[2]` against an
+order of `2^m`, and `factorize`'s characteristic-two branch is now
+`F::characteristic_limbs() == [2]` rather than `F::characteristic() == 2`.
 
 ### 3.1 Public API break, stated plainly
 
@@ -221,7 +244,29 @@ can implement it in about six lines, the bound is load-bearing for
 every `Ring` user to no measured end. **Do not move it in M20.** Revisit only if the adapter
 hits a real conflict — which the probe says it will not.
 
-### 3.4 What this does *not* solve
+### 3.4 How the split is kept
+
+`grobner::mod`'s `test_the_grobner_stack_needs_no_field_cardinality` runs Buchberger, F4 and FGLM
+through a function generic over `F: FiniteField` alone and checks Buchberger's criterion on each
+result. The assertions are a sanity check; the content of the test is that it compiles. Adding
+`F: KnownOrder` to `f4` was tried and breaks it, along with three sites in `f4/tests.rs`, so the
+property is pinned rather than merely documented.
+
+`roots` and `factorize` still take their exponents as `u128`, through one helper:
+
+```rust
+// src/poly/univariate/pow_mod.rs
+pub(crate) fn field_order<F: KnownOrder>() -> u128 {
+    F::order_u128().expect(
+        "root finding and factorization take the field order as a u128; a wider field needs \
+         limb-exponent modular arithmetic",
+    )
+}
+```
+
+One place to fail, one message naming what is missing, and one place for M20-D to replace.
+
+### 3.5 What this does *not* solve
 
 Nothing here makes `roots` work. §1's four files still need wide exponents, and the solving
 pipeline goes straight through them:
@@ -303,7 +348,7 @@ The structure of the plan survives; the sizes change.
 | ID | Deliverable | Change from the plan |
 |---|---|---|
 | **M20-0** | This document | done |
-| **M20-A** | `KnownOrder` split, `inverse` required, four files gain the bound | **much smaller** — no core bound migration, no new `AlgebraField`, no blanket impl |
+| **M20-A** | `KnownOrder` split, `inverse` required | **done**, and much smaller than planned — 16 bound edits, none in the core |
 | **M20-B** | `ark-ff` adapter newtype, BN254 + BLS12-381 `Fr`, oracle property tests | as planned |
 | **M20-C** | F4/Buchberger/quotient/FGLM over both fields; byte-accounted limits | as planned, but expect **no code changes** in the core — it is a test-and-measure sub-milestone |
 | **M20-D** | Limb-exponent `pow_mod`, Frobenius, `roots`, `factorize`, `solve_one` | **the critical path**, and the real risk |
@@ -372,19 +417,17 @@ Neither is M20 work; both are in the code M20 touches.
 
 ## 7. Open decisions
 
-1. **Approve the `KnownOrder` split over a new `AlgebraField`** (§3). This is the one decision
-   M20-A cannot start without. The argument for it is §1: the core needs no new trait because it
-   already asks for nothing beyond arithmetic.
-2. **`inverse` as a required method** is the one unavoidable public break. The alternative — keep
-   the default and have it panic for wide fields — trades a compile error for a runtime one.
-   Recommend the break.
+1. ~~Approve the `KnownOrder` split over a new `AlgebraField`~~ — approved, landed (§3).
+2. ~~`inverse` as a required method~~ — approved; it is the one public break (§3.1).
 3. **Locally declared moduli over `ark-bn254`/`ark-bls12-381`** (§2.2), accepting that the
    moduli are then zeebra's responsibility to get right, checked by test against the published
-   constants.
+   constants. Still open; M20-B decides.
 4. Whether to re-base `PrimeFieldElement128` on `ark-ff` once the adapter exists, given §4.2.
    Out of M20's scope as written; worth an issue.
 
-## 8. Acceptance criteria for M20-0
+## 8. Acceptance criteria
+
+### M20-0
 
 - [x] Every `order`/`characteristic`/`pow`/`inverse`/`random`/`primitive_element`/`root_of_unity`
       use inventoried and classified (§1)
@@ -394,5 +437,21 @@ Neither is M20 work; both are in the code M20 touches.
 - [x] Field-arithmetic baselines recorded for 31-, 64- and 68-bit fields, and for both candidate
       wide fields (§4.1, §4.2)
 - [x] Trait architecture specified, with the public break stated (§3)
+- [x] Architecture approved — the exit criterion
 - [ ] F4/FGLM/solving baselines — deferred to the merged M19 (§4.3)
-- [ ] **Architecture approved** (§7) — the exit criterion
+
+### M20-A
+
+- [x] Existing field types compile through the new abstraction, with unchanged arithmetic and
+      serialization behaviour — the suite is 979 lib tests and 14 doc tests, all passing, same
+      count as before the split plus the new ones
+- [x] The algebraic core is instantiable with a coefficient type that has no cardinality, pinned
+      by a test that fails to compile otherwise (§3.4)
+- [x] Small-field algorithms return identical results; the Singular differential fixtures pass
+      unchanged
+- [x] No duplicated wide-field Gröbner implementation introduced — there is no second
+      implementation of anything
+- [x] The public break documented, in the README's `FiniteField` and `KnownOrder` section and in
+      §3.1
+- [ ] Instantiated with a field whose order exceeds `u128` — M20-B, which is the first point at
+      which such a field exists

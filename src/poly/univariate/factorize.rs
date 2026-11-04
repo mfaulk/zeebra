@@ -19,8 +19,8 @@
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    poly::univariate::{gcd, pow_mod, Polynomial, UnivariatePolynomial},
-    FiniteField,
+    poly::univariate::{gcd, pow_mod, pow_mod::field_order, Polynomial, UnivariatePolynomial},
+    FiniteField, KnownOrder,
 };
 
 /// Each splitting attempt succeeds with probability near one half, so exhausting this many means
@@ -34,7 +34,7 @@ const MAX_SPLIT_ATTEMPTS: usize = 1000;
 ///
 /// # Panics
 /// Panics if `f` is the zero polynomial, which has no factorization.
-pub fn factorize<F: FiniteField, R: RngCore + CryptoRng>(
+pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
     f: &UnivariatePolynomial<F>,
     rng: &mut R,
 ) -> Vec<(UnivariatePolynomial<F>, usize)> {
@@ -47,7 +47,7 @@ pub fn factorize<F: FiniteField, R: RngCore + CryptoRng>(
     let monic = make_monic(f);
     let total_degree = monic.degree();
     let x = variable::<F>();
-    let q = F::order();
+    let q = field_order::<F>();
 
     let mut factors: Vec<(UnivariatePolynomial<F>, usize)> = Vec::new();
     let mut accounted = 0u32;
@@ -106,7 +106,7 @@ pub fn factorize<F: FiniteField, R: RngCore + CryptoRng>(
 ///
 /// # Panics
 /// Panics if `f` is the zero polynomial.
-pub fn is_irreducible<F: FiniteField>(f: &UnivariatePolynomial<F>) -> bool {
+pub fn is_irreducible<F: KnownOrder>(f: &UnivariatePolynomial<F>) -> bool {
     assert!(!f.is_zero(), "the zero polynomial is not irreducible");
 
     let n = f.degree();
@@ -120,7 +120,7 @@ pub fn is_irreducible<F: FiniteField>(f: &UnivariatePolynomial<F>) -> bool {
 
     let monic = make_monic(f);
     let x = variable::<F>();
-    let q = F::order();
+    let q = field_order::<F>();
 
     if frobenius_iterated(&x, n, q, &monic) != x {
         return false;
@@ -138,7 +138,7 @@ pub fn is_irreducible<F: FiniteField>(f: &UnivariatePolynomial<F>) -> bool {
 /// `base^(q^times) mod modulus`, by applying the Frobenius map `times` times.
 ///
 /// Raising to `q^times` directly would overflow the exponent for all but the smallest inputs.
-fn frobenius_iterated<F: FiniteField>(
+fn frobenius_iterated<F: KnownOrder>(
     base: &UnivariatePolynomial<F>,
     times: u32,
     q: u128,
@@ -152,7 +152,7 @@ fn frobenius_iterated<F: FiniteField>(
 }
 
 /// Separate a product of distinct monic irreducibles, each of degree `d`, into those factors.
-pub(crate) fn separate_equal_degree<F: FiniteField, R: RngCore + CryptoRng>(
+pub(crate) fn separate_equal_degree<F: KnownOrder, R: RngCore + CryptoRng>(
     g: &UnivariatePolynomial<F>,
     d: u32,
     rng: &mut R,
@@ -169,7 +169,7 @@ pub(crate) fn separate_equal_degree<F: FiniteField, R: RngCore + CryptoRng>(
 }
 
 /// Split a product of two or more distinct monic irreducibles of degree `d` into two parts.
-fn split<F: FiniteField, R: RngCore + CryptoRng>(
+fn split<F: KnownOrder, R: RngCore + CryptoRng>(
     g: &UnivariatePolynomial<F>,
     d: u32,
     rng: &mut R,
@@ -181,7 +181,7 @@ fn split<F: FiniteField, R: RngCore + CryptoRng>(
 
         // Each irreducible factor of g independently either divides the candidate or does not,
         // so the gcd is a proper factor unless every factor falls on the same side.
-        let candidate = if F::characteristic() == 2 {
+        let candidate = if F::characteristic_limbs() == [2] {
             // The role of "half the elements" falls to the trace onto GF(2), there being no
             // (q^d - 1)/2 in characteristic two. The extension F[x]/(factor) has 2^(m*d)
             // elements, so the trace has m*d terms.
@@ -190,7 +190,7 @@ fn split<F: FiniteField, R: RngCore + CryptoRng>(
             // The target is h^((q^d - 1)/2). Writing (q^d - 1)/2 as
             // ((q - 1)/2) * (1 + q + ... + q^(d-1)) turns it into the norm raised to (q - 1)/2,
             // both of which are computable: the exponent itself would overflow.
-            &pow_mod(&frobenius_norm(&h, g, d), (F::order() - 1) / 2, g)
+            &pow_mod(&frobenius_norm(&h, g, d), (field_order::<F>() - 1) / 2, g)
                 - &UnivariatePolynomial::one()
         };
 
@@ -212,12 +212,12 @@ fn split<F: FiniteField, R: RngCore + CryptoRng>(
 }
 
 /// The norm `h * h^q * h^(q^2) * ... * h^(q^(d-1))` in F[x]/(g).
-fn frobenius_norm<F: FiniteField>(
+fn frobenius_norm<F: KnownOrder>(
     h: &UnivariatePolynomial<F>,
     g: &UnivariatePolynomial<F>,
     d: u32,
 ) -> UnivariatePolynomial<F> {
-    let q = F::order();
+    let q = field_order::<F>();
     let mut term = h.div(g).1;
     let mut norm = term.clone();
     for _ in 1..d {
@@ -228,13 +228,13 @@ fn frobenius_norm<F: FiniteField>(
 }
 
 /// The absolute trace `h + h^2 + h^4 + ... + h^(2^(m*d - 1))` in F[x]/(g), for q = 2^m.
-pub(crate) fn trace_to_gf2<F: FiniteField>(
+pub(crate) fn trace_to_gf2<F: KnownOrder>(
     h: &UnivariatePolynomial<F>,
     g: &UnivariatePolynomial<F>,
     d: u32,
 ) -> UnivariatePolynomial<F> {
     // q = 2^m, so m is the position of its single set bit.
-    let m = F::order().trailing_zeros();
+    let m = field_order::<F>().trailing_zeros();
     let mut term = h.div(g).1;
     let mut sum = term.clone();
     for _ in 1..(m * d) {

@@ -90,7 +90,7 @@ jobs:
         run: cargo test --profile ci-release --doc --verbose
 
       # The `#[ignore]`d tests that are real but slow, named individually: a bare
-      # `--run-ignored=only` would also pick up the four `unimplemented!()` placeholders, which
+      # `--run-ignored=only` would also pick up the two `unimplemented!()` placeholders, which
       # panic by design. `test(=...)` is an exact match, so a renamed test fails the filter
       # rather than silently matching nothing. Release mode is required — the naive reference
       # engine is impractical in a debug build.
