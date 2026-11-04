@@ -6,15 +6,19 @@
 //! structure of the border — the number of nonstandard products against the number of *distinct*
 //! nonstandard monomials, whose gap is the duplicated reduction M18-1 removes.
 //!
-//! Two tables, because they answer different questions:
+//! Three tables, because they answer different questions:
 //!
-//! * **Border structure** bounds what deduplication can save. It is counts only, so it is exact
-//!   and does not depend on the machine.
-//! * **Stages and memory** says where the time actually goes and what the representations hold.
-//!   The timings need `FglmOptions::measure_stages`, which this sets.
+//! * **Border structure** bounds what deduplication can remove. Counts only, so it is exact and
+//!   does not depend on the machine.
+//! * **Stages** says where the time actually goes. Needs `FglmOptions::measure_stages`, which this
+//!   sets.
+//! * **Storage** says what the representations hold, and in particular how the operators compare
+//!   against the dense blocks the dependence test needs. The answer is not uniform: on katsura the
+//!   operators dominate and on the planted family the blocks are nearly forty times larger.
 //!
-//! A high duplication rate is evidence for deduplication and not proof of a speedup: the saving
-//! is bounded by the `nf ms` column, not by the duplication rate.
+//! A high duplication rate is evidence for deduplication and not proof of a speedup: the saving is
+//! bounded by the `nf ms` column, not by the duplication rate. Nor do border monomials cost the
+//! same to reduce — a repeated one is low in the order, which correlates with being cheap.
 //!
 //! ```text
 //! cargo run --release --example fglm_profile
@@ -124,19 +128,11 @@ fn border_row(row: &Row) {
 
 fn stage_header() {
     println!(
-        "| {:<11} | {:>8} | {:>7} | {:>8} | {:>8} | {:>8} | {:>8} | {:>11} | {:>9} |",
-        "system",
-        "total ms",
-        "basis",
-        "classify",
-        "nf ms",
-        "assembly",
-        "walk",
-        "operator kB",
-        "blocks kB",
+        "| {:<11} | {:>8} | {:>7} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} |",
+        "system", "total ms", "basis", "classify", "nf ms", "assembly", "walk", "nf share",
     );
     println!(
-        "|{}|{}|{}|{}|{}|{}|{}|{}|{}|",
+        "|{}|{}|{}|{}|{}|{}|{}|{}|",
         "-".repeat(13),
         "-".repeat(10),
         "-".repeat(9),
@@ -144,16 +140,14 @@ fn stage_header() {
         "-".repeat(10),
         "-".repeat(10),
         "-".repeat(10),
-        "-".repeat(13),
-        "-".repeat(11),
+        "-".repeat(10),
     );
 }
 
 fn stage_row(row: &Row) {
     let t = row.statistics.timings;
-    let m = row.statistics.memory;
     println!(
-        "| {:<11} | {:>8.2} | {:>7.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>11.1} | {:>9.1} |",
+        "| {:<11} | {:>8.2} | {:>7.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>7.0}% |",
         row.name,
         millis(row.wall),
         millis(t.quotient_basis),
@@ -161,8 +155,36 @@ fn stage_row(row: &Row) {
         millis(t.normal_forms),
         millis(t.column_assembly),
         millis(t.dependence),
+        100.0 * t.normal_forms.as_secs_f64() / row.wall.as_secs_f64(),
+    );
+}
+
+fn storage_header() {
+    println!(
+        "| {:<11} | {:>5} | {:>9} | {:>11} | {:>11} | {:>11} |",
+        "system", "D", "entries", "operator kB", "blocks kB", "blocks/ops",
+    );
+    println!(
+        "|{}|{}|{}|{}|{}|{}|",
+        "-".repeat(13),
+        "-".repeat(7),
+        "-".repeat(11),
+        "-".repeat(13),
+        "-".repeat(13),
+        "-".repeat(13),
+    );
+}
+
+fn storage_row(row: &Row) {
+    let m = row.statistics.memory;
+    println!(
+        "| {:<11} | {:>5} | {:>9} | {:>11.1} | {:>11.1} | {:>10.1}x |",
+        row.name,
+        row.statistics.quotient_dimension,
+        m.operator_entries,
         kilobytes(m.operator_bytes),
         kilobytes(m.dense_block_bytes),
+        m.dense_block_bytes as f64 / m.operator_bytes as f64,
     );
 }
 
@@ -221,7 +243,7 @@ fn main() {
     println!("the reductions deduplication can remove — not on the time it can save.");
 
     println!();
-    println!("# FGLM stages and storage, fastest of three, measure_stages on");
+    println!("# FGLM stages, fastest of three, measure_stages on");
     println!();
     stage_header();
     for row in &rows {
@@ -231,10 +253,25 @@ fn main() {
     println!();
     println!("`basis`, `classify`, `nf ms`, `assembly` and `walk` partition the conversion and");
     println!("are in milliseconds. `total ms` is its wall clock, which exceeds their sum by the");
-    println!("bookkeeping outside every stage. `operator kB` is what the operators' columns hold,");
-    println!("capacity included; `blocks kB` is the three dense D x D blocks the conversion needs");
-    println!("at full rank — the span's two and the retained accepted vectors, which no budget");
-    println!("covers. Both are estimates of representations, not measurements of the process.");
+    println!(
+        "bookkeeping outside every stage. `nf share` is the reduction against that total: the"
+    );
+    println!("fraction of a conversion that deduplicating and batching the border could reach.");
+
+    println!();
+    println!("# FGLM storage");
+    println!();
+    storage_header();
+    for row in &rows {
+        storage_row(row);
+    }
+
+    println!();
+    println!("`entries` is the operators' mathematical nonzeros; `operator kB` is what their");
+    println!("columns actually hold, each Vec's spare capacity and the per-column spine included.");
+    println!("`blocks kB` is the three dense D x D blocks the conversion needs at full rank — the");
+    println!("dependence test's two and the retained accepted vectors, which no budget covers.");
+    println!("Both are estimates of representations, not measurements of the process.");
 
     match peak_resident_bytes() {
         Some(peak) => {

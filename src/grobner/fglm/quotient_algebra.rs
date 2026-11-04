@@ -687,7 +687,7 @@ mod tests {
     /// entries run from **58% of dense on the katsura family down to 0.34% on planted-8**. So the
     /// sparse columns are worth 1.7x on one family and 290x on another, and at 16 bytes an entry
     /// against 8 bytes a dense cell they do not pay at all on katsura. That is a storage question
-    /// for M17-E, not a correctness one; what is asserted here is only what holds everywhere.
+    /// for M18-3, not a correctness one; what is asserted here is only what holds everywhere.
     #[test]
     fn test_both_column_kinds_occur_and_beat_a_dense_matrix() {
         let order = MonomialOrder::GradedReverseLexicographic;
