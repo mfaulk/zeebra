@@ -125,24 +125,34 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     statistics.memory.operator_bytes = algebra.operator_bytes();
     statistics.memory.dense_columns = algebra.dense_columns();
 
-    // The span's two blocks are `2 * D^2` entries. Checked before allocating, since the size is a
-    // function of the dimension alone — not discovered as it fills.
+    // Every dense cell the dependence machinery needs at full rank: the span's coordinates, the
+    // span's triangular combinations, and the accepted quotient vectors the walk retains. Checked
+    // before allocating, since the size is a function of the dimension alone — not discovered as it
+    // fills.
     //
-    // The accepted quotient vectors below are a third such block and are **not** checked here:
-    // `max_span_entries` has counted the span's two blocks since M17 and silently redefining it
-    // would make a budget mean one thing in one release and another in the next. The third block
-    // is reported in `statistics.memory` so the omission is visible. M18-4 closes it.
+    // **M17 counted two of the three blocks and `max_span_entries` meant `2 * D^2`.** It now means
+    // all three, and the span's own figure is smaller than it was, so the limit describes a
+    // different quantity than it did. That is M18-4's whole point and is recorded in §8 of
+    // docs/MILESTONE-FGLM-SCALABILITY.md; `statistics.memory` reports each block separately so any
+    // figure quoted against the old meaning can be recomputed.
     let (span_cells, accepted_cells, dense_bytes) = FglmMemory::dense_blocks_for::<F>(dimension)
         .ok_or(FglmError::SpanStorageExceeded {
             entries: usize::MAX,
             limit: options.max_span_entries,
         })?;
+    let dense_cells =
+        span_cells
+            .checked_add(accepted_cells)
+            .ok_or(FglmError::SpanStorageExceeded {
+                entries: usize::MAX,
+                limit: options.max_span_entries,
+            })?;
     statistics.memory.span_cells = span_cells;
     statistics.memory.accepted_vector_cells = accepted_cells;
     statistics.memory.dense_block_bytes = dense_bytes;
-    if span_cells > options.max_span_entries {
+    if dense_cells > options.max_span_entries {
         return Err(FglmError::SpanStorageExceeded {
-            entries: span_cells,
+            entries: dense_cells,
             limit: options.max_span_entries,
         });
     }
@@ -774,9 +784,21 @@ mod tests {
 
         let d = s.quotient_dimension;
         assert_eq!(d, 32);
-        assert_eq!(s.memory.span_cells, 2 * d * d);
+        assert_eq!(
+            s.memory.span_cells,
+            d * d + d * (d + 1) / 2,
+            "a coordinate block and a triangular combination block"
+        );
         assert_eq!(s.memory.accepted_vector_cells, d * d);
-        assert_eq!(s.memory.dense_block_bytes, 3 * d * d * size_of::<F>());
+        assert_eq!(
+            s.memory.dense_block_bytes,
+            (s.memory.span_cells + s.memory.accepted_vector_cells) * size_of::<F>()
+        );
+        // The three blocks M17 priced at `3 * D^2`, now that the combinations are triangular.
+        assert!(
+            s.memory.span_cells + s.memory.accepted_vector_cells < 3 * d * d,
+            "the dense blocks should be under three squares"
+        );
         assert_eq!(s.memory.operator_entries, s.operator_entries);
         assert!(
             s.memory.operator_bytes > s.operator_entries * size_of::<(usize, F)>(),
@@ -958,17 +980,19 @@ mod tests {
             FglmError::OperatorStorageExceeded { .. }
         ));
 
-        // D = 16, so the span needs 2 * 256 = 512 entries.
+        // D = 16, so the dependence machinery needs 256 coordinate cells, a 16 * 17 / 2 = 136
+        // triangular combination block, and 256 retained accepted vectors: 648 in all. M17
+        // budgeted 512, counting two square blocks and omitting the accepted vectors.
         let mut options = FglmOptions::unbounded();
-        options.max_span_entries = 511;
+        options.max_span_entries = 647;
         assert_eq!(
             fglm_to_lex_with_options(&source, source_order, &options).unwrap_err(),
             FglmError::SpanStorageExceeded {
-                entries: 512,
-                limit: 511
+                entries: 648,
+                limit: 647
             }
         );
-        options.max_span_entries = 512;
+        options.max_span_entries = 648;
         assert!(fglm_to_lex_with_options(&source, source_order, &options).is_ok());
     }
 

@@ -9,6 +9,14 @@
 //! and reports statistics, not the multipliers it applied. Recovering the multipliers means
 //! carrying a second block through the elimination, which is what each row does below: alongside
 //! its coordinates it holds its own expression in terms of the accepted vectors.
+//!
+//! # The second block is triangular, not square
+//! An echelon row inserted when the accepted rank is `r` is a combination of the `r + 1` vectors
+//! accepted up to and including the one that produced it. It **cannot** involve a vector accepted
+//! afterwards, so its combination needs `r + 1` coefficients and not `D`. Summed over the rows that
+//! is `D (D + 1) / 2` cells against `D^2` — so the span holds `1.5 D^2` field elements at full rank
+//! rather than `2 D^2`, a quarter less, exactly. Nothing is approximated and nothing is traded: the
+//! padding was zeros.
 
 use crate::FiniteField;
 
@@ -18,7 +26,12 @@ struct SpanRow<F: FiniteField> {
     /// `coordinates = sum_j combination[j] * accepted_j`. The invariant everything rests on.
     coordinates: Vec<F>,
 
-    /// Coefficients over the accepted vectors, zero-padded to the quotient dimension.
+    /// Coefficients over the accepted vectors, of length `index + 1` for the row at `index`.
+    ///
+    /// **Not padded to the dimension.** A row inserted at rank `r` cannot involve a vector accepted
+    /// later, so coefficients beyond `r` are structurally zero — see the module documentation.
+    /// Every loop over this zips against it rather than indexing, so the shorter length is a
+    /// shorter loop and not a bounds hazard.
     combination: Vec<F>,
 
     /// The column this row leads with, distinct from every other row's.
@@ -32,11 +45,11 @@ pub enum Dependence<F: FiniteField> {
     Independent {
         /// The vector with the span's contribution removed, i.e. `v - sum_j c_j * accepted_j`.
         residue: Vec<F>,
-        /// The `c_j` above.
+        /// The `c_j` above, one per **accepted** vector rather than one per dimension.
         combination: Vec<F>,
     },
 
-    /// `v = sum_j coefficients[j] * accepted_j`.
+    /// `v = sum_j coefficients[j] * accepted_j`, one coefficient per accepted vector.
     Dependent { coefficients: Vec<F> },
 }
 
@@ -90,7 +103,9 @@ impl<F: FiniteField> IncrementalSpan<F> {
         );
 
         let mut residue = v.to_vec();
-        let mut combination = vec![F::zero(); self.dimension];
+        // One coefficient per accepted vector, not per dimension: there is nothing for the rest to
+        // be a coefficient of. At rank `r` this is `r` cells where M17 allocated `D`.
+        let mut combination = vec![F::zero(); self.rows.len()];
 
         for row in &self.rows {
             let multiple = residue[row.pivot];
@@ -130,16 +145,19 @@ impl<F: FiniteField> IncrementalSpan<F> {
     /// modular inverse per pivot, and the rest is multiply-and-subtract.
     ///
     /// # Panics
-    /// If `residue` is zero — the caller has handed back a dependent vector — or if either vector
-    /// is not of the span's dimension, or if the span is already of full rank.
+    /// If `residue` is zero — the caller has handed back a dependent vector — or if `residue` is
+    /// not of the span's dimension, or `combination` is not of the accepted count, or the span is
+    /// already of full rank.
     pub fn insert(&mut self, residue: Vec<F>, combination: Vec<F>) {
         assert_eq!(residue.len(), self.dimension, "residue of the wrong length");
+        let index = self.rows.len();
         assert_eq!(
             combination.len(),
-            self.dimension,
-            "combination of the wrong length"
+            index,
+            "a combination of {} coefficients over {} accepted vectors",
+            combination.len(),
+            index
         );
-        let index = self.rows.len();
         assert!(
             index < self.dimension,
             "a {}-dimensional span cannot accept a {}th vector",
@@ -154,17 +172,41 @@ impl<F: FiniteField> IncrementalSpan<F> {
         let scale = residue[pivot].inverse();
 
         let coordinates: Vec<F> = residue.iter().map(|value| *value * scale).collect();
-        let mut row_combination: Vec<F> = combination
-            .iter()
-            .map(|value| (F::zero() - *value) * scale)
-            .collect();
-        row_combination[index] += scale;
+        // `index + 1` coefficients: the negated input over the vectors already accepted, then the
+        // one for the vector being accepted now. Exactly the row's own expression, with no padding.
+        let mut row_combination: Vec<F> = Vec::with_capacity(index + 1);
+        row_combination.extend(combination.iter().map(|value| (F::zero() - *value) * scale));
+        row_combination.push(scale);
 
         self.rows.push(SpanRow {
             coordinates,
             combination: row_combination,
             pivot,
         });
+    }
+
+    /// Field-element cells the rows hold: `D` coordinates plus `r + 1` combination coefficients
+    /// each.
+    ///
+    /// `D^2 + D (D + 1) / 2` at full rank. Reported rather than derived from `D` so that a caller
+    /// measuring a partial conversion sees what is really there.
+    pub fn stored_cells(&self) -> usize {
+        self.rows
+            .iter()
+            .map(|row| row.coordinates.len() + row.combination.len())
+            .sum()
+    }
+
+    /// The cells a span of this dimension holds at full rank, or `None` on overflow.
+    ///
+    /// `D^2` coordinates and `D (D + 1) / 2` combination coefficients. Checked arithmetic, since a
+    /// budget computed from a wrapped product would be no budget at all.
+    pub fn cells_at_full_rank(dimension: usize) -> Option<usize> {
+        let coordinates = dimension.checked_mul(dimension)?;
+        let combinations = dimension
+            .checked_mul(dimension.checked_add(1)?)?
+            .checked_div(2)?;
+        coordinates.checked_add(combinations)
     }
 }
 
@@ -189,6 +231,23 @@ mod tests {
             }
         }
         total
+    }
+
+    /// Feed `vectors` to a span, returning it beside the ones it accepted.
+    fn fill(dimension: usize, vectors: &[Vec<F>]) -> (IncrementalSpan<F>, Vec<Vec<F>>) {
+        let mut span = IncrementalSpan::new(dimension);
+        let mut accepted: Vec<Vec<F>> = Vec::new();
+        for vector in vectors {
+            if let Dependence::Independent {
+                residue,
+                combination,
+            } = span.reduce(vector)
+            {
+                span.insert(residue, combination);
+                accepted.push(vector.clone());
+            }
+        }
+        (span, accepted)
     }
 
     /// The rank of a set of vectors, by textbook dense Gaussian elimination.
@@ -417,6 +476,106 @@ mod tests {
         // Nothing in a 2-dimensional space is independent of two independent vectors, so this is
         // reachable only by lying to `insert`.
         span.insert(field(&[1, 1]), field(&[0, 0]));
+    }
+
+    /// The combination block is triangular: `r + 1` coefficients for the row at `r`.
+    #[test]
+    fn test_the_rows_hold_a_triangular_combination_block() {
+        const D: usize = 12;
+        // Unit vectors in a scrambled order, so the rows' pivots are not their indices and the
+        // triangularity cannot be an accident of the input being already echelonized.
+        let order = [5usize, 0, 9, 2, 11, 7, 1, 8, 3, 10, 4, 6];
+        let vectors: Vec<Vec<F>> = order
+            .iter()
+            .map(|k| {
+                let mut v = vec![F::zero(); D];
+                v[*k] = F::one();
+                v
+            })
+            .collect();
+
+        let (span, accepted) = fill(D, &vectors);
+        assert_eq!(span.accepted(), D, "the unit vectors should be a basis");
+        assert_eq!(accepted.len(), D);
+
+        // `D` coordinates per row, and `r + 1` combination coefficients for the row at `r`.
+        assert_eq!(
+            span.stored_cells(),
+            D * D + D * (D + 1) / 2,
+            "the combination block should be triangular, not square"
+        );
+        assert_eq!(
+            span.stored_cells(),
+            IncrementalSpan::<F>::cells_at_full_rank(D).expect("representable")
+        );
+        // Strictly less than M17's two square blocks, which is the whole point.
+        assert!(span.stored_cells() < 2 * D * D);
+    }
+
+    /// A dependence's coefficients are exact over the *original* accepted vectors.
+    ///
+    /// §8.2's correctness-critical requirement, and the one the triangular block could break: the
+    /// coefficients must be relative to the vectors as they were handed in, not to the internally
+    /// echelonized rows. Checked on vectors with no structure to hide an error.
+    #[test]
+    fn test_dependence_coefficients_are_exact_over_the_accepted_vectors() {
+        const D: usize = 9;
+        // A Vandermonde basis — row `k` is the powers of `k + 2` — which is invertible because the
+        // nodes are distinct. Dense, with no zero and no structure an error could hide behind.
+        let basis: Vec<Vec<F>> = (0..D)
+            .map(|k| {
+                let node = F::new(k as u64 + 2);
+                let mut row = Vec::with_capacity(D);
+                let mut power = F::one();
+                for _ in 0..D {
+                    row.push(power);
+                    power *= node;
+                }
+                row
+            })
+            .collect();
+
+        let (mut span, accepted) = fill(D, &basis);
+        assert_eq!(span.accepted(), D, "the probe basis should have full rank");
+
+        for weights in [
+            vec![1u64, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 3, 0, 0, 5, 0, 0, 0],
+            vec![2, 3, 5, 7, 11, 13, 17, 19, 23],
+        ] {
+            let coefficients = field(&weights);
+            let target = combine(&accepted, &coefficients);
+            match span.reduce(&target) {
+                Dependence::Dependent { coefficients } => {
+                    assert_eq!(
+                        coefficients.len(),
+                        accepted.len(),
+                        "one coefficient per accepted vector"
+                    );
+                    assert_eq!(
+                        combine(&accepted, &coefficients),
+                        target,
+                        "the reported coefficients do not rebuild the vector"
+                    );
+                }
+                other => panic!("{:?} should have been dependent, got {:?}", weights, other),
+            }
+        }
+    }
+
+    /// A combination of the wrong length is rejected rather than silently padded.
+    #[test]
+    #[should_panic(expected = "a combination of")]
+    fn test_a_combination_of_the_wrong_length_is_rejected() {
+        let mut span: IncrementalSpan<F> = IncrementalSpan::new(4);
+        // The span has accepted nothing, so the only valid combination is empty.
+        span.insert(field(&[1, 0, 0, 0]), field(&[0, 0, 0, 0]));
+    }
+
+    /// An unrepresentable dimension has no full-rank cell count rather than a wrapped one.
+    #[test]
+    fn test_an_unrepresentable_dimension_has_no_cell_count() {
+        assert_eq!(IncrementalSpan::<F>::cells_at_full_rank(usize::MAX), None);
     }
 
     /// Row operations are counted, and a reduction against nothing performs none.

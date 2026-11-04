@@ -73,7 +73,7 @@ pub struct FglmOptions {
     /// Standard monomials enumerated before the computation is abandoned.
     ///
     /// This is `D`, which controls everything else: the operators hold up to `N * D` columns and
-    /// the dependence test of M17-C is `2 * D^2` field elements.
+    /// the conversion's dense blocks are `2 D^2 + D (D + 1) / 2` field elements.
     pub max_quotient_dimension: usize,
 
     /// Multiplication-operator entries stored, summed over all `N` operators.
@@ -83,10 +83,21 @@ pub struct FglmOptions {
     /// for a product that is itself a standard monomial stores none, which is the common case.
     pub max_operator_entries: usize,
 
-    /// Entries the dependence test's two blocks may hold, `2 * D^2` at full rank.
+    /// Field-element cells the conversion's dense blocks may hold at full rank.
     ///
-    /// Checked from `D` before the span is allocated rather than as it fills, because the space is
-    /// a function of the dimension alone.
+    /// `2 D^2 + D (D + 1) / 2`: the span's `D` coordinates per row, its *triangular* combination
+    /// block, and the accepted quotient vectors the walk retains. Checked from `D` before anything
+    /// is allocated rather than as it fills, because the space is a function of the dimension
+    /// alone, and with checked arithmetic, because a budget computed from a wrapped product would
+    /// be no budget at all.
+    ///
+    /// # This limit's meaning changed in M18-4
+    /// It was `2 * D^2`, counting the span's two blocks as squares and omitting the accepted
+    /// vectors altogether. Two things were wrong with that and they pull in opposite directions:
+    /// the combination block is triangular rather than square, and there was a third block. So at
+    /// `D = 16` it counted 512 cells where the conversion allocates 648 — a budget cannot protect
+    /// memory it does not know about. [`FglmMemory`](super::FglmMemory) reports each block
+    /// separately, so a figure quoted against the old meaning can be recomputed.
     pub max_span_entries: usize,
 
     /// Whether to fill in [`FglmStageTimings`](super::FglmStatistics).
@@ -136,8 +147,8 @@ impl FglmOptions {
     ///
     /// `max_operator_entries` of 20 million is about 320 MB at 16 bytes per entry, the same figure
     /// and the same accounting as F4's live-nonzero budget. `max_span_entries` is the same number,
-    /// which `2 * D^2` reaches at `D` just over 3,160 — so on a sparse staircase the span is the
-    /// first of the three limits to bind, and on a dense one the operators are.
+    /// which `2 D^2 + D (D + 1) / 2` reaches at `D` just over 2,828 — so on a sparse staircase the
+    /// dense blocks are the first limit to bind, and on a dense one the operators are.
     ///
     /// `max_operator_bytes` of 320 MB is the same quantity of memory the entry budget describes,
     /// stated in the unit that is actually allocated. The two bind together under
