@@ -8,6 +8,7 @@
 //! The design, the measured baseline it is justified by, and the cases where conversion is the
 //! wrong choice are in `docs/MILESTONE-FGLM-SOLVING.md`.
 
+mod border;
 mod conversion;
 mod errors;
 mod incremental_span;
@@ -22,13 +23,14 @@ mod statistics;
 #[cfg(test)]
 mod reference_bases;
 
+pub use border::{BorderIndex, ColumnTarget};
 pub use conversion::{
     fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
 };
 pub use errors::FglmError;
 pub use incremental_span::{Dependence, IncrementalSpan};
 pub use multiplication::MultiplicationOperator;
-pub use options::FglmOptions;
+pub use options::{FglmOptions, OperatorConstruction};
 pub use quotient_algebra::{QuotientAlgebra, QuotientStatistics};
 pub use quotient_basis::{classify_ideal, IdealClass, QuotientBasis};
 pub use statistics::{BorderStatistics, FglmMemory, FglmStageTimings, FglmStatistics};

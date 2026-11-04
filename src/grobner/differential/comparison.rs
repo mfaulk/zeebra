@@ -18,7 +18,10 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     grobner::{
         f4_with_options,
-        fglm::{fglm_to_lex_with_options, FglmError, FglmOptions, QuotientAlgebra, QuotientBasis},
+        fglm::{
+            fglm_to_lex_with_options, BorderIndex, FglmError, FglmOptions, QuotientAlgebra,
+            QuotientBasis,
+        },
         F4Options,
     },
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
@@ -160,12 +163,18 @@ pub struct DifferentialCase {
 
 /// Zeebra's answers, checked against the case's.
 ///
+/// `options` is what the quotient algebra and the conversion are built with, so a caller can point
+/// the whole comparison at a strategy under development. The resource limits in it are the
+/// caller's business; the comparison reports a limit that fires as a disagreement on the check it
+/// fired in, since the oracle produced an answer and Zeebra did not.
+///
 /// # Errors
 /// The first [`Check`] that disagreed, with the two answers in the detail. Includes
 /// [`Check::Parse`] and [`Check::Field`], which are defects in the case rather than findings about
 /// Zeebra, so that neither is mistaken for agreement.
 pub fn verify_case<const N: usize, F: FiniteField>(
     case: &DifferentialCase,
+    options: &FglmOptions,
 ) -> Result<Agreement, Disagreement> {
     let fail = |check: Check, detail: String| Disagreement { check, detail };
 
@@ -234,7 +243,6 @@ pub fn verify_case<const N: usize, F: FiniteField>(
 
     // ---- the quotient dimension -------------------------------------------------------------
 
-    let options = FglmOptions::unbounded();
     let quotient = QuotientBasis::new(&zeebra_source, SOURCE_ORDER, options.max_quotient_dimension);
     let quotient = match (quotient, case.quotient_dimension) {
         (Ok(quotient), Some(dimension)) if quotient.dimension() == dimension => quotient,
@@ -307,7 +315,7 @@ pub fn verify_case<const N: usize, F: FiniteField>(
 
     // ---- the border ---------------------------------------------------------------------------
 
-    let zeebra_border = border_monomials(&quotient);
+    let zeebra_border = BorderIndex::new(&quotient).monomials().to_vec();
     let oracle_border: HashMap<Monomial<N>, MultivariatePolynomial<N, F>> = case
         .border_normal_forms
         .iter()
@@ -363,7 +371,7 @@ pub fn verify_case<const N: usize, F: FiniteField>(
 
     // ---- the multiplication operators --------------------------------------------------------
 
-    let algebra = match QuotientAlgebra::new(&zeebra_source, SOURCE_ORDER, &options) {
+    let algebra = match QuotientAlgebra::new(&zeebra_source, SOURCE_ORDER, options) {
         Ok(algebra) => algebra,
         Err(e) => {
             return Err(fail(
@@ -421,7 +429,7 @@ pub fn verify_case<const N: usize, F: FiniteField>(
         .map(|s| parse(s))
         .collect::<Result<_, _>>()?;
 
-    let zeebra_lex = match fglm_to_lex_with_options(&zeebra_source, SOURCE_ORDER, &options) {
+    let zeebra_lex = match fglm_to_lex_with_options(&zeebra_source, SOURCE_ORDER, options) {
         Ok((basis, _)) => basis,
         Err(e) => {
             return Err(fail(
@@ -441,31 +449,6 @@ pub fn verify_case<const N: usize, F: FiniteField>(
     agreement.lex_basis_elements = Some(zeebra_lex.len());
 
     Ok(agreement)
-}
-
-/// The distinct border monomials of a standard monomial basis, descending under its order.
-///
-/// `∂B = (union over i of x_i B) \ B`. Deterministically ordered, so the list handed to an oracle
-/// and the list a fixture records are the same list.
-pub fn border_monomials<const N: usize>(quotient: &QuotientBasis<N>) -> Vec<Monomial<N>> {
-    let mut seen: HashSet<Monomial<N>> = HashSet::new();
-    let mut border: Vec<Monomial<N>> = Vec::new();
-
-    for monomial in quotient.monomials() {
-        for i in 0..N {
-            let product = *monomial * Monomial::univariate(i, 1);
-            if quotient.index_of(&product).is_some() {
-                continue;
-            }
-            if seen.insert(product) {
-                border.push(product);
-            }
-        }
-    }
-
-    let order = quotient.order();
-    border.sort_by(|a, b| order.cmp(b, a));
-    border
 }
 
 /// Two reduced Gröbner bases of the same ideal and order, compared as values.

@@ -296,7 +296,7 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             buchberger, buchberger_with_criteria, f4,
-            fglm::{FglmError, FglmOptions, FglmStageTimings},
+            fglm::{FglmError, FglmOptions, FglmStageTimings, OperatorConstruction},
             reference::buchberger_reference,
             PairCriteria,
         },
@@ -837,6 +837,86 @@ mod tests {
                 system
             );
         }
+    }
+
+    /// Every operator-construction strategy converts to the same lex basis.
+    ///
+    /// The end-to-end form of the equality `quotient_algebra.rs` asserts on the operators. Run over
+    /// three orders, several fields, and the benchmark corpus, because a strategy that was wrong
+    /// only at characteristic 2, or only on a staircase with a particular shape, would pass a
+    /// narrower check.
+    #[test]
+    fn test_every_strategy_converts_to_the_same_basis() {
+        const STRATEGIES: [OperatorConstruction; 2] = [
+            OperatorConstruction::PerColumn,
+            OperatorConstruction::DeduplicatedBorder,
+        ];
+
+        fn check<const N: usize, const P: u64>(
+            name: &str,
+            system: &[MultivariatePolynomial<N, PrimeFieldElement64<P>>],
+            source_order: MonomialOrder,
+        ) {
+            let source = f4(system, source_order).expect("within limits");
+            let mut answers = Vec::new();
+            for strategy in STRATEGIES {
+                let options = FglmOptions::unbounded().with_operator_construction(strategy);
+                let (basis, statistics) =
+                    fglm_to_lex_with_options(&source, source_order, &options).expect("convertible");
+                answers.push((strategy, basis, statistics));
+            }
+
+            let (_, reference, reference_statistics) = &answers[0];
+            for (strategy, basis, statistics) in &answers[1..] {
+                assert_eq!(
+                    basis, reference,
+                    "{} over GF({}) under {:?}: {:?} disagrees with {:?}",
+                    name, P, source_order, strategy, STRATEGIES[0]
+                );
+                // The conversion downstream of the operators must be identical too, not merely
+                // arrive at the same answer by a different route.
+                assert_eq!(
+                    statistics.span_row_operations, reference_statistics.span_row_operations,
+                    "{} over GF({}): {:?} did different linear algebra",
+                    name, P, strategy
+                );
+                assert_eq!(
+                    statistics.operator_entries, reference_statistics.operator_entries,
+                    "{} over GF({}): {:?} stored a different amount",
+                    name, P, strategy
+                );
+            }
+        }
+
+        for source_order in SOURCE_ORDERS {
+            for system in SYSTEMS {
+                let parsed: Vec<MultivariatePolynomial<2, F>> = parse(system, ["x", "y"]);
+                check::<2, 2147483647>(system[0], &parsed, source_order);
+            }
+        }
+
+        // The same systems at the small characteristics, where an implementation that assumed `2`
+        // is invertible would go wrong.
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        for system in [["x^2 - y", "y^3 - 1"], ["x + y", "x*y - 1"], ["x^2", "y^2"]] {
+            let at =
+                |variables: [&str; 2]| -> Vec<MultivariatePolynomial<2, PrimeFieldElement64<7>>> {
+                    system
+                        .iter()
+                        .map(|s| MultivariatePolynomial::parse(s, variables).unwrap())
+                        .collect()
+                };
+            check::<2, 7>(system[0], &at(["x", "y"]), grevlex);
+        }
+
+        check::<5, 2147483647>("katsura-5", &katsura::<5, F>(), grevlex);
+        check::<6, 2147483647>("katsura-6", &katsura::<6, F>(), grevlex);
+        check::<5, 2147483647>("cyclic-5", &cyclic::<5, F>(), grevlex);
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        check::<6, 2147483647>("planted-6", &planted::<6, F>(&point), grevlex);
     }
 
     /// Resource limits produce structured errors rather than partial bases.

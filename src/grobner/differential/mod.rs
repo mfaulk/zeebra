@@ -43,8 +43,7 @@ mod fixtures;
 
 pub use check::{check_generated, check_system, verify_recorded, SystemOutcome};
 pub use comparison::{
-    border_monomials, verify_case, Agreement, Check, DifferentialCase, Disagreement, SOURCE_ORDER,
-    TARGET_ORDER,
+    verify_case, Agreement, Check, DifferentialCase, Disagreement, SOURCE_ORDER, TARGET_ORDER,
 };
 pub use fixture::{emit_failure, emit_fixture, emit_fixture_module, DifferentialFixture};
 pub use generator::{GeneratedSystem, GeneratedTerm, SystemShape};
@@ -64,7 +63,10 @@ mod tests {
         singular::{Oracle, OracleError, OracleQuery},
         SystemOutcome,
     };
-    use crate::fields::{Zp13, Zp7};
+    use crate::{
+        fields::{Zp13, Zp7},
+        grobner::fglm::{FglmOptions, OperatorConstruction},
+    };
 
     /// An oracle that answers from a recorded table and refuses anything else.
     ///
@@ -94,9 +96,32 @@ mod tests {
 
         for fixture in FIXTURES {
             let case = fixture.to_case();
-            match verify_recorded(&case) {
+            match verify_recorded(&case, &FglmOptions::unbounded()) {
                 Ok(_) => {}
                 Err(disagreement) => panic!("{}: {}", fixture.name, disagreement),
+            }
+        }
+    }
+
+    /// Every committed fixture agrees under every operator-construction strategy.
+    ///
+    /// The strategies are asserted equal to each other in `quotient_algebra.rs`; this asserts each
+    /// separately equal to *Singular*, over 96 ideals and six fields. Two implementations agreeing
+    /// with each other and both being wrong is the thing an external oracle is for.
+    #[test]
+    fn test_every_fixture_agrees_under_every_strategy() {
+        for construction in [
+            OperatorConstruction::PerColumn,
+            OperatorConstruction::DeduplicatedBorder,
+        ] {
+            let options = FglmOptions::unbounded().with_operator_construction(construction);
+            for fixture in FIXTURES {
+                if let Err(disagreement) = verify_recorded(&fixture.to_case(), &options) {
+                    panic!(
+                        "{} under {:?}: {}",
+                        fixture.name, construction, disagreement
+                    );
+                }
             }
         }
     }
@@ -197,7 +222,9 @@ mod tests {
         let mut corrupted = original.clone();
         corrupted.quotient_dimension = Some(original.quotient_dimension.unwrap() + 1);
         assert_eq!(
-            verify_recorded(&corrupted).unwrap_err().check,
+            verify_recorded(&corrupted, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::QuotientDimension
         );
 
@@ -205,7 +232,9 @@ mod tests {
         let mut corrupted = original.clone();
         corrupted.grevlex_basis.pop();
         assert_eq!(
-            verify_recorded(&corrupted).unwrap_err().check,
+            verify_recorded(&corrupted, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::SourceBasis
         );
 
@@ -213,7 +242,9 @@ mod tests {
         let mut corrupted = original.clone();
         corrupted.standard_monomials[0] = "x1^99".to_string();
         assert_eq!(
-            verify_recorded(&corrupted).unwrap_err().check,
+            verify_recorded(&corrupted, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::StandardMonomials
         );
 
@@ -221,7 +252,9 @@ mod tests {
         let mut corrupted = original.clone();
         corrupted.border_normal_forms.pop();
         assert_eq!(
-            verify_recorded(&corrupted).unwrap_err().check,
+            verify_recorded(&corrupted, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::BorderCoverage
         );
 
@@ -229,7 +262,9 @@ mod tests {
         let mut corrupted = original.clone();
         let (monomial, normal_form) = corrupted.border_normal_forms[0].clone();
         corrupted.border_normal_forms[0] = (monomial, format!("{}+1", normal_form));
-        let check = verify_recorded(&corrupted).unwrap_err().check;
+        let check = verify_recorded(&corrupted, &FglmOptions::unbounded())
+            .unwrap_err()
+            .check;
         assert!(
             check == Check::BorderNormalForm || check == Check::OperatorColumn,
             "a corrupted normal form was reported as {:?}",
@@ -240,7 +275,9 @@ mod tests {
         let mut corrupted = original.clone();
         corrupted.lex_basis = Some(vec!["x1".to_string()]);
         assert_eq!(
-            verify_recorded(&corrupted).unwrap_err().check,
+            verify_recorded(&corrupted, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::LexBasis
         );
 
@@ -248,7 +285,9 @@ mod tests {
         let mut corrupted = original.clone();
         corrupted.lex_basis = None;
         assert_eq!(
-            verify_recorded(&corrupted).unwrap_err().check,
+            verify_recorded(&corrupted, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::LexBasis
         );
     }
@@ -258,7 +297,12 @@ mod tests {
     fn test_a_case_over_an_uninstantiated_field_is_rejected() {
         let mut case = FIXTURES[0].to_case();
         case.characteristic = 11;
-        assert_eq!(verify_recorded(&case).unwrap_err().check, Check::Field);
+        assert_eq!(
+            verify_recorded(&case, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
+            Check::Field
+        );
     }
 
     /// Verifying a case at the wrong variable count or characteristic is rejected, not attempted.
@@ -276,12 +320,16 @@ mod tests {
             .to_case();
 
         assert_eq!(
-            verify_case::<3, Zp13>(&case).unwrap_err().check,
+            verify_case::<3, Zp13>(&case, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::Field,
             "a two-variable case was checked as a three-variable one"
         );
         assert_eq!(
-            verify_case::<2, Zp7>(&case).unwrap_err().check,
+            verify_case::<2, Zp7>(&case, &FglmOptions::unbounded())
+                .unwrap_err()
+                .check,
             Check::Field,
             "a case was checked over a field it is not stated over"
         );
@@ -308,7 +356,7 @@ mod tests {
             let mut oracle = RecordedOracle {
                 cases: vec![fixture.to_case()],
             };
-            match check_generated(&system, &mut oracle) {
+            match check_generated(&system, &mut oracle, &FglmOptions::unbounded()) {
                 SystemOutcome::Agreed { .. } => checked += 1,
                 other => panic!("{}: {}", fixture.name, other.summary()),
             }
@@ -332,7 +380,7 @@ mod tests {
             13,
         );
         let mut oracle = RecordedOracle { cases: Vec::new() };
-        let outcome = check_generated(&system, &mut oracle);
+        let outcome = check_generated(&system, &mut oracle, &FglmOptions::unbounded());
         assert!(!outcome.agreed(), "{}", outcome.summary());
         assert!(matches!(outcome, SystemOutcome::OracleFailed { .. }));
     }
@@ -350,7 +398,7 @@ mod tests {
             13,
         );
         let mut oracle = RecordedOracle { cases: Vec::new() };
-        let outcome = check_generated(&system, &mut oracle);
+        let outcome = check_generated(&system, &mut oracle, &FglmOptions::unbounded());
         assert!(!outcome.agreed());
         assert!(matches!(outcome, SystemOutcome::Unsupported { .. }));
     }
@@ -388,6 +436,7 @@ mod tests {
             max_terms: 4,
             minimize_attempts: 0,
             minimize_budget: Duration::from_secs(0),
+            fglm: FglmOptions::unbounded(),
         };
         let report = run_sweep(&options, &mut oracle, &mut |_, _, _| {});
 

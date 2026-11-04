@@ -8,6 +8,8 @@
 
 use std::time::{Duration, Instant};
 
+use crate::grobner::fglm::FglmOptions;
+
 use super::{
     check::{check_generated, SystemOutcome},
     comparison::{Check, DifferentialCase, Disagreement},
@@ -42,6 +44,12 @@ pub struct SweepOptions {
 
     /// Wall-clock allowed for shrinking one failing system.
     pub minimize_budget: Duration,
+
+    /// The options every quotient algebra and conversion in the sweep is built with.
+    ///
+    /// This is how a workstream points the oracle at a strategy under development: the sweep's
+    /// 500 random systems over six fields are then checking *that* strategy, not the default one.
+    pub fglm: FglmOptions,
 }
 
 impl SweepOptions {
@@ -154,7 +162,7 @@ pub fn run_sweep(
 
     for index in 0..options.systems {
         let system = options.system(index);
-        let outcome = check_generated(&system, oracle);
+        let outcome = check_generated(&system, oracle, &options.fglm);
         observe(index, &system, &outcome);
         report.attempted += 1;
 
@@ -227,7 +235,7 @@ fn minimize(
             if let SystemOutcome::Disagreed {
                 case,
                 disagreement: found,
-            } = check_generated(&candidate, oracle)
+            } = check_generated(&candidate, oracle, &options.fglm)
             {
                 if found.check == best_disagreement.check {
                     best = candidate;
@@ -317,7 +325,10 @@ pub fn is_finding(check: Check) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{shrinks_of, SweepOptions};
-    use crate::grobner::differential::generator::{GeneratedSystem, SystemShape};
+    use crate::grobner::{
+        differential::generator::{GeneratedSystem, SystemShape},
+        fglm::FglmOptions,
+    };
     use std::time::Duration;
 
     const SHAPE: SystemShape = SystemShape {
@@ -336,6 +347,7 @@ mod tests {
             max_terms: 4,
             minimize_attempts: 0,
             minimize_budget: Duration::from_secs(0),
+            fglm: FglmOptions::unbounded(),
         }
     }
 

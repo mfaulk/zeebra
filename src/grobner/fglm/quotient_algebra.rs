@@ -5,13 +5,13 @@
 //! provided, because the conversion never performs one: it starts from the class of 1 and reaches
 //! every candidate monomial by applying one variable at a time.
 
-use std::collections::HashSet;
-
 use crate::{
     grobner::{
         f4::StageClock,
         fglm::{
+            border::{BorderIndex, ColumnTarget},
             multiplication::{MultiplicationOperator, OperatorBuilder},
+            options::OperatorConstruction,
             statistics::{BorderStatistics, FglmStageTimings},
             FglmError, FglmOptions, QuotientBasis,
         },
@@ -71,9 +71,11 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
 
     /// As [`Self::new`], additionally reporting the border's shape and the construction's stages.
     ///
-    /// The counters cost one hash-set insert per nonstandard column, which is why they are always
-    /// collected rather than gated: against a normal form it is nothing, and `N * D` of them is
-    /// well under a millisecond at every dimension in the benchmark corpus.
+    /// # The two strategies
+    /// Both begin by classifying every `x_i b_j` with a [`BorderIndex`], which performs no field
+    /// arithmetic. They differ only in whether a border monomial reached from several columns is
+    /// reduced once or once per column, so an ablation between them is an ablation of the sharing
+    /// and of nothing else. See [`OperatorConstruction`].
     pub fn new_with_statistics(
         basis: &[MultivariatePolynomial<N, F>],
         order: MonomialOrder,
@@ -86,43 +88,83 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         let dimension = quotient.dimension();
         statistics.timings.quotient_basis = clock.lap();
 
+        let index = BorderIndex::new(&quotient);
+        statistics.border = BorderStatistics {
+            operator_columns: index.columns(),
+            standard_columns: index.standard_columns(),
+            border_columns: index.border_columns(),
+            distinct_border_monomials: index.monomials().len(),
+            normal_form_calls: 0,
+        };
+        statistics.timings.border_classification = clock.lap();
+
+        // The shared answers, when they are shared. Indexed by border index, so a column's answer
+        // is a lookup — and `|∂B|` coordinate vectors are held at once, which the per-column path
+        // does not do. That is the trade this strategy makes.
+        //
+        // **Budgeted as it fills**, not left until the columns are pushed. Every distinct border
+        // monomial appears in at least one column, so the shared entries are bounded by the
+        // operators' own — which means checking them against `max_operator_entries` can never
+        // reject a system the reference path would have accepted, and the construction's peak
+        // under this strategy is at most twice the limit rather than unbounded.
+        let shared: Vec<Vec<(usize, F)>> = match options.operator_construction {
+            OperatorConstruction::PerColumn => Vec::new(),
+            OperatorConstruction::DeduplicatedBorder => {
+                let mut shared = Vec::with_capacity(index.monomials().len());
+                let mut shared_entries = 0usize;
+                for monomial in index.monomials() {
+                    let column = reduce_border_monomial(
+                        *monomial,
+                        basis,
+                        order,
+                        &quotient,
+                        &mut statistics,
+                        &mut clock,
+                    );
+                    shared_entries = shared_entries.checked_add(column.len()).ok_or(
+                        FglmError::OperatorStorageExceeded {
+                            entries: usize::MAX,
+                            limit: options.max_operator_entries,
+                        },
+                    )?;
+                    if shared_entries > options.max_operator_entries {
+                        return Err(FglmError::OperatorStorageExceeded {
+                            entries: shared_entries,
+                            limit: options.max_operator_entries,
+                        });
+                    }
+                    shared.push(column);
+                }
+                shared
+            }
+        };
+
         let mut operators = Vec::with_capacity(N);
         let mut entries = 0usize;
 
-        // The distinct border monomials, so that the duplication M18-1 removes can be quantified
-        // before it is removed. Reducing each one once is *not* what this does: the normal form
-        // below is computed per column, exactly as M17 computed it.
-        let mut border: HashSet<Monomial<N>> = HashSet::new();
-
         for i in 0..N {
             let mut builder = OperatorBuilder::with_capacity(dimension);
-            for monomial in quotient.monomials() {
-                // No overflow is reachable: a standard monomial's exponents are below their
-                // variables' pure powers, and this raises one of them by one.
-                let product = *monomial * Monomial::univariate(i, 1);
-                let standard = quotient.index_of(&product);
-                statistics.border.operator_columns += 1;
-
-                if let Some(index) = standard {
-                    statistics.border.standard_columns += 1;
-                    builder.push_standard(index);
-                    statistics.timings.border_classification += clock.lap();
-                    continue;
-                }
-
-                statistics.border.border_columns += 1;
-                if border.insert(product) {
-                    statistics.border.distinct_border_monomials += 1;
-                }
-                statistics.timings.border_classification += clock.lap();
-
-                let term = MultivariatePolynomial::new(&[(product, F::one())]);
-                let reduced = term.normal_form(basis, order);
-                statistics.border.normal_form_calls += 1;
-                statistics.timings.normal_forms += clock.lap();
-
-                let column = coordinates_of_normal_form(&reduced, &quotient);
-                statistics.timings.column_assembly += clock.lap();
+            for target in index.column_targets(i) {
+                let column = match *target {
+                    ColumnTarget::Standard(standard) => {
+                        builder.push_standard(standard);
+                        continue;
+                    }
+                    ColumnTarget::Border(border) => match options.operator_construction {
+                        // Cloned rather than shared behind a reference count: every column owning
+                        // its own vector is what M17 stored, so this strategy changes the time and
+                        // leaves the storage alone. Sharing the representation is M18-3's question.
+                        OperatorConstruction::DeduplicatedBorder => shared[border].clone(),
+                        OperatorConstruction::PerColumn => reduce_border_monomial(
+                            index.monomials()[border],
+                            basis,
+                            order,
+                            &quotient,
+                            &mut statistics,
+                            &mut clock,
+                        ),
+                    },
+                };
 
                 entries = entries.checked_add(column.len()).ok_or(
                     FglmError::OperatorStorageExceeded {
@@ -142,7 +184,7 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
         }
 
         // So that the stages partition the construction rather than leaving a tail outside all of
-        // them. What is in this lap is the last operator's `finish`, which is a move.
+        // them. What is in this lap is the column loop's own bookkeeping and the clones.
         statistics.timings.column_assembly += clock.lap();
 
         Ok((
@@ -262,6 +304,34 @@ impl<const N: usize, F: FiniteField> QuotientAlgebra<N, F> {
     }
 }
 
+/// One border monomial's normal form, as a sorted coordinate vector.
+///
+/// The one place a border reduction happens, so that both strategies reduce *identically* and an
+/// ablation between them cannot accidentally be an ablation of two different reductions. Counts
+/// the call and laps the clock, so the stage breakdown is the same either way.
+fn reduce_border_monomial<const N: usize, F: FiniteField>(
+    monomial: Monomial<N>,
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    quotient: &QuotientBasis<N>,
+    statistics: &mut QuotientStatistics,
+    clock: &mut StageClock,
+) -> Vec<(usize, F)> {
+    // A one-term polynomial per reduction. §5.3 of the milestone proposal asks whether this is
+    // worth a specialized entry point that takes a monomial directly. Measured, it is 0.07% to
+    // 0.38% of the reduction it precedes on the families where reduction dominates, so it is not —
+    // see §5.3 of docs/MILESTONE-FGLM-SCALABILITY.md for the measurement and for the one family
+    // where the share is larger and still does not matter.
+    let term = MultivariatePolynomial::new(&[(monomial, F::one())]);
+    let reduced = term.normal_form(basis, order);
+    statistics.border.normal_form_calls += 1;
+    statistics.timings.normal_forms += clock.lap();
+
+    let column = coordinates_of_normal_form(&reduced, quotient);
+    statistics.timings.column_assembly += clock.lap();
+    column
+}
+
 /// The nonzero coordinates of an already-reduced polynomial, ascending by index.
 ///
 /// # Panics
@@ -297,7 +367,7 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             f4,
-            fglm::{FglmError, FglmOptions},
+            fglm::{FglmError, FglmOptions, OperatorConstruction},
         },
         FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
@@ -761,6 +831,210 @@ mod tests {
             QuotientAlgebra::new(&basis, order, &options).unwrap_err(),
             FglmError::QuotientDimensionExceeded { limit: 8 }
         );
+    }
+
+    /// Both construction strategies build the same algebra, value for value.
+    ///
+    /// The whole correctness argument for M18-1, and it is an equality of `QuotientAlgebra`s rather
+    /// than of the lex bases they lead to: a wrong column that happens not to change the final
+    /// basis would pass the weaker check and fail this one.
+    #[test]
+    fn test_the_construction_strategies_agree() {
+        fn check<const N: usize>(
+            name: &str,
+            system: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) {
+            let basis = f4(system, order).expect("within limits");
+            let per_column = FglmOptions::unbounded()
+                .with_operator_construction(OperatorConstruction::PerColumn);
+            let deduplicated = FglmOptions::unbounded()
+                .with_operator_construction(OperatorConstruction::DeduplicatedBorder);
+
+            let (reference, reference_statistics) =
+                QuotientAlgebra::new_with_statistics(&basis, order, &per_column).expect("finite");
+            let (optimized, optimized_statistics) =
+                QuotientAlgebra::new_with_statistics(&basis, order, &deduplicated).expect("finite");
+
+            assert_eq!(
+                reference, optimized,
+                "{} under {:?}: the strategies disagree",
+                name, order
+            );
+            // The classification is shared, so every border counter must match. Only the number
+            // of reductions may differ, and it is checked separately.
+            assert_eq!(
+                reference_statistics.border.operator_columns,
+                optimized_statistics.border.operator_columns
+            );
+            assert_eq!(
+                reference_statistics.border.distinct_border_monomials,
+                optimized_statistics.border.distinct_border_monomials
+            );
+            assert_eq!(
+                reference.operator_entries(),
+                optimized.operator_entries(),
+                "{} under {:?}: the strategies store different amounts",
+                name,
+                order
+            );
+        }
+
+        for order in ORDERS {
+            for system in SYSTEMS {
+                check(system[0], &parse(system, ["x", "y"]), order);
+            }
+            // Three variables, where a border monomial can be reached from three directions
+            // rather than two.
+            check("katsura-3", &katsura::<3, F>(), order);
+            check(
+                "x^2-y, y^2-z, z^2-1",
+                &parse(&["x^2 - y", "y^2 - z", "z^2 - 1"], ["x", "y", "z"]),
+                order,
+            );
+        }
+
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        check("katsura-5", &katsura::<5, F>(), grevlex);
+        check("katsura-6", &katsura::<6, F>(), grevlex);
+        check("cyclic-5", &cyclic::<5, F>(), grevlex);
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        check("planted-6", &planted::<6, F>(&point), grevlex);
+    }
+
+    /// Deduplication reduces once per distinct border monomial, not once per column.
+    ///
+    /// The counters are what distinguish the two paths at runtime, so they are asserted rather than
+    /// assumed — and the gap is asserted to be real on a system where the border repeats.
+    #[test]
+    fn test_deduplication_reduces_once_per_border_monomial() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&katsura::<6, F>(), order).expect("within limits");
+
+        let (_, reference) = QuotientAlgebra::new_with_statistics(
+            &basis,
+            order,
+            &FglmOptions::unbounded().with_operator_construction(OperatorConstruction::PerColumn),
+        )
+        .expect("finite");
+        let (_, optimized) = QuotientAlgebra::new_with_statistics(
+            &basis,
+            order,
+            &FglmOptions::unbounded()
+                .with_operator_construction(OperatorConstruction::DeduplicatedBorder),
+        )
+        .expect("finite");
+
+        assert_eq!(
+            reference.border.normal_form_calls, reference.border.border_columns,
+            "the reference path should reduce once per border column"
+        );
+        assert_eq!(
+            optimized.border.normal_form_calls, optimized.border.distinct_border_monomials,
+            "the deduplicated path should reduce once per distinct border monomial"
+        );
+        assert!(
+            optimized.border.normal_form_calls < reference.border.normal_form_calls,
+            "{} reductions is no saving against {}",
+            optimized.border.normal_form_calls,
+            reference.border.normal_form_calls
+        );
+    }
+
+    /// Deduplication does not change what the operator-entry budget sees.
+    ///
+    /// Each column still owns its own vector, so a limit that fires under one strategy fires under
+    /// the other at the same count. A strategy that quietly raised the storage would be a different
+    /// trade than the one M18-1 claims to make.
+    #[test]
+    fn test_the_operator_budget_is_unchanged_by_deduplication() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&katsura::<5, F>(), order).expect("within limits");
+
+        for construction in [
+            OperatorConstruction::PerColumn,
+            OperatorConstruction::DeduplicatedBorder,
+        ] {
+            let mut options = FglmOptions::unbounded().with_operator_construction(construction);
+            options.max_operator_entries = 4;
+            match QuotientAlgebra::new(&basis, order, &options) {
+                Err(FglmError::OperatorStorageExceeded { entries, limit }) => {
+                    assert_eq!(limit, 4);
+                    assert!(
+                        entries > 4,
+                        "{:?}: {} is not over the limit",
+                        construction,
+                        entries
+                    );
+                }
+                other => panic!(
+                    "{:?}: expected an operator storage error, got ok = {}",
+                    construction,
+                    other.is_ok()
+                ),
+            }
+        }
+    }
+
+    /// A budget set to exactly what a system needs is enough for every strategy.
+    ///
+    /// The deduplicated path checks its shared vectors against the same budget before the columns
+    /// exist, so the claim that this cannot reject a system the reference path accepts is checked
+    /// at the tight boundary rather than argued. It holds because every distinct border monomial
+    /// appears in at least one column, so the shared entries never exceed the operators'.
+    #[test]
+    fn test_a_budget_that_exactly_suffices_is_enough_for_every_strategy() {
+        fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>]) {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let basis = f4(system, order).expect("within limits");
+            let needed = QuotientAlgebra::new(&basis, order, &FglmOptions::unbounded())
+                .expect("finite")
+                .operator_entries();
+
+            for construction in [
+                OperatorConstruction::PerColumn,
+                OperatorConstruction::DeduplicatedBorder,
+            ] {
+                let mut options = FglmOptions::unbounded().with_operator_construction(construction);
+                options.max_operator_entries = needed;
+                assert!(
+                    QuotientAlgebra::new(&basis, order, &options).is_ok(),
+                    "{}: {:?} rejected a system at a budget of exactly its {} entries",
+                    name,
+                    construction,
+                    needed
+                );
+
+                options.max_operator_entries = needed - 1;
+                assert!(
+                    QuotientAlgebra::new(&basis, order, &options).is_err(),
+                    "{}: {:?} accepted a system one entry over its budget",
+                    name,
+                    construction
+                );
+            }
+        }
+
+        check("katsura-5", &katsura::<5, F>());
+        check("katsura-6", &katsura::<6, F>());
+        check("cyclic-5", &cyclic::<5, F>());
+    }
+
+    /// The named baseline is the M17 configuration, so a comparison against it stays meaningful.
+    #[test]
+    fn test_the_baseline_names_the_m17_strategies() {
+        let baseline = FglmOptions::baseline();
+        assert_eq!(
+            baseline.operator_construction,
+            OperatorConstruction::PerColumn
+        );
+        assert!(!baseline.measure_stages);
+        assert_eq!(baseline.max_quotient_dimension, 4_096);
+        assert_eq!(baseline.max_operator_entries, 20_000_000);
+        assert_eq!(baseline.max_span_entries, 20_000_000);
     }
 
     /// The identities hold on a larger system, in more variables, with a planted solution.

@@ -20,6 +20,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction};
+
 use zeebra::grobner::differential::{
     check::{SUPPORTED_CHARACTERISTICS, SUPPORTED_VARIABLES},
     emit_failure, emit_fixture_module, run_sweep, Failure, SingularOracle, SweepOptions,
@@ -55,6 +57,8 @@ OPTIONS
     --max-degree <d>         Largest total degree of a generated term. Default: 3
     --max-terms <t>          Largest number of terms in a generated polynomial. Default: 4
     --timeout <seconds>      Per-system Singular time limit. Default: 30
+    --operator-construction <s>
+                             per-column | deduplicated-border. Default: per-column
     --minimize-attempts <n>  Shrink candidates per failing system, 0 to disable. Default: 40
     --minimize-seconds <s>   Wall-clock for shrinking one failing system. Default: 20
     --fixtures <path>        Write the agreeing cases as a Rust fixture module.
@@ -118,6 +122,10 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
         arguments.sweep.characteristics,
         arguments.sweep.max_degree,
         arguments.sweep.max_terms
+    );
+    println!(
+        "# operator construction: {:?}",
+        arguments.sweep.fglm.operator_construction
     );
     println!("# scratch in {}", oracle.work_dir().display());
     println!();
@@ -278,6 +286,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
         max_terms: 4,
         minimize_attempts: 40,
         minimize_budget: Duration::from_secs(20),
+        fglm: FglmOptions::default(),
     };
     let mut singular = "Singular".to_string();
     let mut timeout = Duration::from_secs(30);
@@ -322,6 +331,20 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
             "--max-degree" => sweep.max_degree = number(&value()?, flag)?,
             "--max-terms" => sweep.max_terms = number(&value()?, flag)?,
             "--timeout" => timeout = Duration::from_secs(number(&value()?, flag)?),
+            "--operator-construction" => {
+                let name = value()?;
+                sweep.fglm.operator_construction = match name.as_str() {
+                    "per-column" => OperatorConstruction::PerColumn,
+                    "deduplicated-border" => OperatorConstruction::DeduplicatedBorder,
+                    other => {
+                        return Err(format!(
+                            "{:?} is not an operator-construction strategy; use per-column or \
+                             deduplicated-border",
+                            other
+                        ))
+                    }
+                };
+            }
             "--minimize-attempts" => sweep.minimize_attempts = number(&value()?, flag)?,
             "--minimize-seconds" => {
                 sweep.minimize_budget = Duration::from_secs(number(&value()?, flag)?)
