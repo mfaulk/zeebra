@@ -1127,10 +1127,13 @@ mod tests {
 /// Singular's `std` is Buchberger/slimgb lineage, so these are independent in algorithm.
 #[cfg(test)]
 mod singular_reference {
-    use super::{fglm_to_lex, TARGET};
+    use super::{fglm_to_lex_with_options, FglmOptions, TARGET};
     use crate::{
         fields::PrimeFieldElement64,
-        grobner::{f4, fglm::reference_bases},
+        grobner::{
+            f4,
+            fglm::{reference_bases, OperatorConstruction, OperatorStorage},
+        },
         MonomialOrder, MultivariatePolynomial,
     };
 
@@ -1141,6 +1144,11 @@ mod singular_reference {
     /// Both sides are the unique reduced lex basis of the ideal, so this is an equality of values
     /// once they are ordered the same way — Singular lists ascending by leading monomial and
     /// Zeebra descending.
+    ///
+    /// Run under every construction and storage strategy, not only the default: the strategies are
+    /// asserted equal to each other elsewhere, and this asserts each one separately equal to
+    /// *Singular*. Which strategy is the default changed in M18-5, and a reference comparison that
+    /// only ever ran the default would have quietly stopped covering the other two.
     fn check<const N: usize, const P: u64>(cases: &[reference_bases::ReferenceBasis]) {
         type Poly<const N: usize, const P: u64> = MultivariatePolynomial<N, PrimeFieldElement64<P>>;
 
@@ -1163,17 +1171,35 @@ mod singular_reference {
             let mut expected: Vec<Poly<N, P>> = case.lex_basis.iter().map(|s| parse(s)).collect();
 
             let source = f4(&system, SOURCE).expect("within limits");
-            let converted = fglm_to_lex(&source, SOURCE).expect("convertible");
 
             expected.sort_by(|a, b| {
                 TARGET.cmp(&b.leading_monomial(TARGET), &a.leading_monomial(TARGET))
             });
 
-            assert_eq!(
-                converted, expected,
-                "{} over GF({}): the conversion disagrees with Singular",
-                case.name, P
-            );
+            for construction in [
+                OperatorConstruction::PerColumn,
+                OperatorConstruction::DeduplicatedBorder,
+                OperatorConstruction::BatchedBorder,
+            ] {
+                for storage in [
+                    OperatorStorage::Sparse,
+                    OperatorStorage::Adaptive,
+                    OperatorStorage::Dense,
+                ] {
+                    let options = FglmOptions::default()
+                        .with_operator_construction(construction)
+                        .with_operator_storage(storage);
+                    let (converted, _) =
+                        fglm_to_lex_with_options(&source, SOURCE, &options).expect("convertible");
+
+                    assert_eq!(
+                        converted, expected,
+                        "{} over GF({}) under {:?} and {:?}: the conversion disagrees with \
+                         Singular",
+                        case.name, P, construction, storage
+                    );
+                }
+            }
         }
     }
 

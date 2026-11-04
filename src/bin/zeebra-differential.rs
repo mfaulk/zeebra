@@ -59,8 +59,9 @@ OPTIONS
     --timeout <seconds>      Per-system Singular time limit. Default: 30
     --operator-construction <s>
                              per-column | deduplicated-border | batched-border.
-                             Default: per-column
-    --operator-storage <s>   sparse | adaptive | dense. Default: sparse
+                             Default: batched-border, the `FglmOptions` default
+    --operator-storage <s>   sparse | adaptive | dense.
+                             Default: adaptive, the `FglmOptions` default
     --minimize-attempts <n>  Shrink candidates per failing system, 0 to disable. Default: 40
     --minimize-seconds <s>   Wall-clock for shrinking one failing system. Default: 20
     --fixtures <path>        Write the agreeing cases as a Rust fixture module.
@@ -171,7 +172,7 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
         // Sorted so that regenerating with the same arguments gives the same file, byte for byte,
         // rather than a diff that depends on the order the sweep happened to finish in.
         report.agreed_cases.sort_by(|a, b| a.name.cmp(&b.name));
-        let module = emit_fixture_module(&report.agreed_cases, &version);
+        let module = emit_fixture_module(&report.agreed_cases, &version, &sweep_flags(&arguments));
         std::fs::write(path, module)
             .map_err(|e| format!("cannot write {}: {}", path.display(), e))?;
         println!(
@@ -183,6 +184,31 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
 
     summarize(&report, elapsed);
     Ok(report)
+}
+
+/// The flags that reproduce this sweep, for the generated fixture module's header.
+///
+/// Spelled out rather than taken from `std::env::args`, so that a table regenerated through a
+/// wrapper script still records flags the tool itself accepts. Only the ones that change which
+/// systems are generated: the oracle's path and the scratch directory do not.
+fn sweep_flags(arguments: &Arguments) -> String {
+    let sweep = &arguments.sweep;
+    let characteristics: Vec<String> = sweep
+        .characteristics
+        .iter()
+        .map(|p| p.to_string())
+        .collect();
+    format!(
+        "--seed {} --systems {} --min-variables {} --max-variables {} --max-degree {} \
+         --max-terms {} --characteristics {}",
+        sweep.seed,
+        sweep.systems,
+        sweep.variables.iter().min().copied().unwrap_or(0),
+        sweep.variables.iter().max().copied().unwrap_or(0),
+        sweep.max_degree,
+        sweep.max_terms,
+        characteristics.join(","),
+    )
 }
 
 fn summarize(report: &SweepReport, elapsed: Duration) {

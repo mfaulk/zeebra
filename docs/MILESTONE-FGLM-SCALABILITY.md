@@ -1,6 +1,6 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
-**Status:** in progress — M18-0 through M18-4 complete; M18-5 outstanding
+**Status:** complete — M18-0 through M18-5
 **Prerequisite:** M17, merged at `7c2fef7`
 **Objective:** make quotient-algebra construction faster and FGLM's memory smaller, without
 changing a single answer
@@ -28,7 +28,7 @@ pipeline first, then investigate whether its scaling limit can be surpassed at a
 | M18-2 | batched border reduction | **complete** |
 | M18-3 | adaptive sparse/dense multiplication operators | **complete** |
 | M18-4 | incremental-span memory, and a sparse-FGLM feasibility spike | **complete** |
-| M18-5 | integration, ablations, and this document's conclusion | not started |
+| M18-5 | integration, ablations, and this document's conclusion | **complete** |
 
 M18-3 and M18-4 are independent of M18-1 and M18-2 and of each other. All four depend on M18-0,
 because none of them may be merged without evidence that it changed no answer.
@@ -48,6 +48,13 @@ exact one. §7.
 **M18-4's result:** the dependence test's dense blocks 1.20x smaller, and a **no-go** on a full
 sparse-FGLM milestone. The decisive measurement: the systems where classical FGLM's memory is the
 problem are exactly the systems the shape-position route cannot convert. §8.
+
+**M18-5's result:** the defaults are `BatchedBorder` at a batch of 64 with `Adaptive` storage,
+measured at least as fast as M17's on **every** system in the corpus — 14.0x on katsura-7, 1.17x on
+planted-10 — and never storing more, 1.41x less on katsura-7. Nothing composed adversely, 240
+differential fixtures agree under all nine configurations, and 2,000 live systems agree under the
+new defaults. **The bottleneck moved:** operator construction was 95% of katsura-7's conversion and
+is 52%; the lex walk is now 69% of planted-10's and is the next milestone. §9.
 
 ---
 
@@ -439,7 +446,8 @@ A sweep's agreeing cases are emitted as Rust literals into
 the same two reasons: the compiler type-checks them, and reading them needs no parser and no new
 dependency.
 
-96 cases are committed. An ordinary test replays **the same comparison function** against them,
+**240 cases are committed** — 96 when the harness landed, expanded at a wider generated shape in
+M18-5 (§9.5). An ordinary test replays **the same comparison function** against them,
 with a table of constants where the subprocess was, so the checks CI runs cannot drift from the
 checks a development machine runs. Three further tests require the table to cover every supported
 characteristic, every supported variable count, and all three ideal classes — a table of twenty
@@ -574,7 +582,7 @@ the budget. The bound is provable rather than measured, and it is the honest cos
 * The lex bases are additionally compared end to end, over three orders, GF(7) and GF(2^31 - 1), and
   the benchmark corpus — together with `span_row_operations` and `operator_entries`, so a strategy
   that reached the same answer by doing different linear algebra would be caught.
-* **All 96 committed differential fixtures are verified under every strategy**, which is each one
+* **Every committed differential fixture is verified under every strategy**, which is each one
   separately compared against Singular rather than against the other. Two implementations agreeing
   with each other and both being wrong is what an external oracle is for.
 * A live sweep of 500 random systems under `--operator-construction deduplicated-border`, over
@@ -584,13 +592,14 @@ the budget. The bound is provable rather than measured, and it is the honest cos
   descending under the order, the border disjoint from the basis, the index reproducible, and the
   unit ideal having no border at all.
 
-### 5.6 The default has not changed
+### 5.6 The default, and when it changed
 
-`FglmOptions::default()` is still `PerColumn`. Deduplication is measured faster on every instance in
-the corpus, agrees everywhere, and stores the same amount — so this is sequencing, not doubt: §12 of
-the proposal asks for defaults to be chosen from the integration ablation in M18-5, when M18-2's
-batched reduction and M18-3's representations can be weighed against it at the same time. A caller
-who wants it now writes
+**As of M18-1 it had not.** `FglmOptions::default()` was still `PerColumn`: deduplication is
+measured faster on every instance in the corpus, agrees everywhere, and stores the same amount, so
+this was sequencing rather than doubt — §12 of the proposal asks for defaults to be chosen from the
+integration ablation in M18-5, when M18-2's batched reduction and M18-3's representations can be
+weighed against it at the same time. §9.3 is where that was done, and the default is now
+`BatchedBorder`, which is deduplicated too. A caller who wants plain deduplication writes
 
 ```rust
 let options = FglmOptions::default()
@@ -733,7 +742,7 @@ the reference path**.
   become pivots would fail this.
 * Every remainder's monomials are standard, with no zero coefficients.
 * The lex basis is compared over the **cross product** of three construction strategies and three
-  storage strategies — nine configurations — and all 96 differential fixtures are verified under all
+  storage strategies — nine configurations — and every differential fixture is verified under all
   nine.
 * 900 live systems across three seeds, over GF(2) through GF(2^31 - 1), under
   `--operator-construction batched-border`: 0 disagreements, 0 oracle failures.
@@ -878,19 +887,19 @@ budget.
 * The lex basis is compared over the **cross product** of construction and storage, six
   configurations, because a construction strategy and a storage strategy could each be right alone
   and wrong together.
-* All 96 differential fixtures are verified under all six configurations, each against Singular.
+* Every differential fixture is verified under all six configurations, each against Singular.
 * `Adaptive` is asserted no larger than either extreme on every family, strictly smaller than
   `Sparse` on katsura-7, and exactly equal to `Sparse` on planted-8 — the last being the claim that
   it correctly declines to hold a 0.5%-full column densely.
 * A zero column allocates nothing under both `Sparse` and `Adaptive`, which is §7.2's requirement
   for a compact zero representation; the sparse form already was one.
 
-### 7.6 The default has not changed
+### 7.6 The default, and when it changed
 
-`FglmOptions::default()` is still `OperatorStorage::Sparse`, for the same reason the construction
-default is unchanged — see §5.6. The two representation changes in §7.1 are *not* behind a strategy
-flag, because they are not strategies: they make the sparse representation smaller without changing
-it.
+**As of M18-3 it had not.** `FglmOptions::default()` was still `OperatorStorage::Sparse`, for the
+same reason the construction default was unchanged — see §5.6. §9.3 chose `Adaptive` from the
+integration ablation. The two representation changes in §7.1 are *not* behind a strategy flag,
+because they are not strategies: they make the sparse representation smaller without changing it.
 
 ---
 
@@ -959,10 +968,10 @@ Krylov sequence. `cargo run --release --example fglm_shape`.
 | planted-6 | 6 | 64 | 4 | none | no |
 | planted-8 | 8 | 256 | 4 | none | no |
 
-The whole katsura family, and nothing else. On the random differential corpus, **26 of the 38
-zero-dimensional fixtures** are in shape position and the shape route agrees with Singular on every
-one of them — that check runs in every sweep and on every fixture, not only in the module's own
-tests.
+The whole katsura family, and nothing else. On the random differential corpus, **76 of the 120
+zero-dimensional fixtures** are in shape position — 26 of 38 on the corpus as it stood in M18-4,
+so 68% then and 63% after M18-5 expanded it. The shape route agrees with Singular on every one of
+them, and that check runs in every sweep and on every fixture, not only in the module's own tests.
 
 **Detection is algebraic, not a solution count.** What is tested is whether `1, t, ..., t^{D-1}` are
 independent. `<x - 1, (y - 1)^2>` has one point over the base field, quotient dimension two, and
@@ -1066,7 +1075,221 @@ milestone, not after.
 
 ---
 
-## 9. Acceptance criteria
+## 9. M18-5: integration
+
+Four changes were measured one at a time against M17. This section measures them **together**,
+chooses the defaults from that measurement, and says where the next milestone's cost is.
+
+Two of the four cannot be ablated and that is part of the result. M18-3's compact sparse column —
+a `Box<[_]>` of exact capacity where a `Vec` grown by `collect` was — and M18-4's triangular
+combination block are not behind options, because neither is a strategy: they make a representation
+smaller without changing what it represents. Both are therefore in **every row below, the baseline
+included**, and §3.5 and §8.1 hold the M17 figures they were measured against. So `baseline` here
+means M17's *strategies* at M18's representations, which is the comparison a caller choosing a
+strategy today actually faces.
+
+### 9.1 The ablation
+
+`cargo run --release --example fglm_ablation`, nine configurations per system, whole conversion,
+fastest of three, milliseconds. One source basis per system, computed outside the measurement, with
+the lex basis and the operators' nonzero count asserted equal to the baseline's on every row. Six
+of the nine are below; `-- list` names them all:
+
+| system | `D` | baseline | 1: dedup | 2: batch 64 | **2+3** | 2: batch ∞ | 3: dense | **won** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 16 | 0.52 | 0.41 | 0.14 | **0.13** | 0.13 | 0.51 | **3.96x** |
+| katsura-6 | 32 | 3.58 | 2.69 | 0.52 | **0.53** | 0.69 | 3.57 | **6.76x** |
+| katsura-7 | 64 | 38.25 | 28.67 | 2.66 | **2.73** | 2.38 | 42.23 | **14.03x** |
+| cyclic-5 | 70 | 2.15 | 1.75 | 0.55 | **0.55** | 0.56 | 2.17 | **3.93x** |
+| cyclic-6 | 156 | 27.83 | 19.65 | 2.81 | **2.78** | 2.72 | 27.39 | **10.01x** |
+| planted-6 | 64 | 0.43 | 0.39 | 0.37 | **0.37** | 0.39 | 0.44 | **1.17x** |
+| planted-8 | 256 | 3.16 | 2.90 | 2.59 | **2.59** | 3.57 | 5.06 | **1.22x** |
+| planted-10 | 1,024 | 41.49 | 39.24 | 35.83 | **35.51** | 60.47 | 74.40 | **1.17x** |
+
+Under Criterion, `cargo bench --bench fglm -- fglm_recommended`, which times
+`FglmOptions::recommended()` against `FglmOptions::baseline()` on a prepared source basis and
+asserts the two lex bases equal first: katsura-6 **3.53 ms to 522 µs**, katsura-7 **41.19 ms to
+2.76 ms**, cyclic-6 **27.59 ms to 2.78 ms**, planted-8 **3.09 ms to 2.61 ms**. The two harnesses
+agree within 1.5% on the recommended configuration; their *baseline* figures differ by up to 8%,
+which is the run-to-run spread §9.2 warns about and the reason the ratios are quoted from a single
+process.
+
+And the memory, which is exact rather than timed:
+
+| system | `D` | baseline total | **2+3 total** | won | operators | dense blocks | 3: dense total |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 16 | 18.7 kB | **14.0 kB** | **1.33x** | 13.6 → 9.0 kB | 5.1 kB | 14.2 kB |
+| katsura-6 | 32 | 80.2 kB | **57.9 kB** | **1.39x** | 60.1 → 37.7 kB | 20.1 kB | 59.1 kB |
+| katsura-7 | 64 | 344.8 kB | **243.8 kB** | **1.41x** | 264.5 → 163.6 kB | 80.2 kB | 252.2 kB |
+| cyclic-5 | 70 | 136.4 kB | 136.4 kB | 1.00x | 40.4 kB | 96.0 kB | 214.6 kB |
+| cyclic-6 | 156 | 698.6 kB | 698.6 kB | 1.00x | 222.7 kB | 475.9 kB | 1,185.2 kB |
+| planted-6 | 64 | 94.5 kB | 94.5 kB | 1.00x | 14.2 kB | 80.2 kB | 209.2 kB |
+| planted-8 | 256 | 1,357.0 kB | 1,357.0 kB | 1.00x | 76.0 kB | 1,281.0 kB | 3,889.0 kB |
+| planted-10 | 1,024 | 20,864.0 kB | 20,864.0 kB | 1.00x | 380.0 kB | 20,484.0 kB | 71,924.0 kB |
+
+**The recommended configuration is faster than M17's on every system in the corpus and never
+stores more.** It is not the fastest *possible* configuration everywhere, and that is deliberate:
+on katsura-7 an unbounded batch takes 2.38 ms against 2.73 — 13% — and the same configuration takes
+60.47 ms on planted-10 where M17's takes 41.49. Giving up 13% of katsura's 14x to avoid a 1.46x
+loss elsewhere is the trade §6.4 described, now made as a default.
+
+### 9.2 Nothing composed adversely, and that was not obvious in advance
+
+`2+3` equals `2-batch64` in time to within the noise of the harness and equals `3-adaptive` in
+bytes exactly, on every instance. The reason is that the two changes touch disjoint quantities —
+how a column's normal form is *computed* against how the result is *stored* — and the one place
+they could have met is the coordinate assembly that writes a reduced column into its
+representation. §9.4's stage table says that assembly is 2% to 14% of a conversion, so a change to
+it does not survive to the total.
+
+The interaction that was predicted to be adverse was M18-1 against M18-2, and it is not visible
+because it is not an interaction: `BatchedBorder` *is* deduplicated — a batch's targets are the
+distinct border monomials — so `1+3` and `2+3` are two points on one axis rather than two options
+that could conflict. The ablation prints both anyway, since "the two cannot conflict" is an
+argument and the table is a measurement.
+
+One figure deserves a caveat rather than a claim. Storage alone, on the baseline construction,
+moves katsura-7's whole conversion by a few percent with **no stable sign**: this ablation reports
+0.92x to 0.98x across three runs, `examples/fglm_storage.rs` reports 0.99x in the same session, and
+Criterion's §7.3 figure was 0.1%. The honest statement is that a per-column representation is not
+detectable at the level of a whole conversion, which is what §7.3 concluded from the application
+benchmark and what makes 1.41x less operator memory worth taking.
+
+### 9.3 The defaults, chosen from the table above
+
+`FglmOptions::recommended()` — and therefore `FglmOptions::default()` — is now
+`OperatorConstruction::BatchedBorder` with `BorderBatch::recommended()`'s batch of 64, and
+`OperatorStorage::Adaptive`. The two enums' `#[default]` variants moved with it, so
+`OperatorConstruction::default()` and `FglmOptions::default().operator_construction` cannot drift
+apart.
+
+What did **not** change:
+
+* `FglmOptions::baseline()` still names M17's strategies explicitly, which is why every figure in
+  this document quoted against the baseline still means what it said.
+* `FglmOptions::unbounded()` still carries the *reference* strategies, not the recommended ones, so
+  a measurement that lifts the budgets does not silently also change the strategy. That is now
+  documented on the constructor rather than being an accident of its definition.
+* Every limit. The baseline and the recommended configuration differ in their strategies and in
+  nothing else, which `options.rs` asserts directly — otherwise a speedup measured against the
+  baseline could be a budget that fired rather than a strategy that worked.
+
+### 9.4 Where the time goes now
+
+`cargo run --release --example fglm_profile` under each configuration — the example takes a
+`baseline` argument for the M17 strategies and profiles the shipped ones otherwise. Stage shares of
+the whole conversion, `measure_stages` on:
+
+| system | M17 total | M17 border % | M17 walk | **now** | border % | walk | **walk %** |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 0.53 ms | 80% | 0.05 | **0.14 ms** | 43% | 0.04 | 29% |
+| katsura-6 | 3.54 ms | 90% | 0.16 | **0.54 ms** | 46% | 0.16 | 30% |
+| katsura-7 | 38.32 ms | 95% | 0.90 | **2.79 ms** | 52% | 0.86 | 31% |
+| cyclic-5 | 1.91 ms | 83% | 0.18 | **0.56 ms** | 39% | 0.21 | 38% |
+| cyclic-6 | 25.04 ms | 92% | 1.16 | **2.78 ms** | 37% | 1.27 | 46% |
+| planted-6 | 0.44 ms | 48% | 0.12 | **0.40 ms** | 38% | 0.13 | 33% |
+| planted-8 | 3.24 ms | 47% | 1.16 | **2.88 ms** | 31% | 1.40 | 49% |
+| planted-10 | 41.38 ms | 26% | 24.83 | **36.89 ms** | 15% | 25.58 | **69%** |
+
+"Border share" is scalar reduction plus batched closure against the total — the same stage of the
+algorithm under two strategies, which is why the profile now prints both columns and takes their
+sum. A profile that reported only `normal_forms` would say that 0% of a batched conversion went
+into reducing the border.
+
+**The bottleneck moved.** M18 opened with operator construction at 95% of katsura-7's conversion
+and §3.4 saying nothing else was worth attacking. It is now 52%, the walk is 31%, and the absolute
+figure is 1.44 ms where it was 36.60. On planted-10 the walk was already 60% and is now 69%: the
+border work there fell from 10.96 ms to 5.58 while the walk did not move, because nothing in M18
+touched it.
+
+Storage says the same thing more sharply. Under the shipped configuration the dependence test's
+three dense blocks against the operators' bytes: 0.5x on katsura-7, 2.1x on cyclic-6, 16.9x on
+planted-8 and **53.9x on planted-10**, where the blocks are 20.5 MB and the operators 380 kB. The
+operators were the whole of M18's storage work and on the systems that scale they are now a
+rounding error.
+
+### 9.5 What the suite says
+
+* `cargo test`: **963 passed, 0 failed, 9 ignored.** `cargo test --release`: the same.
+  `cargo test --doc`: 13 passed, which includes every fenced Rust block in the README.
+* The slow `#[ignore]`d comparisons, release, named individually as CI names them —
+  `test_optimized_agrees_with_reference_on_slow_systems`, `test_f4_on_larger_systems`, and the live
+  Singular sweep: **3 passed in 124 s.**
+* The committed differential corpus went from 96 cases to **240**, at a wider generated shape
+  (degree ≤ 4, terms ≤ 5 where it was 3 and 4): 120 zero-dimensional ideals with a border, 55 unit
+  ideals, 65 positive-dimensional, ten cases per (characteristic, variable count) across six fields
+  and two to five variables, the largest quotient `D = 57`. Every one is verified under all
+  **nine** construction × storage configurations, each against Singular rather than against another
+  configuration. The shape-position route runs and agrees on 76 of the 120.
+* The generated fixture module's header now reproduces the sweep that produced it, flag for flag.
+  It previously quoted the tool's *defaults*, which regenerate a different table — a fixture corpus
+  nobody can reproduce is data of unknown provenance.
+* The 29 Singular reference bases are now compared under all nine configurations too. They used to
+  run only `fglm_to_lex`, so when the default changed they would have quietly stopped covering the
+  other eight.
+* Two live sweeps of **1,000 systems each** under the new defaults, seeds 31337 and 90210, over
+  GF(2) through GF(2^31 - 1) in two to five variables: 949 zero-dimensional, 572 unit ideals, 479
+  positive-dimensional, **0 disagreements and 0 oracle failures**.
+* Every optimization has an independent benchmark: `fglm_operator_construction` for M18-1 and
+  M18-2, `fglm_operator_application` for M18-3, `fglm_dependence` for M18-4, and `fglm_recommended`
+  for the combination. M18-4's is a level rather than a comparison — the triangular block is not
+  option-gated and the padded one no longer exists — so what it does is keep the quantity under
+  measurement: filling a span to full rank is 444 µs at `D = 64`, 5.99 ms at 156 and 26.4 ms at
+  256 — the `O(D^3)` the walk's cost is — and sixteen dependent probes against a full-rank span are
+  227 µs, 1.38 ms and 3.62 ms.
+
+### 9.6 Regressions, stated
+
+* **An unbounded batch is 1.46x slower than M17 on planted-10** (60.47 ms against 41.49) and 1.38x
+  slower on planted-8. It is not the default, it is documented as the wrong choice on a sparse
+  staircase, and it is kept because it is the fastest size on katsura and because a bound chosen
+  without knowing what it costs would be a guess.
+* **Dense storage everywhere is 0.56x on planted-10 and 3.4x its memory** — 71.9 MB against 20.9.
+  It exists to show that, which §7.2 argued and this table confirms at the level of a whole
+  conversion.
+* **Storage alone is a few percent either way on katsura**, with no stable sign across harnesses or
+  runs. §9.2 has the three measurements that disagree about it.
+* **The debug test suite went from 10 s to 41 s**, because the fixture table quadrupled and every
+  case is verified nine times. The release suite is 2.6 s. Both are well inside what CI tolerates,
+  and the alternative — verifying 240 cases under one configuration — is the weaker check.
+* **Peak memory during construction is unchanged and still up to twice the budget** under the
+  deduplicated and batched strategies, which now includes the default. §5.4 proves the bound rather
+  than measuring it; making the default faster did not make that cost go away, and a caller for
+  whom it matters has `OperatorConstruction::PerColumn`.
+
+### 9.7 The next milestone, from the measurements above
+
+**The dependence test is now the whole of the remaining problem on the systems that scale, in both
+time and memory.** The evidence is §9.4: on planted-10 the lex walk is 69% of a conversion and the
+three dense blocks are 20.5 MB against the operators' 380 kB. The walk's row operations are
+`O(D^3)` and its storage is `2 D^2 + D (D + 1) / 2` cells, so at `D = 2,828` the default
+`max_span_entries` of 20 million binds — and that is the limit M18 did not move.
+
+Three things are worth doing, in this order:
+
+1. **Stop retaining the accepted quotient vectors, or store them as the operators are stored.**
+   They are `D^2` of the `2.5 D^2` cells and M17 added them to make a candidate's class cost one
+   operator application instead of a reduction. That trade was never measured against recomputing
+   them, and M18-3's per-column accounting is exactly the machinery for measuring it.
+2. **Put the span's row operations through `linalg`.** The dependence test is a hand-written dense
+   echelon update over `Vec<F>`, and it uses none of the elimination machinery M16 built — neither
+   the backends nor `reduce_rows_against_pivots_with`. The reduction is one scaled subtraction per
+   accepted row, so the question is whether that machinery beats it at `D` in the hundreds, and
+   that is a benchmark rather than an argument: `fglm_dependence` is already the benchmark.
+3. **Reuse closures across batches.** katsura-7's remaining 52% is the batch closure, and a closure
+   is currently discarded at the end of its batch. Border monomials are processed in descending
+   order, so consecutive batches' closures overlap heavily; §6.4 measured what a *bigger* batch is
+   worth and never measured what a *shared* one would be.
+
+What is explicitly **not** recommended is a sparse-FGLM milestone. §8.5 is the no-go and the
+measurement behind it has not changed: the systems whose memory is the problem are exactly the
+systems the shape-position route cannot convert. If a workload with large shape-position quotients
+appears, `fglm::shape` is the foundation and the first thing to do is measure whether the
+algebraic-hash systems that motivate this project are in shape position at all.
+
+---
+
+## 10. Acceptance criteria
 
 ### M18-0 — validation infrastructure
 
@@ -1076,14 +1299,14 @@ milestone, not after.
 - [x] Randomized tests over multiple small prime fields — §4.4, six characteristics including 2
       and 3.
 - [x] Failing cases can be persisted and reproduced — §4.5, §4.6.
-- [x] Representative fixtures committed — §4.7, 96 cases.
+- [x] Representative fixtures committed — §4.7, 96 cases, expanded to 240 in M18-5 (§9.5).
 - [x] Ordinary CI does not require Singular — §4.7.
 
 ### M18-1 — border deduplication
 
 - [x] Unique border monomials enumerated correctly — `BorderIndex`, §5.1, with its own tests.
 - [x] Repeated border products deduplicated — `OperatorConstruction::DeduplicatedBorder`.
-- [x] Normal forms agree with M17 — §5.5, and all 96 fixtures under both strategies.
+- [x] Normal forms agree with M17 — §5.5, and every fixture under both strategies.
 - [x] Operator columns agree exactly — whole-`QuotientAlgebra` equality, §5.5.
 - [x] Performance and duplication rate measured — §5.2, and the two refuted hypotheses in §5.3.
 
@@ -1101,45 +1324,54 @@ milestone, not after.
 
 ### M18-3 — operator storage
 
-- [x] Standard, sparse, and dense columns supported — `Column`, §6.1.
-- [x] Adaptive selection supported where justified — per column, from bytes, §6.2.
-- [x] All representations agree exactly — §6.5, including the cross product with M18-1.
-- [x] Operator application benchmarked separately — §6.3, on unit and dense inputs.
-- [x] Byte-aware accounting introduced — `operator_cells` and exact `operator_bytes`, §6.4.
+- [x] Standard, sparse, and dense columns supported — `Column`, §7.1.
+- [x] Adaptive selection supported where justified — per column, from bytes, §7.1.
+- [x] All representations agree exactly — §7.5, including the cross product with M18-1.
+- [x] Operator application benchmarked separately — §7.3, on unit and dense inputs.
+- [x] Byte-aware accounting introduced — `operator_cells` and exact `operator_bytes`, §7.4.
 - [x] Resource limits apply across representations — `max_operator_bytes` beside the entry
-      budget, §6.4.
+      budget, §7.4.
 
 ### M18-4 — FGLM scalability
 
-- [x] Actual incremental-span storage measured — `IncrementalSpan::stored_cells`, §7.1.
+- [x] Actual incremental-span storage measured — `IncrementalSpan::stored_cells`, §8.1, and
+      benchmarked in M18-5's `fglm_dependence` group, §9.5.
 - [x] All substantial coordinate-vector storage accounted for — all three blocks, and
-      `max_span_entries` now budgets them, §7.2.
+      `max_span_entries` now budgets them, §8.2.
 - [x] Compact dependence representation evaluated — implemented, not merely evaluated: the
-      combination block is triangular, §7.1.
+      combination block is triangular, §8.1.
 - [x] Dependence coefficients remain exact — over the *original* accepted vectors, tested on a
-      Vandermonde basis, §7.1.
+      Vandermonde basis, §8.1.
 - [x] Shape-position detection evaluated — `fglm::shape`, algebraic rather than from a solution
-      count, §7.3.
-- [x] Sparse-FGLM spike documented with go/no-go criteria — **no-go**, §7.5.
+      count, §8.3.
+- [x] Sparse-FGLM spike documented with go/no-go criteria — **no-go**, §8.5.
 - [x] No unverified probabilistic result is exposed as certified output — nothing in the prototype
-      is probabilistic, and its output is verified before it is returned, §7.4.
+      is probabilistic, and its output is verified before it is returned, §8.4.
 
 ### M18-5 — integration
 
-- [ ] All default tests pass.
-- [ ] Release-mode tests pass.
-- [ ] Slow Gröbner and FGLM reference comparisons pass.
-- [ ] Expanded Singular fixtures agree.
-- [ ] Every optimization has an independent benchmark.
-- [ ] Combined performance and memory usage measured.
-- [ ] Any regressions documented.
-- [ ] Default strategies selected from evidence.
-- [ ] README and milestone documentation updated.
-- [ ] Next-milestone recommendation based on measured bottlenecks.
+- [x] All default tests pass — 963 passed, 9 ignored, §9.5.
+- [x] Release-mode tests pass — the same suite and the 13 doc tests, §9.5.
+- [x] Slow Gröbner and FGLM reference comparisons pass — the three `#[ignore]`d comparisons in
+      release, and the 29 Singular reference bases now under all nine configurations, §9.5.
+- [x] Expanded Singular fixtures agree — 96 cases to **240** at a wider shape, each against
+      Singular under nine configurations, §9.5.
+- [x] Every optimization has an independent benchmark — four Criterion groups, one per
+      sub-milestone, plus `fglm_recommended` for the combination, §9.5.
+- [x] Combined performance and memory usage measured — §9.1, with
+      `examples/fglm_ablation.rs` as the harness.
+- [x] Any regressions documented — §9.6, including the two rejected strategies and the figure
+      whose sign is not stable.
+- [x] Default strategies selected from evidence — §9.3, from §9.1's table rather than from
+      katsura-7 alone.
+- [x] README and milestone documentation updated — the defaults, the fixture count, the new
+      example, and the benchmark groups.
+- [x] Next-milestone recommendation based on measured bottlenecks — §9.7: the dependence test, with
+      three ordered proposals and one explicit non-recommendation.
 
 ---
 
-## 10. Compatibility
+## 11. Compatibility
 
 `FglmOptions` gained `measure_stages` and `FglmStatistics` gained `border`, `timings` and `memory`.
 Both structs have public fields, so a downstream struct literal naming every field stops compiling.
@@ -1155,7 +1387,8 @@ quotient vectors were missing entirely. No resource budget changed.
 
 M18-1 added `FglmOptions::operator_construction`, the same source-compatibility note applying. It
 also added `FglmOptions::baseline()` and `FglmOptions::with_operator_construction`, and the public
-`BorderIndex` and `ColumnTarget`. `FglmOptions::default()` is unchanged — see §5.6.
+`BorderIndex` and `ColumnTarget`. `FglmOptions::default()` was unchanged then and changed in M18-5
+— see below.
 
 M18-2 added `OperatorConstruction::BatchedBorder`, `FglmOptions::border_batch` and
 `FglmOptions::with_border_batch`, the public `BorderBatch`, `BorderBatchSize`, `BatchOverflow` and
@@ -1169,6 +1402,29 @@ M18-4 changed what `FglmOptions::max_span_entries` counts — see §8.2 — and 
 rather than per dimension, which is a behaviour change for a downstream caller using
 `IncrementalSpan` directly; the conversion is the only caller in this crate.
 
+**M18-5 changed `FglmOptions::default()`**, which is the one behaviour change in this milestone a
+caller can observe without asking for it. `recommended()` and therefore `Default` now name
+`OperatorConstruction::BatchedBorder` and `OperatorStorage::Adaptive`, and the two enums'
+`#[default]` variants moved to match. Every strategy produces the same lex basis — that is what the
+nine-configuration tests are for — so what changes is time, memory, and which counters in
+`FglmStatistics` are nonzero:
+
+* `FglmStageTimings::normal_forms` is **zero** under the new default and
+  `FglmStageTimings::border_symbolic` is not. They are the same stage of the algorithm under two
+  strategies, so a caller reporting a reduction share must add them; `examples/fglm_profile.rs`
+  does, and §9.4 says what that share now is.
+* `FglmStatistics::batches` is nonzero where it used to be zeros.
+* `FglmMemory::operator_cells` now exceeds `operator_entries` wherever a column is held densely,
+  and `dense_columns` is nonzero on katsura. `operator_entries` itself is unchanged under every
+  strategy, which the tests assert.
+* `FglmOptions::baseline()` is the M17 configuration and is the way to get the old behaviour
+  exactly. `FglmOptions::unbounded()` also still carries the reference strategies.
+
+`emit_fixture_module` took a third argument, the flags that reproduce the sweep, so that a
+generated fixture module's header names the sweep that produced it rather than the tool's defaults.
+`examples/fglm_profile.rs` takes a `baseline` argument and otherwise profiles the shipped
+strategies; its stage table gained a `symbolic` column for the reason above.
+
 M18-3 added `FglmOptions::operator_storage` and `FglmOptions::max_operator_bytes`, the public
 `OperatorStorage` and `FglmOptions::with_operator_storage`, the `FglmError::OperatorBytesExceeded`
 variant, `FglmMemory::operator_cells` and `FglmMemory::dense_columns`, and
@@ -1180,7 +1436,7 @@ unchanged — see §7.6.
 
 ---
 
-## 11. References
+## 12. References
 
 1. Faugère, J.-C., Gianni, P., Lazard, D., Mora, T. (1993). *Efficient Computation of
    Zero-dimensional Gröbner Bases by Change of Ordering.* J. Symbolic Computation 16(4), 329–344.

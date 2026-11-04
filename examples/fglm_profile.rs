@@ -61,11 +61,20 @@ struct Row {
 }
 
 /// The conversion, measured. The fastest of three, since interference can only make a run slower.
-fn measure<const N: usize>(name: &'static str, system: &[MultivariatePolynomial<N, F>]) -> Row {
+fn measure<const N: usize>(
+    name: &'static str,
+    system: &[MultivariatePolynomial<N, F>],
+    strategies: &FglmOptions,
+) -> Row {
     let source_order = MonomialOrder::GradedReverseLexicographic;
     let source = f4(system, source_order).expect("within limits");
 
-    let mut options = FglmOptions::unbounded();
+    // The caller's strategies at lifted limits: a profile that a budget refused to produce is not
+    // a profile, and the limits are not what is being measured.
+    let mut options = FglmOptions::unbounded()
+        .with_operator_construction(strategies.operator_construction)
+        .with_operator_storage(strategies.operator_storage)
+        .with_border_batch(strategies.border_batch);
     options.measure_stages = true;
 
     let mut best: Option<(Duration, FglmStatistics)> = None;
@@ -128,11 +137,19 @@ fn border_row(row: &Row) {
 
 fn stage_header() {
     println!(
-        "| {:<11} | {:>8} | {:>7} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} |",
-        "system", "total ms", "basis", "classify", "nf ms", "assembly", "walk", "nf share",
+        "| {:<11} | {:>8} | {:>7} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} | {:>9} |",
+        "system",
+        "total ms",
+        "basis",
+        "classify",
+        "nf ms",
+        "symbolic",
+        "assembly",
+        "walk",
+        "border %",
     );
     println!(
-        "|{}|{}|{}|{}|{}|{}|{}|{}|",
+        "|{}|{}|{}|{}|{}|{}|{}|{}|{}|",
         "-".repeat(13),
         "-".repeat(10),
         "-".repeat(9),
@@ -141,21 +158,27 @@ fn stage_header() {
         "-".repeat(10),
         "-".repeat(10),
         "-".repeat(10),
+        "-".repeat(11),
     );
 }
 
 fn stage_row(row: &Row) {
     let t = row.statistics.timings;
+    // Scalar reduction and batched reduction are the same stage of the algorithm charged to two
+    // counters — one is zero whenever the other is not — so the share is of their sum. Reporting
+    // only `normal_forms` would say 0% of a batched conversion went into reducing the border.
+    let border = t.normal_forms + t.border_symbolic;
     println!(
-        "| {:<11} | {:>8.2} | {:>7.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>7.0}% |",
+        "| {:<11} | {:>8.2} | {:>7.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8.2} | {:>8.0}% |",
         row.name,
         millis(row.wall),
         millis(t.quotient_basis),
         millis(t.border_classification),
         millis(t.normal_forms),
+        millis(t.border_symbolic),
         millis(t.column_assembly),
         millis(t.dependence),
-        100.0 * t.normal_forms.as_secs_f64() / row.wall.as_secs_f64(),
+        100.0 * border.as_secs_f64() / row.wall.as_secs_f64(),
     );
 }
 
@@ -198,40 +221,56 @@ fn planted_point<const N: usize>() -> Vec<F> {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let wanted = |name: &str| args.is_empty() || args.iter().any(|a| a == name);
+    // `baseline` profiles M17's strategies instead of the shipped ones. It is not a system name,
+    // so it is taken out before the rest are read as one.
+    let strategies = if args.iter().any(|a| a == "baseline") {
+        FglmOptions::baseline()
+    } else {
+        FglmOptions::recommended()
+    };
+    let systems: Vec<&String> = args.iter().filter(|a| *a != "baseline").collect();
+    let wanted = |name: &str| systems.is_empty() || systems.iter().any(|a| *a == name);
+
+    println!(
+        "# construction {:?}, storage {:?}, batch {:?}",
+        strategies.operator_construction, strategies.operator_storage, strategies.border_batch.size
+    );
 
     let mut rows: Vec<Row> = Vec::new();
     if wanted("katsura-5") {
-        rows.push(measure("katsura-5", &katsura::<5, F>()));
+        rows.push(measure("katsura-5", &katsura::<5, F>(), &strategies));
     }
     if wanted("katsura-6") {
-        rows.push(measure("katsura-6", &katsura::<6, F>()));
+        rows.push(measure("katsura-6", &katsura::<6, F>(), &strategies));
     }
     if wanted("katsura-7") {
-        rows.push(measure("katsura-7", &katsura::<7, F>()));
+        rows.push(measure("katsura-7", &katsura::<7, F>(), &strategies));
     }
     if wanted("cyclic-5") {
-        rows.push(measure("cyclic-5", &cyclic::<5, F>()));
+        rows.push(measure("cyclic-5", &cyclic::<5, F>(), &strategies));
     }
     if wanted("cyclic-6") {
-        rows.push(measure("cyclic-6", &cyclic::<6, F>()));
+        rows.push(measure("cyclic-6", &cyclic::<6, F>(), &strategies));
     }
     if wanted("planted-6") {
         rows.push(measure(
             "planted-6",
             &planted::<6, F>(&planted_point::<6>()),
+            &strategies,
         ));
     }
     if wanted("planted-8") {
         rows.push(measure(
             "planted-8",
             &planted::<8, F>(&planted_point::<8>()),
+            &strategies,
         ));
     }
     if wanted("planted-10") {
         rows.push(measure(
             "planted-10",
             &planted::<10, F>(&planted_point::<10>()),
+            &strategies,
         ));
     }
 
@@ -255,12 +294,14 @@ fn main() {
     }
 
     println!();
-    println!("`basis`, `classify`, `nf ms`, `assembly` and `walk` partition the conversion and");
-    println!("are in milliseconds. `total ms` is its wall clock, which exceeds their sum by the");
-    println!(
-        "bookkeeping outside every stage. `nf share` is the reduction against that total: the"
-    );
-    println!("fraction of a conversion that deduplicating and batching the border could reach.");
+    println!("`basis`, `classify`, `nf ms`, `symbolic`, `assembly` and `walk` partition the");
+    println!("conversion and are in milliseconds. `total ms` is its wall clock, which exceeds");
+    println!("their sum by the bookkeeping outside every stage.");
+    println!();
+    println!("`nf ms` is scalar reduction and `symbolic` is a batch's closure and its targets:");
+    println!("the same stage of the algorithm under two strategies, so one is zero whenever the");
+    println!("other is not. `border %` is their sum against the total — the share of a conversion");
+    println!("that any border strategy can reach at all.");
 
     println!();
     println!("# FGLM storage");

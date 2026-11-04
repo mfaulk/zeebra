@@ -13,7 +13,6 @@ pub enum OperatorConstruction {
     /// The reference. A border monomial reached from several columns is reduced several times, and
     /// the repeated answers are provably identical — which is the waste the other variants remove,
     /// and the reason this one is kept as something to compare against rather than deleted.
-    #[default]
     PerColumn,
 
     /// One normal form per *distinct* border monomial, reused by every column that reaches it.
@@ -34,6 +33,10 @@ pub enum OperatorConstruction {
     /// **The targets do not reduce one another.** Each has its own normal form, so the pivots are
     /// fixed before any target is touched and no target becomes one. See
     /// [`batch`](super::batch) and [`BorderBatch`](super::BorderBatch) for the limits.
+    ///
+    /// The default since M18-5, whose ablation measured it at least as fast as [`Self::PerColumn`]
+    /// on every system in the corpus at [`BorderBatch::recommended`]'s batch size.
+    #[default]
     BatchedBorder,
 }
 
@@ -49,7 +52,6 @@ pub enum OperatorConstruction {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum OperatorStorage {
     /// Every reduced column as `(index, coefficient)` pairs, as M17 did. The reference.
-    #[default]
     Sparse,
 
     /// Each column in whichever of the two allocates fewer bytes.
@@ -58,6 +60,11 @@ pub enum OperatorStorage {
     /// substantially different densities, so a whole-operator choice would be wrong for some of
     /// them by construction. A column with no entries is always the sparse side, so a zero column
     /// still allocates nothing.
+    ///
+    /// The default since M18-5. It is never larger than [`Self::Sparse`] — it picks whichever is
+    /// smaller a column at a time — and 1.41x smaller on katsura-7, for a few percent of operator
+    /// *application*, which is not where a conversion's time goes.
+    #[default]
     Adaptive,
 
     /// Every reduced column as `D` coefficients.
@@ -173,6 +180,15 @@ impl FglmOptions {
     /// stated in the unit that is actually allocated. The two bind together under
     /// [`OperatorStorage::Sparse`] and the byte budget binds first under
     /// [`OperatorStorage::Dense`], which is the point of having it.
+    ///
+    /// # The strategies, and where they were chosen
+    /// [`OperatorConstruction::BatchedBorder`] at [`BorderBatch::recommended`]'s batch of 64, and
+    /// [`OperatorStorage::Adaptive`]. Both come from M18-5's ablation — §9 of
+    /// `docs/MILESTONE-FGLM-SCALABILITY.md` — which measured every combination on one source basis
+    /// per system with the lex basis asserted equal throughout. That configuration is **at least
+    /// as fast as M17's on every system in the corpus** (1.17x on planted-10, 14.0x on katsura-7)
+    /// and never stores more (1.41x less on katsura-7, equal elsewhere). [`Self::baseline`] is the
+    /// M17 configuration, kept so that figure stays reproducible.
     pub fn recommended() -> Self {
         Self {
             max_quotient_dimension: 4_096,
@@ -180,8 +196,8 @@ impl FglmOptions {
             max_span_entries: 20_000_000,
             max_operator_bytes: 320_000_000,
             measure_stages: false,
-            operator_construction: OperatorConstruction::PerColumn,
-            operator_storage: OperatorStorage::Sparse,
+            operator_construction: OperatorConstruction::BatchedBorder,
+            operator_storage: OperatorStorage::Adaptive,
             border_batch: BorderBatch::recommended(),
         }
     }
@@ -190,6 +206,11 @@ impl FglmOptions {
     ///
     /// Exists for tests and for measurement, where a limit that fires is a failed measurement
     /// rather than a protected one. Not a sensible default, which is why it is not the default.
+    ///
+    /// Its **strategies are the reference ones**, not the recommended ones, so that a measurement
+    /// which lifts the limits does not silently also change the strategy. A caller who wants the
+    /// recommended strategies without the budgets writes
+    /// `FglmOptions::unbounded().with_operator_construction(..).with_operator_storage(..)`.
     pub fn unbounded() -> Self {
         Self {
             max_quotient_dimension: usize::MAX,
@@ -253,5 +274,70 @@ impl Default for FglmOptions {
     /// [`FglmOptions::recommended`].
     fn default() -> Self {
         Self::recommended()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FglmOptions, OperatorConstruction, OperatorStorage};
+    use crate::grobner::fglm::BorderBatchSize;
+
+    /// The default is the recommended configuration, not a third thing to keep in step.
+    #[test]
+    fn test_the_default_is_the_recommended_configuration() {
+        assert_eq!(FglmOptions::default(), FglmOptions::recommended());
+    }
+
+    /// The recommended strategies are the ones M18-5's ablation chose, including the batch size.
+    #[test]
+    fn test_the_recommended_options_name_the_strategies_the_ablation_chose() {
+        let recommended = FglmOptions::recommended();
+        assert_eq!(
+            recommended.operator_construction,
+            OperatorConstruction::BatchedBorder
+        );
+        assert_eq!(recommended.operator_storage, OperatorStorage::Adaptive);
+        assert_eq!(recommended.border_batch.size, BorderBatchSize::Fixed(64));
+    }
+
+    /// The baseline still names M17's strategies, so a figure quoted against it keeps its meaning.
+    #[test]
+    fn test_the_baseline_names_the_m17_strategies() {
+        let baseline = FglmOptions::baseline();
+        assert_eq!(
+            baseline.operator_construction,
+            OperatorConstruction::PerColumn
+        );
+        assert_eq!(baseline.operator_storage, OperatorStorage::Sparse);
+        assert!(!baseline.measure_stages);
+        assert_eq!(baseline.max_quotient_dimension, 4_096);
+        assert_eq!(baseline.max_operator_entries, 20_000_000);
+        assert_eq!(baseline.max_span_entries, 20_000_000);
+        assert_eq!(baseline.max_operator_bytes, 320_000_000);
+        assert_ne!(baseline, FglmOptions::recommended());
+    }
+
+    /// Every limit the recommended configuration sets is also the limit the baseline sets.
+    ///
+    /// The ablation varied the strategies and nothing else, so the two configurations must differ
+    /// in the strategies and nothing else — otherwise a speedup measured against the baseline
+    /// could be a budget that fired rather than a strategy that worked.
+    #[test]
+    fn test_the_baseline_and_the_recommended_options_differ_only_in_their_strategies() {
+        let baseline = FglmOptions::baseline();
+        let recommended = FglmOptions::recommended();
+
+        assert_eq!(
+            baseline.max_quotient_dimension,
+            recommended.max_quotient_dimension
+        );
+        assert_eq!(
+            baseline.max_operator_entries,
+            recommended.max_operator_entries
+        );
+        assert_eq!(baseline.max_span_entries, recommended.max_span_entries);
+        assert_eq!(baseline.max_operator_bytes, recommended.max_operator_bytes);
+        assert_eq!(baseline.border_batch, recommended.border_batch);
+        assert_eq!(baseline.measure_stages, recommended.measure_stages);
     }
 }

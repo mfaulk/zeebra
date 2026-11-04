@@ -1434,20 +1434,6 @@ mod tests {
         check("cyclic-5", &cyclic::<5, F>());
     }
 
-    /// The named baseline is the M17 configuration, so a comparison against it stays meaningful.
-    #[test]
-    fn test_the_baseline_names_the_m17_strategies() {
-        let baseline = FglmOptions::baseline();
-        assert_eq!(
-            baseline.operator_construction,
-            OperatorConstruction::PerColumn
-        );
-        assert!(!baseline.measure_stages);
-        assert_eq!(baseline.max_quotient_dimension, 4_096);
-        assert_eq!(baseline.max_operator_entries, 20_000_000);
-        assert_eq!(baseline.max_span_entries, 20_000_000);
-    }
-
     /// The identities hold on a larger system, in more variables, with a planted solution.
     ///
     /// The two-variable cases above are exhaustive but small. This is the same commutation and
