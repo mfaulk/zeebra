@@ -138,8 +138,11 @@ impl FglmStageTimings {
 /// * **Bytes** are what the allocation actually takes, including each entry's index and each
 ///   `Vec`'s spare capacity.
 ///
-/// [`FglmOptions`](super::FglmOptions)'s budgets are written in entries and cells. Bytes are
-/// reported, not budgeted, until M18-3 introduces a byte-aware budget.
+/// All three are budgeted: [`max_operator_entries`](super::FglmOptions::max_operator_entries) on
+/// the entries, [`max_span_entries`](super::FglmOptions::max_span_entries) on the dense blocks'
+/// cells, and [`max_operator_bytes`](super::FglmOptions::max_operator_bytes) on the bytes. The
+/// byte budget is beside the entry one rather than a redefinition of it, because under
+/// [`OperatorStorage::Dense`](super::OperatorStorage) the two diverge.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FglmMemory {
     /// Nonzero entries the `N` operators hold between them.
