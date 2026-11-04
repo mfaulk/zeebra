@@ -269,6 +269,28 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md), and
 [`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md).
 
+## Finite Fields
+
+`PrimeFieldElement64<P>` holds elements in **Montgomery form** when `P` is odd, storing
+`a * 2^64 mod P` rather than `a`. This is an internal representation and is not observable through
+the public API: `value()`, `Display`, and the serialized form all give the canonical residue in
+`[0, P)`, and the serialized bytes are unchanged by it.
+
+The reason is that multiplication used to compute `(a as u128 * b as u128) % P as u128`. A
+const-generic modulus does not save that — LLVM does not strength-reduce a 128-bit remainder, so
+every field multiplication compiled to a call to `__umodti3`, compiler-rt's *software* 128-bit
+division. Montgomery reduction replaces the division with two multiplications and a shift.
+
+Two consequences worth knowing:
+
+- `value()` is a Montgomery reduction, not a field read. A hot loop should hold field elements and
+  convert at the boundary rather than call `value()` per iteration.
+- `P = 2` is supported and keeps the wide-remainder path, because `2^64` is not invertible modulo
+  an even number. The branch is on a const generic, so it is resolved at compile time.
+
+`PrimeFieldElement128<P>` still reduces a 256-bit product by software long division. It is not yet
+converted.
+
 ## Gröbner Bases
 
 `grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
