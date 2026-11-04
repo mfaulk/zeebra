@@ -1,6 +1,7 @@
 # Milestone: Hardware-Efficient Arithmetic — SIMD and Parallelism
 
-**Status:** in progress — M19-0 and M19-A complete; M19-B through M19-G outstanding
+**Status:** complete — M19-0 through M19-D landed; M19-E, M19-F and M19-G closed won't-do on
+measurements recorded in §6
 **Prerequisite:** M16 for the stage attribution this milestone targets; independent of M18, which
 runs in parallel on the quotient-algebra side and touches none of the same files
 **Objective:** remove the software division under every field multiplication, then vectorize and
@@ -30,12 +31,13 @@ division, nothing could be vectorized until that was gone.
 | --- | --- | --- |
 | [#45](https://github.com/mfaulk/zeebra/issues/45) M19-0 | Build configuration and a re-measured baseline | done |
 | [#46](https://github.com/mfaulk/zeebra/issues/46) M19-A | Division-free prime field arithmetic | done, 64-bit only |
-| [#47](https://github.com/mfaulk/zeebra/issues/47) M19-B | Carry-less multiplication for the binary field | open |
-| [#48](https://github.com/mfaulk/zeebra/issues/48) M19-C | Delayed reduction in extension-field multiplication | open |
-| [#49](https://github.com/mfaulk/zeebra/issues/49) M19-D | SIMD axpy kernels for dense elimination | open |
-| [#50](https://github.com/mfaulk/zeebra/issues/50) M19-E | Parallel block update in structured elimination | open |
-| [#51](https://github.com/mfaulk/zeebra/issues/51) M19-F | Parallel Macaulay matrix construction | open |
-| [#52](https://github.com/mfaulk/zeebra/issues/52) M19-G | Parallel critical-pair criteria | open |
+| [#47](https://github.com/mfaulk/zeebra/issues/47) M19-B | Carry-less multiplication for the binary field | done, 105x on the operation |
+| [#48](https://github.com/mfaulk/zeebra/issues/48) M19-C | Delayed reduction in extension-field multiplication | done |
+| [#49](https://github.com/mfaulk/zeebra/issues/49) M19-D | SIMD axpy kernels for dense elimination | done by autovectorization; explicit intrinsics measured slower |
+| [#50](https://github.com/mfaulk/zeebra/issues/50) M19-E | Parallel block update in structured elimination | **won't do** — §6.1 |
+| [#51](https://github.com/mfaulk/zeebra/issues/51) M19-F | Parallel Macaulay matrix construction | **won't do** — §6.3 |
+| [#52](https://github.com/mfaulk/zeebra/issues/52) M19-G | Parallel critical-pair criteria | **won't do** — §6.2 |
+| [#62](https://github.com/mfaulk/zeebra/issues/62) | A 32-bit prime field, which §5.3 identifies as the remaining lever | open, follow-on |
 
 ## 3. What landed
 
@@ -181,3 +183,161 @@ required to name which bound it hit.
 | Each measurement states whether it was ALU-bound or bandwidth-bound | met — §4.4 |
 
 Outstanding: `PrimeFieldElement128` is unconverted, and the six remaining sub-milestones are open.
+
+
+## 5. The field work, M19-B through M19-D
+
+### 5.1 GF(2^m): one instruction for sixty-four iterations (#47)
+
+`multiply_polynomials` tested one bit of an operand per iteration, sixty-four times, and
+`long_divide` then iterated once per degree the product had to come down, recomputing a
+leading-zero count each time. Carry-less multiplication is a single instruction and the reduction
+is three of them.
+
+| | ns per multiply over GF(2^63) |
+| --- | --- |
+| bitwise loop + long division | 212.70 |
+| `PCLMULQDQ` + Barrett | 2.02 |
+
+**105x.** Not a criterion benchmark: `fields::binary_field` is a private module with no `pub use`,
+so no bench target can reach the type. The figure is from a standalone program replicating both
+implementations, which also cross-checks them on 1024 pairs.
+
+`pclmulqdq` is probed at run time, not assumed. It is **not** implied by the `x86-64-v3` floor —
+it arrived with the AES-NI generation and belongs to none of the microarchitecture levels.
+
+Barrett needs the product's degree below 2m, and the type already guarantees it: `new` rejects any
+pattern at or above `2^m`, so an element has degree at most m - 1. That is why `new` checks against
+`2^m` and not against P, whose range admits degree-m patterns.
+
+### 5.2 Extension fields: O(N) reductions instead of O(N^2) (#48)
+
+Schoolbook multiplication reduced after every multiply-add. It now accumulates and reduces each
+coefficient once, licensed by an explicit bound: a slot takes at most N products of two residues,
+so the sum is below `N(P-1)^2`, checked against `u128::MAX` at compile time. A prime near 2^64
+fills a u128 with one product and keeps the old per-step path; no modulus in this crate reaches it,
+the largest declared being P = 251 at N = 4.
+
+The per-multiplication heap allocation is gone — `[u128; 2N-1]` needs const-expression arithmetic
+but two `[u128; N]` arrays do not.
+
+Also not benchmarked, for the same reason as §5.1: `fields::extension_field` is private.
+
+### 5.3 The SIMD question answered in the negative (#49)
+
+After the de-branching in #60, LLVM vectorizes the kernel unaided: in `row_echelon_with` over the
+31-bit prime, vector instructions go 71 to 175, `vpmuludq` 0 to 9, `vpsrlq` 0 to 4.
+
+Hand-written AVX2, matching the shipped kernel's cells and counters exactly, at equal storage
+width:
+
+| working set | autovectorized | hand-written AVX2 | ratio |
+| --- | --- | --- | --- |
+| L1, 8 KB | 0.543 ns/entry | 0.631 ns/entry | **0.86x** |
+| L2, 512 KB | 0.553 | 0.566 | 0.98x |
+| out of cache, 32 MB | 0.750 | 0.699 | 1.07x |
+
+Slower in cache. No intrinsics were added.
+
+**The correction that produced the real finding.** A first version of this measurement showed 1.18x
+to 1.59x for AVX2 and was wrong: the scalar path ran over `u64` arrays and the AVX2 path over
+`u32`, so AVX2 moved half the bytes. At equal width the advantage disappears — the gain had been
+the narrower *type*, not the wider instruction.
+
+So the lever is **storage width**. A 31-bit residue in a `u64` wastes half of every cache line, and
+this kernel is bandwidth-bound out of cache. That is #62, and it would make the SIMD question worth
+asking again at eight lanes.
+
+## 6. Parallelism: three won't-dos and one reason
+
+All three parallelism sub-milestones closed without shipping code. They fail for one shared
+structural reason, which is the most useful thing this milestone learned.
+
+### 6.1 The block update has no work in it (#50)
+
+The two-phase split was built and verified: identical matrices, `rank`, `row_operations`,
+`pivot_inversions`, `zero_rows` and `final_nonzeros` against the sequential path over ten shapes
+and six seeds each, deterministic over sixteen runs, budget enforced. Then measured, on batches
+replayed from real computations, at 128 threads:
+
+| system | order | batches | red% | seq/ms | par/ms | x |
+| --- | --- | --- | --- | --- | --- | --- |
+| cyclic-5 | lex | 32 | 71.8 | 9.45 | 26.17 | **0.36** |
+| katsura-6 | lex | 114 | 80.0 | 32 337.66 | 32 694.89 | 0.99 |
+| cyclic-5 | grevlex | 22 | 65.5 | 13.61 | 27.10 | **0.50** |
+| katsura-6 | grevlex | 10 | 95.9 | 673.45 | 697.68 | 0.97 |
+| katsura-7 | grevlex | 12 | 97.0 | 31 561.85 | 31 633.65 | 1.00 |
+
+Never faster. The phase boundary says why:
+
+```
+phase1 ops: 0   lower rows: 3632   of which lead in reducer map: 0
+```
+
+**The parallel phase performs zero row operations, because not one lower row has a leading column
+that a reducer pivot owns.** The echelon loop only ever examines a leading column, and the reducer
+block's pivot columns are disjoint from the lower rows' leading columns — a pair row leads with its
+lcm, and the reducer multiples exist to cancel monomials to the *right* of it. In block terms
+`D -= C A^-1 B` has `C = 0` at every leading position.
+
+What `BlockPlan::ReducersFirstBlock` buys is therefore **avoided work** — not echelonizing the
+reducer block against itself — and not a parallel phase. The real work is
+lower-row-against-lower-row, which is the sequential dependence chain #50 correctly identified as
+unparallelizable. The `peak_nonzeros` semantics the issue asked to settle first never needed
+settling.
+
+One wrong diagnosis is worth recording: the first implementation updated a global live count and
+peak as atomics per row operation, which at 128 threads is three read-modify-writes on one cache
+line in the hot path and looked like the obvious cause. Replacing them with per-task locals changed
+the result not at all — 0.36x to 0.36x.
+
+### 6.2 Pair criteria are under one percent (#52)
+
+The `other` bucket, which is where the criteria live, as a share of total: **0.3% and 0.6%** on the
+two katsura-7 instances, 0.7% on katsura-6 lex, rising to 3.2% only where the absolute time is
+milliseconds. That is the ceiling on the whole stage, of which the parallelizable part is a
+fraction. M16-C already took the real win here by moving the criteria onto leading monomials.
+
+### 6.3 Construction is big but its batches are small (#51)
+
+Two measurements bound this without an attempt. Instrumenting `build_within`: **row filling is 47%
+of construction** (177.2 ms against 203.0 ms for column discovery and the sort), and only the
+filling is per-row independent. And from §6.1, rayon's per-invocation overhead here is about
+**0.52 ms** — measured cleanly, since that phase did no work at all.
+
+Giving the fill phase perfect speedup:
+
+| system | order | total/ms | fill/ms | fill per batch | best case |
+| --- | --- | --- | --- | --- | --- |
+| katsura-7 | grlex | 486.02 | 20.38 | 1.853 ms | **+3.0%** |
+| katsura-7 | grevlex | 759.49 | 18.95 | 1.579 ms | **+1.7%** |
+| katsura-6 | lex | 452.92 | 39.09 | 0.343 ms | **-4.5%** |
+| katsura-6 | grevlex | 25.53 | 2.10 | 0.210 ms | **-12.1%** |
+| cyclic-5 | lex | 21.72 | 2.54 | 0.079 ms | **-64.9%** |
+
+### 6.4 The shared reason
+
+**F4 spreads its work over many small, sequentially-dependent batches.** What matters is not a
+stage's share of the total but its size *per batch*, and that is at or below the cost of handing
+work to a thread pool. katsura-6 lex is the clearest case: construction is 83 ms, the largest
+anywhere in the profile, spread over 114 batches at 0.34 ms of parallelizable work each. Batches
+cannot be parallelized against each other either, because each one's candidates change the basis
+the next sees.
+
+Parallelism is not ruled out for this project — it is ruled out *at this granularity*. A decom-
+position that aggregates work across batches, or a single instance large enough that one batch is
+substantial, would change the arithmetic. Anyone revisiting this should start from a measurement of
+per-batch phase size, not from the block structure, which misled this milestone three times.
+
+## 7. Acceptance criteria, closed out
+
+| Criterion | State |
+| --- | --- |
+| Release builds select a modern ISA baseline, documented and CI-portable | met — `x86-64-v3` |
+| No field operation on the F4 hot path calls a software division routine | met for 64-bit; `PrimeFieldElement128` unconverted and off the hot path |
+| Every change attributed to a stage | met — §4.2, §6 |
+| Field semantics unchanged; property tests pass unmodified | met — 977 tests, release and debug |
+| Montgomery form not observable through the public API | met — two tests pin it |
+| Each measurement states its bound | met — §4.4, §5.3 |
+
+Outstanding: `PrimeFieldElement128` is unconverted, and #62 carries the remaining bandwidth lever.

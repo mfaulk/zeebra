@@ -310,6 +310,17 @@ Two consequences worth knowing:
 `PrimeFieldElement128<P>` still reduces a 256-bit product by software long division. It is not yet
 converted.
 
+Two other field types gained the same treatment, each measured on the operation rather than on a
+whole computation, because both modules are private and no bench target can reach them:
+
+- `BinaryFieldElement<P>` multiplies with `PCLMULQDQ` and reduces by Barrett rather than by a
+  bit-at-a-time loop and long division — **212.70 to 2.02 ns** per multiply over GF(2^63). The
+  instruction is probed at run time, since it is not implied by the `x86-64-v3` floor, and the
+  scalar fallback is kept and tested.
+- `ExtensionFieldElement<P, N, M>` reduces once per output coefficient instead of once per partial
+  product, O(N) instead of O(N^2), under a compile-time overflow bound; the per-multiplication heap
+  allocation is gone.
+
 ## Gröbner Bases
 
 `grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
