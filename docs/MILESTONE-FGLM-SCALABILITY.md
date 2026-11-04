@@ -158,10 +158,14 @@ Milliseconds, and `nf share` is normal forms over total.
 This is the table that sets M18's agenda, and it says the two problems have **different owners**:
 
 * On katsura and cyclic, reduction is 81–95% of the conversion. Classification is under 0.3% and
-  assembly under 2%. §5.3 of the proposal asks whether the one-term `MultivariatePolynomial`
-  allocated per border monomial is material; on this evidence its cost lies in `assemble` and
-  `classify`, which together are 0.66 ms of katsura-7's 35.75 ms. **Deduplicating and batching the
-  reductions is the only lever on this family that can matter.**
+  assembly under 2%, so neither the monomial lookup nor the coordinate-vector construction is worth
+  attacking. **Deduplicating and batching the reductions is the only lever on this family that can
+  matter.**
+
+  One caveat on reading the `normal forms` column: the one-term `MultivariatePolynomial` built per
+  border monomial is *inside* it, not inside `assemble`. So this table does not answer §5.3 of the
+  proposal — whether that allocation is material — and M18-1 must measure it separately rather than
+  infer it from here.
 * On planted-10 the lex walk is 66% and reduction is 24%. Nothing M18-1 or M18-2 does will help
   there. What is large on planted-10 is the **24.6 MB of dense blocks** against 0.6 MB of operators
   — which is M18-4's problem, not M18-2's.
