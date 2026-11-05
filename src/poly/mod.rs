@@ -5,8 +5,9 @@ mod univariate;
 
 pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial};
 pub use univariate::{
-    factorize, gcd, is_irreducible, lagrange_interpolate, pow_mod, roots, Polynomial,
-    PolynomialParams, UnivariatePolynomial,
+    factorize, gcd, inverse_exponent, is_irreducible, is_permutation_exponent,
+    is_permutation_polynomial, lagrange_interpolate, permutation_exponents, pow_mod, roots,
+    Polynomial, PolynomialParams, PowerPermutation, UnivariatePolynomial,
 };
 
 #[cfg(test)]
