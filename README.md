@@ -26,6 +26,7 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Batched border reduction and adaptive operator storage: 14x on katsura-7's conversion
 - [x] 254- and 255-bit prime fields, with F4, FGLM and solving over them end to end
 - [x] Two-adic roots of unity without factoring `q - 1`, so the NTT runs over the wide fields
+- [x] Batch inversion by Montgomery's trick: the inverse NTT now costs what the forward one does
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -276,6 +277,8 @@ cargo run --release --example mq_challenge         # import and solve a Fukuoka 
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
+cargo run --release --example batch_inversion      # batch inversion: routine, integration,
+cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
 cargo run --release --example scoreboard           # registered problems, one record each, staged
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
@@ -674,6 +677,46 @@ Every field type in the crate implements both traits. Two consequences for anyth
 
 `docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 
+### Batch inversion
+
+Inversion is the most expensive operation a prime field has. `batch_invert` and `batch_inverse`
+apply Montgomery's trick — prefix products turn n inversions into **one** inversion and `3(n-1)`
+multiplications:
+
+```rust
+use zeebra::{fields::{batch_inverse, batch_invert, Bn254Fr}, FiniteField, One, Zero};
+
+let values = [Bn254Fr::new(3), Bn254Fr::zero(), Bn254Fr::new(5)];
+let inverses = batch_inverse(&values);
+
+// Each nonzero element is inverted...
+assert!((values[0] * inverses[0]).is_one());
+assert!((values[2] * inverses[2]).is_one());
+// ...and a zero is left as zero rather than panicking.
+assert!(inverses[1].is_zero());
+
+// The in-place form, for a vector you already own.
+let mut owned = vec![Bn254Fr::new(7); 4];
+batch_invert(&mut owned);
+assert!(owned.iter().all(|x| (*x * Bn254Fr::new(7)).is_one()));
+```
+
+**A zero is left as zero.** A batch comes from a container, and a container of field elements may
+legitimately hold zeros, so panicking would make the routine unusable where it is most wanted.
+`FiniteField::inverse` keeps its panic because there the caller named the one element it was asking
+about.
+
+The crossover is **n = 2** in every field; a single-element batch loses by a few percent to the
+copy. The plateau is the ratio between an inversion and three multiplications — 35x over
+Mersenne-31, 38x over the 254-bit fields, up to 90x over Goldilocks, whose inversion is an
+exponentiation by a 64-bit exponent.
+
+`FFTDomain::inverse` is where it is wired in, and `fft::interpolate` additionally hoists the one
+`1/n` it used to compute per coefficient. Together those make the inverse transform cost what the
+forward transform costs; see "Number-Theoretic Transform" below and
+[`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) for the measurements and for
+why F4's pivot normalization is deliberately *not* batched.
+
 ## Dense Matrices
 
 `linalg::Matrix<T>` is a dense matrix over any `T: Ring`, stored row-major, with the `matrix!`
@@ -789,7 +832,7 @@ bytes** from a counting allocator. On a 64-core/300 GB workstation at one second
 | `mul`, schoolbook | 2 | 2^15 | 2^13 | `4 n B` |
 | `div`, long division | 2 | 2^15 | 2^13 | `6 n B` |
 | `evaluate` (NTT) | 1 | **2^23** | **2^21** | `7 n B` |
-| `interpolate` (iNTT) | 1 | 2^22 | 2^18 | `9 n B` |
+| `interpolate` (iNTT) | 1 | **2^23** | **2^20** | `9 n B` |
 | `lagrange_interpolate` | 3 | 2^10 | 2^9 | `8 n B` |
 | `roots` | 2 | 2^12 | 2^8 | `12 n B` |
 
@@ -798,9 +841,12 @@ the 2.5x the F4 budgets are written in: those count sparse `(usize, F)` entries,
 word is paid whatever the field is and dilutes the ratio. A dense coefficient array has no index
 word, so a byte budget carried over from the F4 side under-estimates this layer by 1.6x.
 
-The two transforms are the only quasi-linear stages. Multiplication has no NTT-based path at all,
-and interpolation at arbitrary abscissae — what an evaluation-interpolation resultant needs — is
-cubic. [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the
+The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
+`2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
+2.4x, 5.2x and 8.6x. The whole gap was the `2n` inversions batch inversion removed — see
+[`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Multiplication has no
+NTT-based path at all, and interpolation at arbitrary abscissae — what an evaluation-interpolation
+resultant needs — is cubic. [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the
 full curves, the gap list, and what each stage would need to go further.
 
 ## Gröbner Bases

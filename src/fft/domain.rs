@@ -6,7 +6,7 @@
 //! n is the product of small prime factors. The simplest case, assumed here, is when the size
 //! is a power of 2.
 
-use crate::{fft::evens_and_odds, powers_of, FiniteField};
+use crate::{fft::evens_and_odds, fields::batch_inverse, powers_of, FiniteField};
 use std::{
     fmt::{Display, Formatter},
     ops::Index,
@@ -71,11 +71,17 @@ impl<F: FiniteField> FFTDomain<F> {
     }
 
     /// Inverse powers 1, g^{-1}, g^{-2}, ...
+    ///
+    /// One inversion for the whole domain rather than one per element, by Montgomery's trick —
+    /// see [`batch_inverse`]. Every power of a root of unity is a unit, so no element is skipped.
+    ///
+    /// Not `from_generator(self.generator().inverse(), self.size())`, which is what this used to
+    /// hold as commented-out code. A domain is not required to be a power sequence starting at
+    /// one: [`Self::split`] produces the odd powers `g, g^3, g^5, ...`, whose `generator()` is
+    /// `g^3` and whose inverses are *not* the powers of `g^-3`. That form would also panic on such
+    /// a domain, since `(g^3)^(n/2)` is `-1` rather than one.
     pub fn inverse(&self) -> FFTDomain<F> {
-        let inverse_powers: Vec<_> = self.powers().iter().map(|w_i| w_i.inverse()).collect();
-        FFTDomain::new(inverse_powers)
-        // let inverse_generator = self.generator().inverse();
-        // FFTDomain::from_generator(inverse_generator, self.size())
+        FFTDomain::new(batch_inverse(self.powers()))
     }
 
     /// Returns an iterator over the elements of this domain.
@@ -106,7 +112,9 @@ impl<F: FiniteField> Display for FFTDomain<F> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        fields::PrimeFieldElement64, identities::One, powers_of, FFTDomain, FiniteField, KnownOrder,
+        fields::PrimeFieldElement64,
+        identities::{One, Zero},
+        powers_of, FFTDomain, FiniteField, KnownOrder,
     };
     use rand::{prelude::StdRng, SeedableRng};
 
@@ -147,6 +155,34 @@ mod tests {
         let inverse = domain.inverse();
         let expected_powers = powers_of(&g.inverse(), n);
         assert_eq!(inverse.powers, expected_powers);
+    }
+
+    /// A split domain inverts elementwise, though it is not a power sequence starting at one.
+    ///
+    /// The case that rules out `from_generator(generator().inverse(), size())`: the odd powers
+    /// `g, g^3, g^5, ...` have `generator() == g^3`, whose powers are a different set, and
+    /// `from_generator` would reject `g^3` outright because `(g^3)^(n/2) = -1`.
+    #[test]
+    fn test_inverse_of_a_split_domain() {
+        type F = PrimeFieldElement64<65537>;
+        let mut rng = StdRng::seed_from_u64(104729);
+        let n: usize = 32;
+        let g = F::root_of_unity(n as u64, &mut rng);
+        let domain: FFTDomain<F> = FFTDomain::from_generator(g, n);
+        let (evens, odds) = domain.split();
+
+        for part in [&evens, &odds] {
+            let inverted = part.inverse();
+            assert_eq!(inverted.size(), part.size());
+            for (w_i, inverse) in part.iter().zip(inverted.iter()) {
+                assert_eq!(*inverse, w_i.inverse(), "domain element {w_i}");
+                assert!((*w_i * *inverse).is_one());
+            }
+        }
+
+        // The odd part really is not a power sequence from one, so the cheaper form is unavailable.
+        assert_ne!(odds[0], F::one());
+        assert_eq!(odds.generator().pow((n / 2) as u128), F::zero() - F::one());
     }
 
     #[test]
