@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "poseidon-t2-rf2-rp0-planted",
+  "digest": "9e98ebc3abecbf51f044e0f54f48e5969aeaa95509d074170fc3edd4410dfcb1",
+  "class": "engineering",
+  "surrogate_because": "state width below 16, k = 1, and a planted target",
+  "family": "poseidon-cico",
+  "objective": "cico-exact",
+  "objective_statement": "find the free input words for which the permutation-with-initial-linear-layer reproduces the target output words exactly; the remaining output words are unconstrained",
+  "parameters": [
+    "prime 2130706433",
+    "alpha 3",
+    "t 2",
+    "k 1",
+    "r_f 2",
+    "r_p 0",
+    "target planted inputs=12623332 free=1000"
+  ],
+  "variables": 5,
+  "equations": 5,
+  "program": {
+    "name": "Poseidon Cryptanalysis Initiative",
+    "version": "2026 CICO program, read 2026-11-05; the site states \"THE PROGRAM IS FINISHED\"",
+    "url": "https://www.poseidon-initiative.info/",
+    "reward": null,
+    "redistribution": "parameters and objective are published on the program's page; the round constants are derived, not redistributed"
+  },
+  "external_status": {
+    "state": "not_a_public_problem"
+  },
+  "verifier": "CicoInstance::is_solution rebuilds the input state and runs permutation_plus_linear, so the check goes through the permutation rather than through the polynomial system — independent of the generator and of every transformation applied to it. The program's own verifier is verify_cico_solution in poseidon-tools.",
+  "notes": "A planted target, so a solution is known to exist and \"found nothing\" is distinguishable from \"is broken\". Regression and profiling only."
+}

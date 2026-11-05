@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "fukuoka-mq-VI-n10-seed0",
+  "digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+  "class": "official",
+  "family": "fukuoka-mq",
+  "objective": "mq-root",
+  "objective_statement": "find any x over the published field with F(x) = 0",
+  "parameters": [
+    "field GF(31)",
+    "type VI",
+    "n 10",
+    "m 7",
+    "seed 0",
+    "file-sha256 9512b6032be415ae8391b72ed8ad4f43357bafa4f0058d60b06dba3537a41af3"
+  ],
+  "variables": 10,
+  "equations": 7,
+  "program": {
+    "name": "Fukuoka MQ Challenge",
+    "version": "toy examples, retrieved 2026-11-05",
+    "url": "https://www.mqchallenge.org/",
+    "reward": null,
+    "redistribution": "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved; instance files are not redistributed here and are fetched by tools/fetch-mq-challenge.sh"
+  },
+  "external_status": {
+    "state": "published_with_answer"
+  },
+  "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
+  "notes": "The signature family: n > m, so positive-dimensional as published. A specialized slice is a different problem and is registered as its own instance when run."
+}
