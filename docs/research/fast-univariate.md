@@ -27,7 +27,7 @@ all from #162 stage 1.
 
 ## 1. The blocker, cleared
 
-`primitive_element` and `root_of_unity` were `unimplemented!()` for `PrimeFieldElement256`, because
+`primitive_element` and `root_of_unity` aborted the process for `PrimeFieldElement256`, because
 finding a generator of the multiplicative group means factoring a 254-bit `q - 1`
 (`MILESTONE-LARGE-PRIME-FIELDS.md` §7, open item 6). **There was therefore no NTT over either wide
 field**, and the FFT's only callers were its own tests.
@@ -124,7 +124,8 @@ source.
 
 | stage | measured exponent | what it is |
 |---|---|---|
-| mul | 1.93 – 2.14 → **2** | schoolbook; there is no NTT-based multiply |
+| mul | 1.93 – 2.14 → **2** | schoolbook, which is what `Mul` does |
+| fftmul | 0.90 – 1.15 → **1** | `multiply` through the transform — **measured separately**, §4.1 |
 | div | 1.63 – 2.12 → **2** | in-place long division, after §2 |
 | ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive |
 | intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed |
@@ -135,6 +136,12 @@ source.
 numerator product and synthetic division; the exponent is now **1.86 – 2.12 → 2** and the figure
 above is the pre-#162 measurement, kept because every other row in this table was taken in the same
 run. §4.3 has the new curves.
+
+**The `fftmul` row was not taken in that run**, since the stage did not exist then: it is a
+`budget=0.25` sweep over KoalaBear backed by a `u64`, which reached size `2^18`. The exponent is
+what the row is for and it does not depend on the budget; the reach is not comparable with §3.1's
+figures, so it is not entered there. §4.1 has the crossover, which is the measurement that matters
+for this stage and which a doubling sweep is too coarse to resolve.
 
 ### 3.1 Largest size reached in one second per measurement
 
@@ -229,15 +236,43 @@ are reported as measured rather than derived because the measurement is the clai
 
 ## 4. The gap list
 
-### 4.1 Multiplication: no quasi-linear path exists
+### 4.1 Multiplication: a quasi-linear path, and a very late crossover
 
-`DensePolynomial`'s `Mul` is schoolbook, measured at exponent 2.00. There is no Karatsuba, no
-Toom–Cook, and **nothing in the crate uses the NTT for multiplication** — `src/fft/` is reachable
-only from its own tests and now from `examples/univariate_scaling.rs`. The pieces for an
-NTT-based multiply are all present: a two-adic root of unity over every field of interest,
-`FFTDomain`, `evaluate`, `interpolate`. What is missing is the wrapper that pads to a power of two,
-transforms both inputs, multiplies pointwise and inverts — plus a CRT or Kronecker fallback for
-Mersenne-31, whose two-adicity of 1 rules the transform out entirely.
+**Closed by #124.** `multiply`, `multiply_above` and `multiply_over_domain` in `src/fft/multiply.rs`
+pad to a power of two, transform both inputs, multiply pointwise and invert. The sweep's `fftmul`
+row measures exponent 0.90–1.15, against 1.93–2.14 for schoolbook.
+
+`Mul` itself stays schoolbook, and cannot do otherwise: choosing a domain needs a primitive
+`2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness, neither of which
+`Mul`'s signature can carry — and `KnownOrder` is exactly what the Gröbner core refuses to require
+of a coefficient type (`test_the_grobner_stack_needs_no_field_cardinality`). Mersenne-31, whose
+two-adicity of 1 rules the transform out entirely, needs no CRT or Kronecker fallback for
+correctness: `multiply` falls back to the schoolbook product on precisely that failure.
+
+**The crossover is much later than the asymptotics suggest, and it is not one number.** Medians of
+21 interleaved runs pinned to one core, as the ratio of schoolbook time to transform time against
+the degree of the product:
+
+| product degree | KoalaBear (4 B) | Zp65537 (8 B) | Goldilocks (8 B) | BN254 `Fr` (32 B) |
+|---:|---:|---:|---:|---:|
+| 256 | 0.03x | 0.23x | 0.20x | 0.61x |
+| 1024 | 0.10x | 0.84x | 0.73x | **2.1x** |
+| 2048 | 0.19x | **1.5x** | **1.4x** | 4.1x |
+| 8192 | 0.70x | 5.7x | 5.5x | 12.7x |
+| 16384 | **1.3x** | 11.7x | 10.4x | 23.6x |
+
+Schoolbook wins until degree ~460 over a 254-bit field, ~1500 over a 64-bit one and ~12000 over a
+32-bit one — a 26x spread. `fft_multiplication_crossover::<F>()` is therefore indexed by
+`size_of::<F>()`, at 512, 2048 and 16384, each rounded up from the measurement so the dispatcher
+never picks the slower route.
+
+**The spread is a finding about the transform, not about the fields.** At degree 16384 it takes the
+same 13 ms over KoalaBear, Zp65537 and Goldilocks, three fields whose schoolbook times there differ
+by 9x. So this NTT is bound by allocation and recursion rather than by field arithmetic: `evaluate`
+rebuilds coefficient vectors and re-splits the domain at every level of the recursion. `fftmul`'s
+peak is **208 bytes per element** — 26 `n B` — against 32 for schoolbook and 56 for a single
+`evaluate`, for a computation that is three transforms. An in-place iterative transform would move
+all three crossovers at once, and is now the highest-value piece of work in the layer.
 
 The transform-size ceiling is worth stating as a real bound rather than an asymptotic one: `2^24`
 for KoalaBear, `2^28` for BN254, `2^32` for Goldilocks and BLS12-381. At `7 n B`, BN254's full
@@ -386,12 +421,11 @@ workstation has 300 GB; root finding at `d = 2^20` over BN254 wants 403 MB. Time
 and it is the constraint because the quasi-linear algorithms are missing, not because the degrees
 are intrinsically out of reach.
 
-What quasi-linear multiplication would be worth, from the measured NTT: one multiplication at
-degree `2^20` over BN254 is three transforms of size `2^21`, so about 6.5 s. Root finding needs
-`O(log q)` of them — 254 squarings, each a multiply plus a reduction, and a Newton-iteration
-reduction is a few multiplies — so on the order of **1 to 2 hours** against 202 days. A ~3 000x
-gap, from machinery that is one wrapper away for multiplication and a subproduct tree away for the
-rest.
+What quasi-linear multiplication is worth, now that it exists: one multiplication at degree `2^20`
+over BN254 is three transforms of size `2^21`, so about 6.5 s. Root finding needs `O(log q)` of
+them — 254 squarings, each a multiply plus a reduction, and a Newton-iteration reduction is a few
+multiplies — so on the order of **1 to 2 hours** against 202 days. A ~3 000x gap, of which #124
+takes the multiplication half; the rest is a subproduct tree away.
 
 ### 5.1 What this means for D1's reachable degrees, after #162 stage 1
 
@@ -426,8 +460,12 @@ two of the three official 2026 CICO-2 solutions. Three things change for this se
 - **half-gcd** is a fourth gap, since `gcd.rs` is plain Euclid — but the published univariate route
   needs neither it nor Newton division nor a subproduct tree;
 - the `R_P = 8` challenge was solved by interpolation plus Graeffe root finding at degree `3^13`,
-  which needs a `2^22` transform — **inside** the ceiling this document measured. So an NTT-based
-  multiply is the single blocker, and §5 of that document is the current gap list.
+  which needs a `2^22` transform — **inside** the ceiling this document measured. That named an
+  NTT-based multiply as the single blocker; #124 built it, so §5 of that document is the current
+  gap list. Two caveats carry over to the multiply: it rounds up to a power-of-two domain, so it
+  inherits the two-adicity ceiling rather than the smooth-part one until #125 lands mixed-radix
+  sizes, and §4.1's crossover means it is the slower route below degree ~460 to ~12000 depending
+  on the field.
 
 **Not a no-go, but the governing constraint is not where the epic placed it.** #68 assumed the
 univariate stage would be "FFT/NTT-dominated, and reportedly bound by memory access". On this
@@ -437,8 +475,10 @@ no fast algorithm for them has been written.
 
 Concretely, before D1 or D3 can run at interesting degrees:
 
-1. **NTT-based multiplication** (`O(n log n)`), with a fallback for low-two-adicity fields. Every
-   prerequisite now exists; this is the highest-value single piece of work in the layer.
+1. ~~**NTT-based multiplication** (`O(n log n)`), with a fallback for low-two-adicity fields.~~
+   Done, #124 — but the measured crossover is degree ~460 to ~12000 depending on element width,
+   because the transform is allocation-bound. **An in-place iterative NTT** is what now carries
+   this item's value: it would lower every crossover and speed every stage below that uses one.
 2. **Fast division by Newton iteration**, which `pow_mod_limbs` would then inherit, taking root
    finding from `log q * d^2` to `log q * d log d`.
 3. **A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points, taking

@@ -8,15 +8,17 @@
 //! Six stages per field, each swept by doubling until one measurement exceeds a wall-clock
 //! budget:
 //!
-//! 1. **mul** — a dense product at degree `n - 1`. Schoolbook; there is no NTT-based multiply.
-//! 2. **div** — `div_with_remainder` at the shape `pow_mod` reduces at: degree `2n - 2` by
+//! 1. **mul** — a dense product at degree `n - 1`, schoolbook, which is what `Mul` does.
+//! 2. **fftmul** — the same product through the transform, so the two rows are the crossover.
+//!    Needs a domain of `2n` points and so one more power of two than **ntt** does.
+//! 3. **div** — `div_with_remainder` at the shape `pow_mod` reduces at: degree `2n - 2` by
 //!    degree `n - 1`. Separated from **mul** because root finding spends its time here.
-//! 3. **ntt** — `evaluate` over a size-n domain, which needs a primitive `2^k`-th root of unity
+//! 4. **ntt** — `evaluate` over a size-n domain, which needs a primitive `2^k`-th root of unity
 //!    and so is bounded by the field's two-adicity.
-//! 4. **intt** — `interpolate`, which is **ntt** plus the inverse domain and the `1/n` scaling.
-//! 5. **lagrange** — `lagrange_interpolate` over n points at arbitrary abscissae, which is what
+//! 5. **intt** — `interpolate`, which is **ntt** plus the inverse domain and the `1/n` scaling.
+//! 6. **lagrange** — `lagrange_interpolate` over n points at arbitrary abscissae, which is what
 //!    D1's evaluation-interpolation resultant needs and which the NTT domain cannot serve.
-//! 6. **roots** — `roots` on a degree-d polynomial with four planted roots and a random cofactor,
+//! 7. **roots** — `roots` on a degree-d polynomial with four planted roots and a random cofactor,
 //!    the shape a resultant leaves behind. Every planted root is asserted to be recovered.
 //!
 //! Memory is the **peak live heap bytes** attributed to the stage, from a counting global
@@ -49,8 +51,8 @@ use zeebra::{
     evaluate,
     fields::{two_adic::two_adic_decomposition, Bn254Fr, KoalaBear, PrimeFieldElement64},
     integers::highest_set_bit,
-    interpolate, lagrange_interpolate, roots, FFTDomain, FiniteField, KnownOrder, Polynomial,
-    UnivariatePolynomial,
+    interpolate, lagrange_interpolate, roots, try_multiply_via_fft, FFTDomain, FiniteField,
+    KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
 // === the fields ===
@@ -331,6 +333,33 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
             let b = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
             let (product, elapsed, bytes) = measure(|| &a * &b);
             assert_eq!(product.degree() as usize, 2 * n - 2, "product degree");
+            Ok((elapsed, bytes))
+        },
+    ));
+
+    curves.push(sweep(
+        "fftmul: the same product through the transform",
+        budget,
+        |log_n| {
+            // The product has degree 2n - 2, so it needs 2n - 1 points and a domain of 2n.
+            if log_n + 1 > two_adicity {
+                return Err(format!(
+                    "a product of degree 2^{} needs a domain of 2^{}: the two-adicity of this \
+                     field is {}",
+                    log_n + 1,
+                    log_n + 1,
+                    two_adicity
+                ));
+            }
+            let n = 1usize << log_n;
+            let mut rng = StdRng::seed_from_u64(seed ^ 0x3171);
+            let a = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
+            let b = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
+            let (product, elapsed, bytes) = measure(|| {
+                try_multiply_via_fft(&a, &b, &mut rng).expect("the two-adicity was checked")
+            });
+            // Same seed as `mul`, so this is the same product by the other route.
+            assert_eq!(product, &a * &b, "the transform's product at n = {n}");
             Ok((elapsed, bytes))
         },
     ));
