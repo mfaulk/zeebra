@@ -8,10 +8,15 @@
 
 pub mod manifest;
 pub mod mq;
+pub mod poseidon;
 pub mod slices;
 pub mod specialization;
 
 pub use manifest::{Claim, InstanceManifest, Provenance};
 pub use mq::{MqError, MqField, MqInstance, MqVisitor, SUPPORTED_DIMENSIONS};
+pub use poseidon::{
+    verify_against_trace, CicoInstance, GrainLfsr, Poseidon, PoseidonError, PoseidonParameters,
+    PoseidonTrace, KOALABEAR_PRIME,
+};
 pub use slices::{solve_slice, SliceOutcome};
 pub use specialization::{satisfies, specialize, Specialization, SpecializationError};

@@ -766,6 +766,33 @@ option types should be avoided; M21-C owns them for the duration.
 - [x] A second instance imported and put to use — type VI `n=10` seed 0, underdetermined, 7 of 8
       slices giving verified witnesses (§10.3)
 
+### M21-B
+
+- [x] The reference implementation is pinned by commit and its licence recorded — Apache-2.0,
+      `60075da7c0521d9493749a035b1f30d4eda37138`
+- [x] The real parameters are used, not toy substitutes, and that is **checkable**: the port
+      reproduces the reference's published `permutation([0]*16)[0] = 1393439926`
+- [x] **And every reduced configuration** in the corpus is checked against externally generated
+      vectors, whole output state, both permutation variants, on a nonzero input — because one
+      published vector anchors one configuration and the round schedule changes with `R_F`/`R_P`
+- [x] Field identity, constant count, `k <= t` and the exact dimension are enforced at
+      construction rather than by convention; see `docs/research/poseidon.md` §2.1
+- [x] Field, round counts, state width, round constants, MDS matrix and S-box exponent are all
+      parameters
+- [x] Generated equations verified by substituting intermediate states from a real permutation
+      trace and asserting every equation is zero
+- [x] **And by corruption**: each trace value in turn is corrupted, and its own equation must stop
+      vanishing while no *earlier* equation does — which is what vanishing at one point cannot
+      establish, since the zero system vanishes everywhere
+- [x] Recovered inputs verified **through the permutation**, not by re-evaluating the system, so a
+      generator bug cannot make the check pass
+- [x] The relaxed verifier's low-bit condition is **not** modelled as a field equality, and the
+      module docs say why
+- [x] At least one faithfully specified reduced-round instance generated and solved, with
+      end-to-end verification — three of them, §10.4
+- [x] No full-round claim is inferred: `reduced_from` is carried on every instance and the
+      104-variable gap is stated with every result
+
 ### M21-E
 
 - [x] Substitution is correct on hand-derived examples, **and the slice is the substitution plus
@@ -846,6 +873,49 @@ rather than synthetic input, and M21-A's second family put to use rather than me
 
 It is a *toy* example. `n = 10` is 45 variables short of the smallest unsolved challenge and
 nothing here is a competitive result; see `docs/research/fukuoka-mq.md` §4.
+
+## 10.4 Reduced-round Poseidon, measured
+
+`cargo run --release --example poseidon_cico`. Parameters from `poseidon-tools` at commit
+`60075da7`, which the port reproduces: the reference's README records
+`permutation([0]*16)[0] = 1393439926` at `t=16, R_F=8, R_P=20`, and that one number exercises the
+Grain LFSR's bit layout, its rejection sampling, all 448 round constants, the Cauchy MDS and the
+round schedule.
+
+`k = 1`, planted targets, every row's system asserted to vanish at a real trace **before** solving
+and every recovered input verified by running the permutation on it:
+
+| reduced to | variables | equations | terms | outcome |
+|---|---:|---:|---:|---|
+| `t=2 R_F=2 R_P=0` | 5 | 5 | 35 | solved, **0.9 ms** |
+| `t=2 R_F=2 R_P=2` | 7 | 7 | 117 | solved, **164 ms** |
+| `t=2 R_F=4 R_P=0` | 9 | 9 | 79 | solved, **401 ms** |
+| `t=3 R_F=2 R_P=1` | 9 | 8 | 166 | **column budget crossed after 19.3 s** |
+
+**The last two rows are the finding. Nine variables solve at `t = 2` and fail at `t = 3`** — the
+same variable count, a different reach, because the MDS layer couples three words rather than two
+and every S-box equation is degree 3. Variable count does not predict reach, which is the same
+lesson §6.1's structural analysis refuses to draw conclusions from, arrived at independently.
+
+### Why planted targets
+
+A CICO instance with an arbitrary target may simply have no base-field solution. At
+`t=2, R_F=2, R_P=0, k=1` with target zero the solver returns `NoBaseFieldPoint` — correct, and
+useless as a demonstration, because "found nothing" and "is broken" look identical. So the target
+is the permutation's own output on a chosen state: a solution provably exists, and the planted value
+appears nowhere in the generated system. The same reasoning as the `planted` benchmark family, for
+the same reason.
+
+### What it is not
+
+The bounty is `t = 16, R_F = 6, R_P = 8`: **104 S-box variables**, 118 in total, 106 equations.
+The frontier is nine variables at `t = 2`. The gap is not incremental, and **no result on a reduced
+instance says anything about the full one** — which is why `CicoInstance::reduced_from` carries the
+parameters an instance reduced from, making omission a deliberate act rather than an oversight.
+
+The relaxed CICO verifier is **not** modelled, per §7.3: `(y − c) & mask == 0` is a condition on a
+field element's canonical integer representative and is not a polynomial identity. Formulating it
+is open, and `docs/research/poseidon.md` §6 says so.
 
 ## 11. Risks
 
