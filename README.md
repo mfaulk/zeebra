@@ -269,6 +269,8 @@ cargo run --release --example solve_one            # systems in, verified soluti
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
 cargo run --release --example solve_auto           # four policies against an offline best-of-two
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
+cargo run --release --example field_width          # what a 4-byte field element is worth, per
+cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
 cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
@@ -455,6 +457,7 @@ one four times as wide. `cargo bench --bench field_arithmetic`, per operation:
 
 | field | width | mul | add | sub | inverse |
 |---|---:|---:|---:|---:|---:|
+| `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | 227 ns |
 | `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | 246 ns |
 | `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | 509 ns |
 | `PrimeFieldElement128` | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
@@ -476,6 +479,80 @@ whole computation, because both modules are private and no bench target can reac
 - `ExtensionFieldElement<P, N, M>` reduces once per output coefficient instead of once per partial
   product, O(N) instead of O(N^2), under a compile-time overflow bound; the per-multiplication heap
   allocation is gone.
+
+### A 32-bit prime field
+
+`PrimeFieldElement32<P>` is the same field as `PrimeFieldElement64<P>` for any modulus both can
+hold, in half the bytes. Montgomery form with R = 2^32, the representation unobservable in the same
+two ways; the one place the arithmetic is not a mechanical substitution is that `t + m*P` needs 65
+bits only when P exceeds 2^31, and that predicate is on the const generic, so every declared
+modulus gets a reduction with no carry handling in it.
+
+```rust
+use zeebra::{fields::{BabyBear, Mersenne31, Zp2147483647}, FiniteField, KnownOrder};
+
+assert_eq!(std::mem::size_of::<Mersenne31>(), 4);
+assert_eq!(std::mem::size_of::<Zp2147483647>(), 8);
+assert_eq!(Mersenne31::order_u128(), Zp2147483647::order_u128());
+
+let a = Mersenne31::new(827376);
+assert_eq!(a.pow(2).value(), 1651245630);   // the canonical residue, not the Montgomery form
+assert_eq!(BabyBear::order_u128(), Some(2013265921));
+```
+
+Declared: `Zp31` (Fukuoka MQ types III and VI), `Zp65537_32`, `Mersenne31`, `BabyBear`
+(`2^31 - 2^27 + 1`) and `KoalaBear` (`2^31 - 2^24 + 1`, the 2026 Poseidon challenge prime). The
+last two are NTT-friendly; `Zp65537_32` and `Zp2147483647` are the same mathematical fields as
+`Zp65537` and `Mersenne31`'s 64-bit twin, so a caller picks a width rather than a field.
+
+**What it is worth, and where.** `cargo run --release --example field_width`. The kernel is
+`target -= factor * source` with the nonzero counters the dense backend maintains, at a fixed
+*entry* count so that both widths do the same number of cell updates:
+
+| working set (u32/u64) | u64 ns/entry | u32 ns/entry | u32 GB/s | AVX2 8 lanes | AVX2 GB/s |
+|---|---:|---:|---:|---:|---:|
+| 8 / 16 KB | 1.802 | 0.765 | 15.7 | **0.264** | 45.4 |
+| 256 / 512 KB | 1.770 | 0.751 | 16.0 | **0.253** | 47.5 |
+| 16 / 32 MB | 1.783 | 0.753 | 15.9 | **0.262** | 45.8 |
+| 128 / 256 MB | 1.897 | 0.786 | 15.3 | **0.446** | 26.9 |
+
+Two things in that table correct the premise it was built on. **The scalar kernel is ALU-bound at
+both widths, not bandwidth-bound**: ns/entry is flat to within 7% over a working set spanning four
+orders of magnitude — the 256 MB row re-ran at 1.804 — and 15.9 GB/s is well under what one core
+can pull. So the 2.36x is not
+halved bytes — it is that a 64-bit Montgomery reduction is 128-bit arithmetic that does not
+vectorize, and a 32-bit one is 64-bit arithmetic that does. **Only the AVX2 kernel is fast enough
+for the bytes to bind**, and it is where halving them pays: 45 GB/s in cache falling to 26.9 GB/s
+out of it, which at 24 bytes an entry would have been 0.89 ns rather than 0.446.
+
+That also reverses M19-D's answer. At four lanes over `u64` hand-written AVX2 ran 0.86x to 1.07x
+against autovectorization; at eight lanes over `u32` it runs **1.7x to 3.0x**, against a scalar
+comparand LLVM did vectorize (`vpmuludq` present in both, verified in the artifact). No intrinsics
+are shipped — the kernel lives in the example, cross-checked cell for cell and counter for counter
+against the scalar one — but the question is no longer closed.
+
+Whole eliminations, same matrices at both widths:
+
+| | u64 | u32 | ratio |
+|---|---:|---:|---:|
+| dense echelon, 1500x1500 at 5% | 2515.6 ms, 17.2 MB | 882.9 ms, 8.6 MB | 2.85x |
+| dense echelon, 3000x3000 at 2% | 19789.6 ms, 68.7 MB | 6868.0 ms, 34.3 MB | 2.88x |
+| F4 elimination, katsura-6 grevlex, `Backend::Dense` | 70.78 ms | 25.27 ms | 2.80x |
+| F4 elimination, katsura-6 grevlex, `Backend::Sparse` | 35.03 ms | 25.90 ms | 1.35x |
+| F4 elimination, katsura-6 grevlex, `Backend::Adaptive` | 6.60 ms | 6.41 ms | 1.03x |
+
+**The last row is why no benchmark switched its field.** `Backend::Adaptive` is what
+`F4Options::default()` selects and it is 4x faster than the dense backend at either width, so it is
+the configuration that matters — and it gains nothing, because its cost is sparse-index traversal
+and scatter/gather into a buffer rather than cell traffic. The sparse backend gains little for a
+related reason: a sparse entry is `(usize, F)`, which the index's alignment pads to **16 bytes at
+either width**, so sparse storage does not shrink at all and `F4Options::live_entry_allowance` is
+unchanged. The narrower field is a 2-3x win on the dense path, a memory halving wherever cells are
+stored bare, and the enabler for eight-lane SIMD. It is not a free 2x on F4 as shipped.
+
+The dense entry-budget conversion in `linalg::dense::rows` does move, and not by the factor a
+reader would guess: `cells_per_entry` goes from two to **four**, since the entry cost is pinned at
+16 bytes by the index while the cell cost halves.
 
 ### 254- and 255-bit prime fields
 
@@ -1179,7 +1256,8 @@ substitutes to a nonzero constant is **kept**, so an inconsistent system still r
 
 `grobner::research::MqInstance` imports instances from the
 [Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
-no new arithmetic — `PrimeFieldElement64<31>` already exists — and the GF(2) and GF(2^8) families
+no new arithmetic — `PrimeFieldElement64<31>` already exists, and `Zp31` is the same field in four
+bytes — and the GF(2) and GF(2^8) families
 are refused by name, because `binary_field` and `extension_field` are not publicly exported.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,

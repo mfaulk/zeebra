@@ -1,7 +1,8 @@
 # Milestone: Hardware-Efficient Arithmetic — SIMD and Parallelism
 
 **Status:** complete — M19-0 through M19-D landed; M19-E, M19-F and M19-G closed won't-do on
-measurements recorded in §6
+measurements recorded in §6; #62 landed afterwards and is recorded in §8, which corrects §5.3's
+bandwidth reading and reopens the SIMD question at eight lanes
 **Prerequisite:** M16 for the stage attribution this milestone targets; independent of M18, which
 runs in parallel on the quotient-algebra side and touches none of the same files
 **Objective:** remove the software division under every field multiplication, then vectorize and
@@ -37,7 +38,7 @@ division, nothing could be vectorized until that was gone.
 | [#50](https://github.com/mfaulk/zeebra/issues/50) M19-E | Parallel block update in structured elimination | **won't do** — §6.1 |
 | [#51](https://github.com/mfaulk/zeebra/issues/51) M19-F | Parallel Macaulay matrix construction | **won't do** — §6.3 |
 | [#52](https://github.com/mfaulk/zeebra/issues/52) M19-G | Parallel critical-pair criteria | **won't do** — §6.2 |
-| [#62](https://github.com/mfaulk/zeebra/issues/62) | A 32-bit prime field, which §5.3 identifies as the remaining lever | open, follow-on |
+| [#62](https://github.com/mfaulk/zeebra/issues/62) | A 32-bit prime field, which §5.3 identifies as the remaining lever | done — §8, and it reopens #49 |
 
 ## 3. What landed
 
@@ -248,6 +249,11 @@ So the lever is **storage width**. A 31-bit residue in a `u64` wastes half of ev
 this kernel is bandwidth-bound out of cache. That is #62, and it would make the SIMD question worth
 asking again at eight lanes.
 
+> #62 did both, and corrected half of this paragraph: see §8. The lever is real — 2.36x on this
+> kernel — but the scalar kernel is ALU-bound at both widths rather than bandwidth-bound, and the
+> 32 MB working set called "out of cache" above is inside this machine's 256 MB L3. The SIMD
+> question, asked again at eight lanes, now answers 1.7x to 3.0x in favour of the intrinsics.
+
 ## 6. Parallelism: three won't-dos and one reason
 
 All three parallelism sub-milestones closed without shipping code. They fail for one shared
@@ -340,4 +346,105 @@ per-batch phase size, not from the block structure, which misled this milestone 
 | Montgomery form not observable through the public API | met — two tests pin it |
 | Each measurement states its bound | met — §4.4, §5.3 |
 
-Outstanding: `PrimeFieldElement128` is unconverted, and #62 carries the remaining bandwidth lever.
+Outstanding: `PrimeFieldElement128` is unconverted. #62 landed afterwards and is recorded in §8;
+it changed two of this milestone's conclusions.
+
+## 8. The 32-bit prime field (#62), and what it corrected
+
+`PrimeFieldElement32<P>` is the same field as `PrimeFieldElement64<P>` for any modulus both can
+hold, in four bytes rather than eight. Montgomery form with R = 2^32, the representation
+unobservable in the same two ways §3.2 established, and the instrument is
+`examples/field_width.rs`.
+
+Machine and profile as §4. `taskset`-pinned to one core; the axpy figures reproduced within 3%
+across two runs, unpinned and pinned.
+
+### 8.1 The arithmetic, in isolation
+
+`cargo bench --bench field_arithmetic -- field/<op>/p31`, which now has a `p31_u32` arm over the
+same modulus, so the pair is storage width at a fixed field. Per operation:
+
+| | mul | add | sub | inverse |
+| --- | ---: | ---: | ---: | ---: |
+| `Zp2147483647`, 8 bytes | 1.809 ns | 1.041 ns | 0.984 ns | 262.1 ns |
+| `Mersenne31`, 4 bytes | **1.351** | **0.751** | **0.752** | **226.8** |
+| ratio | 1.34x | 1.39x | 1.31x | 1.16x |
+
+### 8.2 The kernel, and the premise this corrects
+
+`target -= factor * source` with the two zero tests the dense backend maintains, at a fixed *entry*
+count so both widths perform the same number of cell updates. Bytes moved per entry is exact: two
+cells read, one written, so 24 bytes at eight bytes a cell and 12 at four.
+
+| working set (u32/u64) | u64 ns/entry | u32 ns/entry | u32 GB/s | AVX2 8 lanes | AVX2 GB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 8 / 16 KB | 1.802 | 0.765 | 15.7 | **0.264** | 45.4 |
+| 256 / 512 KB | 1.770 | 0.751 | 16.0 | **0.253** | 47.5 |
+| 16 / 32 MB | 1.783 | 0.753 | 15.9 | **0.262** | 45.8 |
+| 128 / 256 MB | 1.897 | 0.786 | 15.3 | **0.446** | 26.9 |
+
+**The scalar kernel is ALU-bound at both widths.** ns/entry is flat to within 7% across a working
+set spanning four orders of magnitude — the last u64 row is the only one outside 2%, and re-ran at
+1.804 — and 15.9 GB/s is far under what one core can pull. #62 was
+opened on the premise that the kernel is bandwidth-bound and that halving the cell width therefore
+halves the time; on this instrument that premise is wrong, and the 2.36x has a different cause —
+a 64-bit Montgomery reduction is 128-bit arithmetic that LLVM does not vectorize, and a 32-bit one
+is 64-bit arithmetic that it does.
+
+Two details make that reading defensible rather than convenient. The last row exists because this
+machine has **256 MB of L3**: §5.3's "out of cache, 32 MB" is out of L2 and still in L3, so no
+figure at that size can support a DRAM-bandwidth claim, including the 0.750 ns/entry this issue
+quoted. And this instrument's u64 kernel runs at 1.78 ns/entry where §5.3's reported 0.750; that
+harness was not committed, so the two are not the same program — only within-table ratios should
+be read across, which is why every arm here is measured at both widths in one run.
+
+### 8.3 The SIMD question, reopened at eight lanes
+
+§5.3 closed #49 in the negative at four lanes over `u64`: 0.86x to 1.07x. At eight lanes over
+`u32`, against a scalar comparand LLVM also vectorized — `vpmuludq` present in both, confirmed by
+an instruction census over the artifact, with each kernel `#[inline(never)]` so the attribution is
+unambiguous — the hand-written kernel runs **1.7x to 3.0x** faster. It is the only kernel measured
+here fast enough for the bytes to bind: 45 GB/s in cache falling to 26.9 GB/s out of it, which at
+24 bytes an entry would have been 0.89 ns rather than 0.446.
+
+No intrinsics are shipped. The kernel lives in the example, checked cell for cell and counter for
+counter against the scalar one at seven lengths including a non-multiple of eight, and the
+Montgomery replica it runs over is checked against the shipped type before any timing is taken. A
+shipped version would have to answer where the cells come from, since `DenseRows` is generic over
+`FiniteField` and an intrinsic kernel is not.
+
+### 8.4 Where the width pays, per backend
+
+katsura-6 grevlex, F4's elimination stage, and two dense echelons over the same matrices:
+
+| | u64 | u32 | ratio |
+| --- | ---: | ---: | ---: |
+| dense echelon, 1500x1500 at 5% | 2515.6 ms, 17.2 MB | 882.9 ms, 8.6 MB | 2.85x |
+| dense echelon, 3000x3000 at 2% | 19789.6 ms, 68.7 MB | 6868.0 ms, 34.3 MB | 2.88x |
+| F4 elimination, `Backend::Dense` | 70.78 ms | 25.27 ms | 2.80x |
+| F4 elimination, `Backend::Sparse` | 35.03 ms | 25.90 ms | 1.35x |
+| F4 elimination, `Backend::Adaptive` | 6.60 ms | 6.41 ms | **1.03x** |
+
+**The benchmarks were deliberately not switched to the narrow field.** The issue anticipated that
+the win only materializes where a caller selects the type; the measurement says something sharper.
+`Backend::Adaptive` is what `F4Options::default()` selects, it is 4x faster than the dense backend
+at either width, and it gains nothing — its cost is sparse-index traversal and scatter/gather into
+a buffer, not cell traffic. The sparse backend gains little for a related reason: a sparse entry is
+`(usize, F)`, which the index's alignment pads to **16 bytes at either width**, so sparse storage
+does not shrink and `F4Options::live_entry_allowance` is unchanged. Switching
+`benchmark_systems`'s callers would have moved the headline figures by 3% and invalidated every
+number recorded against them.
+
+The dense entry-budget conversion the issue asked about does move: `cells_per_entry` goes from two
+to **four**, not three, because the entry cost is pinned at 16 bytes by the index while the cell
+cost halves. Pinned by a test, with the stale comment that said three corrected.
+
+### 8.5 Acceptance
+
+| Criterion | State |
+| --- | --- |
+| Montgomery form not observable, serialized bytes pinned against a plain `u32` | met — the two tests from #46, plus one pinning four bytes on the wire |
+| Field property tests pass over the new type unmodified | met — 1281 lib tests, 30 doc tests |
+| No software division reachable from multiplication, verified on the artifact | met — `__umodti3` 0, `__umoddi3` 0, and no `div` instruction in any zeebra symbol of the `field_arithmetic` binary; the one `__udivti3` is §4.1's `PrimeFieldElement128` |
+| Dense elimination at both widths on the same matrices, bytes-moved stated | met — §8.2, §8.4 |
+| The SIMD question revisited at 8 lanes | met — §8.3, and the answer flips |

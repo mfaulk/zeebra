@@ -638,8 +638,10 @@ and redistribution terms.
 | cryptographic | reduced-round Poseidon (#71, #78) | real structure, independent verification |
 
 GF(31) needs no new arithmetic: `PrimeFieldElement64<31>` exists. KoalaBear is
-`PrimeFieldElement64<2130706433>`. A compact 32-bit representation is issue #62 and an independent
-optimization. GF(2^8) needs the binary and extension field modules exported, which is deliberate
+`PrimeFieldElement64<2130706433>`. The compact 32-bit representation of issue #62 has since landed
+— `Zp31` and `KoalaBear` are the same two fields in four bytes — and remains an independent
+optimization rather than a prerequisite: it is worth 2.8x on the dense elimination backend and
+nothing measurable — 0.98x to 1.04x — on the adaptive one these routes use. See `docs/MILESTONE-SIMD-PARALLELISM.md` §8. GF(2^8) needs the binary and extension field modules exported, which is deliberate
 scope and must not be smuggled into the first importer PR.
 
 ### 7.3 Validation requirements
@@ -771,8 +773,9 @@ option types should be avoided; M21-C owns them for the duration.
 - [x] Redistribution terms are a required field, and the Fukuoka data is **not committed** — "All
       Rights Reserved" with no stated licence, fetched by `tools/fetch-mq-challenge.sh` and pinned
       by SHA-256
-- [x] The GF(31) importer needs no new arithmetic; a 32-bit prime field (#62) is an independent
-      optimization, and GF(2)/GF(2^8) are refused by name with what is missing
+- [x] The GF(31) importer needs no new arithmetic; the 32-bit prime field (#62) landed as an
+      independent optimization, worth nothing measurable on the backend these routes use, and
+      GF(2)/GF(2^8) are refused by name with what is missing
 - [x] The monomial layout is **verified rather than assumed** — four candidates evaluated at a
       published answer, exactly one vanishing — and implemented by sorting with the order the file
       declares rather than as an index pattern
