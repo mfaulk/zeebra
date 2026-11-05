@@ -34,9 +34,12 @@ instead of from what the implementations actually do.
 2. **First priority: reproduce the univariate route, not the resultant.** The `R_P = 8` target was
    solved *without* a resultant — round skip, interpolate one output coordinate, Graeffe root
    finding, then test candidates against the second constraint. Its working degree is `3^13`, which
-   needs a `2^22` transform, **comfortably inside KoalaBear's `2^24` power-of-two ceiling**. The
-   whole prerequisite Zeebra is missing for that shape is the **NTT-based multiply/squaring wrapper**.
-   §3.1, §5.
+   needs a `2^22` transform, **comfortably inside KoalaBear's `2^24` power-of-two ceiling**.
+   NTT-based multiplication is the **only missing foundational polynomial-arithmetic primitive** for
+   that route — but it is not the attack. Three attack-specific components also have to be written
+   and validated: the round-skipping parametrization, the Graeffe transform itself, and candidate
+   reconstruction and verification. Zeebra's root finder today is the gcd/factorization route, not
+   Graeffe. §3.1, §5.
 3. **Second priority: benchmark against Bak–Hostettler's public implementation** rather than build a
    resultant from scratch. It provides single-threaded evaluation–interpolation, Villard resultants
    *and* Gröbner comparisons, which is exactly the instrument D4 needs. §6.3.
@@ -67,6 +70,26 @@ CICO-2. What is still missing is any Zeebra measurement. §7.
 
 **Gröbner bases are the state of the art for `k ≥ 3` and for nothing below it.** All three of
 Zeebra's registered targets are `k = 2`.
+
+### 1.1 What is proven about `D_I`, and what is not
+
+Every cost figure in this document depends on the ideal degree `D_I`, so the strength of that claim
+matters. The two papers word it differently, cite different results for it, and **neither primary
+source has been read here**:
+
+| claim | strength | as cited by |
+|---|---|---|
+| `D_I ≤ d^(k·R_F+R_P)` | a proven **upper bound** | 2026/1905, citing [BBB+25]: "a proof that the degree `D_I` … is **upper bounded by** `d^(kR_F+R_P)`" |
+| `D_I = d^(c·R_F+R_P)` | stated as an **equality** | 2026/150 §4.3, citing [BSGL20, Theorem 10]: "have a degree of the ideal **equal to**" |
+| `deg Res = D_I` for CICO-2 Poseidon | an **experimental observation** | 2026/150 §4.3: "We also experimentally observed that…" |
+
+So the firm result is an upper bound; the equality is asserted in one source against a different
+citation, and the resultant attaining it is an observation on the instances studied. §2 and §3 use
+the equality, which is what the sources' own cost models use — but that makes every degree and every
+derived cost in this document **an upper bound on a particular instance's**, not a prediction of it.
+For a feasibility assessment that is the conservative direction, so no conclusion here flips if only
+the bound holds. Any claim that a *specific* instance's resultant has exactly this degree would need
+[BBB+25] and [BSGL20] read, and ideally a degree measured on a small instance.
 
 Within the Gröbner approach the bottleneck has already moved off F4: [ABM23] observed that Poseidon
 CICO systems have a lower solving degree than random ones, so "the bottleneck shifts from the Gröbner
@@ -268,17 +291,39 @@ every field in the crate including the wide ones; `evaluate` reaching `2^23` ove
 second; `interpolate` at the same cost since #118; Poseidon with the official constants; and
 `roots.rs`, whose algorithm matches the published gcd-based one but at `O(log q · δ²)`.
 
-For the **univariate/Graeffe route** of §2.1, in order:
+For the **univariate/Graeffe route** of §2.1, separated into the one missing primitive and the
+attack-specific work, because conflating them is what made the previous version of this section
+overstate Zeebra's readiness:
 
-1. **NTT-based multiplication and squaring.** The only genuine blocker. Graeffe is
+**The missing polynomial-arithmetic primitive — one item.**
+
+1. **NTT-based multiplication and squaring.** The only *foundational* gap. Graeffe is
    `f0(x)² - x·f1(x)²` by FFT, pointwise, invFFT — every piece exists except the wrapper. Schoolbook
-   today, measured exponent 2.00.
-2. **The Graeffe transform itself**, on top of (1). Small.
-3. **A round-skipping parametrization** for Poseidon with an initial linear layer — the `(1,[1])`
-   skip of 2026/1254 §2.2. New mathematics for the crate, but self-contained.
-4. **Mixed-radix FFT**, only for `R_P = 10` (§3.1). KoalaBear admits `2^24 · 127`.
+   today, measured exponent 2.00. It is also the largest missing piece of the univariate layer D2
+   measured, and a prerequisite for every other route here, which is why it is first regardless of
+   what follows it.
 
-Not needed by this route: subproduct trees (§3.1), half-gcd, Newton division, modular composition.
+**The attack, which does not exist in any form — three items.**
+
+2. **The Graeffe transform and Graeffe-based root finding.** `roots.rs` implements the
+   gcd/factorization route (`x^q - x mod f`, then gcd), which is a *different algorithm*, not a
+   slower version of this one. Small on top of (1), but it is new code with its own correctness
+   obligations.
+3. **A round-skipping parametrization** for Poseidon with an initial linear layer — the `(1,[1])`
+   skip of 2026/1254 §2.2. New mathematics for the crate.
+4. **Family construction, candidate reconstruction and verification.** Building each family's `P1`,
+   lifting a root of `P1` back to a full input, and checking the second output constraint.
+   `CicoInstance::is_solution` covers the last step; the rest does not exist.
+
+**Only for `R_P = 10`:** a mixed-radix FFT (§3.1). KoalaBear admits `2^24 · 127`.
+
+Not needed by this route at all: subproduct trees (§3.1), half-gcd, Newton division, modular
+composition.
+
+So the honest sequencing is: item 1, then a *bounded* reproduction at small round counts with items
+2–4 written against it, recording interpolation, Graeffe and verification costs separately. The
+per-family figures in §3.1 are first-order extrapolations from Zeebra's measured transform
+throughput, not validated whole-family runtimes, and nothing in §3.1 is an attack time (§3.2).
 
 For the **resultant route**, additionally: Sylvester/Villard machinery, fast multipoint
 evaluation–interpolation, and `gcd.rs` is plain Euclid where the literature uses half-gcd. §6.3
@@ -288,17 +333,17 @@ argues against building these.
 
 ### 6.1 D3 (#84) — promote to first
 
-It is the route that solved `R_P = 8`, its prerequisite is one wrapper (§5), two of three registered
-targets sit inside Zeebra's existing transform ceiling, and its memory profile is modest by
-construction — the whole point of the strategy is that it "avoids the memory cost of resultant
+It is the route that solved `R_P = 8`, its one missing *primitive* is the NTT multiply (§5), two of
+three registered targets sit inside Zeebra's existing transform ceiling, and its memory profile is
+modest by construction — the whole point of the strategy is that it "avoids the memory cost of resultant
 computations". Deliverable: **one family, end to end, measured** — build `P1` by interpolation over a
 power-of-two subgroup, Graeffe root finding, evaluate candidates against the second constraint.
 `ZSVD25` (2025/1916) is the machinery reference; 2026/1254 §4.2 is the recipe.
 
 ### 6.2 D1 (#82) — recast as a benchmark, not a build
 
-Its structural question is answered twice over: `D_I = d^(k·R_F+R_P)` is proven [BBB+25], and both
-2026/150 and 2026/1905 exploit `D_I ≪ δ²` as the thing that makes the attack work. Zeebra has no
+Its structural question is answered, with the strength of the answer stated carefully in §1.1, and
+both 2026/150 and 2026/1905 exploit `D_I ≪ δ²` as the thing that makes the attack work. Zeebra has no
 Sylvester construction, no subresultants and no Poseidon2, and §4 shows the resultant route is
 GPU-unfriendly and worse in `R_F`. Building it to find out is not warranted.
 
@@ -361,8 +406,9 @@ supplied locally and extracted with `pdftotext`.
 | **2025/950** Zhao–Ding, *Breaking Poseidon Challenges with Graeffe Transforms…* | read | the FFT 4/3-power memory-access lower bound; its CICO-1 scope and its remark on >1 zero, now superseded by §4 |
 | **2026/150** Bak–Bariant–Jazeron et al., *Ethereum Poseidon bounties* | read | the 2025 round's resultant attacks and the streaming-memory argument |
 | Jazeron, *Solving CICO-2 bounty instances of Poseidon*, 15 Mar 2025 | read — fetched directly | the 2025 round's instance table and results |
-| BSGL20 / [BBB+25] Theorem on `D_I` | **not read** — cited as 2026/150 and 2026/1905 cite it | §1, §6.2, flagged as second-hand |
+| [BSGL20] Thm 10 and [BBB+25] on `D_I` | **not read** — only as 2026/150 and 2026/1905 cite them, and they cite *different* results with *different* strengths | §1.1, which records the discrepancy rather than resolving it |
 | `PoseidonCicoTwo` implementation | **not inspected** — existence and contents per 2026/1905 and the user's check | §2.2, §6.3 |
 
-The two items not read are the proven bound on `D_I` and the public implementation. Both are
-load-bearing for §6's recommendations and should be checked before those are acted on.
+The two items not read are the results bounding `D_I` and the public implementation. Both are
+load-bearing — `D_I` for every cost figure here, the implementation for §6.3's recommendation — and
+should be read before anything stronger than §1.1's upper-bound reading is claimed.
