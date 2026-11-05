@@ -865,6 +865,34 @@ println!("{} batches, largest matrix {} x {}",
 `max_pairs_per_batch: Some(1)` reduces one S-polynomial per matrix, which is useful for isolating
 the effect of batching; the answer does not change, only the number and shape of the matrices.
 
+#### Entry budgets and byte budgets
+
+The matrix's storage is budgeted twice, and both budgets are enforced. `max_live_nonzeros` counts
+mathematical nonzeros; `max_live_bytes` counts what they occupy. An entry is a column index and a
+field element, so it costs `size_of::<(usize, F)>()` — **16 bytes over a 64-bit prime field and 40
+over BN254** — and an entry budget alone therefore admits 2.5x the memory over the wide field:
+
+```rust
+use zeebra::{fields::{Bn254Fr, Zp18446744073709551557}, grobner::F4Options};
+
+let options = F4Options::default();              // 20,000,000 entries and 320 MB
+assert_eq!(options.live_entry_allowance::<Zp18446744073709551557>(), 20_000_000);
+assert_eq!(options.live_entry_allowance::<Bn254Fr>(), 8_000_000);   // the same 320 MB
+```
+
+The two agree over a 64-bit field, which is the width every F4 figure in
+[`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md) was measured at, so the
+byte budget binds only where it is needed. Whichever budget bound names the error:
+`F4Error::TooManyNonzeros` or `F4Error::TooManyLiveBytes`. `FglmOptions` is the same shape —
+`max_operator_bytes` beside `max_operator_entries`, and `max_span_bytes` beside `max_span_entries`.
+
+Neither is a ceiling on the process. `F4Statistics::peak_live_bytes` reports what the budget
+enforces; `max_dense_buffer_bytes` reports what it deliberately omits — the dense buffer the
+elimination backend allocates, which under `Backend::Dense` is `rows * columns` cells and a
+function of the shape alone. `max_estimated_bytes` is the two added, per batch, maxed over batches.
+None of them accounts for the monomial-to-column map, the basis's term vectors, or allocator
+overhead; for the process figure use `util::peak_resident_bytes`.
+
 #### Choosing a strategy
 
 `F4Options` also selects *how* the computation is performed. A reduced Gröbner basis is unique for

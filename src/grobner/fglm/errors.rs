@@ -35,6 +35,14 @@ pub enum FglmError {
     /// Carries the count, which is known from `D` before anything is allocated.
     SpanStorageExceeded { entries: usize, limit: usize },
 
+    /// The dependence test's dense blocks needed more bytes than the limit allowed.
+    ///
+    /// Stands to [`Self::SpanStorageExceeded`] as [`Self::OperatorBytesExceeded`] stands to
+    /// [`Self::OperatorStorageExceeded`]. Here the two diverge by the field width alone: a cell is
+    /// one `F`, so the same cell count is 8 bytes over a 64-bit prime field and 32 over a 254-bit
+    /// one. Carries the count, known from `D` before anything is allocated.
+    SpanBytesExceeded { bytes: usize, limit: usize },
+
     /// The source was not a Gröbner basis under the order it was said to be one under.
     ///
     /// Detected, not assumed: the conversion accepts exactly `D` target standard monomials when
@@ -84,6 +92,11 @@ impl Display for FglmError {
                 f,
                 "the dependence test needed {} entries, over the limit of {}",
                 entries, limit
+            ),
+            Self::SpanBytesExceeded { bytes, limit } => write!(
+                f,
+                "the dependence test needed {} bytes, over the limit of {}",
+                bytes, limit
             ),
             Self::NotAGrobnerBasis => {
                 write!(f, "the source is not a Gröbner basis under the given order")

@@ -93,7 +93,12 @@ pub fn f4_observed<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     options: &F4Options,
     observer: &mut O,
 ) -> Result<(Vec<MultivariatePolynomial<N, F>>, F4Statistics), F4Error> {
-    let mut statistics = F4Statistics::default();
+    // Set before anything else, so that a computation which returns early — the zero ideal, an
+    // unsatisfiable option — still reports the field's entry size rather than zero.
+    let mut statistics = F4Statistics {
+        bytes_per_entry: F4Options::bytes_per_entry::<F>(),
+        ..F4Statistics::default()
+    };
     let total_clock = StageClock::new(options.measure_stages);
 
     // A batch of no pairs makes no progress, so a zero limit is unsatisfiable rather than merely

@@ -1750,6 +1750,99 @@ fn test_structured_elimination_enforces_the_budgets() {
         Err(F4Error::TooManyNonzeros { limit: 1, .. })
     ));
     assert!(f4_with_options(&generators, order, &structured).is_ok());
+
+    // The byte budget, which is a different error from the entry budget even though both are
+    // crossed by the same matrix.
+    assert!(matches!(
+        f4_with_options(
+            &generators,
+            order,
+            &F4Options {
+                max_live_bytes: 16,
+                ..structured.clone()
+            }
+        ),
+        Err(F4Error::TooManyLiveBytes { limit: 16, .. })
+    ));
+}
+
+/// One entry budget admits 2.5x the memory over BN254 as over a 64-bit field; the byte budget does
+/// not. M20-C.
+///
+/// The whole of the defect this limit exists for. The same system over two field widths performs
+/// identical arithmetic and reaches an identical entry count — so an entry budget cannot
+/// distinguish 320 MB from 800 MB, and the figures below are what it fails to see.
+#[test]
+fn test_the_byte_budget_is_what_makes_a_budget_mean_the_same_at_every_field_width() {
+    use crate::fields::{Bn254Fr, Zp18446744073709551557};
+    use std::mem::size_of;
+
+    type Narrow = Zp18446744073709551557;
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let unbounded = F4Options {
+        max_live_bytes: usize::MAX,
+        ..F4Options::default()
+    };
+
+    let (_, narrow) =
+        f4_with_options(&katsura::<5, Narrow>(), order, &unbounded).expect("within limits");
+    let (_, wide) =
+        f4_with_options(&katsura::<5, Bn254Fr>(), order, &unbounded).expect("within limits");
+
+    // Identical computations: the entry counts agree exactly, which is what makes the byte figures
+    // comparable and the entry budget blind.
+    assert_eq!(narrow.max_live_nonzeros, wide.max_live_nonzeros);
+    assert!(narrow.max_live_nonzeros > 0);
+    assert_eq!(narrow.bytes_per_entry, 16);
+    assert_eq!(wide.bytes_per_entry, 40);
+    assert_eq!(
+        wide.peak_live_bytes() * 2,
+        narrow.peak_live_bytes() * 5,
+        "a wide entry is 2.5 narrow ones"
+    );
+
+    // A byte budget sized for the narrow computation's peak admits it and refuses the wide one.
+    let budget = F4Options {
+        max_live_bytes: narrow.peak_live_bytes(),
+        ..F4Options::default()
+    };
+    assert!(f4_with_options(&katsura::<5, Narrow>(), order, &budget).is_ok());
+    assert!(matches!(
+        f4_with_options(&katsura::<5, Bn254Fr>(), order, &budget),
+        Err(F4Error::TooManyLiveBytes { .. })
+    ));
+
+    // The entry budget at that same peak admits both, because it cannot tell them apart. This is
+    // the behaviour that was wrong, asserted so that it is not mistaken for the fix.
+    let entries_only = F4Options {
+        max_live_nonzeros: narrow.max_live_nonzeros,
+        max_live_bytes: usize::MAX,
+        ..F4Options::default()
+    };
+    assert!(f4_with_options(&katsura::<5, Narrow>(), order, &entries_only).is_ok());
+    assert!(f4_with_options(&katsura::<5, Bn254Fr>(), order, &entries_only).is_ok());
+
+    // The dense buffer the adaptive backend allocates is one row wide and is reported, not
+    // budgeted — and it scales with the field width too.
+    assert!(wide.max_dense_buffer_bytes >= size_of::<Bn254Fr>());
+    assert_eq!(
+        wide.max_dense_buffer_bytes,
+        4 * narrow.max_dense_buffer_bytes
+    );
+    assert!(wide.max_estimated_bytes >= wide.peak_live_bytes());
+}
+
+/// A computation that builds no matrix still reports the field's entry size.
+#[test]
+fn test_bytes_per_entry_is_reported_without_a_matrix() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let (basis, statistics) = f4_with_options::<3, F>(&[], order, &F4Options::default())
+        .expect("the zero ideal is not a failure");
+    assert!(basis.is_empty());
+    assert_eq!(statistics.batches, 0);
+    assert_eq!(statistics.bytes_per_entry, 16);
+    assert_eq!(statistics.peak_live_bytes(), 0);
 }
 
 /// Every combination of the pair criteria returns the baseline's basis, in both engines, over

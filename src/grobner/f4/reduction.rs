@@ -20,6 +20,8 @@
 //! not that the polynomials match but that the ideal is unchanged and the selected pairs end up
 //! resolved, which is what the tests check.
 
+use std::mem::size_of;
+
 use crate::{
     grobner::{
         f4::{
@@ -31,6 +33,7 @@ use crate::{
         },
         pairs::CriticalPair,
     },
+    linalg::echelon::Backend,
     poly::MonomialOrder,
     FiniteField, MultivariatePolynomial,
 };
@@ -99,6 +102,11 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     let mut clock = StageClock::new(options.measure_stages);
     let mut stages = crate::grobner::f4::statistics::StageTimings::default();
 
+    // The entry and byte budgets are collapsed to one entry allowance here, so that construction
+    // and elimination are checked against a single number and cannot drift apart as either check
+    // moves. Which budget produced it decides which error a crossing reports.
+    let allowance = options.live_entry_allowance::<F>();
+
     // Every budget is enforced while the thing it bounds is being built, not after it exists.
     // Symbolic preprocessing discovers rows one at a time and matrix construction writes entries
     // one row at a time, so both can refuse to continue; checking afterwards would mean paying the
@@ -120,13 +128,11 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         &preprocessed,
         order,
         options.max_matrix_columns,
-        options.max_live_nonzeros,
+        allowance,
     )
     .map_err(|exceeded| match exceeded {
         BuildBudgetExceeded::Columns { limit } => F4Error::TooManyColumns { limit },
-        BuildBudgetExceeded::Nonzeros { nonzeros, limit } => {
-            F4Error::TooManyNonzeros { nonzeros, limit }
-        }
+        BuildBudgetExceeded::Nonzeros { nonzeros, .. } => options.entry_budget_error::<F>(nonzeros),
     })?;
     stages.construction = clock.lap();
 
@@ -138,6 +144,16 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     let rows = matrix.num_rows();
     let columns = matrix.num_columns();
 
+    // What the chosen backend allocates on top of the sparse rows. Measured, not budgeted: under
+    // `Backend::Dense` it is a function of the shape alone — which the row and column budgets
+    // already bound — and charging it to `max_live_bytes` would make the default refuse
+    // computations the entry budget admits, on katsura-7 among others.
+    let dense_buffer_bytes = match options.elimination {
+        Backend::Sparse => 0,
+        Backend::Dense => rows.saturating_mul(columns).saturating_mul(size_of::<F>()),
+        Backend::Adaptive => columns.saturating_mul(size_of::<F>()),
+    };
+
     // The one elimination call site, so that a structured path and a dense backend can be chosen
     // independently of each other and neither has to touch the other's files.
     let structured = matches!(options.reduction, ReductionStrategy::Structured);
@@ -145,16 +161,8 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         ReductionStrategy::Unstructured => BlockPlan::Baseline,
         ReductionStrategy::Structured => BlockPlan::ReducersFirstBlock,
     };
-    let block = eliminate(
-        plan,
-        options.elimination,
-        &mut matrix,
-        options.max_live_nonzeros,
-    )
-    .map_err(|nonzeros| F4Error::TooManyNonzeros {
-        nonzeros,
-        limit: options.max_live_nonzeros,
-    })?;
+    let block = eliminate(plan, options.elimination, &mut matrix, allowance)
+        .map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
     let elimination = block.statistics;
     stages.elimination = clock.lap();
 
@@ -182,6 +190,8 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         columns,
         elimination,
         candidates: candidates.len(),
+        bytes_per_entry: F4Options::bytes_per_entry::<F>(),
+        dense_buffer_bytes,
         stages,
         reducer_rows_reused: preprocessed.counts.reducer_rows_reused,
         divisor_queries: preprocessed.counts.divisor_queries,

@@ -136,6 +136,25 @@ pub struct BatchStatistics {
     /// New basis elements extracted, i.e. rows whose leading monomial was new.
     pub candidates: usize,
 
+    /// `size_of::<(usize, F)>()` for the field this batch ran over.
+    ///
+    /// Carried rather than derived because nothing downstream of here knows `F`: these counters
+    /// are field-agnostic, and the whole point of a byte figure is that it is not.
+    pub bytes_per_entry: usize,
+
+    /// Bytes the elimination backend allocated outside the sparse rows.
+    ///
+    /// `rows * columns` cells under [`Backend::Dense`](crate::linalg::echelon::Backend::Dense),
+    /// one row-wide accumulator under
+    /// [`Adaptive`](crate::linalg::echelon::Backend::Adaptive), nothing under
+    /// [`Sparse`](crate::linalg::echelon::Backend::Sparse).
+    ///
+    /// **Not covered by [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes)**, and
+    /// reported here so that the figure the budget omits is at least visible. Under the dense
+    /// backend it dwarfs the entries: katsura-7's largest grevlex matrix is 6810x6862, which is
+    /// 374 MB of cells against roughly 22 MB of entries.
+    pub dense_buffer_bytes: usize,
+
     /// Where this batch's time went. Zero unless stage measurement is on.
     pub stages: StageTimings,
 
@@ -164,6 +183,27 @@ pub struct BatchStatistics {
     /// monomials by construction. The unstructured path finds the same thing by accident where it
     /// happens, so this is comparable between the two.
     pub free_pivots: usize,
+}
+
+impl BatchStatistics {
+    /// Bytes of matrix entries live at this batch's peak.
+    ///
+    /// What [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) is enforced on.
+    pub fn peak_live_bytes(&self) -> usize {
+        self.elimination
+            .peak_nonzeros
+            .saturating_mul(self.bytes_per_entry)
+    }
+
+    /// Bytes this batch is estimated to have held at once: its entries plus its dense buffers.
+    ///
+    /// The two are live together, so they are added rather than maxed. Still an estimate of the
+    /// matrix alone — see [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) for what
+    /// no figure here accounts for.
+    pub fn estimated_bytes(&self) -> usize {
+        self.peak_live_bytes()
+            .saturating_add(self.dense_buffer_bytes)
+    }
 }
 
 /// What a whole F4 computation cost.
@@ -220,6 +260,23 @@ pub struct F4Statistics {
     ///
     /// Context for `max_live_nonzeros`: how dense the biggest matrix was to begin with.
     pub max_live_nonzeros_as_built: usize,
+
+    /// `size_of::<(usize, F)>()` for the field the computation ran over.
+    ///
+    /// Set before the first batch, so it is right even for a computation that builds no matrix at
+    /// all. The one number here that depends on the field rather than on the system, and the one
+    /// that turns every entry count above into a quantity of memory.
+    pub bytes_per_entry: usize,
+
+    /// The largest [`BatchStatistics::dense_buffer_bytes`] of any batch.
+    pub max_dense_buffer_bytes: usize,
+
+    /// The largest [`BatchStatistics::estimated_bytes`] of any batch.
+    ///
+    /// The max of a per-batch *sum*, not the sum of two maxima: entries and dense buffers are live
+    /// together within a batch, and the batch with the biggest matrix is not necessarily the one
+    /// with the widest buffer.
+    pub max_estimated_bytes: usize,
 
     /// The peak live entries of the batch whose elimination filled in the most, proportionally.
     ///
@@ -294,6 +351,13 @@ impl F4Statistics {
             self.max_live_nonzeros = batch.elimination.peak_nonzeros;
             self.max_live_nonzeros_as_built = batch.elimination.initial_nonzeros;
         }
+
+        // Constant across a computation, so assigned rather than maxed. A caller driving batches
+        // itself gets it from the first batch; the main loop sets it before any batch runs, so a
+        // computation that builds no matrix still reports the field's entry size.
+        self.bytes_per_entry = batch.bytes_per_entry;
+        self.max_dense_buffer_bytes = self.max_dense_buffer_bytes.max(batch.dense_buffer_bytes);
+        self.max_estimated_bytes = self.max_estimated_bytes.max(batch.estimated_bytes());
 
         // The worst *ratio*, which is a different batch in general. Compared by cross-multiplying
         // rather than by dividing, so the comparison is exact; `u128` because the product of two
@@ -396,6 +460,16 @@ impl F4Statistics {
         } else {
             self.max_live_nonzeros as f64 / self.max_live_nonzeros_as_built as f64
         }
+    }
+
+    /// Bytes of matrix entries live at the peak of the largest elimination.
+    ///
+    /// [`max_live_nonzeros`](Self::max_live_nonzeros) in the unit
+    /// [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) is enforced in. This is the
+    /// figure that differs between field widths on an otherwise identical computation, by the ratio
+    /// of their [`bytes_per_entry`](Self::bytes_per_entry).
+    pub fn peak_live_bytes(&self) -> usize {
+        self.max_live_nonzeros.saturating_mul(self.bytes_per_entry)
     }
 
     /// The fraction of matrix rows that were reduction scaffolding rather than pair halves.

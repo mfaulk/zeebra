@@ -10,11 +10,15 @@
 //! strategy is required to return the identical basis: a reduced Gröbner basis is unique for a
 //! given ideal and order, so an option that changes the answer is a defect, not a trade-off.
 
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    mem::size_of,
+};
 
 use crate::{
     grobner::{f4::symbolic::CacheMode, pairs::PairCriteria},
     linalg::echelon::Backend,
+    FiniteField,
 };
 
 /// How the rows of a Macaulay matrix are eliminated.
@@ -118,6 +122,30 @@ pub struct F4Options {
     /// recoverable, not as a memory limit.
     pub max_live_nonzeros: usize,
 
+    /// The bytes those live entries may occupy at once.
+    ///
+    /// **A second budget rather than a redefinition of [`max_live_nonzeros`](Self::max_live_nonzeros),**
+    /// for the same reason FGLM's
+    /// [`max_operator_bytes`](crate::grobner::FglmOptions::max_operator_bytes) is one: changing what
+    /// the older limit counted would make every figure recorded against it ambiguous. Both are
+    /// enforced, and [`live_entry_allowance`](Self::live_entry_allowance) is the smaller of the two.
+    ///
+    /// An entry is a column index and a field element, so it costs `size_of::<(usize, F)>()`:
+    /// **16 bytes over a 64-bit prime field and 40 over a 254-bit one.** An entry budget alone
+    /// therefore admits 2.5x the memory over BN254 as over `Zp18446744073709551557` — the budget
+    /// means something different at every field width, which is what this limit fixes by being
+    /// stated in the unit that is allocated.
+    ///
+    /// It covers the same storage [`max_live_nonzeros`](Self::max_live_nonzeros) does and no more:
+    /// not the monomial-to-column map, not the basis's term vectors, not the dense buffer a
+    /// backend reduces through, and not allocator overhead. The dense buffers are *reported*
+    /// instead — see [`BatchStatistics::dense_buffer_bytes`](super::BatchStatistics::dense_buffer_bytes)
+    /// — because enforcing them here would make the default refuse computations the entry budget
+    /// admits, and under [`Backend::Dense`] they are a function of the shape alone, which the row
+    /// and column budgets already bound. This is still not a ceiling on the process; it is the
+    /// entry budget in bytes.
+    pub max_live_bytes: usize,
+
     /// The most batches to process before giving up, or `None` for no limit.
     pub max_batches: Option<usize>,
 
@@ -168,6 +196,7 @@ impl F4Options {
             max_matrix_rows: 200_000,
             max_matrix_columns: 200_000,
             max_live_nonzeros: 20_000_000,
+            max_live_bytes: 320_000_000,
             max_batches: None,
             max_basis_elements: None,
             elimination: Backend::Sparse,
@@ -206,6 +235,52 @@ impl F4Options {
             ..Self::baseline()
         }
     }
+
+    /// Bytes one live matrix entry over `F` occupies.
+    ///
+    /// A [`SparseRow`](crate::linalg::sparse::SparseRow) holds `Vec<(usize, F)>`, so this is the
+    /// pair's size — including any padding the field's alignment forces, which is why it is
+    /// `size_of::<(usize, F)>()` and not `8 + size_of::<F>()`.
+    pub fn bytes_per_entry<F: FiniteField>() -> usize {
+        size_of::<(usize, F)>()
+    }
+
+    /// The live entries this configuration admits over `F`.
+    ///
+    /// The smaller of [`max_live_nonzeros`](Self::max_live_nonzeros) and what
+    /// [`max_live_bytes`](Self::max_live_bytes) pays for. One number, so construction and
+    /// elimination cannot be checked against two budgets that disagree, and so the two cannot
+    /// drift apart as either check moves.
+    ///
+    /// Never divides by zero: an entry carries a `usize` whatever `F` is, so the divisor is at
+    /// least 8.
+    pub fn live_entry_allowance<F: FiniteField>(&self) -> usize {
+        self.max_live_nonzeros
+            .min(self.max_live_bytes / Self::bytes_per_entry::<F>())
+    }
+
+    /// Whether [`max_live_bytes`](Self::max_live_bytes) is the budget that binds over `F`.
+    ///
+    /// Strictly smaller, so that when the two budgets describe the same quantity the older error
+    /// is the one reported and a figure recorded against it keeps its meaning.
+    pub fn bytes_bind_first<F: FiniteField>(&self) -> bool {
+        self.live_entry_allowance::<F>() < self.max_live_nonzeros
+    }
+
+    /// The error for a live-entry count that crossed whichever budget binds over `F`.
+    pub(crate) fn entry_budget_error<F: FiniteField>(&self, nonzeros: usize) -> F4Error {
+        if self.bytes_bind_first::<F>() {
+            F4Error::TooManyLiveBytes {
+                bytes: nonzeros.saturating_mul(Self::bytes_per_entry::<F>()),
+                limit: self.max_live_bytes,
+            }
+        } else {
+            F4Error::TooManyNonzeros {
+                nonzeros,
+                limit: self.max_live_nonzeros,
+            }
+        }
+    }
 }
 
 impl Default for F4Options {
@@ -213,7 +288,12 @@ impl Default for F4Options {
     /// enough to fail before exhausting a workstation, with every strategy the measurements
     /// justified.
     ///
-    /// `max_live_nonzeros` of 20 million is about 320 MB at 16 bytes per entry.
+    /// `max_live_nonzeros` of 20 million is about 320 MB at 16 bytes per entry, and
+    /// `max_live_bytes` is that same 320 MB stated in the unit that is allocated. The two bind
+    /// together over a 64-bit prime field, which is the width every figure in M16 was measured at,
+    /// and the byte budget binds first over anything wider: at BN254's 40 bytes an entry it admits
+    /// 8 million entries rather than 20. That is the point of having it — the same default now
+    /// describes the same memory at every field width instead of 2.5x more of it over a wide one.
     ///
     /// This is [`F4Options::recommended`], **not** [`F4Options::baseline`]. The two were identical
     /// until the ablation was run: an optimization milestone should not move its own default as a
@@ -248,6 +328,14 @@ pub enum F4Error {
     /// every row written and after every row operation.
     TooManyNonzeros { nonzeros: usize, limit: usize },
 
+    /// Construction or elimination needed more bytes of live entries than allowed.
+    ///
+    /// Reported in place of `TooManyNonzeros` exactly when
+    /// [`F4Options::max_live_bytes`] is the budget that binds for the field in use, so the two are
+    /// never both plausible for one failure. `bytes` is the live count when the limit was crossed,
+    /// times `size_of::<(usize, F)>()`.
+    TooManyLiveBytes { bytes: usize, limit: usize },
+
     /// The computation did not finish within the allowed number of batches.
     TooManyBatches { limit: usize },
 
@@ -279,6 +367,11 @@ impl Display for F4Error {
                 "{} live nonzero entries were needed, over the limit of {}",
                 nonzeros, limit
             ),
+            Self::TooManyLiveBytes { bytes, limit } => write!(
+                f,
+                "{} bytes of live entries were needed, over the limit of {}",
+                bytes, limit
+            ),
             Self::TooManyBatches { limit } => {
                 write!(f, "the computation did not finish within {} batches", limit)
             }
@@ -300,9 +393,13 @@ impl std::error::Error for F4Error {}
 mod tests {
     use super::{F4Error, F4Options, ReducerSelection, ReductionStrategy};
     use crate::{
+        fields::{Bls12_381Fr, Bn254Fr, Zp18446744073709551557},
         grobner::{f4::symbolic::CacheMode, pairs::PairCriteria},
         linalg::echelon::Backend,
     };
+
+    /// The width every figure in M16 was measured at, and the width the two budgets agree over.
+    type Narrow = Zp18446744073709551557;
 
     /// The defaults leave the batch size and the overall limits unbounded.
     #[test]
@@ -314,6 +411,7 @@ mod tests {
         assert!(options.max_matrix_rows > 0);
         assert!(options.max_matrix_columns > 0);
         assert!(options.max_live_nonzeros > 0);
+        assert!(options.max_live_bytes > 0);
     }
 
     /// The default is the recommended configuration, and the baseline remains reachable.
@@ -437,10 +535,135 @@ mod tests {
                 elements: 10,
                 limit: 5,
             },
+            F4Error::TooManyLiveBytes {
+                bytes: 10,
+                limit: 5,
+            },
         ];
         for error in cases {
             let message = error.to_string();
             assert!(message.contains('5'), "{:?} does not name its limit", error);
         }
+    }
+
+    /// An entry's byte cost is the index-and-coefficient pair's, which grows with the field width.
+    #[test]
+    fn test_bytes_per_entry_follows_the_field_width() {
+        assert_eq!(F4Options::bytes_per_entry::<Narrow>(), 16);
+        assert_eq!(F4Options::bytes_per_entry::<Bn254Fr>(), 40);
+        assert_eq!(F4Options::bytes_per_entry::<Bls12_381Fr>(), 40);
+    }
+
+    /// The default's two budgets describe the same memory over the 64-bit field M16 measured at.
+    #[test]
+    fn test_the_default_budgets_agree_over_a_64_bit_field() {
+        let options = F4Options::default();
+        assert_eq!(
+            options.max_live_bytes,
+            options.max_live_nonzeros * F4Options::bytes_per_entry::<Narrow>()
+        );
+        assert_eq!(options.live_entry_allowance::<Narrow>(), 20_000_000);
+        assert!(
+            !options.bytes_bind_first::<Narrow>(),
+            "with the two budgets equal the older one must be the one reported"
+        );
+    }
+
+    /// Over a wide field the same default admits 2.5x fewer entries, which is the same memory.
+    #[test]
+    fn test_the_byte_budget_binds_first_over_a_wide_field() {
+        let options = F4Options::default();
+        assert_eq!(options.live_entry_allowance::<Bn254Fr>(), 8_000_000);
+        assert!(options.bytes_bind_first::<Bn254Fr>());
+        // The entry budget alone would have admitted 800 MB here against the 320 MB it describes
+        // over a 64-bit field. The byte budget is what makes the default mean one quantity.
+        assert_eq!(
+            options.live_entry_allowance::<Bn254Fr>() * F4Options::bytes_per_entry::<Bn254Fr>(),
+            options.max_live_bytes
+        );
+    }
+
+    /// The allowance is the smaller of the two budgets, whichever that is.
+    #[test]
+    fn test_the_allowance_is_the_smaller_budget() {
+        let entries_bind = F4Options {
+            max_live_nonzeros: 100,
+            max_live_bytes: 320_000_000,
+            ..F4Options::default()
+        };
+        assert_eq!(entries_bind.live_entry_allowance::<Narrow>(), 100);
+        assert!(!entries_bind.bytes_bind_first::<Narrow>());
+
+        let bytes_bind = F4Options {
+            max_live_nonzeros: usize::MAX,
+            max_live_bytes: 1_600,
+            ..F4Options::default()
+        };
+        assert_eq!(bytes_bind.live_entry_allowance::<Narrow>(), 100);
+        assert!(bytes_bind.bytes_bind_first::<Narrow>());
+
+        // A budget that does not pay for one whole entry admits none, rather than rounding up to
+        // one and allocating memory it did not grant.
+        let starved = F4Options {
+            max_live_bytes: 15,
+            ..F4Options::default()
+        };
+        assert_eq!(starved.live_entry_allowance::<Narrow>(), 0);
+    }
+
+    /// A crossing reports the budget that bound, and converts to bytes only when that was the one.
+    #[test]
+    fn test_the_error_names_the_budget_that_bound() {
+        let entries_bind = F4Options {
+            max_live_nonzeros: 100,
+            max_live_bytes: 320_000_000,
+            ..F4Options::default()
+        };
+        assert_eq!(
+            entries_bind.entry_budget_error::<Narrow>(101),
+            F4Error::TooManyNonzeros {
+                nonzeros: 101,
+                limit: 100
+            }
+        );
+
+        let bytes_bind = F4Options {
+            max_live_nonzeros: usize::MAX,
+            max_live_bytes: 1_600,
+            ..F4Options::default()
+        };
+        assert_eq!(
+            bytes_bind.entry_budget_error::<Narrow>(101),
+            F4Error::TooManyLiveBytes {
+                bytes: 101 * 16,
+                limit: 1_600
+            }
+        );
+
+        // The same options over a wider field: the same entry count is more bytes.
+        assert_eq!(
+            bytes_bind.entry_budget_error::<Bn254Fr>(101),
+            F4Error::TooManyLiveBytes {
+                bytes: 101 * 40,
+                limit: 1_600
+            }
+        );
+    }
+
+    /// Converting an entry count to bytes saturates rather than wrapping to a small figure.
+    #[test]
+    fn test_the_byte_error_does_not_wrap() {
+        let options = F4Options {
+            max_live_nonzeros: usize::MAX,
+            max_live_bytes: 16,
+            ..F4Options::default()
+        };
+        assert_eq!(
+            options.entry_budget_error::<Bn254Fr>(usize::MAX),
+            F4Error::TooManyLiveBytes {
+                bytes: usize::MAX,
+                limit: 16
+            }
+        );
     }
 }
