@@ -2814,3 +2814,134 @@ fn test_certification_cost_is_reported() {
         "the generators must be checked, not only the criterion"
     );
 }
+
+/// Lower-degree relations occur, and the schedule goes straight back down to them.
+///
+/// M22-D's question, as a measurement rather than an argument. F4 selects the lowest pending degree
+/// every time, so a relation that creates lower-degree pairs is acted on at the very next batch —
+/// but "so it must be exploited" is a claim about the implementation, and this is the counter that
+/// checks it.
+#[test]
+fn test_mutants_occur_and_the_schedule_returns_to_them() {
+    type G = Zp2147483647;
+
+    let mut any_mutants = false;
+    let mut any_regression = false;
+    let mut any_attributed = false;
+
+    for order in ALL_ORDERS {
+        for (name, statistics) in [
+            (
+                "katsura-5",
+                f4_with_options(&katsura::<5, G>(), order, &F4Options::default())
+                    .expect("within limits")
+                    .1,
+            ),
+            (
+                "katsura-6",
+                f4_with_options(&katsura::<6, G>(), order, &F4Options::default())
+                    .expect("within limits")
+                    .1,
+            ),
+            (
+                "cyclic-5",
+                f4_with_options(&cyclic::<5, G>(), order, &F4Options::default())
+                    .expect("within limits")
+                    .1,
+            ),
+        ] {
+            let context = format!("{} under {}", name, order.name());
+
+            // A mutant is a relation below the degree of the batch that found it, so the gap is
+            // positive exactly when one occurred.
+            assert_eq!(
+                statistics.mutant_elements > 0,
+                statistics.batches_with_mutants > 0,
+                "{}: the element and batch counts disagree",
+                context
+            );
+            assert_eq!(
+                statistics.batches_with_mutants > 0,
+                statistics.max_mutant_degree_gap > 0,
+                "{}: a batch with a mutant must have a positive degree gap",
+                context
+            );
+            assert!(
+                statistics.batches_with_mutants <= statistics.batches,
+                "{}: more batches with mutants than batches",
+                context
+            );
+            assert!(
+                statistics.mutant_elements >= statistics.batches_with_mutants,
+                "{}: fewer mutant elements than batches that produced one",
+                context
+            );
+            assert!(
+                statistics.regressions_after_mutants <= statistics.degree_regressions,
+                "{}: attributed more regressions than occurred",
+                context
+            );
+            assert_eq!(
+                statistics.degree_regressions > 0,
+                statistics.max_degree_drop > 0,
+                "{}: a regression must have a positive drop",
+                context
+            );
+
+            any_mutants |= statistics.mutant_elements > 0;
+            any_regression |= statistics.degree_regressions > 0;
+            any_attributed |= statistics.regressions_after_mutants > 0;
+        }
+    }
+
+    assert!(any_mutants, "no instance produced a lower-degree relation");
+    assert!(
+        any_regression,
+        "no instance ever returned to a lower degree, so nothing exploits a mutant"
+    );
+    assert!(
+        any_attributed,
+        "no regression followed a batch that produced a mutant, so the mechanism was never observed"
+    );
+}
+
+/// The next batch is always at the lowest pending degree — which is why a mutant needs no
+/// mechanism.
+///
+/// The structural half of M22-D's answer. `select_batch` takes the minimum degree available, so a
+/// relation that creates a pair below the current degree is selected *next*, before any remaining
+/// pair of the current degree. Asserted here on a live queue rather than inferred from the
+/// selection code.
+#[test]
+fn test_a_lower_degree_pair_is_selected_before_the_current_degree_finishes() {
+    use crate::grobner::{CriterionCounts, PairCriteria, PairQueue};
+    use crate::Monomial;
+
+    // Leading monomials x^3, y^3 — one pair, at degree six.
+    let mut leads = vec![
+        Monomial::<3>::new(&[3, 0, 0]),
+        Monomial::<3>::new(&[0, 3, 0]),
+    ];
+    let mut counts = CriterionCounts::default();
+    let mut queue = PairQueue::seeded_from_leads(&leads, &PairCriteria::NONE, &mut counts);
+    assert_eq!(queue.next_degree(), Some(6));
+
+    // Take it, then append a "mutant" of degree one, as a batch at degree six might.
+    let batch = queue.select_batch(None);
+    assert_eq!(batch.len(), 1);
+    leads.push(Monomial::<3>::new(&[0, 0, 1]));
+    queue.push_pairs_from_leads(&leads, 2, &PairCriteria::NONE, &mut counts);
+
+    // Its pairs are at degree four, and that is what comes out next — with no mechanism asked for.
+    assert_eq!(
+        queue.next_degree(),
+        Some(4),
+        "the lowest pending degree must be the mutant's, not the batch's"
+    );
+    let next = queue.select_batch(None);
+    assert!(
+        next.iter().all(|pair| pair.degree == 4),
+        "the next batch mixed degrees: {:?}",
+        next.iter().map(|p| p.degree).collect::<Vec<_>>()
+    );
+}

@@ -179,6 +179,12 @@ below their batch's degree. That is enough to make M22-D worth measuring and not
 what a mutant *mechanism* would buy: Zeebra already appends these elements immediately and generates
 their pairs at once, so the question M22-D has to answer is whether anything is left on the table.
 
+**M22-D answered it, and the element count turns out to be the wrong measure.** Counting instead the
+*batches* that produce a mutant and the times the schedule consequently goes back to a lower degree:
+every regression in the corpus followed a batch with a mutant, and there are only zero, one or two
+regressions per computation. The Poseidon `t = 3` instance produces 164 mutants over 12 of its 20
+batches and **zero** regressions. See [`mutants.md`](mutants.md).
+
 ## 7. Selection-time criteria discard nothing here
 
 The `cut` column is **zero at every degree of every instance above**. The product and chain criteria

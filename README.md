@@ -1350,6 +1350,25 @@ count is not a count of useless pairs in either direction. What is informative i
 pair rows added on top of the reducer block, which is `rank - reducer_rows`; that is exact and does
 not depend on the order elimination took the rows in, because rank does not.
 
+##### Mutants, and why they need no mechanism
+
+A matrix built at degree `d` can produce a relation of degree *below* `d` — information arriving
+earlier than the schedule expected. `F4Statistics` counts them (`mutant_elements`,
+`batches_with_mutants`, `max_mutant_degree_gap`) and, separately, counts what the engine does next:
+`degree_regressions` is batches whose selection degree was below the previous batch's, and
+`regressions_after_mutants` attributes those that immediately followed a batch which produced one.
+
+The two are kept apart because a regression can also follow an ordinary batch: a new element of the
+batch's own degree can pair low with an old one. Without the attribution the mechanism could not be
+credited with anything.
+
+The reason no mutant *mode* exists is structural. `PairQueue::select_batch` takes the pairs of the
+**lowest pending degree**, so a relation that creates a pair below the current degree is selected at
+the very next batch, ahead of any remaining pair of the current degree — immediate priority, with
+nothing asked for. That is asserted on a live queue, not inferred from the selection code. See
+[`docs/research/mutants.md`](docs/research/mutants.md) for the measurement and for what the
+auxiliary-basis form of the idea would require.
+
 Two further quantities are kept apart deliberately:
 
 | Figure | What it is |
