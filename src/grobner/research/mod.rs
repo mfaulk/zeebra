@@ -9,6 +9,7 @@
 pub mod manifest;
 pub mod mq;
 pub mod poseidon;
+pub mod record;
 pub mod slices;
 pub mod specialization;
 
@@ -18,5 +19,6 @@ pub use poseidon::{
     verify_against_trace, CicoInstance, GrainLfsr, Poseidon, PoseidonError, PoseidonParameters,
     PoseidonTrace, KOALABEAR_PRIME,
 };
+pub use record::{AttemptRecord, ExperimentRecord, Json};
 pub use slices::{solve_slice, SliceOutcome};
 pub use specialization::{satisfies, specialize, Specialization, SpecializationError};
