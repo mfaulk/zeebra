@@ -74,11 +74,15 @@ impl Sha256 {
                 self.buffer.clear();
             }
         }
-        let mut chunks = rest.chunks_exact(64);
-        for block in &mut chunks {
+        // `split_at` rather than `chunks_exact(64)`: a constant chunk size draws clippy's
+        // `chunks_exact_to_as_chunks`, and `as_chunks` is newer than the toolchain floor this
+        // crate builds on.
+        while rest.len() >= 64 {
+            let (block, tail) = rest.split_at(64);
             self.compress(block.try_into().expect("exactly 64"));
+            rest = tail;
         }
-        self.buffer.extend_from_slice(chunks.remainder());
+        self.buffer.extend_from_slice(rest);
     }
 
     /// Pad, compress the last blocks, and return the digest.
@@ -96,13 +100,16 @@ impl Sha256 {
         let mut block = std::mem::take(&mut self.buffer);
         block.extend_from_slice(&tail);
         debug_assert!(block.len().is_multiple_of(64));
-        for chunk in block.chunks_exact(64) {
+        let mut rest: &[u8] = &block;
+        while rest.len() >= 64 {
+            let (chunk, tail) = rest.split_at(64);
             self.compress(chunk.try_into().expect("exactly 64"));
+            rest = tail;
         }
 
         let mut digest = [0u8; 32];
-        for (word, out) in self.state.iter().zip(digest.chunks_exact_mut(4)) {
-            out.copy_from_slice(&word.to_be_bytes());
+        for (index, word) in self.state.iter().enumerate() {
+            digest[4 * index..4 * index + 4].copy_from_slice(&word.to_be_bytes());
         }
         digest
     }
@@ -120,8 +127,11 @@ impl Sha256 {
     /// §6.2.2 on one 512-bit block.
     fn compress(&mut self, block: &[u8; 64]) {
         let mut w = [0u32; 64];
-        for (word, bytes) in w.iter_mut().zip(block.chunks_exact(4)) {
-            *word = u32::from_be_bytes(bytes.try_into().expect("exactly 4"));
+        for (index, word) in w.iter_mut().take(16).enumerate() {
+            let bytes: [u8; 4] = block[4 * index..4 * index + 4]
+                .try_into()
+                .expect("exactly 4");
+            *word = u32::from_be_bytes(bytes);
         }
         for i in 16..64 {
             let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
