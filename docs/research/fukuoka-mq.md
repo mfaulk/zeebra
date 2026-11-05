@@ -190,9 +190,31 @@ it is not a Bernoulli trial of that question. `Campaign::stopped` now counts tho
 when nothing was decided. This was found by running the campaign, which is the argument for running
 it.
 
-For contrast, M22-E's type VI `n = 10` slices — three variables fixed — *did* finish, at degree 9
-with 4 315 columns, and produced witnesses. Five surplus variables at `n = 15` is past the wall,
-and the degree is the same 9 either way: what grows is the width at that degree.
+### 4.3 Type VI `n = 10`: a rate that does exist
+
+The same campaign at the size that finishes, eight precommitted seeds, three of ten variables fixed:
+
+| | |
+|---|---|
+| slices | 8, all **decided** |
+| witnesses | **6** |
+| per-slice time | 569–595 ms |
+| expected work per witness | **0.8 s**, including the two empty slices |
+| success rate | **40.9% to 92.9%** (Wilson, 95%, over the eight decided slices) |
+
+Every witness was evaluated against the *original* published coefficient vectors, so the
+specialization is inverted rather than assumed, and the two empty slices are recorded as facts
+about those slices.
+
+This is the pair the plan asked for. At `n = 10` the campaign produces an expected cost per witness
+and an interval on the rate; at `n = 15` it produces neither, because none of its slices reached a
+verdict. The two sit in the same table only because the record distinguishes *decided* from
+*stopped* — and the interval at `n = 10` is still 52 points wide on eight trials, which is what
+eight trials support.
+
+For contrast with M22-E: its two type VI `n = 10` slices finished at degree 9 with 4 315 columns.
+Five surplus variables at `n = 15` is past the wall, and the degree is the same 9 either way — what
+grows is the width at that degree.
 
 ## 5. What type VI is for
 

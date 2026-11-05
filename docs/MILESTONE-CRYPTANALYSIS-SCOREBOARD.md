@@ -381,6 +381,7 @@ would not describe what the library does.
 |---|---|---|---|
 | Fukuoka III `n=15` | not established | basis computed, 3 829 ms capped | **verified witness, and it is the published answer**, 7 874 ms |
 | Fukuoka III `n=20` | — | — | stopped at the entry cap, degree 5 |
+| Fukuoka VI `n=10` | dead slices measured | witnesses on two slices | **6 witnesses in 8 slices**, 0.8 s per witness, rate 40.9%–92.9% |
 | Fukuoka VI `n=15` | — | — | eight slices, **no verdict**: all crossed the entry cap at degree 9 |
 | Poseidon `t = 16`, any rounds | no attempt | not the main benchmark | **verified witness** at `R_F=2, R_P=0` sliced; an eighteen-row ladder with every stop named |
 | a non-Gröbner elimination | — | deferred | a resultant, **578x** faster on the same slice |
@@ -528,7 +529,7 @@ run.
 | all three official CICO targets registered and independently checkable | **met** — and their external status recorded with dates |
 | a full-width reduced-round ladder attempted under controlled budgets | **met** — eighteen rows, every stop a reproducible resource bound |
 | at least one full-width structural transformation validated and measured | **met** — four formulations, same `D`, same witness, measured apart |
-| a harder Fukuoka benchmark investigated, outcome documented either way | **met** — `n = 15` solved to the published answer, `n = 20` out of reach |
+| a harder Fukuoka benchmark investigated, outcome documented either way | **met** — III `n = 15` solved to the published answer, III `n = 20` out of reach, VI `n = 15` undecided, VI `n = 10` measured at 0.8 s per witness |
 | separate F4, FGLM, root-solving and verification figures wherever reached | **met** — every run record carries the stage split |
 | a comparison against a fundamentally different elimination method | **met** — M23-E, 578x on the same slice |
 | a report naming the bottleneck that most limits further progress | **met** — §5b.4 |
