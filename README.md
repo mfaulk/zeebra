@@ -223,6 +223,7 @@ cargo run --release --example fglm_ablation        # every strategy combination,
 cargo run --release --example fglm_ablation -- list
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
+cargo run --release --example solve_auto           # four policies against an offline best-of-two
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -871,6 +872,53 @@ solving degree.** In particular `generators == variables` proves nothing: cyclic
 equations in four variables and positive-dimensional, katsura-4 is four in four and
 zero-dimensional, and the two agree on every column `analyze` reports.
 
+#### Letting the solver choose
+
+`solve_one_planned` picks a route on stated grounds and, if permitted, tries the other one — with
+a decision log beside the answer. It is opt-in: the explicit entry points above are untouched.
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::katsura, solve_one_planned,
+             PlannedSolveOptions, SolveOutcome, SolvePolicy}};
+
+let options = PlannedSolveOptions::with_policy(SolvePolicy::AutoWithFallback);
+let (outcome, plan) = solve_one_planned(
+    &katsura::<7, Zp2147483647>(),
+    &mut StdRng::seed_from_u64(1),
+    &options,
+);
+
+assert!(matches!(outcome, Ok(SolveOutcome::Point(_))));
+assert_eq!(plan.attempts.len(), 1);              // the opening route worked
+println!("{}", plan);                            // every decision, with its reason and its cost
+```
+
+**The conservative opening is grevlex-then-FGLM**, which contradicts `DirectLexF4` being the
+`#[default]` strategy described as "the conservative choice". The argument is not that conversion
+usually wins — it loses on the whole planted family — but that **its refusals are cheap by
+construction**: FGLM's binding budget is the span's `2D² + D(D+1)/2` cells, computed from `D` and
+checked before anything is allocated, while F4's is discovered during elimination and so costs the
+whole elimination up to the crossing. Measured: katsura-7's direct attempt burns 28.3 s and 1.3 GB
+before refusing; planted-12's conversion refuses after 36 ms. The conservative question is not
+which route usually wins but **which route's failure is affordable**.
+
+The one decision made on a measured quantity is the conversion's feasibility: after a source basis
+exists, `D` is *counted* and the span requirement is a function of `D` alone, so
+`SolveError::ConversionInfeasible` means the conversion was never started — distinct from
+`Fglm(SpanStorageExceeded)`, which means it ran and crossed the limit.
+
+`PlanBudget` is shared across attempts, and holds only quantities that are *spent* —
+`max_elapsed` and `max_total_batches`. A peak is not consumed by an attempt, so the entry and byte
+budgets stay per-attempt in `SolveOptions`. `SolvePlan` keeps the same split: `total_batches()`
+sums, `peak_estimated_bytes()` maxes. `max_elapsed` is checked *between* attempts, since F4 has no
+cooperative time check, so it bounds whether a second route starts rather than how long the first
+runs.
+
+An `Err` from the planner means **inconclusive**, never "no solution".
+`cargo run --release --example solve_auto` compares all four policies against an offline
+best-of-two the planner was not allowed to see.
+
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
 on a 14-variable system with 16384 solutions that is 1.9 ms against 1.6 s, a factor of **830**.
@@ -881,14 +929,17 @@ which it handles by enumerating the field.
 **Neither strategy dominates.** `SolveStrategy::GrevlexF4ThenFglm` is the only route to katsura-7,
 whose lex basis crosses F4's limits; `SolveStrategy::DirectLexF4`, the default, is the only route to
 planted-12 and planted-14, whose quotient algebras are too large to build. `cargo run --release
---example solve_one` shows both failures.
+--example solve_one` shows both failures. `solve_one_planned` will choose for you — see
+[Letting the solver choose](#letting-the-solver-choose) below — but the choice stays the caller's
+by default.
 
 Whether conversion is worth doing depends entirely on the system —
 `cargo run --release --example fglm_conversion` measures it. On cyclic-6 the pipeline is **7.4x**
 faster than direct lex F4, on katsura-6 **2.5x**, and on katsura-7 direct lex F4 produces **no
 basis at all** while the pipeline finishes in 68 ms. On the planted family it loses by up to
-**65x**. There is no automatic strategy selection, because there is not yet a heuristic that would
-make the right call on both ends of that range.
+**65x**. Automatic selection is opt-in rather than default, and it is not a cost heuristic: it
+opens with the route whose *refusal* is cheap and decides the conversion's feasibility from a
+counted quotient dimension. See [Letting the solver choose](#letting-the-solver-choose).
 
 ### F4
 

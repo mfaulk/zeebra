@@ -311,7 +311,7 @@ lets a fallback spend 28 s and then 47 ms and report the 47 ms, which misreprese
 policy rather than of the algorithm. The plan is explicit that a fallback must not silently reset a
 caller's budget, and a shared budget is the only arrangement that cannot.
 
-Consequences to implement and test:
+Consequences, implemented and tested:
 
 - A report states total work across attempts, including discarded work. The successful attempt's
   cost is a component, never the headline.
@@ -320,12 +320,125 @@ Consequences to implement and test:
   monomial order, and nothing in M21 will pretend it can. A fallback restarts, and the report says
   so.
 
-### 5.4 Outcome semantics, preserved
+#### Only cumulative quantities can be shared
+
+A distinction M21-D had to make explicit and the plan does not. Of the budgets in play:
+
+| quantity | spent or peak? | can be shared? |
+|---|---|---|
+| wall clock | spent | **yes** |
+| F4 batches | spent | **yes** |
+| live matrix entries / bytes | peak | **no** |
+| quotient dimension, span cells | peak | **no** |
+
+A peak is not consumed by an attempt — the next attempt's matrices are allocated after the
+previous attempt's are freed — so "sharing" one is meaningless. `PlanBudget` therefore holds only
+`max_elapsed` and `max_total_batches`; the peak budgets stay in `SolveOptions::f4` and
+`SolveOptions::fglm`, bounding each attempt individually. `SolvePlan` reflects the same split:
+`total_batches()` **sums** across attempts, `peak_estimated_bytes()` takes the **maximum**.
+Conflating the two is how a shared budget comes to mean nothing.
+
+#### `max_elapsed` gates an attempt, it does not interrupt one
+
+F4 has no cooperative time check inside it, so the time budget is checked *between* attempts. It
+bounds whether a **second** route starts, not how long the first runs. That is the protection
+katsura-7 needs and it is not a wall-clock guarantee — exactly the distinction §8.5 asks for, and
+better said than implied.
+
+### 5.4 A predicted crossing is not a crossing
+
+`SolveError::ConversionInfeasible { dimension, estimated_bytes, limit }`, new in M21-D, and the
+distinction is not cosmetic. `Fglm(SpanStorageExceeded)` means the conversion **ran** and crossed a
+budget; `ConversionInfeasible` means it was never started, because a *counted* `D` and a span
+requirement that is a function of `D` alone were enough to know it could not fit. Reporting the
+first for the second would attribute a cost that was never paid.
+
+It is also why `SolveError::is_resource_failure()` returns `false` for it: a predicted
+infeasibility is a *reason to switch routes*, which the planner acts on directly, and it must not
+additionally license retrying the route that was just ruled out.
+
+### 5.5 Outcome semantics, preserved
 
 `Ok(None)` — or its typed successor in §6.2 — is returned **only** when the computation finished
 and established that no base-field point exists. A crossed budget is always an error. This holds
 today and M21's tests must pin it, because a planner that retries is exactly the kind of code that
 would turn an exhausted attempt into an apparent answer.
+
+## 5.6 What the policy actually cost
+
+`cargo run --release --example solve_auto`. Four configurations per system; `best-of-2` runs both
+explicit routes and keeps the better, which is information **no policy has**.
+
+| system | direct ms | fglm ms | conservative ms | fallback ms | fallback wasted | best-of-2 |
+|---|---:|---:|---:|---:|---:|---:|
+| katsura-6 | 22.6 | 7.0 | 7.0 | 6.7 | — | 7.0 |
+| katsura-7 | **28,753 ✗** | 48.4 | 48.2 | 47.4 | — | 48.4 |
+| cyclic-5 | 2.7 | 2.1 | 9.0 | 2.1 | — | 2.1 |
+| cyclic-6 | 316.2 | 19.9 | 20.0 | 20.1 | — | 19.9 |
+| planted-8 | 1.0 | 3.5 | 3.6 | 3.6 | — | 1.0 |
+| planted-10 | 1.3 | 31.0 | 25.1 | 25.2 | — | 1.3 |
+| planted-12 | 1.3 | **40.0 ✗** | **4.8 ✗** | 5.6 | 4.3 | 1.3 |
+| cyclic-4 | ✗ pos-dim | ✗ pos-dim | ✗ pos-dim | ✗ pos-dim | 0.1 | — |
+| inconsistent | 0.0 | 0.0 | 0.0 | 0.0 | — | 0.0 |
+| no-F-point | 0.0 | 0.0 | 0.0 | 0.0 | — | 0.0 |
+
+✗ is a failure. cyclic-4 is positive-dimensional and correctly refused by everything, so it has no
+best-of-two.
+
+**Completion rate.** Of the nine systems where an answer exists, explicit direct reaches eight,
+explicit FGLM reaches eight, `ConservativeAuto` reaches eight, and **`AutoWithFallback` reaches
+nine**. No configuration answers anything wrongly.
+
+**The cost of that.** Summed over the nine, best-of-two is **81.0 ms** and `AutoWithFallback` is
+**110.7 ms — 1.37x the oracle**, for a completion rate the oracle's components do not individually
+reach. The gap is almost entirely one system: planted-10, where the planner opens with conversion
+and conversion is 19x slower there than direct. **That is the honest price of the policy** and it
+is the tradeoff §11.2 asks to be recorded rather than hidden — a policy chosen for the price of
+being wrong will sometimes be slow when it is right.
+
+**Three results worth stating separately.**
+
+1. **katsura-7: 47.4 ms against a 28.7-second failure.** §4.3's prediction, measured through the
+   policy rather than inferred from the two explicit columns. 606x.
+2. **planted-12: ruling the conversion out beats letting it fail, by 8.6x.** Explicit FGLM crosses
+   its span budget after 40.0 ms. The planner declines the conversion after 4.8 ms — from a
+   *counted* `D`, before a single operator column is built — and the whole plan including the
+   direct fallback is 5.6 ms. Deciding from a measurement is cheaper than discovering by crossing,
+   and this is the number that says so.
+3. **`ConservativeAuto` fails planted-12 by design**, reporting `ConversionInfeasible`. One route
+   chosen and stood by is its contract; the system needs the other one. So the policy that meets
+   the acceptance criterion is `AutoWithFallback`, and the two are kept separate precisely so that
+   the cost of the second attempt is visible rather than assumed.
+
+The `cyclic-5 conservative` row at 9.0 ms against the same route's 2.1 ms explicitly is run-to-run
+variation on a 2 ms measurement, not a policy effect — both ran grevlex-then-FGLM.
+
+### The decision log
+
+```text
+Structure: 12 variables, 12 generators, max degree 2
+
+Attempt 1: GrevlexF4ThenFglm
+  Chosen because: conservative policy: a cheap refusal is worth more than a fast win
+  Gröbner: 2 batches, largest matrix 24x25, 60 peak entries (960 bytes)
+  Elapsed: 4.197276ms
+  Result: inconclusive — conversion was not attempted: quotient dimension 4096 needs
+          41945088 span cells, over the limit of 20000000
+
+Attempt 2: DirectLexF4
+  Chosen because: conversion ruled out from a counted D = 4096 needing 41945088 span cells
+  Gröbner: 2 batches, largest matrix 30x31, 79 peak entries (1264 bytes)
+  Elapsed: 1.360706ms
+  Result: Point
+
+Total: 5.557982ms over 2 attempt(s), 4.197276ms of it discarded; 4 batches, 1512 peak bytes
+```
+
+Note which budget is named. At `D = 4096` the dense blocks are `2D² + D(D+1)/2 = 41,945,088`
+cells, which is 335.6 MB over GF(2^31 − 1) — so **both** budgets are exceeded and the *cell* one is
+exceeded by more. The first draft of the error quoted `max_span_bytes`'s limit against the cell
+requirement, which over BN254 would have been wrong by a factor of four. It now names the budget
+that bound.
 
 ## 6. Public API proposals
 
@@ -562,18 +675,26 @@ option types should be avoided; M21-C owns them for the duration.
 
 ### M21-D
 
-- [ ] `SolvePolicy` is opt-in; explicit strategy behaviour is bit-for-bit unchanged
-- [ ] Every attempt is recorded with the reason it was chosen and the work it spent, including
-      discarded work
-- [ ] Budgets are shared across attempts and a fallback cannot reset them
-- [ ] katsura-7 and planted-12 both succeed under one policy and one budget configuration, with no
-      input-specific special-casing and no benchmark names in the planner
-- [ ] cyclic-4 is reported positive-dimensional, not sent through FGLM
-- [ ] An inconsistent ideal, and a zero-dimensional ideal with no base-field point, each reach the
-      correct distinct outcome
-- [ ] A system on which every permitted route exhausts its budget reports inconclusive
+- [x] `SolvePolicy` is opt-in — `solve_one`, `solve_one_with_options`, `solve_one_with_outcome` and
+      `solve_zero_dimensional` are untouched, and a plan happens only through `solve_one_planned`
+- [x] Every attempt is recorded with the reason it was chosen and the work it spent, including
+      discarded work; `SolvePlan` implements `Display` as a decision log
+- [x] Budgets are shared across attempts and a fallback cannot reset them — and the arithmetic
+      distinguishes spent quantities from peaks, §5.3
+- [x] katsura-7 and planted-12 both succeed under one policy and one budget configuration
+      (`AutoWithFallback`, default budgets), with no input-specific special-casing
+- [x] No benchmark names in the planner, pinned by a test that relabels a planted system's
+      coefficients and asserts identical treatment — a planner that special-cased its corpus would
+      pass every other test and fail that one
+- [x] cyclic-4 is reported positive-dimensional, not sent through FGLM, **and does not trigger a
+      fallback**: a property of the ideal would be refused identically by the other route
+- [x] An inconsistent ideal, and a zero-dimensional ideal with no base-field point, each reach the
+      correct distinct outcome; a *visible* contradiction is settled by the structural pass with no
+      attempt at all
+- [x] A system on which every permitted route exhausts its budget reports inconclusive, tested on
+      a system that does have a point so a wrong answer would fail rather than a missing one
 - [ ] The fallback order of §4.3 is re-measured, and the policy's order follows the measurement
-      rather than this document
+      rather than this document — **M21-I**
 
 ### M21-E
 

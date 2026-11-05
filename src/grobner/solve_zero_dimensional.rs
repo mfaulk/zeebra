@@ -212,6 +212,29 @@ pub enum SolveError {
     /// The conversion crossed one of its limits.
     Fglm(FglmError),
 
+    /// The conversion was **not attempted**: a computed quotient dimension put it out of budget.
+    ///
+    /// Distinct from `Fglm(FglmError::SpanStorageExceeded)`, which means the conversion ran and
+    /// crossed the limit. Here nothing was spent on it at all — the source basis exists and its
+    /// quotient basis was enumerated, and that was enough to know the conversion could not fit. A
+    /// predicted crossing reported as a real one would misattribute the cost.
+    ///
+    /// Produced only by the policy layer; the explicit strategies never predict.
+    ConversionInfeasible {
+        /// `D`, counted rather than estimated.
+        dimension: usize,
+        /// What the dense blocks would need, in the unit of the budget that bound.
+        needed: usize,
+        /// That budget's value.
+        limit: usize,
+        /// Which budget bound: `"span cells"` or `"span bytes"`.
+        ///
+        /// Named, because the two are different quantities over a wide field — a cell is 8 bytes
+        /// over a 64-bit prime field and 32 over BN254 — and quoting one budget's value against
+        /// the other's requirement would be wrong by that factor.
+        budget: &'static str,
+    },
+
     /// The search tried `limit` candidate assignments without exhausting the tree.
     TooManyBranches { limit: usize },
 
@@ -231,6 +254,17 @@ impl Display for SolveError {
             ),
             Self::Grobner(e) => write!(f, "the Gröbner basis could not be computed: {}", e),
             Self::Fglm(e) => write!(f, "the basis could not be converted to lex: {}", e),
+            Self::ConversionInfeasible {
+                dimension,
+                needed,
+                limit,
+                budget,
+            } => write!(
+                f,
+                "conversion was not attempted: quotient dimension {} needs {} {}, over the limit \
+                 of {}",
+                dimension, needed, budget, limit
+            ),
             Self::TooManyBranches { limit } => write!(
                 f,
                 "the search did not finish within {} candidate assignments",
@@ -240,6 +274,26 @@ impl Display for SolveError {
                 write!(f, "there are more than the {} solutions allowed", limit)
             }
         }
+    }
+}
+
+impl SolveError {
+    /// Whether this failure is about resources rather than about the ideal.
+    ///
+    /// The distinction a fallback turns on. [`Self::PositiveDimensional`] is a property of the
+    /// ideal, so the other route would refuse it identically and trying is pure waste; an
+    /// unsatisfiable `F4Options` is a caller error with the same property. Everything else is a
+    /// budget, and a different route may fit a different one.
+    pub fn is_resource_failure(&self) -> bool {
+        !matches!(
+            self,
+            Self::PositiveDimensional
+                | Self::Grobner(F4Error::InvalidOptions { .. })
+                // Predicted infeasibility is not a spent budget. It is a *reason to switch*, which
+                // the planner acts on directly, so it must not also license a retry of the route
+                // that was just ruled out.
+                | Self::ConversionInfeasible { .. }
+        )
     }
 }
 
@@ -348,7 +402,51 @@ fn solve_one_into<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     statistics: &mut SolveStatistics,
 ) -> Result<SolveOutcome<N, F>, SolveError> {
     let basis = lex_basis(system, options, statistics)?;
-    let found = search(&basis, system, Stop::AtFirst, options, statistics, rng)?;
+    solve_from_lex_basis_into(&basis, system, options, statistics, rng)
+}
+
+/// One point of `system`, from a lexicographic Gröbner basis already in hand.
+///
+/// The back-substitution half of [`solve_one_with_outcome`], split out so that a caller which
+/// reached the lex basis by its own route — a planner weighing the two, a specialization that
+/// solved a reduced system — runs the same search rather than a second copy of it.
+///
+/// `basis` must be a Gröbner basis of `system` under
+/// [`MonomialOrder::Lexicographic`]. That is a precondition and is not checked, because checking it
+/// means recomputing the basis; what *is* checked is zero-dimensionality, so a basis of the wrong
+/// shape is refused rather than reaching the search's internal invariant.
+///
+/// The point is verified against `system` — the original generators, not `basis` — before it is
+/// returned, exactly as the ordinary entry points do.
+///
+/// # Errors
+/// [`SolveError::PositiveDimensional`] if `basis` does not generate a zero-dimensional ideal, or a
+/// resource variant if a search limit in `options` is crossed.
+pub fn solve_from_lex_basis<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    basis: &[MultivariatePolynomial<N, F>],
+    system: &[MultivariatePolynomial<N, F>],
+    options: &SolveOptions,
+    rng: &mut R,
+) -> Result<(SolveOutcome<N, F>, SolveStatistics), SolveError> {
+    let mut statistics = SolveStatistics::default();
+    let outcome = solve_from_lex_basis_into(basis, system, options, &mut statistics, rng);
+    outcome.map(|outcome| (outcome, statistics))
+}
+
+/// [`solve_from_lex_basis`], accumulating into a caller-owned `statistics`.
+fn solve_from_lex_basis_into<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    basis: &[MultivariatePolynomial<N, F>],
+    system: &[MultivariatePolynomial<N, F>],
+    options: &SolveOptions,
+    statistics: &mut SolveStatistics,
+    rng: &mut R,
+) -> Result<SolveOutcome<N, F>, SolveError> {
+    // The unit ideal is zero-dimensional and `classify_ideal` says so, so this check does not
+    // reject an inconsistent system; `search` reports that one as `Inconsistent` below.
+    if !classify_ideal(basis, MonomialOrder::Lexicographic).is_finite_dimensional() {
+        return Err(SolveError::PositiveDimensional);
+    }
+    let found = search(basis, system, Stop::AtFirst, options, statistics, rng)?;
 
     Ok(match found.into_iter().next() {
         Some(point) => SolveOutcome::Point(point),

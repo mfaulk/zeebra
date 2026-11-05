@@ -11,5 +11,9 @@
 //! from equation counts. §3.1 of `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` is the argument.
 
 pub mod analysis;
+pub mod policy;
+pub mod report;
 
 pub use analysis::{analyze, SystemShape};
+pub use policy::{solve_one_planned, PlanBudget, PlannedSolveOptions, SolvePolicy};
+pub use report::{Attempt, Choice, OutcomeClass, SolvePlan};
