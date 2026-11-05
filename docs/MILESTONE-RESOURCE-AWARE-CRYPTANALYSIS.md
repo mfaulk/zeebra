@@ -564,24 +564,51 @@ every caller matches it exhaustively, and work inside a failure conflates the tw
 ### 6.5 Specialization (M21-E)
 
 ```rust
-pub struct Specialization<const N: usize, F: FiniteField> {
-    pub fixed: Vec<(usize, F)>,
-    pub seed: Option<u64>,
-}
+pub struct Specialization<const N: usize, F: FiniteField> { /* fixed, seed */ }
 
 pub fn specialize<const N: usize, F: FiniteField>(
     system: &[MultivariatePolynomial<N, F>],
     specialization: &Specialization<N, F>,
 ) -> Vec<MultivariatePolynomial<N, F>>;
 
-pub fn lift<const N: usize, F: FiniteField>(
+pub fn solve_slice<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    system: &[MultivariatePolynomial<N, F>],
     specialization: &Specialization<N, F>,
-    partial: &[F; N],
-) -> [F; N];
+    options: &PlannedSolveOptions,
+    rng: &mut R,
+) -> (Result<SliceOutcome<N, F>, SolveError>, SolvePlan);
+
+pub enum SliceOutcome<const N: usize, F: KnownOrder> {
+    Witness([F; N]),      // about the ORIGINAL system
+    EmptySlice,           // about this slice only
+    SliceInconsistent,    // about this slice only
+}
 ```
 
 Specialized variables stay as inactive positions in the same `N`-variable ring. `const N` is not
 replaced, and no second polynomial representation is introduced.
+
+#### The slice ideal is `I + <x_i − a_i>`, not the substituted generators
+
+**A defect in the first implementation, and the one real subtlety in M21-E.** Because `const N` is
+not replaced, a fixed variable does not *leave* the ring — substitution only removes it from every
+monomial. A variable that appears in no generator is **unconstrained**, so the substituted system
+is positive-dimensional however many equations are left, and the zero-dimensional solvers refuse
+it. Correctly.
+
+Concretely: `x·y − 6` at `x = 2` substitutes to `2y − 6`, whose zero set in `F[x, y]` is the *line*
+`{(x, 3)}`. The first draft of `solve_slice` returned `PositiveDimensional` on exactly that and the
+test caught it.
+
+So `Specialization::apply` appends the pinning equations `x_i − a_i`. They generate the same ideal
+as the substitution does — reducing a generator modulo `x_i − a_i` is what substituting *is* — and
+together the two give `I_a`, whose variety is the slice. Substituting as well as pinning is not
+redundant work but a better generating set, and it has a second benefit: a point of `I_a` now
+carries the fixed coordinates, so `solve_slice` **asserts** they match rather than patching them in
+with `lift`. A mismatch would mean the pins were missing, and overwriting would hide that.
+
+`Specialization::lift` is kept for a caller who solved the substituted generators without the
+pins, where the fixed coordinates really are whatever the search assigned.
 
 ### 6.6 Instance dimensions (M21-A)
 
@@ -718,13 +745,64 @@ option types should be avoided; M21-C owns them for the duration.
 
 ### M21-E
 
-- [ ] Substitution is correct on hand-derived examples
-- [ ] Every reported witness satisfies every original generator after lifting
-- [ ] Seeds, fixed variables, and assigned values are recorded and reproducible
-- [ ] An empty specialization is reported as an experiment, never as unsatisfiability of the
-      original system — tested with a system that is satisfiable and a slice that is not
+- [x] Substitution is correct on hand-derived examples, **and the slice is the substitution plus
+      the pinning equations** — the distinction §6.5 explains, with a test asserting that
+      substitution alone leaves the fixed variable unconstrained
+- [x] Every reported witness satisfies every original generator; `SliceOutcome::Witness` is
+      constructible only after that check, and `solve_slice` additionally asserts that the point's
+      fixed coordinates match the slice's
+- [x] Seeds, fixed variables, and assigned values are recorded and reproducible — and the seed
+      **alone** reconstructs the slice, which `Specialization::seeded` makes true rather than
+      merely claiming; `Specialization::new` records no seed and promises none
+- [x] An empty specialization is reported as an experiment, never as unsatisfiability —
+      `SliceOutcome::is_evidence_about_the_original_system` returns true for exactly one variant,
+      and `EmptySlice` is kept distinct from `SliceInconsistent` because they are different facts
+- [x] Demonstrated on a satisfiable system with both outcomes present, §10.1
 
-## 10. Risks
+## 10. Specialization, measured
+
+### 10.1 Two slice sizes on one system
+
+`cargo run --release --example specialize_slices`. Six quadratics in nine unknowns, positive-
+dimensional, refused outright by the zero-dimensional solvers. Ten seeded slices at each of two
+sizes, from one RNG stream:
+
+| variables fixed | unknowns left | witnesses | dead slices | slice `D` |
+|---:|---:|---:|---:|---:|
+| 3 | 6 | **7** | 3 | 9 |
+| 6 | 3 | **0** | 10 | 0 |
+
+The second row is a column of ten dead slices, and **it proves nothing at all** — which is the
+claim M21-E exists to make checkable rather than merely stated. The first row proves the system
+satisfiable, with seven witnesses verified against the original generators, so the ten deaths in
+the second cannot be evidence of unsatisfiability. They are evidence that six random coordinates
+over-constrain six equations in nine unknowns: a fact about the slicing, not about the system.
+
+Both tables come from the same program, so the argument is closed inside the artifact rather than
+asserted in prose. The example `assert!`s that the first campaign finds a witness and the second
+finds none, so a change that broke either half would fail rather than quietly invalidate the text.
+
+Note also *which* dead outcome each size produces. At three fixed the slices are
+`EmptySlice` — zero-dimensional with `D = 9` and no base-field point, the variety nonempty over an
+extension. At six fixed they are `SliceInconsistent`, `D = 0`, the equations contradicting each
+other. Collapsing those into one "no solution" would lose a real distinction, which is why
+`SliceOutcome` has three variants where a solver has `Option`.
+
+### 10.2 How many variables to fix
+
+Not decided by the library, and not inferrable. `SystemShape::specialization_candidates` ranks
+variables by how few equations constrain them — on this system `[0, 1, 8, 2, 7, 3, 6, 4, 5]`, from
+occurrence counts `[2, 2, 3, 4, 5, 5, 4, 3, 2]` — and that is a ranking, not a recommendation, and
+says nothing at all about *how many* to take.
+
+Each slice is drawn from **its own seed**, so a row replays from the seed alone.
+`Specialization::seeded` constructs the RNG from the seed rather than taking one; the first version
+took an RNG *and* a seed and recorded the seed beside values it had not produced, which a reviewer
+caught — a field named `seed` that reproduces nothing is worse than no field. Values chosen rather
+than drawn go through `Specialization::new`, which records no seed and claims none. §10.1 is what happens when the count is wrong, and
+both rows used the same ranking.
+
+## 11. Risks
 
 **The planner's route order is wrong on real instances.** §4.3's ordering rests on ten synthetic
 systems. Mitigation: the order is a documented policy with its evidence attached, explicit selection
@@ -747,7 +825,7 @@ manifest first; a CLI only after the library interfaces hold still.
 and Graeffe transforms are out. M21 measures whether they are needed; issues #74–#76 and #82–#85
 hold the work.
 
-## 11. Definition of done
+## 12. Definition of done
 
 Zeebra can load a publicly specified instance, validate it against its source and field spec,
 analyze its observable structure, choose a route under a stated policy and a shared budget, run it,

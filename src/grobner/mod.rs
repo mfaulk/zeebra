@@ -8,6 +8,7 @@ pub mod fglm;
 pub mod pairs;
 pub mod planning;
 pub mod reference;
+pub mod research;
 mod s_polynomial;
 mod solve;
 mod solve_zero_dimensional;

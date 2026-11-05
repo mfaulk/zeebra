@@ -224,6 +224,7 @@ cargo run --release --example fglm_ablation -- list
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
 cargo run --release --example solve_auto           # four policies against an offline best-of-two
+cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -918,6 +919,55 @@ runs.
 An `Err` from the planner means **inconclusive**, never "no solution".
 `cargo run --release --example solve_auto` compares all four policies against an offline
 best-of-two the planner was not allowed to see.
+
+#### Underdetermined systems, and what a slice establishes
+
+The zero-dimensional solvers refuse a positive-dimensional system, which is the right answer — but
+the interesting cryptanalytic systems are underdetermined, so `grobner::research` fixes some
+variables and solves the slice:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{fields::Zp2147483647, grobner::{research::{solve_slice, Specialization},
+             PlannedSolveOptions}, FiniteField, MultivariatePolynomial};
+
+type F = Zp2147483647;
+// A curve: one equation, two unknowns, so positive-dimensional.
+let curve: Vec<MultivariatePolynomial<2, F>> =
+    vec![MultivariatePolynomial::parse("x*y - 6", ["x", "y"]).unwrap()];
+
+let slice = Specialization::new(&[(0, F::new(2))]).unwrap();
+let (outcome, _plan) = solve_slice(
+    &curve, &slice, &PlannedSolveOptions::default(), &mut StdRng::seed_from_u64(1),
+);
+assert_eq!(outcome.unwrap().witness(), Some([F::new(2), F::new(3)]));
+```
+
+The slice ideal is `I + <x_i - a_i>`, **not** the substituted generators alone. Because `const N`
+is not replaced, a fixed variable does not leave the ring — substitution only removes it from every
+monomial, and a variable in no generator is *unconstrained*. `x*y - 6` at `x = 2` substitutes to
+`2y - 6`, whose zero set in `F[x, y]` is the line `{(x, 3)}`. So `Specialization::apply` appends
+the pinning equations, which generate the same ideal and make the fixed coordinates part of the
+answer.
+
+`SliceOutcome` has three variants where a solver has `Option`, and only one of them says anything
+about the system you started with:
+
+| outcome | about |
+|---|---|
+| `Witness(p)` | the **original** system — verified against every original generator |
+| `EmptySlice` | this slice: zero-dimensional, no base-field point |
+| `SliceInconsistent` | this slice: `1` is in `I_a` |
+
+**A run of dead slices proves nothing.** A section of a nonempty variety can be empty over `F_q`,
+and only exhausting all `q^|S|` slices would settle it.
+`SliceOutcome::is_evidence_about_the_original_system` returns true for exactly one variant so that
+a caller has to pass through it rather than reason about the variants.
+`cargo run --release --example specialize_slices` runs ten slices at each of two sizes on one
+system — seven witnesses at three fixed, ten dead at six fixed — which closes the argument with
+evidence on both sides rather than asserting it. Each slice comes from its own seed, and
+`Specialization::seeded` builds the RNG from it, so `seed()` is a promise that the slice
+reconstructs; `Specialization::new` takes chosen values and records no seed.
 
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
