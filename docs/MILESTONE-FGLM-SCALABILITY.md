@@ -708,6 +708,10 @@ Automatic sizing is still deferred, as §6.5 asks. The figures above are what a 
 on, and 64 being safe everywhere is a weaker claim than knowing which systems want 1 and which want
 unbounded — that needs a predictor of reduction depth, which this milestone does not have.
 
+§6.7 re-measures this table after bounding the reduction buffer by its dirty range. The curve moves
+at the unbounded end and **nowhere else**, so the figures above still stand as what a sizing policy
+would be keyed on.
+
 ### 6.5 Resource limits and the fallback
 
 `BorderBatch` bounds a batch's closure: reducer rows, columns, and reducer entries. All three are
@@ -746,6 +750,72 @@ the reference path**.
   nine.
 * 900 live systems across three seeds, over GF(2) through GF(2^31 - 1), under
   `--operator-construction batched-border`: 0 disagreements, 0 oracle failures.
+
+### 6.7 The reduction buffer, bounded by its dirty range
+
+§6.4 named the per-target column scan as nearly all of the work on the planted family, and
+`reduce_targets` made two of its three passes over the **whole** closure width per target: the
+zeroing before a target and the extraction after it. Only the reduction scan between them was
+bounded below by the target's leading column.
+
+Neither unbounded pass had to be. `buffer[start] = one` is the only seed, and §6.2's triangularity
+gives every reducer row leading at column `c` its other entries after `c` — so every write for a
+target lands at or after `start` and `[0, start)` stays zero. The zeroing is therefore correct over
+`[previous start, len)`: if the next `start` is larger that region is a superset of what was
+written, and if it is smaller the gap below it was never written. The extraction starts at `start`
+for the same reason. No new invariant, and a `debug_assert` that the prefix below the previous
+target's column is still zero fails loudly if the column ordering ever changes.
+
+**It did not flatten the curve.** §6.4's table re-measured, both variants built from the same tree
+and pinned to one core, each cell the best of three runs of fastest-of-three:
+
+| system | | size 1 | 4 | 16 | 64 | unbounded |
+|---|---|---:|---:|---:|---:|---:|
+| katsura-6 | before | 1.47 | 0.71 | 0.47 | 0.38 | 0.36 |
+| | after | 1.47 | 0.71 | 0.47 | 0.39 | 0.37 |
+| katsura-7 | before | 9.95 | 4.28 | 2.49 | 1.97 | 1.76 |
+| | after | 9.94 | 4.23 | 2.47 | 1.96 | 1.74 |
+| cyclic-6 | before | 6.30 | 3.35 | 2.38 | 2.19 | 2.13 |
+| | after | 6.18 | 3.32 | 2.37 | 2.19 | 2.09 |
+| planted-8 | before | 1.89 | 1.94 | 2.01 | 2.10 | 2.75 |
+| | after | 1.93 | 1.99 | 2.05 | 2.11 | **2.55** |
+| planted-10 | before | 27.18 | 27.26 | 27.71 | 28.31 | 46.74 |
+| | after | 27.11 | 27.44 | 27.93 | 28.63 | **41.29** |
+
+Every bounded size is inside the ±2% this harness repeats to. The one column that moves is
+`unbounded`, by 7.3% on planted-8 and 11.7% on planted-10 — which shrinks the unbounded penalty
+over the best size from 1.46x to 1.32x and from 1.72x to 1.52x. **The shape between 1 and 64 is
+unchanged**, so §6.5's deferred sizing policy is keyed on the same curve as before and a predictor
+of reduction depth has exactly as much to get right. That is the opposite of what filing this
+expected, and it is the measurement rather than the expectation.
+
+Why the gain sits where it does, from timing `reduce_targets` alone — the whole border reduced in
+batches of each size, fastest of 25 within a process, best of five such runs:
+
+| system | | size 1 | 4 | 16 | 64 | unbounded |
+|---|---|---:|---:|---:|---:|---:|
+| katsura-7 | before | 0.338 | 0.353 | 0.355 | 0.367 | 0.379 |
+| | after | 0.333 | 0.348 | 0.348 | 0.359 | 0.363 |
+| | | -1.6% | -1.5% | -2.0% | -2.2% | **-4.1%** |
+| cyclic-6 | before | 0.213 | 0.201 | 0.210 | 0.238 | 0.337 |
+| | after | 0.211 | 0.200 | 0.203 | 0.224 | 0.269 |
+| | | -1.1% | -0.8% | -3.2% | -6.0% | **-20.2%** |
+| planted-8 | before | 0.061 | 0.055 | 0.078 | 0.139 | 0.691 |
+| | after | 0.060 | 0.055 | 0.071 | 0.133 | 0.539 |
+| | | -2.4% | -0.9% | -9.8% | -4.4% | **-21.9%** |
+| planted-10 | before | 0.243 | 0.242 | 0.387 | 0.785 | 18.73 |
+| | after | 0.240 | 0.237 | 0.359 | 0.759 | 15.39 |
+| | | -1.2% | -1.8% | -7.1% | -3.3% | **-17.8%** |
+
+Every cell is faster and the gain grows with the batch, which is what the change predicts: the
+saving is half of two passes over the **closure's** width, and the closure tracks the batch. On
+planted-10 a batch of 64 reaches 122 columns on average and 192 at its widest, against 6,144 for one
+unbounded batch — 50x — so a fifth of the unbounded scan is a few percent of the bounded one. At 64
+the whole border's scan is 0.76 ms of a 28.6 ms conversion, so even removing it entirely would be
+2.7%. That is why the conversion table cannot see this at the size the default uses.
+
+`BorderBatch::recommended()` is **unchanged** at 64. The ablation, not this, is where that size is
+chosen, and nothing above argues for moving it.
 
 ---
 
