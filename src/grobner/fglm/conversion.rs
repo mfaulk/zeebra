@@ -157,6 +157,15 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
             limit: options.max_span_entries,
         });
     }
+    // The same blocks in the unit that is allocated. Which of the two budgets binds is decided by
+    // the field width and nothing else — a cell is 8 bytes over a 64-bit prime field and 32 over
+    // BN254 — so the cell budget is checked first and this one refines it.
+    if dense_bytes > options.max_span_bytes {
+        return Err(FglmError::SpanBytesExceeded {
+            bytes: dense_bytes,
+            limit: options.max_span_bytes,
+        });
+    }
 
     let walk = StageClock::new(options.measure_stages);
     let mut span = IncrementalSpan::new(dimension);
@@ -305,7 +314,7 @@ mod tests {
         fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis, TARGET,
     };
     use crate::{
-        fields::{PrimeFieldElement64, Zp2147483647},
+        fields::{Bn254Fr, PrimeFieldElement64, Zp2147483647},
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
             buchberger, buchberger_with_criteria, f4,
@@ -996,6 +1005,64 @@ mod tests {
         );
         options.max_span_entries = 648;
         assert!(fglm_to_lex_with_options(&source, source_order, &options).is_ok());
+
+        // The same 648 cells in bytes. `F` is 8 bytes wide here, so the two budgets describe the
+        // same blocks at a ratio this test can state exactly.
+        let bytes = 648 * size_of::<F>();
+        let mut options = FglmOptions::unbounded();
+        options.max_span_bytes = bytes - 1;
+        assert_eq!(
+            fglm_to_lex_with_options(&source, source_order, &options).unwrap_err(),
+            FglmError::SpanBytesExceeded {
+                bytes,
+                limit: bytes - 1
+            }
+        );
+        options.max_span_bytes = bytes;
+        assert!(fglm_to_lex_with_options(&source, source_order, &options).is_ok());
+    }
+
+    /// The span's cell budget alone admits four times the memory over BN254 as over a 64-bit field,
+    /// and the byte budget is what makes the two widths cost the same.
+    #[test]
+    fn test_the_span_byte_budget_is_field_width_aware() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+
+        // The same system over two field widths, so the only thing that differs is `size_of::<F>()`.
+        let narrow = f4(&katsura::<5, F>(), order).expect("within limits");
+        let wide = f4(&katsura::<5, Bn254Fr>(), order).expect("within limits");
+
+        let cells = 648;
+        assert_eq!(size_of::<Bn254Fr>(), 4 * size_of::<F>());
+
+        // A byte budget sized for the narrow field admits it and refuses the wide one. A cell
+        // budget cannot express that distinction at all: 648 cells is 648 cells either way.
+        let mut options = FglmOptions::unbounded();
+        options.max_span_bytes = cells * size_of::<F>();
+        assert!(fglm_to_lex_with_options(&narrow, order, &options).is_ok());
+        assert_eq!(
+            fglm_to_lex_with_options(&wide, order, &options).unwrap_err(),
+            FglmError::SpanBytesExceeded {
+                bytes: cells * size_of::<Bn254Fr>(),
+                limit: cells * size_of::<F>()
+            }
+        );
+
+        // And the cells the two conversions report are identical, which is why a cell budget could
+        // not have told them apart.
+        options.max_span_bytes = usize::MAX;
+        let (_, narrow_statistics) =
+            fglm_to_lex_with_options(&narrow, order, &options).expect("within limits");
+        let (_, wide_statistics) =
+            fglm_to_lex_with_options(&wide, order, &options).expect("within limits");
+        assert_eq!(
+            narrow_statistics.memory.span_cells + narrow_statistics.memory.accepted_vector_cells,
+            wide_statistics.memory.span_cells + wide_statistics.memory.accepted_vector_cells
+        );
+        assert_eq!(
+            wide_statistics.memory.dense_block_bytes,
+            4 * narrow_statistics.memory.dense_block_bytes
+        );
     }
 
     /// `is_grobner_basis` accepts what the engines produce and rejects a non-basis.

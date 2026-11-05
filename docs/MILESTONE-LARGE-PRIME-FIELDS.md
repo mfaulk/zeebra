@@ -1,9 +1,9 @@
 # Milestone: Large Prime Fields and Cryptographic Algebra Readiness
 
-**Status:** M20-0, M20-A, M20-B and M20-D landed. The milestone's primary demonstration passes
-over both target fields: a planted zero-dimensional system goes through F4, the quotient algebra,
-FGLM and `solve_one`, and the returned point is verified against the original system. Remaining:
-M20-C's byte-accounted resource limits, and M20-E's benchmark corpus.
+**Status:** M20-0, M20-A, M20-B, M20-C and M20-D landed. The milestone's primary demonstration
+passes over both target fields: a planted zero-dimensional system goes through F4, the quotient
+algebra, FGLM and `solve_one`, and the returned point is verified against the original system.
+Remaining: M20-E's benchmark corpus.
 **Prerequisites:** M18 merged; M19 complete on `m19-field-arithmetic` but **not yet on `main`**
 (`main` carries only the M19-0/M19-A merge). M20 branches from the merged M19.
 
@@ -343,9 +343,10 @@ honest claim is that the gap is small — not that it is exactly 8%.
 - **F4, FGLM and end-to-end solving over the wide fields.** The correctness tests run on systems
   small enough to be instant; nothing here yet says what a cryptographically interesting system
   costs. That is M20-E.
-- **Byte-accounted resource limits.** `size_of::<(usize, F)>()` is 40 bytes for a wide field
-  against 16 for a 64-bit one, so the same nonzero-entry budget admits 2.5x the memory. F4's
-  budget is still counted in entries only. FGLM already has `max_operator_bytes`.
+- ~~**Byte-accounted resource limits.**~~ Done — `size_of::<(usize, F)>()` is 40 bytes for a wide
+  field against 16 for a 64-bit one, so the same nonzero-entry budget admitted 2.5x the memory, and
+  FGLM's span cells were worse at 4x. `F4Options::max_live_bytes` and `FglmOptions::max_span_bytes`
+  are the fix; see §5.2 for the figures and for what is reported rather than budgeted.
 - **F4/FGLM baselines on the merged M19.** M19 is still not on `main`.
 
 ### 4.4 Dependency and build cost
@@ -368,7 +369,7 @@ The structure of the plan survives; the sizes change.
 | **M20-0** | This document | done |
 | **M20-A** | `KnownOrder` split, `inverse` required | **done**, and much smaller than planned — 16 bound edits, none in the core |
 | **M20-B** | `PrimeFieldElement256`, BN254 + BLS12-381 `Fr`, oracle tests | **done**, but implemented in-crate rather than adapted — see §2 |
-| **M20-C** | F4/Buchberger/quotient/FGLM over both fields; byte-accounted limits | **partly done** — the core needed no changes at all, as predicted; the end-to-end test passes over BN254. Byte accounting outstanding |
+| **M20-C** | F4/Buchberger/quotient/FGLM over both fields; byte-accounted limits | **done** — the core needed no changes at all, as predicted; the end-to-end test passes over BN254. Byte accounting landed as three new budgets beside the existing entry ones, §5.2 |
 | **M20-D** | Limb-exponent `pow_mod`, Frobenius, `roots`, `factorize`, `solve_one` | **done** — one new function and five call-site changes; see §5.1 |
 | **M20-E** | Crypto corpus, oracle, measurements | as planned, starts now |
 | **M20-I** | Integration, benchmarks, report | as planned |
@@ -413,7 +414,73 @@ What this buys, tested: `roots` recovers planted roots over both target fields, 
 against 192 explicit squarings where only it applies; and `solve_one` returns a verified point
 over both fields.
 
-### 5.2 How the dependencies actually ran
+### 5.2 M20-C's byte accounting, as landed
+
+The defect §4.3 named: every memory budget in the Gröbner stack counted *representation entries*,
+and an entry's size depends on the field. So one configuration meant different quantities of
+memory at different field widths, and the wide field — the one the budget exists to protect
+against — got the loosest one.
+
+| budget | counts | 64-bit prime field | BN254 `Fr` | factor |
+|---|---|---:|---:|---:|
+| `F4Options::max_live_nonzeros` | `(usize, F)` entries | 16 B | 40 B | **2.5x** |
+| `FglmOptions::max_operator_entries` | `(usize, F)` entries | 16 B | 40 B | **2.5x** |
+| `FglmOptions::max_span_entries` | `F` cells | 8 B | 32 B | **4x** |
+
+`max_operator_bytes` already existed beside the first of those, from M18-3. M20-C adds the other
+two, in the same shape and for the same stated reason: **a second budget, never a redefinition.**
+Changing what an entry budget counts would make every figure M16 and M18 recorded against it
+ambiguous, which is a worse outcome than carrying two numbers.
+
+```rust
+pub struct F4Options {
+    pub max_live_nonzeros: usize,   // 20,000,000
+    pub max_live_bytes: usize,      // 320,000,000 — new
+    // ...
+}
+
+pub struct FglmOptions {
+    pub max_span_entries: usize,    // 20,000,000
+    pub max_span_bytes: usize,      // 320,000,000 — new
+    // ...
+}
+```
+
+Both default to 320 MB, which is the quantity the entry budgets already described at 16 bytes an
+entry. The consequence is that **the defaults are unchanged over a 64-bit prime field and tighten
+over a wide one**, which is the whole intent:
+
+| | entries admitted, 64-bit | entries admitted, BN254 |
+|---|---:|---:|
+| F4 live entries | 20,000,000 (320 MB) | **8,000,000** (320 MB), was 20,000,000 at 800 MB |
+| FGLM span cells | 20,000,000 (160 MB) — cells bind | **10,000,000** (320 MB), was 20,000,000 at 640 MB |
+
+Over a 64-bit field the F4 budgets are exactly equal, so the older `TooManyNonzeros` is still what
+a crossing reports and no M16 figure changes meaning. The byte budget is reported —
+`F4Error::TooManyLiveBytes`, `FglmError::SpanBytesExceeded` — only where it is the one that bound.
+
+F4 collapses its two budgets to one entry allowance, `F4Options::live_entry_allowance::<F>()`,
+rather than threading a second counter through construction and elimination. Two counters checked
+in two places is two things to keep in step; one allowance cannot drift, and which budget produced
+it is a property of the options rather than of the check.
+
+#### What is reported rather than budgeted
+
+The one place entries badly understate bytes is `Backend::Dense`, which densifies the matrix whole
+and so allocates `rows * columns` cells however sparse it is. Katsura-7's largest grevlex matrix is
+6810x6862: **374 MB of cells against roughly 22 MB of entries.** That is not charged to
+`max_live_bytes`, deliberately — doing so would make the default refuse a computation the entry
+budget admits, and under that backend the figure is a function of the shape alone, which the row and
+column budgets already bound. It is reported instead, as
+`F4Statistics::max_dense_buffer_bytes`, with `max_estimated_bytes` adding it to the entries per
+batch and taking the maximum over batches.
+
+So the accounting now distinguishes four things, which M21-C needs kept apart: mathematical
+dimensions (`max_live_nonzeros`, `quotient_dimension`), representation entries and cells,
+estimated allocated bytes (`peak_live_bytes`, `max_estimated_bytes`, `FglmMemory`), and measured
+process RSS (`util::peak_resident_bytes`). None of the first three is a ceiling on the process.
+
+### 5.3 How the dependencies actually ran
 
 The plan's §14 expected M20-B, M20-D and M20-E to proceed in parallel after M20-A. In the event
 the order was strictly sequential and each step was small enough that parallelism would have cost
@@ -506,8 +573,10 @@ Open:
    obstacle is that `PrimeFieldElement128` takes its modulus as a `const P: u128` generic while
    `PrimeFieldElement256` takes a trait, so converting changes its public shape. Worth an issue;
    out of M20's scope as written.
-5. **Byte-accounted resource limits** (§4.3). F4's budget is still counted in entries, and a
-   wide-field entry is 2.5x the bytes of a 64-bit one. M20-C.
+5. ~~**Byte-accounted resource limits**~~ — landed in M20-C (§5.2). Two new budgets beside the
+   entry ones, `F4Options::max_live_bytes` and `FglmOptions::max_span_bytes`, both defaulting to
+   the 320 MB the entry budgets already described at 16 bytes an entry. The `Backend::Dense`
+   densification is reported rather than budgeted, and §5.2 says why.
 6. **Whether a generator is ever needed over a wide field.** `primitive_element` and
    `root_of_unity` are `unimplemented!()` for `PrimeFieldElement256`, since finding one means
    factoring a 254-bit `q - 1`. Nothing in the crate needs them, and the FFT's uses are
@@ -560,6 +629,24 @@ Open:
       heap in the hot path
 - [x] `PrimeModulus256`'s documented range — any odd prime up to 256 bits — actually works, with
       tests at one, two, three and four limbs (§6, defect 3)
+
+### M20-C
+
+- [x] F4, Buchberger, the quotient algebra and FGLM all run over both target fields, with no
+      wide-field fork of any of them — the core needed no changes at all (§1)
+- [x] The complete F4 → quotient → FGLM → `solve_one` pipeline passes over BN254 and BLS12-381,
+      with the returned point verified against the original system
+- [x] Resource limits are byte-accounted: `F4Options::max_live_bytes` and
+      `FglmOptions::max_span_bytes`, beside the entry budgets rather than redefining them (§5.2)
+- [x] A budget means the same quantity of memory at every field width — asserted end to end, by
+      running one system over a 64-bit field and over BN254 and checking that a byte budget sized
+      for the first refuses the second while an entry budget admits both
+- [x] The error names which budget bound, and the older `TooManyNonzeros` is still what a crossing
+      reports wherever the two budgets are equal
+- [x] Entry-count-to-byte conversion saturates rather than wrapping
+- [x] What the budgets do **not** cover is reported rather than silently omitted —
+      `F4Statistics::max_dense_buffer_bytes` for the dense backend's shape-determined allocation,
+      which is 374 MB against 22 MB of entries on katsura-7 grevlex
 
 ### M20-D
 

@@ -121,6 +121,18 @@ pub struct FglmOptions {
     /// separately, so a figure quoted against the old meaning can be recomputed.
     pub max_span_entries: usize,
 
+    /// Bytes those dense blocks may occupy at full rank.
+    ///
+    /// The byte counterpart of [`max_span_entries`](Self::max_span_entries), standing to it exactly
+    /// as [`max_operator_bytes`](Self::max_operator_bytes) stands to
+    /// [`max_operator_entries`](Self::max_operator_entries) and as
+    /// [`F4Options::max_live_bytes`](crate::grobner::F4Options::max_live_bytes) stands to that
+    /// struct's entry budget. A cell is one `F`: **8 bytes over a 64-bit prime field and 32 over a
+    /// 254-bit one**, so a cell budget alone admits 4x the memory over BN254. Both are enforced,
+    /// and the bytes are checked against the same `2 D^2 + D (D + 1) / 2` figure, from `D`, before
+    /// anything is allocated.
+    pub max_span_bytes: usize,
+
     /// Whether to fill in [`FglmStageTimings`](super::FglmStatistics).
     ///
     /// Off by default, and not merely out of caution: the operator loop runs `N * D` times and
@@ -181,6 +193,11 @@ impl FglmOptions {
     /// [`OperatorStorage::Sparse`] and the byte budget binds first under
     /// [`OperatorStorage::Dense`], which is the point of having it.
     ///
+    /// `max_span_bytes` of 320 MB is the same figure again, and it is the field width rather than a
+    /// strategy that decides which of it and `max_span_entries` binds: 20 million cells is 160 MB
+    /// over a 64-bit prime field, so the cell budget binds there, and 640 MB over BN254, so the
+    /// byte budget binds and caps `D` near 2,000 rather than 2,828.
+    ///
     /// # The strategies, and where they were chosen
     /// [`OperatorConstruction::BatchedBorder`] at [`BorderBatch::recommended`]'s batch of 64, and
     /// [`OperatorStorage::Adaptive`]. Both come from M18-5's ablation — §9 of
@@ -194,6 +211,7 @@ impl FglmOptions {
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
             max_span_entries: 20_000_000,
+            max_span_bytes: 320_000_000,
             max_operator_bytes: 320_000_000,
             measure_stages: false,
             operator_construction: OperatorConstruction::BatchedBorder,
@@ -216,6 +234,7 @@ impl FglmOptions {
             max_quotient_dimension: usize::MAX,
             max_operator_entries: usize::MAX,
             max_span_entries: usize::MAX,
+            max_span_bytes: usize::MAX,
             max_operator_bytes: usize::MAX,
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,
@@ -235,6 +254,7 @@ impl FglmOptions {
             max_quotient_dimension: 4_096,
             max_operator_entries: 20_000_000,
             max_span_entries: 20_000_000,
+            max_span_bytes: 320_000_000,
             max_operator_bytes: 320_000_000,
             measure_stages: false,
             operator_construction: OperatorConstruction::PerColumn,

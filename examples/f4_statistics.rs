@@ -79,7 +79,7 @@ fn report<const N: usize>(
         let largest_fill = s.fill_in_of_the_largest_matrix();
 
         println!(
-            "{:<12} {:<8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>6}x{:<6} {:>6.1}% {:>8} {:>6.2} {:>6.2} {:>6}",
+            "{:<12} {:<8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>6}x{:<6} {:>6.1}% {:>8} {:>7.1} {:>6.2} {:>6.2} {:>6}",
             name,
             order_name,
             reduced,
@@ -91,6 +91,7 @@ fn report<const N: usize>(
             s.max_matrix_columns,
             scaffolding,
             s.max_live_nonzeros,
+            s.peak_live_bytes() as f64 / 1e6,
             worst_fill,
             largest_fill,
             basis.len(),
@@ -100,7 +101,7 @@ fn report<const N: usize>(
 
 fn main() {
     println!(
-        "{:<12} {:<8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>13} {:>7} {:>8} {:>6} {:>6} {:>6}",
+        "{:<12} {:<8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>13} {:>7} {:>8} {:>7} {:>6} {:>6} {:>6}",
         "system",
         "order",
         "bb:red",
@@ -111,6 +112,7 @@ fn main() {
         "max matrix",
         "scaffld",
         "peak nz",
+        "peak MB",
         "worst",
         "big",
         "basis"
@@ -139,6 +141,11 @@ fn main() {
     println!("bb:0    of those reductions, how many produced zero");
     println!("empty   of those matrices, how many produced no new basis element");
     println!("scaffld share of matrix rows added by symbolic preprocessing to enable reduction");
+    println!(
+        "peak MB those entries in megabytes, at {} bytes each over this field — what \
+         F4Options::max_live_bytes budgets",
+        F4Options::bytes_per_entry::<F>()
+    );
     println!("worst   the largest fill-in ratio over all batches: how badly elimination densifies");
     println!(
         "big     the fill-in of the single largest matrix, which is the one that sized memory"
