@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "run_count": 61,
+  "run_count": 70,
   "runs": [
     {
       "schema": 1,
@@ -4359,6 +4359,709 @@
       },
       "experiment": null,
       "reproduce": "tools/fetch-mq-challenge.sh && cargo run --release --example scoreboard -- stable  # fukuoka-mq-III-n15-seed0"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 0)",
+      "transformations": [
+        "specialize variables 7..10 at seed 0"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 594782612,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 150244,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 583665554,
+          "estimated_peak_bytes": 4653648,
+          "detail": {
+            "max_matrix_rows": 4984,
+            "max_matrix_columns": 5106,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 10599530,
+          "estimated_peak_bytes": 879312,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 346415,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 20869,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4984,
+        "max_matrix_columns": 5106,
+        "peak_live_nonzeros": 288300,
+        "peak_estimated_bytes": 4653648,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 1)",
+      "transformations": [
+        "specialize variables 7..10 at seed 1"
+      ],
+      "outcome": "slice_established_nothing",
+      "significance": "no verified witness",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 569127226,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 93517,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 558937512,
+          "estimated_peak_bytes": 4660904,
+          "detail": {
+            "max_matrix_rows": 4981,
+            "max_matrix_columns": 5103,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 9816658,
+          "estimated_peak_bytes": 881008,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 279539,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4981,
+        "max_matrix_columns": 5103,
+        "peak_live_nonzeros": 288755,
+        "peak_estimated_bytes": 4660904,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 2)",
+      "transformations": [
+        "specialize variables 7..10 at seed 2"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 582934279,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 87165,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 571526639,
+          "estimated_peak_bytes": 4680408,
+          "detail": {
+            "max_matrix_rows": 4983,
+            "max_matrix_columns": 5105,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 10917532,
+          "estimated_peak_bytes": 880016,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 381212,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 21731,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4983,
+        "max_matrix_columns": 5105,
+        "peak_live_nonzeros": 289973,
+        "peak_estimated_bytes": 4680408,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 3)",
+      "transformations": [
+        "specialize variables 7..10 at seed 3"
+      ],
+      "outcome": "slice_established_nothing",
+      "significance": "no verified witness",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 578863150,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 88859,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 567300527,
+          "estimated_peak_bytes": 4613904,
+          "detail": {
+            "max_matrix_rows": 4982,
+            "max_matrix_columns": 5104,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 11163597,
+          "estimated_peak_bytes": 881216,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 310167,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4982,
+        "max_matrix_columns": 5104,
+        "peak_live_nonzeros": 285817,
+        "peak_estimated_bytes": 4613904,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 4)",
+      "transformations": [
+        "specialize variables 7..10 at seed 4"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 585634161,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 99718,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 574141250,
+          "estimated_peak_bytes": 4691032,
+          "detail": {
+            "max_matrix_rows": 4987,
+            "max_matrix_columns": 5109,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 10968469,
+          "estimated_peak_bytes": 881696,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 402903,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 21821,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4987,
+        "max_matrix_columns": 5109,
+        "peak_live_nonzeros": 290635,
+        "peak_estimated_bytes": 4691032,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 5)",
+      "transformations": [
+        "specialize variables 7..10 at seed 5"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 583044588,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 99268,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 571710858,
+          "estimated_peak_bytes": 4663544,
+          "detail": {
+            "max_matrix_rows": 4985,
+            "max_matrix_columns": 5107,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 10809958,
+          "estimated_peak_bytes": 879312,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 400899,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 23605,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4985,
+        "max_matrix_columns": 5107,
+        "peak_live_nonzeros": 288918,
+        "peak_estimated_bytes": 4663544,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 6)",
+      "transformations": [
+        "specialize variables 7..10 at seed 6"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 592397759,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 100240,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 582097365,
+          "estimated_peak_bytes": 4661120,
+          "detail": {
+            "max_matrix_rows": 4980,
+            "max_matrix_columns": 5102,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 9866061,
+          "estimated_peak_bytes": 881568,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 313243,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 20850,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4980,
+        "max_matrix_columns": 5102,
+        "peak_live_nonzeros": 288769,
+        "peak_estimated_bytes": 4661120,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 7)",
+      "transformations": [
+        "specialize variables 7..10 at seed 7"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 577755073,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 86694,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 566307707,
+          "estimated_peak_bytes": 4673744,
+          "detail": {
+            "max_matrix_rows": 4980,
+            "max_matrix_columns": 5102,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 10930707,
+          "estimated_peak_bytes": 879216,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 407592,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 22373,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4980,
+        "max_matrix_columns": 5102,
+        "peak_live_nonzeros": 289558,
+        "peak_estimated_bytes": 4673744,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "campaign over 8 slices",
+      "transformations": [
+        "8 slices, each fixing 3 of 10 variables at a seeded value"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "every witness evaluated against the original published coefficient vectors",
+      "elapsed_nanos": 4668269703,
+      "stages": [
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 4668269703,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": null,
+      "campaign": {
+        "trials": 8,
+        "stopped_at_limit": 0,
+        "decided": 8,
+        "witnesses": 6,
+        "fixed_variables": 3,
+        "total_nanos": 4668269703,
+        "seeds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "work_per_witness": {
+          "nanos": 4668269703,
+          "witnesses": 6
+        },
+        "success_rate_basis_points": {
+          "low": 4093,
+          "high": 9285,
+          "method": "wilson-95"
+        }
+      },
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
     }
   ]
 }

@@ -66,32 +66,53 @@ milestone, not in a spike:
   halve the work and need no bound at all.
 - **The determinant.** This takes an order-`2d` determinant per sample through the generic dense
   path. A Sylvester matrix is structured, and a subresultant or Euclidean algorithm is
-  asymptotically better; §5 of the module docs records why the spike did not use one — the
-  specialization trap it would have to handle is exactly what the determinant construction avoids.
+  asymptotically better; the module docs record why the spike did not use one — the specialization
+  trap it would have to handle is exactly what the determinant construction avoids.
+- **The interpolation**, which §4.1 measures at `O(n³)` and which turns out to dominate both of the
+  above. Ranked there rather than here, because it took attempting a row that does not finish to
+  see it.
 
 ## 4. The four-round row, attempted
 
 `--all` attempts what the guard declines. On `t16 R_F=2 R_P=2` — four rounds, so degree 81 — the
 symbolic evaluation takes **431 ms** and produces two polynomials of 3 403 terms each, exactly the
 straight-line degree. The resultant then needs 13 123 samples of an order-162 Sylvester determinant,
-and **it had not finished after 90 minutes** when this was written.
+and **it had not finished after two hours** when this was written. §4.1 is why.
 
-That is the measurement, and it is the one the default guard is set by: the row is reachable in
-principle — nothing about it is impossible, the polynomials exist and are small — and it is not
-reachable with a Sylvester determinant per interpolation point taken through a generic dense
-`Matrix`. The two constants in §3 are where the hour goes:
+### 4.1 Where the time actually goes, measured
 
-- 13 123 samples where 6 562 would do, because the degree bound is `2d²` and the degree is `d²`.
-- An order-162 dense determinant per sample, where the Sylvester structure is not used at all.
+The first draft of this section blamed the determinants. That was wrong, and the measurement is
+easy: `lagrange_interpolate` is **cubic** in the number of points.
 
-Each sample costs about `162³/3` multiplications plus 162 modular inversions, so 13 123 of them is
-roughly `3 × 10^10` field multiplications through a generic `Matrix` — which is where the ninety
-minutes go, and it is arithmetic rather than a surprise.
+| points | time | factor for 2x the points |
+|---:|---:|---:|
+| 250 | 28.6 ms | — |
+| 500 | 219.4 ms | 7.7x |
+| 1 000 | 1 632 ms | 7.4x |
+| 2 000 | 12 880 ms | 7.9x |
+
+`7.4x`–`7.9x` per doubling is `2³`: the implementation builds each of the `n` Lagrange basis
+polynomials by multiplying `n − 1` linear factors into a growing polynomial and then dividing, which
+is `O(n²)` apiece and `O(n³)` in total. Extrapolating 12.9 s at 2 000 points to the 13 123 the
+four-round row needs gives **about an hour for the interpolation alone** — against roughly
+`3 × 10^10` field multiplications, or a few minutes, for all 13 123 determinants together.
+
+So the ranked list of what to fix is not what §3 guessed:
+
+1. **The interpolation.** `O(n³)` where Newton's divided differences are `O(n²)` and a product-tree
+   or NTT evaluation is `O(n log² n)`. KoalaBear has the two-adic roots of unity for the NTT route —
+   #147 landed them — and 13 123 points pad to 16 384.
+2. **The sample count**, 2x loose: the degree bound is `2d²` and the observed degree is `d²`.
+3. **The determinant**, which is a few minutes of the hour and therefore last.
+
+That reordering is the useful output of attempting a row that does not finish. `bivariate_resultant`
+is a reference implementation and the module says so; what the spike establishes is which of its
+three costs is worth an implementation milestone, and it is not the one that looked obvious.
 
 Together those are a factor of several before any algorithmic change, which is why the conclusion is
 "scope an implementation" rather than "the resultant route stops at two rounds". What can be said
-without an implementation milestone is: **two rounds in 52 ms, four rounds not in ninety minutes,
-and six rounds never** — `3.3 × 10¹⁵` field operations for the resultant alone, before cubing a polynomial
+without an implementation milestone is: **two rounds in 52 ms, four rounds not in two hours, and
+six rounds never** — `3.3 × 10¹⁵` field operations for the resultant alone, before cubing a polynomial
 with 265 720 terms.
 
 ## 5. What this decided
@@ -101,7 +122,8 @@ with 265 720 terms.
 | Does structure-aware elimination beat general F4 here? | **Yes, by 578x** on the one row both can do, and it returns every witness rather than the first. |
 | Is the univariate polynomial manageable? | Yes at two rounds — degree 81, 17 ms to find its roots over KoalaBear. |
 | Does Poseidon's structure reduce the degree below Bézout? | **No.** The bivariate degree is exactly `3^rounds` and the resultant's is exactly `d²`. |
-| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in ninety minutes with this implementation, six rounds `3.3 × 10^15` operations. |
+| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in two hours with this implementation, six rounds `3.3 × 10^15` operations. |
+| Which cost should an implementation attack first? | **The interpolation**, measured at `O(n³)` — not the determinant, which is a few minutes of the hour. §4.1. |
 | Did it extend the frontier? | **No** — both routes reach two rounds. What it changed is the cost there, by 578x. |
 | Should a resultant implementation be scoped? | Yes, and narrowly: early-terminating interpolation plus a structured determinant, aimed at the slice shape, not at a general solver. |
 
