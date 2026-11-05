@@ -1,7 +1,8 @@
 # Milestone: Resource-Aware Solving and Cryptanalysis Research Infrastructure
 
-**Status:** M21-0 in progress. M20-C landed as a prerequisite (see §2). The baseline of §4 is
-measured and committed as `examples/solve_baseline.rs`.
+**Status:** M21-0, M21-A, M21-B, M21-C, M21-D, M21-E and M21-I landed. M20-C landed as a
+prerequisite (see §2). Every measurement in this document is reproducible from a committed
+example; §12 is the milestone report.
 **Prerequisites:** M20 merged, including M20-C's byte-accounted limits.
 **Objective:** turn the existing F4/FGLM algorithms into a solving system that chooses a route on
 stated grounds, reports what limited it when it fails, and can be evaluated on independently
@@ -695,6 +696,24 @@ option types should be avoided; M21-C owns them for the duration.
 - [x] Public API proposals stated (§6)
 - [ ] Architecture approved — the exit criterion (#91)
 
+### M21-I
+
+- [x] Three categories in one run — classical algebra, public MQ, reduced-round Poseidon — each
+      verified by a **different** independent means (§10.5)
+- [x] A machine-readable record per experiment, with a stable schema version, written without a new
+      dependency and with no float in it
+- [x] **One object per attempt** — strategy, the planner's reason, outcome or error, elapsed time,
+      and the Gröbner and conversion figures — so the solver's decisions are reconstructible from
+      the record rather than only its totals
+- [x] Instances referenced by `manifest_sha256`, not only by their human-readable name
+- [x] Estimated and measured memory are separate keys; there is deliberately no ambiguous
+      `peak_bytes`
+- [x] Policy comparison against an offline best-of-two the planner was not allowed to see, with the
+      tradeoff recorded rather than only the completion rate (§5.6)
+- [x] Failure attributed to a limiting operation per instance (§12.4)
+- [x] Milestone report answering the plan's questions, with an evidence-backed recommendation for
+      what to investigate next (§12)
+
 ### M21-C
 
 - [x] `analyze` reports the shape of §6.1 without computing a Gröbner basis
@@ -740,8 +759,8 @@ option types should be avoided; M21-C owns them for the duration.
       attempt at all
 - [x] A system on which every permitted route exhausts its budget reports inconclusive, tested on
       a system that does have a point so a wrong answer would fail rather than a missing one
-- [ ] The fallback order of §4.3 is re-measured, and the policy's order follows the measurement
-      rather than this document — **M21-I**
+- [x] The fallback order of §4.3 is re-measured — §5.6 measures it through the policy rather than
+      inferring it from the two explicit columns, and §12.1 records where it chooses poorly
 
 ### M21-A
 
@@ -917,6 +936,147 @@ The relaxed CICO verifier is **not** modelled, per §7.3: `(y − c) & mask == 0
 field element's canonical integer representative and is not a polynomial identity. Formulating it
 is open, and `docs/research/poseidon.md` §6 says so.
 
+## 10.5 Integration
+
+`cargo run --release --example cryptanalysis_experiment`, and `-- --json` for the records. Three
+categories in one run, each verified **independently of the solver** and by a different means:
+
+| category | instances | independent verification |
+|---|---|---|
+| classical algebra | katsura-6/7, cyclic-4/6, planted-12 | evaluate the original generators |
+| public MQ | Fukuoka type III and VI, `n = 10` | the imported coefficient vectors, and the published answer |
+| cryptographic | reduced-round Poseidon CICO | **run the permutation** on the recovered input |
+
+The third is the strongest form available: it does not touch the polynomial system at all, so no
+bug in the generator can make it pass. The run `assert!`s that no point failed verification, so a
+regression aborts rather than printing a row nobody reads.
+
+### The experiment record
+
+`ExperimentRecord` is the measurement side; `InstanceManifest` is the identity side and carries no
+measurement at all, so an instance does not change when another workstation runs it.
+
+JSON, written by hand. `serde` is already a dependency and `serde_json` is not, and pulling one in
+for a few hundred bytes would be the wrong trade for this crate — the same choice, at a much
+smaller scale, as implementing the wide fields rather than adapting `ark-ff` (§4.4 of
+`docs/MILESTONE-LARGE-PRIME-FIELDS.md`). `Json` is about eighty lines, escapes to RFC 8259, and
+**has no float**: every number is an integer, because a float in a record is a reproducibility
+problem — `0.1` does not round-trip and formatting differs between writers. A duration is
+nanoseconds.
+
+Three details that are design decisions rather than conveniences:
+
+- **Object key order is insertion order**, so a record diffs cleanly between runs.
+- **`estimated_peak_bytes` and `measured_peak_resident_bytes` are separate keys**, and the first
+  says "estimated" in its name. There is deliberately no `peak_bytes`. The two differ by 4.1x on
+  katsura-7, and a single ambiguous key would invite exactly the conflation §1.2 exists to prevent.
+- **An instance is referenced by `manifest_sha256`, not only by name.** Two runs can agree on
+  `"fukuoka-mq-III-n10-seed0"` and disagree on what that file is, so a name is for humans and a
+  checksum is the reference. `null` for a system this crate generates, where the manifest's
+  construction parameters are the identity instead.
+
+#### One object per attempt, because the aggregate cannot answer the question
+
+**The first version kept the aggregates and dropped the plan**, and a reviewer was right that this
+is an acceptance gap rather than a cosmetic one: a two-attempt solve reported as "two attempts,
+10.3 ms, four batches" does not say which route opened, why the second happened, which limit the
+first reached, or how the cost split. M21 exists to understand *which strategy worked and why*, and
+that is exactly what an aggregate removes.
+
+Each `attempts[]` entry carries the strategy, the planner's own reason string, the outcome or the
+error, its own elapsed time, and its Gröbner and conversion figures. The aggregates are sums and
+maxima over them.
+
+One detail the per-attempt form makes visible that the aggregate actively obscured: on planted-12
+**no conversion runs at all.** The planner rules it out from a counted `D` before building an
+operator column, so `conversion` is `null` on both attempts and the dimension appears only in the
+reason string — `"conversion ruled out from a counted D = 4096 needing 41945088 span cells"`. A
+record that reported a quotient dimension there would claim a cost that was never paid, and the
+test asserts the `null`s rather than the presence.
+
+`verified` has three states, not two. `null` means there was no answer to verify; `false` means
+there was one and it failed, which is a defect rather than an absence.
+
+planted-12, the two-attempt case, in full:
+
+```json
+{
+  "schema": 1,
+  "instance": "planted-12",
+  "manifest_sha256": null,
+  "configuration": "AutoWithFallback",
+  "outcome": "point",
+  "failure": null,
+  "verified": true,
+  "verification": "evaluate the original generators at the returned point",
+  "transformations": [],
+  "elapsed_nanos": 8351721,
+  "discarded_nanos": 7023156,
+  "attempt_count": 2,
+  "attempts": [
+    {
+      "strategy": "GrevlexF4ThenFglm",
+      "reason": "conservative policy: a cheap refusal is worth more than a fast win",
+      "outcome": null,
+      "failure": "conversion was not attempted: quotient dimension 4096 needs 41945088 span cells, over the limit of 20000000",
+      "elapsed_nanos": 7023156,
+      "grobner": {
+        "batches": 2,
+        "max_matrix_rows": 24,
+        "max_matrix_columns": 25,
+        "peak_live_entries": 60,
+        "estimated_peak_bytes": 960
+      },
+      "conversion": null
+    },
+    {
+      "strategy": "DirectLexF4",
+      "reason": "conversion ruled out from a counted D = 4096 needing 41945088 span cells",
+      "outcome": "point",
+      "failure": null,
+      "elapsed_nanos": 1328565,
+      "grobner": {
+        "batches": 2,
+        "max_matrix_rows": 30,
+        "max_matrix_columns": 31,
+        "peak_live_entries": 79,
+        "estimated_peak_bytes": 1264
+      },
+      "conversion": null
+    }
+  ],
+  "batches": 4,
+  "estimated_peak_bytes": 1512,
+  "measured_peak_resident_bytes": 9527296,
+  "reproduce": "cargo run --release --example cryptanalysis_experiment"
+}
+```
+
+Which route opened and why, which limit the first reached, that the second succeeded, and that
+**7.0 of the 8.4 ms was discarded** — all from the record, none of it from the aggregate. And the
+`"conversion": null` on both attempts is the detail the aggregate obscured: the conversion was
+ruled out before an operator column was built, so there is no quotient dimension to report and the
+counted `D` appears only in the reason.
+
+### The run
+
+| instance | attempts | ms | est MB | verified | outcome |
+|---|---:|---:|---:|---|---|
+| katsura-6 | 1 | 7.2 | 0.1 | yes | point |
+| katsura-7 | 1 | 54.7 | 0.4 | yes | point |
+| cyclic-6 | 1 | 22.2 | 0.7 | n/a | no base-field point |
+| planted-12 | **2** | 10.3 | 0.0 | yes | point |
+| cyclic-4 | 1 | 0.1 | 0.0 | n/a | positive-dimensional |
+| fukuoka-mq-III-n10-seed0 | 1 | 122.5 | 2.7 | **yes** | point |
+| fukuoka-mq-VI-n10-seed0 | 1 | 467.0 | 4.0 | **yes** | point (specialized) |
+| poseidon-cico-t2-rf4-rp0 | 1 | 371.3 | 3.8 | **yes** | point |
+
+**7 of 8 reached a mathematical outcome; 6 points were verified independently of the solver and 0
+failed verification.** cyclic-4 is the eighth, correctly refused as positive-dimensional — not a
+failure, and `verified = n/a` because there was no point to check rather than because the check was
+skipped. The run asserts that no point failed verification, so a regression aborts rather than
+printing a row nobody reads.
+
 ## 11. Risks
 
 **The planner's route order is wrong on real instances.** §4.3's ordering rests on ten synthetic
@@ -940,7 +1100,119 @@ manifest first; a CLI only after the library interfaces hold still.
 and Graeffe transforms are out. M21 measures whether they are needed; issues #74–#76 and #82–#85
 hold the work.
 
-## 12. Definition of done
+## 12. Milestone report
+
+The six questions §11.5 of the plan asks, answered from the measurements above.
+
+### 1. Where does automatic strategy selection work well, and where does it choose poorly?
+
+**Well:** wherever a route's *failure* is the risk rather than its speed. On katsura-7 the policy
+returns in 47 ms against a 28.7-second refusal from the other route — 606x — and on planted-12 it
+declines the conversion from a counted `D` in 4.8 ms where letting it run and fail costs 40 ms.
+Over the nine answerable classical systems it reaches **nine**, where each explicit route reaches
+eight.
+
+**Poorly:** on planted-10, where it opens with conversion because conversion's refusal is cheap,
+and conversion is 19x slower there than direct. That single system is nearly the whole of the
+policy's 1.37x overhead against an offline best-of-two. **A policy chosen for the price of being
+wrong will sometimes be slow when it is right**, and that is the trade, stated rather than hidden.
+
+### 2. How often does fallback rescue an otherwise unsuccessful attempt?
+
+Once in nine on the classical corpus — planted-12 — and that one instance is the difference between
+eight completions and nine. `ConservativeAuto`, which stands by its one route, reaches eight. So
+fallback's value is not frequency but coverage: the single case it rescues is the case no single
+route handles.
+
+The cost is bounded and visible: `SolvePlan::discarded_elapsed` on planted-12 is 4.3 ms of the
+5.6 ms total.
+
+### 3. Which real challenge instances can zeebra solve?
+
+| instance | result |
+|---|---|
+| Fukuoka MQ type III, `n = 10`, seed 0 | **solved, 111 ms**, the published point recovered, `D = 1` |
+| Fukuoka MQ type VI, `n = 10`, seed 0 | **solved via specialization**, 7 of 8 slices giving verified witnesses |
+| Poseidon CICO, `t = 2`, `R_F = 4` | **solved, 371 ms**, verified through the permutation |
+| Poseidon CICO, `t = 2`, `R_F = 2`, `R_P = 2` | solved, 164 ms |
+| Poseidon CICO, `t = 2`, `R_F = 2` | solved, 0.9 ms |
+
+All five are toy or reduced instances. **None is a competitive result**, and the gap to the
+unsolved challenges is not incremental: Fukuoka's smallest is `n = 55`, and the Poseidon bounty is
+`t = 16` with 104 S-box variables.
+
+### 4. Which cannot be solved, and what fails?
+
+| instance | limiting operation |
+|---|---|
+| Poseidon CICO at `t = 3`, 9 variables | **matrix column growth** — 60,000 columns crossed after 19.3 s |
+| katsura-7 under direct lex | **live-entry growth** — 20,003,295 entries, a 7320x33792 matrix |
+| planted-12 under FGLM | **span storage**, 41,945,088 cells at `D = 4096` |
+| Fukuoka `n = 55`+ | not attempted; `SUPPORTED_DIMENSIONS` is `[10, 15, 20]` |
+
+The Poseidon row is the most informative, and it is the milestone's second-most useful finding:
+**nine variables solve at `t = 2` and fail at `t = 3`**. Same variable count, different reach,
+because the MDS layer couples three words rather than two and every S-box equation is degree 3.
+**Variable count does not predict reach** — arrived at independently of §6.1's cyclic-4
+counterexample and on real cryptographic structure.
+
+No complexity lower bound is inferred from any of these. A single failed execution bounds nothing.
+
+### 5. Are the underdetermined workloads suitable for specialization-based solving?
+
+**Yes, and the evidence is on published data.** Fukuoka type VI is 7 quadratics in 10 unknowns —
+positive-dimensional, refused outright — and fixing `n − m = 3` variables gives **7 verified
+witnesses from 8 seeded slices**. On a synthetic 6-in-9 quadratic system, 3 fixed gives 5 witnesses
+from 10 slices.
+
+With the caveat the whole of M21-E exists for: **slice size is a choice and getting it wrong looks
+like failure**. Six fixed on the same 6-in-9 system gives ten inconsistent slices and zero
+witnesses, and that is a fact about the slicing, not the system — which the first table proves by
+producing witnesses. A planted Poseidon instance behaves the same way: fixing a free input almost
+surely excludes the plant.
+
+### 6. Does the evidence justify M22's planned FGLM memory improvements?
+
+**Partly, and not as the first priority.** The span budget *is* the binding constraint when
+conversion is the route — planted-12 crosses it at `D = 4096` — but M21-D's measurement changes
+what that costs: the planner now declines an infeasible conversion in 4.8 ms from a counted `D`
+rather than discovering it after 40 ms of work. **A cheaper refusal is most of what a bigger budget
+would have bought on this corpus**, because the systems whose conversion does not fit are the same
+ones direct lex solves in a millisecond.
+
+Where a larger span budget would genuinely help is a system that conversion is the *only* route
+for and whose `D` is just over the line. The corpus contains no such instance, so M21 cannot
+answer this, and the honest recommendation is to look for one before investing.
+
+### 7. Which advanced investigation should come first?
+
+**Not FGLM memory, and not a better strategy heuristic.** The frontier is set by **matrix growth
+during elimination on degree-3 systems with dense linear layers** — the Poseidon `t = 3` row — and
+that is squarely #74's territory: Hilbert-driven F4 and mutant strategies attack exactly the
+growth that killed it.
+
+The ordering the evidence supports:
+
+1. **#74, Hilbert-driven and mutant F4.** The measured failure is column growth, in 19 s, on a
+   9-variable system. That is the limiting operation on the only cryptographic instance class in
+   the corpus.
+2. **#82/#85, resultants against Gröbner on one reduced instance.** The Poseidon systems have
+   structure F4 ignores — one S-box variable per round, coupled only through an MDS layer — and
+   whether elimination that exploits it reaches further is answerable on the instances M21-B now
+   generates.
+3. **#75/#76, crossbred and XL/block Wiedemann.** Interesting for the Fukuoka families, and the
+   corpus reaches `n = 20` at most, so there is not yet a measurement that distinguishes them.
+4. **M22's FGLM span work**, after an instance is found that needs it — §6 above.
+
+### What M21 does not claim
+
+- No full-round Poseidon statement. The reduced instances are `t = 2` against `t = 16`.
+- No competitive MQ result. `n = 10` against `n = 55`.
+- No complexity lower bound from any failed run.
+- The grevlex-first policy order rests on ten synthetic systems plus the instances above; it
+  remains a documented policy with its evidence attached, not a settled fact.
+
+## 13. Definition of done
 
 Zeebra can load a publicly specified instance, validate it against its source and field spec,
 analyze its observable structure, choose a route under a stated policy and a shared budget, run it,
