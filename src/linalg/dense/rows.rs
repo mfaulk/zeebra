@@ -17,8 +17,11 @@ use crate::{
 /// The dense cells a budget of `max_nonzeros` sparse entries licenses, at equal bytes.
 ///
 /// A sparse entry is a column index and a field element; a dense cell is a field element alone.
-/// So the same byte budget buys `size_of::<(usize, F)>() / size_of::<F>()` times as many cells —
-/// typically three, for a 32-bit field on a 64-bit target.
+/// So the same byte budget buys `size_of::<(usize, F)>() / size_of::<F>()` times as many cells:
+/// two for an 8-byte field, and **four** for a 4-byte one — not three, because `(usize, u32)` is
+/// padded to 16 bytes by the index's alignment. A sparse entry therefore costs the same 16 bytes
+/// at either width while a dense cell halves, which is why narrowing the field widens this ratio
+/// instead of leaving it alone.
 ///
 /// This exists because `max_nonzeros` bounds *stored nonzeros*, and a dense representation has no
 /// zeros it can decline to store: a matrix that is a fraction of a percent dense satisfies the
@@ -412,7 +415,7 @@ mod tests {
 
     use super::DenseRows;
     use crate::{
-        fields::Zp13,
+        fields::{Mersenne31, Zp13},
         linalg::sparse::{row_echelon, SparseMatrix, SparseRow},
         FiniteField,
     };
@@ -643,6 +646,38 @@ mod tests {
             check_dense_budget(&SparseMatrix::<Zp13>::zero(4, 4), usize::MAX),
             Ok(())
         );
+    }
+
+    /// The conversion is still sound at a 4-byte cell, and widens rather than staying put.
+    ///
+    /// The unit conversion exists to compare an entry budget against a byte cost, so halving the
+    /// cell width has to move it. It does, and not by the factor a reader would guess: a sparse
+    /// entry is `(usize, F)`, which the index's alignment pads to 16 bytes at *either* width, so
+    /// the entry cost is unchanged while the cell cost halves. Four cells per entry, not three.
+    #[test]
+    fn test_the_budget_conversion_at_a_four_byte_cell() {
+        assert_eq!(std::mem::size_of::<Mersenne31>(), 4);
+        assert_eq!(std::mem::size_of::<(usize, Mersenne31)>(), 16);
+        assert_eq!(std::mem::size_of::<(usize, Zp13)>(), 16);
+
+        assert_eq!(super::cells_per_entry::<Zp13>(), 2);
+        assert_eq!(super::cells_per_entry::<Mersenne31>(), 4);
+        assert_eq!(licensed_cells::<Mersenne31>(1_000), 4_000);
+        assert_eq!(licensed_cells::<Mersenne31>(usize::MAX), usize::MAX);
+
+        // So a shape that the 64-bit field cannot densify within a budget may fit at 32 bits, and
+        // the refusal is still reported in entries rather than in cells.
+        let narrow: Vec<SparseRow<Mersenne31>> = (0..40)
+            .map(|i| SparseRow::new(&[(i, Mersenne31::new(1))]))
+            .collect();
+        let narrow = SparseMatrix::new(40, narrow);
+        let wide: Vec<SparseRow<Zp13>> = (0..40)
+            .map(|i| SparseRow::new(&[(i, Zp13::new(1))]))
+            .collect();
+        let wide = SparseMatrix::new(40, wide);
+
+        assert_eq!(check_dense_budget(&narrow, 400), Ok(()));
+        assert_eq!(check_dense_budget(&wide, 400), Err(800));
     }
 
     /// A matrix that fits is accepted, so the guard does not refuse the ordinary case.
