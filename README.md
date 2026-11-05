@@ -241,6 +241,7 @@ cargo run --release --example f4_degrees           # F4, work and useful work pe
 cargo run --release --example f4_schedule          # critical-pair order, and batch size, apart
 cargo run --release --example f4_schedule -- list  # the instances available
 cargo run --release --example hilbert_study         # the semiregular model against the measurement
+cargo run --release --example cryptanalysis_ladder  # Poseidon and MQ, with every transform inverted
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
@@ -1085,8 +1086,20 @@ Measured frontier, `k = 1`, planted targets:
 | `t=2 R_F=4 R_P=0` | 9 | solved, 371 ms |
 | `t=3 R_F=2 R_P=1` | 9 | column budget crossed after ~18 s |
 
-**Nine variables solve at `t = 2` and fail at `t = 3`** — same count, different reach, because the
-MDS layer couples three words rather than two. Variable count does not predict reach.
+**Variable count does not predict reach** — but the reason is not the state width. `N - E = t - 2k`,
+so at `k = 1` the `t = 2` rows are square and the `t = 3` row has one more variable than equation:
+the two nine-variable instances are *not the same kind of system*, and the comparison above is
+confounded. Controlling for it, by pinning a single free input of the `t = 3` system — which matches
+the equation count without touching the round structure — it becomes **the easiest of the three**:
+complete in 13.9 ms at degree 5 and 0.2 MB, against the square `t = 2` instance's 367 ms and 3.8 MB,
+where unpinned it crossed the column budget at degree 11 and 155 MB.
+
+So what the frontier measures is the underdetermined direction: one free coordinate takes the
+computation from degree 5 to degree 11 and from 0.2 MB to 155 MB. The pinned system's dimension is
+read from `classify_ideal` of its computed basis rather than inferred from the counts, and the
+pinned value is a *planted* one, so a solution is known to exist on that slice — comparing it
+against an arbitrary-target CICO challenge would be comparing different distributions. See
+[`docs/research/degree-profiles.md`](docs/research/degree-profiles.md) §4.
 
 The bounty instance is `t = 16, R_F = 6, R_P = 8`: 104 S-box variables and 118 in total. **No
 result on a reduced instance says anything about the full one**, which is why
@@ -1095,6 +1108,57 @@ result on a reduced instance says anything about the full one**, which is why
 The bounty's *relaxed* CICO verifier is **not** modelled. Its condition is on the low bits of a
 field element's canonical integer representative — `(y - c) & mask == 0` — which is not a
 polynomial identity over the field. See `docs/research/poseidon.md`.
+
+##### Relabelling the variables, and getting the answer back
+
+Which variable is `x_0` changes the Gröbner basis, the matrices and the cost, while changing nothing
+about the problem — so variable order is a free parameter of a cryptanalytic experiment.
+`research::VariableOrder` makes exploring it safe:
+
+```rust
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::planted,
+             research::{satisfies, VariableOrder}}, FiniteField};
+
+let point = [Zp2147483647::new(7), Zp2147483647::new(11), Zp2147483647::new(13)];
+let system = planted::<3, Zp2147483647>(&point);
+
+// sources[new] = old, checked to be a bijection of 0..N.
+let order = VariableOrder::<3>::new("reversed", &[2, 1, 0]).unwrap();
+let relabelled = order.apply(&system);
+
+// The plant, moved into the new coordinates, solves the relabelled system — and comes back.
+let moved = order.forward(&point);
+assert!(satisfies(&relabelled, &moved));
+assert_eq!(order.recover(&moved), point);
+```
+
+The constructor is the only way in and it rejects anything that is not a bijection, because a
+non-bijective "permutation" silently identifies two variables and changes the problem. `recover` is
+the only way back, and using `forward` in its place produces a point that satisfies nothing — which
+on a system whose answer is not known in advance is indistinguishable from a solver that found
+nothing. `RoundLayout` builds the three layouts the Poseidon experiments compare, from the
+**per-round** S-box variable counts rather than one width, since a schedule mixes full rounds
+introducing `t` variables with partial rounds introducing one.
+
+##### Eliminating the variables an affine generator determines
+
+A CICO instance's `k` output constraints are affine and nothing else in the system is.
+`research::eliminate_affine` solves each affine generator for its highest-indexed variable and
+substitutes, recording an affine expression in the **surviving** variables for each one eliminated.
+
+**Substituting is not enough, and the reason is worth stating.** F4 already reduces by an affine
+basis element; what it cannot do is make the variable stop existing, so it keeps a column in every
+Macaulay matrix and a place in the monomial order. Worse, after substitution the variable appears in
+no generator — so it is *unconstrained*, and the ideal becomes positive-dimensional. That is the
+same trap `Specialization::apply` documents. `AffineElimination::project` removes the variables from
+the ring at a smaller compile-time dimension, and `lift` puts a solution back; the dimension is
+checked to be exactly the number of survivors, since a spare position is another unconstrained
+variable.
+
+The sweep is deliberately bounded: it is Gaussian elimination on the affine part of a generating
+set, not a general preprocessor and not nonlinear elimination. An affine relation that appears only
+after some nonlinear cancellation is not found, and nothing looks for one. A generator that
+substitutes to a nonzero constant is **kept**, so an inconsistent system still reports `{1}`.
 
 #### External instances: the Fukuoka MQ Challenge
 
