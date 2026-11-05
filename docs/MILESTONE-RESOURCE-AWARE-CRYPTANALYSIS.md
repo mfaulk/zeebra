@@ -70,6 +70,13 @@ It is the reason M21 must label every memory figure with which of four things it
 A configured budget is a cooperative limit on (2) stated in (3). It is not a guarantee about (4),
 and M21 must not describe it as one.
 
+Two figures to keep apart within (3), because the baseline now prints both. The count in the
+*error* is the live count at the crossing — 20,003,295 entries, 320 MB. `max_live_nonzeros` is the
+peak of the last elimination that *finished*, which on this instance is 18,148,835 entries and
+290 MB. The second is lower by construction: the batch that crossed the budget never completed, so
+its peak was never recorded. Neither is wrong; they answer different questions, and a report that
+quoted one as the other would overstate or understate by a batch.
+
 ### 1.3 Over a wide field, the cost is not in the matrices
 
 Also measured. The same system over GF(2^31 − 1) and over BN254 `Fr`:
@@ -170,7 +177,7 @@ additive — itself a consequence of §1.
 |---|---|---:|---:|---:|---:|---|---:|---|
 | katsura-6 | direct | 19.7 | 92x169 | 5,623 | 0.1 | — | 20.8 | verified point |
 | katsura-6 | fglm | 3.0 | 431x458 | 6,014 | 0.1 | D=32, 0.1 MB | **6.0** | verified point |
-| katsura-7 | direct | — | — | — | — | — | **28,258** | **F4 entry budget crossed** |
+| katsura-7 | direct | — | 7320x33792 | 18,148,835 | 290.4 | — | **28,258** | **F4 entry budget crossed** |
 | katsura-7 | fglm | 29.8 | 1262x1320 | 27,356 | 0.4 | D=64, 0.2 MB | **47.5** | verified point |
 | cyclic-5 | direct | 2.3 | 161x185 | 2,243 | 0.0 | — | 2.6 | no F-point |
 | cyclic-5 | fglm | 1.3 | 111x115 | 1,206 | 0.0 | D=70, 0.1 MB | 2.1 | no F-point |
@@ -184,6 +191,10 @@ additive — itself a consequence of §1.
 | planted-12 | fglm | 0.1 | 24x25 | 60 | 0.0 | **span budget crossed** | 36.0 | **FGLM budget crossed** |
 | cyclic-4 | direct | 0.1 | 13x21 | 59 | 0.0 | — | 0.1 | positive-dim |
 | cyclic-4 | fglm | 0.1 | 20x25 | 93 | 0.0 | — | 0.1 | positive-dim |
+
+The katsura-7 and cyclic-4 figures above come from `solve_one_reported`, which M21-C added for
+exactly this: when the baseline was first written those rows printed `—` across the board, because
+a failed attempt dropped every counter and made a 28-second refusal look free. See §6.4.
 | inconsistent | direct | 0.0 | 2x2 | 4 | 0.0 | — | 0.0 | inconsistent |
 | inconsistent | fglm | 0.0 | 2x2 | 4 | 0.0 | D=0 | 0.0 | inconsistent |
 | no-F-point | direct | 0.0 | 0x0 | 0 | 0.0 | — | 0.0 | no F-point |
@@ -386,11 +397,41 @@ back that could look complete.
 ```rust
 pub struct SolveStatistics {
     // ... existing fields ...
-    /// What the source-basis computation cost. `None` only if it was never reached.
+    /// `1` is in the ideal — which `Ok(None)` could not say.
+    pub inconsistent: bool,
+    /// What the Gröbner stage cost. `None` only if it was never reached.
     pub f4: Option<F4Statistics>,
     pub fglm: Option<FglmStatistics>,   // existing
 }
 ```
+
+**One thing the plan did not call for, which the baseline made necessary.** Carrying the
+statistics on the *success* path is not enough: `solve_one_with_outcome` returns
+`Result<(SolveOutcome, SolveStatistics), SolveError>`, so a failed attempt drops every counter —
+and a failed attempt is where they matter. Three failures have three different amounts of completed
+work behind them:
+
+| failure | completed work behind it |
+|---|---|
+| `PositiveDimensional` | a **complete** Gröbner basis |
+| conversion crossed its budget | a complete **source** basis |
+| F4 crossed its budget | no basis, but the batches it managed |
+
+In the first baseline every one of those printed `—` for matrix shape and `0.0` for bytes, which
+made cyclic-4's refusal and planted-12's look free. So M21-C adds the one-level-up analogue of
+§6.3:
+
+```rust
+pub fn solve_one_reported<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    system: &[MultivariatePolynomial<N, F>],
+    rng: &mut R,
+    options: &SolveOptions,
+) -> (Result<SolveOutcome<N, F>, SolveError>, SolveStatistics);
+```
+
+A tuple rather than statistics inside `SolveError`, for the reason §6.3 gives: the error is `Copy`,
+every caller matches it exhaustively, and work inside a failure conflates the two. M21-D needs this
+— a policy that cannot see what a discarded attempt spent cannot charge a shared budget for it.
 
 ### 6.5 Specialization (M21-E)
 
@@ -501,17 +542,23 @@ option types should be avoided; M21-C owns them for the duration.
 
 ### M21-C
 
-- [ ] `analyze` reports the shape of §6.1 without computing a Gröbner basis
-- [ ] A test pins that no structural figure is treated as a dimension claim, with cyclic-4 as the
-      committed counterexample
-- [ ] `SolveOutcome` distinguishes `NoBaseFieldPoint` from `Inconsistent`, with both reachable and
-      both tested
-- [ ] `f4_reported` returns accumulated statistics on the error path; `f4` and `f4_with_options`
-      are unchanged
-- [ ] `SolveStatistics` carries the source basis's `F4Statistics`, so `examples/solve_baseline.rs`
+- [x] `analyze` reports the shape of §6.1 without computing a Gröbner basis
+- [x] A test pins that no structural figure is treated as a dimension claim, with cyclic-4 as the
+      committed counterexample — it and katsura-4 agree on every reported column and differ in
+      dimension
+- [x] `SolveOutcome` distinguishes `NoBaseFieldPoint` from `Inconsistent`, with both reachable and
+      both tested, under both routes
+- [x] `f4_reported` returns accumulated statistics on the error path; `f4` and `f4_with_options`
+      are unchanged, and the two paths are asserted to agree where both succeed
+- [x] `SolveStatistics` carries the Gröbner stage's `F4Statistics`, so `examples/solve_baseline.rs`
       no longer re-runs the pipeline
-- [ ] Estimated bytes and measured RSS are reported as separate, differently labelled quantities
-- [ ] A crossed budget never produces a no-solution answer — tested, not assumed
+- [x] A **failed** attempt keeps its diagnostics too, through `solve_one_reported` — see §6.4 for
+      why this was added beyond the plan
+- [x] Estimated bytes and measured RSS are reported as separate, differently labelled quantities;
+      `estimated_peak_bytes` is the max of the two stage estimates and not their sum, because F4's
+      matrices are gone before the conversion allocates
+- [x] A crossed budget never produces a no-solution answer — tested across six budgets on a system
+      that does have a point, so a wrong answer would fail rather than a missing one
 
 ### M21-D
 

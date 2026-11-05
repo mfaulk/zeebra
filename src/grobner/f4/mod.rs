@@ -78,6 +78,46 @@ pub fn f4_with_options<const N: usize, F: FiniteField>(
     f4_observed(generators, order, options, &mut observer::Ignore)
 }
 
+/// As [`f4_with_options`], returning the statistics accumulated even when a limit is crossed.
+///
+/// The diagnostic entry point, for a caller that has to say *what the computation did* before it
+/// ran out of room — how many batches it got through, how large the matrices became, how badly
+/// they filled in. `f4` and `f4_with_options` discard exactly that on the error path, and a
+/// resource failure is the case where it matters most.
+///
+/// **A crossed budget still cannot be mistaken for a finished one**: the basis lives inside the
+/// `Result`, so an incomplete computation has no basis to hand back. The statistics beside it
+/// describe work, never an answer.
+///
+/// ```
+/// use zeebra::{fields::Zp13, grobner::{f4_reported, F4Options}, MonomialOrder, MultivariatePolynomial};
+///
+/// let system = vec![MultivariatePolynomial::<2, Zp13>::parse("x^2 - y", ["x", "y"]).unwrap()];
+/// let budget = F4Options { max_live_bytes: 16, ..F4Options::default() };
+/// let (result, statistics) = f4_reported(&system, MonomialOrder::Lexicographic, &budget);
+/// // The field's entry size is known even when nothing was built.
+/// assert_eq!(statistics.bytes_per_entry, 16);
+/// assert!(result.is_ok() || statistics.batches == 0);
+/// ```
+pub fn f4_reported<const N: usize, F: FiniteField>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+) -> (
+    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
+    F4Statistics,
+) {
+    let mut statistics = new_statistics::<F>();
+    let basis = f4_into(
+        generators,
+        order,
+        options,
+        &mut observer::Ignore,
+        &mut statistics,
+    );
+    (basis, statistics)
+}
+
 /// As [`f4_with_options`], notifying `observer` of each batch before it is reduced.
 ///
 /// The instrumentation entry point. Generic over the observer rather than taking a trait object,
@@ -93,12 +133,35 @@ pub fn f4_observed<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     options: &F4Options,
     observer: &mut O,
 ) -> Result<(Vec<MultivariatePolynomial<N, F>>, F4Statistics), F4Error> {
-    // Set before anything else, so that a computation which returns early — the zero ideal, an
-    // unsatisfiable option — still reports the field's entry size rather than zero.
-    let mut statistics = F4Statistics {
+    let mut statistics = new_statistics::<F>();
+    let basis = f4_into(generators, order, options, observer, &mut statistics)?;
+    Ok((basis, statistics))
+}
+
+/// An accumulator that already knows the field's entry size.
+///
+/// Set before anything else, so that a computation which returns early — the zero ideal, an
+/// unsatisfiable option, a budget crossed in the first batch — still reports it rather than zero.
+fn new_statistics<F: FiniteField>() -> F4Statistics {
+    F4Statistics {
         bytes_per_entry: F4Options::bytes_per_entry::<F>(),
         ..F4Statistics::default()
-    };
+    }
+}
+
+/// The main loop, accumulating into a caller-owned `statistics`.
+///
+/// A `&mut` parameter rather than a return value for one reason: the counters have to survive the
+/// error path, and a function that returns them can only do so by returning them *in* the error,
+/// which would put work and failure in one type and make every existing `match` on `F4Error`
+/// stop compiling.
+fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+    observer: &mut O,
+    statistics: &mut F4Statistics,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, F4Error> {
     let total_clock = StageClock::new(options.measure_stages);
 
     // A batch of no pairs makes no progress, so a zero limit is unsatisfiable rather than merely
@@ -121,7 +184,7 @@ pub fn f4_observed<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         }
     }
     if basis.is_empty() {
-        return Ok((Vec::new(), statistics));
+        return Ok(Vec::new());
     }
 
     // The limit is on the basis, so it applies to the generators the caller supplied and not only
@@ -206,7 +269,7 @@ pub fn f4_observed<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // pair selection and basis bookkeeping, which is what `stage_coverage` reports.
     statistics.total = total_clock.elapsed();
 
-    Ok((reduced, statistics))
+    Ok(reduced)
 }
 
 /// Reject a basis larger than `options` allows.

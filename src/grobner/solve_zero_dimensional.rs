@@ -35,10 +35,10 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     grobner::{
-        f4_with_options,
+        f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmError, FglmOptions, FglmStatistics},
         solve::{candidate_values, is_nonzero_constant},
-        F4Error, F4Options,
+        F4Error, F4Options, F4Statistics,
     },
     FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
@@ -104,7 +104,10 @@ impl SolveOptions {
 /// without an instrumented build. `branches` is the one that is otherwise invisible: it is what
 /// [`SolveOptions::max_branches`] is enforced on, and the difference between finding one solution
 /// and finding all of them shows up here before it shows up in the clock.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+///
+/// Not `Copy` since M21-C, because [`F4Statistics`] is not — the same reason
+/// [`SolveOptions`] is not.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SolveStatistics {
     /// Elements of the lexicographic basis the search ran on.
     pub lex_basis_elements: usize,
@@ -115,8 +118,80 @@ pub struct SolveStatistics {
     /// Distinct solutions returned.
     pub solutions: usize,
 
+    /// The lexicographic basis contained a nonzero constant, so `1` is in the ideal.
+    ///
+    /// The distinction that was otherwise lost. An inconsistent system and a zero-dimensional one
+    /// with no point over `F` both return no solutions, and they are different mathematical facts;
+    /// this is which of the two happened. [`SolveOutcome`] is the typed form.
+    pub inconsistent: bool,
+
+    /// What the Gröbner basis computation did.
+    ///
+    /// `None` only if it was never reached. Both routes compute one — under
+    /// [`SolveStrategy::GrevlexF4ThenFglm`] this is the *source* basis, under
+    /// [`SolveStrategy::DirectLexF4`] it is the lex basis itself.
+    ///
+    /// Carried since M21-C. It was computed and discarded before, which left a caller unable to
+    /// say what either route cost and left `examples/solve_baseline.rs` re-running the whole
+    /// pipeline to find out.
+    pub f4: Option<F4Statistics>,
+
     /// What the conversion did, or `None` under [`SolveStrategy::DirectLexF4`].
     pub fglm: Option<FglmStatistics>,
+}
+
+impl SolveStatistics {
+    /// Estimated bytes the largest stage held at once.
+    ///
+    /// The **maximum** of the Gröbner stage's estimate and the conversion's, not their sum: F4's
+    /// matrices are dropped before the conversion allocates anything, so the two peaks are not
+    /// live together and adding them would overstate the high-water mark.
+    ///
+    /// An *estimate*, of the representation only. It omits what
+    /// [`F4Options::max_live_bytes`](crate::grobner::F4Options::max_live_bytes) omits — the
+    /// monomial-to-column map, the basis's term vectors, the backend's dense buffer, allocator
+    /// overhead — and it omits the back-substitution search entirely. For the measured figure use
+    /// [`peak_resident_bytes`](crate::util::peak_resident_bytes); on katsura-7 under lex the two
+    /// differ by 4.1x, and §1.2 of `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` is why.
+    pub fn estimated_peak_bytes(&self) -> usize {
+        let grobner = self.f4.as_ref().map_or(0, |s| s.max_estimated_bytes);
+        let conversion = self.fglm.as_ref().map_or(0, |s| s.estimated_bytes());
+        grobner.max(conversion)
+    }
+}
+
+/// What a solve attempt established, as distinct mathematical facts.
+///
+/// [`solve_one`] returns `Option<[F; N]>`, which collapses two of these: an inconsistent system
+/// and a zero-dimensional one with no point over `F` are both `None`. They are different answers
+/// to a cryptanalytic question — the first says the equations contradict each other, the second
+/// says the variety is nonempty over an extension and has no base-field point — so
+/// [`solve_one_with_outcome`] returns this instead.
+///
+/// **Every variant is an answer.** A crossed budget is a [`SolveError`] and can never appear here,
+/// which is the invariant that keeps a resource failure from being read as "no solution".
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SolveOutcome<const N: usize, F: FiniteField> {
+    /// A point, already verified against the original generators.
+    Point([F; N]),
+
+    /// The ideal is zero-dimensional and has no point over the base field.
+    ///
+    /// `x^2 + 1` over GF(3) is the small case: quotient dimension two, no roots.
+    NoBaseFieldPoint,
+
+    /// `1` is in the ideal, so the system has no solution over any extension either.
+    Inconsistent,
+}
+
+impl<const N: usize, F: FiniteField> SolveOutcome<N, F> {
+    /// The point, if there is one. The bridge to [`solve_one`]'s older return type.
+    pub fn point(&self) -> Option<[F; N]> {
+        match self {
+            Self::Point(p) => Some(*p),
+            _ => None,
+        }
+    }
 }
 
 /// Why a zero-dimensional solve stopped without an answer.
@@ -210,10 +285,78 @@ pub fn solve_one_with_options<const N: usize, F: KnownOrder, R: RngCore + Crypto
     rng: &mut R,
     options: &SolveOptions,
 ) -> Result<(Option<[F; N]>, SolveStatistics), SolveError> {
-    let (basis, fglm) = lex_basis(system, options)?;
-    let (found, mut statistics) = search(&basis, system, Stop::AtFirst, options, rng)?;
-    statistics.fglm = fglm;
-    Ok((found.into_iter().next(), statistics))
+    solve_one_with_outcome(system, rng, options)
+        .map(|(outcome, statistics)| (outcome.point(), statistics))
+}
+
+/// As [`solve_one_with_options`], distinguishing the two reasons there might be no point.
+///
+/// The entry point M21-C added, and the one to prefer when the *answer* matters rather than only
+/// the point: `Ok(None)` cannot say whether the equations contradicted each other or merely had no
+/// base-field solution, and [`SolveOutcome`] can. Nothing else differs — the same route, the same
+/// budgets, the same statistics, and the same verification of the returned point against the
+/// original generators.
+///
+/// # Errors
+/// As [`solve_one`]. A crossed budget is an error here too, and **never** a `NoBaseFieldPoint`.
+#[allow(clippy::type_complexity)]
+pub fn solve_one_with_outcome<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    system: &[MultivariatePolynomial<N, F>],
+    rng: &mut R,
+    options: &SolveOptions,
+) -> Result<(SolveOutcome<N, F>, SolveStatistics), SolveError> {
+    let (outcome, statistics) = solve_one_reported(system, rng, options);
+    outcome.map(|outcome| (outcome, statistics))
+}
+
+/// As [`solve_one_with_outcome`], returning the statistics even when the attempt fails.
+///
+/// The diagnostic entry point, and the analogue of
+/// [`f4_reported`](crate::grobner::f4_reported) one level up. A route that fails has still done
+/// work, and which work it did is the question a planner has to answer before it decides whether
+/// to try the other one:
+///
+/// - a positive-dimensional system has a **complete** Gröbner basis behind the refusal, and
+///   `statistics.f4` describes it;
+/// - a conversion that crosses its span budget has a complete *source* basis behind it, so
+///   `statistics.f4` is present and `statistics.fglm` is not;
+/// - an F4 computation that crosses a budget has no basis at all, and `statistics.f4` still says
+///   how many batches it got through and how large the matrices became.
+///
+/// `solve_one_with_outcome` discards exactly that, because a `SolveError` cannot carry it: the
+/// error type is `Copy`, every caller matches on it exhaustively, and putting work inside a failure
+/// would conflate the two. Hence a tuple.
+///
+/// **Statistics are never an answer.** The outcome is in the `Result`, so a crossed budget has no
+/// `SolveOutcome` to be mistaken for one.
+#[allow(clippy::type_complexity)]
+pub fn solve_one_reported<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    system: &[MultivariatePolynomial<N, F>],
+    rng: &mut R,
+    options: &SolveOptions,
+) -> (Result<SolveOutcome<N, F>, SolveError>, SolveStatistics) {
+    let mut statistics = SolveStatistics::default();
+    let outcome = solve_one_into(system, rng, options, &mut statistics);
+    (outcome, statistics)
+}
+
+/// One solve, accumulating into a caller-owned `statistics`.
+fn solve_one_into<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
+    system: &[MultivariatePolynomial<N, F>],
+    rng: &mut R,
+    options: &SolveOptions,
+    statistics: &mut SolveStatistics,
+) -> Result<SolveOutcome<N, F>, SolveError> {
+    let basis = lex_basis(system, options, statistics)?;
+    let found = search(&basis, system, Stop::AtFirst, options, statistics, rng)?;
+
+    Ok(match found.into_iter().next() {
+        Some(point) => SolveOutcome::Point(point),
+        // `search` has already set `inconsistent` from the basis, so this reads a fact rather than
+        // re-deriving one.
+        None if statistics.inconsistent => SolveOutcome::Inconsistent,
+        None => SolveOutcome::NoBaseFieldPoint,
+    })
 }
 
 /// Every distinct solution of `system` over `F`.
@@ -241,9 +384,9 @@ pub fn solve_zero_dimensional_with_options<
     rng: &mut R,
     options: &SolveOptions,
 ) -> Result<(Vec<[F; N]>, SolveStatistics), SolveError> {
-    let (basis, fglm) = lex_basis(system, options)?;
-    let (found, mut statistics) = search(&basis, system, Stop::AtEvery, options, rng)?;
-    statistics.fglm = fglm;
+    let mut statistics = SolveStatistics::default();
+    let basis = lex_basis(system, options, &mut statistics)?;
+    let found = search(&basis, system, Stop::AtEvery, options, &mut statistics, rng)?;
     Ok((found, statistics))
 }
 
@@ -252,32 +395,41 @@ pub fn solve_zero_dimensional_with_options<
 /// Zero-dimensionality is decided from whichever basis the strategy computes first, which is the
 /// grevlex one where there is a choice: classification is a question about leading monomials and
 /// costs the same under any order, so it is asked of the cheaper basis.
-#[allow(clippy::type_complexity)]
+///
+/// `statistics` is filled in as each stage completes, **including when a later stage refuses**: a
+/// positive-dimensional classification and a crossed span budget both sit behind a Gröbner basis
+/// that really was computed, and discarding its counters would make the two failures look free.
 fn lex_basis<const N: usize, F: FiniteField>(
     system: &[MultivariatePolynomial<N, F>],
     options: &SolveOptions,
-) -> Result<(Vec<MultivariatePolynomial<N, F>>, Option<FglmStatistics>), SolveError> {
+    statistics: &mut SolveStatistics,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, SolveError> {
+    let order = match options.strategy {
+        SolveStrategy::DirectLexF4 => MonomialOrder::Lexicographic,
+        SolveStrategy::GrevlexF4ThenFglm => MonomialOrder::GradedReverseLexicographic,
+    };
+
+    // `f4_reported` rather than `f4_with_options`, so that a crossed F4 budget still says how many
+    // batches it managed and how large the matrices became.
+    let (basis, f4) = f4_reported(system, order, &options.f4);
+    statistics.f4 = Some(f4);
+    let basis = basis?;
+
+    // Classified from whichever basis the route computed first, which is the grevlex one where
+    // there is a choice: classification is a question about leading monomials and costs the same
+    // under any order, so it is asked of the cheaper basis. Doing it here rather than inside the
+    // conversion also means a positive-dimensional system costs no quotient algebra and reports
+    // the same variant under either route.
+    if !classify_ideal(&basis, order).is_finite_dimensional() {
+        return Err(SolveError::PositiveDimensional);
+    }
+
     match options.strategy {
-        SolveStrategy::DirectLexF4 => {
-            let lex = MonomialOrder::Lexicographic;
-            let (basis, _) = f4_with_options(system, lex, &options.f4)?;
-            if !classify_ideal(&basis, lex).is_finite_dimensional() {
-                return Err(SolveError::PositiveDimensional);
-            }
-            Ok((basis, None))
-        }
+        SolveStrategy::DirectLexF4 => Ok(basis),
         SolveStrategy::GrevlexF4ThenFglm => {
-            let source_order = MonomialOrder::GradedReverseLexicographic;
-            let (source, _) = f4_with_options(system, source_order, &options.f4)?;
-            // `fglm_to_lex_with_options` classifies too, but doing it here means a
-            // positive-dimensional system costs no quotient-algebra construction and reports the
-            // same variant it would under the other strategy.
-            if !classify_ideal(&source, source_order).is_finite_dimensional() {
-                return Err(SolveError::PositiveDimensional);
-            }
-            let (basis, statistics) =
-                fglm_to_lex_with_options(&source, source_order, &options.fglm)?;
-            Ok((basis, Some(statistics)))
+            let (lex, fglm) = fglm_to_lex_with_options(&basis, order, &options.fglm)?;
+            statistics.fglm = Some(fglm);
+            Ok(lex)
         }
     }
 }
@@ -313,16 +465,17 @@ fn search<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     stop: Stop,
     options: &SolveOptions,
+    statistics: &mut SolveStatistics,
     rng: &mut R,
-) -> Result<(Vec<[F; N]>, SolveStatistics), SolveError> {
-    let mut statistics = SolveStatistics {
-        lex_basis_elements: basis.len(),
-        ..SolveStatistics::default()
-    };
+) -> Result<Vec<[F; N]>, SolveError> {
+    statistics.lex_basis_elements = basis.len();
 
-    // The unit ideal: the system is inconsistent, so there is nothing to search.
+    // The unit ideal: the system is inconsistent, so there is nothing to search. Recorded as
+    // well as acted on, because "no solutions because 1 is in the ideal" and "no solutions in this
+    // field" are different answers and the caller cannot otherwise tell them apart.
     if basis.iter().any(is_nonzero_constant) {
-        return Ok((Vec::new(), statistics));
+        statistics.inconsistent = true;
+        return Ok(Vec::new());
     }
 
     let mut budget = Budget {
@@ -362,7 +515,7 @@ fn search<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
 
     statistics.branches = budget.branches;
     statistics.solutions = solutions.len();
-    Ok((solutions, statistics))
+    Ok(solutions)
 }
 
 /// One level of the back-substitution.
@@ -1135,5 +1288,334 @@ mod tests {
         let all = solve_zero_dimensional(&f, &mut rng).expect("zero-dimensional");
         let distinct: HashSet<_> = all.iter().copied().collect();
         assert_eq!(all.len(), distinct.len(), "{:?} contains a repeat", all);
+    }
+}
+
+#[cfg(test)]
+mod outcome_tests {
+    //! M21-C: the typed outcome, the carried diagnostics, and the invariant between them.
+
+    use rand::{prelude::StdRng, SeedableRng};
+
+    use super::{
+        solve_one, solve_one_reported, solve_one_with_outcome, SolveError, SolveOptions,
+        SolveOutcome, SolveStrategy,
+    };
+    use crate::{
+        fields::Zp2147483647,
+        grobner::{
+            benchmark_systems::{cyclic, katsura, planted},
+            F4Options, FglmOptions,
+        },
+        FiniteField, MultivariatePolynomial, Zero,
+    };
+
+    type F = Zp2147483647;
+
+    const STRATEGIES: [SolveStrategy; 2] =
+        [SolveStrategy::DirectLexF4, SolveStrategy::GrevlexF4ThenFglm];
+
+    fn parse<const N: usize>(
+        strings: &[&str],
+        vars: [&str; N],
+    ) -> Vec<MultivariatePolynomial<N, F>> {
+        strings
+            .iter()
+            .map(|s| MultivariatePolynomial::parse(s, vars).expect("parses"))
+            .collect()
+    }
+
+    fn solve<const N: usize>(
+        system: &[MultivariatePolynomial<N, F>],
+        strategy: SolveStrategy,
+    ) -> Result<SolveOutcome<N, F>, SolveError> {
+        let mut rng = StdRng::seed_from_u64(7);
+        solve_one_with_outcome(system, &mut rng, &SolveOptions::with_strategy(strategy))
+            .map(|(outcome, _)| outcome)
+    }
+
+    /// An inconsistent system and one with no base-field point reach *different* outcomes.
+    ///
+    /// Both are `Ok(None)` from `solve_one`, which is the conflation M21-C exists to close. The
+    /// second system is zero-dimensional with quotient dimension two: 2^31 - 1 is 3 mod 4, so -1
+    /// is not a square and `x^2 + 1` has no root in the field.
+    #[test]
+    fn test_inconsistency_is_distinguished_from_having_no_base_field_point() {
+        let inconsistent = parse(&["x - 1", "x - 2"], ["x", "y"]);
+        let no_point = parse(&["x^2 + 1", "y"], ["x", "y"]);
+
+        for strategy in STRATEGIES {
+            assert_eq!(
+                solve(&inconsistent, strategy).expect("within limits"),
+                SolveOutcome::Inconsistent,
+                "{:?}",
+                strategy
+            );
+            assert_eq!(
+                solve(&no_point, strategy).expect("within limits"),
+                SolveOutcome::NoBaseFieldPoint,
+                "{:?}",
+                strategy
+            );
+        }
+
+        // And the older entry point still collapses them, which is why it is not the one to use
+        // when the answer matters.
+        let mut rng = StdRng::seed_from_u64(7);
+        assert_eq!(solve_one(&inconsistent, &mut rng), Ok(None));
+        let mut rng = StdRng::seed_from_u64(7);
+        assert_eq!(solve_one(&no_point, &mut rng), Ok(None));
+    }
+
+    /// A found point comes back as `Point`, and agrees with what `solve_one` returns.
+    #[test]
+    fn test_a_point_is_reported_and_agrees_with_solve_one() {
+        let point: Vec<F> = (0..6).map(|i| F::new(2 * i as u64 + 3)).collect();
+        let system = planted::<6, F>(&point);
+
+        for strategy in STRATEGIES {
+            let outcome = solve(&system, strategy).expect("within limits");
+            let found = outcome.point().expect("a point exists");
+            for p in &system {
+                assert!(p.eval(&found).is_zero(), "{} is not satisfied", p);
+            }
+        }
+    }
+
+    /// A positive-dimensional system is an error, not an outcome.
+    ///
+    /// The route does not apply; that is a statement about the ideal and not an answer about its
+    /// points, so it cannot be a `SolveOutcome` variant.
+    #[test]
+    fn test_positive_dimensional_is_not_an_outcome() {
+        for strategy in STRATEGIES {
+            assert_eq!(
+                solve(&cyclic::<4, F>(), strategy),
+                Err(SolveError::PositiveDimensional)
+            );
+        }
+    }
+
+    /// A crossed budget is an error and **never** a no-solution outcome. M21-C's key invariant.
+    ///
+    /// The failure mode a retrying planner would otherwise introduce: an exhausted attempt read as
+    /// "there is no solution". Every budget in `SolveOptions` is exercised against a system that
+    /// does have a point, so any `NoBaseFieldPoint` or `Inconsistent` here would be a wrong answer
+    /// rather than a missing one.
+    #[test]
+    fn test_a_crossed_budget_is_never_a_no_solution_answer() {
+        let point: Vec<F> = (0..6).map(|i| F::new(2 * i as u64 + 3)).collect();
+        let solvable = planted::<6, F>(&point);
+
+        let budgets = [
+            SolveOptions {
+                f4: F4Options {
+                    max_live_nonzeros: 1,
+                    ..F4Options::default()
+                },
+                ..SolveOptions::default()
+            },
+            SolveOptions {
+                f4: F4Options {
+                    max_live_bytes: 16,
+                    ..F4Options::default()
+                },
+                ..SolveOptions::default()
+            },
+            SolveOptions {
+                f4: F4Options {
+                    max_matrix_rows: 1,
+                    ..F4Options::default()
+                },
+                ..SolveOptions::default()
+            },
+            SolveOptions {
+                max_branches: Some(1),
+                ..SolveOptions::default()
+            },
+            SolveOptions {
+                strategy: SolveStrategy::GrevlexF4ThenFglm,
+                fglm: FglmOptions {
+                    max_quotient_dimension: 1,
+                    ..FglmOptions::default()
+                },
+                ..SolveOptions::default()
+            },
+            SolveOptions {
+                strategy: SolveStrategy::GrevlexF4ThenFglm,
+                fglm: FglmOptions {
+                    max_span_bytes: 8,
+                    ..FglmOptions::default()
+                },
+                ..SolveOptions::default()
+            },
+        ];
+
+        for options in budgets {
+            let mut rng = StdRng::seed_from_u64(7);
+            let result = solve_one_with_outcome(&solvable, &mut rng, &options);
+            match result {
+                Err(_) => {}
+                Ok((SolveOutcome::Point(_), _)) => {}
+                Ok((outcome, _)) => panic!(
+                    "{:?} under {:?} turned an exhausted budget into an answer",
+                    outcome, options.strategy
+                ),
+            }
+        }
+    }
+
+    /// A failed attempt still reports the work it did, which is what a planner has to charge for.
+    ///
+    /// Three failures with three different amounts of completed work behind them. All three are
+    /// `Err` from `solve_one_with_outcome`, which discards every counter; `solve_one_reported`
+    /// keeps them, and the difference between the three is the whole reason M21-D can account for
+    /// discarded work at all.
+    #[test]
+    fn test_a_failed_attempt_keeps_its_diagnostics() {
+        // 1. Positive-dimensional. The basis behind the refusal is complete.
+        let mut rng = StdRng::seed_from_u64(3);
+        let (outcome, statistics) =
+            solve_one_reported(&cyclic::<4, F>(), &mut rng, &SolveOptions::default());
+        assert_eq!(outcome, Err(SolveError::PositiveDimensional));
+        let f4 = statistics.f4.as_ref().expect("a basis really was computed");
+        assert!(
+            f4.batches > 0 && f4.max_matrix_rows > 0,
+            "a positive-dimensional refusal is not free and must not look free"
+        );
+        assert_eq!(statistics.fglm, None, "the conversion was never reached");
+
+        // 2. The conversion crosses its budget. The *source* basis behind it is complete.
+        let point: Vec<F> = (0..6).map(|i| F::new(2 * i as u64 + 3)).collect();
+        let mut rng = StdRng::seed_from_u64(3);
+        let (outcome, statistics) = solve_one_reported(
+            &planted::<6, F>(&point),
+            &mut rng,
+            &SolveOptions {
+                strategy: SolveStrategy::GrevlexF4ThenFglm,
+                fglm: FglmOptions {
+                    max_quotient_dimension: 1,
+                    ..FglmOptions::default()
+                },
+                ..SolveOptions::default()
+            },
+        );
+        assert!(matches!(outcome, Err(SolveError::Fglm(_))));
+        assert!(statistics.f4.is_some(), "the source basis was computed");
+        assert_eq!(statistics.fglm, None, "and the conversion did not finish");
+
+        // 3. F4 itself crosses a budget. No basis at all, but the batches it managed are reported.
+        let mut rng = StdRng::seed_from_u64(3);
+        let (outcome, statistics) = solve_one_reported(
+            &katsura::<6, F>(),
+            &mut rng,
+            &SolveOptions {
+                f4: F4Options {
+                    max_batches: Some(2),
+                    ..F4Options::default()
+                },
+                ..SolveOptions::default()
+            },
+        );
+        assert!(matches!(
+            outcome,
+            Err(SolveError::Grobner(
+                crate::grobner::F4Error::TooManyBatches { limit: 2 }
+            ))
+        ));
+        let f4 = statistics
+            .f4
+            .as_ref()
+            .expect("the attempt is still described");
+        assert_eq!(f4.batches, 2);
+        assert!(f4.max_live_nonzeros > 0);
+
+        // And in every case the statistics are not an answer: there is no outcome to misread.
+        assert!(!statistics.inconsistent);
+        assert_eq!(statistics.solutions, 0);
+    }
+
+    /// `solve_one_with_outcome` is `solve_one_reported` with the statistics dropped on failure.
+    #[test]
+    fn test_the_reported_and_unreported_entry_points_agree() {
+        let point: Vec<F> = (0..6).map(|i| F::new(2 * i as u64 + 3)).collect();
+        for system in [planted::<6, F>(&point), katsura::<6, F>()] {
+            for strategy in STRATEGIES {
+                let options = SolveOptions::with_strategy(strategy);
+                let (reported, reported_statistics) =
+                    solve_one_reported(&system, &mut StdRng::seed_from_u64(5), &options);
+                let direct =
+                    solve_one_with_outcome(&system, &mut StdRng::seed_from_u64(5), &options);
+                assert_eq!(
+                    reported.map(|o| (o, reported_statistics)),
+                    direct,
+                    "{:?}",
+                    strategy
+                );
+            }
+        }
+    }
+
+    /// The Gröbner stage's statistics reach the caller, on both routes.
+    #[test]
+    fn test_the_grobner_statistics_are_carried() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let (_, direct) = solve_one_with_outcome(
+            &katsura::<5, F>(),
+            &mut rng,
+            &SolveOptions::with_strategy(SolveStrategy::DirectLexF4),
+        )
+        .expect("within limits");
+        let f4 = direct
+            .f4
+            .as_ref()
+            .expect("the direct route computes a basis");
+        assert!(f4.batches > 0);
+        assert!(f4.max_matrix_rows > 0);
+        assert_eq!(f4.bytes_per_entry, 16);
+        assert_eq!(direct.fglm, None, "the direct route converts nothing");
+        assert_eq!(direct.estimated_peak_bytes(), f4.max_estimated_bytes);
+
+        let mut rng = StdRng::seed_from_u64(7);
+        let (_, converted) = solve_one_with_outcome(
+            &katsura::<5, F>(),
+            &mut rng,
+            &SolveOptions::with_strategy(SolveStrategy::GrevlexF4ThenFglm),
+        )
+        .expect("within limits");
+        let source = converted
+            .f4
+            .as_ref()
+            .expect("the source basis is computed too");
+        let conversion = converted.fglm.expect("and converted");
+        assert!(source.batches > 0);
+        assert!(conversion.quotient_dimension > 0);
+        // The maximum of the two stages, not their sum: F4's matrices are gone before the
+        // conversion allocates.
+        assert_eq!(
+            converted.estimated_peak_bytes(),
+            source.max_estimated_bytes.max(conversion.estimated_bytes())
+        );
+    }
+
+    /// `solve_one` is exactly the point of `solve_one_with_outcome`, with nothing else changed.
+    #[test]
+    fn test_the_two_entry_points_agree() {
+        let point: Vec<F> = (0..6).map(|i| F::new(2 * i as u64 + 3)).collect();
+        // Each arity separately, since `N` is a const generic and the systems do not share one.
+        agree(&planted::<6, F>(&point));
+        agree(&katsura::<6, F>());
+        agree(&cyclic::<5, F>());
+    }
+
+    /// `solve_one` and `solve_one_with_outcome` return the same point, under both routes.
+    fn agree<const N: usize>(system: &[MultivariatePolynomial<N, F>]) {
+        for strategy in STRATEGIES {
+            let options = SolveOptions::with_strategy(strategy);
+            let mut rng = StdRng::seed_from_u64(11);
+            let old = solve_one(system, &mut StdRng::seed_from_u64(11));
+            let new = solve_one_with_outcome(system, &mut rng, &options).map(|(o, _)| o.point());
+            assert_eq!(old, new, "{:?}", strategy);
+        }
     }
 }
