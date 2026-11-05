@@ -1283,6 +1283,14 @@ XHash8 are rejected, each with a recorded reason. The document also states plain
 results are `log₂ T` and `log₂ M` estimates, several with memory exponents past 65 bits, and there
 are no challenge files to solve.
 
+An accepted candidate becomes a `ChallengeManifest` row, so the document also records what each one
+would require of [the registry](#the-challenge-registry): an `AnemoiCico` parameters variant with
+the algebraic model *inside the digest*, since `FCICO` and `PCICO` are two different polynomial
+systems for the same primitive; a new objective tag for LowMC, whose key recovery is neither
+`CicoExact` nor `MqRoot`; and one field the registry does not yet have anywhere — the **published
+competitor figure**, which `ExternalStatus` cannot carry because it records whether and when a
+problem was solved elsewhere and not at what cost.
+
 `tools/check-griffin-reconstruction.py` is that survey's one executable result. It instantiates
 Griffin with `(t, α) = (12, 3)` over the 55-bit prime `p = 28407454060060787` from the constants
 published in the FreeLunch appendix, and reproduces all five published CICO solutions for

@@ -5,8 +5,10 @@ Challenge — see [`fukuoka-mq.md`](fukuoka-mq.md) — and A2 (#71) the Ethereum
 This issue surveys the rest of the published landscape and answers one question: **which instances
 carry a published number that zeebra could be right or wrong against?**
 
-It is a shortlist, not a reading list. Nothing here authorizes an implementation, and §6 argues that
-the manifest schema should be frozen (A4, #73) before any of it becomes a problem definition.
+It is a shortlist, not a reading list. Nothing here authorizes an implementation. M23-0 froze the
+challenge registry while this survey was in progress, which is the gate every candidate below has to
+pass through; §6 re-checks the schema conclusions against what it actually froze, and finds one gap
+that should be closed before the first candidate is registered.
 
 ## 1. The shortlist, ranked
 
@@ -268,41 +270,70 @@ What LowMC *is* good for, and why it is on the shortlist at rank 4:
 Fukuoka `GF(2)` and `GF(2^8)` families by name. Until that module is public, nothing in this
 candidate can be imported. Do not bundle the export with the import.
 
-## 6. Consequences for the schema (A4, #73) — freeze it first
+## 6. Consequences for the frozen registry (M23-0) and for A4 (#73)
 
-Every candidate above is a *generated* instance, not a downloaded file, and three of them do not fit
-`InstanceManifest` as it stands. These are concrete, not speculative; each is a field that is missing
-or a field whose meaning breaks.
+**M23-0 landed `grobner::research::challenge` while this survey was in progress, and it changes the
+answer here.** This section was first written against `InstanceManifest`; it has been re-checked
+against the schema that actually exists. A `ChallengeManifest` defines a *problem* where an
+`InstanceManifest` defines a *file*, its identity is a SHA-256 digest over family, objective tag and
+parameters, and `registry()` is frozen by `test_the_registry_is_frozen`, which pins every id and
+digest. Adding a family is therefore a deliberate edit that fails a test if it redefines anything —
+the correct gate for everything in §1, and it is already in place.
 
-1. **There is nowhere to put the published competitor figure.** This is the gap that matters. The
-   epic exists to obtain external numbers; `InstanceManifest` carries no measurements *by design*
-   and `ExperimentRecord` carries only zeebra's own run — `elapsed`, `attempts`,
-   `peak_resident_bytes`, `reproduce`. "FreeLunch reports 5727 s for `polyDet` and 27.6 GB on one
-   core of an AMD EPYC 7352" is neither an instance property nor a zeebra measurement, and it has no
-   home. A third record — paper, parameters, step, reported time and memory, hardware, software — is
-   needed, and it should be added *before* any candidate is imported, because an import that lands
-   first will put the competitor figure in a comment.
-2. **`provenance.sha256` is required by `missing()`, and a generated instance has no file.** Griffin
-   is reconstructed from constants printed in a paper appendix; Anemoi from a Sage script plus `(p,
-   α, N, model, ordering)`. `ExperimentRecord::manifest_sha256` already documents the generated case
-   as `None`, "where the manifest's construction parameters are the identity instead" — but
-   `InstanceManifest` has no such parameters, and so can never be `is_complete()`. Either a
-   construction-parameter field, or a `missing()` that accepts it.
-3. **A witness in different coordinates than `variables`.** `witness: Option<Vec<u64>>` is "in the
-   same order as `Self::variables`". Griffin's published witness is a permutation state of 12
-   coordinates; the system's variables are `x₀ … x_r`. Recording the published pair in the `witness`
-   field would be wrong, and dropping it would throw away the thing that makes candidate 2
-   verifiable.
-4. **`monomial_order: String` cannot express a weighted order.** Both the FreeLunch order and
-   `ACICO`'s `WDRL` for `α > 3` are weighted. A verbatim string is fine for Fukuoka's `"graded
-   reverse lex order"`; it cannot carry weights that a reader has to act on.
-5. **Generator degrees are not recorded, and here they are the shape of the problem.** `generators`
-   is a count. `FCICO` at `N=5` is ten generators of degree 3; `PCICO` at `N=5` is six generators of
-   degrees up to 10. Same instance, same solutions, and a solver meets them completely differently.
+### 6.1 Closed by M23-0
 
-Nothing above argues for a redesign — the Proved/Observed split and the measurement/identity
-separation both held up well against four new sources. It argues for one new record type and three
-fields, decided once, before the corpus grows.
+- **Generated instances.** Resolved. Identity is a parameter digest, and the module documentation
+  says so outright: "a challenge need not be a file: the 2026 CICO targets are a sentence and five
+  numbers, and their round constants are *derived* rather than published."
+  `InstanceManifest::missing()` requiring `provenance.sha256` simply does not apply, and
+  `ChallengeParameters::MqSystem` keeps a `sha256` for the one family whose problem *is* a file.
+- **A witness in the permutation's coordinates.** Resolved. `CicoTarget::PlantedFrom { inputs, free }`
+  records a witness as constrained and free *input words*, not as the polynomial system's variables.
+  Griffin's published pairs fit it directly at `k = 1`.
+- **The reduced-round framing.** `BenchmarkClass::FaithfulReduction { of }` and
+  `Significance::ReducedInstanceWitness { of }` are precisely what every candidate in §1 is, and
+  they make the "says nothing about the full-round primitive" caveat structural instead of
+  editorial.
+- **A weighted monomial order — withdrawn as a schema gap.** The FreeLunch order and `ACICO`'s
+  `WDRL` are properties of an *attack*, not of a problem; they belong in
+  `ExperimentRecord::configuration` and `transformations`. `InstanceManifest::monomial_order`
+  describes a file's coefficient layout, which none of these candidates has an analogue of.
+
+### 6.2 Still open, and it is the one that matters
+
+**There is nowhere to put the published competitor figure.** `ExternalStatus` records *whether and
+when* a problem was solved elsewhere — `NoneRecorded { as_of }`, `SolvedExternally { verified }`,
+`PublishedWithAnswer` — and carries no time, no memory and no hardware. "FreeLunch reports 5727 s
+for `polyDet` and 27.6 GB on one core of an AMD EPYC 7352 at 2.3 GHz" is still homeless: not an
+instance property, not a zeebra measurement, and not a status. Every candidate in §1 is a candidate
+*because* it has such a figure, so a reference-point record — paper, parameters, step, reported time
+and memory, hardware, software — should be decided before the first one is registered. It must sit
+outside `canonical()` for exactly the reason program metadata does: a corrected extrapolation must
+not change a problem's identity.
+
+### 6.3 What each candidate would require of the registry
+
+- **`ChallengeParameters` needs an `AnemoiCico` variant, and the model must be inside it** — hence
+  inside the digest. `FCICO` at `N=5` is ten generators of degree 3; `PCICO` at `N=5` is six
+  generators of degrees up to 10. Same primitive, same solutions, two different polynomial systems.
+  If the model is not in `canonical_lines`, two digests collide on problems a solver meets
+  completely differently. This supersedes the earlier "record generator degrees" framing: the
+  degrees follow from the model, so the model is the field.
+- **`Objective::CicoExact` fits Anemoi and Griffin as written.** Its statement is about "the
+  permutation-with-initial-linear-layer", and Griffin's Definition 11 does begin with `M × ·`. No
+  new objective tag — and §2 of the scoreboard document is right that adding a relaxed one would
+  change every digest that used it.
+- **LowMC needs both a new parameters variant and a new objective.** Key recovery from a single
+  plaintext/ciphertext pair is neither `CicoExact` nor `MqRoot`. A second reason to keep it at
+  rank 4, beyond the `binary_field` export.
+- **`ExternalStatus::PublishedWithAnswer` is the right status** for Griffin `r ∈ {5,6,7}` and for the
+  `six-worlds-anemoi` rows, which makes `significance(true)` a `Reproduction` — honest, and the
+  strongest claim available on a solved reduced instance.
+- **Anemoi needs `derived_digest` more than Poseidon does.** That digest exists because a parameter
+  checksum cannot notice a changed *generator*. Anemoi's round constants depend on `g`, which the
+  reference implementation takes to be `F.multiplicative_generator()` — a Sage convention rather than
+  a specified value, per §3.1 — so the constants are exactly the kind of thing that could change
+  under an unchanged identity.
 
 ## 7. Rejection list
 
