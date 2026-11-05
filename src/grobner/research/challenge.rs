@@ -1679,9 +1679,11 @@ mod tests {
             // And its size is still a fact about the problem, reported from the program's
             // parameters rather than from a system nobody can build.
             assert!(row.variables().expect("a size") > 0);
+            // Every 2025 tier constrains one word at each end.
+            let k = 1;
             assert_eq!(
                 row.variables().expect("a size") - row.equations().expect("a size"),
-                row.parameters_t() - 2 * 1,
+                row.parameters_t() - 2 * k,
                 "{}: N - E = t - 2k",
                 row.id
             );
