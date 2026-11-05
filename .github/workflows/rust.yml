@@ -10,6 +10,21 @@ on:
   # So the benchmark job, which pull requests skip, can be run against a branch on demand.
   workflow_dispatch:
 
+# One run per pull request and per branch, and the newest wins. A stack of dependent pull requests
+# is merged one commit at a time, so pushing a stack sends a burst of pushes seconds apart: eight
+# merges landed within 90 seconds on 2026-11-05 and spent 135 job-minutes, ~118 of it on commits
+# that were superseded before the first job finished. The runs also queued 40 jobs against the
+# 20-job concurrency ceiling and delayed every pull request behind them.
+#
+# `cancel-in-progress` applies to `main` as well as to pull requests, which does mean an
+# intermediate merge commit can go untested there. Every commit in a stack is already green as a
+# pull request before it is merged, and the tip of the burst is tested in full, so what that loses
+# is a check that had already passed once. The event name is part of the group so an on-demand
+# `workflow_dispatch` against a branch cannot cancel that branch's pull-request run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   # `-C target-cpu` is repeated here on purpose. `.cargo/config.toml` sets it for local builds,
@@ -94,7 +109,14 @@ jobs:
       # panic by design. `test(=...)` is an exact match, so a renamed test fails the filter
       # rather than silently matching nothing. Release mode is required — the naive reference
       # engine is impractical in a debug build.
+      #
+      # Pushes to main and manual runs only, for the same reason as the benchmark job below:
+      # these two tests take 145s on a shared runner, which is a quarter of this job's wall clock
+      # and sits on the critical path of every pull request. They reuse the build the steps above
+      # already paid for, so running them after a merge — where latency blocks nothing — costs
+      # almost nothing, and `workflow_dispatch` runs them against a branch on demand.
       - name: Gröbner engines agree on the slow systems
+        if: github.event_name != 'pull_request'
         run: |
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
@@ -119,33 +141,40 @@ jobs:
       # `cargo bench -- --test`, not `cargo test --benches`: with `test = false` on the benchmark
       # targets the latter now selects nothing and would pass vacuously. This runs each case once
       # and takes no measurements.
+      #
+      # `--profile ci-release` for exactly that reason. A bare `cargo bench` resolves
+      # `[profile.bench]`, which inherits `release`, so it links all eight criterion binaries
+      # under fat LTO at one codegen unit — the settings that exist to make a *measurement*
+      # reproducible, which this job does not take. Cold, for one bench target: 193s under
+      # `bench`, 34s under `ci-release`. The build is most of this job's 8.4 minutes.
+      #
+      # The cost is that no CI job compiles the fat-LTO profile any more, so a failure that only
+      # appears at one codegen unit — a link error, or an ICE in the LTO pass — surfaces on the
+      # machine taking the measurement rather than here. Accepted: every reported number comes
+      # from a local `cargo bench`, which still resolves `[profile.bench]` and is unaffected.
       - name: Benchmarks execute without panicking
-        run: cargo bench -- --test
+        run: cargo bench --profile ci-release -- --test
 
-  format:
-    name: Format
+  # One job rather than two. `cargo fmt --all --check` takes 0.1s and needs no cache, so as its
+  # own job it was almost entirely runner start-up, a checkout and a toolchain install — and it
+  # held one of the five concurrency slots a run occupies.
+  lint:
+    name: Format and lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Check formatting
         run: cargo fmt --all --check
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - uses: Swatinem/rust-cache@v2
-
+      # `!cancelled()` rather than the default: formatting and linting are independent, and a
+      # misplaced brace should not hide every clippy finding behind a second round trip.
       - name: Lint
+        if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --all-features -- -D warnings
