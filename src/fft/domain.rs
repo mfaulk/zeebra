@@ -105,7 +105,9 @@ impl<F: FiniteField> Display for FFTDomain<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{fields::PrimeFieldElement64, identities::One, powers_of, FFTDomain, FiniteField};
+    use crate::{
+        fields::PrimeFieldElement64, identities::One, powers_of, FFTDomain, FiniteField, KnownOrder,
+    };
     use rand::{prelude::StdRng, SeedableRng};
 
     #[test]

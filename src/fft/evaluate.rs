@@ -83,7 +83,7 @@ mod tests {
         fft::{domain::FFTDomain, evaluate::evaluate, tests::to_polynomial},
         fields::PrimeFieldElement64,
         identities::Zero,
-        FiniteField, Polynomial, UnivariatePolynomial,
+        FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
     };
     use rand::{prelude::StdRng, SeedableRng};
 

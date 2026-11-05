@@ -24,6 +24,7 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] Batched border reduction and adaptive operator storage: 14x on katsura-7's conversion
+- [x] 254- and 255-bit prime fields, with F4, FGLM and solving over them end to end
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -87,9 +88,10 @@ cargo test --release --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
-Four other `#[ignore]`d tests are unimplemented placeholders for statistical distribution checks
-and a rare division branch, and they panic if run. A bare `cargo test -- --ignored` therefore
-reports those four as failures; the commands above select the tests that are meant to pass.
+Two other `#[ignore]`d tests are unimplemented placeholders — a `BigUInt` sampling distribution
+check and a rare division branch — and they panic if run. A bare `cargo test -- --ignored`
+therefore reports those two as failures; the commands above select the tests that are meant to
+pass.
 
 CI runs the suite twice: once in debug, and once in release in a separate job that also runs the
 two Gröbner engine-agreement tests above. Both configurations are checked because a release build
@@ -329,8 +331,9 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-F4.md`](docs/MILESTONE-F4.md),
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md),
 [`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md),
-[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md), and
-[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md).
+[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md),
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md), and
+[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md).
 
 ## Finite Fields
 
@@ -351,8 +354,22 @@ Two consequences worth knowing:
 - `P = 2` is supported and keeps the wide-remainder path, because `2^64` is not invertible modulo
   an even number. The branch is on a const generic, so it is resolved at compile time.
 
-`PrimeFieldElement128<P>` still reduces a 256-bit product by software long division. It is not yet
-converted.
+`PrimeFieldElement128<P>` still reduces a 256-bit product by allocating software long division. It
+is not yet converted, and is measurably the slowest field in the crate as a result — slower than
+one four times as wide. `cargo bench --bench field_arithmetic`, per operation:
+
+| field | width | mul | add | sub | inverse |
+|---|---:|---:|---:|---:|---:|
+| `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | 246 ns |
+| `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | 509 ns |
+| `PrimeFieldElement128` | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
+| `Bn254Fr` | 254 | 18.71 ns | 3.69 ns | 3.41 ns | 3.77 µs |
+| `Bls12_381Fr` | 255 | 19.34 ns | 3.52 ns | 3.27 ns | 3.97 µs |
+
+Read the last three rows together: a 254-bit multiply is **7.0x faster** than the 68-bit one, and
+10.9x slower than the 64-bit one. A claim about what field width costs has to say which baseline
+it means. Inversion over a wide field is 202 multiplies, so pivot normalization should multiply by
+a precomputed inverse rather than divide per entry.
 
 Two other field types gained the same treatment, each measured on the operation rather than on a
 whole computation, because both modules are private and no bench target can reach them:
@@ -364,6 +381,116 @@ whole computation, because both modules are private and no bench target can reac
 - `ExtensionFieldElement<P, N, M>` reduces once per output coefficient instead of once per partial
   product, O(N) instead of O(N^2), under a compile-time overflow bound; the per-multiplication heap
   allocation is gone.
+
+### 254- and 255-bit prime fields
+
+`PrimeFieldElement256<M>` is the scalar field of a pairing-friendly curve, held in Montgomery form
+over four 64-bit limbs — CIOS multiplication, binary extended Euclid inversion, and `R mod p` /
+`R^2 mod p` as compile-time constants. Two fields are provided:
+
+```rust
+use zeebra::{fields::{Bls12_381Fr, Bn254Fr}, FiniteField, KnownOrder, One};
+
+let a = <Bn254Fr as FiniteField>::from_str("123456789012345678901234567890").unwrap();
+assert_eq!(a * a.inverse(), Bn254Fr::one());
+
+// The order does not fit in a machine integer, which is why `KnownOrder` reports limbs.
+assert_eq!(Bn254Fr::order_u128(), None);
+assert_eq!(Bn254Fr::order_limbs().len(), 4);
+assert_eq!(Bls12_381Fr::order_limbs().len(), 4);
+```
+
+The modulus arrives through the `PrimeModulus256` trait rather than a const generic, because a
+const generic parameter cannot be 256 bits wide — the same device `IrreduciblePolynomial` already
+uses for extension fields. A new field is its modulus limbs and nothing else:
+
+```rust
+use zeebra::fields::{PrimeFieldElement256, PrimeModulus256};
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+struct MyModulus;
+
+impl PrimeModulus256 for MyModulus {
+    // Must be an odd prime: R = 2^256 is not invertible modulo an even number.
+    const MODULUS: [u64; 4] = [0xffffffff00000001, 0x53bda402fffe5bfe,
+                               0x3339d80809a1d805, 0x73eda753299d7d48];
+}
+
+type MyField = PrimeFieldElement256<MyModulus>;
+```
+
+Any odd prime up to 256 bits works, not only one that fills all four limbs. A narrower modulus
+leaves its high limbs zero, and the bit width that `new` and `random` depend on is derived from the
+highest occupied limb rather than assumed — the tests cover moduli at one, two, three and four
+limbs, with GF(7) checked exhaustively against `PrimeFieldElement64<7>`. Below 2^128 the order
+fits a machine integer again, so `KnownOrder::order_u128` starts returning `Some`.
+
+`BN254_FR_MODULUS_DECIMAL` and `BLS12_381_FR_MODULUS_DECIMAL` are public so the compiled-in limbs
+can be checked against the published values, which the module's own tests do.
+
+What the representation means for a caller:
+
+- `canonical_limbs()`, `to_bytes_le()` and `Display` are Montgomery reductions, not field reads.
+  Hold field elements in a hot loop and convert at the boundary.
+- Serialization and `to_bytes_le` emit the **canonical residue**, never the stored Montgomery
+  value, so an encoding does not depend on an internal representation choice.
+- `from_canonical_limbs` and `try_from_bytes_le` **reject** an input at or above the modulus, as
+  does deserialization. `from_limbs_reduced` is the separately named constructor that reduces.
+- `random` is masked rejection sampling. Reducing a uniform 256-bit draw modulo a 254-bit prime
+  would favour the low residues.
+- `primitive_element` and `root_of_unity` are `unimplemented!()`. Finding a generator of the
+  multiplicative group means factoring a 254-bit `q - 1`, which no algorithm here needs and which
+  should not start by accident.
+
+The whole stack works over these fields, not just the arithmetic:
+`grobner::mod`'s `test_the_whole_pipeline_over_bn254_fr` and its BLS12-381 twin take a planted
+zero-dimensional system through F4, check the basis against Buchberger's criterion, convert to lex
+with FGLM, compare that against a direct lex F4, and then recover a solution with `solve_one` and
+re-evaluate it against the original system.
+
+Root finding over a wide field works because `pow_mod_limbs` takes its exponent as little-endian
+limbs rather than a `u128`; `roots` passes `F::order_limbs()` straight through. `pow_mod` is now a
+thin wrapper over it and is unchanged for callers.
+
+The arithmetic is checked against `ark-ff` as a **dev-dependency oracle**, in the role Singular
+already plays for Gröbner bases: 20,000 random cases per field on add, sub, mul, square, negate,
+invert and divide, plus the edge residues. Nothing third-party is in the shipped crate.
+
+### `FiniteField` and `KnownOrder`
+
+A coefficient type implements `FiniteField`: arithmetic, inversion, parsing, uniform sampling,
+`new`, and exponentiation by a `u128`. The field's *order* is not there. It lives in a separate
+trait:
+
+```rust
+use zeebra::{fields::Zp2147483647, KnownOrder};
+
+assert_eq!(Zp2147483647::order_limbs(), &[2147483647]);
+assert_eq!(Zp2147483647::order_u128(), Some(2147483647));
+```
+
+`KnownOrder` gives the order q and the characteristic p as little-endian 64-bit limbs — a width
+that covers 64-, 128- and 256-bit orders without allocating — plus `order_u128` and
+`characteristic_u128` for callers that need a machine integer and can fail without one, and
+`primitive_element` and `root_of_unity`. For an extension field q = p^k, so the order and the
+characteristic are genuinely different; both are reported.
+
+The split is there because a 254-bit prime field has no order that fits in a machine integer, and
+because **nothing in the algebraic core asks for one**: the multivariate polynomials, the linear
+algebra, F4, FGLM and Buchberger are all generic over `FiniteField` alone. Only root finding,
+factorization and enumerating the field itself need `KnownOrder`, and they say so in their bounds.
+`grobner::mod`'s `test_the_grobner_stack_needs_no_field_cardinality` fails to compile if that
+stops being true.
+
+Every field type in the crate implements both traits. Two consequences for anything generic over
+`F: FiniteField`:
+
+- `F::order()` and `F::characteristic()` are gone. Add `F: KnownOrder` and call `order_limbs()`,
+  or `order_u128()` where the old `u128` is what you want.
+- `inverse()` is a required method rather than a provided one. Its only sensible default was
+  `a^(q-2)`, which needs the order; a field whose order does not fit in a `u128` cannot have it.
+
+`docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 
 ## Gröbner Bases
 

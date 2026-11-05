@@ -27,7 +27,7 @@ mod tests {
         evaluate,
         fft::{domain::FFTDomain, tests::to_polynomial},
         fields::PrimeFieldElement64,
-        interpolate, FiniteField, Polynomial, UnivariatePolynomial,
+        interpolate, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
     };
     use rand::{prelude::StdRng, SeedableRng};
 

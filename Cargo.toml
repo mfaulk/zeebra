@@ -29,6 +29,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde_arrays = "0.1.0"
 
 [dev-dependencies]
+# `ark-ff` is a *test oracle only*, in the role Singular already plays for Gröbner bases: the
+# 256-bit prime field arithmetic in `fields::prime_field_256` is checked against an independent,
+# widely deployed implementation. Nothing in the shipped crate depends on it. The two scalar
+# fields are declared from their moduli through `MontConfig` rather than taken from `ark-bn254`
+# and `ark-bls12-381`, which pull in `ark-ec` and the whole curve stack unconditionally.
+ark-ff = { version = "0.6", default-features = false, features = ["std"] }
 bincode = "1.3.3"
 criterion = { version = "0.5", features = ["html_reports"] }
 

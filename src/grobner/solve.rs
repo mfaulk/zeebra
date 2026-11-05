@@ -19,7 +19,7 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     grobner::buchberger,
     poly::{roots, MonomialOrder, Polynomial, UnivariatePolynomial},
-    FiniteField, MultivariatePolynomial,
+    FiniteField, KnownOrder, MultivariatePolynomial,
 };
 
 /// The largest field whose elements this solver will enumerate.
@@ -36,7 +36,7 @@ const MAX_FIELD_ORDER: u128 = 1 << 20;
 /// # Panics
 /// Panics if the system leaves a variable unconstrained and the field's order exceeds
 /// `MAX_FIELD_ORDER`. A system with finitely many solutions has no such limit.
-pub fn solve<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+pub fn solve<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     rng: &mut R,
 ) -> Vec<[F; N]> {
@@ -78,7 +78,7 @@ pub fn solve<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 ///
 /// `basis` always has the already-assigned variables substituted in, so at the deepest level
 /// every polynomial is a constant.
-fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+fn extend<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     basis: &[MultivariatePolynomial<N, F>],
     remaining: usize,
     assignment: &mut [F; N],
@@ -102,11 +102,11 @@ fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
             // with.
             if elements.is_none() {
                 assert!(
-                    F::order() <= MAX_FIELD_ORDER,
+                    F::order_u128().is_some_and(|q| q <= MAX_FIELD_ORDER),
                     "variable {} is unconstrained, so covering it means enumerating the field, \
-                     whose order {} exceeds the limit of {}",
+                     whose order {:?} exceeds the limit of {}",
                     index,
-                    F::order(),
+                    F::order_limbs(),
                     MAX_FIELD_ORDER
                 );
                 *elements = Some(field_elements(rng));
@@ -137,7 +137,7 @@ fn extend<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
 ///
 /// Shared with [`super::solve_zero_dimensional`], which needs the same candidates under a stricter
 /// contract: for a zero-dimensional ideal this never returns `None`. See that module for why.
-pub(crate) fn candidate_values<const N: usize, F: FiniteField, R: RngCore + CryptoRng>(
+pub(crate) fn candidate_values<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     basis: &[MultivariatePolynomial<N, F>],
     index: usize,
     rng: &mut R,
@@ -215,12 +215,12 @@ pub(crate) fn is_nonzero_constant<const N: usize, F: FiniteField>(
 /// Built from a generator because `FiniteField` offers no way to enumerate elements directly:
 /// `new` maps integers into the field, which reaches only the prime subfield of an extension.
 /// The multiplicative group is cyclic of order q - 1, so its powers cover every nonzero element.
-fn field_elements<F: FiniteField, R: RngCore + CryptoRng>(rng: &mut R) -> Vec<F> {
-    let order = F::order();
+fn field_elements<F: KnownOrder, R: RngCore + CryptoRng>(rng: &mut R) -> Vec<F> {
+    let order = F::order_u128().unwrap_or(u128::MAX);
     assert!(
         order <= MAX_FIELD_ORDER,
-        "enumerating a field of order {} exceeds the limit of {}",
-        order,
+        "enumerating a field of order {:?} exceeds the limit of {}",
+        F::order_limbs(),
         MAX_FIELD_ORDER
     );
     let mut elements = Vec::with_capacity(order as usize);
@@ -245,7 +245,7 @@ mod tests {
     use crate::{
         fields::{PrimeFieldElement64, Zp18446744073709551557, Zp2147483647},
         identities::Zero,
-        FiniteField, MultivariatePolynomial,
+        FiniteField, KnownOrder, MultivariatePolynomial,
     };
 
     /// Every point at which the system vanishes, found by trying all of them.
@@ -418,7 +418,7 @@ mod tests {
         type F = Zp2147483647; // 2^31 - 1, about two thousand times the enumeration limit
         let vars = ["x", "y"];
         let mut rng = StdRng::seed_from_u64(37);
-        assert!(F::order() > super::MAX_FIELD_ORDER);
+        assert!(F::order_u128().unwrap() > super::MAX_FIELD_ORDER);
 
         // A single point.
         let f: Vec<MultivariatePolynomial<2, F>> = vec![
