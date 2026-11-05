@@ -10,13 +10,21 @@
 //! carrying a second block through the elimination, which is what each row does below: alongside
 //! its coordinates it holds its own expression in terms of the accepted vectors.
 //!
-//! # The second block is triangular, not square
+//! # Neither block is square
 //! An echelon row inserted when the accepted rank is `r` is a combination of the `r + 1` vectors
 //! accepted up to and including the one that produced it. It **cannot** involve a vector accepted
 //! afterwards, so its combination needs `r + 1` coefficients and not `D`. Summed over the rows that
-//! is `D (D + 1) / 2` cells against `D^2` — so the span holds `1.5 D^2` field elements at full rank
-//! rather than `2 D^2`, a quarter less, exactly. Nothing is approximated and nothing is traded: the
-//! padding was zeros.
+//! is `D (D + 1) / 2` cells against `D^2`.
+//!
+//! The coordinates are the same argument from the other end. A row is reduced against every
+//! earlier row before it is inserted, so it is zero below its own pivot, and nothing writes to a
+//! row afterwards — [`IncrementalSpan::reduce`] only reads. So each row stores its coordinates
+//! from its pivot on: `D - pivot` cells. At full rank the pivots are a permutation of `0..D`, so
+//! the block is `D (D + 1) / 2` as well, and the span holds `D (D + 1)` field elements rather than
+//! `D^2 + D (D + 1) / 2`: a third less in the limit, and 33.3% less at `D = 1,024`. Nothing is
+//! approximated and nothing is traded — both paddings were zeros — but note the arithmetic rather
+//! than the slogan: against the conversion's three dense blocks, of which the span is two, the
+//! same cells are a fifth and not a quarter.
 
 use crate::FiniteField;
 
@@ -24,6 +32,11 @@ use crate::FiniteField;
 #[derive(Clone, Debug)]
 struct SpanRow<F: FiniteField> {
     /// `coordinates = sum_j combination[j] * accepted_j`. The invariant everything rests on.
+    ///
+    /// **Stored from the pivot on**: `coordinates[k]` is the coefficient of column `pivot + k`, so
+    /// the vector is `dimension - pivot` long. Everything below the pivot was cleared when the row
+    /// was reduced and nothing writes to a row afterwards, so the padding this drops was zeros —
+    /// see the module documentation.
     coordinates: Vec<F>,
 
     /// Coefficients over the accepted vectors, of length `index + 1` for the row at `index`.
@@ -59,7 +72,8 @@ pub struct IncrementalSpan<F: FiniteField> {
     rows: Vec<SpanRow<F>>,
     dimension: usize,
 
-    /// Row subtractions performed, for the statistics. One subtraction touches `2 * D` entries.
+    /// Row subtractions performed, for the statistics. One subtraction against the row at `r`
+    /// leading at `pivot` touches `D - pivot` coordinates and `r + 1` coefficients, not `2 * D`.
     row_operations: usize,
 }
 
@@ -112,8 +126,10 @@ impl<F: FiniteField> IncrementalSpan<F> {
             if multiple.is_zero() {
                 continue;
             }
-            // The row is monic at its pivot, so the multiple is the entry itself.
-            for (slot, value) in residue.iter_mut().zip(&row.coordinates) {
+            // The row is monic at its pivot, so the multiple is the entry itself. The row is
+            // stored from its pivot on and the residue is full width, so the slice aligns the two
+            // and the zip is exact rather than truncating.
+            for (slot, value) in residue[row.pivot..].iter_mut().zip(&row.coordinates) {
                 *slot -= multiple * *value;
             }
             for (slot, value) in combination.iter_mut().zip(&row.combination) {
@@ -171,7 +187,12 @@ impl<F: FiniteField> IncrementalSpan<F> {
             .expect("an independent vector has a nonzero entry");
         let scale = residue[pivot].inverse();
 
-        let coordinates: Vec<F> = residue.iter().map(|value| *value * scale).collect();
+        // From the pivot on. `residue[..pivot]` is zero by the definition of `pivot` above, and no
+        // later write reintroduces a nonzero there, so there is nothing to store.
+        let coordinates: Vec<F> = residue[pivot..]
+            .iter()
+            .map(|value| *value * scale)
+            .collect();
         // `index + 1` coefficients: the negated input over the vectors already accepted, then the
         // one for the vector being accepted now. Exactly the row's own expression, with no padding.
         let mut row_combination: Vec<F> = Vec::with_capacity(index + 1);
@@ -185,11 +206,12 @@ impl<F: FiniteField> IncrementalSpan<F> {
         });
     }
 
-    /// Field-element cells the rows hold: `D` coordinates plus `r + 1` combination coefficients
-    /// each.
+    /// Field-element cells the rows hold: `D - pivot` coordinates plus `r + 1` combination
+    /// coefficients each.
     ///
-    /// `D^2 + D (D + 1) / 2` at full rank. Reported rather than derived from `D` so that a caller
-    /// measuring a partial conversion sees what is really there.
+    /// `D (D + 1)` at full rank, two triangles. Reported rather than derived from `D` so that a
+    /// caller measuring a partial conversion sees what is really there — and a partial span's
+    /// figure is not `r (r + 1)`, because the rows' pivots are whatever columns the input led with.
     pub fn stored_cells(&self) -> usize {
         self.rows
             .iter()
@@ -199,14 +221,12 @@ impl<F: FiniteField> IncrementalSpan<F> {
 
     /// The cells a span of this dimension holds at full rank, or `None` on overflow.
     ///
-    /// `D^2` coordinates and `D (D + 1) / 2` combination coefficients. Checked arithmetic, since a
-    /// budget computed from a wrapped product would be no budget at all.
+    /// `D (D + 1)`: two triangular blocks of `D (D + 1) / 2`. At full rank the pivots are a
+    /// permutation of `0..D`, so the coordinates sum to `sum_pivot (D - pivot)` exactly, and the
+    /// combinations to `sum_r (r + 1)`. Checked arithmetic, since a budget computed from a wrapped
+    /// product would be no budget at all.
     pub fn cells_at_full_rank(dimension: usize) -> Option<usize> {
-        let coordinates = dimension.checked_mul(dimension)?;
-        let combinations = dimension
-            .checked_mul(dimension.checked_add(1)?)?
-            .checked_div(2)?;
-        coordinates.checked_add(combinations)
+        dimension.checked_mul(dimension.checked_add(1)?)
     }
 }
 
@@ -478,9 +498,9 @@ mod tests {
         span.insert(field(&[1, 1]), field(&[0, 0]));
     }
 
-    /// The combination block is triangular: `r + 1` coefficients for the row at `r`.
+    /// Both blocks are triangular: `D - pivot` coordinates and `r + 1` coefficients per row.
     #[test]
-    fn test_the_rows_hold_a_triangular_combination_block() {
+    fn test_the_rows_hold_two_triangular_blocks() {
         const D: usize = 12;
         // Unit vectors in a scrambled order, so the rows' pivots are not their indices and the
         // triangularity cannot be an accident of the input being already echelonized.
@@ -498,18 +518,64 @@ mod tests {
         assert_eq!(span.accepted(), D, "the unit vectors should be a basis");
         assert_eq!(accepted.len(), D);
 
-        // `D` coordinates per row, and `r + 1` combination coefficients for the row at `r`.
+        // At full rank the pivots are a permutation of `0..D`, so the coordinate block is
+        // `sum (D - pivot) = D (D + 1) / 2` cells, and the combination block is the same figure
+        // from the other direction: `r + 1` coefficients for the row at `r`.
         assert_eq!(
             span.stored_cells(),
-            D * D + D * (D + 1) / 2,
-            "the combination block should be triangular, not square"
+            D * (D + 1) / 2 + D * (D + 1) / 2,
+            "both blocks should be triangular, not one"
         );
+        assert_eq!(span.stored_cells(), D * (D + 1), "which is `D (D + 1)`");
         assert_eq!(
             span.stored_cells(),
             IncrementalSpan::<F>::cells_at_full_rank(D).expect("representable")
         );
-        // Strictly less than M17's two square blocks, which is the whole point.
-        assert!(span.stored_cells() < 2 * D * D);
+        // Strictly less than the square coordinate block alone, which is the whole point.
+        assert!(span.stored_cells() < D * D + D * (D + 1) / 2);
+    }
+
+    /// A single row stores `D - pivot` coordinates, and still reduces a dependent vector exactly.
+    ///
+    /// The aggregate figure above would also hold if a row stored the wrong `D - pivot` cells — a
+    /// span of full rank has one row per pivot either way. This pins one row's length against its
+    /// own pivot, and then checks that the offset row still clears the column it leads with.
+    #[test]
+    fn test_a_row_stores_its_coordinates_from_its_pivot() {
+        const D: usize = 8;
+        const PIVOT: usize = 3;
+        let mut span = IncrementalSpan::new(D);
+
+        // Leading zeros, so the pivot is 3 rather than 0 and an off-by-one is visible.
+        let v = field(&[0, 0, 0, 2, 5, 0, 7, 11]);
+        match span.reduce(&v) {
+            Dependence::Independent {
+                residue,
+                combination,
+            } => span.insert(residue, combination),
+            other => panic!("the first vector should be independent, got {:?}", other),
+        }
+        // `D - PIVOT` coordinates and the one combination coefficient of the row at index 0.
+        assert_eq!(span.stored_cells(), (D - PIVOT) + 1);
+
+        // Three times the vector is dependent with coefficient three, which it cannot be unless
+        // the stored coordinates are aligned to the pivot they were offset by.
+        let target: Vec<F> = v.iter().map(|value| F::new(3) * *value).collect();
+        match span.reduce(&target) {
+            Dependence::Dependent { coefficients } => assert_eq!(coefficients, field(&[3])),
+            other => panic!("three times the row should be dependent, got {:?}", other),
+        }
+
+        // And a vector that differs only below the pivot keeps that difference: the row has
+        // nothing stored there to subtract.
+        let mut below = v.clone();
+        below[0] = F::new(9);
+        match span.reduce(&below) {
+            Dependence::Independent { residue, .. } => {
+                assert_eq!(residue, field(&[9, 0, 0, 0, 0, 0, 0, 0]));
+            }
+            other => panic!("a new leading entry should be independent, got {:?}", other),
+        }
     }
 
     /// A dependence's coefficients are exact over the *original* accepted vectors.

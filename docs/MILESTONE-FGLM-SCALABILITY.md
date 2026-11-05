@@ -987,7 +987,7 @@ It does not need to be. A row inserted when the accepted rank is `r` is a combin
 vectors accepted up to and including the one that produced it — it **cannot** involve one accepted
 afterwards, so coefficients beyond `r` are structurally zero. Summed over the rows:
 
-| block | M17 | now |
+| block | M17 | M18-4 |
 |---|---:|---:|
 | coordinates | `D^2` | `D^2` |
 | combinations | `D^2` | `D (D + 1) / 2` |
@@ -996,12 +996,15 @@ afterwards, so coefficients beyond `r` are structurally zero. Summed over the ro
 
 A quarter off the span, exactly, with nothing traded: the padding was zeros. Measured:
 
-| system | `D` | M17 dense blocks | now | won |
+| system | `D` | M17 dense blocks | M18-4 | won |
 |---|---:|---:|---:|---:|
 | katsura-7 | 64 | 96.0 kB | 80.2 kB | 1.20x |
 | cyclic-6 | 156 | 570.4 kB | 475.9 kB | 1.20x |
 | planted-8 | 256 | 1,536.0 kB | 1,281.0 kB | 1.20x |
 | planted-10 | 1,024 | 24,576.0 kB | **20,484.0 kB** | 1.20x |
+
+**The coordinate rows of both tables changed again after the milestone**, by the same argument
+applied to the other block: §8.6.
 
 The coefficients a dependence reports must still be exact over the **original** accepted vectors —
 §8.2 of the proposal calls that correctness-critical, and it is the thing a triangular block could
@@ -1010,12 +1013,12 @@ break. Tested on a Vandermonde basis, where there is no structure for an error t
 ### 8.2 `max_span_entries` now counts all three blocks
 
 It counted two of them and priced both as squares, so at `D = 16` it budgeted 512 cells where the
-conversion allocates 648. **A budget cannot protect memory it does not know about**, and §8.1 of the
-proposal asks for all substantial arrays to be recorded and budgeted — so the limit's meaning has
-changed. Loudly: the option's documentation says so, the error's value changed in a test that
-states the arithmetic, and `FglmMemory` reports each block separately so a figure quoted against the
-old meaning can be recomputed. Checked arithmetic throughout, since a budget computed from a
-wrapped product is no budget.
+conversion then allocated 648 — and allocates 528 after §8.6. **A budget cannot protect memory it
+does not know about**, and §8.1 of the proposal asks for all substantial arrays to be recorded and
+budgeted — so the limit's meaning has changed. Loudly: the option's documentation says so, the
+error's value changed in a test that states the arithmetic, and `FglmMemory` reports each block
+separately so a figure quoted against the old meaning can be recomputed. Checked arithmetic
+throughout, since a budget computed from a wrapped product is no budget.
 
 ### 8.3 The sparse-FGLM spike: shape position
 
@@ -1061,6 +1064,10 @@ points would get both wrong.
 Milliseconds. `lex walk` and `shape route` start from a prepared quotient algebra; the end-to-end
 columns include building it, which neither route can avoid.
 
+**§8.6 changed both cell columns**, since the span is in both: at `D = 64` they are 8,256 and
+4,224, so the ratio is 1.95x rather than 1.65x. Both routes drive the same `IncrementalSpan`, so
+both also got faster; the time columns are a ratio between them and were not re-measured.
+
 **The shape route is slower, and the reason is instructive.** It does `D` span reductions where the
 walk does about `D + |G|`, which is comparable — but the walk's vectors are the *classes of
 monomials*, which are sparse early on, and `reduce` skips a row whose pivot column is zero in the
@@ -1097,7 +1104,8 @@ Nothing here is probabilistic, so there is no certified-versus-conjectural disti
 
 ### 8.5 The deliverable: no-go, and why
 
-§8.6 of the proposal asks six questions.
+The M18 proposal asks six questions of the spike — a different document's numbering from this
+one's.
 
 **1. Which benchmark systems meet the shape-position criterion?** The katsura family at every size,
 and nothing else in the corpus. 68% of the random differential fixtures.
@@ -1114,7 +1122,7 @@ is complete and costs `O(N D)` operator applications. A Wiedemann variant choosi
 form or a random separating element could reuse it unchanged, so such a variant could be exposed as
 certified rather than conjectural. This is the one unambiguously reusable result of the spike.
 
-**5. What memory limits would remain?** The echelon form, `D^2 + D (D + 1) / 2` cells. The shape
+**5. What memory limits would remain?** The echelon form, `D (D + 1)` cells after §8.6. The shape
 route removes the accepted-vector block and nothing else, so it is still `O(D^2)`. Only replacing the
 echelon form — a scalar Krylov sequence of length `2D` plus Berlekamp–Massey — gets to `O(D)`, and
 Zeebra has no Berlekamp–Massey.
@@ -1142,6 +1150,74 @@ and it is the foundation a Berlekamp–Massey route would stand on if a workload
 shape-position quotients ever appears. Measuring whether the algebraic-hash systems that motivate
 this project's architecture are in shape position is the thing to do **before** committing to such a
 milestone, not after.
+
+### 8.6 Follow-up (issue #56): the coordinate block is triangular too
+
+Filed and done after the milestone closed, by §8.1's argument applied to the other block. An
+echelon row is reduced against every earlier row before it is inserted, so it is **zero below its
+own pivot**, and nothing writes to a row afterwards — `reduce` only reads. So a row leading at
+`pivot` stores `D - pivot` coordinates and the subtraction loop starts there:
+
+| block | M17 | M18-4 | now |
+|---|---:|---:|---:|
+| coordinates | `D^2` | `D^2` | `D (D + 1) / 2` |
+| combinations | `D^2` | `D (D + 1) / 2` | `D (D + 1) / 2` |
+| accepted vectors | `D^2`, uncounted | `D^2` | `D^2` |
+| **span** | `2 D^2` | `D^2 + D (D + 1) / 2` | **`D (D + 1)`** |
+| **total** | `3 D^2` | `2 D^2 + D (D + 1) / 2` | `D^2 + D (D + 1)` |
+
+Nothing is traded — this padding was zeros as well — and the saving is worth stating as a
+percentage rather than as a ratio, because the two are easy to confuse and one of them was
+confused in review. The span loses `D^2 - D (D + 1) / 2` cells, which is **a third of it in the
+limit and less than that at every finite `D`**: 30.6% at `D = 16`, 32.6% at 64, 33.3% at 1,024.
+Against all three blocks the same cells are **a fifth**, not a quarter: 18.5% at `D = 16` and
+20.0% at 1,024. The before/after *ratio* is 1.25x, and a 1.25x ratio is a 20% reduction.
+
+| system | `D` | M18-4 dense blocks | now | ratio | cut |
+|---|---:|---:|---:|---:|---:|
+| katsura-7 | 64 | 80.2 kB | 64.5 kB | 1.24x | 19.6% |
+| cyclic-6 | 156 | 475.9 kB | 381.5 kB | 1.25x | 19.8% |
+| planted-8 | 256 | 1,281.0 kB | 1,026.0 kB | 1.25x | 19.9% |
+| planted-10 | 1,024 | 20,484.0 kB | **16,392.0 kB** | 1.25x | 20.0% |
+
+Measured with `cargo run --release --example fglm_profile`; the percentages are the exact
+arithmetic above, which the kB figures reproduce.
+
+The two steps were measured separately, because the time win and the memory win have different
+causes and the issue asked for them to be attributed rather than bundled. `prefix skip` is the
+subtraction loop starting at the row's pivot with the representation unchanged; `offset` is the
+representation change on top of it. Lex-walk milliseconds, the `walk` column of `fglm_profile`,
+fastest of three runs of an example that itself reports the fastest of three conversions, each
+variant built into its own target directory and identified by the storage table it printed:
+
+| system | `D` | M18-4 walk | prefix skip | offset | won | conversion, M18-4 → now |
+|---|---:|---:|---:|---:|---:|---:|
+| katsura-7 | 64 | 0.84 | 0.72 | 0.69 | 1.22x | 2.31 → 2.14 ms |
+| cyclic-6 | 156 | 1.24 | 0.99 | 0.96 | 1.29x | 2.47 → 2.22 ms |
+| planted-8 | 256 | 1.03 | 0.97 | 0.89 | 1.16x | 2.37 → 2.22 ms |
+| planted-10 | 1,024 | 23.61 | 20.98 | **12.68** | **1.86x** | 32.50 → 20.47 ms |
+
+**The prefix skip is the smaller half, and that is the interesting part.** The field operations
+saved are the same in both columns — the skip already avoids every multiply-and-subtract below the
+pivot, and `span_row_operations` is identical across all three variants, because the loop over the
+rows and its zero test are untouched. What the representation change adds is a smaller working
+set: planted-10's coordinate block goes from 8 MB to 4.2 MB, and only on that instance, where the
+block does not fit in cache either way, does it matter. At `D = 64` the two columns differ by
+0.03 ms.
+
+**The ceiling, stated as the issue asked.** On katsura-7 the walk is 32% of a conversion and the
+dense blocks are 0.4x the operators, so 1.22x on the walk is 1.08x end to end and the memory win is
+16 kB. The figure worth quoting is planted-10's — and §8.5's third bullet still stands: F4 gets
+planted-8's lex basis directly in 0.04 ms against a 2.2 ms conversion, so **this makes a route
+faster that callers are already steered away from.** That bounds the value, and is why this was an
+issue and not a milestone.
+
+`max_span_entries` moved with the arithmetic, for the reason §8.2 gives: a budget that prices a
+block the conversion no longer allocates is the same bug as one that misses a block it does. At
+`D = 16` the three blocks are 528 cells where M18-4 counted 648 and M17 counted 512, and the
+default 20 million cells now admits `D = 3,162` rather than 2,828 — **12% on the reachable
+dimension, from a 20% saving on a quadratic.** That is the honest shape of this change: it does
+not move the asymptotics, and §9.7's reading of where FGLM's memory limit lies is unaffected.
 
 ---
 
@@ -1270,13 +1346,15 @@ into reducing the border.
 and §3.4 saying nothing else was worth attacking. It is now 52%, the walk is 31%, and the absolute
 figure is 1.44 ms where it was 36.60. On planted-10 the walk was already 60% and is now 69%: the
 border work there fell from 10.96 ms to 5.58 while the walk did not move, because nothing in M18
-touched it.
+touched it. §8.6 did, after the milestone: planted-10's walk is 12.68 ms and 62% of its
+conversion.
 
 Storage says the same thing more sharply. Under the shipped configuration the dependence test's
 three dense blocks against the operators' bytes: 0.5x on katsura-7, 2.1x on cyclic-6, 16.9x on
 planted-8 and **53.9x on planted-10**, where the blocks are 20.5 MB and the operators 380 kB. The
 operators were the whole of M18's storage work and on the systems that scale they are now a
-rounding error.
+rounding error. §8.6 took planted-10's blocks to 16.4 MB and 43.1x, which does not change that
+reading.
 
 ### 9.5 What the suite says
 
@@ -1332,15 +1410,18 @@ rounding error.
 **The dependence test is now the whole of the remaining problem on the systems that scale, in both
 time and memory.** The evidence is §9.4: on planted-10 the lex walk is 69% of a conversion and the
 three dense blocks are 20.5 MB against the operators' 380 kB. The walk's row operations are
-`O(D^3)` and its storage is `2 D^2 + D (D + 1) / 2` cells, so at `D = 2,828` the default
-`max_span_entries` of 20 million binds — and that is the limit M18 did not move.
+`O(D^3)` and its storage was `2 D^2 + D (D + 1) / 2` cells, so at `D = 2,828` the default
+`max_span_entries` of 20 million bound — and that is the limit M18 did not move. §8.6 took the
+storage to `D^2 + D (D + 1)` and the crossing to `D = 3,162`: a fifth off the storage and 12% on
+the reachable dimension, not an order of magnitude, so the recommendations below stand.
 
 Three things are worth doing, in this order:
 
 1. **Stop retaining the accepted quotient vectors, or store them as the operators are stored.**
-   They are `D^2` of the `2.5 D^2` cells and M17 added them to make a candidate's class cost one
-   operator application instead of a reduction. That trade was never measured against recomputing
-   them, and M18-3's per-column accounting is exactly the machinery for measuring it.
+   They are `D^2` of the `2 D^2 + D` cells — half of them, after §8.6 — and M17 added them to make
+   a candidate's class cost one operator application instead of a reduction. That trade was never
+   measured against recomputing them, and M18-3's per-column accounting is exactly the machinery
+   for measuring it.
 2. **Put the span's row operations through `linalg`.** The dependence test is a hand-written dense
    echelon update over `Vec<F>`, and it uses none of the elimination machinery M16 built — neither
    the backends nor `reduce_rows_against_pivots_with`. The reduction is one scaled subtraction per

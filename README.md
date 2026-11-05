@@ -342,11 +342,12 @@ the lex basis and the operators' nonzero count asserted equal to the baseline's 
 reports time and memory side by side. **It is where the defaults came from.** The shipped
 configuration is at least as fast as M17's on every system in the corpus — 14.0x on katsura-7, 1.17x
 on planted-10 — and never stores more. Two changes cannot be ablated and the example says so: the
-compact sparse column and the triangular combination block are not strategies, so they are in every
+compact sparse column and the span's two triangular blocks are not strategies, so they are in every
 row including the baseline. `cargo bench --bench fglm -- fglm_recommended` is the same comparison
 under Criterion, and `fglm_profile` shows what that left behind: border reduction was 95% of
-katsura-7's conversion and is 52%, while planted-10's lex walk is 69% of its own and nothing in M18
-touched it.
+katsura-7's conversion and is 52%, while planted-10's lex walk is the majority of its own —
+M18 did not touch it, and offsetting the span's rows by their pivots took it from 24.3 ms to
+12.5 ms and the conversion's dense blocks from 20,484 kB to 16,392 kB.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),
@@ -920,7 +921,7 @@ println!("{}", plan);                            // every decision, with its rea
 **The conservative opening is grevlex-then-FGLM**, which contradicts `DirectLexF4` being the
 `#[default]` strategy described as "the conservative choice". The argument is not that conversion
 usually wins — it loses on the whole planted family — but that **its refusals are cheap by
-construction**: FGLM's binding budget is the span's `2D² + D(D+1)/2` cells, computed from `D` and
+construction**: FGLM's binding budget is the span's `D² + D(D+1)` cells, computed from `D` and
 checked before anything is allocated, while F4's is discovered during elimination and so costs the
 whole elimination up to the crossing. Measured: katsura-7's direct attempt burns 28.3 s and 1.3 GB
 before refusing; planted-12's conversion refuses after 36 ms. The conservative question is not

@@ -170,9 +170,9 @@ pub struct FglmMemory {
 
     /// Field-element cells the dependence test's echelon rows hold.
     ///
-    /// `D^2 + D (D + 1) / 2` at full rank: a `D`-coordinate vector per row, and a combination of
-    /// `r + 1` coefficients for the row at `r`. M17 padded every combination to `D` and so held
-    /// `2 D^2`; the padding was zeros. See [`IncrementalSpan`](super::IncrementalSpan).
+    /// `D (D + 1)` at full rank: `D - pivot` coordinates for a row leading at `pivot`, and a
+    /// combination of `r + 1` coefficients for the row at `r`. Both blocks are triangular, and
+    /// both paddings M17 held were zeros. See [`IncrementalSpan`](super::IncrementalSpan).
     pub span_cells: usize,
 
     /// Field-element cells the retained accepted quotient vectors hold: `D^2` at full rank.
@@ -201,8 +201,7 @@ impl FglmMemory {
     ///
     /// Returns `(span cells, accepted-vector cells, bytes of both)`. The span's figure is
     /// [`IncrementalSpan::cells_at_full_rank`](super::IncrementalSpan::cells_at_full_rank) —
-    /// `D^2 + D (D + 1) / 2`, the triangular combination block included — and the accepted vectors
-    /// are `D^2`.
+    /// `D (D + 1)`, two triangular blocks — and the accepted vectors are `D^2`.
     ///
     /// `None` on arithmetic overflow, which `D` near `usize::MAX` would reach: a budget computed
     /// from a wrapped product would be no budget at all.
@@ -330,18 +329,23 @@ mod tests {
         );
     }
 
-    /// The span is a square plus a triangle, and the accepted vectors are a square.
+    /// The span is two triangles — `D (D + 1)` cells — and the accepted vectors are a square.
     #[test]
-    fn test_the_dense_blocks_are_a_square_a_triangle_and_a_square() {
+    fn test_the_dense_blocks_are_two_triangles_and_a_square() {
         let (span, accepted, bytes) = FglmMemory::dense_blocks_for::<F>(64).expect("representable");
-        assert_eq!(span, 64 * 64 + 64 * 65 / 2, "coordinates plus combinations");
+        assert_eq!(
+            span,
+            64 * 65 / 2 + 64 * 65 / 2,
+            "offset coordinates plus combinations"
+        );
+        assert_eq!(span, 64 * 65, "which is `D (D + 1)`");
         assert_eq!(accepted, 64 * 64);
         assert_eq!(bytes, (span + accepted) * size_of::<F>());
 
-        // M17 counted two square blocks and omitted the third; the truth is 15% less than three
-        // squares, because the combination block is triangular.
+        // M17 counted two square blocks and omitted the third; both of the span's blocks are
+        // triangular, so the truth is a third less than three squares — 8,256 against 12,288.
         assert!(span + accepted < 3 * 64 * 64);
-        assert!(span < 2 * 64 * 64);
+        assert!(span < 64 * 64 + 64 * 65 / 2, "both blocks, not just one");
     }
 
     /// A dimension whose square overflows is reported as unrepresentable, not wrapped.
