@@ -6,3 +6,6 @@
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
+
+# Fukuoka MQ Challenge data: "All Rights Reserved", fetched by tools/fetch-mq-challenge.sh
+research/instances/
