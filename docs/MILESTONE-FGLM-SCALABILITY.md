@@ -1253,6 +1253,26 @@ varies by ±15% on planted-10 — which is why the first attempt at this measure
 Slightly better than the issue's own expectation of "a few percent on the lex walk, not a factor",
 and for the reason it gave: the per-call term is small but it is multiplied by `D + |G|` calls.
 
+#### Both follow-ups together, under one protocol
+
+§8.6's table and this one were measured under different protocols, so dividing one by the other is
+not a controlled comparison. This is: `main` at the commit before §8.6 — which already carries
+issue #57's batch-buffer change — against §8.6 and §8.7 integrated, two binaries built from
+separate trees into separate target directories, `md5sum`-checked as distinct, identified by the
+storage figure they print, pinned to one core, and run 30 times each interleaved.
+
+| system | `D` | walk before | walk after | won | conversion | dense blocks |
+|---|---:|---:|---:|---:|---:|---:|
+| katsura-7 | 64 | 0.84 | 0.69 | 1.22x | 2.29 → 2.13 ms | 80.2 → 64.5 kB |
+| cyclic-6 | 156 | 1.26 | 0.94 | 1.34x | 2.51 → 2.17 ms | 475.9 → 381.5 kB |
+| planted-8 | 256 | 1.39 | 0.90 | 1.54x | 2.76 → 2.23 ms | 1,281.0 → 1,026.0 kB |
+| planted-10 | 1,024 | 23.16 | **11.07** | **2.09x** | 32.11 → 18.33 ms | 20,484 → 16,392 kB |
+
+Medians. The two steps' separately measured factors multiply to 1.86 x 1.14 = 2.12 on planted-10
+against 2.09 measured together, which is the agreement that makes the attribution in §8.6 and §8.7
+worth believing. **This is the table to quote**; the per-step tables are there to say which half
+came from where.
+
 #### The registers are storage, and no budget counts them
 
 They are `2 D` cells the span now holds for its lifetime where it previously allocated and dropped
