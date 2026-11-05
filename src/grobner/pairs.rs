@@ -36,6 +36,11 @@ pub fn leading_monomials<const N: usize, F: FiniteField>(
 /// order is total and the computation reproducible. The lcm comparison uses `Monomial`'s derived
 /// ordering rather than the monomial order under computation: a tiebreaker only has to be
 /// deterministic, not meaningful.
+///
+/// The two multipliers are carried as well, for [`PairSchedule`]. They are **appended** to the
+/// declaration rather than inserted, because `Ord` is derived: a field before `right` would change
+/// the baseline's tiebreak, whereas one after it can never be reached, since `(left, right)`
+/// already identifies the pair.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CriticalPair<const N: usize> {
     /// The total degree of `lcm`, which is what selection ranks by.
@@ -49,6 +54,21 @@ pub struct CriticalPair<const N: usize> {
 
     /// Index into the basis of the second element.
     pub right: usize,
+
+    /// The larger of the two multipliers `lcm / LM(g_left)` and `lcm / LM(g_right)`, by degree.
+    ///
+    /// "Larger" is by *degree*, which is a total order on the two and needs no monomial order to
+    /// establish. Which of the two monomials this is does not depend on the order; how the pair
+    /// then ranks against another pair's multiplier can, and
+    /// [`PairSchedule::SmallMultiplierMonomial`] is the schedule that uses that.
+    ///
+    /// The monomials are stored rather than only their degrees because the published ordering
+    /// compares the monomials, and they cannot be recovered from the pair: that would need the two
+    /// leading monomials, which a pair deliberately does not carry.
+    pub larger_multiplier: Monomial<N>,
+
+    /// The smaller of the two multipliers, by degree.
+    pub smaller_multiplier: Monomial<N>,
 }
 
 impl<const N: usize> CriticalPair<N> {
@@ -78,12 +98,46 @@ impl<const N: usize> CriticalPair<N> {
         assert_ne!(left, right, "a polynomial does not pair with itself");
         let (left, right) = (left.min(right), left.max(right));
         let lcm = Monomial::lcm(&leads[left], &leads[right]);
+        let degree = lcm.degree();
+        // The multipliers are lcm/LM(g) each. A leading monomial divides the lcm of the pair it
+        // belongs to, so each quotient exists and `checked_div` cannot fail here; a failure would
+        // mean the pair was built against a different basis.
+        let multiplier = |lead: &Monomial<N>| {
+            lcm.checked_div(lead)
+                .expect("a leading monomial divides its own pair's lcm")
+        };
+        let (left_multiplier, right_multiplier) =
+            (multiplier(&leads[left]), multiplier(&leads[right]));
+        // Ordered by degree, which needs no monomial order. See the field documentation.
+        let (larger_multiplier, smaller_multiplier) =
+            if left_multiplier.degree() >= right_multiplier.degree() {
+                (left_multiplier, right_multiplier)
+            } else {
+                (right_multiplier, left_multiplier)
+            };
         Self {
-            degree: lcm.degree(),
+            degree,
             lcm,
             left,
             right,
+            larger_multiplier,
+            smaller_multiplier,
         }
+    }
+
+    /// The degree of the larger of the two multipliers.
+    pub fn larger_multiplier_degree(&self) -> u64 {
+        self.larger_multiplier.degree()
+    }
+
+    /// The degree of the smaller of the two multipliers.
+    ///
+    /// `larger + smaller = 2 * degree - deg LM(g_left) - deg LM(g_right)`, so at a fixed lcm degree
+    /// the sum is determined by the two leading monomials and only the *split* is free. That is why
+    /// [`PairSchedule::SmallMultiplierDegree`] ranks on the larger and then the smaller rather than
+    /// on their sum, which would order nothing the lcm degree does not already.
+    pub fn smaller_multiplier_degree(&self) -> u64 {
+        self.smaller_multiplier.degree()
     }
 
     /// True if Buchberger's first criterion eliminates this pair.
@@ -121,6 +175,186 @@ pub fn are_relatively_prime<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) ->
         .iter()
         .zip(b.exponents().iter())
         .all(|(x, y)| *x == 0 || *y == 0)
+}
+
+/// In what order the pending pairs of one degree are taken.
+///
+/// **Not a criterion.** A criterion is a theorem that a pair need not be reduced at all; a schedule
+/// only decides which of the pairs that *will* be reduced is reduced first. Every variant here
+/// keeps every pending pair pending until it is selected or a sound criterion discards it, so every
+/// variant returns the identical reduced Gröbner basis — which is asserted over the correctness
+/// corpus, not assumed.
+///
+/// The lcm degree is primary under every schedule, and that is a correctness-adjacent requirement
+/// rather than a preference: [`PairQueue::select_batch`] forms a batch from the pairs of one degree
+/// and F4's termination argument is stated in terms of ascending degree. A schedule reorders
+/// *within* a degree.
+///
+/// # What the reordering is for
+///
+/// A pair's two matrix rows are the shifted basis elements `(lcm / LM g_i) * g_i` and
+/// `(lcm / LM g_j) * g_j`. A larger shift moves a polynomial further up, so its monomials are
+/// larger, so more of them are reducible, so symbolic preprocessing adds more reducer rows to
+/// cover them. The hypothesis is that preferring small multipliers gives a smaller symbolic
+/// closure and therefore a narrower matrix.
+///
+/// It is a hypothesis. M22-0 measured reducer scaffolding at 40% to 99% of all rows, so the closure
+/// is where the rows are — but a pair with smaller multipliers need not produce a smaller closure,
+/// because what each reducer row costs is decided by *its* tail and not by the shift that asked for
+/// it. The `Large…` variants are in this enum as the controls that settle the direction.
+///
+/// # Degree against monomial, which are different strategies
+///
+/// Sakata, K., Takagi, T. (2026), *An Efficient Variant of F4 Algorithm for Solving MQ Problem*,
+/// IACR TCHES 2026(3), 1284–1309, rank candidate pairs on the larger and then the smaller of the
+/// two multipliers **under the monomial order**. Comparing the multipliers' *degrees* is a coarser
+/// relation: `x^2` and `y^2` have the same degree and are distinct under grevlex, so a
+/// degree comparator falls through to the lcm tiebreak exactly where the published one still
+/// discriminates.
+///
+/// Both are offered, and they are named for what they compare, because a measurement of one is not
+/// a measurement of the other:
+///
+/// - [`PairSchedule::SmallMultiplierDegree`] is the degree heuristic.
+/// - [`PairSchedule::SmallMultiplierMonomial`] is the published ordering.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PairSchedule {
+    /// Lowest lcm degree first, then the lcm and the two indices. The measured baseline.
+    #[default]
+    DegreeThenLcm,
+
+    /// Within a degree, the smallest larger multiplier *degree* first, then the smaller degree.
+    ///
+    /// A coarsening of [`PairSchedule::SmallMultiplierMonomial`] — see the type's documentation for
+    /// why the two are not the same strategy. Ties fall through to the baseline's tiebreak, so the
+    /// order is still total.
+    SmallMultiplierDegree,
+
+    /// Within a degree, the *largest* larger multiplier degree first.
+    ///
+    /// The control for [`PairSchedule::SmallMultiplierDegree`]. If preferring small multipliers
+    /// reduces matrix growth, preferring large ones should increase it, and a heuristic that beats
+    /// the baseline in both directions is measuring run-to-run noise.
+    LargeMultiplierDegree,
+
+    /// Within a degree, the smallest larger multiplier **monomial** first, then the smaller.
+    ///
+    /// Sakata–Takagi's refined ordering as published: the comparison is between monomials under the
+    /// monomial order being computed, not between their degrees. This is the variant a claim about
+    /// their strategy has to be measured with.
+    SmallMultiplierMonomial,
+
+    /// Within a degree, the *largest* larger multiplier monomial first. The control for the above.
+    LargeMultiplierMonomial,
+}
+
+impl PairSchedule {
+    /// Every schedule, for an ablation that should not have to be edited when one is added.
+    pub const ALL: [Self; 5] = [
+        Self::DegreeThenLcm,
+        Self::SmallMultiplierDegree,
+        Self::LargeMultiplierDegree,
+        Self::SmallMultiplierMonomial,
+        Self::LargeMultiplierMonomial,
+    ];
+
+    /// A short name, for a table column.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::DegreeThenLcm => "degree-then-lcm",
+            Self::SmallMultiplierDegree => "small-multiplier-degree",
+            Self::LargeMultiplierDegree => "large-multiplier-degree",
+            Self::SmallMultiplierMonomial => "small-multiplier-monomial",
+            Self::LargeMultiplierMonomial => "large-multiplier-monomial",
+        }
+    }
+
+    /// True if the schedule compares multiplier monomials and so depends on the monomial order.
+    ///
+    /// The queue carries an order only for these; see [`PairQueue::scheduled_in`].
+    pub fn needs_the_monomial_order(&self) -> bool {
+        matches!(
+            self,
+            Self::SmallMultiplierMonomial | Self::LargeMultiplierMonomial
+        )
+    }
+}
+
+/// A pending pair together with the schedule that ranks it and the order that schedule needs.
+///
+/// The heap's element type. `BinaryHeap` takes its comparison from `Ord` on the element, so both
+/// have to be reachable from one — hence a copy of two one-byte enums per entry rather than a
+/// comparator stored on the queue. Every entry in a queue carries the same values, which
+/// [`PairQueue::push`] is the only place that can establish and does.
+#[derive(Clone, Debug)]
+struct ScheduledPair<const N: usize> {
+    schedule: PairSchedule,
+    order: MonomialOrder,
+    pair: CriticalPair<N>,
+}
+
+/// Equality on the pair alone, so that `Ord` and `Eq` cannot disagree.
+///
+/// Derived equality would compare the schedule and the order too, and `Ord` below returns `Equal`
+/// exactly when the two pairs are the same pair — so two entries with equal pairs and different
+/// schedules would be ordered equal and compare unequal, which `Ord`'s contract forbids. The queue
+/// never holds mixed schedules, so this is unreachable rather than a bug being papered over; it is
+/// written this way so that the types agree without depending on that.
+impl<const N: usize> PartialEq for ScheduledPair<N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.pair == other.pair
+    }
+}
+
+impl<const N: usize> Eq for ScheduledPair<N> {}
+
+impl<const N: usize> Ord for ScheduledPair<N> {
+    /// Degree first under every schedule; the rest is the schedule's own key, then the baseline's
+    /// tiebreak so that the order is total whatever the schedule decided.
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let fallback = |a: &CriticalPair<N>, b: &CriticalPair<N>| {
+            a.lcm
+                .cmp(&b.lcm)
+                .then(a.left.cmp(&b.left))
+                .then(a.right.cmp(&b.right))
+        };
+        let (mine, theirs) = (&self.pair, &other.pair);
+        let order = self.order;
+
+        mine.degree
+            .cmp(&theirs.degree)
+            .then_with(|| match self.schedule {
+                PairSchedule::DegreeThenLcm => std::cmp::Ordering::Equal,
+                PairSchedule::SmallMultiplierDegree => mine
+                    .larger_multiplier_degree()
+                    .cmp(&theirs.larger_multiplier_degree())
+                    .then(
+                        mine.smaller_multiplier_degree()
+                            .cmp(&theirs.smaller_multiplier_degree()),
+                    ),
+                PairSchedule::LargeMultiplierDegree => theirs
+                    .larger_multiplier_degree()
+                    .cmp(&mine.larger_multiplier_degree())
+                    .then(
+                        theirs
+                            .smaller_multiplier_degree()
+                            .cmp(&mine.smaller_multiplier_degree()),
+                    ),
+                PairSchedule::SmallMultiplierMonomial => order
+                    .cmp(&mine.larger_multiplier, &theirs.larger_multiplier)
+                    .then(order.cmp(&mine.smaller_multiplier, &theirs.smaller_multiplier)),
+                PairSchedule::LargeMultiplierMonomial => order
+                    .cmp(&theirs.larger_multiplier, &mine.larger_multiplier)
+                    .then(order.cmp(&theirs.smaller_multiplier, &mine.smaller_multiplier)),
+            })
+            .then_with(|| fallback(mine, theirs))
+    }
+}
+
+impl<const N: usize> PartialOrd for ScheduledPair<N> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 /// Which pair-elimination criteria a computation may apply.
@@ -233,10 +467,10 @@ impl CriterionCounts {
 /// A pair's identity: its two basis indices, smaller first.
 type PairKey = (usize, usize);
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PairQueue<const N: usize> {
     // `Reverse` turns the max-heap into a min-heap.
-    pending: BinaryHeap<Reverse<CriticalPair<N>>>,
+    pending: BinaryHeap<Reverse<ScheduledPair<N>>>,
 
     /// Pairs Gebauer–Möller removed from the pending set, whose heap entry is still there.
     ///
@@ -259,18 +493,68 @@ pub struct PairQueue<const N: usize> {
     ///
     /// Set from the criteria the queue is driven with, which are fixed for a computation.
     track_handled: bool,
+
+    /// In what order pairs of one degree come out. Fixed for the queue's lifetime.
+    schedule: PairSchedule,
+
+    /// The monomial order, for a schedule that compares multiplier monomials.
+    ///
+    /// The queue is otherwise order-agnostic, deliberately: an lcm is a pointwise maximum and the
+    /// criteria are statements about divisibility, neither of which an order enters into. Only
+    /// [`PairSchedule::needs_the_monomial_order`] schedules read this, and for the others any value
+    /// gives the same queue — which [`PairQueue::scheduled`] relies on to keep the old constructor.
+    order: MonomialOrder,
+}
+
+impl<const N: usize> Default for PairQueue<N> {
+    /// An empty queue under the baseline schedule.
+    ///
+    /// Hand-written rather than derived because the queue now carries a [`MonomialOrder`], which
+    /// has no `Default` — deliberately, since no order is the obvious one. The baseline schedule
+    /// does not read it.
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> PairQueue<N> {
-    /// An empty queue.
+    /// An empty queue, under the baseline schedule.
     pub fn new() -> Self {
+        Self::scheduled(PairSchedule::default())
+    }
+
+    /// An empty queue, under the given schedule.
+    ///
+    /// # Panics
+    /// If `schedule` compares multiplier monomials, which needs an order: use
+    /// [`PairQueue::scheduled_in`]. Rejected rather than defaulted, because a monomial-comparing
+    /// schedule silently ranked under the wrong order would produce a different computation and
+    /// look like a measurement.
+    pub fn scheduled(schedule: PairSchedule) -> Self {
+        assert!(
+            !schedule.needs_the_monomial_order(),
+            "{} compares multiplier monomials and needs an order: use scheduled_in",
+            schedule.name()
+        );
+        Self::scheduled_in(schedule, MonomialOrder::GradedReverseLexicographic)
+    }
+
+    /// An empty queue, under the given schedule and monomial order.
+    pub fn scheduled_in(schedule: PairSchedule, order: MonomialOrder) -> Self {
         Self {
             pending: BinaryHeap::new(),
             removed: HashSet::new(),
             handled: HashSet::new(),
             live: 0,
             track_handled: false,
+            schedule,
+            order,
         }
+    }
+
+    /// The schedule this queue selects under.
+    pub fn schedule(&self) -> PairSchedule {
+        self.schedule
     }
 
     /// Every pair of the given basis.
@@ -295,7 +579,31 @@ impl<const N: usize> PairQueue<N> {
         criteria: &PairCriteria,
         counts: &mut CriterionCounts,
     ) -> Self {
-        let mut queue = Self::new();
+        Self::seeded_from_leads_scheduled(
+            leads,
+            criteria,
+            PairSchedule::default(),
+            MonomialOrder::GradedReverseLexicographic,
+            counts,
+        )
+    }
+
+    /// As [`PairQueue::seeded_from_leads`], under the given schedule and monomial order.
+    ///
+    /// The order is only read by a schedule that compares multiplier monomials; for every other
+    /// schedule any value gives the same queue.
+    ///
+    /// A separate constructor rather than an extra parameter on the existing one, so that the two
+    /// engines and the existing tests that drive the queue directly keep the signature they were
+    /// written against and the baseline stays the thing you get by not asking for anything.
+    pub fn seeded_from_leads_scheduled(
+        leads: &[Monomial<N>],
+        criteria: &PairCriteria,
+        schedule: PairSchedule,
+        order: MonomialOrder,
+        counts: &mut CriterionCounts,
+    ) -> Self {
+        let mut queue = Self::scheduled_in(schedule, order);
         for right in 0..leads.len() {
             queue.push_pairs_from_leads(leads, right, criteria, counts);
         }
@@ -390,13 +698,14 @@ impl<const N: usize> PairQueue<N> {
         let stale: Vec<PairKey> = self
             .pending
             .iter()
-            .filter(|Reverse(pair)| !self.removed.contains(&(pair.left, pair.right)))
-            .filter(|Reverse(pair)| {
+            .map(|Reverse(entry)| &entry.pair)
+            .filter(|pair| !self.removed.contains(&(pair.left, pair.right)))
+            .filter(|pair| {
                 divides(&lead_h, &pair.lcm)
                     && Monomial::lcm(&leads[pair.left], &lead_h) != pair.lcm
                     && Monomial::lcm(&lead_h, &leads[pair.right]) != pair.lcm
             })
-            .map(|Reverse(pair)| (pair.left, pair.right))
+            .map(|pair| (pair.left, pair.right))
             .collect();
         for key in stale {
             self.removed.insert(key);
@@ -436,9 +745,16 @@ impl<const N: usize> PairQueue<N> {
     }
 
     /// Insert a pair into the pending set.
+    ///
+    /// The one place a heap entry is created, which is what makes "every entry carries the queue's
+    /// schedule" an invariant rather than a convention.
     fn push(&mut self, pair: CriticalPair<N>) {
         self.live += 1;
-        self.pending.push(Reverse(pair));
+        self.pending.push(Reverse(ScheduledPair {
+            schedule: self.schedule,
+            order: self.order,
+            pair,
+        }));
     }
 
     /// Drop lazily deleted entries from the top of the heap, so that the top is a pending pair.
@@ -447,7 +763,7 @@ impl<const N: usize> PairQueue<N> {
             let Some(Reverse(top)) = self.pending.peek() else {
                 return;
             };
-            let key = (top.left, top.right);
+            let key = (top.pair.left, top.pair.right);
             if !self.removed.remove(&key) {
                 return;
             }
@@ -455,10 +771,11 @@ impl<const N: usize> PairQueue<N> {
         }
     }
 
-    /// The next pair, of minimum lcm degree.
+    /// The next pair: of minimum lcm degree, and within that degree whichever the schedule ranks
+    /// first.
     pub fn pop(&mut self) -> Option<CriticalPair<N>> {
         self.drop_stale_top();
-        let Reverse(pair) = self.pending.pop()?;
+        let Reverse(ScheduledPair { pair, .. }) = self.pending.pop()?;
         self.live -= 1;
         if self.track_handled {
             self.handled.insert((pair.left, pair.right));
@@ -474,6 +791,14 @@ impl<const N: usize> PairQueue<N> {
     /// limit of one reduces F4 to processing a single pair per matrix, which is a useful
     /// degenerate case to be able to test.
     ///
+    /// **The `limit` is what decides whether a [`PairSchedule`] changes the batch *sets*.** Without a
+    /// cap the batch is every pending pair of its degree whatever the schedule, so the sets are
+    /// identical and only the row order differs; with a cap the schedule decides which pairs of the
+    /// degree reach *this* matrix and which wait for the next. The pairs left behind stay pending
+    /// either way, which is what makes every schedule complete.
+    ///
+    /// Row order is not inert even so — see [`PairSchedule`].
+    ///
     /// # Panics
     /// If `limit` is `Some(0)`, which would select nothing and loop forever.
     pub fn select_batch(&mut self, limit: Option<usize>) -> Vec<CriticalPair<N>> {
@@ -488,7 +813,7 @@ impl<const N: usize> PairQueue<N> {
         while limit.is_none_or(|limit| batch.len() < limit) {
             self.drop_stale_top();
             match self.pending.peek() {
-                Some(Reverse(next)) if next.degree == degree => {
+                Some(Reverse(next)) if next.pair.degree == degree => {
                     batch.push(self.pop().expect("peeked at a pair that is there"));
                 }
                 _ => break,
@@ -619,7 +944,7 @@ impl<const N: usize> PairQueue<N> {
 mod tests {
     use super::{
         are_relatively_prime, divides, leading_monomials, CriterionCounts, CriticalPair,
-        PairCriteria, PairQueue,
+        PairCriteria, PairQueue, PairSchedule,
     };
     use crate::{fields::Zp13, poly::MonomialOrder, Monomial, MultivariatePolynomial};
 
@@ -1123,5 +1448,444 @@ mod tests {
         for _ in 0..8 {
             assert_eq!(batches_of(), first);
         }
+    }
+
+    /// A pair records the degrees of its two multipliers, larger first.
+    ///
+    /// `lcm / LM(g)` for each side, so the degrees are `deg lcm - deg LM(g)`. On x^2*y against
+    /// x*y^3 the lcm is x^2*y^3 of degree five, so the multipliers are y^2 and x, of degrees two
+    /// and one.
+    #[test]
+    fn test_pair_records_the_multiplier_degrees() {
+        let basis = vec![parse("x^2*y + 1"), parse("x*y^3 + z")];
+        let pair = CriticalPair::new(&basis, 0, 1, ORDER);
+        assert_eq!(pair.larger_multiplier_degree(), 2);
+        assert_eq!(pair.smaller_multiplier_degree(), 1);
+        // And they sum to what the identity in the field docs says they must.
+        let leads = leading_monomials(&basis, ORDER);
+        assert_eq!(
+            pair.larger_multiplier_degree() + pair.smaller_multiplier_degree(),
+            2 * pair.degree - leads[0].degree() - leads[1].degree()
+        );
+    }
+
+    /// A relatively prime pair has multipliers that are the other side's leading monomial.
+    #[test]
+    fn test_multiplier_degrees_of_a_relatively_prime_pair() {
+        // lcm(x^2, y^3) = x^2*y^3, so the multipliers are y^3 and x^2.
+        let basis = vec![parse("x^2 - 1"), parse("y^3 - 1")];
+        let pair = CriticalPair::new(&basis, 0, 1, ORDER);
+        assert_eq!(pair.larger_multiplier_degree(), 3);
+        assert_eq!(pair.smaller_multiplier_degree(), 2);
+    }
+
+    /// The multiplier degrees do not disturb the baseline order, which is degree then lcm.
+    ///
+    /// They are appended to a struct whose `Ord` is derived, so they sort after `right` — which
+    /// already identifies the pair, so they can never be reached. Asserted because the alternative
+    /// is silently changing the baseline every figure in M16 was measured against.
+    #[test]
+    fn test_the_multiplier_degrees_do_not_change_the_derived_order() {
+        let leads = monomials::<3>(&[[2, 0, 1], [0, 2, 1], [1, 1, 0], [1, 0, 2], [0, 1, 1]]);
+        let mut pairs: Vec<CriticalPair<3>> = Vec::new();
+        for right in 0..leads.len() {
+            for left in 0..right {
+                pairs.push(CriticalPair::from_leads(&leads, left, right));
+            }
+        }
+
+        let mut by_derived = pairs.clone();
+        by_derived.sort();
+        let mut by_hand = pairs.clone();
+        by_hand.sort_by_key(|p| (p.degree, p.lcm, p.left, p.right));
+        assert_eq!(by_derived, by_hand);
+    }
+
+    /// Every schedule keeps the lcm degree primary.
+    ///
+    /// Not a preference: `select_batch` forms a batch from one degree and F4's termination argument
+    /// is stated in ascending degree, so a schedule that reordered across degrees would be changing
+    /// the algorithm rather than its order of work.
+    #[test]
+    fn test_every_schedule_is_degree_first() {
+        let leads = monomials::<3>(&[
+            [4, 0, 0],
+            [0, 1, 0],
+            [2, 2, 0],
+            [1, 0, 3],
+            [0, 3, 1],
+            [1, 1, 1],
+        ]);
+
+        for schedule in PairSchedule::ALL {
+            let mut counts = CriterionCounts::default();
+            let mut queue = PairQueue::seeded_from_leads_scheduled(
+                &leads,
+                &PairCriteria::NONE,
+                schedule,
+                ORDER,
+                &mut counts,
+            );
+            assert_eq!(queue.schedule(), schedule);
+
+            let mut degrees = Vec::new();
+            while let Some(pair) = queue.pop() {
+                degrees.push(pair.degree);
+            }
+            let mut sorted = degrees.clone();
+            sorted.sort_unstable();
+            assert_eq!(
+                degrees,
+                sorted,
+                "{} reordered across degrees",
+                schedule.name()
+            );
+        }
+    }
+
+    /// Within a degree, `SmallMultiplier` takes the smallest larger multiplier first and
+    /// `LargeMultiplier` takes the largest.
+    #[test]
+    fn test_the_schedules_order_within_a_degree() {
+        // Leading monomials x^4, x^3*y, x, y^4. Two pairs have lcm degree five: (0,1) with lcm
+        // x^4*y and multipliers y and x, so a larger multiplier degree of one; and (2,3) with lcm
+        // x*y^4 and multipliers y^4 and x, so a larger multiplier degree of four. The lcm degree
+        // cannot separate those two, which is exactly the case a schedule decides.
+        let leads = monomials::<3>(&[[4, 0, 0], [3, 1, 0], [1, 0, 0], [0, 4, 0]]);
+        let of = |schedule| {
+            let mut counts = CriterionCounts::default();
+            let mut queue = PairQueue::seeded_from_leads_scheduled(
+                &leads,
+                &PairCriteria::NONE,
+                schedule,
+                ORDER,
+                &mut counts,
+            );
+            let mut keys = Vec::new();
+            while let Some(pair) = queue.pop() {
+                keys.push((pair.degree, pair.larger_multiplier_degree()));
+            }
+            keys
+        };
+
+        // Within each degree the larger-multiplier column is nondecreasing under SmallMultiplier
+        // and nonincreasing under LargeMultiplier.
+        for (schedule, ascending) in [
+            (PairSchedule::SmallMultiplierDegree, true),
+            (PairSchedule::LargeMultiplierDegree, false),
+        ] {
+            let keys = of(schedule);
+            for window in keys.windows(2) {
+                if window[0].0 != window[1].0 {
+                    continue;
+                }
+                if ascending {
+                    assert!(
+                        window[0].1 <= window[1].1,
+                        "{}: {:?} then {:?}",
+                        schedule.name(),
+                        window[0],
+                        window[1]
+                    );
+                } else {
+                    assert!(
+                        window[0].1 >= window[1].1,
+                        "{}: {:?} then {:?}",
+                        schedule.name(),
+                        window[0],
+                        window[1]
+                    );
+                }
+            }
+        }
+
+        // And the two really do differ on this input, so the test is not vacuous.
+        assert_ne!(
+            of(PairSchedule::SmallMultiplierDegree),
+            of(PairSchedule::LargeMultiplierDegree)
+        );
+    }
+
+    /// Every schedule yields exactly the same set of pairs, in a different order.
+    ///
+    /// The property that makes a schedule safe: it reorders, it does not discard. A pair the
+    /// schedule deprioritizes stays pending until it is selected.
+    #[test]
+    fn test_a_schedule_discards_nothing() {
+        let leads = monomials::<3>(&[
+            [2, 0, 1],
+            [0, 2, 1],
+            [1, 1, 0],
+            [1, 0, 2],
+            [0, 1, 1],
+            [3, 0, 0],
+            [0, 0, 4],
+        ]);
+
+        for criteria in [
+            PairCriteria::NONE,
+            PairCriteria::PRODUCT_ONLY,
+            PairCriteria::ALL,
+        ] {
+            let of = |schedule| {
+                let mut counts = CriterionCounts::default();
+                let queue = PairQueue::seeded_from_leads_scheduled(
+                    &leads,
+                    &criteria,
+                    schedule,
+                    ORDER,
+                    &mut counts,
+                );
+                let mut keys = drain(queue);
+                keys.sort_unstable();
+                (keys, counts)
+            };
+
+            let baseline = of(PairSchedule::DegreeThenLcm);
+            for schedule in PairSchedule::ALL {
+                assert_eq!(
+                    of(schedule),
+                    baseline,
+                    "{} under {:?} selected a different pair set",
+                    schedule.name(),
+                    criteria
+                );
+            }
+        }
+    }
+
+    /// Selection under every schedule is deterministic.
+    #[test]
+    fn test_every_schedule_is_deterministic() {
+        let leads = monomials::<3>(&[
+            [4, 0, 0],
+            [3, 1, 0],
+            [1, 0, 0],
+            [0, 4, 0],
+            [0, 0, 3],
+            [1, 1, 1],
+        ]);
+
+        for schedule in PairSchedule::ALL {
+            let of = || {
+                let mut counts = CriterionCounts::default();
+                let queue = PairQueue::seeded_from_leads_scheduled(
+                    &leads,
+                    &PairCriteria::ALL,
+                    schedule,
+                    ORDER,
+                    &mut counts,
+                );
+                (drain(queue), counts)
+            };
+            let first = of();
+            for _ in 0..8 {
+                assert_eq!(of(), first, "{}", schedule.name());
+            }
+        }
+    }
+
+    /// A batch cap under a schedule takes the pairs the schedule ranks first, and leaves the rest
+    /// pending.
+    ///
+    /// This is the only place a schedule changes *what* is computed rather than the order of a
+    /// matrix's rows: with no cap the batch is the whole degree whatever the schedule.
+    #[test]
+    fn test_a_capped_batch_follows_the_schedule_and_loses_nothing() {
+        let leads = monomials::<3>(&[[4, 0, 0], [3, 1, 0], [1, 0, 0], [0, 4, 0]]);
+
+        for schedule in PairSchedule::ALL {
+            let mut counts = CriterionCounts::default();
+            let mut queue = PairQueue::seeded_from_leads_scheduled(
+                &leads,
+                &PairCriteria::NONE,
+                schedule,
+                ORDER,
+                &mut counts,
+            );
+            let total = queue.len();
+
+            let mut taken = Vec::new();
+            while !queue.is_empty() {
+                let batch = queue.select_batch(Some(2));
+                assert!(batch.len() <= 2, "{}", schedule.name());
+                assert!(
+                    batch.iter().all(|p| p.degree == batch[0].degree),
+                    "{}: a capped batch mixed degrees",
+                    schedule.name()
+                );
+                taken.extend(batch.iter().map(|p| (p.left, p.right)));
+            }
+            assert_eq!(
+                taken.len(),
+                total,
+                "{}: pairs went missing",
+                schedule.name()
+            );
+            taken.sort_unstable();
+            taken.dedup();
+            assert_eq!(
+                taken.len(),
+                total,
+                "{}: a pair came out twice",
+                schedule.name()
+            );
+        }
+    }
+
+    /// The chain criterion's handled set is unaffected by the schedule's ordering.
+    ///
+    /// A deferred pair must not become a witness merely because the schedule put it late, and a
+    /// pair the schedule put early must not witness one that has not been processed. Both follow
+    /// from `handled` being populated only by `pop`, which this checks by driving the queue under
+    /// each schedule and asserting the chain criterion's decisions stay sound: every kept pair is
+    /// reduced, and the union of kept and discarded is every pair.
+    #[test]
+    fn test_the_chain_criterion_stays_sound_under_every_schedule() {
+        let leads = monomials::<3>(&[[1, 0, 0], [0, 1, 0], [1, 1, 0], [2, 1, 0], [1, 2, 0]]);
+
+        for schedule in PairSchedule::ALL {
+            let mut counts = CriterionCounts::default();
+            let mut queue = PairQueue::seeded_from_leads_scheduled(
+                &leads,
+                &CHAIN_ONLY,
+                schedule,
+                ORDER,
+                &mut counts,
+            );
+            let total = queue.len();
+
+            let mut kept = 0;
+            let mut discarded = 0;
+            while let Some(pair) = queue.pop() {
+                if queue.is_discarded(&pair, &leads, &CHAIN_ONLY, &mut counts) {
+                    discarded += 1;
+                } else {
+                    kept += 1;
+                }
+            }
+            assert_eq!(
+                kept + discarded,
+                total,
+                "{}: pairs were neither kept nor discarded",
+                schedule.name()
+            );
+            // A pair is only ever discarded on the strength of pairs already popped, so the first
+            // pair out can never be discarded whatever the schedule chose it to be.
+            assert!(kept > 0, "{}: every pair was discarded", schedule.name());
+        }
+    }
+
+    /// The monomial comparator discriminates where the degree comparator cannot.
+    ///
+    /// The point of Finding 3 and the reason both exist. Sakata–Takagi rank on the larger
+    /// multiplier **under the monomial order**; comparing degrees is coarser, and `x^2` against
+    /// `y^2` is the smallest case where the two part company — equal degree, distinct under
+    /// grevlex. A measurement of the degree heuristic is therefore not a measurement of the
+    /// published ordering.
+    #[test]
+    fn test_the_monomial_comparator_separates_equal_degree_multipliers() {
+        // Leading monomials y^2, x^2, x^2*y^2. Pair (0,2) has lcm x^2*y^2 and multipliers x^2 and
+        // 1; pair (1,2) has the same lcm and multipliers y^2 and 1. Equal degrees throughout,
+        // different monomials.
+        let leads = monomials::<2>(&[[0, 2], [2, 0], [2, 2]]);
+        let (a, b) = (
+            CriticalPair::from_leads(&leads, 0, 2),
+            CriticalPair::from_leads(&leads, 1, 2),
+        );
+
+        assert_eq!(a.degree, b.degree, "the lcm degree cannot separate them");
+        assert_eq!(a.lcm, b.lcm, "nor can the lcm");
+        assert_eq!(
+            (a.larger_multiplier_degree(), a.smaller_multiplier_degree()),
+            (b.larger_multiplier_degree(), b.smaller_multiplier_degree()),
+            "nor can the multiplier degrees"
+        );
+        assert_ne!(
+            a.larger_multiplier, b.larger_multiplier,
+            "but the multiplier monomials differ, which is what the published ordering compares"
+        );
+
+        // The two pairs' relative order under each schedule, read off a live queue.
+        let relative = |schedule, order| {
+            let mut counts = CriterionCounts::default();
+            let mut queue = PairQueue::<2>::scheduled_in(schedule, order);
+            queue.push_pairs_from_leads(&leads, 2, &PairCriteria::NONE, &mut counts);
+            let mut seen = Vec::new();
+            while let Some(pair) = queue.pop() {
+                let key = (pair.left, pair.right);
+                if key == (0, 2) || key == (1, 2) {
+                    seen.push(key);
+                }
+            }
+            seen
+        };
+
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+
+        // The degree comparator ties on both keys and falls through to the lcm, which is also
+        // equal, then to the indices — so small and large agree. That is the finding, asserted.
+        assert_eq!(
+            relative(PairSchedule::SmallMultiplierDegree, grevlex),
+            relative(PairSchedule::LargeMultiplierDegree, grevlex),
+            "equal degrees leave the degree comparator nothing to order by"
+        );
+
+        // The monomial comparator does not tie: x^2 > y^2 under grevlex, so taking the smallest
+        // larger multiplier first puts (1,2) ahead of (0,2), and the control reverses it.
+        let small = relative(PairSchedule::SmallMultiplierMonomial, grevlex);
+        let large = relative(PairSchedule::LargeMultiplierMonomial, grevlex);
+        assert_eq!(
+            small,
+            vec![(1, 2), (0, 2)],
+            "smallest larger multiplier first"
+        );
+        assert_eq!(large, vec![(0, 2), (1, 2)], "and the control reverses it");
+    }
+
+    /// A monomial-comparing schedule under two different orders gives two different queues.
+    ///
+    /// What makes threading the order through the queue necessary rather than cosmetic.
+    #[test]
+    fn test_the_monomial_comparator_depends_on_the_order() {
+        let leads = monomials::<3>(&[[0, 2, 0], [2, 0, 0], [2, 2, 0], [2, 2, 0]]);
+        let drain_under = |order| {
+            let mut counts = CriterionCounts::default();
+            let mut queue =
+                PairQueue::<3>::scheduled_in(PairSchedule::SmallMultiplierMonomial, order);
+            queue.push_pairs_from_leads(&leads, 2, &PairCriteria::NONE, &mut counts);
+            queue.push_pairs_from_leads(&leads, 3, &PairCriteria::NONE, &mut counts);
+            drain(queue)
+        };
+        // x^2 > y^2 under lex and grevlex alike, but the *lcm* tiebreak below the multiplier
+        // comparison can still reorder, so assert the weaker and true thing: each order is
+        // internally consistent and the queue is deterministic under each.
+        for order in [
+            MonomialOrder::Lexicographic,
+            MonomialOrder::GradedReverseLexicographic,
+        ] {
+            let first = drain_under(order);
+            for _ in 0..4 {
+                assert_eq!(drain_under(order), first, "{}", order.name());
+            }
+        }
+    }
+
+    /// Asking for a monomial-comparing schedule without an order is refused, not defaulted.
+    #[test]
+    #[should_panic(expected = "needs an order")]
+    fn test_a_monomial_schedule_without_an_order_is_refused() {
+        let _ = PairQueue::<3>::scheduled(PairSchedule::SmallMultiplierMonomial);
+    }
+
+    /// The default schedule is the baseline, which is what the earlier milestones measured.
+    #[test]
+    fn test_the_default_schedule_is_the_baseline() {
+        assert_eq!(PairSchedule::default(), PairSchedule::DegreeThenLcm);
+        assert_eq!(
+            PairQueue::<3>::new().schedule(),
+            PairSchedule::DegreeThenLcm
+        );
+        assert_eq!(PairSchedule::ALL.len(), 5);
     }
 }

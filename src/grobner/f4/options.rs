@@ -16,7 +16,10 @@ use std::{
 };
 
 use crate::{
-    grobner::{f4::symbolic::CacheMode, pairs::PairCriteria},
+    grobner::{
+        f4::symbolic::CacheMode,
+        pairs::{PairCriteria, PairSchedule},
+    },
     linalg::echelon::Backend,
     FiniteField,
 };
@@ -167,6 +170,12 @@ pub struct F4Options {
     /// Which criteria may discard a critical pair before a matrix is built. See [`PairCriteria`].
     pub criteria: PairCriteria,
 
+    /// In what order the pairs of one degree are taken. See [`PairSchedule`].
+    ///
+    /// A schedule discards nothing, so this cannot change the basis — only which pairs share a
+    /// matrix, and then only when [`Self::max_pairs_per_batch`] caps the batch.
+    pub schedule: PairSchedule,
+
     /// Whether reducer multiples are tracked between batches. See [`CacheMode`].
     ///
     /// **Nothing is served from this**, and that is the measured conclusion: the repetition rate
@@ -213,6 +222,7 @@ impl F4Options {
             reduction: ReductionStrategy::Unstructured,
             reducer_selection: ReducerSelection::FirstApplicable,
             criteria: PairCriteria::PRODUCT_ONLY,
+            schedule: PairSchedule::DegreeThenLcm,
             reducer_cache: CacheMode::Off,
             measure_stages: false,
             profile_degrees: false,
