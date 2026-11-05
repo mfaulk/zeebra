@@ -1496,6 +1496,14 @@ MDS matrix, and three of them are pinned in tests.
 `dispatch_cico` bridges the const generic — `CicoInstance::system::<N>()` needs `N` at compile time
 and the registry has fifteen distinct `N` — in the same shape as `MqVisitor` does for the MQ family.
 
+**A registered problem need not be one this crate can build.** The initiative ran two bounty
+programs with objectives at opposite ends of the state — the 2026 CICO program constrains the
+leading words, the 2025 program the trailing ones — and three 2025 tiers are still listed as
+unsolved. Those are registered, and `cico_instance` and `dispatch_cico` **refuse** them by name:
+building a trailing-constraint objective as a leading-constraint one would produce a different
+problem wearing that row's identity, and nothing about the result would look wrong. A scoreboard
+that listed only what it can run would hide the only open problems on it.
+
 The registry is frozen by `test_the_registry_is_frozen`, which pins every id and digest, so
 redefining a registered problem fails a test rather than silently changing what an earlier
 measurement meant. See
@@ -1611,6 +1619,15 @@ it vanishes at the published answer, and independently recovers that same point 
 `D = 1`. Both directions matter: a wrong layout could vanish at one point by accident, but it could
 not also be solved to the same one. This is a *toy* example at 45 variables short of the smallest
 unsolved challenge, and is not a competitive result.
+
+Under one stated budget — 200,000 columns and 20,000,000 live entries, the bound that binds —
+`n = 15` **recovers the published answer** in 7.9 s, checked coordinate by coordinate against the
+answer file it was not given; `n = 20` crosses the entry cap at degree 5 after 67.5 s. So the
+published type III examples end at `n = 15` here. Type VI `n = 15` needs a slice, and all eight
+precommitted slices crossed the same cap at degree 9 — recorded as a campaign that **reached no
+verdict** rather than as eight failures, because a slice that ran out of budget never tested
+whether it contains a solution. `Campaign::decided()` is the rate's denominator for exactly that
+reason, and `success_rate_basis_points` returns nothing when nothing was decided.
 
 **The instance data is not redistributed here** — the files are "All Rights Reserved" with no
 stated licence. `tools/fetch-mq-challenge.sh` fetches them into `research/instances/mq/` and

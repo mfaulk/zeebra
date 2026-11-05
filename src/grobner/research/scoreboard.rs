@@ -395,6 +395,15 @@ pub struct Campaign {
     /// Slices attempted.
     pub trials: usize,
 
+    /// Slices that reached **no verdict**: they stopped at a resource limit.
+    ///
+    /// Separate from the witness count, and the distinction is the difference between a rate and a
+    /// fiction. A slice that ran out of budget did not test whether it contains a solution, so it
+    /// cannot be a Bernoulli trial of that question — counting it as a failure would report
+    /// "0 witnesses in 8 slices" for a campaign that established nothing at all. Found by running
+    /// the Fukuoka type VI `n = 15` campaign, where all eight slices crossed the entry cap.
+    pub stopped: usize,
+
     /// Slices that produced an independently verified witness.
     pub witnesses: usize,
 
@@ -417,19 +426,29 @@ impl Campaign {
         (self.witnesses > 0).then_some((self.total.as_nanos(), self.witnesses))
     }
 
+    /// Trials that reached a verdict: a witness, or a slice shown to be empty.
+    ///
+    /// The denominator of the success rate. The others measured the budget, not the problem.
+    pub fn decided(&self) -> usize {
+        self.trials.saturating_sub(self.stopped)
+    }
+
     /// A 95% Wilson score interval for the success rate, in basis points.
     ///
-    /// Wilson rather than the normal approximation because the rates of interest are near zero
-    /// and small-sample: at 1 success in 20 the normal interval runs negative, which is not a
-    /// probability. `None` for no trials at all.
+    /// Over the trials that **reached a verdict**, so a campaign whose slices all ran out of
+    /// budget has no rate rather than a rate of zero. Wilson rather than the normal approximation
+    /// because the rates of interest are near zero and small-sample: at 1 success in 20 the normal
+    /// interval runs negative, which is not a probability.
     pub fn success_rate_basis_points(&self) -> Option<(u32, u32)> {
-        wilson_interval(self.witnesses, self.trials)
+        wilson_interval(self.witnesses, self.decided())
     }
 
     /// The campaign as JSON.
     pub fn to_json(&self) -> Json {
         let mut fields = vec![
             ("trials", Json::size(self.trials)),
+            ("stopped_at_limit", Json::size(self.stopped)),
+            ("decided", Json::size(self.decided())),
             ("witnesses", Json::size(self.witnesses)),
             ("fixed_variables", Json::size(self.fixed)),
             ("total_nanos", Json::nanos(self.total)),
@@ -753,6 +772,7 @@ impl RunRecord {
                 let size = |key: &str| c.get(key).and_then(Json::as_int).unwrap_or(0) as usize;
                 Some(Campaign {
                     trials: size("trials"),
+                    stopped: size("stopped_at_limit"),
                     witnesses: size("witnesses"),
                     total: Duration::from_nanos(
                         c.get("total_nanos").and_then(Json::as_int).unwrap_or(0) as u64,
@@ -1830,6 +1850,7 @@ mod tests {
     fn test_a_campaign_reports_the_failures_too() {
         let campaign = Campaign {
             trials: 20,
+            stopped: 0,
             witnesses: 1,
             total: Duration::from_secs(40),
             seeds: (0..20).collect(),
@@ -1853,14 +1874,49 @@ mod tests {
         // No witnesses: no work-per-witness rather than a division.
         let dead = Campaign {
             trials: 10,
+            stopped: 0,
             witnesses: 0,
             total: Duration::from_secs(5),
             seeds: (0..10).collect(),
             fixed: 12,
         };
         assert_eq!(dead.work_per_witness(), None);
+        assert_eq!(dead.decided(), 10);
         assert_eq!(dead.success_rate_basis_points(), Some((0, 2_775)));
         assert_eq!(wilson_interval(0, 0), None);
+
+        // And a campaign whose every slice ran out of budget has **no rate at all**, not a rate
+        // of zero: those trials measured the budget rather than the problem. The Fukuoka type VI
+        // n = 15 campaign is exactly this case, and reporting "0 witnesses in 8 slices, 0% to
+        // 32%" for it would be a claim about the instance that nothing established.
+        let undecided = Campaign {
+            trials: 8,
+            stopped: 8,
+            witnesses: 0,
+            total: Duration::from_secs(236),
+            seeds: (0..8).collect(),
+            fixed: 5,
+        };
+        assert_eq!(undecided.decided(), 0);
+        assert_eq!(undecided.success_rate_basis_points(), None);
+        assert_eq!(undecided.work_per_witness(), None);
+        let json = undecided.to_json().to_json();
+        assert!(json.contains("\"stopped_at_limit\": 8"), "{}", json);
+        assert!(json.contains("\"decided\": 0"), "{}", json);
+        assert!(
+            json.contains("\"success_rate_basis_points\": null"),
+            "{}",
+            json
+        );
+
+        // One decided slice among many stopped: the rate is over the one, and says so by being
+        // extremely wide rather than by being zero.
+        let partly = Campaign {
+            stopped: 7,
+            ..undecided
+        };
+        assert_eq!(partly.decided(), 1);
+        assert_eq!(partly.success_rate_basis_points(), Some((0, 7_935)));
     }
 
     /// Stage costs are separate keys, so the dominant stage is visible.

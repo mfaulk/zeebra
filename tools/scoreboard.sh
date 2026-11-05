@@ -13,8 +13,11 @@
 #   tools/scoreboard.sh stable --write       # adds the published MQ instances
 #   tools/scoreboard.sh ladder --write       # the nine full-width rows, one process each
 #   tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp0 --slice 0 --write
+#   tools/scoreboard.sh mq fukuoka-mq-VI-n15-seed0 --seeds 8 --write
 #
-# ZEEBRA_WALL_SECONDS bounds each frontier row (default 600).
+# ZEEBRA_WALL_SECONDS bounds each frontier row (default 600). ZEEBRA_MAX_ENTRIES raises the
+# live-entry cap that actually binds (default 20000000) — for deciding whether a row is out of
+# reach or merely out of this budget. Every reported figure uses the default.
 #
 # ZEEBRA_CORES pins the run (default 0-7). ZEEBRA_MACHINE labels it; without one the hostname is
 # used, which is what a cross-machine comparison keys on.

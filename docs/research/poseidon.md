@@ -163,6 +163,44 @@ gap is not incremental, and **no result on a reduced instance says anything abou
 reason: a result that did not say what it reduced would be misleading, and the field makes omitting
 it a deliberate act rather than an oversight.
 
+## 5a. Two programs, two objectives, and three targets still open (M23-D)
+
+The initiative has run **two** bounty programs, and they do not state the same problem. Read
+2026-11-05 from <https://www.poseidon-initiative.info/>:
+
+| program | objective, in its own words | status |
+|---|---|---|
+| 2026 CICO | `Perm(0xc09de4,0xee6282,X1,...,X14)= (0,0,Y1,...,Y14)` | "THE PROGRAM IS FINISHED"; all three tiers verified in 2026 |
+| 2025 bounty | `Perm(X1,..., X14,0,0)= (Y1,...,Y14,0,0)` | tiers claimed from Nov 2024 to Nov 2025 |
+
+**The constrained words are at opposite ends**, and that is a different problem rather than the
+same one with variables renamed: the MDS layer couples all `t` words, so constraining the leading
+pair and constraining the trailing pair produce different ideals. `CicoInstance` constrains the
+leading words, which is what the 2026 program asks for;
+`Objective::CicoExactTrailing` names the other one and **nothing generates it**.
+`ChallengeManifest::cico_instance` and `dispatch_cico` both refuse a row carrying it, by name,
+rather than building the objective they do support — which would produce a different problem
+wearing that row's identity, and nothing about the result would look wrong.
+
+Three tiers of the 2025 program are listed as unsolved and are registered for that reason:
+
+| id | field | `alpha` | `t` | `R_F` | `R_P` | reward |
+|---|---|---:|---:|---:|---:|---|
+| `poseidon256-cico-2025-rf6-rp11` | BLS12-381 scalar field | 5 | 3 | 6 | 11 | $10,000 |
+| `poseidon256-cico-2025-rf6-rp16` | BLS12-381 scalar field | 5 | 3 | 6 | 16 | $15,000 |
+| `poseidon64-cico-2025-rf6-rp13` | Goldilocks `2^64 − 2^32 + 1` | 7 | 8 | 6 | 13 | $15,000 |
+
+Registered and deliberately not implemented: the first two are over a 255-bit scalar field and the
+third over Goldilocks, neither of which this generator is wired for, and all three use the trailing
+objective. A scoreboard that listed only what it can run would hide exactly the problems that are
+open — these are the only rows in the registry with no public solution recorded.
+
+**What this says about M23-B's ladder.** The 2025 program's Poseidon-31 tiers at `R_F = 6` with
+`R_P` up to 4 were claimed between November 2024 and November 2025, at `t = 16`. M23-B's
+`R_F = 6, R_P = 4` row stops at degree 4. Those are *different objectives* over fields that differ
+in one case (M31 against KoalaBear), so the comparison is not apples to apples — but it is evidence
+that round counts of that order at `t = 16` are reachable by some attack, and not by this one.
+
 ## 6. Open
 
 - **The relaxed verifier's bit conditions** need a formulation that is not a field equation. §3.

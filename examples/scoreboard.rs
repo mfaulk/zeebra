@@ -52,7 +52,7 @@ use zeebra::{
         solve_from_lex_basis, BatchObserver, CriticalPair, F4Options, FglmOptions, IdealClass,
         SolveOptions, SolveOutcome,
     },
-    MonomialOrder, MultivariatePolynomial, Zero,
+    FiniteField, MonomialOrder, MultivariatePolynomial, Zero,
 };
 
 type K = PrimeFieldElement64<KOALABEAR_PRIME>;
@@ -124,6 +124,38 @@ fn main() {
         }
         // The supervisor may have left a thread running; nothing else is pending, so stop here
         // rather than waiting for it.
+        std::process::exit(0);
+    }
+
+    // One published MQ instance, with a slice campaign when it is underdetermined.
+    if tier == "mq" {
+        let id = positional
+            .get(1)
+            .expect("usage: scoreboard mq <challenge-id> [--seeds N] [--write]");
+        let seeds: u64 = arguments
+            .iter()
+            .position(|a| a == "--seeds")
+            .and_then(|at| arguments.get(at + 1))
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(8);
+        let manifest = challenge(id).unwrap_or_else(|| panic!("{} is not registered", id));
+        let wall = wall_clock();
+        println!("# {} ({})", id, manifest.class);
+        println!("- policy: {}\n", frontier_policy());
+
+        let records = run_mq_rows(&manifest, &environment, seeds, wall);
+        if records.is_empty() {
+            println!("skipped: run tools/fetch-mq-challenge.sh for the instance files");
+            std::process::exit(0);
+        }
+        for record in records {
+            report(&record);
+            board.add(record, &registry).expect("a registered problem");
+        }
+        if write {
+            write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
+            println!("\nappended to research/scoreboard/");
+        }
         std::process::exit(0);
     }
 
@@ -211,11 +243,7 @@ fn main() {
         for seed in 0..seeds {
             let record = run_frontier_row(&manifest, &environment, Some(seed), wall);
             report(&record);
-            campaign.trials += 1;
-            campaign.seeds.push(seed);
-            if record.outcome.is_verified_witness() {
-                campaign.witnesses += 1;
-            }
+            tally(&mut campaign, seed, &record.outcome);
             board.add(record, &registry).expect("a registered problem");
         }
         campaign.total = at.elapsed();
@@ -228,11 +256,7 @@ fn main() {
             policy: frontier_policy(),
             ..environment.clone()
         };
-        summary.outcome = if campaign.witnesses > 0 {
-            RunOutcome::VerifiedWitness
-        } else {
-            RunOutcome::SliceEstablishedNothing
-        };
+        summary.outcome = campaign_outcome(&campaign);
         summary.verification =
             "every witness checked by running permutation_plus_linear on the recovered inputs"
                 .to_string();
@@ -247,29 +271,7 @@ fn main() {
             manifest.id,
             seeds
         );
-        if let Some((nanos, witnesses)) = campaign.work_per_witness() {
-            println!(
-                "\n{} witnesses in {} slices; {:.1} s per witness including the failures",
-                witnesses,
-                campaign.trials,
-                nanos as f64 / 1e9 / witnesses as f64
-            );
-        } else {
-            println!(
-                "\nno witness in {} slices, which is a fact about the slices and not about the \
-                 problem",
-                campaign.trials
-            );
-        }
-        if let Some((low, high)) = campaign.success_rate_basis_points() {
-            println!(
-                "success rate {}.{:02}% to {}.{:02}% (Wilson, 95%)",
-                low / 100,
-                low % 100,
-                high / 100,
-                high % 100
-            );
-        }
+        report_campaign(&campaign);
         summary.campaign = Some(campaign);
         report(&summary);
         board.add(summary, &registry).expect("a registered problem");
@@ -422,7 +424,14 @@ fn frontier_options() -> F4Options {
     F4Options {
         profile_degrees: true,
         max_matrix_columns: 200_000,
-        max_live_bytes: 4_000_000_000,
+        // `ZEEBRA_MAX_ENTRIES` raises the bound that binds, for the one question a fixed budget
+        // cannot answer: whether a row is out of reach or merely out of *this* budget. The default
+        // is what every reported figure uses.
+        max_live_nonzeros: std::env::var("ZEEBRA_MAX_ENTRIES")
+            .ok()
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(20_000_000),
+        max_live_bytes: 64_000_000_000,
         max_batches: Some(10_000),
         ..F4Options::default()
     }
@@ -440,8 +449,9 @@ fn wall_clock() -> Duration {
 
 fn frontier_policy() -> String {
     format!(
-        "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 \
-         batches, wall clock {} s as a backstop",
+        "grevlex F4 only; 200000 columns, {} live entries (the binding bound), 10000 batches, \
+         wall clock {} s as a backstop",
+        std::env::var("ZEEBRA_MAX_ENTRIES").unwrap_or_else(|_| "20000000".to_string()),
         std::env::var("ZEEBRA_WALL_SECONDS").unwrap_or_else(|_| "600".to_string())
     )
 }
@@ -753,11 +763,11 @@ impl CicoVisitor<K> for Frontier<'_> {
 /// The supervisor is why this takes the system by value: F4 has no cooperative time check, so a
 /// run that outlasts its clock is abandoned in a worker thread and the process exits after the
 /// record is written. A thread that owns its data can be abandoned safely.
-fn supervised_solve<const D: usize>(
-    system: Vec<MultivariatePolynomial<D, K>>,
+fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
+    system: Vec<MultivariatePolynomial<D, F>>,
     wall: Duration,
     sliced: bool,
-    verify: impl Fn(&[K; D]) -> bool,
+    verify: impl Fn(&[F; D]) -> bool,
 ) -> (RunOutcome, Vec<StageCost>, GrobnerFrontier) {
     let mut stages = Vec::new();
     let retained = system.clone();
@@ -845,6 +855,246 @@ fn supervised_solve<const D: usize>(
                 GrobnerFrontier::default(),
             )
         }
+    }
+}
+
+/// Run a registered MQ problem under the frontier budget, slicing it if it is underdetermined.
+///
+/// Returns one record for an overdetermined instance, or one per slice plus a campaign summary for
+/// an underdetermined one. Empty if the instance file is absent.
+fn run_mq_rows(
+    manifest: &ChallengeManifest,
+    environment: &Environment,
+    seeds: u64,
+    wall: Duration,
+) -> Vec<RunRecord> {
+    let ChallengeParameters::MqSystem { kind, n, m, .. } = manifest.parameters else {
+        return Vec::new();
+    };
+    let Some((instance, published)) = read_mq(kind, n) else {
+        return Vec::new();
+    };
+
+    let underdetermined = m < n;
+    let mut records = Vec::new();
+    let mut campaign = Campaign {
+        fixed: n.saturating_sub(m),
+        ..Campaign::default()
+    };
+    let at = Instant::now();
+
+    for seed in 0..if underdetermined { seeds } else { 1 } {
+        let mut record = instance
+            .dispatch::<Q, _>(SolveMqSliced {
+                manifest,
+                instance: &instance,
+                published: &published,
+                slice: underdetermined.then_some(seed),
+                fixed: campaign.fixed,
+                wall,
+            })
+            .expect("a supported dimension");
+        record.environment = Environment {
+            policy: frontier_policy(),
+            ..environment.clone()
+        };
+        record.reproduce = format!(
+            "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq {} --seeds {}",
+            manifest.id, seeds
+        );
+        if underdetermined {
+            tally(&mut campaign, seed, &record.outcome);
+        }
+        records.push(record);
+    }
+
+    if underdetermined {
+        campaign.total = at.elapsed();
+        let mut summary = RunRecord::new(manifest, format!("campaign over {} slices", seeds));
+        summary.environment = Environment {
+            policy: frontier_policy(),
+            ..environment.clone()
+        };
+        summary.outcome = campaign_outcome(&campaign);
+        summary.verification =
+            "every witness evaluated against the original published coefficient vectors"
+                .to_string();
+        summary.transformations = vec![format!(
+            "{} slices, each fixing {} of {} variables at a seeded value",
+            seeds, campaign.fixed, n
+        )];
+        summary.stages = vec![StageCost::new(Stage::Grobner, campaign.total)];
+        summary.reproduce = format!("tools/scoreboard.sh mq {} --seeds {}", manifest.id, seeds);
+        report_campaign(&campaign);
+        summary.campaign = Some(campaign);
+        records.push(summary);
+    }
+    records
+}
+
+/// Tally one slice into a campaign: a witness, a decided-but-empty slice, or no verdict at all.
+fn tally(campaign: &mut Campaign, seed: u64, outcome: &RunOutcome) {
+    campaign.trials += 1;
+    campaign.seeds.push(seed);
+    match outcome {
+        RunOutcome::VerifiedWitness => campaign.witnesses += 1,
+        // A slice that ran out of budget did not test whether it contains a solution. Counting it
+        // as a failure would turn "nothing was established" into "the rate is zero".
+        RunOutcome::StoppedAtLimit(_) | RunOutcome::WitnessRejected => campaign.stopped += 1,
+        _ => {}
+    }
+}
+
+/// What a campaign as a whole established.
+fn campaign_outcome(campaign: &Campaign) -> RunOutcome {
+    if campaign.witnesses > 0 {
+        RunOutcome::VerifiedWitness
+    } else if campaign.decided() == 0 {
+        RunOutcome::StoppedAtLimit(Limit {
+            resource: "campaign reached no verdict".to_string(),
+            detail: format!(
+                "all {} slices stopped at a resource limit, so none of them tested whether it \
+                 contains a solution",
+                campaign.trials
+            ),
+            degree: None,
+            last_completed_stage: Stage::Generation,
+        })
+    } else {
+        RunOutcome::SliceEstablishedNothing
+    }
+}
+
+/// Print a campaign's summary lines, with no rate where there is no rate.
+fn report_campaign(campaign: &Campaign) {
+    match campaign.work_per_witness() {
+        Some((nanos, witnesses)) => println!(
+            "\n{} witnesses in {} slices ({} decided); {:.1} s per witness including the failures",
+            witnesses,
+            campaign.trials,
+            campaign.decided(),
+            nanos as f64 / 1e9 / witnesses as f64
+        ),
+        None if campaign.decided() == 0 => println!(
+            "\nno witness, and **no rate**: all {} slices stopped at a resource limit, so none of \
+             them tested whether it contains a solution",
+            campaign.trials
+        ),
+        None => println!(
+            "\nno witness in {} decided slices of {}, which is a fact about those slices and not \
+             about the problem",
+            campaign.decided(),
+            campaign.trials
+        ),
+    }
+    if let Some((low, high)) = campaign.success_rate_basis_points() {
+        println!(
+            "success rate {}.{:02}% to {}.{:02}% over the {} decided slices (Wilson, 95%)",
+            low / 100,
+            low % 100,
+            high / 100,
+            high % 100,
+            campaign.decided()
+        );
+    }
+}
+
+/// Read a published instance and its answer, if both are on disk.
+fn read_mq(kind: &str, n: usize) -> Option<(MqInstance, Vec<u64>)> {
+    let directory = std::env::var("ZEEBRA_MQ_DIR").unwrap_or("research/instances/mq".to_string());
+    let name = format!(
+        "ToyExample-type{}-n{}-seed0",
+        if kind == "III" { 3 } else { 6 },
+        n
+    );
+    let text = fs::read_to_string(Path::new(&directory).join(&name)).ok()?;
+    let answer = fs::read_to_string(Path::new(&directory).join(format!("{}-answer", name))).ok()?;
+    Some((
+        MqInstance::parse(&text).expect("a published instance"),
+        MqInstance::parse_answer(&answer),
+    ))
+}
+
+/// One MQ instance, optionally sliced, under the supervisor.
+struct SolveMqSliced<'a> {
+    manifest: &'a ChallengeManifest,
+    instance: &'a MqInstance,
+    published: &'a [u64],
+    slice: Option<u64>,
+    fixed: usize,
+    wall: Duration,
+}
+
+impl MqVisitor<Q> for SolveMqSliced<'_> {
+    type Output = RunRecord;
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, Q>]) -> RunRecord {
+        let mut record = RunRecord::new(
+            self.manifest,
+            match self.slice {
+                None => "as published".to_string(),
+                Some(seed) => format!("slice({} fixed, seed {})", self.fixed, seed),
+            },
+        );
+
+        let at = Instant::now();
+        // The slice fixes the surplus variables — the ones that make a signature instance
+        // positive-dimensional — at values drawn from a precommitted seed.
+        let system: Vec<MultivariatePolynomial<N, Q>> = match self.slice {
+            Some(seed) => {
+                let variables: Vec<usize> = (N - self.fixed..N).collect();
+                let specialization =
+                    Specialization::<N, Q>::seeded(&variables, seed).expect("distinct indices");
+                record.transformations.push(format!(
+                    "specialize variables {}..{} at seed {}",
+                    N - self.fixed,
+                    N,
+                    seed
+                ));
+                specialization.apply(system)
+            }
+            None => system.to_vec(),
+        };
+        record.stages.push(
+            StageCost::new(Stage::Generation, at.elapsed())
+                .with("variables", N as i64)
+                .with("equations", system.len() as i64),
+        );
+
+        // The check is against the *published* coefficient vectors, reconstructed from the file
+        // rather than from the system that was solved — and, where the instance has a published
+        // answer and a unique solution, against that answer too.
+        let reconstructed = self
+            .instance
+            .system::<N, Q>()
+            .expect("the same instance parses twice");
+        let published: Vec<Q> = self.published.iter().map(|v| Q::new(*v)).collect();
+        let (outcome, stages, frontier) =
+            supervised_solve(system, self.wall, self.slice.is_some(), |point| {
+                let vanishes = reconstructed
+                    .iter()
+                    .all(|polynomial| polynomial.eval(point) == Q::zero());
+                if vanishes && published.len() == N {
+                    let matches: Vec<bool> = (0..N).map(|i| point[i] == published[i]).collect();
+                    println!(
+                        "    recovered point {} the published answer",
+                        if matches.iter().all(|m| *m) {
+                            "is"
+                        } else {
+                            "is a different root from"
+                        }
+                    );
+                }
+                vanishes
+            });
+        record.outcome = outcome;
+        record.stages.extend(stages);
+        record.frontier = Some(frontier);
+        record.verification = format!(
+            "evaluated against the published coefficient vectors; the published answer starts {:?}",
+            &self.published[..self.published.len().min(4)]
+        );
+        record
     }
 }
 
