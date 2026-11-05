@@ -74,7 +74,7 @@ milestone, not in a spike:
 `--all` attempts what the guard declines. On `t16 R_F=2 R_P=2` — four rounds, so degree 81 — the
 symbolic evaluation takes **431 ms** and produces two polynomials of 3 403 terms each, exactly the
 straight-line degree. The resultant then needs 13 123 samples of an order-162 Sylvester determinant,
-and **it had not finished after 74 minutes** when this was written.
+and **it had not finished after 90 minutes** when this was written.
 
 That is the measurement, and it is the one the default guard is set by: the row is reachable in
 principle — nothing about it is impossible, the polynomials exist and are small — and it is not
@@ -84,10 +84,14 @@ reachable with a Sylvester determinant per interpolation point taken through a g
 - 13 123 samples where 6 562 would do, because the degree bound is `2d²` and the degree is `d²`.
 - An order-162 dense determinant per sample, where the Sylvester structure is not used at all.
 
+Each sample costs about `162³/3` multiplications plus 162 modular inversions, so 13 123 of them is
+roughly `3 × 10^10` field multiplications through a generic `Matrix` — which is where the ninety
+minutes go, and it is arithmetic rather than a surprise.
+
 Together those are a factor of several before any algorithmic change, which is why the conclusion is
 "scope an implementation" rather than "the resultant route stops at two rounds". What can be said
-without an implementation milestone is: **two rounds in 52 ms, four rounds not in an hour, and six
-rounds never** — `3.3 × 10¹⁵` field operations for the resultant alone, before cubing a polynomial
+without an implementation milestone is: **two rounds in 52 ms, four rounds not in ninety minutes,
+and six rounds never** — `3.3 × 10¹⁵` field operations for the resultant alone, before cubing a polynomial
 with 265 720 terms.
 
 ## 5. What this decided
@@ -97,7 +101,7 @@ with 265 720 terms.
 | Does structure-aware elimination beat general F4 here? | **Yes, by 578x** on the one row both can do, and it returns every witness rather than the first. |
 | Is the univariate polynomial manageable? | Yes at two rounds — degree 81, 17 ms to find its roots over KoalaBear. |
 | Does Poseidon's structure reduce the degree below Bézout? | **No.** The bivariate degree is exactly `3^rounds` and the resultant's is exactly `d²`. |
-| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in an hour with this implementation, six rounds `3.3 × 10^15` operations. |
+| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in ninety minutes with this implementation, six rounds `3.3 × 10^15` operations. |
 | Did it extend the frontier? | **No** — both routes reach two rounds. What it changed is the cost there, by 578x. |
 | Should a resultant implementation be scoped? | Yes, and narrowly: early-terminating interpolation plus a structured determinant, aimed at the slice shape, not at a general solver. |
 
