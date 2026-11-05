@@ -1397,6 +1397,43 @@ for the same reason the Singular one is. `docs/research/fukuoka-mq.md` records t
 verification, and one quirk worth knowing: coefficients are uniform over `0..=31`, not `0..=30`, so
 **zero is twice as likely as any other coefficient** in the published GF(31) data.
 
+#### Candidate external instances, surveyed but not imported
+
+[`docs/research/additional-benchmarks.md`](docs/research/additional-benchmarks.md) is the shortlist
+of published cryptanalysis instances worth importing next, with the rejections and their reasons.
+Four candidates are accepted: reduced-round **Anemoi** CICO, whose reference data is raw Magma F4
+and FGLM logs under MIT and whose quotient dimension is a published `(α+2)^N` zeebra can be checked
+against; reduced-round **Griffin**; Anemoi's `ACICO` model as a second formulation of the first; and
+reduced-round **LowMC**, which is blocked on `binary_field` not being exported. UOV, MAYO, Arion and
+XHash8 are rejected, each with a recorded reason. The document also states plainly that the
+[LowMC challenge](https://lowmcchallenge.github.io/) is a **claimed-complexity competition** — its
+results are `log₂ T` and `log₂ M` estimates, several with memory exponents past 65 bits, and there
+are no challenge files to solve.
+
+An accepted candidate becomes a `ChallengeManifest` row, so the document also records what each one
+would require of [the registry](#the-challenge-registry): an `AnemoiCico` parameters variant with
+the algebraic model *inside the digest*, since `FCICO` and `PCICO` are two different polynomial
+systems for the same primitive; a new objective tag for LowMC, whose key recovery is neither
+`CicoExact` nor `MqRoot`; and one field the registry does not yet have anywhere — the **published
+competitor figure**, which `ExternalStatus` cannot carry because it records whether and when a
+problem was solved elsewhere and not at what cost.
+
+`tools/check-griffin-reconstruction.py` is that survey's one executable result. It instantiates
+Griffin with `(t, α) = (12, 3)` over the 55-bit prime `p = 28407454060060787` from the constants
+published in the FreeLunch appendix, and reproduces all five published CICO solutions for
+`r ∈ {5, 6, 7}`:
+
+```sh
+tools/check-griffin-reconstruction.py            # 43 ms, standard library only
+tools/check-griffin-reconstruction.py --verbose  # print each reconstructed output
+```
+
+It exists because the specification is *not* complete on its own: the linear layer comes from the
+designers' reference implementation, and the paper's `(δ, µ)` index convention is ambiguous. The
+published witnesses decide the ambiguity — one reading reproduces 5 of 5 and the other 0 of 5 — so
+the instance is reconstructed rather than guessed. That is the argument the document makes for
+preferring candidates that publish a witness.
+
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
 on a 14-variable system with 16384 solutions that is 1.9 ms against 1.6 s, a factor of **830**.
