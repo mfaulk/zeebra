@@ -3,7 +3,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    linalg::matrix::iterating::{RowIterator, RowsIterator},
+    linalg::matrix::iterating::{ColumnIterator, ColumnsIterator, RowIterator, RowsIterator},
     FiniteField, Ring,
 };
 use proptest::{
@@ -13,6 +13,7 @@ use proptest::{
 };
 use std::fmt::{Debug, Display, Formatter};
 mod arithmetic_ops;
+mod concat;
 mod error;
 mod indexing;
 mod iterating;
@@ -184,6 +185,25 @@ impl<T: Ring> Matrix<T> {
         RowsIterator::new(self)
     }
 
+    /// The elements of the given column, top to bottom.
+    ///
+    /// # Panics
+    /// * If the column index is out of bounds.
+    pub fn column(&self, column_index: usize) -> ColumnIterator<'_, T> {
+        assert!(
+            column_index < self.num_columns,
+            "column_index: {}, num_columns: {}",
+            column_index,
+            self.num_columns
+        );
+        ColumnIterator::new(self, column_index)
+    }
+
+    /// Iterate over the columns of the matrix, left to right.
+    pub fn columns(&self) -> ColumnsIterator<'_, T> {
+        ColumnsIterator::new(self)
+    }
+
     /// Iterate over the rows of the matrix, as mutable references.
     pub fn rows_mut(&mut self) -> RowsIteratorMut<'_, T> {
         RowsIteratorMut::new(self)
@@ -201,6 +221,40 @@ impl<T: Ring> Matrix<T> {
             self[[i, k]] = self[[j, k]];
             self[[j, k]] = tmp;
         }
+    }
+
+    /// This matrix raised to the given power, by repeated squaring.
+    ///
+    /// The zeroth power is the identity of this matrix's size, which is why a non-square matrix is
+    /// rejected even at exponent zero: there is no size the identity could take.
+    ///
+    /// # Errors
+    /// * `NotSquare` if the matrix is not square.
+    pub fn pow(&self, exponent: u64) -> Result<Self, Error> {
+        if !self.is_square() {
+            return Err(Error::NotSquare {
+                num_rows: self.num_rows,
+                num_columns: self.num_columns,
+            });
+        }
+
+        // Square and multiply over the bits of the exponent, least significant first: `base` holds
+        // self^(2^k) as bit k is examined, and is folded into the product when that bit is set.
+        // That is ~log2(exponent) multiplications rather than `exponent` of them.
+        let mut product = Matrix::identity(self.num_rows);
+        let mut base = self.clone();
+        let mut remaining = exponent;
+        while remaining > 0 {
+            if remaining & 1 == 1 {
+                product = &product * &base;
+            }
+            remaining >>= 1;
+            // The last squaring would be unused, and on a large matrix it is not cheap.
+            if remaining > 0 {
+                base = &base * &base;
+            }
+        }
+        Ok(product)
     }
 
     /// Apply a function to each element of the matrix.
@@ -281,13 +335,9 @@ impl<F: FiniteField> Matrix<F> {
 
         // Reduce [A | I]. The row operations that carry A to the identity carry I to A inverse, so
         // the right half of the result is the inverse whenever the left half reduces to I.
-        let mut augmented = Matrix::zero(n, 2 * n);
-        for i in 0..n {
-            for j in 0..n {
-                augmented[[i, j]] = self[[i, j]];
-            }
-            augmented[[i, n + i]] = F::ONE;
-        }
+        let augmented = self
+            .hconcat(&Matrix::identity(n))
+            .expect("a square matrix and an identity of its size have the same number of rows");
         let reduced = gauss_jordan_elimination(&augmented);
 
         let rows: Vec<usize> = (0..n).collect();
@@ -748,6 +798,147 @@ mod tests {
             prop_assert_eq!(m.determinant().unwrap() == Zp541::new(0), singular);
             prop_assert_eq!(m.inverse().is_err(), singular);
         }
+    }
+
+    /// The zeroth power is the identity, the first is the matrix itself, and higher powers agree
+    /// with repeated multiplication.
+    #[test]
+    fn test_pow_agrees_with_repeated_multiplication() {
+        type F = Zp541;
+        let a = matrix![
+            F::new(1), F::new(2);
+            F::new(3), F::new(4)
+        ];
+
+        assert_eq!(a.pow(0).unwrap(), Matrix::identity(2));
+        assert_eq!(a.pow(1).unwrap(), a);
+
+        // Exponents either side of a power of two, so both the squaring and the multiply-in step
+        // are exercised.
+        let mut expected = Matrix::<F>::identity(2);
+        for exponent in 0..=9u64 {
+            assert_eq!(a.pow(exponent).unwrap(), expected, "exponent {}", exponent);
+            expected = &expected * &a;
+        }
+    }
+
+    /// A spot check against a power computed independently over the integers.
+    #[test]
+    fn test_pow_spotcheck() {
+        type F = Zp541;
+        // [1,2; 3,4]^5 over ZZ is [1069, 1558; 2337, 3406], which reduces mod 541 to the
+        // expectation below. Computed outside the implementation under test, so an error in the
+        // squaring schedule shows up as a disagreement.
+        let a = matrix![
+            F::new(1), F::new(2);
+            F::new(3), F::new(4)
+        ];
+        let expected = matrix![
+            F::new(528), F::new(476);
+            F::new(173), F::new(160)
+        ];
+        assert_eq!(a.pow(5).unwrap(), expected);
+    }
+
+    /// A large exponent is reached by squaring, not by that many multiplications.
+    #[test]
+    fn test_pow_of_a_large_exponent() {
+        type F = Zp541;
+        // The transfer matrix of the Fibonacci recurrence: its nth power holds F(n+1), F(n).
+        let fibonacci = matrix![
+            F::new(1), F::new(1);
+            F::new(1), F::new(0)
+        ];
+        let big = fibonacci.pow(1_000_000).unwrap();
+        // Checked against the recurrence run forward mod 541.
+        let (mut previous, mut current) = (F::new(0), F::new(1));
+        for _ in 0..1_000_000u64 {
+            let next = previous + current;
+            previous = current;
+            current = next;
+        }
+        // current is F(1_000_000 + 1) and previous is F(1_000_000).
+        assert_eq!(big[[0, 0]], current);
+        assert_eq!(big[[0, 1]], previous);
+        assert_eq!(big[[1, 0]], previous);
+    }
+
+    /// Powers add: A^m * A^n = A^(m+n).
+    #[test]
+    fn test_pow_adds_exponents() {
+        type F = Zp541;
+        let a = matrix![
+            F::new(0), F::new(1), F::new(0);
+            F::new(0), F::new(0), F::new(1);
+            F::new(2), F::new(0), F::new(3)
+        ];
+        for m in 0..=5u64 {
+            for n in 0..=5u64 {
+                assert_eq!(
+                    &a.pow(m).unwrap() * &a.pow(n).unwrap(),
+                    a.pow(m + n).unwrap(),
+                    "m {}, n {}",
+                    m,
+                    n
+                );
+            }
+        }
+    }
+
+    proptest! {
+        /// Repeated squaring agrees with repeated multiplication, and powers add.
+        #[test]
+        fn test_pow_agrees_with_the_naive_product(
+            m in (1..=5usize).prop_flat_map(|n| any_with::<super::Matrix<Zp541>>((n, n).into())),
+            exponent in 0..=12u64)
+        {
+            let mut naive = Matrix::identity(m.num_rows());
+            for _ in 0..exponent {
+                naive = &naive * &m;
+            }
+            prop_assert_eq!(m.pow(exponent).unwrap(), naive);
+
+            // A^e * A^e = A^(2e), the identity repeated squaring relies on.
+            let half = m.pow(exponent).unwrap();
+            prop_assert_eq!(&half * &half, m.pow(2 * exponent).unwrap());
+        }
+
+        /// Columns are the rows of the transpose, and there are `num_columns` of them.
+        #[test]
+        fn test_columns_match_the_transpose(
+            m in (1..=6usize, 1..=6usize).prop_map(MatrixParams::from).prop_flat_map(any_with::<super::Matrix<Zp541>>))
+        {
+            prop_assert_eq!(m.columns().count(), m.num_columns());
+            let transpose = m.transpose();
+            for j in 0..m.num_columns() {
+                let column: Vec<Zp541> = m.column(j).copied().collect();
+                prop_assert_eq!(column.len(), m.num_rows());
+                let row: Vec<Zp541> = transpose.row(j).copied().collect();
+                prop_assert_eq!(column, row);
+            }
+        }
+    }
+
+    /// Only a square matrix can be raised to a power, and the error reports the shape.
+    #[test]
+    fn test_pow_rejects_non_square() {
+        type F = Zp541;
+        let not_square = matrix![F::new(1), F::new(2), F::new(3); F::new(4), F::new(5), F::new(6)];
+        assert_eq!(
+            not_square.pow(2),
+            Err(super::Error::NotSquare {
+                num_rows: 2,
+                num_columns: 3
+            })
+        );
+        // Even the zeroth power, which would otherwise be an identity of no determinate size.
+        assert_eq!(
+            not_square.pow(0),
+            Err(super::Error::NotSquare {
+                num_rows: 2,
+                num_columns: 3
+            })
+        );
     }
 
     /// A non-square matrix has no determinant, and reports its dimensions.

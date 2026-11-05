@@ -589,6 +589,55 @@ Every field type in the crate implements both traits. Two consequences for anyth
 
 `docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 
+## Dense Matrices
+
+`linalg::Matrix<T>` is a dense matrix over any `T: Ring`, stored row-major, with the `matrix!`
+macro for small literals and `zero`, `identity`, `from_diag` and `new` for the rest. Rows are
+reachable by `row`, `row_mut`, `rows` and `rows_mut`; columns by `column` and `columns`, which walk
+the buffer at a stride of `num_columns` rather than materializing a `transpose()`. Over a
+`FiniteField` there are also `rank`, `inverse` and `determinant`.
+
+```rust
+use zeebra::{fields::Zp541, linalg::Matrix, matrix, FiniteField};
+
+type F = Zp541;
+
+let a = matrix![
+    F::new(1), F::new(2);
+    F::new(3), F::new(4)
+];
+assert_eq!(
+    a.column(1).copied().collect::<Vec<F>>(),
+    vec![F::new(2), F::new(4)]
+);
+assert_eq!(a.columns().count(), 2);
+
+// [A | I], the augmented matrix an inversion reduces.
+let augmented = a.hconcat(&Matrix::identity(2)).unwrap();
+assert_eq!(augmented.shape(), (2, 4));
+
+// The other dimension has to agree, and the error reports both shapes when it does not.
+assert!(a.vconcat(&Matrix::identity(3)).is_err());
+
+// The transfer matrix of the Fibonacci recurrence: its nth power holds F(n+1) and F(n).
+let fibonacci = matrix![
+    F::new(1), F::new(1);
+    F::new(1), F::new(0)
+];
+assert_eq!(fibonacci.pow(10).unwrap()[[0, 1]], F::new(55));
+```
+
+`pow` is repeated squaring, so a large exponent costs log-many multiplications; it returns
+`Err(NotSquare)` for a non-square matrix, including at exponent zero, where there is no size the
+identity could take. `hconcat` and `vconcat` return `Err(IncompatibleShapes)` carrying both shapes.
+
+Two gaps are deliberate. There is no mutable column iterator — handing out disjoint `&mut` down a
+strided column of a row-major buffer is where the borrow checker stops being free, and nothing in
+the crate needs it yet. And `Matrix<T>` does not implement `Ring`, so a matrix cannot yet be a
+polynomial coefficient: `Ring` has no fallible operations, and only *square* matrices form one, so
+that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime check inside
+`mul`. [#132](https://github.com/mfaulk/zeebra/issues/132) has the discussion.
+
 ## Gröbner Bases
 
 `grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
