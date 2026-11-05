@@ -459,6 +459,39 @@ pub struct F4Statistics {
     /// Summed over every batch: new basis elements of degree below their batch's selection degree.
     pub mutant_elements: usize,
 
+    /// Batches that produced at least one such element.
+    ///
+    /// Distinct from [`Self::mutant_elements`]: one batch can produce several, and the question
+    /// M22-D asks is about *batches* — whether a batch that finds a lower-degree relation is
+    /// followed by work at a lower degree.
+    pub batches_with_mutants: usize,
+
+    /// The largest gap between a batch's selection degree and the degree of an element it produced.
+    ///
+    /// Three means a degree-7 matrix yielded a degree-4 relation. The size of the gap is what
+    /// decides whether a mutant is interesting: a relation one degree early is the ordinary
+    /// behaviour of an inhomogeneous computation, and one four degrees early is information the
+    /// schedule had no way to anticipate.
+    pub max_mutant_degree_gap: u64,
+
+    /// Batches whose selection degree was **below** the previous batch's.
+    ///
+    /// The operational measure of whether lower-degree relations are exploited. F4 selects the
+    /// lowest pending degree every time, so a relation that creates lower-degree pairs is acted on
+    /// at the very next batch — and this counts the times that happened, rather than arguing that
+    /// it must.
+    pub degree_regressions: usize,
+
+    /// Of those, regressions immediately after a batch that produced a mutant.
+    ///
+    /// The attribution. A regression can also follow an ordinary batch — a new element of the
+    /// batch's own degree can pair low with an old one — so the two counts have to be separate or
+    /// the mechanism cannot be credited with anything.
+    pub regressions_after_mutants: usize,
+
+    /// The largest drop in selection degree between consecutive batches.
+    pub max_degree_drop: u64,
+
     /// The largest total degree of any monomial that appeared as a matrix column.
     ///
     /// **Not the same quantity as [`F4Statistics::max_pair_degree`]**, and in general larger:

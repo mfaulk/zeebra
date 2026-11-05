@@ -202,9 +202,16 @@ fn summarize(run: &Run) {
         s.dependent_candidate_rows + s.candidate_rank_contribution
     );
     println!(
-        "- reducer scaffolding: {:.1}% of rows; mutant elements (degree below their batch's): {}",
-        100.0 * s.reducer_row_fraction(),
-        s.mutant_elements
+        "- reducer scaffolding: {:.1}% of rows",
+        100.0 * s.reducer_row_fraction()
+    );
+    println!(
+        "- mutants: {} elements over {} of {} batches, largest degree gap {}",
+        s.mutant_elements, s.batches_with_mutants, s.batches, s.max_mutant_degree_gap
+    );
+    println!(
+        "- degree regressions: {} ({} right after a batch with a mutant), largest drop {}",
+        s.degree_regressions, s.regressions_after_mutants, s.max_degree_drop
     );
     println!();
     degree_table(&s.degrees);

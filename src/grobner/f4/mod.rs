@@ -243,6 +243,12 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // `has_work` rather than `!is_empty`: a selection strategy may have deferred pairs out of the
     // pending set, and a computation with deferred pairs left is not finished. Promoting them is
     // what makes such a strategy complete — see [`hilbert_driven`].
+    // The previous batch's selection degree, and whether it produced a relation below it. Both are
+    // needed to attribute a drop in degree: a drop can also follow an ordinary batch, since a new
+    // element of the batch's own degree can pair low with an old one.
+    let mut previous_degree: Option<u64> = None;
+    let mut previous_had_mutant = false;
+
     while pending.has_work() {
         if pending.is_empty() {
             statistics.hilbert.pairs_promoted += pending.promote_deferred();
@@ -299,6 +305,22 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         let degree = selected.first().map_or(0, |pair| pair.degree);
         let considered = selected.len();
 
+        // Did the schedule go *down*? F4 always selects the lowest pending degree, so a relation
+        // that created lower-degree pairs is acted on at the very next batch — this records the
+        // times that happened rather than arguing that it must. Counted before the criteria, since
+        // the degree was selected whether or not a matrix follows.
+        if let Some(previous) = previous_degree {
+            if degree < previous {
+                statistics.degree_regressions += 1;
+                statistics.max_degree_drop = statistics.max_degree_drop.max(previous - degree);
+                if previous_had_mutant {
+                    statistics.regressions_after_mutants += 1;
+                }
+            }
+        }
+        previous_degree = Some(degree);
+        previous_had_mutant = false;
+
         // The prediction's quota for this degree, recorded against what the degree yields. Taken
         // before the batch is reduced, since the basis grows during it.
         let quota = limits
@@ -338,6 +360,15 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         if let Some(quota) = quota {
             statistics.hilbert.predicted_new_elements += quota;
             statistics.hilbert.observed_new_elements += outcome.statistics.candidates;
+        }
+        if outcome.statistics.candidates_below_batch_degree > 0 {
+            statistics.batches_with_mutants += 1;
+            previous_had_mutant = true;
+            if let Some(lowest) = outcome.statistics.min_candidate_degree {
+                statistics.max_mutant_degree_gap = statistics
+                    .max_mutant_degree_gap
+                    .max(degree.saturating_sub(lowest));
+            }
         }
 
         // Having taken this degree's predicted quota, set the rest of it aside and move on. The
