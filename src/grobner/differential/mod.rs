@@ -41,9 +41,12 @@ pub mod text;
 #[cfg(test)]
 mod fixtures;
 
-pub use check::{check_generated, check_system, verify_recorded, SystemOutcome};
+pub use check::{
+    check_generated, check_system, verify_recorded, verify_recorded_with, SystemOutcome,
+};
 pub use comparison::{
-    verify_case, Agreement, Check, DifferentialCase, Disagreement, SOURCE_ORDER, TARGET_ORDER,
+    verify_case, verify_case_with, Agreement, Check, DifferentialCase, Disagreement, SOURCE_ORDER,
+    TARGET_ORDER,
 };
 pub use fixture::{emit_failure, emit_fixture, emit_fixture_module, DifferentialFixture};
 pub use generator::{GeneratedSystem, GeneratedTerm, SystemShape};
@@ -56,7 +59,10 @@ mod tests {
     use std::collections::HashSet;
 
     use super::{
-        check::{check_generated, verify_recorded, SUPPORTED_CHARACTERISTICS, SUPPORTED_VARIABLES},
+        check::{
+            check_generated, verify_recorded, verify_recorded_with, SUPPORTED_CHARACTERISTICS,
+            SUPPORTED_VARIABLES,
+        },
         comparison::{verify_case, Check, DifferentialCase},
         fixtures::FIXTURES,
         generator::{GeneratedSystem, SystemShape},
@@ -65,7 +71,10 @@ mod tests {
     };
     use crate::{
         fields::{Zp13, Zp7},
-        grobner::fglm::{FglmOptions, OperatorConstruction, OperatorStorage},
+        grobner::{
+            f4::F4Options,
+            fglm::{FglmOptions, OperatorConstruction, OperatorStorage},
+        },
     };
 
     /// An oracle that answers from a recorded table and refuses anything else.
@@ -132,6 +141,394 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    /// The M22 strategies, as a list, used by both the offline and the Singular checks.
+    ///
+    /// One list so the two cannot drift: a strategy added here is checked against the recorded
+    /// oracle in CI and against a live Singular when one is present.
+    fn m22_configurations() -> Vec<(&'static str, F4Options)> {
+        use crate::grobner::{HilbertSelection, PairSchedule};
+
+        vec![
+            ("baseline", F4Options::default()),
+            (
+                "small-multiplier degree",
+                F4Options {
+                    schedule: PairSchedule::SmallMultiplierDegree,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "small-multiplier monomial",
+                F4Options {
+                    schedule: PairSchedule::SmallMultiplierMonomial,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert observe",
+                F4Options {
+                    hilbert: HilbertSelection::Observe,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert limited+4",
+                F4Options {
+                    hilbert: HilbertSelection::CertifiedLimited { slack: 4 },
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert deferred+4",
+                F4Options {
+                    hilbert: HilbertSelection::Deferred { slack: 4 },
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "certified",
+                F4Options {
+                    certify: true,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "combined",
+                F4Options {
+                    schedule: PairSchedule::SmallMultiplierMonomial,
+                    hilbert: HilbertSelection::CertifiedLimited { slack: 4 },
+                    certify: true,
+                    ..F4Options::default()
+                },
+            ),
+        ]
+    }
+
+    /// One configuration against the whole recorded corpus.
+    ///
+    /// The offline half of the external-validation claim: a fixture is a recorded *Singular*
+    /// answer, so checking a configured strategy against it is a comparison against the oracle and
+    /// not against Zeebra's own default. 240 ideals over six fields and four variable counts.
+    fn agrees_with_the_recorded_oracle(name: &str, f4: &F4Options) {
+        let options = FglmOptions::unbounded();
+        for fixture in FIXTURES {
+            if let Err(disagreement) = verify_recorded_with(&fixture.to_case(), &options, f4) {
+                panic!("{} under {}: {}", fixture.name, name, disagreement);
+            }
+        }
+    }
+
+    /// One test per configuration rather than one loop over all of them.
+    ///
+    /// `cargo nextest` runs each test in its own process, so eight tests of eleven seconds cost
+    /// eleven seconds of wall clock where one test of ninety costs ninety — and a failure names
+    /// the configuration without reading the panic message. The configurations come from
+    /// [`m22_configurations`] by name, which is asserted to cover all of them, so the split cannot
+    /// silently drop one.
+    macro_rules! offline_oracle_test {
+        ($test:ident, $configuration:literal) => {
+            #[test]
+            fn $test() {
+                let (name, f4) = m22_configurations()
+                    .into_iter()
+                    .find(|(name, _)| *name == $configuration)
+                    .expect("the configuration list no longer has this entry");
+                agrees_with_the_recorded_oracle(name, &f4);
+            }
+        };
+    }
+
+    offline_oracle_test!(
+        test_the_baseline_agrees_with_the_recorded_oracle,
+        "baseline"
+    );
+    offline_oracle_test!(
+        test_small_multiplier_degree_agrees_with_the_recorded_oracle,
+        "small-multiplier degree"
+    );
+    offline_oracle_test!(
+        test_small_multiplier_monomial_agrees_with_the_recorded_oracle,
+        "small-multiplier monomial"
+    );
+    offline_oracle_test!(
+        test_hilbert_observe_agrees_with_the_recorded_oracle,
+        "hilbert observe"
+    );
+    offline_oracle_test!(
+        test_hilbert_limited_agrees_with_the_recorded_oracle,
+        "hilbert limited+4"
+    );
+    offline_oracle_test!(
+        test_hilbert_deferred_agrees_with_the_recorded_oracle,
+        "hilbert deferred+4"
+    );
+    offline_oracle_test!(test_certified_agrees_with_the_recorded_oracle, "certified");
+    offline_oracle_test!(test_combined_agrees_with_the_recorded_oracle, "combined");
+
+    /// Every configuration in the list has an offline test of its own.
+    ///
+    /// The macro above names its configurations as string literals, so a configuration added to
+    /// `m22_configurations` would otherwise reach the live Singular sweep and never reach CI. This
+    /// fails when that happens.
+    #[test]
+    fn test_every_configuration_has_an_offline_test() {
+        let covered = [
+            "baseline",
+            "small-multiplier degree",
+            "small-multiplier monomial",
+            "hilbert observe",
+            "hilbert limited+4",
+            "hilbert deferred+4",
+            "certified",
+            "combined",
+        ];
+        let listed: Vec<&str> = m22_configurations()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(
+            listed, covered,
+            "a configuration was added or renamed without an offline_oracle_test! for it"
+        );
+    }
+
+    /// The configured F4 options really do compute the basis the comparison checks.
+    ///
+    /// The regression test for the defect this plumbing fixes: `verify_recorded_with` once ignored
+    /// its caller's strategy and compared a `F4Options::default()` basis, so every configuration
+    /// "agreed" with the oracle by construction. A configuration F4 cannot finish under must
+    /// therefore *fail* — if it passes, the parameter is being dropped again.
+    #[test]
+    fn test_the_configured_f4_options_reach_the_source_basis() {
+        let options = FglmOptions::unbounded();
+        let case = fixture_by_name("seed-1001-p7-n2").to_case();
+
+        verify_recorded(&case, &options).expect("the fixture agrees under the default");
+
+        let one_batch = F4Options {
+            max_batches: Some(1),
+            ..F4Options::default()
+        };
+        let disagreement = verify_recorded_with(&case, &options, &one_batch)
+            .expect_err("a one-batch budget cannot produce this basis, so this must not agree");
+        assert_eq!(
+            disagreement.check,
+            Check::SourceBasis,
+            "the limit must be reported where it fired: {}",
+            disagreement
+        );
+    }
+
+    /// A basis that differs from the oracle's only below the leading terms is rejected.
+    ///
+    /// Leading monomials alone do not determine a reduced Gröbner basis, so a comparison that
+    /// checked only them would accept a wrong answer. This perturbs one *constant* term of one
+    /// oracle basis element, asserts the leading monomials are unchanged, and requires the
+    /// comparison to reject it anyway — under a configured strategy, which is the path M22 added.
+    #[test]
+    fn test_a_perturbed_tail_is_rejected_although_the_leading_monomials_agree() {
+        use crate::{MonomialOrder, MultivariatePolynomial};
+
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let correct = "x2^2-2*x1-2*x2-3";
+        let perturbed = "x2^2-2*x1-2*x2-2";
+
+        // The perturbation is confined to the tail: same lead, different polynomial.
+        let parse =
+            |source| MultivariatePolynomial::<2, Zp7>::parse(source, ["x1", "x2"]).expect("parses");
+        let (a, b) = (parse(correct), parse(perturbed));
+        assert_eq!(
+            a.leading_monomial(order),
+            b.leading_monomial(order),
+            "the perturbation must not move the leading monomial, or it proves nothing"
+        );
+        assert_ne!(a, b, "the perturbation must change the polynomial");
+
+        let fixture = fixture_by_name("seed-1001-p7-n2");
+        let mut case = fixture.to_case();
+        assert!(
+            case.grevlex_basis.iter().any(|g| g == correct),
+            "the fixture no longer contains {}, so this test needs a new perturbation",
+            correct
+        );
+        for element in case.grevlex_basis.iter_mut() {
+            if element == correct {
+                *element = perturbed.to_string();
+            }
+        }
+
+        let options = FglmOptions::unbounded();
+        for (name, f4) in m22_configurations() {
+            let disagreement = verify_recorded_with(&case, &options, &f4).expect_err(&format!(
+                "{} accepted a basis that differs from the oracle's below the leading terms",
+                name
+            ));
+            assert_eq!(
+                disagreement.check,
+                Check::SourceBasis,
+                "{}: the disagreement must be reported on the source basis: {}",
+                name,
+                disagreement
+            );
+        }
+    }
+
+    /// The fixture with this name, which is a defect in the test if it is missing.
+    fn fixture_by_name(name: &str) -> &'static super::DifferentialFixture {
+        FIXTURES
+            .iter()
+            .find(|fixture| fixture.name == name)
+            .unwrap_or_else(|| panic!("the corpus no longer contains {}", name))
+    }
+
+    /// Every strategy M22 added agrees with Singular on a live sweep.
+    ///
+    /// Each M22 workstream asserts its strategy returns the *baseline's* basis on a fixed
+    /// correctness corpus, and the baseline is differentially tested against Singular. Composing
+    /// the two is a valid argument — and it is an argument. This checks the strategies against the
+    /// oracle directly, on random systems nobody chose, over six characteristics.
+    ///
+    /// ```text
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::differential::tests::test_m22_strategies_agree_with_singular
+    /// ```
+    ///
+    /// Twenty-four systems per strategy, which is exactly the `4 x 6` cross product of supported
+    /// variable counts and characteristics — the sweep walks it in a fixed order, so that count is
+    /// the smallest one that reaches every field. Eight would reach two. The field coverage is
+    /// then *asserted* from the agreed cases rather than assumed from the index arithmetic.
+    ///
+    /// `src/bin/zeebra-differential.rs` is the tool for a longer sweep, and `--f4-*` is not wired
+    /// into it because a sweep that takes an hour should be pointed at one configuration
+    /// deliberately rather than by flag.
+    #[test]
+    #[ignore = "needs a local Singular installation"]
+    fn test_m22_strategies_agree_with_singular() {
+        use super::{run_sweep, SingularOracle, SweepOptions};
+        use crate::grobner::{HilbertSelection, PairSchedule};
+        use std::collections::BTreeSet;
+        use std::time::Duration;
+
+        let work_dir =
+            std::env::temp_dir().join(format!("zeebra-m22-differential-{}", std::process::id()));
+        let mut oracle = SingularOracle::new("Singular", &work_dir, Duration::from_secs(60), false)
+            .expect("a writable scratch directory");
+        let version = oracle.version().expect("Singular runs");
+
+        let configurations: Vec<(&str, F4Options)> = vec![
+            ("baseline", F4Options::default()),
+            (
+                "small-multiplier degree",
+                F4Options {
+                    schedule: PairSchedule::SmallMultiplierDegree,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "small-multiplier monomial",
+                F4Options {
+                    schedule: PairSchedule::SmallMultiplierMonomial,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert observe",
+                F4Options {
+                    hilbert: HilbertSelection::Observe,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert limited+4",
+                F4Options {
+                    hilbert: HilbertSelection::CertifiedLimited { slack: 4 },
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "hilbert deferred+4",
+                F4Options {
+                    hilbert: HilbertSelection::Deferred { slack: 4 },
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "certified",
+                F4Options {
+                    certify: true,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "combined",
+                F4Options {
+                    schedule: PairSchedule::SmallMultiplierMonomial,
+                    hilbert: HilbertSelection::CertifiedLimited { slack: 4 },
+                    certify: true,
+                    ..F4Options::default()
+                },
+            ),
+        ];
+
+        for (name, f4) in configurations {
+            let options = SweepOptions {
+                seed: 22_000,
+                systems: 24,
+                variables: SUPPORTED_VARIABLES.to_vec(),
+                characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+                max_degree: 3,
+                max_terms: 4,
+                minimize_attempts: 0,
+                minimize_budget: Duration::from_secs(0),
+                fglm: FglmOptions::unbounded(),
+                f4,
+            };
+            let report = run_sweep(&options, &mut oracle, &mut |_, _, _| {});
+
+            assert!(
+                report.clean(),
+                "{} against Singular build {}: {} disagreements, {} oracle failures {:?}, \
+                 {} Zeebra failures {:?}",
+                name,
+                version,
+                report.failures.len(),
+                report.oracle_failures.len(),
+                report.oracle_failures,
+                report.zeebra_failures.len(),
+                report.zeebra_failures,
+            );
+            assert!(report.agreed > 0, "{}: the sweep checked nothing", name);
+
+            // Coverage is asserted, not inferred. `clean()` is also true of a sweep where every
+            // system was rejected before reaching a field, and an earlier version of this test
+            // ran eight systems and reached two of the six characteristics while asserting
+            // nothing about which.
+            let reached: BTreeSet<u64> = report
+                .agreed_cases
+                .iter()
+                .map(|case| case.characteristic)
+                .collect();
+            let expected: BTreeSet<u64> = SUPPORTED_CHARACTERISTICS.iter().copied().collect();
+            assert_eq!(
+                reached, expected,
+                "{} agreed over {:?} and the sweep advertises {:?}",
+                name, reached, expected
+            );
+
+            let variable_counts: BTreeSet<usize> = report
+                .agreed_cases
+                .iter()
+                .map(|case| case.variables.len())
+                .collect();
+            let expected_counts: BTreeSet<usize> = SUPPORTED_VARIABLES.iter().copied().collect();
+            assert_eq!(
+                variable_counts, expected_counts,
+                "{} agreed at variable counts {:?} and the sweep advertises {:?}",
+                name, variable_counts, expected_counts
+            );
         }
     }
 
@@ -403,7 +800,12 @@ mod tests {
             let mut oracle = RecordedOracle {
                 cases: vec![fixture.to_case()],
             };
-            match check_generated(&system, &mut oracle, &FglmOptions::unbounded()) {
+            match check_generated(
+                &system,
+                &mut oracle,
+                &FglmOptions::unbounded(),
+                &F4Options::default(),
+            ) {
                 SystemOutcome::Agreed { .. } => checked += 1,
                 other => panic!("{}: {}", fixture.name, other.summary()),
             }
@@ -427,7 +829,12 @@ mod tests {
             13,
         );
         let mut oracle = RecordedOracle { cases: Vec::new() };
-        let outcome = check_generated(&system, &mut oracle, &FglmOptions::unbounded());
+        let outcome = check_generated(
+            &system,
+            &mut oracle,
+            &FglmOptions::unbounded(),
+            &F4Options::default(),
+        );
         assert!(!outcome.agreed(), "{}", outcome.summary());
         assert!(matches!(outcome, SystemOutcome::OracleFailed { .. }));
     }
@@ -445,7 +852,12 @@ mod tests {
             13,
         );
         let mut oracle = RecordedOracle { cases: Vec::new() };
-        let outcome = check_generated(&system, &mut oracle, &FglmOptions::unbounded());
+        let outcome = check_generated(
+            &system,
+            &mut oracle,
+            &FglmOptions::unbounded(),
+            &F4Options::default(),
+        );
         assert!(!outcome.agreed());
         assert!(matches!(outcome, SystemOutcome::Unsupported { .. }));
     }
@@ -484,6 +896,7 @@ mod tests {
             minimize_attempts: 0,
             minimize_budget: Duration::from_secs(0),
             fglm: FglmOptions::unbounded(),
+            f4: F4Options::default(),
         };
         let report = run_sweep(&options, &mut oracle, &mut |_, _, _| {});
 

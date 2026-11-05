@@ -21,6 +21,7 @@ use std::{
 };
 
 use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction, OperatorStorage};
+use zeebra::grobner::F4Options;
 
 use zeebra::grobner::differential::{
     check::{SUPPORTED_CHARACTERISTICS, SUPPORTED_VARIABLES},
@@ -315,6 +316,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
         minimize_attempts: 40,
         minimize_budget: Duration::from_secs(20),
         fglm: FglmOptions::default(),
+        f4: F4Options::default(),
     };
     let mut singular = "Singular".to_string();
     let mut timeout = Duration::from_secs(30);

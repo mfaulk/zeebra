@@ -244,6 +244,8 @@ cargo run --release --example hilbert_study         # the semiregular model agai
 cargo run --release --example cryptanalysis_ladder  # Poseidon and MQ, with every transform inverted
 cargo run --release --example hilbert_driven        # a predicted cap against a cap chosen without one
 cargo run --release --example hilbert_driven -- list
+cargo run --release --example m22_ablation          # every M22 strategy, one table per instance
+cargo run --release --example m22_ablation -- list
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
@@ -301,6 +303,17 @@ controlled Poseidon family — where the `t = 3` and `t = 2` nine-variable insta
 the same algebraic dimension** (`N - E = t - 2k`), so the `t = 3` system is also run with one free
 input pinned, which matches the equation counts without changing the round structure. Needs
 `tools/fetch-mq-challenge.sh` for the MQ sections; the rest runs without it.
+
+`m22_ablation` is M22-I's: the whole M22 strategy matrix on one table per instance, over the
+corpus of §11.2 — katsura-5/6/7, cyclic-5/6, a planted system, a nonradical ideal, a
+positive-dimensional one, the Fukuoka type III and specialized type VI instances, and three Poseidon
+systems. Every row's basis is **asserted** equal to the baseline's and certified, since a differing
+basis is a defect and a column reporting one would bury it. `total ms` is solve plus certification,
+which is the only figure a default decision may use. Variable order is held fixed at the generated
+layout throughout — M22-E measured it at 1.6x–1.7x, which would otherwise be attributed to whichever
+F4 strategy varied alongside it. There is no mutant row, because M22-D added no mutant mode; `D = A`
+is printed to make the gap explicit. See
+[`docs/MILESTONE-DEGREE-AWARE-F4.md`](docs/MILESTONE-DEGREE-AWARE-F4.md).
 
 `hilbert_study` is M22-B's measurement: the exact Hilbert function of each computed basis's
 leading-term ideal against the semiregular prediction, degree by degree, with the first
@@ -1569,6 +1582,35 @@ reduced from 4611 to 231 and the largest matrix from 1954 rows to 92 — and it 
 chain criterion finds at selection time, so enabling both discards nothing more than enabling
 Gebauer–Möller alone. In the classical engine neither dominates: on katsura-5 under lex the chain
 criterion reduces fewer pairs than Gebauer–Möller does.
+
+The sweep's F4 options are configurable through `SweepOptions::f4`, the analogue of the `fglm`
+field one level up: it is how a workstream points the external oracle at a strategy under
+development rather than at the default. M22 uses it to check each of its configurations —
+`SmallMultiplierDegree`, `SmallMultiplierMonomial`, `Observe`, `CertifiedLimited`, `Deferred`,
+`certify`, and three together — against Singular on random systems over six characteristics, which
+is stronger than composing "strategy equals baseline on a fixed corpus" with "baseline agrees with
+Singular".
+
+The configuration has to reach the comparison for any of that to be true, and that is the
+distinction between two pairs of entry points:
+
+| entry point | source basis computed with |
+| --- | --- |
+| `verify_case`, `verify_recorded` | `F4Options::default()` |
+| `verify_case_with`, `verify_recorded_with` | the caller's `F4Options` |
+
+The `_with` forms are what the sweep calls. An earlier version of the harness took the
+configuration, used it for the border query, and then compared a *default-configuration* basis
+against the oracle — so every configuration agreed by construction and the sweep was evidence about
+the default alone. Two tests now hold the plumbing in place: one runs a configuration F4 cannot
+finish under and requires the comparison to fail, and one perturbs an oracle basis element below
+its leading term and requires rejection under every configuration. The fixtures also give the
+strategy-versus-oracle check with no Singular present, since a fixture is a recorded Singular
+answer:
+
+```text
+cargo test --lib agrees_with_the_recorded_oracle    # one test per configuration
+```
 
 `grobner::solve` still uses `buchberger`. The sparse linear algebra F4 is built on is reusable on
 its own, as `linalg::sparse`, with the dense representations as `linalg::dense`;
