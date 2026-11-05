@@ -354,6 +354,11 @@ That bounds where to look next in both directions:
   two rounds — but its limit is arithmetic and written down (`16 · 3^{5·rounds}` field operations)
   where F4's is a matrix nobody can bound in advance. A cost difference of 578x at the shared
   frontier is the finding; an extension of the frontier is not.
+- **And, unexpectedly, in `lagrange_interpolate`**, which M23-E measured at `O(n³)`: 7.4x–7.9x per
+  doubling of the point count, 12.9 s at 2 000 points, extrapolating to about an hour at the 13 123
+  the four-round row needs — against a few minutes for all of that row's determinants together.
+  Attempting a row that does not finish is what found it, and it reordered the spike's own list of
+  what to fix.
 
 ### 5b.5 The same instances across three milestones
 
