@@ -78,11 +78,34 @@ pub fn two_adic_root_of_unity<F: KnownOrder, R: RngCore + CryptoRng>(log_n: u32,
 }
 
 /// `x^(2^times)`.
-fn repeated_squaring<F: FiniteField>(mut x: F, times: u32) -> F {
+pub(crate) fn repeated_squaring<F: FiniteField>(mut x: F, times: u32) -> F {
     for _ in 0..times {
         x = x * x;
     }
     x
+}
+
+/// `(q - 1) / 2`, for q given as little-endian 64-bit limbs.
+///
+/// Euler's criterion's exponent. Undefined for even q, where `q - 1` is odd; the callers that
+/// need it have ruled out characteristic two first.
+pub(crate) fn halved_group_order(order_limbs: &[u64]) -> Vec<u64> {
+    shift_right(&decrement(order_limbs), 1)
+}
+
+/// `limbs + 1`, little-endian, widening if it carries out of the top limb.
+pub(crate) fn increment(limbs: &[u64]) -> Vec<u64> {
+    let mut out = limbs.to_vec();
+    for limb in out.iter_mut() {
+        if let Some(sum) = limb.checked_add(1) {
+            *limb = sum;
+            return out;
+        }
+        // Carry into the next limb.
+        *limb = 0;
+    }
+    out.push(1);
+    out
 }
 
 /// `limbs - 1`, little-endian.
@@ -103,7 +126,7 @@ fn decrement(limbs: &[u64]) -> Vec<u64> {
 }
 
 /// `limbs >> bits`, little-endian.
-fn shift_right(limbs: &[u64], bits: usize) -> Vec<u64> {
+pub(crate) fn shift_right(limbs: &[u64], bits: usize) -> Vec<u64> {
     let whole = bits / 64;
     let part = bits % 64;
     if whole >= limbs.len() {

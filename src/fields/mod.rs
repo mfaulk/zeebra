@@ -10,6 +10,7 @@ mod prime_field_128;
 mod prime_field_256;
 mod prime_field_32;
 mod prime_field_64;
+mod sqrt;
 pub mod two_adic;
 
 pub use batch_inverse::{batch_inverse, batch_invert};
@@ -23,6 +24,7 @@ pub use prime_field_256::{
 };
 pub use prime_field_32::PrimeFieldElement32;
 pub use prime_field_64::PrimeFieldElement64;
+pub use sqrt::legendre_symbol;
 
 // === 32-bit prime fields ===
 //

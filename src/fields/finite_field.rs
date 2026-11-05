@@ -414,6 +414,18 @@ pub trait KnownOrder: FiniteField {
         two_adic::two_adic_decomposition(Self::order_limbs()).0
     }
 
+    /// A square root of this element, or `None` if it is not a square.
+    ///
+    /// Tonelli-Shanks, over every field in the crate including characteristic two; see
+    /// [`sqrt`](super::sqrt). On [`KnownOrder`] rather than [`FiniteField`] because the exponents
+    /// it raises to are read off `q - 1`.
+    ///
+    /// Of the two roots `+-r` it is unspecified which is returned. The rng is drawn from only
+    /// where a quadratic non-residue is needed — see the module comment for when that is.
+    fn sqrt<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Option<Self> {
+        super::sqrt::sqrt(self, rng)
+    }
+
     /// A primitive `2^log_n`-th root of unity.
     ///
     /// Unlike [`Self::try_root_of_unity`] this needs no generator and so no factorization of
