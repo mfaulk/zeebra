@@ -151,6 +151,49 @@ precisely so that implementations can check themselves, and `n = 10` is 45 varia
 smallest unsolved challenge. What it establishes is that the import is faithful and the pipeline
 runs end to end on data this project did not generate.
 
+### 4.1 The whole published type III family, under one stated budget (M23-D)
+
+`tools/scoreboard.sh mq <id>` under the frontier budget — 200,000 columns, **20,000,000 live
+entries**, which is the bound that binds, and a wall clock that never did. Pinned to cores 0–7.
+
+| instance | vars | eqs | deg | outcome | `D` | F4 | total |
+|---|---:|---:|---:|---|---:|---:|---:|
+| type III `n=10` seed 0 | 10 | 20 | 4 | **verified witness** | 1 | 114 ms | 114 ms |
+| type III `n=15` seed 0 | 15 | 30 | 4 | **verified witness** | 1 | 7 873 ms | 7 874 ms |
+| type III `n=20` seed 0 | 20 | 40 | 5 | stopped at 20 001 424 live entries | — | 67 496 ms | 67 497 ms |
+
+**`n = 15` recovers the published answer**, and the run says so: the recovered point is compared
+against the published answer coordinate by coordinate, and it matches. That is the strongest check
+available on this family — the solver was not told the answer, `D = 1` says the solution is unique,
+and the point that came back is the one the challenge publishes. M22 had computed a basis for this
+instance; this completes the pipeline to a checked witness.
+
+`n = 20` crosses the entry cap at degree 5 after 67.5 s. So the published type III toy examples end
+at `n = 15` under this budget, and `n = 20` is the first one that does not fit. Both figures are
+reproducible resource bounds rather than timeouts.
+
+### 4.2 Type VI `n = 15`: eight slices, and a rate that does not exist
+
+Type VI is underdetermined, so a slice is the only way in: fix `n − m = 5` of the fifteen variables
+at values drawn from a precommitted seed and solve the rest. Eight seeds, and **every one of them
+crossed the entry cap at degree 9**, each in about 29.5 s.
+
+The campaign is therefore recorded as *having reached no verdict* — not as eight failures. The
+distinction is the whole point of the record:
+
+> `0 witnesses in 8 slices; success rate 0.00% to 32.44%`
+
+was what the first version of the runner printed, and it is a claim about the **instance** that
+nothing established. A slice that ran out of budget did not test whether it contains a solution, so
+it is not a Bernoulli trial of that question. `Campaign::stopped` now counts those separately,
+`Campaign::decided()` is the rate's denominator, and `success_rate_basis_points` returns `None`
+when nothing was decided. This was found by running the campaign, which is the argument for running
+it.
+
+For contrast, M22-E's type VI `n = 10` slices — three variables fixed — *did* finish, at degree 9
+with 4 315 columns, and produced witnesses. Five surplus variables at `n = 15` is past the wall,
+and the degree is the same 9 either way: what grows is the width at that degree.
+
 ## 5. What type VI is for
 
 Type VI is the signature family: `n ≈ 1.5m`, so **underdetermined** — `n = 10` carries only 7

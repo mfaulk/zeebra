@@ -145,6 +145,16 @@ pub enum Objective {
     /// over the base field.
     CicoExact,
 
+    /// The same, with the **trailing** words constrained instead of the leading ones:
+    /// `Perm(X_1..X_{t−k}, 0^k) = (Y_1..Y_{t−k}, 0^k)`.
+    ///
+    /// The 2025 bounty program's objective, and a different problem from [`Self::CicoExact`] — the
+    /// constrained positions interact with the MDS layer differently, so the two are not each
+    /// other with relabelled variables. `CicoInstance` constrains the leading words and this crate
+    /// therefore cannot generate this one; the rows that use it are registered and refused by
+    /// [`ChallengeManifest::cico_instance`] rather than silently built as the other objective.
+    CicoExactTrailing,
+
     /// `F(x) = 0` for the published coefficient vectors, over the published field.
     MqRoot,
 }
@@ -154,6 +164,7 @@ impl Objective {
     pub fn tag(&self) -> &'static str {
         match self {
             Self::CicoExact => "cico-exact",
+            Self::CicoExactTrailing => "cico-exact-trailing",
             Self::MqRoot => "mq-root",
         }
     }
@@ -165,6 +176,10 @@ impl Objective {
                 "find the free input words for which the permutation-with-initial-linear-layer \
                  reproduces the target output words exactly; the remaining output words are \
                  unconstrained"
+            }
+            Self::CicoExactTrailing => {
+                "find the leading input words for which the permutation reproduces the target in \
+                 its trailing words exactly; the leading output words are unconstrained"
             }
             Self::MqRoot => "find any x over the published field with F(x) = 0",
         }
@@ -212,6 +227,30 @@ pub enum ChallengeParameters {
         target: CicoTarget,
     },
 
+    /// A Poseidon CICO challenge this crate cannot construct, registered anyway.
+    ///
+    /// Two reasons occur: a field with no coefficient type here — the 2025 program's Poseidon-256
+    /// is over a 255-bit scalar field and its Poseidon-64 over Goldilocks, neither of which this
+    /// generator is wired for — and the trailing-constraint objective, which `CicoInstance` does
+    /// not express. Registered because a scoreboard that only lists what it can run hides the
+    /// targets that are actually open.
+    PoseidonCicoUnregisterable {
+        /// The field as the program names it.
+        field: &'static str,
+        /// The modulus in decimal, as text, since it need not fit a `u64`.
+        prime: &'static str,
+        /// The S-box exponent.
+        alpha: u32,
+        /// State width.
+        t: usize,
+        /// Constrained words at each end.
+        k: usize,
+        /// Full rounds.
+        r_f: usize,
+        /// Partial rounds.
+        r_p: usize,
+    },
+
     /// A published multivariate quadratic system, identified by the bytes of its file.
     MqSystem {
         /// The field, as the source names it.
@@ -236,7 +275,7 @@ impl ChallengeParameters {
     /// The family's stable name.
     pub fn family(&self) -> &'static str {
         match self {
-            Self::PoseidonCico { .. } => "poseidon-cico",
+            Self::PoseidonCico { .. } | Self::PoseidonCicoUnregisterable { .. } => "poseidon-cico",
             Self::MqSystem { .. } => "fukuoka-mq",
         }
     }
@@ -269,6 +308,23 @@ impl ChallengeParameters {
                 });
                 lines
             }
+            Self::PoseidonCicoUnregisterable {
+                field,
+                prime,
+                alpha,
+                t,
+                k,
+                r_f,
+                r_p,
+            } => vec![
+                format!("field {}", field),
+                format!("prime {}", prime),
+                format!("alpha {}", alpha),
+                format!("t {}", t),
+                format!("k {}", k),
+                format!("r_f {}", r_f),
+                format!("r_p {}", r_p),
+            ],
             Self::MqSystem {
                 field,
                 kind,
@@ -480,6 +536,15 @@ impl ChallengeManifest {
         }
     }
 
+    /// The state width, for either Poseidon variant.
+    pub fn parameters_t(&self) -> usize {
+        match &self.parameters {
+            ChallengeParameters::PoseidonCico { t, .. }
+            | ChallengeParameters::PoseidonCicoUnregisterable { t, .. } => *t,
+            ChallengeParameters::MqSystem { .. } => 0,
+        }
+    }
+
     /// The Poseidon parameters, for a CICO problem.
     pub fn poseidon_parameters(&self) -> Option<PoseidonParameters> {
         match &self.parameters {
@@ -507,6 +572,11 @@ impl ChallengeManifest {
             ChallengeParameters::PoseidonCico { t, k, .. } => {
                 Some(t - k + self.poseidon_parameters()?.sboxes())
             }
+            // The same count, computed from the program's parameters rather than from a system
+            // this crate can build. A size is a fact about the problem either way.
+            ChallengeParameters::PoseidonCicoUnregisterable { t, k, r_f, r_p, .. } => {
+                Some(t - k + t * r_f + r_p)
+            }
             ChallengeParameters::MqSystem { n, .. } => Some(*n),
         }
     }
@@ -516,6 +586,9 @@ impl ChallengeManifest {
         match &self.parameters {
             ChallengeParameters::PoseidonCico { k, .. } => {
                 Some(self.poseidon_parameters()?.sboxes() + k)
+            }
+            ChallengeParameters::PoseidonCicoUnregisterable { t, k, r_f, r_p, .. } => {
+                Some(t * r_f + r_p + k)
             }
             ChallengeParameters::MqSystem { m, .. } => Some(*m),
         }
@@ -532,12 +605,27 @@ impl ChallengeManifest {
     /// Otherwise whatever [`Poseidon::new`] and [`CicoInstance::new`] report, including
     /// [`PoseidonError::FieldMismatch`] when `F` is not the field the parameters name.
     pub fn cico_instance<F: KnownOrder>(&self) -> Result<CicoInstance<F>, PoseidonError> {
+        // A row whose objective this crate does not generate must not be built as the objective it
+        // does generate: the constrained positions interact with the MDS layer differently, and
+        // the result would be a different problem wearing this row's identity.
+        if self.objective != Objective::CicoExact {
+            return Err(PoseidonError::WrongStateWidth {
+                expected: 0,
+                found: 0,
+            });
+        }
         let (k, target) = match &self.parameters {
             ChallengeParameters::PoseidonCico { k, target, .. } => (*k, target),
             ChallengeParameters::MqSystem { n, .. } => {
                 return Err(PoseidonError::WrongStateWidth {
                     expected: 0,
                     found: *n,
+                })
+            }
+            ChallengeParameters::PoseidonCicoUnregisterable { t, .. } => {
+                return Err(PoseidonError::WrongStateWidth {
+                    expected: 0,
+                    found: *t,
                 })
             }
         };
@@ -741,6 +829,22 @@ pub enum ChallengeError {
         variables: usize,
     },
 
+    /// A registered CICO problem over a field this crate has no coefficient type for.
+    NotGeneratable {
+        /// The field, as the program names it.
+        field: &'static str,
+    },
+
+    /// The objective is one this crate does not generate.
+    ///
+    /// Registered problems may name an objective the generator cannot express — the 2025 bounty
+    /// program constrains the *trailing* words — and a runner iterating the registry will reach
+    /// one. Refused by name rather than approximated.
+    UnsupportedObjective {
+        /// The objective's tag.
+        objective: &'static str,
+    },
+
     /// The instance could not be built.
     Poseidon(PoseidonError),
 }
@@ -749,6 +853,16 @@ impl Display for ChallengeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotCico { family } => write!(f, "not a CICO problem: family {}", family),
+            Self::NotGeneratable { field } => {
+                write!(f, "this crate has no coefficient type for {}", field)
+            }
+            Self::UnsupportedObjective { objective } => {
+                write!(
+                    f,
+                    "this crate does not generate the {} objective",
+                    objective
+                )
+            }
             Self::UnsupportedDimension { variables } => write!(
                 f,
                 "no dimension compiled for {} variables; see dispatch_cico",
@@ -775,13 +889,21 @@ pub fn dispatch_cico<F: KnownOrder, V: CicoVisitor<F>>(
     manifest: &ChallengeManifest,
     visitor: V,
 ) -> Result<V::Output, ChallengeError> {
-    if !matches!(
-        manifest.parameters,
-        ChallengeParameters::PoseidonCico { .. }
-    ) {
+    // Family, then objective, then field: each refusal names the first reason that applies, and
+    // "not a CICO problem: family poseidon-cico" would be a self-contradictory thing to say about
+    // a 2025-program row, which is why the family check is about the family alone.
+    if let ChallengeParameters::MqSystem { .. } = manifest.parameters {
         return Err(ChallengeError::NotCico {
             family: manifest.parameters.family(),
         });
+    }
+    if manifest.objective != Objective::CicoExact {
+        return Err(ChallengeError::UnsupportedObjective {
+            objective: manifest.objective.tag(),
+        });
+    }
+    if let ChallengeParameters::PoseidonCicoUnregisterable { field, .. } = manifest.parameters {
+        return Err(ChallengeError::NotGeneratable { field });
     }
     let instance = manifest.cico_instance::<F>()?;
     let variables = instance.variables();
@@ -975,6 +1097,78 @@ pub fn registry() -> Vec<ChallengeManifest> {
         });
     }
 
+    // The 2025 bounty program's tiers that the program itself still lists as unsolved. A
+    // different objective from the 2026 CICO program — the zeros are the *trailing* words, not the
+    // leading ones — and two of the three are over fields this crate has no coefficient type for.
+    // Registered and refused by the constructor, because a scoreboard that lists only what it can
+    // run hides exactly the problems that are open.
+    for (id, program_field, prime, alpha, t, r_f, r_p, reward, notes) in [
+        (
+            "poseidon256-cico-2025-rf6-rp11",
+            "BLS12-381 scalar field",
+            "52435875175126190479447740508185965837690552500527637822603658699938581184513",
+            5u32,
+            3usize,
+            6usize,
+            11usize,
+            "$10,000",
+            "Perm(X_1, X_2, 0) = (Y_1, Y_2, 0), a 32-bit tier of the 2025 program, listed as \
+             unsolved on 2026-11-05. A 255-bit field, which this generator is not wired for.",
+        ),
+        (
+            "poseidon256-cico-2025-rf6-rp16",
+            "BLS12-381 scalar field",
+            "52435875175126190479447740508185965837690552500527637822603658699938581184513",
+            5,
+            3,
+            6,
+            16,
+            "$15,000",
+            "The 40-bit tier of the same family, listed as unsolved on 2026-11-05 and the hardest \
+             offered there.",
+        ),
+        (
+            "poseidon64-cico-2025-rf6-rp13",
+            "Goldilocks",
+            "18446744069414584321",
+            7,
+            8,
+            6,
+            13,
+            "$15,000",
+            "Perm(X_1..X_7, 0) = (Y_1..Y_7, 0) over 2^64 - 2^32 + 1 with a degree-7 S-box, the \
+             40-bit tier, listed as unsolved on 2026-11-05. The lower tiers of this family were \
+             claimed in April and May 2025.",
+        ),
+    ] {
+        challenges.push(ChallengeManifest {
+            id,
+            schema: ChallengeManifest::SCHEMA,
+            class: BenchmarkClass::Official,
+            parameters: ChallengeParameters::PoseidonCicoUnregisterable {
+                field: program_field,
+                prime,
+                alpha,
+                t,
+                k: 1,
+                r_f,
+                r_p,
+            },
+            objective: Objective::CicoExactTrailing,
+            program: ChallengeProgram {
+                version: "2025 bounty program, read 2026-11-05",
+                reward: Some(reward),
+                ..INITIATIVE
+            },
+            external: ExternalStatus::NoneRecorded {
+                as_of: "2026-11-05",
+            },
+            verifier: "the program's own verifier; this crate generates no system for this \
+                       objective and so has nothing to check",
+            notes,
+        });
+    }
+
     for (id, kind, n, m, sha256, external, notes) in [
         (
             "fukuoka-mq-III-n10-seed0",
@@ -1087,8 +1281,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::{
-        challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeParameters,
-        CicoTarget, CicoVisitor, ExternalStatus, Objective, Significance,
+        challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeManifest,
+        ChallengeParameters, CicoTarget, CicoVisitor, ExternalStatus, Objective, Significance,
     };
     use crate::{
         fields::PrimeFieldElement64,
@@ -1123,6 +1317,9 @@ mod tests {
             ("poseidon-t2-rf2-rp2-planted", "84cde35887fd"),
             ("poseidon-t2-rf4-rp0-planted", "ebd238585cc0"),
             ("poseidon-t3-rf2-rp1-planted", "036ea475c0b1"),
+            ("poseidon256-cico-2025-rf6-rp11", "341728ee0a3d"),
+            ("poseidon256-cico-2025-rf6-rp16", "d63ef953e886"),
+            ("poseidon64-cico-2025-rf6-rp13", "442f473600ad"),
             ("fukuoka-mq-III-n10-seed0", "ae24edf8efc8"),
             ("fukuoka-mq-III-n15-seed0", "0552d3b51070"),
             ("fukuoka-mq-III-n20-seed0", "434135c809f6"),
@@ -1441,6 +1638,52 @@ mod tests {
                 digest,
                 "{}'s derived constants changed",
                 id
+            );
+        }
+    }
+
+    /// A registered problem this crate cannot generate is refused, not approximated.
+    ///
+    /// The 2025 program constrains the **trailing** words, and `CicoInstance` constrains the
+    /// leading ones. Building one as the other would produce a different problem wearing this
+    /// row's identity — the constrained positions interact with the MDS layer differently — and
+    /// nothing about the result would look wrong. So both paths refuse by name.
+    #[test]
+    fn test_an_objective_this_crate_cannot_generate_is_refused() {
+        struct Nothing;
+        impl CicoVisitor<K> for Nothing {
+            type Output = ();
+            fn visit<const N: usize>(self, _: &[MultivariatePolynomial<N, K>]) {}
+        }
+
+        let rows: Vec<ChallengeManifest> = registry()
+            .into_iter()
+            .filter(|c| c.objective == Objective::CicoExactTrailing)
+            .collect();
+        assert_eq!(rows.len(), 3, "the three unsolved 2025 tiers");
+
+        for row in rows {
+            assert!(
+                row.cico_instance::<K>().is_err(),
+                "{} must not be built as the leading-constraint objective",
+                row.id
+            );
+            assert_eq!(
+                dispatch_cico::<K, _>(&row, Nothing),
+                Err(ChallengeError::UnsupportedObjective {
+                    objective: "cico-exact-trailing"
+                }),
+                "{}",
+                row.id
+            );
+            // And its size is still a fact about the problem, reported from the program's
+            // parameters rather than from a system nobody can build.
+            assert!(row.variables().expect("a size") > 0);
+            assert_eq!(
+                row.variables().expect("a size") - row.equations().expect("a size"),
+                row.parameters_t() - 2 * 1,
+                "{}: N - E = t - 2k",
+                row.id
             );
         }
     }
