@@ -282,6 +282,12 @@ rest.
 
 ## 6. Go / no-go for #68
 
+**Superseded in part.** [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md) is the
+epic-level assessment, written after the primary source for the published resultant attack turned
+out to be readable. It keeps everything below and adds the two facts that change the priorities: the
+resultant route needs 824 TB on the easiest target Zeebra has registered, and half-gcd is a fourth
+gap this section does not list.
+
 **Not a no-go, but the governing constraint is not where the epic placed it.** #68 assumed the
 univariate stage would be "FFT/NTT-dominated, and reportedly bound by memory access". On this
 codebase it is neither: the NTT is the healthiest stage in the layer, memory is not binding at any
