@@ -8,7 +8,7 @@
 
 use std::time::{Duration, Instant};
 
-use crate::grobner::fglm::FglmOptions;
+use crate::grobner::{f4::F4Options, fglm::FglmOptions};
 
 use super::{
     check::{check_generated, SystemOutcome},
@@ -50,6 +50,14 @@ pub struct SweepOptions {
     /// This is how a workstream points the oracle at a strategy under development: the sweep's
     /// 500 random systems over six fields are then checking *that* strategy, not the default one.
     pub fglm: FglmOptions,
+
+    /// The options every Gröbner basis in the sweep is computed with.
+    ///
+    /// The same facility one level down, and M22 is what it is for: every strategy that milestone
+    /// added — pair schedule, Hilbert-driven cap, certification — is asserted to return the
+    /// baseline's basis on a fixed corpus, and this is how the *same* claim gets checked against an
+    /// external oracle on hundreds of random systems instead.
+    pub f4: F4Options,
 }
 
 impl SweepOptions {
@@ -162,7 +170,7 @@ pub fn run_sweep(
 
     for index in 0..options.systems {
         let system = options.system(index);
-        let outcome = check_generated(&system, oracle, &options.fglm);
+        let outcome = check_generated(&system, oracle, &options.fglm, &options.f4);
         observe(index, &system, &outcome);
         report.attempted += 1;
 
@@ -235,7 +243,7 @@ fn minimize(
             if let SystemOutcome::Disagreed {
                 case,
                 disagreement: found,
-            } = check_generated(&candidate, oracle, &options.fglm)
+            } = check_generated(&candidate, oracle, &options.fglm, &options.f4)
             {
                 if found.check == best_disagreement.check {
                     best = candidate;
@@ -325,6 +333,7 @@ pub fn is_finding(check: Check) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{shrinks_of, SweepOptions};
+    use crate::grobner::f4::F4Options;
     use crate::grobner::{
         differential::generator::{GeneratedSystem, SystemShape},
         fglm::FglmOptions,
@@ -348,6 +357,7 @@ mod tests {
             minimize_attempts: 0,
             minimize_budget: Duration::from_secs(0),
             fglm: FglmOptions::unbounded(),
+            f4: F4Options::default(),
         }
     }
 

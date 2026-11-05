@@ -193,12 +193,17 @@ pub struct DifferentialCase {
     pub lex_basis: Option<Vec<String>>,
 }
 
-/// Zeebra's answers, checked against the case's.
+/// Zeebra's answers under the default F4 configuration, checked against the case's.
 ///
 /// `options` is what the quotient algebra and the conversion are built with, so a caller can point
 /// the whole comparison at a strategy under development. The resource limits in it are the
 /// caller's business; the comparison reports a limit that fires as a disagreement on the check it
 /// fired in, since the oracle produced an answer and Zeebra did not.
+///
+/// **The F4 strategy is not one of them**: this computes the source basis with
+/// [`F4Options::default`]. To check a *configured* strategy against the oracle, call
+/// [`verify_case_with`] — comparing a default-configuration basis would say nothing about the
+/// configuration under test.
 ///
 /// # Errors
 /// The first [`Check`] that disagreed, with the two answers in the detail. Includes
@@ -207,6 +212,22 @@ pub struct DifferentialCase {
 pub fn verify_case<const N: usize, F: KnownOrder>(
     case: &DifferentialCase,
     options: &FglmOptions,
+) -> Result<Agreement, Disagreement> {
+    verify_case_with::<N, F>(case, options, &F4Options::default())
+}
+
+/// Zeebra's answers under a chosen F4 configuration, checked against the case's.
+///
+/// `f4` computes the source basis, and every later check is built on that basis — so the
+/// configuration is what is being compared against the oracle, which is the only form in which
+/// this function is evidence about a strategy. Everything else is as [`verify_case`].
+///
+/// # Errors
+/// As [`verify_case`].
+pub fn verify_case_with<const N: usize, F: KnownOrder>(
+    case: &DifferentialCase,
+    options: &FglmOptions,
+    f4: &F4Options,
 ) -> Result<Agreement, Disagreement> {
     let fail = |check: Check, detail: String| Disagreement { check, detail };
 
@@ -289,8 +310,7 @@ pub fn verify_case<const N: usize, F: KnownOrder>(
 
     // ---- the source basis -------------------------------------------------------------------
 
-    let f4_options = F4Options::default();
-    let zeebra_source = match f4_with_options(&system, SOURCE_ORDER, &f4_options) {
+    let zeebra_source = match f4_with_options(&system, SOURCE_ORDER, f4) {
         Ok((basis, _)) => basis,
         Err(e) => {
             return Err(fail(

@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    comparison::{verify_case, Agreement, DifferentialCase, Disagreement, SOURCE_ORDER},
+    comparison::{verify_case_with, Agreement, DifferentialCase, Disagreement, SOURCE_ORDER},
     generator::GeneratedSystem,
     singular::{Oracle, OracleError, OracleQuery},
     text::monomial_to_string,
@@ -100,14 +100,16 @@ impl SystemOutcome {
 
 /// Check one system at a known variable count and field.
 ///
-/// `verify_case` recomputes the source basis and the standard monomials rather than being handed
-/// the ones found here. That is deliberate duplication: it keeps `verify_case` runnable against a
-/// committed fixture with no oracle present, so CI exercises the same comparison code this does.
-/// The systems are small enough that computing a basis twice costs nothing worth saving.
+/// `verify_case_with` recomputes the source basis and the standard monomials rather than being
+/// handed the ones found here. That is deliberate duplication: it keeps the comparison runnable
+/// against a committed fixture with no oracle present, so CI exercises the same comparison code
+/// this does. The systems are small enough that computing a basis twice costs nothing worth saving.
+/// It is recomputed under `f4`, so the duplication does not quietly change the configuration.
 pub fn check_system<const N: usize, F: KnownOrder>(
     system: &GeneratedSystem,
     oracle: &mut impl Oracle,
     options: &FglmOptions,
+    f4: &F4Options,
 ) -> SystemOutcome {
     let names = system.variable_names();
     let array = match <[&str; N]>::try_from(names.as_slice()) {
@@ -132,7 +134,7 @@ pub fn check_system<const N: usize, F: KnownOrder>(
         }
     }
 
-    let source = match f4_with_options(&polynomials, SOURCE_ORDER, &F4Options::default()) {
+    let source = match f4_with_options(&polynomials, SOURCE_ORDER, f4) {
         Ok((basis, _)) => basis,
         Err(e) => {
             return SystemOutcome::ZeebraFailed {
@@ -172,7 +174,10 @@ pub fn check_system<const N: usize, F: KnownOrder>(
         Err(error) => return SystemOutcome::OracleFailed { error },
     };
 
-    match verify_case::<N, F>(&case, options) {
+    // `verify_case_with` and not `verify_case`: the comparison has to recompute the source basis
+    // under the *same* `f4` this function used, or the sweep would check a default-configuration
+    // basis against the oracle and report agreement about a configuration it never ran.
+    match verify_case_with::<N, F>(&case, options, f4) {
         Ok(agreement) => SystemOutcome::Agreed { case, agreement },
         Err(disagreement) => SystemOutcome::Disagreed { case, disagreement },
     }
@@ -180,14 +185,16 @@ pub fn check_system<const N: usize, F: KnownOrder>(
 
 /// Dispatch on the characteristic for a fixed variable count.
 macro_rules! by_characteristic {
-    ($n:literal, $body:ident, $system:expr, $oracle:expr, $options:expr) => {
+    ($n:literal, $body:ident, $system:expr, $oracle:expr, $options:expr, $f4:expr) => {
         match $system.characteristic {
-            2 => $body::<$n, PrimeFieldElement64<2>>($system, $oracle, $options),
-            3 => $body::<$n, PrimeFieldElement64<3>>($system, $oracle, $options),
-            7 => $body::<$n, PrimeFieldElement64<7>>($system, $oracle, $options),
-            13 => $body::<$n, PrimeFieldElement64<13>>($system, $oracle, $options),
-            65537 => $body::<$n, PrimeFieldElement64<65537>>($system, $oracle, $options),
-            2147483647 => $body::<$n, PrimeFieldElement64<2147483647>>($system, $oracle, $options),
+            2 => $body::<$n, PrimeFieldElement64<2>>($system, $oracle, $options, $f4),
+            3 => $body::<$n, PrimeFieldElement64<3>>($system, $oracle, $options, $f4),
+            7 => $body::<$n, PrimeFieldElement64<7>>($system, $oracle, $options, $f4),
+            13 => $body::<$n, PrimeFieldElement64<13>>($system, $oracle, $options, $f4),
+            65537 => $body::<$n, PrimeFieldElement64<65537>>($system, $oracle, $options, $f4),
+            2147483647 => {
+                $body::<$n, PrimeFieldElement64<2147483647>>($system, $oracle, $options, $f4)
+            }
             other => SystemOutcome::Unsupported {
                 detail: format!(
                     "GF({}) is not one of {:?}",
@@ -206,12 +213,13 @@ pub fn check_generated(
     system: &GeneratedSystem,
     oracle: &mut impl Oracle,
     options: &FglmOptions,
+    f4: &F4Options,
 ) -> SystemOutcome {
     match system.variables.len() {
-        2 => by_characteristic!(2, check_system, system, oracle, options),
-        3 => by_characteristic!(3, check_system, system, oracle, options),
-        4 => by_characteristic!(4, check_system, system, oracle, options),
-        5 => by_characteristic!(5, check_system, system, oracle, options),
+        2 => by_characteristic!(2, check_system, system, oracle, options, f4),
+        3 => by_characteristic!(3, check_system, system, oracle, options, f4),
+        4 => by_characteristic!(4, check_system, system, oracle, options, f4),
+        5 => by_characteristic!(5, check_system, system, oracle, options, f4),
         other => SystemOutcome::Unsupported {
             detail: format!(
                 "{} variables is not one of {:?}",
@@ -223,14 +231,16 @@ pub fn check_generated(
 
 /// Dispatch on the characteristic for a fixed variable count, for a recorded case.
 macro_rules! verify_by_characteristic {
-    ($n:literal, $case:expr, $options:expr) => {
+    ($n:literal, $case:expr, $options:expr, $f4:expr) => {
         match $case.characteristic {
-            2 => verify_case::<$n, PrimeFieldElement64<2>>($case, $options),
-            3 => verify_case::<$n, PrimeFieldElement64<3>>($case, $options),
-            7 => verify_case::<$n, PrimeFieldElement64<7>>($case, $options),
-            13 => verify_case::<$n, PrimeFieldElement64<13>>($case, $options),
-            65537 => verify_case::<$n, PrimeFieldElement64<65537>>($case, $options),
-            2147483647 => verify_case::<$n, PrimeFieldElement64<2147483647>>($case, $options),
+            2 => verify_case_with::<$n, PrimeFieldElement64<2>>($case, $options, $f4),
+            3 => verify_case_with::<$n, PrimeFieldElement64<3>>($case, $options, $f4),
+            7 => verify_case_with::<$n, PrimeFieldElement64<7>>($case, $options, $f4),
+            13 => verify_case_with::<$n, PrimeFieldElement64<13>>($case, $options, $f4),
+            65537 => verify_case_with::<$n, PrimeFieldElement64<65537>>($case, $options, $f4),
+            2147483647 => {
+                verify_case_with::<$n, PrimeFieldElement64<2147483647>>($case, $options, $f4)
+            }
             other => Err(Disagreement {
                 check: super::comparison::Check::Field,
                 detail: format!(
@@ -250,11 +260,24 @@ pub fn verify_recorded(
     case: &DifferentialCase,
     options: &FglmOptions,
 ) -> Result<Agreement, Disagreement> {
+    verify_recorded_with(case, options, &F4Options::default())
+}
+
+/// Verify a recorded case under a chosen F4 configuration.
+///
+/// The configured counterpart of [`verify_recorded`]: the source basis, and so every check built
+/// on it, comes from `f4`. A fixture is a recorded oracle answer and does not depend on how Zeebra
+/// reaches its own, which is what makes this a usable offline check of a strategy.
+pub fn verify_recorded_with(
+    case: &DifferentialCase,
+    options: &FglmOptions,
+    f4: &F4Options,
+) -> Result<Agreement, Disagreement> {
     match case.variables.len() {
-        2 => verify_by_characteristic!(2, case, options),
-        3 => verify_by_characteristic!(3, case, options),
-        4 => verify_by_characteristic!(4, case, options),
-        5 => verify_by_characteristic!(5, case, options),
+        2 => verify_by_characteristic!(2, case, options, f4),
+        3 => verify_by_characteristic!(3, case, options, f4),
+        4 => verify_by_characteristic!(4, case, options, f4),
+        5 => verify_by_characteristic!(5, case, options, f4),
         other => Err(Disagreement {
             check: super::comparison::Check::Field,
             detail: format!(
