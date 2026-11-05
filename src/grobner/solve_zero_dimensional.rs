@@ -1361,12 +1361,13 @@ mod tests {
         assert!(fglm.span_row_operations > 0);
 
         // The storage estimate is the operators' own bytes plus every dense block the dependence
-        // machinery needs at full rank: the span's `D` coordinates per row, its *triangular*
-        // combination block, and the retained accepted vectors. M17 counted two square blocks and
+        // machinery needs at full rank: the span's two *triangular* blocks — a row leading at
+        // `pivot` stores `D - pivot` coordinates and a row at `r` stores `r + 1` combination
+        // coefficients — and the retained accepted vectors. M17 counted two square blocks and
         // priced the operators at a flat 16 bytes an entry, which was wrong in three ways — the
-        // operators have a column spine, the combinations are triangular, and the accepted vectors
-        // were missing entirely.
-        assert_eq!(fglm.memory.span_cells, 16 * 16 + 16 * 17 / 2);
+        // operators have a column spine, neither of the span's blocks is square, and the accepted
+        // vectors were missing entirely.
+        assert_eq!(fglm.memory.span_cells, 16 * 17);
         assert_eq!(fglm.memory.accepted_vector_cells, 16 * 16);
         assert_eq!(
             fglm.estimated_bytes(),

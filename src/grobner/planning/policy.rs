@@ -519,14 +519,14 @@ mod tests {
             }) => {
                 assert_eq!(dimension, 4096);
                 assert!(needed > limit);
-                // At D = 4096 the dense blocks are 41,945,088 cells, so over GF(2^31 - 1) the
+                // At D = 4096 the dense blocks are 33,558,528 cells, so over GF(2^31 - 1) the
                 // *cell* budget binds first and the error must say so rather than quoting the
                 // byte limit against a cell requirement.
                 assert_eq!(budget, "span cells");
-                // `2 D^2 + D (D + 1) / 2`: the span's coordinates, its triangular combination
-                // block, and the accepted quotient vectors.
-                assert_eq!(needed, 2 * 4096 * 4096 + 4096 * 4097 / 2);
-                assert_eq!(needed, 41_945_088);
+                // `D^2 + D (D + 1)`: the span's two triangular blocks — its rows' coordinates are
+                // stored from their pivots on — and the accepted quotient vectors.
+                assert_eq!(needed, 4096 * 4096 + 4096 * 4097);
+                assert_eq!(needed, 33_558_528);
             }
             other => panic!("expected an infeasible conversion, got {:?}", other),
         }

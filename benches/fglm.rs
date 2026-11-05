@@ -276,10 +276,11 @@ fn bench_operator_storage<const N: usize>(
 
 /// The dependence test on its own: fill a span to full rank, then test dependent vectors.
 ///
-/// The quantity M18-4 changed. A row's combination is `r + 1` coefficients at rank `r` where M17
-/// padded it to `D`, so the inner loop over the combination shortens as well as the allocation —
-/// which is why this is timed rather than only counted. It cannot be ablated: the triangular block
-/// is not behind an option, and the padded one no longer exists to compare against.
+/// The quantity M18-4 changed, and the one issue #56 changed again. A row's combination is
+/// `r + 1` coefficients at rank `r` and its coordinates run from its pivot on, where M17 padded
+/// both to `D`, so the inner loops shorten along with the allocation — which is why this is timed
+/// rather than only counted. It cannot be ablated: neither block is behind an option, and the
+/// padded ones no longer exist to compare against.
 ///
 /// The vectors are dense and pseudo-random, which is the worst case for the test and not what the
 /// walk always hands it: an early candidate's quotient vector is often sparse. `D` stops at 256
@@ -341,12 +342,12 @@ fn bench_dependence(c: &mut Criterion, dimension: usize) {
     assert_eq!(
         full.stored_cells(),
         IncrementalSpan::<F>::cells_at_full_rank(dimension).expect("representable"),
-        "the span stores something other than the triangular figure"
+        "the span stores something other than the two triangular blocks"
     );
 
     // The same span across every iteration rather than a clone per iteration: `reduce` leaves the
-    // rows alone — it only advances the operation counter — and cloning `D^2 + D (D + 1) / 2` cells
-    // inside the timed region would be measuring a memcpy.
+    // rows alone — it only advances the operation counter — and cloning `D (D + 1)` cells inside
+    // the timed region would be measuring a memcpy.
     group.bench_with_input(
         BenchmarkId::new("test_dependent", &label),
         &probes,

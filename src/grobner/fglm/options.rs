@@ -94,7 +94,7 @@ pub struct FglmOptions {
     /// Standard monomials enumerated before the computation is abandoned.
     ///
     /// This is `D`, which controls everything else: the operators hold up to `N * D` columns and
-    /// the conversion's dense blocks are `2 D^2 + D (D + 1) / 2` field elements.
+    /// the conversion's dense blocks are `D^2 + D (D + 1)` field elements.
     pub max_quotient_dimension: usize,
 
     /// Multiplication-operator entries stored, summed over all `N` operators.
@@ -106,19 +106,24 @@ pub struct FglmOptions {
 
     /// Field-element cells the conversion's dense blocks may hold at full rank.
     ///
-    /// `2 D^2 + D (D + 1) / 2`: the span's `D` coordinates per row, its *triangular* combination
-    /// block, and the accepted quotient vectors the walk retains. Checked from `D` before anything
+    /// `D^2 + D (D + 1)`: the span's two *triangular* blocks — a row leading at `pivot` stores
+    /// `D - pivot` coordinates and a row at `r` stores `r + 1` combination coefficients — and the
+    /// accepted quotient vectors the walk retains. Checked from `D` before anything
     /// is allocated rather than as it fills, because the space is a function of the dimension
     /// alone, and with checked arithmetic, because a budget computed from a wrapped product would
     /// be no budget at all.
     ///
-    /// # This limit's meaning changed in M18-4
-    /// It was `2 * D^2`, counting the span's two blocks as squares and omitting the accepted
+    /// # This limit's meaning has changed twice
+    /// In M17 it was `2 * D^2`, counting the span's two blocks as squares and omitting the accepted
     /// vectors altogether. Two things were wrong with that and they pull in opposite directions:
     /// the combination block is triangular rather than square, and there was a third block. So at
-    /// `D = 16` it counted 512 cells where the conversion allocates 648 — a budget cannot protect
-    /// memory it does not know about. [`FglmMemory`](super::FglmMemory) reports each block
-    /// separately, so a figure quoted against the old meaning can be recomputed.
+    /// `D = 16` it counted 512 cells where the conversion then allocated 648 — a budget cannot
+    /// protect memory it does not know about. M18-4 made it count all three.
+    ///
+    /// The span's coordinate block then became triangular too, which took `D = 16` from 648 cells
+    /// to 528. A budget that priced a block the conversion no longer allocates would be the same
+    /// bug in the other direction. [`FglmMemory`](super::FglmMemory) reports each block
+    /// separately, so a figure quoted against either older meaning can be recomputed.
     pub max_span_entries: usize,
 
     /// Bytes those dense blocks may occupy at full rank.
@@ -129,7 +134,7 @@ pub struct FglmOptions {
     /// [`F4Options::max_live_bytes`](crate::grobner::F4Options::max_live_bytes) stands to that
     /// struct's entry budget. A cell is one `F`: **8 bytes over a 64-bit prime field and 32 over a
     /// 254-bit one**, so a cell budget alone admits 4x the memory over BN254. Both are enforced,
-    /// and the bytes are checked against the same `2 D^2 + D (D + 1) / 2` figure, from `D`, before
+    /// and the bytes are checked against the same `D^2 + D (D + 1)` figure, from `D`, before
     /// anything is allocated.
     pub max_span_bytes: usize,
 
@@ -185,8 +190,8 @@ impl FglmOptions {
     ///
     /// `max_operator_entries` of 20 million is about 320 MB at 16 bytes per entry, the same figure
     /// and the same accounting as F4's live-nonzero budget. `max_span_entries` is the same number,
-    /// which `2 D^2 + D (D + 1) / 2` reaches at `D` just over 2,828 — so on a sparse staircase the
-    /// dense blocks are the first limit to bind, and on a dense one the operators are.
+    /// which `D^2 + D (D + 1)` reaches at `D = 3,162` — so on a sparse staircase the dense blocks
+    /// are the first limit to bind, and on a dense one the operators are.
     ///
     /// `max_operator_bytes` of 320 MB is the same quantity of memory the entry budget describes,
     /// stated in the unit that is actually allocated. The two bind together under
@@ -196,7 +201,7 @@ impl FglmOptions {
     /// `max_span_bytes` of 320 MB is the same figure again, and it is the field width rather than a
     /// strategy that decides which of it and `max_span_entries` binds: 20 million cells is 160 MB
     /// over a 64-bit prime field, so the cell budget binds there, and 640 MB over BN254, so the
-    /// byte budget binds and caps `D` near 2,000 rather than 2,828.
+    /// byte budget binds and caps `D` at 2,235 rather than 3,162.
     ///
     /// # The strategies, and where they were chosen
     /// [`OperatorConstruction::BatchedBorder`] at [`BorderBatch::recommended`]'s batch of 64, and
