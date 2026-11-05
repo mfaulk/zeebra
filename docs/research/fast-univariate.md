@@ -283,12 +283,16 @@ rest.
 ## 6. Go / no-go for #68
 
 **Superseded in part.** [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md) is the
-epic-level assessment, written once all three primary sources were readable. It keeps everything
-below and adds three things this section gets wrong or omits: the transform ceiling is set by the
-**smooth part** of `q - 1` and not by the two-adicity alone, so KoalaBear reaches `2^24 · 127` with
-a mixed-radix FFT rather than stopping at `2^24`; **half-gcd** is a fourth gap, since `gcd.rs` is
-plain Euclid; and the Graeffe route needs only FFT, invFFT and pointwise multiplication, so it does
-not depend on items 2–4 of the list below at all.
+epic-level assessment, written against six primary sources including the technical disclosures of
+two of the three official 2026 CICO-2 solutions. Three things change for this section:
+
+- the transform ceiling is set by the **smooth part** of `q - 1`, not the two-adicity alone, so
+  KoalaBear reaches `2^24 · 127` with a mixed-radix FFT rather than stopping at `2^24`;
+- **half-gcd** is a fourth gap, since `gcd.rs` is plain Euclid — but the published univariate route
+  needs neither it nor Newton division nor a subproduct tree;
+- the `R_P = 8` challenge was solved by interpolation plus Graeffe root finding at degree `3^13`,
+  which needs a `2^22` transform — **inside** the ceiling this document measured. So an NTT-based
+  multiply is the single blocker, and §5 of that document is the current gap list.
 
 **Not a no-go, but the governing constraint is not where the epic placed it.** #68 assumed the
 univariate stage would be "FFT/NTT-dominated, and reportedly bound by memory access". On this
