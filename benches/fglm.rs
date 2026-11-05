@@ -282,6 +282,10 @@ fn bench_operator_storage<const N: usize>(
 /// rather than only counted. It cannot be ablated: neither block is behind an option, and the
 /// padded ones no longer exist to compare against.
 ///
+/// This drives the value-returning `reduce`/`insert` pair. The conversion drives the register
+/// form, which allocates nothing per call, so what is timed here carries one allocation per
+/// reduction that the walk does not — see issue #59 and §8.7 of the milestone.
+///
 /// The vectors are dense and pseudo-random, which is the worst case for the test and not what the
 /// walk always hands it: an early candidate's quotient vector is often sparse. `D` stops at 256
 /// because filling a span is `O(D^3)` and a dimension of 1,024 would be seconds per iteration.

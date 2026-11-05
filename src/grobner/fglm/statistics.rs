@@ -205,6 +205,14 @@ impl FglmMemory {
     ///
     /// `None` on arithmetic overflow, which `D` near `usize::MAX` would reach: a budget computed
     /// from a wrapped product would be no budget at all.
+    ///
+    /// # What this does not count
+    /// The `O(D^2)` blocks, and nothing else. The span additionally holds two working registers of
+    /// `D` cells each — see [`IncrementalSpan`](super::IncrementalSpan) — which are `O(D)`, 0.1% of
+    /// the blocks at `D = 1,024`, and were live during every reduction before the span began
+    /// keeping them, so they raise neither this figure meaningfully nor the peak at all. Also
+    /// uncounted, and larger: the candidate vectors the walk allocates one at a time, the relation
+    /// polynomials it emits, and everything F4 held while producing the input.
     pub fn dense_blocks_for<F: FiniteField>(dimension: usize) -> Option<(usize, usize, usize)> {
         let span_cells = IncrementalSpan::<F>::cells_at_full_rank(dimension)?;
         let accepted_cells = dimension.checked_mul(dimension)?;
