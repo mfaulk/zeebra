@@ -28,6 +28,10 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        mpsc, Arc,
+    },
     time::{Duration, Instant},
 };
 
@@ -36,13 +40,17 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::{
-        classify_ideal, f4_reported, fglm_to_lex_with_options,
+        classify_ideal,
+        f4::symbolic::MonicBasis,
+        f4_observed_reported, f4_reported, fglm_to_lex_with_options,
         research::{
-            challenge, dispatch_cico, registry, ChallengeManifest, ChallengeParameters,
-            CicoVisitor, Environment, GrobnerFrontier, Json, Limit, MqInstance, MqVisitor,
-            RunOutcome, RunRecord, Scoreboard, Stage, StageCost, KOALABEAR_PRIME,
+            challenge, dispatch_cico, eliminate_affine, registry, Campaign, ChallengeManifest,
+            ChallengeParameters, CicoVisitor, Comparison, Environment, GrobnerFrontier, Json,
+            Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome, RunRecord, Scoreboard,
+            Specialization, Stage, StageCost, KOALABEAR_PRIME,
         },
-        solve_from_lex_basis, F4Options, FglmOptions, IdealClass, SolveOptions, SolveOutcome,
+        solve_from_lex_basis, BatchObserver, CriticalPair, F4Options, FglmOptions, IdealClass,
+        SolveOptions, SolveOutcome,
     },
     MonomialOrder, MultivariatePolynomial, Zero,
 };
@@ -71,15 +79,207 @@ fn policy() -> String {
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let write = arguments.iter().any(|a| a == "--write");
-    let tier = arguments
-        .iter()
-        .find(|a| !a.starts_with("--"))
-        .cloned()
+    let positional: Vec<&String> = arguments.iter().filter(|a| !a.starts_with("--")).collect();
+    let tier = positional
+        .first()
+        .map(|s| s.to_string())
         .unwrap_or_else(|| "smoke".to_string());
 
     let registry = registry();
     let environment = detect_environment();
     let mut board = Scoreboard::new();
+
+    // One registered problem, with the frontier budget and a wall-clock supervisor, then exit.
+    //
+    // Its own process on purpose. F4 has no cooperative time check, so a run that outlasts the
+    // supervisor can only be stopped by leaving its thread behind and exiting — which is fine once
+    // per process and unacceptable nine times in one.
+    if tier == "row" {
+        let id = positional
+            .get(1)
+            .expect("usage: scoreboard row <challenge-id> [--slice <seed>] [--write]");
+        let slice = arguments
+            .iter()
+            .position(|a| a == "--slice")
+            .and_then(|at| arguments.get(at + 1))
+            .map(|seed| seed.parse::<u64>().expect("a seed"));
+        let manifest = challenge(id).unwrap_or_else(|| panic!("{} is not registered", id));
+        let formulation = arguments
+            .iter()
+            .position(|a| a == "--layout")
+            .and_then(|at| arguments.get(at + 1))
+            .map(|name| {
+                Formulation::named(name).unwrap_or_else(|| panic!("no formulation named {}", name))
+            })
+            .unwrap_or(Formulation::AsGenerated);
+        let wall = wall_clock();
+        println!("# {} ({}), wall clock {:?}", id, manifest.class, wall);
+        println!("- policy: {}\n", frontier_policy());
+        let record = run_frontier_formulation(&manifest, &environment, slice, wall, formulation);
+        report(&record);
+        board.add(record, &registry).expect("a registered problem");
+        if write {
+            write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
+            println!("appended to research/scoreboard/");
+        }
+        // The supervisor may have left a thread running; nothing else is pending, so stop here
+        // rather than waiting for it.
+        std::process::exit(0);
+    }
+
+    // Every formulation of one problem, compared. The identity digest is the same for all of
+    // them — a relabelling is a ring isomorphism and an affine elimination generates the same
+    // ideal — which is exactly why `Comparison::of` agrees to compare them.
+    if tier == "formulations" {
+        let id = positional
+            .get(1)
+            .expect("usage: scoreboard formulations <challenge-id> [--slice seed] [--write]");
+        let slice = arguments
+            .iter()
+            .position(|a| a == "--slice")
+            .and_then(|at| arguments.get(at + 1))
+            .map(|seed| seed.parse::<u64>().expect("a seed"));
+        let manifest = challenge(id).unwrap_or_else(|| panic!("{} is not registered", id));
+        let wall = wall_clock();
+        println!("# formulations of {} ({})", id, manifest.class);
+        println!("- policy: {}\n", frontier_policy());
+
+        let mut records = Vec::new();
+        for formulation in [
+            Formulation::AsGenerated,
+            Formulation::LastRoundFirst,
+            Formulation::FreeInputsLast,
+            Formulation::AffineProjected,
+        ] {
+            let record =
+                run_frontier_formulation(&manifest, &environment, slice, wall, formulation);
+            report(&record);
+            records.push(record);
+        }
+
+        println!("\n## Against the generated layout\n");
+        let baseline = records[0].clone();
+        for candidate in records.iter().skip(1) {
+            match Comparison::of(&baseline, candidate) {
+                Ok(comparison) => {
+                    println!("- {}", comparison);
+                    for caveat in &comparison.caveats {
+                        println!("  - caveat: {}", caveat);
+                    }
+                }
+                Err(error) => println!("- refused: {}", error),
+            }
+        }
+
+        for record in records {
+            board.add(record, &registry).expect("a registered problem");
+        }
+        if write {
+            write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
+            println!("\nappended to research/scoreboard/");
+        }
+        std::process::exit(0);
+    }
+
+    // A specialization campaign over one problem: several slices from precommitted seeds, each
+    // recorded, plus a summary that reports the slices which found nothing.
+    if tier == "campaign" {
+        let id = positional
+            .get(1)
+            .expect("usage: scoreboard campaign <challenge-id> [--seeds N] [--write]");
+        let seeds: u64 = arguments
+            .iter()
+            .position(|a| a == "--seeds")
+            .and_then(|at| arguments.get(at + 1))
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(8);
+        let manifest = challenge(id).unwrap_or_else(|| panic!("{} is not registered", id));
+        let wall = wall_clock();
+        println!("# campaign on {} ({})", id, manifest.class);
+        println!("- {} slices, seeds 0..{}", seeds, seeds);
+        println!("- policy: {}\n", frontier_policy());
+
+        let mut campaign = Campaign {
+            fixed: manifest
+                .cico_instance::<K>()
+                .expect("a registered problem")
+                .free_inputs()
+                - 2,
+            ..Campaign::default()
+        };
+        let at = Instant::now();
+        for seed in 0..seeds {
+            let record = run_frontier_row(&manifest, &environment, Some(seed), wall);
+            report(&record);
+            campaign.trials += 1;
+            campaign.seeds.push(seed);
+            if record.outcome.is_verified_witness() {
+                campaign.witnesses += 1;
+            }
+            board.add(record, &registry).expect("a registered problem");
+        }
+        campaign.total = at.elapsed();
+
+        // The summary. Its outcome is a witness only if some slice produced one, and the campaign
+        // beside it carries the trials that did not — which is what stops a lucky slice from being
+        // quoted as the cost of a solution.
+        let mut summary = RunRecord::new(&manifest, format!("campaign over {} slices", seeds));
+        summary.environment = Environment {
+            policy: frontier_policy(),
+            ..environment.clone()
+        };
+        summary.outcome = if campaign.witnesses > 0 {
+            RunOutcome::VerifiedWitness
+        } else {
+            RunOutcome::SliceEstablishedNothing
+        };
+        summary.verification =
+            "every witness checked by running permutation_plus_linear on the recovered inputs"
+                .to_string();
+        summary.transformations = vec![format!(
+            "{} slices, each fixing {} free inputs at a seeded value",
+            seeds, campaign.fixed
+        )];
+        summary.stages = vec![StageCost::new(Stage::Grobner, campaign.total)];
+        summary.reproduce = format!(
+            "ZEEBRA_WALL_SECONDS={} tools/scoreboard.sh campaign {} --seeds {}",
+            wall.as_secs(),
+            manifest.id,
+            seeds
+        );
+        if let Some((nanos, witnesses)) = campaign.work_per_witness() {
+            println!(
+                "\n{} witnesses in {} slices; {:.1} s per witness including the failures",
+                witnesses,
+                campaign.trials,
+                nanos as f64 / 1e9 / witnesses as f64
+            );
+        } else {
+            println!(
+                "\nno witness in {} slices, which is a fact about the slices and not about the \
+                 problem",
+                campaign.trials
+            );
+        }
+        if let Some((low, high)) = campaign.success_rate_basis_points() {
+            println!(
+                "success rate {}.{:02}% to {}.{:02}% (Wilson, 95%)",
+                low / 100,
+                low % 100,
+                high / 100,
+                high % 100
+            );
+        }
+        summary.campaign = Some(campaign);
+        report(&summary);
+        board.add(summary, &registry).expect("a registered problem");
+
+        if write {
+            write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
+            println!("appended to research/scoreboard/");
+        }
+        std::process::exit(0);
+    }
 
     println!("# Scoreboard run: tier {}\n", tier);
     println!("- machine: {}", environment.machine);
@@ -127,8 +327,9 @@ fn main() {
 
     if tier == "frontier" {
         println!(
-            "\nThe full-width rows are M23-B's; this runner has the harness for them and does not \
-             yet drive it.\n"
+            "\nThe full-width rows run one per process, so that a wall-clock supervisor can stop \
+             one without leaving nine threads behind: `tools/scoreboard.sh ladder --write`, or \
+             `scoreboard row <id> [--slice <seed>]` for one of them.\n"
         );
     }
 
@@ -195,7 +396,7 @@ impl CicoVisitor<K> for Solve<'_> {
                 .with("equations", system.len() as i64),
         );
 
-        let (outcome, stages, frontier) = staged_solve(system, |point| {
+        let (outcome, stages, frontier) = staged_solve(system, false, |point| {
             // The verification that matters: rebuild the input state and run the permutation.
             let free: Vec<K> = point[..self.instance.free_inputs()].to_vec();
             self.instance.is_solution(&free).unwrap_or(false)
@@ -207,6 +408,443 @@ impl CicoVisitor<K> for Solve<'_> {
             "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs"
                 .to_string();
         record
+    }
+}
+
+/// The frontier budget: wider than the stable one, and stated.
+///
+/// Ten times the columns, a byte cap set high enough not to bind, and a batch cap so that a
+/// computation staying under both still stops. The bound that **actually binds** on these rows is
+/// the default live-entry cap of 20,000,000 — about 320 MB at this field's 16 bytes an entry — and
+/// that is deliberate: an entry count is reproducible on any machine, where a wall-clock stop is a
+/// fact about this one. The supervisor below is a backstop, not the budget.
+fn frontier_options() -> F4Options {
+    F4Options {
+        profile_degrees: true,
+        max_matrix_columns: 200_000,
+        max_live_bytes: 4_000_000_000,
+        max_batches: Some(10_000),
+        ..F4Options::default()
+    }
+}
+
+/// The per-row wall clock, from the environment. A backstop, not the budget.
+fn wall_clock() -> Duration {
+    Duration::from_secs(
+        std::env::var("ZEEBRA_WALL_SECONDS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(600),
+    )
+}
+
+fn frontier_policy() -> String {
+    format!(
+        "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 \
+         batches, wall clock {} s as a backstop",
+        std::env::var("ZEEBRA_WALL_SECONDS").unwrap_or_else(|_| "600".to_string())
+    )
+}
+
+/// Which equivalent presentation of the same problem to solve.
+///
+/// Every one of these is the **same mathematical problem** — a relabelling is a ring isomorphism,
+/// and an affine elimination generates the same ideal — which is why they share the registry's
+/// identity digest and why `Comparison::of` will compare them. What differs is the cost, which is
+/// the thing M23-C is about.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Formulation {
+    /// Free inputs, then S-box variables in round order: what the generator produces.
+    AsGenerated,
+
+    /// Free inputs, then the round blocks reversed. M22-E's winner on the `t = 2` surrogates.
+    LastRoundFirst,
+
+    /// S-box variables first, free inputs last.
+    FreeInputsLast,
+
+    /// Eliminate every affine generator and project the determined variables out of the ring.
+    AffineProjected,
+}
+
+impl Formulation {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::AsGenerated => "as generated",
+            Self::LastRoundFirst => "last-round-first",
+            Self::FreeInputsLast => "free-inputs-last",
+            Self::AffineProjected => "affine-projected",
+        }
+    }
+
+    fn named(name: &str) -> Option<Self> {
+        [
+            Self::AsGenerated,
+            Self::LastRoundFirst,
+            Self::FreeInputsLast,
+            Self::AffineProjected,
+        ]
+        .into_iter()
+        .find(|f| f.name() == name)
+    }
+
+    /// The variable layout this formulation uses, where it is a relabelling.
+    fn layout(&self) -> Option<RoundLayout> {
+        match self {
+            Self::AsGenerated => Some(RoundLayout::Generated),
+            Self::LastRoundFirst => Some(RoundLayout::LastRoundFirst),
+            Self::FreeInputsLast => Some(RoundLayout::FreeInputsLast),
+            Self::AffineProjected => None,
+        }
+    }
+}
+
+/// The per-round S-box variable counts of a schedule, for [`RoundLayout`].
+///
+/// A full round introduces `t` S-box variables and a partial round one, and the schedule is
+/// `R_F/2` full, then `R_P` partial, then `R_F/2` full. A single width would mis-group every
+/// instance with `R_P > 0`.
+fn block_sizes(t: usize, r_f: usize, r_p: usize) -> Vec<usize> {
+    let half = r_f / 2;
+    let mut sizes = vec![t; half];
+    sizes.extend(std::iter::repeat_n(1, r_p));
+    sizes.extend(std::iter::repeat_n(t, half));
+    sizes
+}
+
+/// How far a computation had got when the supervisor stopped it.
+///
+/// Written by the observer from inside the worker thread and read from outside it, because F4 has
+/// no cooperative check: when the wall clock expires the only thing that knows anything about the
+/// state of the computation is whatever was watching the batches go past.
+#[derive(Default)]
+struct Progress {
+    batches: AtomicUsize,
+    degree: AtomicU64,
+    basis: AtomicUsize,
+}
+
+/// Records each batch's selection degree and the basis size, for the supervisor to read.
+struct Watch(Arc<Progress>);
+
+impl<const N: usize, F: zeebra::KnownOrder> BatchObserver<N, F> for Watch {
+    fn batch(&mut self, basis: &MonicBasis<N, F>, pairs: &[CriticalPair<N>]) {
+        self.0.batches.fetch_add(1, Ordering::Relaxed);
+        self.0.basis.store(basis.len(), Ordering::Relaxed);
+        let degree = pairs.iter().map(|p| p.lcm.degree()).max().unwrap_or(0);
+        self.0.degree.fetch_max(degree, Ordering::Relaxed);
+    }
+}
+
+/// One full-width row: build it, optionally slice it, run F4 under the frontier budget, and record
+/// where it stopped.
+///
+/// The Gröbner stage only. At this size the question is not which route recovers a point but
+/// whether a basis exists within the budget at all, and a conversion that never gets a basis is a
+/// stage that did not run rather than one that cost nothing.
+fn run_frontier_row(
+    manifest: &ChallengeManifest,
+    environment: &Environment,
+    slice: Option<u64>,
+    wall: Duration,
+) -> RunRecord {
+    run_frontier_formulation(manifest, environment, slice, wall, Formulation::AsGenerated)
+}
+
+/// One full-width row under one formulation of the same problem.
+fn run_frontier_formulation(
+    manifest: &ChallengeManifest,
+    environment: &Environment,
+    slice: Option<u64>,
+    wall: Duration,
+    formulation: Formulation,
+) -> RunRecord {
+    let at = Instant::now();
+    let instance = manifest.cico_instance::<K>().expect("a registered problem");
+    let generation = at.elapsed();
+
+    let mut record = dispatch_cico::<K, _>(
+        manifest,
+        Frontier {
+            manifest,
+            instance: &instance,
+            generation,
+            slice,
+            wall,
+            formulation,
+        },
+    )
+    .expect("a compiled dimension");
+    record.environment = Environment {
+        policy: frontier_policy(),
+        ..environment.clone()
+    };
+    record.reproduce = format!(
+        "ZEEBRA_WALL_SECONDS={} tools/scoreboard.sh row {}{} --layout {}",
+        wall.as_secs(),
+        manifest.id,
+        match slice {
+            Some(seed) => format!(" --slice {}", seed),
+            None => String::new(),
+        },
+        formulation.name()
+    );
+    record
+}
+
+/// The frontier attempt at one compiled dimension.
+struct Frontier<'a> {
+    manifest: &'a ChallengeManifest,
+    instance: &'a zeebra::grobner::research::CicoInstance<K>,
+    generation: Duration,
+    slice: Option<u64>,
+    wall: Duration,
+    formulation: Formulation,
+}
+
+impl CicoVisitor<K> for Frontier<'_> {
+    type Output = RunRecord;
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, K>]) -> RunRecord {
+        let free = self.instance.free_inputs();
+        let mut record = RunRecord::new(
+            self.manifest,
+            match (self.slice, self.formulation) {
+                (None, Formulation::AsGenerated) => "as generated".to_string(),
+                (None, formulation) => formulation.name().to_string(),
+                (Some(seed), Formulation::AsGenerated) => {
+                    format!("slice({} fixed, seed {})", free - 2, seed)
+                }
+                (Some(seed), formulation) => format!(
+                    "slice({} fixed, seed {}) + {}",
+                    free - 2,
+                    seed,
+                    formulation.name()
+                ),
+            },
+        );
+
+        // The slice fixes all but two free inputs, leaving two unknowns against the two output
+        // constraints. The seed is precommitted and recorded: `Specialization::seeded` promises
+        // that the same seed reconstructs the same slice.
+        let at = Instant::now();
+        let system: Vec<MultivariatePolynomial<N, K>> = match self.slice {
+            None => system.to_vec(),
+            Some(seed) => {
+                let variables: Vec<usize> = (2..free).collect();
+                let specialization =
+                    Specialization::<N, K>::seeded(&variables, seed).expect("distinct indices");
+                record.transformations.push(format!(
+                    "specialize free inputs {}..{} at seed {} ({} values)",
+                    2,
+                    free,
+                    seed,
+                    specialization.len()
+                ));
+                specialization.apply(system)
+            }
+        };
+
+        // Then the formulation, which is the axis M23-C compares along. Every one of these is the
+        // same ideal presented differently, and each carries its own inverse so a recovered
+        // witness is checked against the *original* permutation either way.
+        let sliced = self.slice.is_some();
+        let instance = self.instance;
+        let outcome = match self.formulation.layout() {
+            Some(layout) => {
+                let parameters = self.manifest.poseidon_parameters().expect("a CICO row");
+                let order = layout
+                    .order::<N>(
+                        free,
+                        &block_sizes(parameters.t, parameters.r_f, parameters.r_p),
+                    )
+                    .expect("the block sizes account for every variable");
+                let relabelled = order.apply(&system);
+                if !order.is_identity() {
+                    record
+                        .transformations
+                        .push(format!("relabel variables: {}", order.name()));
+                }
+                let generation = self.generation + at.elapsed();
+                record.stages.push(
+                    StageCost::new(Stage::Generation, generation)
+                        .with("variables", N as i64)
+                        .with("equations", relabelled.len() as i64)
+                        .with("free_inputs", free as i64),
+                );
+                supervised_solve(relabelled, self.wall, sliced, |point| {
+                    // Back through the relabelling, then through the permutation.
+                    let original = order.recover(point);
+                    let inputs: Vec<K> = original[..free].to_vec();
+                    instance.is_solution(&inputs).unwrap_or(false)
+                })
+            }
+            None => {
+                let (reduced, elimination) = eliminate_affine(&system);
+                let kept = elimination.kept().len();
+                record.transformations.push(format!(
+                    "eliminate {} affine generators and project to {} variables",
+                    elimination.len(),
+                    kept
+                ));
+                let generation = self.generation + at.elapsed();
+                record.stages.push(
+                    StageCost::new(Stage::Generation, generation)
+                        .with("variables", kept as i64)
+                        .with("equations", reduced.len() as i64)
+                        .with("eliminated", elimination.len() as i64)
+                        .with("free_inputs", free as i64),
+                );
+
+                // The projected dimension is a compile-time constant and the survivor count is
+                // not, so only the dimensions this experiment needs are compiled. An uncompiled
+                // one is a fact about the harness and is recorded as one rather than guessed at.
+                macro_rules! project_and_solve {
+                    ($($m:literal),+ $(,)?) => {
+                        match kept {
+                            $($m => {
+                                let projected = elimination
+                                    .project::<$m>(&reduced)
+                                    .expect("the survivor count is M");
+                                supervised_solve(projected, self.wall, sliced, |point| {
+                                    let lifted = elimination
+                                        .lift::<$m>(point)
+                                        .expect("the survivor count is M");
+                                    let inputs: Vec<K> = lifted[..free].to_vec();
+                                    instance.is_solution(&inputs).unwrap_or(false)
+                                })
+                            })+
+                            other => (
+                                RunOutcome::StoppedAtLimit(Limit {
+                                    resource: "compiled_dimension".to_string(),
+                                    detail: format!(
+                                        "no projected dimension {} is compiled; add it to \
+                                         project_and_solve! to measure this row",
+                                        other
+                                    ),
+                                    degree: None,
+                                    last_completed_stage: Stage::Generation,
+                                }),
+                                Vec::new(),
+                                GrobnerFrontier::default(),
+                            ),
+                        }
+                    };
+                }
+                // 32 is the sliced `R_F = 2, R_P = 0` row and 44 is the same row unsliced.
+                project_and_solve!(32, 44)
+            }
+        };
+
+        let (result, stages, frontier) = outcome;
+        record.outcome = result;
+        record.stages.extend(stages);
+        record.frontier = Some(frontier);
+        record.verification =
+            "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered \
+             inputs, after inverting every transformation applied here"
+                .to_string();
+        record
+    }
+}
+
+/// F4 under a wall-clock supervisor, then the rest of the pipeline if a basis came back.
+///
+/// The supervisor is why this takes the system by value: F4 has no cooperative time check, so a
+/// run that outlasts its clock is abandoned in a worker thread and the process exits after the
+/// record is written. A thread that owns its data can be abandoned safely.
+fn supervised_solve<const D: usize>(
+    system: Vec<MultivariatePolynomial<D, K>>,
+    wall: Duration,
+    sliced: bool,
+    verify: impl Fn(&[K; D]) -> bool,
+) -> (RunOutcome, Vec<StageCost>, GrobnerFrontier) {
+    let mut stages = Vec::new();
+    let retained = system.clone();
+
+    let progress = Arc::new(Progress::default());
+    let observed = Arc::clone(&progress);
+    let (sender, receiver) = mpsc::channel();
+    let at = Instant::now();
+    std::thread::spawn(move || {
+        let mut watch = Watch(observed);
+        let outcome = f4_observed_reported(&system, GREVLEX, &frontier_options(), &mut watch);
+        // A send failure means the supervisor has already given up, which is not an error here.
+        let _ = sender.send(outcome);
+    });
+
+    match receiver.recv_timeout(wall) {
+        Ok((result, statistics)) => {
+            let elapsed = at.elapsed();
+            let completed = result.is_ok();
+            let mut frontier =
+                GrobnerFrontier::of(&statistics, completed).with_profile(&statistics.degrees);
+            stages.push(
+                StageCost::new(Stage::Grobner, elapsed)
+                    .with("max_matrix_rows", statistics.max_matrix_rows as i64)
+                    .with("max_matrix_columns", statistics.max_matrix_columns as i64)
+                    .with("max_pair_degree", statistics.max_pair_degree as i64)
+                    .with("pairs_considered", statistics.pairs_considered as i64)
+                    .with("pairs_reduced", statistics.pairs_reduced as i64)
+                    .with("elements_added", statistics.elements_added as i64)
+                    .with_estimated_bytes(statistics.max_estimated_bytes),
+            );
+
+            match result {
+                // A basis at this size is the newsworthy case, and it is not yet a witness. Carry
+                // on through the conversion and the search, which is where one would come from.
+                Ok(basis) => {
+                    let (outcome, tail, dimension) =
+                        finish_from_basis(&basis, &retained, sliced, verify);
+                    stages.extend(tail);
+                    if let Some(dimension) = dimension {
+                        frontier = frontier.with_quotient_dimension(dimension);
+                    }
+                    (outcome, stages, frontier)
+                }
+                Err(error) => (
+                    RunOutcome::StoppedAtLimit(Limit {
+                        resource: resource_of(&error),
+                        detail: error.to_string(),
+                        degree: Some(statistics.max_pair_degree),
+                        last_completed_stage: Stage::Generation,
+                    }),
+                    stages,
+                    frontier,
+                ),
+            }
+        }
+        Err(_) => {
+            // Nothing from the worker: no statistics exist, and the only account of the state is
+            // the observer's. Reported as a wall-clock stop rather than as a budget, because it is
+            // a fact about this supervisor and not about the system.
+            let batches = progress.batches.load(Ordering::Relaxed);
+            let degree = progress.degree.load(Ordering::Relaxed);
+            stages.push(
+                StageCost::new(Stage::Grobner, wall)
+                    .with("batches_started", batches as i64)
+                    .with("highest_selection_degree", degree as i64)
+                    .with(
+                        "basis_elements",
+                        progress.basis.load(Ordering::Relaxed) as i64,
+                    ),
+            );
+            (
+                RunOutcome::StoppedAtLimit(Limit {
+                    resource: "wall_clock".to_string(),
+                    detail: format!(
+                        "stopped after {} s with {} batches started; F4 has no cooperative time \
+                         check, so no matrix statistics exist for a run killed this way",
+                        wall.as_secs(),
+                        batches
+                    ),
+                    degree: (degree > 0).then_some(degree),
+                    last_completed_stage: Stage::Generation,
+                }),
+                stages,
+                GrobnerFrontier::default(),
+            )
+        }
     }
 }
 
@@ -270,7 +908,7 @@ impl MqVisitor<Q> for SolveMq<'_> {
             .instance
             .system::<N, Q>()
             .expect("the same instance parses twice");
-        let (outcome, stages, frontier) = staged_solve(system, |point| {
+        let (outcome, stages, frontier) = staged_solve(system, false, |point| {
             reconstructed
                 .iter()
                 .all(|polynomial| polynomial.eval(point) == Q::zero())
@@ -293,6 +931,7 @@ impl MqVisitor<Q> for SolveMq<'_> {
 /// are different facts.
 fn staged_solve<const N: usize, F: zeebra::KnownOrder>(
     system: &[MultivariatePolynomial<N, F>],
+    sliced: bool,
     verify: impl Fn(&[F; N]) -> bool,
 ) -> (RunOutcome, Vec<StageCost>, GrobnerFrontier) {
     let mut stages = Vec::new();
@@ -328,14 +967,39 @@ fn staged_solve<const N: usize, F: zeebra::KnownOrder>(
         }
     };
 
-    if classify_ideal(&basis, GREVLEX) != IdealClass::ZeroDimensional {
-        // Not a limit and not a witness: the ideal is positive-dimensional, so the zero-dimensional
-        // route does not apply and saying "no solution" would be wrong.
-        return (RunOutcome::BasisOnly, stages, frontier);
+    let (outcome, tail, dimension) = finish_from_basis(&basis, system, sliced, verify);
+    stages.extend(tail);
+    if let Some(dimension) = dimension {
+        frontier = frontier.with_quotient_dimension(dimension);
+    }
+    (outcome, stages, frontier)
+}
+
+/// The conversion, the univariate search and the independent check, each timed.
+///
+/// Split out of [`staged_solve`] because the frontier rows reach a basis by a different route —
+/// through a wall-clock supervisor — and a second copy of the stage accounting would be a second
+/// place for the slice rule to be forgotten.
+///
+/// `verify` is the problem's own independent check, which is what decides between a witness and a
+/// defect. A candidate that fails it is [`RunOutcome::WitnessRejected`]: an absence and a defect
+/// are different facts.
+fn finish_from_basis<const N: usize, F: zeebra::KnownOrder>(
+    basis: &[MultivariatePolynomial<N, F>],
+    system: &[MultivariatePolynomial<N, F>],
+    sliced: bool,
+    verify: impl Fn(&[F; N]) -> bool,
+) -> (RunOutcome, Vec<StageCost>, Option<usize>) {
+    let mut stages = Vec::new();
+
+    if classify_ideal(basis, GREVLEX) != IdealClass::ZeroDimensional {
+        // Not a limit and not a witness: the ideal is positive-dimensional, so the
+        // zero-dimensional route does not apply and saying "no solution" would be wrong.
+        return (RunOutcome::BasisOnly, stages, None);
     }
 
     let at = Instant::now();
-    let converted = fglm_to_lex_with_options(&basis, GREVLEX, &FglmOptions::default());
+    let converted = fglm_to_lex_with_options(basis, GREVLEX, &FglmOptions::default());
     let conversion_elapsed = at.elapsed();
     let (lex, conversion) = match converted {
         Ok(pair) => pair,
@@ -345,18 +1009,18 @@ fn staged_solve<const N: usize, F: zeebra::KnownOrder>(
                 RunOutcome::StoppedAtLimit(Limit {
                     resource: "conversion".to_string(),
                     detail: error.to_string(),
-                    degree: Some(statistics.max_pair_degree),
+                    degree: None,
                     last_completed_stage: Stage::Grobner,
                 }),
                 stages,
-                frontier,
+                None,
             );
         }
     };
-    frontier = frontier.with_quotient_dimension(conversion.quotient_dimension);
+    let dimension = conversion.quotient_dimension;
     stages.push(
         StageCost::new(Stage::Conversion, conversion_elapsed)
-            .with("quotient_dimension", conversion.quotient_dimension as i64)
+            .with("quotient_dimension", dimension as i64)
             .with_estimated_bytes(conversion.estimated_bytes()),
     );
 
@@ -367,9 +1031,8 @@ fn staged_solve<const N: usize, F: zeebra::KnownOrder>(
         &SolveOptions::default(),
         &mut StdRng::seed_from_u64(1),
     );
-    let search_elapsed = at.elapsed();
     stages.push(
-        StageCost::new(Stage::Univariate, search_elapsed)
+        StageCost::new(Stage::Univariate, at.elapsed())
             .with("lex_basis_elements", lex.len() as i64),
     );
 
@@ -384,6 +1047,10 @@ fn staged_solve<const N: usize, F: zeebra::KnownOrder>(
                 RunOutcome::WitnessRejected
             }
         }
+        // An empty *slice* is a fact about the slice: a witness on it would be a witness for the
+        // original system, but its absence says nothing. M21-E's rule, at the record level.
+        Ok((SolveOutcome::NoBaseFieldPoint, _)) if sliced => RunOutcome::SliceEstablishedNothing,
+        Ok((SolveOutcome::Inconsistent, _)) if sliced => RunOutcome::SliceEstablishedNothing,
         Ok((SolveOutcome::NoBaseFieldPoint, _)) => RunOutcome::NoBaseFieldPoint,
         Ok((SolveOutcome::Inconsistent, _)) => RunOutcome::Inconsistent,
         Err(error) => RunOutcome::StoppedAtLimit(Limit {
@@ -393,7 +1060,7 @@ fn staged_solve<const N: usize, F: zeebra::KnownOrder>(
             last_completed_stage: Stage::Conversion,
         }),
     };
-    (outcome, stages, frontier)
+    (outcome, stages, Some(dimension))
 }
 
 /// Which bound bound, as a stable name a consumer can key on.
@@ -506,31 +1173,37 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
             .map(|r| r.items().to_vec())
             .unwrap_or_default(),
     );
+    let entries_for_history = entries.clone();
     fs::write(
         &history_path,
         Json::object([
             ("schema", Json::int(RunRecord::SCHEMA)),
-            ("run_count", Json::size(entries.len())),
-            ("runs", Json::Array(entries)),
+            ("run_count", Json::size(entries_for_history.len())),
+            ("runs", Json::Array(entries_for_history)),
         ])
         .to_json()
             + "\n",
     )
     .expect("a writable file");
 
+    // `best.json` and the Markdown are rendered from the **accumulated history**, not from this
+    // process's board. The frontier rows run one per process, and a renderer that used only what
+    // the current process measured would overwrite the table with a single row each time.
+    let accumulated = Json::object([("runs", Json::Array(entries))]);
+    let all = Scoreboard::load(&accumulated, registry).expect("the history this program wrote");
+
     fs::write(
         root.join("results").join("best.json"),
         Json::object([(
             "best",
             Json::Array(
-                board
-                    .best()
+                all.best()
                     .values()
                     .map(|run| {
                         let manifest = registry
                             .iter()
                             .find(|c| c.id == run.challenge)
-                            .expect("checked on add");
+                            .expect("checked on load");
                         run.to_json(manifest)
                     })
                     .collect(),
@@ -541,5 +1214,5 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     )
     .expect("a writable file");
 
-    fs::write(root.join("SCOREBOARD.md"), board.to_markdown(registry)).expect("a writable file");
+    fs::write(root.join("SCOREBOARD.md"), all.to_markdown(registry)).expect("a writable file");
 }

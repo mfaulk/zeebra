@@ -14,11 +14,11 @@
   },
   "significance": "no verified witness",
   "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-  "elapsed_nanos": 19063890555,
+  "elapsed_nanos": 17192118667,
   "stages": [
     {
       "stage": "generation",
-      "elapsed_nanos": 7424,
+      "elapsed_nanos": 6493,
       "estimated_peak_bytes": null,
       "detail": {
         "variables": 9,
@@ -27,7 +27,7 @@
     },
     {
       "stage": "grobner",
-      "elapsed_nanos": 19063883131,
+      "elapsed_nanos": 17192112174,
       "estimated_peak_bytes": 155325736,
       "detail": {
         "max_matrix_rows": 40279,
@@ -51,9 +51,9 @@
   },
   "campaign": null,
   "environment": {
-    "commit": "7c14fb1",
+    "commit": "7e333fb",
     "machine": "fedora",
-    "cpu": "8 logical, affinity unpinned",
+    "cpu": "8 logical, affinity 0-7",
     "build": "release, RUSTFLAGS=default",
     "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
   },

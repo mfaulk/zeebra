@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf4-rp4",
+  "challenge_digest": "2d8f8531107d11ad9116a130ca25ddecd97d7338f167943613604934b46908f3",
+  "class": "faithful-reduction",
+  "formulation": "slice(12 fixed, seed 0)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 0 (12 values)"
+  ],
+  "outcome": "stopped_at_limit",
+  "limit": {
+    "resource": "max_live_nonzeros",
+    "detail": "20000281 live nonzero entries were needed, over the limit of 20000000",
+    "degree": 4,
+    "last_completed_stage": "generation"
+  },
+  "significance": "no verified witness",
+  "verification": "no candidate was produced, so nothing was verified",
+  "elapsed_nanos": 25928443629,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 278923454,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 82,
+        "equations": 82,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 25649520175,
+      "estimated_peak_bytes": 26226080,
+      "detail": {
+        "max_matrix_rows": 6710,
+        "max_matrix_columns": 18706,
+        "max_pair_degree": 4,
+        "pairs_considered": 10563,
+        "pairs_reduced": 10563,
+        "elements_added": 777
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": false,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 3,
+    "max_matrix_rows": 6710,
+    "max_matrix_columns": 18706,
+    "peak_live_nonzeros": 1635266,
+    "peak_estimated_bytes": 26226080,
+    "pairs_reduced": 10563,
+    "elements_added": 777,
+    "quotient_dimension": null
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "7e333fb",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 120 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=120 tools/scoreboard.sh row poseidon31-cico-t16-rf4-rp4 --slice 0"
+}

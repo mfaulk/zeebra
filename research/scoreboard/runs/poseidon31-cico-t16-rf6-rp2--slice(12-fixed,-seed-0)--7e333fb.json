@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf6-rp2",
+  "challenge_digest": "4e79a017932dbb57bf7326039f35de0eaa5df70d5be80b30a872c77a36700a7e",
+  "class": "faithful-reduction",
+  "formulation": "slice(12 fixed, seed 0)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 0 (12 values)"
+  ],
+  "outcome": "stopped_at_limit",
+  "limit": {
+    "resource": "max_live_nonzeros",
+    "detail": "20000793 live nonzero entries were needed, over the limit of 20000000",
+    "degree": 4,
+    "last_completed_stage": "generation"
+  },
+  "significance": "no verified witness",
+  "verification": "no candidate was produced, so nothing was verified",
+  "elapsed_nanos": 27577962104,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 503654831,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 112,
+        "equations": 112,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 27074307273,
+      "estimated_peak_bytes": 29297240,
+      "detail": {
+        "max_matrix_rows": 5696,
+        "max_matrix_columns": 25561,
+        "max_pair_degree": 4,
+        "pairs_considered": 10523,
+        "pairs_reduced": 10523,
+        "elements_added": 845
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": false,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 3,
+    "max_matrix_rows": 5696,
+    "max_matrix_columns": 25561,
+    "peak_live_nonzeros": 1818297,
+    "peak_estimated_bytes": 29297240,
+    "pairs_reduced": 10523,
+    "elements_added": 845,
+    "quotient_dimension": null
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "7e333fb",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 120 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=120 tools/scoreboard.sh row poseidon31-cico-t16-rf6-rp2 --slice 0"
+}

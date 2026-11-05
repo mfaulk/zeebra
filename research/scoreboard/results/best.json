@@ -10,11 +10,11 @@
       "outcome": "verified_witness",
       "significance": "reproduction of a challenge solved externally on publication",
       "verification": "evaluated against the published coefficient vectors; the published answer is [22, 22, 28, 12]",
-      "elapsed_nanos": 124008894,
+      "elapsed_nanos": 106412685,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 17604,
+          "elapsed_nanos": 14207,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 10,
@@ -23,7 +23,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 123834353,
+          "elapsed_nanos": 106263012,
           "estimated_peak_bytes": 2695192,
           "detail": {
             "max_matrix_rows": 1468,
@@ -34,7 +34,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 32031,
+          "elapsed_nanos": 27802,
           "estimated_peak_bytes": 344,
           "detail": {
             "quotient_dimension": 1
@@ -42,7 +42,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 76605,
+          "elapsed_nanos": 69171,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 10
@@ -50,7 +50,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 48301,
+          "elapsed_nanos": 38493,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -69,9 +69,9 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7c14fb1",
+        "commit": "7e333fb",
         "machine": "fedora",
-        "cpu": "8 logical, affinity unpinned",
+        "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -88,11 +88,11 @@
       "outcome": "verified_witness",
       "significance": "reproduction of a challenge solved externally on publication",
       "verification": "evaluated against the published coefficient vectors; the published answer is [25, 17, 12, 28]",
-      "elapsed_nanos": 8999905103,
+      "elapsed_nanos": 7798455012,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 35638,
+          "elapsed_nanos": 31459,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 15,
@@ -101,7 +101,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 8999350192,
+          "elapsed_nanos": 7797951449,
           "estimated_peak_bytes": 34303736,
           "detail": {
             "max_matrix_rows": 4589,
@@ -112,7 +112,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 53572,
+          "elapsed_nanos": 49063,
           "estimated_peak_bytes": 496,
           "detail": {
             "quotient_dimension": 1
@@ -120,7 +120,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 266224,
+          "elapsed_nanos": 246517,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 15
@@ -128,7 +128,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 199477,
+          "elapsed_nanos": 176524,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -147,9 +147,9 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7c14fb1",
+        "commit": "7e333fb",
         "machine": "fedora",
-        "cpu": "8 logical, affinity unpinned",
+        "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -166,11 +166,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 894463,
+      "elapsed_nanos": 973682,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 12704,
+          "elapsed_nanos": 12063,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 5,
@@ -179,7 +179,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 622318,
+          "elapsed_nanos": 691098,
           "estimated_peak_bytes": 12872,
           "detail": {
             "max_matrix_rows": 71,
@@ -190,7 +190,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 81935,
+          "elapsed_nanos": 82656,
           "estimated_peak_bytes": 4680,
           "detail": {
             "quotient_dimension": 9
@@ -198,7 +198,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 176885,
+          "elapsed_nanos": 187274,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 5
@@ -206,7 +206,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 621,
+          "elapsed_nanos": 591,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -225,9 +225,9 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7c14fb1",
+        "commit": "7e333fb",
         "machine": "fedora",
-        "cpu": "8 logical, affinity unpinned",
+        "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -244,11 +244,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 167213358,
+      "elapsed_nanos": 156562829,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 4789,
+          "elapsed_nanos": 4749,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 7,
@@ -257,7 +257,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 146469676,
+          "elapsed_nanos": 138170612,
           "estimated_peak_bytes": 1657192,
           "detail": {
             "max_matrix_rows": 1027,
@@ -268,7 +268,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 3303614,
+          "elapsed_nanos": 2888749,
           "estimated_peak_bytes": 330000,
           "detail": {
             "quotient_dimension": 81
@@ -276,7 +276,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 17433616,
+          "elapsed_nanos": 15497948,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 7
@@ -284,7 +284,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 1663,
+          "elapsed_nanos": 771,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -303,9 +303,9 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7c14fb1",
+        "commit": "7e333fb",
         "machine": "fedora",
-        "cpu": "8 logical, affinity unpinned",
+        "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -322,11 +322,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 393117089,
+      "elapsed_nanos": 363610376,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 5420,
+          "elapsed_nanos": 5781,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 9,
@@ -335,7 +335,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 370219929,
+          "elapsed_nanos": 343468962,
           "estimated_peak_bytes": 3806968,
           "detail": {
             "max_matrix_rows": 1862,
@@ -346,7 +346,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 5497959,
+          "elapsed_nanos": 4836515,
           "estimated_peak_bytes": 446632,
           "detail": {
             "quotient_dimension": 81
@@ -354,7 +354,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 17392408,
+          "elapsed_nanos": 15297916,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 9
@@ -362,7 +362,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 1373,
+          "elapsed_nanos": 1202,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -381,14 +381,97 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7c14fb1",
+        "commit": "7e333fb",
         "machine": "fedora",
-        "cpu": "8 logical, affinity unpinned",
+        "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
       "experiment": null,
       "reproduce": "cargo run --release --example scoreboard -- smoke  # poseidon-t2-rf4-rp0-planted"
+    },
+    {
+      "schema": 1,
+      "challenge": "poseidon31-cico-t16-rf2-rp0",
+      "challenge_digest": "56ccc99d85e099ce212311850170489f95b86495dc36d3823cdc9f14f24f7dad",
+      "class": "faithful-reduction",
+      "formulation": "slice(12 fixed, seed 2)",
+      "transformations": [
+        "specialize free inputs 2..14 at seed 2 (12 values)"
+      ],
+      "outcome": "verified_witness",
+      "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+      "verification": "no candidate was produced, so nothing was verified",
+      "elapsed_nanos": 30107857915,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 51650576,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 46,
+            "equations": 46,
+            "free_inputs": 14
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 29913306997,
+          "estimated_peak_bytes": 102778752,
+          "detail": {
+            "max_matrix_rows": 20866,
+            "max_matrix_columns": 17424,
+            "max_pair_degree": 4,
+            "pairs_considered": 5815,
+            "pairs_reduced": 5815,
+            "elements_added": 545
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 121906186,
+          "estimated_peak_bytes": 1891792,
+          "detail": {
+            "quotient_dimension": 81
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 20990469,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 46
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 3687,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 4,
+        "highest_completed_degree": 4,
+        "max_matrix_rows": 20866,
+        "max_matrix_columns": 17424,
+        "peak_live_nonzeros": 6414960,
+        "peak_estimated_bytes": 102778752,
+        "pairs_reduced": 5815,
+        "elements_added": 545,
+        "quotient_dimension": 81
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "7e333fb",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 180 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "ZEEBRA_WALL_SECONDS=180 tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp0 --slice 2"
     }
   ]
 }

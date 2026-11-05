@@ -114,6 +114,21 @@ impl RunOutcome {
     pub fn is_verified_witness(&self) -> bool {
         matches!(self, Self::VerifiedWitness)
     }
+
+    /// A table-width summary: the bound and the degree, without the solver's whole sentence.
+    ///
+    /// `Display` keeps the sentence, because a record read on its own should carry the detail; a
+    /// table cell holding sixty words of it is unreadable, and the detail is a field away in the
+    /// JSON.
+    pub fn short(&self) -> String {
+        match self {
+            Self::StoppedAtLimit(limit) => match limit.degree {
+                Some(degree) => format!("stopped: {} at degree {}", limit.resource, degree),
+                None => format!("stopped: {}", limit.resource),
+            },
+            other => other.to_string(),
+        }
+    }
 }
 
 impl Display for RunOutcome {
@@ -1296,7 +1311,7 @@ impl Scoreboard {
                         .into_iter()
                         .rfind(|r| r.challenge == manifest.id)
                     {
-                        Some(run) => format!("{}", run.outcome),
+                        Some(run) => run.outcome.short(),
                         None => "not attempted".to_string(),
                     },
                 };
@@ -1341,7 +1356,7 @@ impl Scoreboard {
                     "| `{}` | {} | {} | {} | {} | {} | {:.1} |\n",
                     run.challenge,
                     run.formulation,
-                    run.outcome,
+                    run.outcome.short(),
                     frontier.max_pair_degree,
                     frontier
                         .highest_completed_degree
@@ -1572,7 +1587,7 @@ mod tests {
         let markdown = board.to_markdown(&registry);
         assert!(markdown.contains("Where the unfinished runs stopped"));
         assert!(markdown.contains("not** nearer a solution"));
-        assert!(markdown.contains("stopped: max_matrix_columns"));
+        assert!(markdown.contains("stopped: max_matrix_columns at degree 11"));
     }
 
     /// The fastest verified witness wins, and classes get separate tables.
