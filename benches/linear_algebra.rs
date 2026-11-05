@@ -1,7 +1,7 @@
 //! Dense finite-field linear algebra.
 //!
-//! Gaussian elimination and Gauss–Jordan elimination at several sizes, over a 31-bit and a 64-bit
-//! prime. These drive the pivot-normalization path, which is the clearest arithmetic bottleneck
+//! Gaussian elimination and Gauss–Jordan elimination at several sizes, over a 31-bit prime at two
+//! storage widths and a 64-bit prime. These drive the pivot-normalization path, which is the clearest arithmetic bottleneck
 //! identified in the milestone review: one modular inverse per entry rather than per row.
 //!
 //! Matrices are generated in advance from a fixed seed, so the same matrices are reused across
@@ -10,7 +10,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
-    fields::{Zp18446744073709551557, Zp2147483647},
+    fields::{Mersenne31, Zp18446744073709551557, Zp2147483647},
     linalg::{gauss_jordan_elimination, Matrix},
     FiniteField,
 };
@@ -49,6 +49,9 @@ fn bench_field<F: FiniteField + 'static>(c: &mut Criterion, name: &str) {
 
 fn benches(c: &mut Criterion) {
     bench_field::<Zp2147483647>(c, "p31");
+    // The same modulus in a 4-byte cell. A dense matrix is cells and nothing else, so this is
+    // where halving the storage width is expected to show, and `p31` is the control.
+    bench_field::<Mersenne31>(c, "p31_u32");
     bench_field::<Zp18446744073709551557>(c, "p64");
 }
 
