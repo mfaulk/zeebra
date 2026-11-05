@@ -23,12 +23,18 @@
 /// Linux only, from `VmHWM` in `/proc/self/status`. Returns `None` on every other platform and on
 /// a Linux where `/proc` is not mounted, rather than guessing.
 pub fn peak_resident_bytes() -> Option<u64> {
+    status_field_bytes("VmHWM:")
+}
+
+/// A `/proc/self/status` size field in bytes, by line prefix, or `None` if unavailable.
+#[allow(unused_variables)]
+fn status_field_bytes(prefix: &str) -> Option<u64> {
     #[cfg(target_os = "linux")]
     {
         let status = std::fs::read_to_string("/proc/self/status").ok()?;
         for line in status.lines() {
             // `VmHWM:   123456 kB`, and the unit is always kB on Linux.
-            let value = match line.strip_prefix("VmHWM:") {
+            let value = match line.strip_prefix(prefix) {
                 Some(value) => value,
                 None => continue,
             };
@@ -49,7 +55,9 @@ pub fn peak_resident_bytes() -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::peak_resident_bytes;
+    // Every test here is Linux-gated, and so is the import they share.
+    #[cfg(target_os = "linux")]
+    use super::{peak_resident_bytes, status_field_bytes};
 
     /// On Linux the peak is reported and is a plausible size for a test process.
     #[cfg(target_os = "linux")]
@@ -63,17 +71,23 @@ mod tests {
         );
     }
 
-    /// Touching 32 MB raises the reported peak by most of 32 MB.
+    /// Touching 32 MB raises the reported peak to at least 32 MB above the live RSS beforehand.
     ///
     /// The property the figure is read for, and the only one asserted: that it responds to real
     /// resident memory. It is deliberately not asserted to stay raised afterwards — see
     /// [`peak_resident_bytes`] on why that does not hold everywhere.
+    ///
+    /// The baseline is `VmRSS` and not `VmHWM`, which is what this asserted until #170. Both
+    /// figures are process-wide, but `VmHWM` is a high-water mark: under a harness that shares one
+    /// process across tests it sits wherever the suite's largest transient left it, arbitrarily
+    /// far above live RSS, and no ballast this test can afford will clear that. Live RSS has no
+    /// such history, so what is left is only concurrent noise, which the slack below absorbs.
     #[cfg(target_os = "linux")]
     #[test]
     fn test_touching_memory_raises_the_peak() {
         const BALLAST: u64 = 32 * 1024 * 1024;
 
-        let before = peak_resident_bytes().expect("readable");
+        let before = status_field_bytes("VmRSS:").expect("readable");
         // Written to rather than merely allocated, so the pages are really resident. Every page is
         // touched, which `vec![0u8; _]` alone does not guarantee.
         let mut ballast = vec![0u8; BALLAST as usize];
@@ -82,11 +96,12 @@ mod tests {
         }
         let during = peak_resident_bytes().expect("readable");
 
-        // Three quarters rather than all of it: the test binary is multi-threaded and the figure
-        // is process-wide, so another test's free can land between the two readings.
+        // Three quarters rather than all of it: under the built-in harness the binary is
+        // multi-threaded and both figures are process-wide, so another test's free can land
+        // between the two readings. Under nextest, a process per test, there is no such thread.
         assert!(
             during >= before + BALLAST / 4 * 3,
-            "{} is not {} bytes above {}",
+            "peak {} is not {} bytes above the {} resident beforehand",
             during,
             BALLAST / 4 * 3,
             before
