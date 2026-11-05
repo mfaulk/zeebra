@@ -83,6 +83,15 @@ pub enum RunOutcome {
     /// A completed Gröbner basis and no witness: positive-dimensional, or none was attempted.
     BasisOnly,
 
+    /// A specialized slice has no point, which says **nothing** about the problem it is a slice of.
+    ///
+    /// Distinct from [`Self::NoBaseFieldPoint`] and [`Self::Inconsistent`], and the distinction is
+    /// load-bearing: a slice is `I + ⟨x_i − a_i⟩`, so a witness on it *is* a witness for the
+    /// original system, and an empty slice is a fact about the slice alone. Only exhausting every
+    /// `q^|S|` slice would settle the original, which is M21-E's rule. A run that reported an empty
+    /// slice as "no base-field point" would be claiming the problem has no solution.
+    SliceEstablishedNothing,
+
     /// Stopped at a bound.
     StoppedAtLimit(Limit),
 }
@@ -96,6 +105,7 @@ impl RunOutcome {
             Self::NoBaseFieldPoint => "no_base_field_point",
             Self::Inconsistent => "inconsistent",
             Self::BasisOnly => "basis_only",
+            Self::SliceEstablishedNothing => "slice_established_nothing",
             Self::StoppedAtLimit(_) => "stopped_at_limit",
         }
     }
@@ -114,6 +124,12 @@ impl Display for RunOutcome {
             Self::NoBaseFieldPoint => write!(f, "no base-field point"),
             Self::Inconsistent => write!(f, "inconsistent"),
             Self::BasisOnly => write!(f, "basis only, no witness"),
+            Self::SliceEstablishedNothing => {
+                write!(
+                    f,
+                    "the slice is empty, which says nothing about the problem"
+                )
+            }
             Self::StoppedAtLimit(limit) => write!(f, "stopped: {}", limit),
         }
     }
@@ -150,6 +166,20 @@ impl Stage {
             Self::Verification => "verification",
             Self::Nothing => "nothing",
         }
+    }
+
+    /// The stage with this stable name.
+    pub fn named(name: &str) -> Option<Self> {
+        [
+            Self::Generation,
+            Self::Grobner,
+            Self::Conversion,
+            Self::Univariate,
+            Self::Verification,
+            Self::Nothing,
+        ]
+        .into_iter()
+        .find(|stage| stage.name() == name)
     }
 }
 
@@ -575,6 +605,212 @@ impl RunRecord {
         manifest.significance(self.outcome.is_verified_witness())
     }
 
+    /// Read a stored record back, taking its class from the registry.
+    ///
+    /// Needed because a scoreboard **accumulates**: comparing two runs from different commits
+    /// means loading at least one of them from a file. The class comes from `manifest` rather than
+    /// from the stored name, and the stored digest is checked against it — so loading a record of
+    /// a problem that has since been redefined fails here, exactly as adding one does.
+    ///
+    /// **The per-attempt [`ExperimentRecord`] is not reconstructed.** Nothing the scoreboard
+    /// renders or compares reads it, it is a large surface to parse, and the run file keeps it
+    /// verbatim. A loaded record is therefore for rendering and comparison, and `results/history`
+    /// is appended as raw JSON rather than rewritten from loaded records — otherwise that detail
+    /// would be dropped on each pass.
+    ///
+    /// # Errors
+    /// [`ScoreboardError::MalformedRun`] naming the first field it cannot read, or
+    /// [`ScoreboardError::StaleIdentity`].
+    pub fn from_json(value: &Json, manifest: &ChallengeManifest) -> Result<Self, ScoreboardError> {
+        let text = |key: &'static str| -> Result<String, ScoreboardError> {
+            value
+                .get(key)
+                .and_then(Json::as_str)
+                .map(|s| s.to_string())
+                .ok_or(ScoreboardError::MalformedRun { field: key })
+        };
+        let challenge = text("challenge")?;
+        let challenge_digest = text("challenge_digest")?;
+        if challenge_digest != manifest.digest() {
+            return Err(ScoreboardError::StaleIdentity {
+                id: challenge,
+                recorded: challenge_digest,
+                registry: manifest.digest(),
+            });
+        }
+
+        let outcome = match value
+            .get("outcome")
+            .and_then(Json::as_str)
+            .ok_or(ScoreboardError::MalformedRun { field: "outcome" })?
+        {
+            "verified_witness" => RunOutcome::VerifiedWitness,
+            "witness_rejected" => RunOutcome::WitnessRejected,
+            "no_base_field_point" => RunOutcome::NoBaseFieldPoint,
+            "inconsistent" => RunOutcome::Inconsistent,
+            "basis_only" => RunOutcome::BasisOnly,
+            "slice_established_nothing" => RunOutcome::SliceEstablishedNothing,
+            "stopped_at_limit" => {
+                let limit = value
+                    .get("limit")
+                    .ok_or(ScoreboardError::MalformedRun { field: "limit" })?;
+                RunOutcome::StoppedAtLimit(Limit {
+                    resource: limit
+                        .get("resource")
+                        .and_then(Json::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                    detail: limit
+                        .get("detail")
+                        .and_then(Json::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                    degree: limit.get("degree").and_then(Json::as_int).map(|d| d as u64),
+                    last_completed_stage: limit
+                        .get("last_completed_stage")
+                        .and_then(Json::as_str)
+                        .and_then(Stage::named)
+                        .unwrap_or(Stage::Nothing),
+                })
+            }
+            _ => return Err(ScoreboardError::MalformedRun { field: "outcome" }),
+        };
+
+        let stages = value
+            .get("stages")
+            .map(|stages| {
+                stages
+                    .items()
+                    .iter()
+                    .filter_map(|stage| {
+                        Some(StageCost {
+                            stage: Stage::named(stage.get("stage")?.as_str()?)?,
+                            elapsed: Duration::from_nanos(
+                                stage.get("elapsed_nanos")?.as_int()? as u64
+                            ),
+                            estimated_peak_bytes: stage
+                                .get("estimated_peak_bytes")
+                                .and_then(Json::as_int)
+                                .map(|b| b as usize),
+                            detail: match stage.get("detail") {
+                                Some(Json::Object(fields)) => fields
+                                    .iter()
+                                    .filter_map(|(k, v)| Some((k.clone(), v.as_int()?)))
+                                    .collect(),
+                                _ => Vec::new(),
+                            },
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let frontier = match value.get("grobner_frontier") {
+            Some(Json::Object(_)) => {
+                let f = value.get("grobner_frontier").expect("just matched");
+                let size = |key: &str| f.get(key).and_then(Json::as_int).unwrap_or(0) as usize;
+                Some(GrobnerFrontier {
+                    completed: matches!(f.get("completed"), Some(Json::Bool(true))),
+                    max_pair_degree: f.get("max_pair_degree").and_then(Json::as_int).unwrap_or(0)
+                        as u64,
+                    highest_completed_degree: f
+                        .get("highest_completed_degree")
+                        .and_then(Json::as_int)
+                        .map(|d| d as u64),
+                    max_matrix_rows: size("max_matrix_rows"),
+                    max_matrix_columns: size("max_matrix_columns"),
+                    peak_live_nonzeros: size("peak_live_nonzeros"),
+                    peak_estimated_bytes: size("peak_estimated_bytes"),
+                    pairs_reduced: size("pairs_reduced"),
+                    elements_added: size("elements_added"),
+                    quotient_dimension: f
+                        .get("quotient_dimension")
+                        .and_then(Json::as_int)
+                        .map(|d| d as usize),
+                })
+            }
+            _ => None,
+        };
+
+        let campaign = match value.get("campaign") {
+            Some(Json::Object(_)) => {
+                let c = value.get("campaign").expect("just matched");
+                let size = |key: &str| c.get(key).and_then(Json::as_int).unwrap_or(0) as usize;
+                Some(Campaign {
+                    trials: size("trials"),
+                    witnesses: size("witnesses"),
+                    total: Duration::from_nanos(
+                        c.get("total_nanos").and_then(Json::as_int).unwrap_or(0) as u64,
+                    ),
+                    seeds: c
+                        .get("seeds")
+                        .map(|seeds| {
+                            seeds
+                                .items()
+                                .iter()
+                                .filter_map(|s| s.as_int().map(|s| s as u64))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    fixed: size("fixed_variables"),
+                })
+            }
+            _ => None,
+        };
+
+        let environment = value
+            .get("environment")
+            .ok_or(ScoreboardError::MalformedRun {
+                field: "environment",
+            })?;
+        let field = |key: &str| {
+            environment
+                .get(key)
+                .and_then(Json::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
+
+        Ok(Self {
+            schema: value.get("schema").and_then(Json::as_int).unwrap_or(1) as u32,
+            challenge: text("challenge")?,
+            challenge_digest,
+            class: manifest.class,
+            formulation: text("formulation")?,
+            transformations: value
+                .get("transformations")
+                .map(|t| {
+                    t.items()
+                        .iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            outcome,
+            verification: value
+                .get("verification")
+                .and_then(Json::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            stages,
+            frontier,
+            campaign,
+            environment: Environment {
+                commit: field("commit"),
+                machine: field("machine"),
+                cpu: field("cpu"),
+                build: field("build"),
+                policy: field("policy"),
+            },
+            experiment: None,
+            reproduce: value
+                .get("reproduce")
+                .and_then(Json::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        })
+    }
+
     /// The record as JSON.
     pub fn to_json(&self, manifest: &ChallengeManifest) -> Json {
         let mut fields = vec![
@@ -649,6 +885,12 @@ impl RunRecord {
 /// Why a run could not be added to a scoreboard, or two runs could not be compared.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ScoreboardError {
+    /// A stored record is missing a field the scoreboard reads, or has it at the wrong type.
+    MalformedRun {
+        /// Which field.
+        field: &'static str,
+    },
+
     /// The run names a problem the registry does not hold.
     UnknownChallenge {
         /// The id it named.
@@ -681,6 +923,9 @@ pub enum ScoreboardError {
 impl Display for ScoreboardError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::MalformedRun { field } => {
+                write!(f, "a stored run has no usable {}", field)
+            }
             Self::UnknownChallenge { id } => write!(f, "no registered problem named {}", id),
             Self::StaleIdentity {
                 id,
@@ -897,6 +1142,33 @@ impl Scoreboard {
     /// The runs, in insertion order.
     pub fn runs(&self) -> &[RunRecord] {
         &self.runs
+    }
+
+    /// Load an accumulated history: `{"runs": [...]}` as [`Self::to_json`] writes it.
+    ///
+    /// This is what makes the plan's "two runs of the same instance on different commits compare
+    /// automatically" possible at all — one of them is in a file. Every record is checked against
+    /// the registry on the way in, so a history that outlived a redefinition fails loudly.
+    ///
+    /// # Errors
+    /// As [`RunRecord::from_json`], plus [`ScoreboardError::UnknownChallenge`].
+    pub fn load(history: &Json, registry: &[ChallengeManifest]) -> Result<Self, ScoreboardError> {
+        let entries = history
+            .get("runs")
+            .ok_or(ScoreboardError::MalformedRun { field: "runs" })?;
+        let mut board = Self::new();
+        for entry in entries.items() {
+            let id = entry
+                .get("challenge")
+                .and_then(Json::as_str)
+                .ok_or(ScoreboardError::MalformedRun { field: "challenge" })?;
+            let manifest = registry
+                .iter()
+                .find(|c| c.id == id)
+                .ok_or_else(|| ScoreboardError::UnknownChallenge { id: id.to_string() })?;
+            board.runs.push(RunRecord::from_json(entry, manifest)?);
+        }
+        Ok(board)
     }
 
     /// The fastest verified witness for each problem.
@@ -1366,6 +1638,176 @@ mod tests {
         let json = surrogate.to_json(&manifest).to_json();
         assert!(json.contains("witness for a surrogate"), "{}", json);
         assert!(json.contains("\"class\": \"engineering\""), "{}", json);
+    }
+
+    /// A stored run loads back with everything the scoreboard reads, and compares against a new one.
+    ///
+    /// The acceptance criterion in one test: two runs of the same problem from different commits,
+    /// one of them read from a file, compared automatically. Without a reader there is no "across
+    /// commits" at all.
+    #[test]
+    fn test_a_history_loads_and_compares_across_commits() {
+        use crate::grobner::research::{challenge, Json};
+
+        let registry = registry();
+        let manifest = challenge("poseidon-t2-rf4-rp0-planted").expect("registered");
+
+        let mut old = witness(
+            "poseidon-t2-rf4-rp0-planted",
+            "as generated",
+            352,
+            3_800_000,
+        );
+        old.environment.commit = "aaaaaaa".to_string();
+        old.transformations = vec!["none".to_string()];
+        old.frontier = Some(GrobnerFrontier {
+            completed: true,
+            max_pair_degree: 5,
+            highest_completed_degree: Some(5),
+            max_matrix_columns: 1_341,
+            peak_estimated_bytes: 3_800_000,
+            quotient_dimension: Some(81),
+            ..GrobnerFrontier::default()
+        });
+        old.stages = vec![
+            StageCost::new(Stage::Grobner, Duration::from_millis(352))
+                .with("max_matrix_columns", 1_341i64)
+                .with_estimated_bytes(3_800_000),
+            StageCost::new(Stage::Univariate, Duration::from_micros(17_400)),
+        ];
+
+        // Written as a history file would be, then read back.
+        let history = Json::object([
+            ("schema", Json::int(1i32)),
+            ("runs", Json::Array(vec![old.to_json(&manifest)])),
+        ]);
+        let text = history.to_json();
+        let loaded = Scoreboard::load(&Json::parse(&text).expect("valid"), &registry)
+            .expect("a registered problem");
+        assert_eq!(loaded.runs().len(), 1);
+
+        let read = &loaded.runs()[0];
+        assert_eq!(read.challenge_digest, old.challenge_digest);
+        assert_eq!(read.class, old.class);
+        assert_eq!(read.formulation, "as generated");
+        assert_eq!(read.transformations, vec!["none".to_string()]);
+        assert_eq!(read.outcome, RunOutcome::VerifiedWitness);
+        // Exactly, in nanoseconds: 352 ms of F4 and 17.4 ms of root finding.
+        assert_eq!(read.elapsed(), Duration::from_micros(369_400));
+        assert_eq!(read.stages.len(), 2);
+        assert_eq!(
+            read.stage(Stage::Grobner).expect("ran").detail,
+            vec![("max_matrix_columns".to_string(), 1_341i128)]
+        );
+        assert_eq!(read.frontier, old.frontier);
+        assert_eq!(read.environment.commit, "aaaaaaa");
+
+        // And the comparison a later commit wants.
+        let mut new = witness(
+            "poseidon-t2-rf4-rp0-planted",
+            "as generated",
+            219,
+            2_900_000,
+        );
+        new.environment = read.environment.clone();
+        let comparison = Comparison::of(read, &new).expect("the same problem");
+        // 369.4 ms against 219 ms, over the whole pipeline rather than F4 alone.
+        assert_eq!(comparison.speedup_per_mille, 1_686);
+        assert!(comparison.caveats.is_empty(), "{:?}", comparison.caveats);
+    }
+
+    /// A run that stopped, and a slice that established nothing, both survive a round trip.
+    #[test]
+    fn test_outcomes_that_are_not_witnesses_round_trip() {
+        use crate::grobner::research::{challenge, Json};
+
+        let registry = registry();
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+
+        let mut stopped = RunRecord::new(&manifest, "as generated");
+        stopped.environment = environment();
+        stopped.outcome = RunOutcome::StoppedAtLimit(Limit {
+            resource: "max_live_nonzeros".to_string(),
+            detail: "20000322 live nonzero entries were needed, over the limit of 20000000"
+                .to_string(),
+            degree: Some(6),
+            last_completed_stage: Stage::Generation,
+        });
+
+        let mut slice = RunRecord::new(&manifest, "slice(12 fixed, seed 0)");
+        slice.environment = environment();
+        slice.outcome = RunOutcome::SliceEstablishedNothing;
+        slice.transformations = vec!["specialize free inputs 2..14 at seed 0".to_string()];
+
+        let history = Json::object([(
+            "runs",
+            Json::Array(vec![stopped.to_json(&manifest), slice.to_json(&manifest)]),
+        )]);
+        let loaded = Scoreboard::load(&Json::parse(&history.to_json()).expect("valid"), &registry)
+            .expect("registered");
+
+        assert_eq!(loaded.runs()[0].outcome, stopped.outcome);
+        assert_eq!(
+            loaded.runs()[1].outcome,
+            RunOutcome::SliceEstablishedNothing
+        );
+        assert!(loaded.best().is_empty(), "neither is a witness");
+        // And the slice's own Display refuses to be read as a statement about the problem.
+        assert!(loaded.runs()[1]
+            .outcome
+            .to_string()
+            .contains("says nothing about the problem"));
+    }
+
+    /// A history whose problem has been redefined fails to load, and names the field it cannot use.
+    #[test]
+    fn test_a_malformed_or_stale_history_is_refused() {
+        use crate::grobner::research::{challenge, Json};
+
+        let registry = registry();
+        let manifest = challenge("poseidon-t2-rf4-rp0-planted").expect("registered");
+        let run = witness("poseidon-t2-rf4-rp0-planted", "as generated", 1, 1);
+
+        // Stale: the stored digest no longer matches the registry's.
+        let mut stale = run.to_json(&manifest);
+        if let Json::Object(fields) = &mut stale {
+            for (key, value) in fields.iter_mut() {
+                if key == "challenge_digest" {
+                    *value = Json::string("0".repeat(64));
+                }
+            }
+        }
+        let history = Json::object([("runs", Json::Array(vec![stale]))]);
+        assert!(matches!(
+            Scoreboard::load(&history, &registry),
+            Err(ScoreboardError::StaleIdentity { .. })
+        ));
+
+        // Malformed: no environment at all.
+        let history = Json::parse(
+            r#"{"runs":[{"challenge":"poseidon-t2-rf4-rp0-planted",
+            "challenge_digest":"x","outcome":"basis_only","formulation":"f"}]}"#,
+        )
+        .expect("valid JSON");
+        assert!(matches!(
+            Scoreboard::load(&history, &registry),
+            Err(ScoreboardError::StaleIdentity { .. })
+        ));
+
+        // And an unknown problem is named.
+        let history = Json::parse(r#"{"runs":[{"challenge":"nope"}]}"#).expect("valid JSON");
+        assert_eq!(
+            Scoreboard::load(&history, &registry).expect_err("unknown"),
+            ScoreboardError::UnknownChallenge {
+                id: "nope".to_string()
+            }
+        );
+
+        // A history with no `runs` key at all says which field it wanted.
+        assert_eq!(
+            Scoreboard::load(&Json::object([("x", Json::Null)]), &registry).expect_err("no runs"),
+            ScoreboardError::MalformedRun { field: "runs" }
+        );
     }
 
     /// A campaign reports its failures, its work per witness and an interval on the rate.
