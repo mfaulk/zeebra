@@ -26,7 +26,7 @@ pub use fglm::{
     FglmStageTimings, FglmStatistics, IdealClass, MultiplicationOperator, OperatorConstruction,
     OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics,
 };
-pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue};
+pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue, PairSchedule};
 pub use planning::{
     analyze, solve_one_planned, Attempt, Choice, OutcomeClass, PlanBudget, PlannedSolveOptions,
     SolvePlan, SolvePolicy, SystemShape,

@@ -204,7 +204,13 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     let mut leads: Vec<Monomial<N>> = monic.leading_monomials().collect();
 
     let mut criteria_counts = CriterionCounts::default();
-    let mut pending = PairQueue::seeded_from_leads(&leads, &options.criteria, &mut criteria_counts);
+    let mut pending = PairQueue::seeded_from_leads_scheduled(
+        &leads,
+        &options.criteria,
+        options.schedule,
+        order,
+        &mut criteria_counts,
+    );
     let mut cache = ReducerCache::new(options.reducer_cache);
 
     // Terminates because each batch either consumes pairs without adding any, or produces a

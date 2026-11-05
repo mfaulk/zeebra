@@ -2367,3 +2367,190 @@ fn test_the_rank_attribution_identity_holds_on_real_batches() {
         }
     }
 }
+
+/// Every pair schedule returns the identical reduced Gröbner basis, on the correctness corpus and
+/// under every monomial order and every criterion combination.
+///
+/// The acceptance criterion for M22-A. A schedule is not a criterion: it discards nothing, so it
+/// cannot change the answer. That has to be asserted against the criteria as well as alone, because
+/// the chain criterion's soundness argument refers to which pairs have been *processed*, and a
+/// schedule changes the order in which they are.
+#[test]
+fn test_every_schedule_returns_the_same_basis() {
+    use crate::grobner::{PairCriteria, PairSchedule};
+
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            for criteria in [
+                PairCriteria::NONE,
+                PairCriteria::PRODUCT_ONLY,
+                PairCriteria::ALL,
+            ] {
+                let expected = f4_with_options(
+                    &f,
+                    order,
+                    &F4Options {
+                        criteria,
+                        schedule: PairSchedule::DegreeThenLcm,
+                        ..F4Options::baseline()
+                    },
+                )
+                .expect("within limits")
+                .0;
+
+                for schedule in PairSchedule::ALL {
+                    let actual = f4_with_options(
+                        &f,
+                        order,
+                        &F4Options {
+                            criteria,
+                            schedule,
+                            ..F4Options::baseline()
+                        },
+                    )
+                    .expect("within limits")
+                    .0;
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{:?} under {} with {:?} and {}",
+                        strings,
+                        order.name(),
+                        criteria,
+                        schedule.name()
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Every schedule agrees on the benchmark families, including under a batch cap.
+///
+/// The cap is the case that matters: without one, a batch is the whole degree whatever the schedule
+/// chose, so the batch *sets* are identical. With one, the schedule decides which pairs of a degree
+/// share a matrix — so the candidates differ, the trajectory differs, and the *basis* still must
+/// not.
+#[test]
+fn test_every_schedule_agrees_under_a_batch_cap() {
+    use crate::grobner::PairSchedule;
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        for cap in [None, Some(1), Some(4)] {
+            for (name, system) in [
+                ("katsura-4", katsura::<4, G>()),
+                ("cyclic-4", cyclic::<4, G>()),
+            ] {
+                let expected = f4_with_options(
+                    &system,
+                    order,
+                    &F4Options {
+                        max_pairs_per_batch: cap,
+                        ..F4Options::default()
+                    },
+                )
+                .expect("within limits")
+                .0;
+
+                for schedule in PairSchedule::ALL {
+                    let (basis, statistics) = f4_with_options(
+                        &system,
+                        order,
+                        &F4Options {
+                            max_pairs_per_batch: cap,
+                            schedule,
+                            ..F4Options::default()
+                        },
+                    )
+                    .expect("within limits");
+                    assert_eq!(
+                        basis,
+                        expected,
+                        "{} under {} at cap {:?} with {}",
+                        name,
+                        order.name(),
+                        cap,
+                        schedule.name()
+                    );
+                    assert!(statistics.pairs_reduced > 0);
+                }
+            }
+        }
+    }
+}
+
+/// What a schedule can and cannot change, measured rather than assumed.
+///
+/// Uncapped, a batch is every pending pair of its degree, so the batch *sets* are identical whatever
+/// the schedule — and since a matrix's row set is then identical too, so is its row space, so the
+/// pivot columns and therefore the leading monomials of the new basis elements are identical. The
+/// basis grows the same way, the queue evolves the same way, and `batches` and `pairs_reduced` come
+/// out equal.
+///
+/// **It does not follow that the computation is identical.** Row echelon form depends on the order
+/// the rows are taken in, so the candidates' *tails* differ, and a different tail is a different
+/// set of monomials for the next batch's symbolic preprocessing to cover. On katsura-5 grevlex the
+/// widest matrix is 146 columns under the baseline and 166 under `SmallMultiplier`, with every pair
+/// and batch count identical. So a schedule is never inert, and a measurement of one has to be an
+/// end-to-end measurement.
+#[test]
+fn test_what_an_uncapped_schedule_changes() {
+    use crate::grobner::PairSchedule;
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+
+    let shape = |cap, schedule| {
+        let (basis, statistics) = f4_with_options(
+            &katsura::<5, G>(),
+            order,
+            &F4Options {
+                max_pairs_per_batch: cap,
+                schedule,
+                ..F4Options::default()
+            },
+        )
+        .expect("within limits");
+        (
+            basis,
+            statistics.batches,
+            statistics.pairs_reduced,
+            statistics.max_matrix_columns,
+        )
+    };
+
+    let baseline = shape(None, PairSchedule::DegreeThenLcm);
+    let mut widths = vec![baseline.3];
+    for schedule in PairSchedule::ALL {
+        let other = shape(None, schedule);
+        assert_eq!(other.0, baseline.0, "{}: the basis moved", schedule.name());
+        assert_eq!(
+            (other.1, other.2),
+            (baseline.1, baseline.2),
+            "{}: an uncapped batch is the whole degree, so the counts must match",
+            schedule.name()
+        );
+        widths.push(other.3);
+    }
+    // And at least one schedule did reach a different matrix width, through the echelon
+    // representatives rather than through the pair sets.
+    widths.dedup();
+    assert!(
+        widths.len() > 1,
+        "no schedule changed the matrix width, so row order is not reaching later batches"
+    );
+
+    // Capped, the pair sets themselves differ, so a count moves too.
+    assert_ne!(
+        (
+            shape(Some(2), PairSchedule::DegreeThenLcm).1,
+            shape(Some(2), PairSchedule::DegreeThenLcm).3
+        ),
+        (
+            shape(Some(2), PairSchedule::LargeMultiplierDegree).1,
+            shape(Some(2), PairSchedule::LargeMultiplierDegree).3
+        ),
+        "a capped batch under two schedules took the same shape"
+    );
+}

@@ -238,6 +238,8 @@ cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
 cargo run --release --example f4_degrees           # F4, work and useful work per degree
+cargo run --release --example f4_schedule          # critical-pair order, and batch size, apart
+cargo run --release --example f4_schedule -- list  # the instances available
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
@@ -295,6 +297,12 @@ controlled Poseidon family — where the `t = 3` and `t = 2` nine-variable insta
 the same algebraic dimension** (`N - E = t - 2k`), so the `t = 3` system is also run with one free
 input pinned, which matches the equation counts without changing the round structure. Needs
 `tools/fetch-mq-challenge.sh` for the MQ sections; the rest runs without it.
+
+`f4_schedule` is M22-A's measurement: three deterministic critical-pair orders on one table per
+instance, with the computed basis asserted equal to the baseline's on every row. Ordering and batch
+sizing get a table each, deliberately — a sort and a cap varied together cannot be attributed —
+plus a cross product on one instance to check whether the two interact. `-- list` names the
+instances and `-- <name>` runs one per process.
 
 `f4_blocks` replays the batches a computation really built and eliminates each one four ways —
 rows as preprocessing produced them, reducer rows first, reducer rows taken as established pivots,
@@ -1297,6 +1305,7 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 | `reduction` | `ReductionStrategy::{Unstructured, Structured}` | whether reducer rows are established as pivots before the pair rows are reduced against them |
 | `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial. `FirstApplicable` is the default and the faster of the two: picking the largest divisor minimizes the multiplier but maximizes how much of the reducer's tail stays reducible, which grows the matrix |
 | `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
+| `schedule` | `PairSchedule::{DegreeThenLcm, SmallMultiplierDegree, LargeMultiplierDegree, SmallMultiplierMonomial, LargeMultiplierMonomial}` | in what order the pending pairs of one degree are taken. Not a criterion — it discards nothing |
 | `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches. `Count` measures repetition without serving anything; `Store` currently behaves as `Count`, because building a multiple's terms is an integer addition per variable per term and serving them from a map costs more than that even at a 95% hit rate |
 | `measure_stages` | `bool` | whether `F4Statistics::stages` is populated |
 
@@ -1325,6 +1334,52 @@ monomial hash in symbolic preprocessing and the rewritten final interreduction a
 
 `PairCriteria::NONE` reduces every pair, which is the reference the criteria are checked against: a
 criterion is sound exactly when enabling it does not change the basis.
+
+##### Pair order, which is not a criterion
+
+`PairSchedule` decides which of the pending pairs *at the lowest available degree* is taken first.
+The distinction from `PairCriteria` is the whole of its safety argument: a criterion is a theorem
+that a pair need not be reduced at all, whereas a schedule only reorders pairs that will all be
+reduced. Nothing leaves the queue unprocessed, so every schedule returns the identical basis — which
+is asserted over the correctness corpus, under every monomial order and every criterion combination.
+
+The lcm degree stays primary under every schedule. That is not a preference: a batch is formed from
+the pairs of one degree, and F4's termination argument is stated in ascending degree.
+
+A pair's two matrix rows are `(lcm / LM g_i) * g_i` and `(lcm / LM g_j) * g_j`. A larger shift moves
+a polynomial further up, so more of its monomials are reducible, so symbolic preprocessing adds more
+reducer rows — which is why preferring small multipliers is worth trying, given that scaffolding is
+40%–99% of all rows. Each `Large…` variant is the control for its `Small…` counterpart: if
+small-multiplier-first narrows the matrix then large-multiplier-first should widen it, and a
+heuristic that beats the baseline in both directions is measuring run-to-run noise.
+
+**The degree and monomial variants are different strategies, and only the second is the published
+one.** Sakata–Takagi rank on the larger then the smaller multiplier *under the monomial order*;
+comparing the multipliers' degrees is strictly coarser, and `x^2` against `y^2` is the smallest case
+where they part company — equal degree, distinct under grevlex. Measured, they behave differently:
+the degree comparator cuts row operations and widens the matrix, while the monomial comparator is
+the best schedule on every structural counter on the two largest instances (7%–9.5% less peak
+memory, up to 14.5% fewer row operations) with a control that is the *worst* on five of six, by up
+to 1.75x. Neither clears the threshold to become a default. See
+[`docs/research/pair-scheduling.md`](docs/research/pair-scheduling.md) §2.
+
+A monomial-comparing schedule is the one thing in `PairQueue` that needs a `MonomialOrder`, so
+`PairQueue::scheduled` refuses one and `scheduled_in` takes the order — a silent default there would
+rank under the wrong order and look like a measurement.
+
+**A schedule is never inert, even with no batch cap.** It is tempting to think it is: without
+`max_pairs_per_batch` the batch is every pending pair of its degree whatever the order, so the batch
+sets, the row sets, the row spaces, the pivot columns, and therefore the leading monomials of the
+new basis elements all agree — `batches` and `pairs_reduced` come out equal, and are asserted to.
+But row echelon form depends on the order the rows are taken in, so the candidates' *tails* differ,
+and a different tail is a different set of monomials for the next batch to cover. On katsura-5
+grevlex the widest matrix is 146 columns under `DegreeThenLcm` and 166 under `SmallMultiplier`, with
+every pair and batch count identical. So a schedule has to be measured end to end.
+
+`f4_schedule` does, and measures ordering and batch sizing **separately** — combining a new sort
+with a new cap and attributing the whole difference to the sort is the easiest way to get a wrong
+answer here. See [`docs/research/pair-scheduling.md`](docs/research/pair-scheduling.md) for the
+tables and what they decided.
 
 With `default()`, **F4 is faster than `buchberger()` on every system and order measured** — 1.2x
 to 236x — and katsura-6 under grevlex, F4's worst case at 0.47x one milestone ago, is 3.8x.
