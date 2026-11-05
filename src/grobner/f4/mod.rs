@@ -20,7 +20,9 @@
 //! Journal of Pure and Applied Algebra 139, 61-88, and `docs/MILESTONE-F4.md` for the invariants
 //! this implementation is built on.
 
+pub mod certify;
 pub mod degrees;
+pub mod hilbert_driven;
 pub mod macaulay;
 pub mod observer;
 pub mod options;
@@ -32,12 +34,14 @@ pub mod symbolic;
 #[cfg(test)]
 mod tests;
 
+pub use certify::{certify_f4_output, certify_submitted_basis, CertificationReport, Provenance};
 pub use degrees::{DegreeProfile, DegreeStatistics};
+pub use hilbert_driven::{HilbertSelection, SelectionLimits};
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy};
 pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
-pub use statistics::{BatchStatistics, F4Statistics, StageClock, StageTimings};
+pub use statistics::{BatchStatistics, F4Statistics, HilbertCounts, StageClock, StageTimings};
 pub use symbolic::{
     symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
     MonicBasis, MonicElement, Preprocessed, PreprocessedRow, ReducerCache, RowBudgetExceeded,
@@ -213,12 +217,77 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     );
     let mut cache = ReducerCache::new(options.reducer_cache);
 
+    // The Hilbert prediction, computed once from the generators' degrees. A failure to compute it
+    // is not fatal: the strategy becomes inert, which is counted, because a run whose cap was never
+    // computed is not the same result as a run whose cap did not bite.
+    let limits = if options.hilbert.is_active() {
+        match SelectionLimits::new(generators, options.hilbert.slack()) {
+            Ok(limits) => {
+                statistics.hilbert.degree_of_regularity = limits.degree_of_regularity();
+                Some(limits)
+            }
+            Err(_) => {
+                statistics.hilbert.predictions_unavailable += 1;
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Terminates because each batch either consumes pairs without adding any, or produces a
     // candidate whose leading monomial is outside the leading-term ideal of the current basis —
     // which therefore grows strictly. An ascending chain of monomial ideals stabilizes, by
     // Dickson's lemma, so only finitely many candidates are ever produced.
-    while !pending.is_empty() {
-        let selected = pending.select_batch(options.max_pairs_per_batch);
+    //
+    // `has_work` rather than `!is_empty`: a selection strategy may have deferred pairs out of the
+    // pending set, and a computation with deferred pairs left is not finished. Promoting them is
+    // what makes such a strategy complete — see [`hilbert_driven`].
+    while pending.has_work() {
+        if pending.is_empty() {
+            statistics.hilbert.pairs_promoted += pending.promote_deferred();
+            continue;
+        }
+
+        // The cap this batch is selected under: the caller's, and the prediction's where one
+        // applies. The smaller of the two, so neither can be escaped by the other.
+        let next_degree = pending.next_degree();
+        let predicted_cap = limits
+            .as_ref()
+            .filter(|_| options.hilbert.limits())
+            .and_then(|limits| {
+                let degree = next_degree?;
+                match limits.cap(degree, &leads) {
+                    Some(cap) => Some(cap),
+                    None => {
+                        statistics.hilbert.predictions_unavailable += 1;
+                        None
+                    }
+                }
+            });
+        let cap = match (options.max_pairs_per_batch, predicted_cap) {
+            (Some(caller), Some(predicted)) => Some(caller.min(predicted)),
+            (caller, None) => caller,
+            (None, predicted) => predicted,
+        };
+
+        // Pairs available *at this degree*, not in the whole queue: a batch is formed from one
+        // degree, so charging the cap with withholding pairs at a higher degree — which it was
+        // never offered and which no cap could have taken — would overstate it severalfold.
+        //
+        // Counted **only when a cap could have bound**. `pending_at_degree` is a scan of the whole
+        // heap, so computing it unconditionally would put O(pending) per batch on the default path,
+        // where `hilbert` is `Off` and the result is unused. The default path should not pay for an
+        // experimental counter, and should not rely on the optimizer to notice.
+        let available = match (predicted_cap, next_degree) {
+            (Some(_), Some(degree)) => pending.pending_at_degree(degree),
+            _ => 0,
+        };
+        let selected = pending.select_batch(cap);
+        if predicted_cap.is_some_and(|cap| cap < available) {
+            statistics.hilbert.degrees_limited += 1;
+            statistics.hilbert.pairs_withheld += available - selected.len();
+        }
         statistics.pairs_considered += selected.len();
         for pair in &selected {
             statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
@@ -229,6 +298,12 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         // discards is still filed under the degree it was selected at.
         let degree = selected.first().map_or(0, |pair| pair.degree);
         let considered = selected.len();
+
+        // The prediction's quota for this degree, recorded against what the degree yields. Taken
+        // before the batch is reduced, since the basis grows during it.
+        let quota = limits
+            .as_ref()
+            .and_then(|limits| limits.predicted_new_elements(degree, &leads));
 
         // The pair criteria, applied before anything is built. A pair a criterion discards is one
         // whose S-polynomial is guaranteed to reduce to zero modulo relations the computation
@@ -260,6 +335,18 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         if options.profile_degrees {
             statistics.degrees.record(degree, &outcome.statistics);
         }
+        if let Some(quota) = quota {
+            statistics.hilbert.predicted_new_elements += quota;
+            statistics.hilbert.observed_new_elements += outcome.statistics.candidates;
+        }
+
+        // Having taken this degree's predicted quota, set the rest of it aside and move on. The
+        // pairs are promoted back before the loop can end, so this reorders work and never skips
+        // it — see [`hilbert_driven`] for why that is the only form of the idea the measurements
+        // support.
+        if options.hilbert.defers() && predicted_cap.is_some() {
+            statistics.hilbert.pairs_deferred += pending.defer_degree(degree);
+        }
 
         for candidate in outcome.candidates {
             statistics.max_terms = statistics.max_terms.max(candidate.terms().len());
@@ -286,6 +373,23 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     let mut interreduction_clock = StageClock::new(options.measure_stages);
     let reduced = reduce_grobner_basis(&basis, order);
     statistics.stages.interreduction = interreduction_clock.lap();
+
+    // The independent check, when asked for. It is not what makes the computation complete — no
+    // strategy here discards a pair on heuristic grounds, and the deferred set is drained by the
+    // loop's own termination test — but a correctness claim that cannot fail is not a check, and
+    // the plan's §8.5 needs its cost reported separately from the work it is checking.
+    if options.certify {
+        // `certify_f4_output` and not the submitted-basis entry point: this *is* F4's output,
+        // run on these generators, so the derivation invariant holds and `is_complete` means what
+        // it says. A caller certifying a basis from elsewhere gets the weaker conclusion.
+        let report = certify::certify_f4_output(generators, &reduced, order);
+        statistics.certification = Some(report);
+        if let Some(reason) = report.first_failure() {
+            // Deliberately before `statistics.total` is set: a refusal has no total, and the
+            // diagnostic entry point still carries everything above.
+            return Err(F4Error::CertificationFailed { reason });
+        }
+    }
 
     // Read last, so that everything is inside the total. What the stages do not account for is
     // pair selection and basis bookkeeping, which is what `stage_coverage` reports.

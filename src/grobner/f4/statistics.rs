@@ -112,6 +112,61 @@ impl StageClock {
     }
 }
 
+/// What a Hilbert-driven selection predicted and what happened.
+///
+/// Zero throughout unless [`F4Options::hilbert`](super::F4Options::hilbert) is active. The two
+/// element counts are the comparison the strategy has to be judged on: a prediction that is
+/// consistently *below* what a degree yields is capping too hard and costing batches, and one that
+/// is consistently above is inert.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct HilbertCounts {
+    /// Degrees at which the predicted quota was smaller than the pairs available.
+    pub degrees_limited: usize,
+
+    /// Pairs a cap left pending for a later batch at the same degree.
+    pub pairs_withheld: usize,
+
+    /// Pairs moved out of the pending set and into the deferred set.
+    pub pairs_deferred: usize,
+
+    /// Deferred pairs returned to the pending set.
+    ///
+    /// Must equal [`Self::pairs_deferred`] less whatever Gebauer-Moller removed while they were
+    /// deferred. A successful computation with pairs still deferred would be a defect, and the main
+    /// loop cannot produce one: its termination test counts deferred pairs as work.
+    pub pairs_promoted: usize,
+
+    /// Times the exact or predicted half of the quota could not be computed.
+    ///
+    /// A failure means **no limit** was applied, which is the safe reading. Counted because a run
+    /// in which it happened often is a run whose cap was mostly inert, and that is not the same
+    /// result as a cap that did not bite.
+    pub predictions_unavailable: usize,
+
+    /// Summed over the degrees where a quota was computed: the quota, before slack and clamping.
+    pub predicted_new_elements: i128,
+
+    /// Summed over those same degrees: the new basis elements the degree actually produced.
+    pub observed_new_elements: usize,
+
+    /// The model's degree of regularity, if the expansion reached it.
+    pub degree_of_regularity: Option<u64>,
+}
+
+impl HilbertCounts {
+    /// Predicted new elements against observed, over the degrees a quota was computed for.
+    ///
+    /// One means the prediction was exactly right in total; below one means it predicted fewer than
+    /// appeared, which is the direction that caps too hard. Zero when nothing was observed.
+    pub fn prediction_ratio(&self) -> f64 {
+        if self.observed_new_elements == 0 {
+            0.0
+        } else {
+            self.predicted_new_elements as f64 / self.observed_new_elements as f64
+        }
+    }
+}
+
 /// What one batch of critical pairs cost.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BatchStatistics {
@@ -412,6 +467,19 @@ pub struct F4Statistics {
     /// of a run. Zero unless
     /// [`F4Options::profile_degrees`](super::F4Options::profile_degrees) is set.
     pub max_monomial_degree: u64,
+
+    /// What a Hilbert-driven selection predicted and what happened.
+    ///
+    /// Zero throughout unless [`F4Options::hilbert`](super::F4Options::hilbert) is active.
+    pub hilbert: HilbertCounts,
+
+    /// What certifying the returned basis checked and cost.
+    ///
+    /// `None` unless [`F4Options::certify`](super::F4Options::certify) is set. Reported separately
+    /// from [`F4Statistics::total`] — which includes it — so that a strategy that skips work can be
+    /// compared on its cost both with and without the check, which is what the milestone plan's
+    /// §8.5 requires.
+    pub certification: Option<super::certify::CertificationReport>,
 
     /// What happened at each selection degree.
     ///

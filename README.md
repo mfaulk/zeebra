@@ -217,6 +217,8 @@ cargo run --release --example f4_schedule          # critical-pair order, and ba
 cargo run --release --example f4_schedule -- list  # the instances available
 cargo run --release --example hilbert_study         # the semiregular model against the measurement
 cargo run --release --example cryptanalysis_ladder  # Poseidon and MQ, with every transform inverted
+cargo run --release --example hilbert_driven        # a predicted cap against a cap chosen without one
+cargo run --release --example hilbert_driven -- list
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
@@ -1349,6 +1351,8 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 | `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial. `FirstApplicable` is the default and the faster of the two: picking the largest divisor minimizes the multiplier but maximizes how much of the reducer's tail stays reducible, which grows the matrix |
 | `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
 | `schedule` | `PairSchedule::{DegreeThenLcm, SmallMultiplierDegree, LargeMultiplierDegree, SmallMultiplierMonomial, LargeMultiplierMonomial}` | in what order the pending pairs of one degree are taken. Not a criterion — it discards nothing |
+| `hilbert` | `HilbertSelection::{Off, Observe, CertifiedLimited, Deferred}` | whether a Hilbert prediction caps how many pairs a degree contributes to one batch. Not a criterion either |
+| `certify` | `bool` | whether the returned basis is checked independently before being returned |
 | `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches. `Count` measures repetition without serving anything; `Store` currently behaves as `Count`, because building a multiple's terms is an integer addition per variable per term and serving them from a map costs more than that even at a 95% hit rate |
 | `measure_stages` | `bool` | whether `F4Statistics::stages` is populated |
 
@@ -1423,6 +1427,64 @@ every pair and batch count identical. So a schedule has to be measured end to en
 with a new cap and attributing the whole difference to the sort is the easiest way to get a wrong
 answer here. See [`docs/research/pair-scheduling.md`](docs/research/pair-scheduling.md) for the
 tables and what they decided.
+
+##### A Hilbert-driven cap, and why it cannot be a criterion
+
+`HilbertSelection` uses the prediction above to decide how many pairs a degree is worth. The
+quantity is
+
+```text
+N_d = (predicted dim I_d) − dim (current leading-term ideal)_d
+```
+
+— an upper bound on how many new leading monomials degree `d` can still produce. The second term is
+**exact**, computed from the monomials in hand; the first is the prediction, so `N_d` inherits its
+error. On Fukuoka type III `n=10`'s top forms the quota is 20, 65, 20 at degrees 2, 3, 4, and the
+measured minimal-generator counts are 20, 65, 20.
+
+**Neither limiting mode discards a pair**, which is what lets the modes be offered at all given that
+the prediction is wrong on exactly the systems this is for:
+
+- `CertifiedLimited { slack }` caps the *batch* at `N_d + slack`. The pairs it does not take stay
+  **pending**, and the lcm degree is primary under every schedule, so they are the next thing
+  selected. A wrong `N_d` costs batches, never the answer.
+- `Deferred { slack }` moves the rest of the degree out of the pending set and goes on to the next
+  degree. Those pairs are promoted back before the loop can end — its termination test counts them
+  as work — they stay visible to Gebauer–Möller while deferred, and they are **not** recorded as
+  processed, so the chain criterion cannot use one as a witness. It is a decision about *when*, not
+  *whether*.
+
+`Observe` computes the prediction and records how it compared, changing nothing; a run under it is
+bit-identical to one under `Off`, which is asserted.
+
+`certify` checks the result independently rather than inferring it from the strategy having run:
+every input generator reduces to zero modulo the basis, Buchberger's criterion holds, and the basis
+is reduced. **What it cannot check is the reverse containment** — an ideal strictly larger than the
+input's has every generator reducing to zero in it. The sharpest case is `I = <x²>` against
+`G = {x}`: `x²` reduces to zero modulo `x`, a one-element basis has no S-polynomial, and `x` is
+monic and reduced, yet `<x²> ≠ <x>`.
+
+So containment in the input ideal is a **precondition carried by the API, not a measurement**. The
+report records a `Provenance`, and the two entry points differ only in what they assert about where
+the basis came from:
+
+| entry point | provenance | `checks_passed()` | `is_complete()` |
+| --- | --- | --- | --- |
+| `certify_f4_output` | `F4Output` | the three checks | the three checks |
+| `certify_submitted_basis` | `Submitted` | the three checks | **always false** |
+
+`is_complete` is the only honest conclusion of the pair, and it is the one the solver uses.
+`certify_f4_output` is sound because every F4 matrix row is a monomial multiple of a current basis
+element, so the output cannot leave the input ideal — and its sole call site in this crate is F4's
+own return path. Anything else goes through `certify_submitted_basis`, where passing all three
+checks yields `checks_passed()` and a `first_failure()` naming the containment that was not
+established. The gap and the provenance's effect are each recorded as their own test rather than
+left to be discovered.
+
+Certification is `|G|²/2` normal forms, so it is quadratic in the basis and not cheap.
+`F4Statistics::certification` reports its own cost separately from the total **because that is the
+comparison that decides anything**: a strategy that skips work has to be judged on its cost
+including the check that establishes the result, and a saving the check erases is not a saving.
 
 With `default()`, **F4 is faster than `buchberger()` on every system and order measured** — 1.2x
 to 236x — and katsura-6 under grevlex, F4's worst case at 0.47x one milestone ago, is 3.8x.

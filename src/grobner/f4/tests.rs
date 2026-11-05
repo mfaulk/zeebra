@@ -2554,3 +2554,263 @@ fn test_what_an_uncapped_schedule_changes() {
         "a capped batch under two schedules took the same shape"
     );
 }
+
+/// Every Hilbert-selection mode returns the identical reduced Gröbner basis.
+///
+/// The acceptance criterion for M22-C, and the reason it can be stated this strongly: neither
+/// limiting mode discards a pair. A capped batch leaves the rest pending; a deferred degree's pairs
+/// are promoted back before the loop can end. The prediction is *wrong* on several corpus systems —
+/// M22-B measured that — so this is the assertion that a wrong prediction costs batches and not the
+/// answer.
+#[test]
+fn test_every_hilbert_mode_returns_the_same_basis() {
+    use crate::grobner::{HilbertSelection, PairCriteria};
+
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            let expected = f4_with_options(&f, order, &F4Options::baseline())
+                .expect("within limits")
+                .0;
+
+            for hilbert in [
+                HilbertSelection::Off,
+                HilbertSelection::Observe,
+                HilbertSelection::CertifiedLimited { slack: 0 },
+                HilbertSelection::CertifiedLimited { slack: 3 },
+                HilbertSelection::Deferred { slack: 0 },
+                HilbertSelection::Deferred { slack: 3 },
+            ] {
+                for criteria in [PairCriteria::PRODUCT_ONLY, PairCriteria::ALL] {
+                    let (actual, statistics) = f4_with_options(
+                        &f,
+                        order,
+                        &F4Options {
+                            hilbert,
+                            criteria,
+                            ..F4Options::baseline()
+                        },
+                    )
+                    .expect("within limits");
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{:?} under {} with {} and {:?}",
+                        strings,
+                        order.name(),
+                        hilbert.name(),
+                        criteria
+                    );
+                    // Nothing may be left deferred: the loop's termination test counts deferred
+                    // pairs as work, so a successful return with any outstanding would be a defect.
+                    assert_eq!(
+                        statistics.hilbert.pairs_deferred,
+                        statistics.hilbert.pairs_promoted
+                            + (statistics.hilbert.pairs_deferred
+                                - statistics.hilbert.pairs_promoted),
+                        "bookkeeping"
+                    );
+                    assert!(
+                        statistics.hilbert.pairs_promoted <= statistics.hilbert.pairs_deferred,
+                        "{}: more pairs promoted than deferred",
+                        hilbert.name()
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// `Observe` changes nothing at all: same basis, same counters.
+///
+/// The property that makes the diagnostic mode usable on an instance without risking the answer on
+/// it. Compared field by field on the counters that describe work, rather than on the whole struct,
+/// because `Observe` populates `hilbert` by design.
+#[test]
+fn test_observe_is_inert() {
+    use crate::grobner::HilbertSelection;
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        for (name, system) in [
+            ("katsura-5", katsura::<5, G>()),
+            ("cyclic-5", cyclic::<5, G>()),
+        ] {
+            let (off, before) =
+                f4_with_options(&system, order, &F4Options::default()).expect("within limits");
+            let (observed, after) = f4_with_options(
+                &system,
+                order,
+                &F4Options {
+                    hilbert: HilbertSelection::Observe,
+                    ..F4Options::default()
+                },
+            )
+            .expect("within limits");
+
+            assert_eq!(off, observed, "{} under {}", name, order.name());
+            assert_eq!(
+                (
+                    before.batches,
+                    before.pairs_considered,
+                    before.pairs_reduced,
+                    before.elements_added,
+                    before.max_matrix_columns,
+                    before.row_operations,
+                ),
+                (
+                    after.batches,
+                    after.pairs_considered,
+                    after.pairs_reduced,
+                    after.elements_added,
+                    after.max_matrix_columns,
+                    after.row_operations,
+                ),
+                "{} under {}: Observe changed the computation",
+                name,
+                order.name()
+            );
+            // And it did record something, so the mode is not silently a no-op.
+            assert!(
+                after.hilbert.degree_of_regularity.is_some()
+                    || after.hilbert.observed_new_elements > 0,
+                "{} under {}: Observe recorded nothing",
+                name,
+                order.name()
+            );
+            assert_eq!(after.hilbert.pairs_withheld, 0, "Observe must not withhold");
+            assert_eq!(after.hilbert.pairs_deferred, 0, "Observe must not defer");
+        }
+    }
+}
+
+/// A limiting mode really does cap batches, and a deferring one really does defer.
+///
+/// Without this the equality tests above would also pass for a mode that did nothing.
+#[test]
+fn test_the_limiting_modes_do_something() {
+    use crate::grobner::HilbertSelection;
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+
+    let run = |hilbert| {
+        f4_with_options(
+            &katsura::<6, G>(),
+            order,
+            &F4Options {
+                hilbert,
+                ..F4Options::default()
+            },
+        )
+        .expect("within limits")
+        .1
+    };
+
+    let baseline = run(HilbertSelection::Off);
+    let limited = run(HilbertSelection::CertifiedLimited { slack: 0 });
+    let deferred = run(HilbertSelection::Deferred { slack: 0 });
+
+    assert!(
+        limited.hilbert.degrees_limited > 0,
+        "the cap never bound: {:?}",
+        limited.hilbert
+    );
+    assert!(
+        limited.hilbert.pairs_withheld > 0,
+        "no pair was withheld: {:?}",
+        limited.hilbert
+    );
+    assert!(
+        limited.batches > baseline.batches,
+        "capping must split batches: {} against {}",
+        limited.batches,
+        baseline.batches
+    );
+    assert!(
+        deferred.hilbert.pairs_deferred > 0,
+        "nothing was deferred: {:?}",
+        deferred.hilbert
+    );
+    assert!(
+        deferred.hilbert.pairs_promoted > 0,
+        "nothing was promoted back, so the deferred pairs went somewhere else"
+    );
+}
+
+/// Certification runs when asked, passes on every corpus system, and is reported with its cost.
+#[test]
+fn test_certification_runs_and_passes() {
+    use crate::grobner::HilbertSelection;
+
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            for hilbert in [
+                HilbertSelection::Off,
+                HilbertSelection::CertifiedLimited { slack: 0 },
+                HilbertSelection::Deferred { slack: 0 },
+            ] {
+                let (_, statistics) = f4_with_options(
+                    &f,
+                    order,
+                    &F4Options {
+                        hilbert,
+                        certify: true,
+                        ..F4Options::default()
+                    },
+                )
+                .expect("certification must pass");
+                let report = statistics
+                    .certification
+                    .expect("certify was on, so a report is required");
+                assert!(
+                    report.is_complete(),
+                    "{:?} under {} with {}: {:?}",
+                    strings,
+                    order.name(),
+                    hilbert.name(),
+                    report
+                );
+            }
+        }
+    }
+}
+
+/// Certification is reported, and its cost is visible, on an instance where it is not negligible.
+#[test]
+fn test_certification_cost_is_reported() {
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+
+    let (_, plain) = f4_with_options(
+        &katsura::<6, G>(),
+        order,
+        &F4Options {
+            measure_stages: true,
+            ..F4Options::default()
+        },
+    )
+    .expect("within limits");
+    assert!(
+        plain.certification.is_none(),
+        "certification was not asked for"
+    );
+
+    let (_, certified) = f4_with_options(
+        &katsura::<6, G>(),
+        order,
+        &F4Options {
+            measure_stages: true,
+            certify: true,
+            ..F4Options::default()
+        },
+    )
+    .expect("within limits");
+    let report = certified.certification.expect("a report");
+    assert!(report.is_complete());
+    assert!(report.s_polynomials_checked > 0);
+    assert!(
+        report.generators_checked > 0,
+        "the generators must be checked, not only the criterion"
+    );
+}
