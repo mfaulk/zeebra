@@ -18,7 +18,8 @@ use std::{
 };
 
 use crate::{
-    integers::{big_uint::BigUInt, factor, num_digits, FromDecStrErr},
+    fields::two_adic,
+    integers::{big_uint::BigUInt, bit, factor, highest_set_bit, num_digits, FromDecStrErr},
     Ring,
 };
 
@@ -127,6 +128,34 @@ where
             // b is odd: a^b = a * a^(b-1)
             *self * self.pow(b - 1)
         }
+    }
+
+    /// `self^exponent`, with the exponent as little-endian 64-bit limbs.
+    ///
+    /// [`Self::pow`] takes a `u128`, which cannot express the exponents a wide field needs:
+    /// `(q - 1) / 2^s` for a 254-bit q is itself 226 bits. The cost is one squaring per bit of
+    /// the exponent either way, and trailing zero limbs cost nothing, so a caller may pass a
+    /// fixed-width value without trimming it.
+    ///
+    /// `0^0 = 1`, as in [`Self::pow`].
+    fn pow_limbs(&self, exponent: &[u64]) -> Self {
+        let Some(highest) = highest_set_bit(exponent) else {
+            // A zero exponent, including for a zero base.
+            return Self::one();
+        };
+
+        let mut result = Self::one();
+        let mut square = *self;
+        for index in 0..=highest {
+            if bit(exponent, index) {
+                result *= square;
+            }
+            // The last squaring would be discarded, and for a wide exponent it is not cheap.
+            if index < highest {
+                square = square * square;
+            }
+        }
+        result
     }
 
     /// The additive inverse of this element.
@@ -250,6 +279,27 @@ pub trait KnownOrder: FiniteField {
         let g = Self::primitive_element(rng);
         g.pow(group_order / n as u128)
     }
+
+    /// The field's two-adicity: the largest s with `2^s` dividing `q - 1`.
+    ///
+    /// The ceiling on every power-of-two NTT over this field — a transform of size `2^k` needs a
+    /// primitive `2^k`-th root of unity, which exists exactly for `k <= s`. Read off `q - 1`
+    /// rather than declared, so it cannot disagree with the compiled-in modulus.
+    fn two_adicity() -> u32 {
+        two_adic::two_adic_decomposition(Self::order_limbs()).0
+    }
+
+    /// A primitive `2^log_n`-th root of unity.
+    ///
+    /// Unlike [`Self::root_of_unity`] this needs no generator and so no factorization of `q - 1`,
+    /// which is what makes it the only usable path over a 254-bit field. See
+    /// [`two_adic`](super::two_adic).
+    ///
+    /// # Panics
+    /// Panics if `log_n` exceeds [`Self::two_adicity`].
+    fn two_adic_root_of_unity<R: RngCore + CryptoRng>(log_n: u32, rng: &mut R) -> Self {
+        two_adic::two_adic_root_of_unity::<Self, R>(log_n, rng)
+    }
 }
 
 /// `limbs` as a `u128`, or `None` if it is wider than that.
@@ -271,7 +321,7 @@ mod tests {
             irreducible_polynomials::{Modulus13Pow4, X8_X4_X3_X_1},
             PrimeFieldElement128, Zp2147483647,
         },
-        KnownOrder,
+        FiniteField, KnownOrder, One, Zero,
     };
 
     /// An order below 2^64 reports one limb, not a word padded with a zero.
@@ -304,5 +354,55 @@ mod tests {
         type F = BinaryFieldElement<X8_X4_X3_X_1>;
         assert_eq!(F::order_limbs(), &[256]);
         assert_eq!(F::characteristic_limbs(), &[2]);
+    }
+
+    /// `pow_limbs` agrees with `pow` on every exponent both can express.
+    #[test]
+    fn test_pow_limbs_agrees_with_pow() {
+        type F = PrimeFieldElement128<221360928884514619393>;
+        for value in [0u64, 1, 2, 3, 97, 12345] {
+            let a = <F as FiniteField>::new(value);
+            for exponent in [0u128, 1, 2, 3, 17, 64, 255, 1 << 40, u64::MAX as u128] {
+                let limbs = [exponent as u64, (exponent >> 64) as u64];
+                assert_eq!(a.pow_limbs(&limbs), a.pow(exponent), "{value}^{exponent}");
+            }
+        }
+    }
+
+    /// Trailing zero limbs do not change the result, so a fixed-width order needs no trimming.
+    #[test]
+    fn test_pow_limbs_ignores_trailing_zero_limbs() {
+        let a = Zp2147483647::new(7);
+        let expected = a.pow(1000);
+        for padded in [vec![1000u64], vec![1000, 0], vec![1000, 0, 0, 0]] {
+            assert_eq!(a.pow_limbs(&padded), expected);
+        }
+    }
+
+    /// An exponent beyond a `u128`, checked against the squarings it is made of.
+    ///
+    /// Fermat pins the answer independently: `a^(q-1) = 1`, and `2^192 mod (q - 1)` is computed
+    /// here by the same squaring chain rather than by the limb bit-walk under test.
+    #[test]
+    fn test_pow_limbs_handles_an_exponent_beyond_u128() {
+        let a = Zp2147483647::new(5);
+
+        // 2^192: the fourth limb's lowest bit.
+        let exponent = [0u64, 0, 0, 1];
+        let mut expected = a;
+        for _ in 0..192 {
+            expected = expected * expected;
+        }
+        assert_eq!(a.pow_limbs(&exponent), expected);
+    }
+
+    /// Zero to a zero exponent is one, as it is for `pow`; zero to any other is zero.
+    #[test]
+    fn test_pow_limbs_of_zero() {
+        let zero = Zp2147483647::zero();
+        assert!(zero.pow_limbs(&[0]).is_one());
+        assert!(zero.pow_limbs(&[]).is_one());
+        assert!(zero.pow_limbs(&[1]).is_zero());
+        assert!(zero.pow_limbs(&[0, 1]).is_zero());
     }
 }

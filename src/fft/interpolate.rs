@@ -62,6 +62,31 @@ mod tests {
         }
     }
 
+    /// Evaluating then interpolating recovers the polynomial over both 254-bit scalar fields.
+    ///
+    /// The first NTT round trip over a field whose order needs four limbs. The domain comes from
+    /// the two-adic construction, so this exercises the whole path the wide fields previously had
+    /// no access to.
+    #[test]
+    fn test_evaluate_then_interpolate_over_the_wide_fields() {
+        use crate::fields::{Bls12_381Fr, Bn254Fr};
+
+        fn round_trip<F: FiniteField + KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for log_n in 0..=5u32 {
+                let n = 1usize << log_n;
+                let w = F::two_adic_root_of_unity(log_n, &mut rng);
+                let domain = FFTDomain::from_generator(w, n);
+                let p = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
+                let evaluations = evaluate(&p, &domain);
+                assert_eq!(interpolate(&evaluations, &domain), p, "n = {n}");
+            }
+        }
+
+        round_trip::<Bn254Fr>(31);
+        round_trip::<Bls12_381Fr>(37);
+    }
+
     #[test]
     // Property: Evaluating then interpolating should recover the original polynomial.
     fn test_evaluate_then_interpolate_gf_97() {

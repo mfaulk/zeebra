@@ -283,10 +283,22 @@ impl<M: PrimeModulus256> KnownOrder for PrimeFieldElement256<M> {
         )
     }
 
-    fn root_of_unity<R: RngCore + CryptoRng>(_n: u64, _rng: &mut R) -> Self {
-        // Reachable only through `primitive_element`. A two-adic root of unity is derivable from
-        // the field's two-adicity without factoring, but nothing here asks for one yet.
-        unimplemented!("a root of unity in a 254-bit field needs a known generator")
+    /// A primitive nth root of unity, for n a power of two.
+    ///
+    /// The default would factor `q - 1` to find a generator. For a power-of-two n the two-adic
+    /// construction needs no generator at all — see [`two_adic`](super::two_adic) — and a
+    /// power-of-two n is the only kind the NTT uses. Any other n still needs the factorization
+    /// and still panics.
+    ///
+    /// # Panics
+    /// Panics unless n is a power of two no larger than `2^s`, for s the field's two-adicity.
+    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
+        assert!(
+            n.is_power_of_two(),
+            "a root of unity of order {n} in a 254-bit field needs the factorization of q - 1; \
+             only a power-of-two order is reachable from the two-adicity alone"
+        );
+        Self::two_adic_root_of_unity(n.trailing_zeros(), rng)
     }
 }
 
@@ -841,6 +853,68 @@ mod tests {
         // The whole point of the `KnownOrder` split: this order does not fit in a u128.
         assert_eq!(Bn254Fr::order_u128(), None);
         assert_eq!(Bls12_381Fr::order_u128(), None);
+    }
+
+    /// The two-adicity of both fields agrees with `ark-ff`'s own constant.
+    ///
+    /// The oracle check on the figure every NTT size over these fields is bounded by. zeebra
+    /// derives it from the compiled-in modulus; `ark-ff` carries it as a `FftField` constant
+    /// computed by its own derive from the same decimal. `two_adic::tests` separately checks the
+    /// derivation against `q - 1` without any oracle.
+    #[test]
+    fn test_two_adicity_agrees_with_the_oracle() {
+        assert_eq!(
+            Bn254Fr::two_adicity(),
+            <ArkBn254Fr as ark_ff::FftField>::TWO_ADICITY
+        );
+        assert_eq!(
+            Bls12_381Fr::two_adicity(),
+            <ArkBls12_381Fr as ark_ff::FftField>::TWO_ADICITY
+        );
+        // The values themselves, so a change to either side is visible rather than merely equal.
+        assert_eq!(Bn254Fr::two_adicity(), 28);
+        assert_eq!(Bls12_381Fr::two_adicity(), 32);
+    }
+
+    /// `root_of_unity` now works over a wide field, for a power-of-two order.
+    ///
+    /// It was `unimplemented!()`, which is what left the crate with no NTT over these fields at
+    /// all (`docs/MILESTONE-LARGE-PRIME-FIELDS.md` §7, open item 6).
+    #[test]
+    fn test_root_of_unity_over_a_wide_field() {
+        let mut rng = StdRng::seed_from_u64(21);
+        for log_n in 0..=12u32 {
+            let n = 1u64 << log_n;
+            let w = Bn254Fr::root_of_unity(n, &mut rng);
+            assert!(w.pow(n as u128).is_one(), "w^{n} != 1");
+            if n > 1 {
+                assert!(!w.pow(n as u128 / 2).is_one(), "w is not primitive");
+            }
+        }
+    }
+
+    /// An order that is not a power of two still needs the factorization of `q - 1`.
+    #[test]
+    #[should_panic(expected = "needs the factorization of q - 1")]
+    fn test_root_of_unity_of_non_power_of_two_order_panics() {
+        let mut rng = StdRng::seed_from_u64(22);
+        let _ = Bn254Fr::root_of_unity(3, &mut rng);
+    }
+
+    /// An order beyond `2^s` does not exist in the field, and is refused rather than approximated.
+    #[test]
+    #[should_panic(expected = "the two-adicity of this field is 28")]
+    fn test_root_of_unity_beyond_the_two_adicity_panics() {
+        let mut rng = StdRng::seed_from_u64(23);
+        let _ = Bn254Fr::root_of_unity(1 << 29, &mut rng);
+    }
+
+    /// Finding a generator of the whole multiplicative group is still not attempted.
+    #[test]
+    #[should_panic(expected = "factorization of q - 1")]
+    fn test_primitive_element_is_still_unimplemented() {
+        let mut rng = StdRng::seed_from_u64(24);
+        let _ = Bn254Fr::primitive_element(&mut rng);
     }
 
     /// Equal elements hash equally, which `Hash`'s contract with `Eq` requires.
