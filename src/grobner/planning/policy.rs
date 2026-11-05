@@ -79,17 +79,48 @@ pub enum SolvePolicy {
 /// [`SolveOptions::f4`] where they bound each attempt individually. Confusing the two is how a
 /// shared budget comes to mean nothing.
 ///
-/// # `max_elapsed` gates attempts, it does not interrupt one
-/// Checked **between** attempts, because F4 has no cooperative time check inside it. So this
-/// bounds whether a *second* route starts, not how long the first runs — which is exactly the
-/// protection katsura-7 needs, and is not a wall-clock guarantee. Stated here rather than implied.
+/// # The two budgets are enforced differently, and the difference is not cosmetic
+///
+/// `max_total_batches` is **enforced inside each attempt**: the remaining allowance becomes that
+/// attempt's [`F4Options::max_batches`](crate::grobner::F4Options::max_batches), tightened by
+/// whatever per-attempt limit the caller set. So `Some(0)` really does permit no batch, and a
+/// fallback starting with one batch left can spend one. F4 already counts batches and refuses at a
+/// limit; the budget rides that mechanism rather than inventing a second one.
+///
+/// `max_elapsed` **gates attempts and does not interrupt one**, because F4 has no cooperative time
+/// check to ride. So it bounds whether a *second* route starts, not how long the first runs —
+/// which is the protection katsura-7 needs, and is not a wall-clock guarantee.
+///
+/// The asymmetry is a property of what the solver can be told, not a design preference, and it is
+/// stated here rather than left for a caller to discover.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PlanBudget {
-    /// Wall clock across every attempt, checked between them. `None` for no limit.
+    /// Wall clock across every attempt, checked **between** them. `None` for no limit.
     pub max_elapsed: Option<Duration>,
 
     /// F4 batches summed over every attempt, discarded work included. `None` for no limit.
+    ///
+    /// Enforced during each attempt, not merely before the second. See the type's docs.
     pub max_total_batches: Option<usize>,
+}
+
+impl PlanBudget {
+    /// The batches one attempt may spend, given `spent` already consumed.
+    ///
+    /// The smaller of what the shared budget has left and what the caller's per-attempt
+    /// `F4Options::max_batches` allows — so neither can be escaped by the other, and a plan with
+    /// no shared budget behaves exactly as the per-attempt limit alone did.
+    ///
+    /// Saturating: a `spent` beyond the limit gives zero rather than wrapping, and zero is a
+    /// satisfiable instruction to F4 — it refuses before building a matrix.
+    pub fn batches_for_attempt(&self, spent: usize, per_attempt: Option<usize>) -> Option<usize> {
+        let remaining = self.max_total_batches.map(|l| l.saturating_sub(spent));
+        match (remaining, per_attempt) {
+            (Some(shared), Some(each)) => Some(shared.min(each)),
+            (Some(shared), None) => Some(shared),
+            (None, each) => each,
+        }
+    }
 }
 
 /// Policy, shared budget, and the per-attempt budgets each route runs under.
@@ -155,11 +186,15 @@ pub fn solve_one_planned<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         shape: analyze(system),
         attempts: Vec::new(),
         declined: None,
+        preflight: None,
     };
 
     // Step 1. The only conclusion the input's shape licenses, and it costs nothing: a nonzero
-    // constant generator is a unit, so the ideal is the whole ring. No basis, no attempt.
+    // constant generator is a unit, so the ideal is the whole ring. No basis, no attempt — and
+    // recorded in `preflight`, because a plan with no attempts still reached a conclusive answer
+    // and `SolvePlan::outcome` reads the last attempt.
     if plan.shape.constant_contradiction {
+        plan.preflight = Some(OutcomeClass::Inconsistent);
         return (Ok(SolveOutcome::Inconsistent), plan);
     }
 
@@ -232,8 +267,14 @@ fn run<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     options: &PlannedSolveOptions,
     plan: &mut SolvePlan,
 ) -> Result<SolveOutcome<N, F>, SolveError> {
+    // The shared batch allowance, minus what earlier attempts spent. Computed here rather than
+    // inside `attempt`, which has no view of the plan.
+    let batches = options
+        .budget
+        .batches_for_attempt(plan.total_batches(), options.attempt.f4.max_batches);
+
     let at = Instant::now();
-    let (outcome, statistics) = attempt(system, strategy, rng, options);
+    let (outcome, statistics) = attempt(system, strategy, batches, rng, options);
     plan.attempts.push(Attempt {
         strategy,
         choice,
@@ -262,16 +303,20 @@ fn class<const N: usize, F: KnownOrder>(outcome: &SolveOutcome<N, F>) -> Outcome
 fn attempt<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     strategy: SolveStrategy,
+    batches: Option<usize>,
     rng: &mut R,
     options: &PlannedSolveOptions,
 ) -> (
     Result<SolveOutcome<N, F>, SolveError>,
     crate::grobner::SolveStatistics,
 ) {
-    let per_attempt = SolveOptions {
+    let mut per_attempt = SolveOptions {
         strategy,
         ..options.attempt.clone()
     };
+    // What the shared budget has left for this attempt, which is how `max_total_batches` is
+    // enforced rather than merely checked between attempts.
+    per_attempt.f4.max_batches = batches;
     let mut statistics = crate::grobner::SolveStatistics::default();
 
     let order = match strategy {
@@ -532,6 +577,15 @@ mod tests {
         assert_eq!(outcome, Ok(SolveOutcome::Inconsistent));
         assert!(plan.attempts.is_empty());
         assert_eq!(plan.total_elapsed(), Duration::ZERO);
+        // A conclusive answer with no attempt is still reported as one: `outcome()` reads the last
+        // attempt, so without `preflight` it would say `None` about a decided question.
+        assert_eq!(plan.preflight, Some(OutcomeClass::Inconsistent));
+        assert_eq!(plan.outcome(), Some(OutcomeClass::Inconsistent));
+        assert!(
+            !plan.is_inconclusive(),
+            "the structural pass settled it, which is not inconclusive"
+        );
+        assert!(plan.to_string().contains("the structure settled it"));
 
         // An inconsistency that is *not* visible in the generators still reaches the same answer,
         // by computing a basis — which is the case the structural pass cannot shortcut.
@@ -542,6 +596,9 @@ mod tests {
         );
         assert_eq!(outcome, Ok(SolveOutcome::Inconsistent));
         assert_eq!(plan.attempts.len(), 1);
+        // Reached by computing a basis, so there is no preflight conclusion to report.
+        assert_eq!(plan.preflight, None);
+        assert_eq!(plan.outcome(), Some(OutcomeClass::Inconsistent));
     }
 
     /// A zero-dimensional ideal with no base-field point is an answer, not a fallback trigger.
@@ -624,6 +681,106 @@ mod tests {
                 "the shared batch budget was already spent"
             ))
         );
+    }
+
+    /// The shared batch budget bounds what each attempt spends, not just whether one starts.
+    ///
+    /// The gap a reviewer found: the budget was only consulted *between* attempts, so
+    /// `max_total_batches: Some(0)` did not stop the first attempt from running batches, and a
+    /// fallback with one batch left could spend many. Both halves are pinned here.
+    #[test]
+    fn test_the_shared_batch_budget_is_enforced_during_each_attempt() {
+        // katsura-6 needs several batches by either route, so a small allowance must bite.
+        let system = katsura::<6, F>();
+
+        // Zero batches permitted: the *first* attempt must not run one.
+        let (outcome, plan) = solve_one_planned(
+            &system,
+            &mut StdRng::seed_from_u64(20),
+            &PlannedSolveOptions {
+                policy: SolvePolicy::AutoWithFallback,
+                budget: PlanBudget {
+                    max_total_batches: Some(0),
+                    ..PlanBudget::default()
+                },
+                attempt: SolveOptions::default(),
+            },
+        );
+        assert!(outcome.is_err());
+        assert_eq!(
+            plan.total_batches(),
+            0,
+            "a zero batch budget must permit no batch at all"
+        );
+
+        // A positive allowance is spent across attempts and never exceeded.
+        for limit in 1..=4usize {
+            let (_, plan) = solve_one_planned(
+                &system,
+                &mut StdRng::seed_from_u64(21),
+                &PlannedSolveOptions {
+                    policy: SolvePolicy::AutoWithFallback,
+                    budget: PlanBudget {
+                        max_total_batches: Some(limit),
+                        ..PlanBudget::default()
+                    },
+                    attempt: SolveOptions::default(),
+                },
+            );
+            assert!(
+                plan.total_batches() <= limit,
+                "a limit of {} was exceeded: {} batches over {} attempts",
+                limit,
+                plan.total_batches(),
+                plan.attempts.len()
+            );
+        }
+    }
+
+    /// A tighter per-attempt limit still applies, and neither budget escapes the other.
+    #[test]
+    fn test_the_two_batch_limits_compose() {
+        let budget = PlanBudget {
+            max_total_batches: Some(10),
+            ..PlanBudget::default()
+        };
+        // The shared allowance shrinks as batches are spent.
+        assert_eq!(budget.batches_for_attempt(0, None), Some(10));
+        assert_eq!(budget.batches_for_attempt(4, None), Some(6));
+        // Saturating rather than wrapping, and zero is a satisfiable instruction.
+        assert_eq!(budget.batches_for_attempt(99, None), Some(0));
+        // The tighter of the two wins, in both directions.
+        assert_eq!(budget.batches_for_attempt(0, Some(3)), Some(3));
+        assert_eq!(budget.batches_for_attempt(8, Some(3)), Some(2));
+        // With no shared budget, the per-attempt limit is untouched — so a plan without one
+        // behaves exactly as the explicit route did.
+        let none = PlanBudget::default();
+        assert_eq!(none.batches_for_attempt(0, Some(7)), Some(7));
+        assert_eq!(none.batches_for_attempt(100, None), None);
+
+        // And end to end: the per-attempt limit binds when it is the smaller.
+        let system = katsura::<6, F>();
+        let (_, plan) = solve_one_planned(
+            &system,
+            &mut StdRng::seed_from_u64(22),
+            &PlannedSolveOptions {
+                policy: SolvePolicy::AutoWithFallback,
+                budget: PlanBudget {
+                    max_total_batches: Some(100),
+                    ..PlanBudget::default()
+                },
+                attempt: SolveOptions {
+                    f4: F4Options {
+                        max_batches: Some(1),
+                        ..F4Options::default()
+                    },
+                    ..SolveOptions::default()
+                },
+            },
+        );
+        // Two attempts, one batch each: the per-attempt cap, not the shared one.
+        assert_eq!(plan.total_batches(), plan.attempts.len());
+        assert!(plan.attempts.len() <= 2);
     }
 
     /// A zero time budget declines the fallback outright, which is what the 28-second case needs.

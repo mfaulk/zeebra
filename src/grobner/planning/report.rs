@@ -127,6 +127,13 @@ pub struct SolvePlan {
     /// Carried so that "we stopped because we ran out" is distinguishable from "there was nothing
     /// else to try".
     pub declined: Option<(SolveStrategy, &'static str)>,
+
+    /// An outcome the structural pass settled before any route ran.
+    ///
+    /// A nonzero constant generator puts 1 in the ideal, which is conclusive and costs nothing —
+    /// so the plan has no attempts and [`Self::outcome`], which reads the last attempt, would
+    /// otherwise report `None` for a mathematically decided result.
+    pub preflight: Option<OutcomeClass>,
 }
 
 impl SolvePlan {
@@ -174,16 +181,27 @@ impl SolvePlan {
     }
 
     /// What the plan established, if anything.
+    ///
+    /// The last attempt's result, or [`Self::preflight`] when the structural pass settled it and
+    /// no route ran.
     pub fn outcome(&self) -> Option<OutcomeClass> {
-        self.attempts.last().and_then(|a| a.result.ok())
+        match self.attempts.last() {
+            Some(attempt) => attempt.result.ok(),
+            None => self.preflight,
+        }
     }
 
     /// Whether every permitted route was tried and none established anything.
     ///
     /// **Inconclusive, not "no solution".** Nothing here licenses any statement about whether the
     /// system has a point; it says this configuration could not find out.
+    ///
+    /// False when the structural pass settled the question, which is conclusive without an
+    /// attempt.
     pub fn is_inconclusive(&self) -> bool {
-        !self.attempts.is_empty() && self.attempts.iter().all(|a| !a.succeeded())
+        self.preflight.is_none()
+            && !self.attempts.is_empty()
+            && self.attempts.iter().all(|a| !a.succeeded())
     }
 }
 
@@ -203,8 +221,14 @@ impl Display for SolvePlan {
             }
         )?;
 
-        if self.attempts.is_empty() {
-            writeln!(f, "No route attempted: the structure settled it.")?;
+        if let Some(class) = self.preflight {
+            writeln!(
+                f,
+                "No route attempted: the structure settled it — {:?}",
+                class
+            )?;
+        } else if self.attempts.is_empty() {
+            writeln!(f, "No route attempted.")?;
         }
 
         for (index, attempt) in self.attempts.iter().enumerate() {

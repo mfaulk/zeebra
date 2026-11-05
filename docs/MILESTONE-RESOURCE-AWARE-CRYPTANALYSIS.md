@@ -338,12 +338,27 @@ previous attempt's are freed — so "sharing" one is meaningless. `PlanBudget` t
 `total_batches()` **sums** across attempts, `peak_estimated_bytes()` takes the **maximum**.
 Conflating the two is how a shared budget comes to mean nothing.
 
-#### `max_elapsed` gates an attempt, it does not interrupt one
+#### The two shared budgets are enforced differently, and the asymmetry is forced
 
-F4 has no cooperative time check inside it, so the time budget is checked *between* attempts. It
-bounds whether a **second** route starts, not how long the first runs. That is the protection
-katsura-7 needs and it is not a wall-clock guarantee — exactly the distinction §8.5 asks for, and
-better said than implied.
+| budget | enforced | why |
+|---|---|---|
+| `max_total_batches` | **inside each attempt** | F4 counts batches and refuses at a limit, so the budget rides that mechanism |
+| `max_elapsed` | **between attempts only** | F4 has no cooperative time check to ride |
+
+`max_total_batches` becomes the attempt's `F4Options::max_batches`, tightened by whatever
+per-attempt limit the caller set, and the remaining allowance shrinks as batches are spent. So
+`Some(0)` really does permit no batch, and a fallback with one batch left can spend one.
+
+**The first implementation got this wrong**, and a reviewer caught it: the budget was consulted
+only *between* attempts, as a gate on starting the fallback. `Some(0)` did not stop the first
+attempt from running batches, and a permitted second attempt could spend arbitrarily many. The old
+test asserted that an already-exhausted budget declined a fallback — true, and not the same claim.
+It now asserts that the completed batch total never exceeds the configured limit, for every limit
+from one to four.
+
+`max_elapsed` bounds whether a **second** route starts, not how long the first runs. That is the
+protection katsura-7 needs and it is not a wall-clock guarantee. The asymmetry is a property of
+what the solver can be told, not a design preference.
 
 ### 5.4 A predicted crossing is not a crossing
 
@@ -681,6 +696,11 @@ option types should be avoided; M21-C owns them for the duration.
       discarded work; `SolvePlan` implements `Display` as a decision log
 - [x] Budgets are shared across attempts and a fallback cannot reset them — and the arithmetic
       distinguishes spent quantities from peaks, §5.3
+- [x] `max_total_batches` is **enforced during** each attempt rather than only gating the second,
+      tested by asserting the completed total never exceeds the limit; `max_elapsed` gates only,
+      because F4 has no time check to ride, and §5.3 says which is which and why
+- [x] A conclusive preflight result is reported: `SolvePlan::preflight` carries an outcome the
+      structural pass settled, so `outcome()` does not say `None` about a decided question
 - [x] katsura-7 and planted-12 both succeed under one policy and one budget configuration
       (`AutoWithFallback`, default budgets), with no input-specific special-casing
 - [x] No benchmark names in the planner, pinned by a test that relabels a planted system's
