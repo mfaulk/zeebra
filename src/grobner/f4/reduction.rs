@@ -183,6 +183,36 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     candidates.sort_by(|a, b| order.cmp(&b.leading_monomial(order), &a.leading_monomial(order)));
     stages.extraction = clock.lap();
 
+    // The degree this batch worked at, and the degrees of what it produced. A relation below the
+    // batch degree is a mutant: information arriving earlier than the schedule expected. Counted
+    // unconditionally — one `degree()` call per candidate, and candidates are the rare row.
+    let batch_degree = pairs.iter().map(|pair| pair.degree).max().unwrap_or(0);
+    let mut min_candidate_degree = None;
+    let mut max_candidate_degree = None;
+    let mut candidates_below_batch_degree = 0;
+    for candidate in &candidates {
+        let degree = candidate.degree();
+        min_candidate_degree = Some(min_candidate_degree.map_or(degree, |d: u64| d.min(degree)));
+        max_candidate_degree = Some(max_candidate_degree.map_or(degree, |d: u64| d.max(degree)));
+        if degree < batch_degree {
+            candidates_below_batch_degree += 1;
+        }
+    }
+
+    // One scan of the column vector, and only when asked for. The columns are the matrix's
+    // monomials, so this is the degree the *matrix* reached rather than the degree it was selected
+    // at — the two differ because reducer multiples can exceed the lcm.
+    let max_column_degree = if options.profile_degrees {
+        matrix
+            .columns()
+            .iter()
+            .map(|monomial| monomial.degree())
+            .max()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
     let statistics = BatchStatistics {
         pairs: pairs.len(),
         rows,
@@ -201,6 +231,12 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         // for, so this is zero there. Zero is the honest answer to "how many pivots did this
         // elimination know in advance", not a missing measurement.
         free_pivots: block.free_pivots,
+        input_leading_monomials: preprocessed.leading_monomials.len(),
+        batch_degree,
+        min_candidate_degree,
+        max_candidate_degree,
+        candidates_below_batch_degree,
+        max_column_degree,
     };
 
     Ok(BatchOutcome {

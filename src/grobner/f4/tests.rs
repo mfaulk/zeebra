@@ -2088,3 +2088,282 @@ fn test_criteria_reduce_the_matrices_built() {
         );
     }
 }
+
+/// Degree profiling does not change the basis, on every system in the correctness corpus.
+///
+/// The acceptance criterion M22-0 rests on: instrumentation that altered the answer would make
+/// every measurement taken with it unattributable.
+#[test]
+fn test_profiling_degrees_changes_nothing() {
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            let plain = f4_with_options(&f, order, &F4Options::default()).expect("within limits");
+            let profiled = f4_with_options(
+                &f,
+                order,
+                &F4Options {
+                    profile_degrees: true,
+                    ..F4Options::default()
+                },
+            )
+            .expect("within limits");
+
+            assert_eq!(plain.0, profiled.0, "{:?} under {}", strings, order.name());
+            // And every counter the profile is built from is identical too, since the profile only
+            // files existing numbers under a degree.
+            assert_eq!(
+                (
+                    plain.1.pairs_considered,
+                    plain.1.pairs_reduced,
+                    plain.1.batches,
+                    plain.1.candidate_rank_contribution,
+                ),
+                (
+                    profiled.1.pairs_considered,
+                    profiled.1.pairs_reduced,
+                    profiled.1.batches,
+                    profiled.1.candidate_rank_contribution,
+                ),
+                "{:?} under {}",
+                strings,
+                order.name()
+            );
+        }
+    }
+}
+
+/// The per-degree records reconcile exactly with the whole-computation counters.
+///
+/// Every batch is filed under exactly one degree, so the sums have to agree. A profile that drops
+/// or double-counts a batch would otherwise be invisible.
+#[test]
+fn test_the_degree_profile_reconciles_with_the_totals() {
+    type G = Zp2147483647;
+    let options = F4Options {
+        profile_degrees: true,
+        ..F4Options::default()
+    };
+
+    for order in ALL_ORDERS {
+        for (name, statistics) in [
+            (
+                "katsura-4",
+                f4_with_options(&katsura::<4, G>(), order, &options)
+                    .expect("within limits")
+                    .1,
+            ),
+            (
+                "cyclic-4",
+                f4_with_options(&cyclic::<4, G>(), order, &options)
+                    .expect("within limits")
+                    .1,
+            ),
+        ] {
+            let profile = &statistics.degrees;
+            assert!(!profile.is_empty(), "{} under {}", name, order.name());
+
+            let context = format!("{} under {}", name, order.name());
+            assert_eq!(
+                profile.iter().map(|d| d.batches).sum::<usize>(),
+                statistics.batches,
+                "{}: batches",
+                context
+            );
+            assert_eq!(
+                profile.iter().map(|d| d.pairs_considered).sum::<usize>(),
+                statistics.pairs_considered,
+                "{}: pairs considered",
+                context
+            );
+            assert_eq!(
+                profile.iter().map(|d| d.pairs_reduced).sum::<usize>(),
+                statistics.pairs_reduced,
+                "{}: pairs reduced",
+                context
+            );
+            assert_eq!(
+                profile.iter().map(|d| d.new_basis_elements).sum::<usize>(),
+                statistics.elements_added,
+                "{}: new basis elements",
+                context
+            );
+            assert_eq!(
+                profile.iter().map(|d| d.reducer_rows).sum::<usize>(),
+                statistics.reducer_rows,
+                "{}: reducer rows",
+                context
+            );
+            assert_eq!(
+                profile
+                    .iter()
+                    .map(|d| d.candidate_rank_contribution)
+                    .sum::<usize>(),
+                statistics.candidate_rank_contribution,
+                "{}: candidate rank",
+                context
+            );
+            assert_eq!(
+                profile.iter().map(|d| d.max_matrix_rows).max().unwrap_or(0),
+                statistics.max_matrix_rows,
+                "{}: largest matrix",
+                context
+            );
+            assert_eq!(
+                profile.max_degree(),
+                Some(statistics.max_pair_degree),
+                "{}: the highest degree selected",
+                context
+            );
+
+            // Selection-time rejections only: Gebauer-Moller acts at insertion and is deliberately
+            // not attributed to a degree.
+            assert_eq!(
+                profile
+                    .iter()
+                    .map(|d| d.pairs_rejected_by_criteria)
+                    .sum::<usize>(),
+                statistics.criteria.product + statistics.criteria.chain,
+                "{}: selection-time rejections",
+                context
+            );
+        }
+    }
+}
+
+/// A matrix's monomials reach at least the degree its pairs were selected at, and often beyond it.
+///
+/// The two quantities are reported separately because they are different: reducer multiples carry
+/// monomials above the lcm that produced them. Neither is the solving degree.
+#[test]
+fn test_the_matrix_degree_is_at_least_the_selection_degree() {
+    type G = Zp2147483647;
+    let options = F4Options {
+        profile_degrees: true,
+        ..F4Options::default()
+    };
+
+    for order in ALL_ORDERS {
+        let (_, statistics) =
+            f4_with_options(&katsura::<5, G>(), order, &options).expect("within limits");
+        for degree in statistics.degrees.iter().filter(|d| d.batches > 0) {
+            assert!(
+                degree.max_column_degree >= degree.degree,
+                "{}: a matrix at degree {} held no monomial of that degree",
+                order.name(),
+                degree.degree
+            );
+        }
+        assert!(
+            statistics.max_monomial_degree >= statistics.max_pair_degree,
+            "{}: {} monomial degree against {} pair degree",
+            order.name(),
+            statistics.max_monomial_degree,
+            statistics.max_pair_degree
+        );
+    }
+}
+
+/// A computation that runs out of room keeps the per-degree work it already completed.
+///
+/// `f4_reported` is the diagnostic entry point, and the degrees reached before the failure are the
+/// most informative thing it can carry: they say *where* the computation became unaffordable.
+#[test]
+fn test_a_failed_computation_retains_its_degree_profile() {
+    type G = Zp2147483647;
+    let order = MonomialOrder::Lexicographic;
+
+    // Large enough that several degrees complete before the budget bites.
+    let budget = F4Options {
+        max_live_nonzeros: 4_000,
+        profile_degrees: true,
+        ..F4Options::default()
+    };
+    let (result, statistics) = f4_reported(&katsura::<6, G>(), order, &budget);
+
+    assert!(
+        result.is_err(),
+        "the budget was meant to be crossed; statistics: {:?}",
+        statistics.batches
+    );
+    assert!(
+        !statistics.degrees.is_empty(),
+        "the degrees completed before the failure were discarded"
+    );
+    let (peak_degree, peak) = statistics
+        .degrees
+        .peak_degree()
+        .expect("a matrix was built before the failure");
+    assert!(peak > 0);
+    assert!(peak_degree >= 2);
+    // And the lowest degree reached completed without incident.
+    let first = statistics
+        .degrees
+        .iter()
+        .next()
+        .expect("at least one degree");
+    assert!(first.batches > 0, "the first degree built no matrix");
+}
+
+/// Every batch's new basis elements are exactly the pivots in columns no input row led with.
+///
+/// `candidates = rank - |input leading monomials|`, asserted on real batches rather than on
+/// constructed counters. This is the identity the rank attribution in `degrees` rests on, and it is
+/// what makes "useful work" a measured quantity instead of an estimate.
+#[test]
+fn test_the_rank_attribution_identity_holds_on_real_batches() {
+    use crate::grobner::{f4::reduce_batch, trace_batches};
+    type G = Zp2147483647;
+
+    for order in ALL_ORDERS {
+        for (name, traced) in [
+            (
+                "katsura-4",
+                trace_batches(&katsura::<4, G>(), order, &F4Options::default()),
+            ),
+            (
+                "cyclic-4",
+                trace_batches(&cyclic::<4, G>(), order, &F4Options::default()),
+            ),
+        ] {
+            let (_, _, trace) = traced.expect("within limits");
+            assert!(!trace.is_empty(), "{} traced nothing", name);
+
+            for (index, batch) in trace.batches().iter().enumerate() {
+                let outcome =
+                    reduce_batch(&batch.basis, &batch.pairs, order, &F4Options::default())
+                        .expect("within limits");
+                let s = &outcome.statistics;
+
+                assert_eq!(
+                    s.candidates,
+                    s.elimination.rank - s.input_leading_monomials,
+                    "{} under {}, batch {}: candidates against rank {} and {} input leads",
+                    name,
+                    order.name(),
+                    index,
+                    s.elimination.rank,
+                    s.input_leading_monomials
+                );
+                assert!(
+                    s.elimination.rank >= s.reducer_rows,
+                    "{} under {}, batch {}: rank {} below the {} reducer rows, which are independent",
+                    name,
+                    order.name(),
+                    index,
+                    s.elimination.rank,
+                    s.reducer_rows
+                );
+                // Reducer rows never reduce to zero, so every dependency is a pair row.
+                assert_eq!(
+                    s.dependent_candidate_rows(),
+                    s.elimination.zero_rows,
+                    "{} under {}, batch {}",
+                    name,
+                    order.name(),
+                    index
+                );
+            }
+        }
+    }
+}

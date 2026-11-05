@@ -182,6 +182,16 @@ pub struct F4Options {
     /// not per row or per row operation — so it attributes cost at a granularity that does not
     /// distort what it measures.
     pub measure_stages: bool,
+
+    /// Break the work down by the degree it was done at, into
+    /// [`super::F4Statistics::degrees`].
+    ///
+    /// Off by default, and a flag for the same reason [`Self::measure_stages`] is: the shipping
+    /// path should contain no profiling. What it costs when on is a map insertion per batch and one
+    /// scan of each matrix's column vector — per *batch*, not per row — so it does not distort the
+    /// measurement it takes. The rank attribution the profile is built on is free either way, since
+    /// it is arithmetic on counters the elimination already returns.
+    pub profile_degrees: bool,
 }
 
 impl F4Options {
@@ -205,6 +215,7 @@ impl F4Options {
             criteria: PairCriteria::PRODUCT_ONLY,
             reducer_cache: CacheMode::Off,
             measure_stages: false,
+            profile_degrees: false,
         }
     }
 

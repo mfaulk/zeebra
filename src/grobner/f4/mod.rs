@@ -20,6 +20,7 @@
 //! Journal of Pure and Applied Algebra 139, 61-88, and `docs/MILESTONE-F4.md` for the invariants
 //! this implementation is built on.
 
+pub mod degrees;
 pub mod macaulay;
 pub mod observer;
 pub mod options;
@@ -31,6 +32,7 @@ pub mod symbolic;
 #[cfg(test)]
 mod tests;
 
+pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy};
@@ -216,10 +218,21 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             statistics.max_pair_degree = statistics.max_pair_degree.max(pair.degree);
         }
 
+        // One degree per batch: `select_batch` takes the pairs of the lowest degree available and
+        // stops at the first pair above it. Read before filtering, so that a batch every criterion
+        // discards is still filed under the degree it was selected at.
+        let degree = selected.first().map_or(0, |pair| pair.degree);
+        let considered = selected.len();
+
         // The pair criteria, applied before anything is built. A pair a criterion discards is one
         // whose S-polynomial is guaranteed to reduce to zero modulo relations the computation
         // already has, so there is no reason to put its rows in a matrix.
         let batch = pending.filter_batch(selected, &leads, &options.criteria, &mut criteria_counts);
+        if options.profile_degrees {
+            statistics
+                .degrees
+                .record_selection(degree, considered, considered - batch.len());
+        }
         if batch.is_empty() {
             continue;
         }
@@ -238,6 +251,9 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
         let outcome = reduce_batch_in(&monic, &batch, order, options, &mut cache)?;
         statistics.record(&outcome.statistics);
+        if options.profile_degrees {
+            statistics.degrees.record(degree, &outcome.statistics);
+        }
 
         for candidate in outcome.candidates {
             statistics.max_terms = statistics.max_terms.max(candidate.terms().len());
