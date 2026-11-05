@@ -7,6 +7,7 @@ mod irreducible_polynomials;
 mod montgomery_256;
 mod prime_field_128;
 mod prime_field_256;
+mod prime_field_32;
 mod prime_field_64;
 
 pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
@@ -15,7 +16,30 @@ pub use prime_field_256::{
     Bls12_381Fr, Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256,
     PrimeModulus256, BLS12_381_FR_MODULUS_DECIMAL, BN254_FR_MODULUS_DECIMAL,
 };
+pub use prime_field_32::PrimeFieldElement32;
 pub use prime_field_64::PrimeFieldElement64;
+
+// === 32-bit prime fields ===
+//
+// A residue below 2^32 fits in four bytes, and the dense elimination kernel is bandwidth-bound
+// once the matrix leaves L2, so the same computation over one of these moves half the bytes it
+// does over the 64-bit-backed type of the same modulus. See the README section "A 32-bit prime
+// field" for what that is worth measured, and `examples/field_width.rs` for the instrument.
+
+/// Z mod 31. The coefficient field of Fukuoka MQ Challenge types III and VI.
+pub type Zp31 = PrimeFieldElement32<31>;
+
+/// Z mod 65537, Proth prime 2^16 + 1. [`Zp65537`] is the same field backed by a `u64`.
+pub type Zp65537_32 = PrimeFieldElement32<65537>;
+
+/// Mersenne prime 2^31 - 1. [`Zp2147483647`] is the same field backed by a `u64`.
+pub type Mersenne31 = PrimeFieldElement32<2147483647>;
+
+/// BabyBear, 2^31 - 2^27 + 1 = 2013265921. NTT-friendly: 2^27 divides p - 1.
+pub type BabyBear = PrimeFieldElement32<2013265921>;
+
+/// KoalaBear, 2^31 - 2^24 + 1 = 2130706433, the prime the 2026 Poseidon challenges use.
+pub type KoalaBear = PrimeFieldElement32<2130706433>;
 
 // === 64-bit prime fields ===
 
