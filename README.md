@@ -276,6 +276,8 @@ cargo run --release --example mq_challenge         # import and solve a Fukuoka 
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
+cargo run --release --example scoreboard           # registered problems, one record each, staged
+tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -1454,6 +1456,75 @@ measurement meant. See
 full table and for what the three 2026 CICO targets' external status implies about what a result
 there could claim.
 
+#### The scoreboard
+
+`grobner::research::Scoreboard` collects what runs established about registered problems, and its
+job is to refuse three specific mistakes.
+
+**Comparing different problems.** A `RunRecord` references its problem by identity *digest*, not by
+name. `Scoreboard::add` looks the problem up in the registry and refuses a run whose digest no
+longer matches — the problem was redefined after the run, so the measurement is about something
+else. `Comparison::of` refuses two runs of different problems outright, and deliberately does not
+compare ids.
+
+**Ranking unfinished runs.** `Scoreboard::best` returns verified witnesses only. Two computations
+that crossed a budget at degrees 9 and 11 are not ordered: a higher degree is not nearer a
+solution. Those appear in their own table, under a heading that says it is a diagnostic.
+
+**Quoting a difference the hardware cannot resolve.** `Comparison::runtime_readable` is false inside
+±20%, which is the band M22 declined to read on this machine. The comparison is still reported, with
+the flag.
+
+```rust
+use std::time::Duration;
+use zeebra::grobner::research::{
+    challenge, Comparison, Environment, GrobnerFrontier, RunOutcome, RunRecord, Stage, StageCost};
+
+fn run(id: &str, formulation: &str, millis: u64, bytes: usize) -> RunRecord {
+    let manifest = challenge(id).expect("registered");
+    let mut run = RunRecord::new(&manifest, formulation);
+    run.outcome = RunOutcome::VerifiedWitness;
+    run.stages = vec![StageCost::new(Stage::Grobner, Duration::from_millis(millis))];
+    run.frontier = Some(GrobnerFrontier { completed: true, peak_estimated_bytes: bytes,
+                                          ..GrobnerFrontier::default() });
+    run
+}
+
+// Two formulations of one problem: M22-E's last-round-first result on this instance.
+let baseline = run("poseidon-t2-rf4-rp0-planted", "as generated", 352, 3_800_000);
+let candidate = run("poseidon-t2-rf4-rp0-planted", "last-round-first", 219, 2_900_000);
+let comparison = Comparison::of(&baseline, &candidate).expect("the same problem");
+assert_eq!(comparison.speedup_per_mille, 1_607);          // 1.607x, as two integers
+assert_eq!(comparison.memory_reduction_basis_points, 2_369);
+assert!(comparison.runtime_readable);
+
+// A different problem is refused rather than rendered.
+let elsewhere = run("poseidon-t2-rf2-rp2-planted", "as generated", 143, 1_700_000);
+assert!(Comparison::of(&baseline, &elsewhere).is_err());
+```
+
+Costs are recorded **per stage** — generation, Gröbner, conversion, univariate, verification —
+because M20 measured that over a wide field the cost is not in the matrices, and a single total
+hides the stage that dominates. The runner therefore drives `f4_reported`, then
+`fglm_to_lex_with_options`, then `solve_from_lex_basis` itself rather than calling
+`solve_one_planned`.
+
+A randomized specialization campaign is summarized by `Campaign`, which reports the slices that
+found **nothing** alongside the one that worked: work per witness is the whole campaign's time over
+the witnesses, and the success rate carries a 95% Wilson interval. One witness in twenty slices is
+a rate of 0.89% to 23.6%, which is a different claim from "solved in 2 seconds".
+
+```sh
+tools/scoreboard.sh                    # smoke tier: the surrogates, nothing written
+tools/scoreboard.sh stable --write     # adds the published MQ instances, updates the tree
+cargo run --release --example scoreboard -- frontier
+```
+
+The tree under `research/scoreboard/` is committed: the registry emitted from code, one JSON record
+per run, the accumulated history, and a generated `SCOREBOARD.md`. `Json::parse` reads back what
+`Json::to_json` writes — round-tripping is asserted — so the history accumulates rather than being
+overwritten, with no dependency to read eighty lines of writer.
+
 #### External instances: the Fukuoka MQ Challenge
 
 `grobner::research::MqInstance` imports instances from the
@@ -1481,6 +1552,43 @@ verifies the SHA-256 that `Provenance` pins; the test against a genuine instance
 for the same reason the Singular one is. `docs/research/fukuoka-mq.md` records the format, the
 verification, and one quirk worth knowing: coefficients are uniform over `0..=31`, not `0..=30`, so
 **zero is twice as likely as any other coefficient** in the published GF(31) data.
+
+#### Candidate external instances, surveyed but not imported
+
+[`docs/research/additional-benchmarks.md`](docs/research/additional-benchmarks.md) is the shortlist
+of published cryptanalysis instances worth importing next, with the rejections and their reasons.
+Four candidates are accepted: reduced-round **Anemoi** CICO, whose reference data is raw Magma F4
+and FGLM logs under MIT and whose quotient dimension is a published `(α+2)^N` zeebra can be checked
+against; reduced-round **Griffin**; Anemoi's `ACICO` model as a second formulation of the first; and
+reduced-round **LowMC**, which is blocked on `binary_field` not being exported. UOV, MAYO, Arion and
+XHash8 are rejected, each with a recorded reason. The document also states plainly that the
+[LowMC challenge](https://lowmcchallenge.github.io/) is a **claimed-complexity competition** — its
+results are `log₂ T` and `log₂ M` estimates, several with memory exponents past 65 bits, and there
+are no challenge files to solve.
+
+An accepted candidate becomes a `ChallengeManifest` row, so the document also records what each one
+would require of [the registry](#the-challenge-registry): an `AnemoiCico` parameters variant with
+the algebraic model *inside the digest*, since `FCICO` and `PCICO` are two different polynomial
+systems for the same primitive; a new objective tag for LowMC, whose key recovery is neither
+`CicoExact` nor `MqRoot`; and one field the registry does not yet have anywhere — the **published
+competitor figure**, which `ExternalStatus` cannot carry because it records whether and when a
+problem was solved elsewhere and not at what cost.
+
+`tools/check-griffin-reconstruction.py` is that survey's one executable result. It instantiates
+Griffin with `(t, α) = (12, 3)` over the 55-bit prime `p = 28407454060060787` from the constants
+published in the FreeLunch appendix, and reproduces all five published CICO solutions for
+`r ∈ {5, 6, 7}`:
+
+```sh
+tools/check-griffin-reconstruction.py            # 43 ms, standard library only
+tools/check-griffin-reconstruction.py --verbose  # print each reconstructed output
+```
+
+It exists because the specification is *not* complete on its own: the linear layer comes from the
+designers' reference implementation, and the paper's `(δ, µ)` index convention is ambiguous. The
+published witnesses decide the ambiguity — one reading reproduces 5 of 5 and the other 0 of 5 — so
+the instance is reconstructed rather than guessed. That is the argument the document makes for
+preferring candidates that publish a witness.
 
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —

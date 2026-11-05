@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "fukuoka-mq-VI-n15-seed0",
+  "digest": "0345980a26d883ec7987776d5ce3208c41318fe2eb98195d5d263f17e72daf90",
+  "class": "official",
+  "family": "fukuoka-mq",
+  "objective": "mq-root",
+  "objective_statement": "find any x over the published field with F(x) = 0",
+  "parameters": [
+    "field GF(31)",
+    "type VI",
+    "n 15",
+    "m 10",
+    "seed 0",
+    "file-sha256 ad22fe9a065688453b481fe8cb0e2990f3207920dc83e8c64f8dea2651b5e888"
+  ],
+  "variables": 15,
+  "equations": 10,
+  "program": {
+    "name": "Fukuoka MQ Challenge",
+    "version": "toy examples, retrieved 2026-11-05",
+    "url": "https://www.mqchallenge.org/",
+    "reward": null,
+    "redistribution": "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved; instance files are not redistributed here and are fetched by tools/fetch-mq-challenge.sh"
+  },
+  "external_status": {
+    "state": "published_with_answer"
+  },
+  "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
+  "notes": "Five surplus variables rather than three, so a specialization campaign has a larger slice space."
+}
