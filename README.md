@@ -103,9 +103,9 @@ check and a rare division branch — and they panic if run. A bare `cargo test -
 therefore reports those two as failures; the commands above select the tests that are meant to
 pass.
 
-CI runs the suite twice: once in debug, and once in release in a separate job that also runs the
-two Gröbner engine-agreement tests above. Both configurations are checked because a release build
-takes different paths — `debug-assertions` and `overflow-checks` are off, so every
+CI runs the suite twice: once in debug, and once in release in a separate job. Both configurations
+are checked because a release build takes different paths — `debug-assertions` and
+`overflow-checks` are off, so every
 `debug_assert`-guarded invariant goes unchecked and integer arithmetic wraps instead of panicking.
 Release is also the configuration every benchmark uses, so
 
@@ -114,6 +114,11 @@ cargo test --release
 ```
 
 is worth running locally before claiming a measurement.
+
+The two Gröbner engine-agreement tests above run in that release job, but on pushes to main and on
+manual dispatch only, not on pull requests. They take 145s on a shared runner — a quarter of the
+job's wall clock, on the critical path of every pull request — and they reuse the build the steps
+before them already paid for, so running them after a merge costs almost nothing.
 
 A third job runs the benchmarks, on pushes to main and on manual dispatch only. The benchmark
 targets are declared `test = false`, which keeps them out of `cargo test`: a `[[bench]]` target
@@ -124,12 +129,19 @@ still worth doing — it catches one that panics rather than merely failing to c
 to its own job rather than being dropped:
 
 ```sh
-cargo bench -- --test
+cargo bench --profile ci-release -- --test
 ```
 
 `cargo bench -- --test` and not `cargo test --benches`, which now selects nothing and would pass
 vacuously. A benchmark that stops *compiling* still breaks the `cargo build --all-targets` step in
 the pull-request jobs.
+
+`--profile ci-release` because this job takes no measurements. A bare `cargo bench` resolves
+`[profile.bench]`, which inherits `release`, and links all eight criterion binaries under fat LTO
+at one codegen unit — settings that exist to make a measurement reproducible. Cold, for one bench
+target, that is 193s against 34s under `ci-release`. The trade is that no CI job compiles the
+fat-LTO profile any more, so a failure that appears only at one codegen unit surfaces on the
+machine taking the measurement instead; a local `cargo bench` is unchanged.
 
 The release job builds under `[profile.ci-release]` rather than `release`. It inherits `release`,
 so `debug-assertions` and `overflow-checks` are off and the job tests exactly what it did before,
@@ -137,8 +149,21 @@ but it drops the single codegen unit that makes a `release` build expensive — 
 caches dependencies and never the crate under test, so `zeebra` is relinked from scratch on every
 run, which was ~318s of a 321s step. Cargo.toml records the four configurations measured and why
 this one was chosen; it is a compromise, because the codegen setting that makes the build cheap
-also slows the two engine-agreement tests. Benchmarks are unaffected — `cargo bench` resolves
-`[profile.bench]`, which still inherits `release`, so every reported number stays comparable.
+also slows the two engine-agreement tests. Reported numbers are unaffected — a local `cargo bench`
+resolves `[profile.bench]`, which still inherits `release`, so every measurement stays comparable
+with every measurement recorded before this profile existed.
+
+A fourth job checks formatting and runs clippy. Both are in one job because `cargo fmt --all
+--check` takes a tenth of a second and needs no cache, so on its own it was almost entirely runner
+start-up.
+
+Each pull request and each branch has one run in flight at a time; a new push cancels the one
+before it. A stack of dependent pull requests is merged one commit at a time, so pushing a stack
+sends a burst of pushes seconds apart — eight merges in 90 seconds spent 135 job-minutes, most of
+it on commits that were superseded before the first job finished, and queued 40 jobs against a
+20-job ceiling. Cancellation applies on `main` too, so an intermediate merge commit there can go
+untested; every commit in a stack is green as a pull request before it is merged, and the tip of
+the burst is tested in full.
 
 The suite is not sharded across parallel jobs. Warm the 968 tests take under 3s and the two slow
 `#[ignore]`d systems dominate everything else, with all but 0.3s of that being a single test that

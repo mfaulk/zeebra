@@ -46,7 +46,8 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # change and 11.6s after, against 2.4s for the 968 tests and 8.9s for the 13 doc examples. The
 # ~168s was the eight benchmarks, split between linking them under `lto = "fat"` with
 # `codegen-units = 1` — eight whole-crate LTO links — and executing 455 cases. It is now a
-# separate CI job running `cargo bench -- --test` on pushes to main, off the pull-request path.
+# separate CI job running `cargo bench --profile ci-release -- --test` on pushes to main, off the
+# pull-request path; that job takes no measurements, so it has no use for the fat-LTO links above.
 #
 # `--all-targets` still builds these, so a benchmark that stops compiling still breaks every job
 # that uses it; `test = false` governs only whether `cargo test` runs them.
@@ -136,9 +137,11 @@ codegen-units = 1
 # false` at 16 units and still recovers ~12s. The sum is what CI pays per run, and it is lowest
 # here -- 157s against 434s for `release`.
 #
-# Benchmarks deliberately do not use this. `cargo bench` resolves `[profile.bench]`, which
+# Measurements deliberately do not use this. `cargo bench` resolves `[profile.bench]`, which
 # inherits `release`, so every number this project reports still comes from a fat-LTO build at one
-# codegen unit, and stays comparable with every number recorded before this profile existed.
+# codegen unit, and stays comparable with every number recorded before this profile existed. The
+# CI smoke job overrides it with `--profile ci-release` precisely because it reports no numbers:
+# it runs each case once under `--test` and records nothing.
 [profile.ci-release]
 inherits = "release"
 lto = "thin"
