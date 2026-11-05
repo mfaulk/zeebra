@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "challenge": "fukuoka-mq-III-n10-seed0",
+  "challenge_digest": "ae24edf8efc8502dd8e298037f1052f56d0a87b90fe8224e6bdc83ccf5e41c2a",
+  "class": "official",
+  "formulation": "as published",
+  "transformations": [],
+  "outcome": "verified_witness",
+  "significance": "reproduction of a challenge solved externally on publication",
+  "verification": "evaluated against the published coefficient vectors; the published answer is [22, 22, 28, 12]",
+  "elapsed_nanos": 123263396,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 15860,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 10,
+        "equations": 20
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 123086081,
+      "estimated_peak_bytes": 2695192,
+      "detail": {
+        "max_matrix_rows": 1468,
+        "max_matrix_columns": 859,
+        "max_pair_degree": 4,
+        "pairs_reduced": 743
+      }
+    },
+    {
+      "stage": "conversion",
+      "elapsed_nanos": 30999,
+      "estimated_peak_bytes": 344,
+      "detail": {
+        "quotient_dimension": 1
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 85081,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "lex_basis_elements": 10
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 45375,
+      "estimated_peak_bytes": null,
+      "detail": {}
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 4,
+    "max_matrix_rows": 1468,
+    "max_matrix_columns": 859,
+    "peak_live_nonzeros": 168020,
+    "peak_estimated_bytes": 2695192,
+    "pairs_reduced": 743,
+    "elements_added": 168,
+    "quotient_dimension": 1
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "744fdf9",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
+  },
+  "experiment": null,
+  "reproduce": "tools/fetch-mq-challenge.sh && cargo run --release --example scoreboard -- stable  # fukuoka-mq-III-n10-seed0"
+}

@@ -13,6 +13,7 @@ pub mod mq;
 pub mod poseidon;
 pub mod record;
 pub mod reorder;
+pub mod resultant;
 pub mod scoreboard;
 pub mod slices;
 pub mod specialization;
@@ -31,6 +32,7 @@ pub use poseidon::{
 };
 pub use record::{AttemptRecord, ExperimentRecord, Json};
 pub use reorder::{ReorderError, RoundLayout, VariableOrder};
+pub use resultant::{bivariate_resultant, cico_bivariate, ResultantError};
 pub use scoreboard::{
     wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit, RunOutcome,
     RunRecord, Scoreboard, ScoreboardError, Stage, StageCost,

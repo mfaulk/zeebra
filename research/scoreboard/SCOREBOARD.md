@@ -27,7 +27,7 @@ The official field, state width, `k`, constants and objective; fewer rounds. A w
 
 | problem | identity | vars | eqs | best result | external status |
 |---|---|---:|---:|---|---|
-| `poseidon31-cico-t16-rf2-rp0` | `56ccc99d85e0` | 46 | 34 | **verified witness** in 30107.9 ms (slice(12 fixed, seed 2)) | — |
+| `poseidon31-cico-t16-rf2-rp0` | `56ccc99d85e0` | 46 | 34 | **verified witness** in 51.9 ms (resultant, slice(12 fixed, seed 1)) | — |
 | `poseidon31-cico-t16-rf2-rp2` | `af93deb46aa5` | 48 | 36 | stopped: max_live_nonzeros at degree 4 | — |
 | `poseidon31-cico-t16-rf2-rp4` | `08e66c87a885` | 50 | 38 | stopped: max_live_nonzeros at degree 5 | — |
 | `poseidon31-cico-t16-rf4-rp0` | `a9242143a8c6` | 78 | 66 | stopped: max_live_nonzeros at degree 4 | — |
@@ -89,4 +89,5 @@ A higher degree is **not** nearer a solution: this table is a diagnostic, not a 
 | `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 7) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 |
 | `fukuoka-mq-VI-n15-seed0` | campaign over 8 slices | stopped: campaign reached no verdict | 0 | none | 0 | 0.0 |
 | `fukuoka-mq-III-n20-seed0` | as published | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 10147 | 195.5 |
+| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
 

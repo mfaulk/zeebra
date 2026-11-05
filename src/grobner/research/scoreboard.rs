@@ -160,6 +160,11 @@ pub enum Stage {
     Generation,
     /// The Gröbner basis.
     Grobner,
+    /// Elimination by something that is not a Gröbner basis — a resultant, say.
+    ///
+    /// Its own stage rather than reported as `Grobner`, because the point of measuring an
+    /// alternative elimination is that it is not that one.
+    Elimination,
     /// Monomial-order conversion.
     Conversion,
     /// Univariate factorization and root finding.
@@ -176,6 +181,7 @@ impl Stage {
         match self {
             Self::Generation => "generation",
             Self::Grobner => "grobner",
+            Self::Elimination => "elimination",
             Self::Conversion => "conversion",
             Self::Univariate => "univariate",
             Self::Verification => "verification",
@@ -188,6 +194,7 @@ impl Stage {
         [
             Self::Generation,
             Self::Grobner,
+            Self::Elimination,
             Self::Conversion,
             Self::Univariate,
             Self::Verification,

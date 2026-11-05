@@ -25,6 +25,10 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] Batched border reduction and adaptive operator storage: 14x on katsura-7's conversion
 - [x] 254- and 255-bit prime fields, with F4, FGLM and solving over them end to end
+- [x] A frozen registry of public cryptanalysis challenges, and a scoreboard that refuses to
+      compare two different problems
+- [x] A verified CICO witness at Poseidon-31's official state width `t = 16`, for a registered
+      reduced-round instance
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -276,6 +280,7 @@ cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO
 cargo run --release --example scoreboard           # registered problems, one record each, staged
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
+cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -1467,6 +1472,34 @@ The tree under `research/scoreboard/` is committed: the registry emitted from co
 per run, the accumulated history, and a generated `SCOREBOARD.md`. `Json::parse` reads back what
 `Json::to_json` writes — round-tripping is asserted — so the history accumulates rather than being
 overwritten, with no dependency to read eighty lines of writer.
+
+#### Elimination that is not a Gröbner basis
+
+`grobner::research::bivariate_resultant` computes `Res_y(f, g)` for two bivariate polynomials, as
+the determinant of their Sylvester matrix recovered by interpolating scalar determinants. The
+determinant construction rather than a Euclidean algorithm on purpose: evaluating a matrix and
+taking its determinant commutes with evaluation *always*, so there is no case to analyse — where
+specializing `f` at a point that kills its leading coefficient in `y` drops its degree, and the
+specialized resultant is then not the specialization of the resultant.
+
+It exists to answer one question, and the answer is worth knowing. On a registered `t = 16` CICO
+slice — twelve of the fourteen free inputs fixed, two unknowns left — the S-box variables can be
+*evaluated away* instead of solved for, because the permutation is a straight-line program. That
+turns 46 equations in 46 variables into **two polynomials in two variables** of degree `3^rounds`,
+and one resultant finishes it:
+
+| route | time on the same slice | witnesses found |
+|---|---:|---|
+| grevlex F4, then FGLM, then the search | 30 142 ms | the first one |
+| straight-line evaluation, then one resultant | **51 ms** | **all three** |
+
+578x, on the same registered problem, with every candidate checked by running the permutation. The
+S-box-per-variable formulation exists to hold the degree at 3 and pays 32 extra variables for it;
+when only two inputs are free, those variables are the whole cost and the degree it avoids is
+affordable. The resultant route's own limit is arithmetic — about `16 · 3^{5·rounds}` field
+operations — so it reaches the same two rounds F4 does and not one more: what it changes is the
+cost there, not the frontier. See
+[`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md).
 
 #### External instances: the Fukuoka MQ Challenge
 
