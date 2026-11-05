@@ -346,8 +346,10 @@ compact sparse column and the span's two triangular blocks are not strategies, s
 row including the baseline. `cargo bench --bench fglm -- fglm_recommended` is the same comparison
 under Criterion, and `fglm_profile` shows what that left behind: border reduction was 95% of
 katsura-7's conversion and is 52%, while planted-10's lex walk is the majority of its own —
-M18 did not touch it, and offsetting the span's rows by their pivots took it from 24.3 ms to
-12.5 ms and the conversion's dense blocks from 20,484 kB to 16,392 kB.
+M18 did not touch it, and two follow-ups did. Offsetting the span's rows by their pivots took that
+walk from 24.3 ms to 12.5 ms and the conversion's dense blocks from 20,484 kB to 16,392 kB, and
+reducing into registers the span owns, rather than allocating a residue per candidate, took a
+further 1.14x.
 
 Recorded baselines, before/after measurements, and the reasoning behind each optimization are in
 [`docs/MILESTONE-ALGEBRA-FOUNDATION.md`](docs/MILESTONE-ALGEBRA-FOUNDATION.md),

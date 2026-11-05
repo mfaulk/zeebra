@@ -124,6 +124,15 @@ pub struct FglmOptions {
     /// to 528. A budget that priced a block the conversion no longer allocates would be the same
     /// bug in the other direction. [`FglmMemory`](super::FglmMemory) reports each block
     /// separately, so a figure quoted against either older meaning can be recomputed.
+    ///
+    /// # It counts the quadratic blocks only
+    /// The span also holds two `D`-cell working registers, and this does **not** price them: they
+    /// are `O(D)` beside the blocks' `O(D^2)` — 2,048 cells against 2,098,176 at `D = 1,024` — and
+    /// the per-call vectors they replaced were live during every reduction anyway, so admitting
+    /// them would not have changed which conversions this limit refuses. A third change of meaning
+    /// for a term that rounds to nothing against the limit's own quantity would cost more in
+    /// comparability than it bought in accuracy. §8.7 of
+    /// `docs/MILESTONE-FGLM-SCALABILITY.md` states the choice and its arithmetic.
     pub max_span_entries: usize,
 
     /// Bytes those dense blocks may occupy at full rank.

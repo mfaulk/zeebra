@@ -25,6 +25,21 @@
 //! approximated and nothing is traded — both paddings were zeros — but note the arithmetic rather
 //! than the slogan: against the conversion's three dense blocks, of which the span is two, the
 //! same cells are a fifth and not a quarter.
+//!
+//! # The reduction happens in registers the span owns
+//! A reduction needs a `D`-cell dense vector and an `r`-cell coefficient vector, and the lex walk
+//! performs `D + |G|` of them. Those two live in the span, as
+//! [`DenseAccumulator`](crate::linalg::DenseAccumulator)'s buffer lives in it rather than in its
+//! caller, so **the dependence test** allocates nothing per reduction:
+//! [`IncrementalSpan::reduce_in_place`] fills them and [`IncrementalSpan::insert_scratch`] reads
+//! them back. [`IncrementalSpan::reduce`] is the value-returning form and hands the buffers out,
+//! which costs one allocation per call — what it cost before the registers existed.
+//!
+//! The registers are `2 D` cells the span now holds for its lifetime, and
+//! [`FglmMemory`](super::FglmMemory) does not count them: it reports the `O(D^2)` blocks, and
+//! these are `O(D)` — 0.1% of them at `D = 1,024` and 6% at `D = 16`. Nor do they raise the peak,
+//! since the per-call vectors they replace were live during every reduction anyway. See
+//! [`FglmMemory::dense_blocks_for`](super::FglmMemory::dense_blocks_for), which says so.
 
 use crate::FiniteField;
 
@@ -75,6 +90,20 @@ pub struct IncrementalSpan<F: FiniteField> {
     /// Row subtractions performed, for the statistics. One subtraction against the row at `r`
     /// leading at `pivot` touches `D - pivot` coordinates and `r + 1` coefficients, not `2 * D`.
     row_operations: usize,
+
+    /// The working register a reduction happens in: `D` cells, reused across calls.
+    ///
+    /// Held by the span rather than allocated per call, as
+    /// [`DenseAccumulator`](crate::linalg::DenseAccumulator) holds its own. The lex walk
+    /// reduces `D + |G|` vectors, so a per-call `Vec` is `D + |G|` allocations of `D` cells for one
+    /// register's worth of live data.
+    residue: Vec<F>,
+
+    /// The second working register: the residue's expression over the accepted vectors.
+    ///
+    /// Resized to the accepted count on each reduction, which after the first call of a given rank
+    /// writes `r` zeros and allocates nothing.
+    combination: Vec<F>,
 }
 
 impl<F: FiniteField> IncrementalSpan<F> {
@@ -84,6 +113,8 @@ impl<F: FiniteField> IncrementalSpan<F> {
             rows: Vec::new(),
             dimension,
             row_operations: 0,
+            residue: vec![F::zero(); dimension],
+            combination: Vec::with_capacity(dimension),
         }
     }
 
@@ -99,6 +130,34 @@ impl<F: FiniteField> IncrementalSpan<F> {
 
     /// Whether `v` lies in the span, and the coefficients either way.
     ///
+    /// The value-returning form, for a caller that wants owned vectors back. The walk uses
+    /// [`Self::reduce_in_place`] instead, which allocates nothing of its own.
+    ///
+    /// The registers' buffers leave with the value rather than being copied out of, so this costs
+    /// what it cost before the registers existed — one allocation per call — and no more.
+    /// [`Self::insert`] hands them back.
+    ///
+    /// # Panics
+    /// If `v` is not of the span's dimension.
+    pub fn reduce(&mut self, v: &[F]) -> Dependence<F> {
+        if self.reduce_in_place(v) {
+            Dependence::Dependent {
+                coefficients: std::mem::take(&mut self.combination),
+            }
+        } else {
+            Dependence::Independent {
+                residue: std::mem::take(&mut self.residue),
+                combination: std::mem::take(&mut self.combination),
+            }
+        }
+    }
+
+    /// As [`Self::reduce`], into the span's own registers: `true` if `v` lies in the span.
+    ///
+    /// The coefficients are [`Self::scratch_combination`] either way, and an independent `v` is
+    /// accepted with [`Self::insert_scratch`], which reads the registers this left behind. Nothing
+    /// is allocated once the registers have reached their size.
+    ///
     /// A single forward pass suffices, and that is not obvious: the rows are in echelon form but
     /// are *not* reduced against each other, so subtracting a later row could in principle
     /// reintroduce a nonzero in an earlier row's pivot column. It cannot, because row `r` was
@@ -107,7 +166,7 @@ impl<F: FiniteField> IncrementalSpan<F> {
     ///
     /// # Panics
     /// If `v` is not of the span's dimension.
-    pub fn reduce(&mut self, v: &[F]) -> Dependence<F> {
+    pub(crate) fn reduce_in_place(&mut self, v: &[F]) -> bool {
         assert_eq!(
             v.len(),
             self.dimension,
@@ -116,12 +175,23 @@ impl<F: FiniteField> IncrementalSpan<F> {
             self.dimension
         );
 
-        let mut residue = v.to_vec();
+        // Disjoint borrows of the fields, so the rows can be read while the registers are written.
+        let Self {
+            rows,
+            row_operations,
+            residue,
+            combination,
+            ..
+        } = self;
+
+        residue.clear();
+        residue.extend_from_slice(v);
         // One coefficient per accepted vector, not per dimension: there is nothing for the rest to
         // be a coefficient of. At rank `r` this is `r` cells where M17 allocated `D`.
-        let mut combination = vec![F::zero(); self.rows.len()];
+        combination.clear();
+        combination.resize(rows.len(), F::zero());
 
-        for row in &self.rows {
+        for row in rows.iter() {
             let multiple = residue[row.pivot];
             if multiple.is_zero() {
                 continue;
@@ -135,19 +205,15 @@ impl<F: FiniteField> IncrementalSpan<F> {
             for (slot, value) in combination.iter_mut().zip(&row.combination) {
                 *slot += multiple * *value;
             }
-            self.row_operations += 1;
+            *row_operations += 1;
         }
 
-        if residue.iter().all(|value| value.is_zero()) {
-            Dependence::Dependent {
-                coefficients: combination,
-            }
-        } else {
-            Dependence::Independent {
-                residue,
-                combination,
-            }
-        }
+        residue.iter().all(|value| value.is_zero())
+    }
+
+    /// The coefficients the last [`Self::reduce_in_place`] produced.
+    pub(crate) fn scratch_combination(&self) -> &[F] {
+        &self.combination
     }
 
     /// Accept a vector that [`Self::reduce`] found independent.
@@ -166,14 +232,39 @@ impl<F: FiniteField> IncrementalSpan<F> {
     /// already of full rank.
     pub fn insert(&mut self, residue: Vec<F>, combination: Vec<F>) {
         assert_eq!(residue.len(), self.dimension, "residue of the wrong length");
-        let index = self.rows.len();
         assert_eq!(
             combination.len(),
-            index,
+            self.rows.len(),
             "a combination of {} coefficients over {} accepted vectors",
             combination.len(),
-            index
+            self.rows.len()
         );
+
+        // Into the registers, so that there is one insertion path and not two. The buffers
+        // `reduce` handed out come back here, which is why alternating the two entry points
+        // allocates once per reduction rather than once per reduction and once per insertion.
+        self.residue = residue;
+        self.combination = combination;
+        self.insert_scratch();
+    }
+
+    /// Accept the vector the last [`Self::reduce_in_place`] found independent.
+    ///
+    /// Reads the registers that call left behind, so nothing is handed back and forth. The row it
+    /// builds is as [`Self::insert`] describes.
+    ///
+    /// # Panics
+    /// If the register holds the zero vector — the caller has accepted a dependent vector — or if
+    /// it does not hold a vector at all, which is the state [`Self::reduce`] leaves behind, or if
+    /// the span is already of full rank.
+    pub(crate) fn insert_scratch(&mut self) {
+        assert_eq!(
+            self.residue.len(),
+            self.dimension,
+            "the register holds no reduced vector: `reduce` hands its buffer out, so a caller \
+             mixing it with the register form must accept through `insert`"
+        );
+        let index = self.rows.len();
         assert!(
             index < self.dimension,
             "a {}-dimensional span cannot accept a {}th vector",
@@ -181,22 +272,27 @@ impl<F: FiniteField> IncrementalSpan<F> {
             index + 1
         );
 
-        let pivot = residue
+        let pivot = self
+            .residue
             .iter()
             .position(|value| !value.is_zero())
             .expect("an independent vector has a nonzero entry");
-        let scale = residue[pivot].inverse();
+        let scale = self.residue[pivot].inverse();
 
         // From the pivot on. `residue[..pivot]` is zero by the definition of `pivot` above, and no
         // later write reintroduces a nonzero there, so there is nothing to store.
-        let coordinates: Vec<F> = residue[pivot..]
+        let coordinates: Vec<F> = self.residue[pivot..]
             .iter()
             .map(|value| *value * scale)
             .collect();
         // `index + 1` coefficients: the negated input over the vectors already accepted, then the
         // one for the vector being accepted now. Exactly the row's own expression, with no padding.
         let mut row_combination: Vec<F> = Vec::with_capacity(index + 1);
-        row_combination.extend(combination.iter().map(|value| (F::zero() - *value) * scale));
+        row_combination.extend(
+            self.combination
+                .iter()
+                .map(|value| (F::zero() - *value) * scale),
+        );
         row_combination.push(scale);
 
         self.rows.push(SpanRow {
@@ -576,6 +672,80 @@ mod tests {
             }
             other => panic!("a new leading entry should be independent, got {:?}", other),
         }
+    }
+
+    /// The register path and the value path produce the same verdicts, coefficients and rows.
+    ///
+    /// The conversion uses the first and every test here uses the second, so an answer that
+    /// differed between them would be invisible to both.
+    #[test]
+    fn test_the_register_path_agrees_with_the_value_path() {
+        const D: usize = 9;
+        // A Vandermonde basis followed by combinations of it, so the sequence contains both
+        // verdicts and the dependent ones have coefficients worth comparing.
+        let mut vectors: Vec<Vec<F>> = (0..D)
+            .map(|k| {
+                let node = F::new(k as u64 + 2);
+                let mut row = Vec::with_capacity(D);
+                let mut power = F::one();
+                for _ in 0..D {
+                    row.push(power);
+                    power *= node;
+                }
+                row
+            })
+            .collect();
+        for weights in [
+            vec![1u64, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![0, 0, 3, 0, 0, 5, 0, 0, 0],
+            vec![2, 3, 5, 7, 11, 13, 17, 19, 23],
+        ] {
+            let combined = combine(&vectors[..D], &field(&weights));
+            vectors.push(combined);
+        }
+
+        let mut by_value = IncrementalSpan::new(D);
+        let mut by_register = IncrementalSpan::new(D);
+        for v in &vectors {
+            let dependent = by_register.reduce_in_place(v);
+            let register_combination = by_register.scratch_combination().to_vec();
+            match by_value.reduce(v) {
+                Dependence::Dependent { coefficients } => {
+                    assert!(dependent, "the register path called {:?} independent", v);
+                    assert_eq!(coefficients, register_combination);
+                }
+                Dependence::Independent {
+                    residue,
+                    combination,
+                } => {
+                    assert!(!dependent, "the register path called {:?} dependent", v);
+                    assert_eq!(combination, register_combination);
+                    by_value.insert(residue, combination);
+                    by_register.insert_scratch();
+                }
+            }
+            assert_eq!(by_value.accepted(), by_register.accepted());
+            assert_eq!(by_value.stored_cells(), by_register.stored_cells());
+            assert_eq!(by_value.row_operations(), by_register.row_operations());
+        }
+        assert_eq!(by_value.accepted(), D, "the basis should have full rank");
+        // Identical rows, not merely identical verdicts: the rows are what the next reduction
+        // reads, so equality here is equality for every future answer as well.
+        assert_eq!(
+            format!("{:?}", by_value.rows),
+            format!("{:?}", by_register.rows)
+        );
+    }
+
+    /// Accepting from a register that `reduce` emptied is a loud panic, not a wrong row.
+    #[test]
+    #[should_panic(expected = "holds no reduced vector")]
+    fn test_accepting_from_an_emptied_register_panics() {
+        let mut span = IncrementalSpan::new(3);
+        // `reduce` hands the register's buffer out with the value, so the register is empty and
+        // the independent vector it found is the caller's to hand back through `insert`.
+        let _ = span.reduce(&field(&[1, 2, 3]));
+        span.insert_scratch();
     }
 
     /// A dependence's coefficients are exact over the *original* accepted vectors.

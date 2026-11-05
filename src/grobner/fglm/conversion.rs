@@ -25,7 +25,7 @@ use crate::{
     grobner::{
         f4::StageClock,
         fglm::{
-            incremental_span::{Dependence, IncrementalSpan},
+            incremental_span::IncrementalSpan,
             statistics::{FglmMemory, FglmStatistics},
             FglmError, FglmOptions, QuotientAlgebra,
         },
@@ -196,31 +196,34 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
             }
         };
 
-        match span.reduce(&vector) {
-            Dependence::Independent {
-                residue,
-                combination,
-            } => {
-                statistics.candidates_independent += 1;
-                span.insert(residue, combination);
-                let accepted = accepted_monomials.len();
-                accepted_monomials.push(monomial);
-                accepted_vectors.push(vector);
+        // The register-based form: the walk runs this `D + |G|` times, and the value-returning
+        // `reduce` would allocate a `D`-cell residue and an `r`-cell combination on every one of
+        // them for data that lives until the next call. The candidate's own vector above is still
+        // an allocation per candidate, and a dependent one still builds a polynomial — this
+        // removes the dependence test's two, not every allocation in the loop.
+        if span.reduce_in_place(&vector) {
+            statistics.candidates_dependent += 1;
+            relations.push(relation(
+                monomial,
+                span.scratch_combination(),
+                &accepted_monomials,
+            ));
+            leading.push(monomial);
+        } else {
+            statistics.candidates_independent += 1;
+            span.insert_scratch();
+            let accepted = accepted_monomials.len();
+            accepted_monomials.push(monomial);
+            accepted_vectors.push(vector);
 
-                for variable in 0..N {
-                    let child = monomial * Monomial::univariate(variable, 1);
-                    if seen.insert(child) {
-                        frontier.push((
-                            Reverse(ByTargetOrder(child)),
-                            Origin::Multiple { variable, accepted },
-                        ));
-                    }
+            for variable in 0..N {
+                let child = monomial * Monomial::univariate(variable, 1);
+                if seen.insert(child) {
+                    frontier.push((
+                        Reverse(ByTargetOrder(child)),
+                        Origin::Multiple { variable, accepted },
+                    ));
                 }
-            }
-            Dependence::Dependent { coefficients } => {
-                statistics.candidates_dependent += 1;
-                relations.push(relation(monomial, &coefficients, &accepted_monomials));
-                leading.push(monomial);
             }
         }
     }

@@ -1219,6 +1219,99 @@ default 20 million cells now admits `D = 3,162` rather than 2,828 — **12% on t
 dimension, from a 20% saving on a quadratic.** That is the honest shape of this change: it does
 not move the asymptotics, and §9.7's reading of where FGLM's memory limit lies is unaffected.
 
+### 8.7 Follow-up (issue #59): the reduction happens in registers the span owns
+
+`linalg` already had the discipline: `DenseAccumulator` is a dense working row the elimination
+keeps and reuses, and its buffer lives in the accumulator rather than in its caller.
+`IncrementalSpan` is the same object and allocated per call — a `D`-cell residue and an `r`-cell
+combination on each of the walk's `D + |G|` reductions. Both now live in the span.
+`reduce_in_place` fills them and `insert_scratch` reads them back, so **the dependence test**
+allocates nothing per candidate; `reduce` is still there, still returns owned vectors, and hands
+the registers' buffers out rather than copying out of them, so it costs exactly what it did
+before.
+
+Said precisely, because the looser version of it was corrected in review: the walk still allocates
+per candidate — `MultiplicationOperator::apply` returns an owned `Vec<F>` for the candidate's
+class, and a dependent candidate still builds a relation polynomial. What this removes is the
+span's two, which are the two that were pure overhead: a buffer allocated, filled, read once, and
+dropped.
+
+**The measurement protocol is stricter than §8.6's**, because the effect expected here was a few
+percent and §8.6's protocol could not have seen it: each variant is a separate target directory,
+every run is pinned to one core with `taskset`, and 30 runs of each variant are interleaved so that
+machine drift hits all of them equally. The figure quoted is the median of the `walk` column, each
+run of the example itself reporting the fastest of three conversions. Unpinned, the same binary
+varies by ±15% on planted-10 — which is why the first attempt at this measurement was discarded.
+
+| system | `D` | §8.6 walk | registers | won | conversion |
+|---|---:|---:|---:|---:|---:|
+| katsura-7 | 64 | 0.70 | 0.68 | 1.03x | 2.14 → 2.13 ms |
+| cyclic-6 | 156 | 0.97 | 0.92 | 1.05x | 2.22 → 2.18 ms |
+| planted-8 | 256 | 0.98 | 0.87 | 1.13x | 2.30 → 2.19 ms |
+| planted-10 | 1,024 | 11.67 | **10.25** | **1.14x** | 18.62 → 17.14 ms |
+
+Slightly better than the issue's own expectation of "a few percent on the lex walk, not a factor",
+and for the reason it gave: the per-call term is small but it is multiplied by `D + |G|` calls.
+
+#### The registers are storage, and no budget counts them
+
+They are `2 D` cells the span now holds for its lifetime where it previously allocated and dropped
+the same two vectors per call. `FglmMemory` does not report them and `max_span_entries` does not
+price them, which is a deliberate choice and not an oversight:
+
+* **They are `O(D)` against the blocks' `O(D^2)`** — 2,048 cells beside 2,098,176 at `D = 1,024`,
+  which is 0.098%, and 16 kB of the 16,392 kB the conversion already reports. At `D = 16` the
+  share is 6%, where the absolute figure is 256 bytes.
+* **They do not raise the peak.** A residue and a combination were live during every reduction
+  before this change as well; what changed is that the buffers persist between reductions instead
+  of being freed and reallocated. A budget enforced before allocation, which is what
+  `max_span_entries` is, would have had to admit them either way.
+* **`max_span_entries` has already changed meaning twice** — §8.2 and §8.6 — and each change made
+  every figure recorded against the older meaning ambiguous. Doing it a third time for a term that
+  rounds to zero against the budget's own quantity would cost more in comparability than it buys in
+  accuracy.
+
+`IncrementalSpan::stored_cells` keeps its meaning too: the echelon rows, which is the storage that
+grows. The exclusion is documented where a caller reading a budget would meet it —
+`FglmMemory::dense_blocks_for`, `FglmOptions::max_span_entries`, and the module documentation —
+rather than left to be inferred from the absence of a field.
+
+#### What was rejected, and measured before being rejected
+
+The issue named three per-call overheads and this takes two of them. The third — the full-`D`
+`residue.iter().all(is_zero)` dependence test — was to become a counter maintained by the
+subtraction loop, the way `DenseAccumulator::subtract_scaled` maintains `nonzeros`. **Measured on
+top of the registers, it does not pay**, and a third design was tried beside it:
+
+| variant | katsura-7 | cyclic-6 | planted-8 | planted-10 |
+|---|---:|---:|---:|---:|
+| registers | 0.68 | 0.92 | 0.88 | 11.08 |
+| + maintained nonzero count | 0.64 | 0.97 | 0.88 | 11.31 |
+| + zero test over non-pivot columns only | 0.65 | 0.91 | 0.88 | 10.99 |
+
+Medians, same protocol, 25–30 interleaved runs; this batch was measured before `reduce` was given
+its final form, so its register column is not identical to the table above.
+
+**Why the counter loses, which is a difference from `DenseAccumulator` and not a surprise.** There
+the subtraction loop runs over a *sparse* row's support and the zero test is consulted repeatedly
+per row, so a counter replaces many full-width scans with work proportional to the support. Here
+the subtraction loop is the `O(D^3)` part of the algorithm and the scan happens once per call, so
+maintaining the count adds two operations to every subtracted cell — `O(D r)` per call — to remove
+one `O(D)` scan. It also needs the residue's initial count, which is another full pass over `D`.
+Trading a scan at the end for a scan at the start plus work in the dominant loop is a bad trade,
+and cyclic-6 shows it as a 5% regression.
+
+The second design is sound and still not worth having. A forward pass clears every pivot column —
+that is the invariant the single pass already rests on — so the residue is zero exactly when the
+**non-pivot** columns are, and there are `D - r` of those: zero work at full rank, which is where
+the walk spends most of its candidates. It measures within 1% of the registers alone on every
+system. The issue's own standard applies: "a change that does not move it is not worth the
+invariant", and this one would add a `Vec<usize>` to maintain and a second way for the dependence
+verdict to be wrong.
+
+So the zero scan stays. Note that it is `all`, not a count: on an independent vector it stops at
+the first nonzero, which on the walk is usually immediately.
+
 ---
 
 ## 9. M18-5: integration
@@ -1346,7 +1439,7 @@ into reducing the border.
 and §3.4 saying nothing else was worth attacking. It is now 52%, the walk is 31%, and the absolute
 figure is 1.44 ms where it was 36.60. On planted-10 the walk was already 60% and is now 69%: the
 border work there fell from 10.96 ms to 5.58 while the walk did not move, because nothing in M18
-touched it. §8.6 did, after the milestone: planted-10's walk is 12.68 ms and 62% of its
+touched it. §8.6 and §8.7 did, after the milestone: planted-10's walk is 10.25 ms and 60% of its
 conversion.
 
 Storage says the same thing more sharply. Under the shipped configuration the dependence test's
@@ -1426,7 +1519,10 @@ Three things are worth doing, in this order:
    echelon update over `Vec<F>`, and it uses none of the elimination machinery M16 built — neither
    the backends nor `reduce_rows_against_pivots_with`. The reduction is one scaled subtraction per
    accepted row, so the question is whether that machinery beats it at `D` in the hundreds, and
-   that is a benchmark rather than an argument: `fglm_dependence` is already the benchmark.
+   that is a benchmark rather than an argument: `fglm_dependence` is already the benchmark. §8.7
+   took the *bookkeeping* from `linalg`'s `DenseAccumulator` and found that one of its three
+   devices does not transfer, which is evidence about this recommendation and not against it: what
+   transfers has to be measured one piece at a time.
 3. **Reuse closures across batches.** katsura-7's remaining 52% is the batch closure, and a closure
    is currently discarded at the end of its batch. Border monomials are processed in descending
    order, so consecutive batches' closures overlap heavily; §6.4 measured what a *bigger* batch is
