@@ -212,6 +212,7 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example f4_degrees           # F4, work and useful work per degree
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
@@ -259,6 +260,16 @@ unattributed cost cannot hide. It takes the name of a configuration — `baselin
 `recommended` for what `F4Options::default()` is — so the effect of one optimization can be read
 off against another's. The timing comes from
 `F4Options::measure_stages`, which reads a clock four times per batch and is off by default.
+
+`f4_degrees` is M22-0's baseline: one table per system giving, for each lcm degree, the pairs
+selected and discarded, the split of matrix rows into reducer scaffolding and pair halves, **the
+rank the pair rows added on top of the reducer block**, the pair rows that added nothing, the
+largest matrix, the elements extracted, and how many of those came out below the degree that found
+them. It covers katsura-5 for calibration, the Fukuoka type III and VI toy instances, and the
+controlled Poseidon family — where the `t = 3` and `t = 2` nine-variable instances **do not have
+the same algebraic dimension** (`N - E = t - 2k`), so the `t = 3` system is also run with one free
+input pinned, which matches the equation counts without changing the round structure. Needs
+`tools/fetch-mq-challenge.sh` for the MQ sections; the rest runs without it.
 
 `f4_blocks` replays the batches a computation really built and eliminates each one four ways —
 rows as preprocessing produced them, reducer rows first, reducer rows taken as established pivots,
@@ -1190,6 +1201,60 @@ assert!(statistics.max_matrix_rows > 0);
 A crossed budget still cannot be mistaken for a finished one: the basis lives inside the `Result`,
 so an incomplete computation has no basis to hand back, and the statistics beside it describe work
 rather than an answer.
+
+#### Degree by degree, and which of the work was useful
+
+Every counter above is a sum or a maximum over the whole run, so none of them can say *at which
+degree* the matrices became unaffordable or whether the work there carried new information.
+`F4Options::profile_degrees` breaks the same work out by the lcm degree its batch was selected at:
+
+```rust
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::katsura, f4_with_options, F4Options},
+             MonomialOrder};
+
+let options = F4Options { profile_degrees: true, ..F4Options::default() };
+let (_basis, statistics) = f4_with_options(
+    &katsura::<5, Zp2147483647>(),
+    MonomialOrder::GradedReverseLexicographic,
+    &options,
+).unwrap();
+
+for degree in statistics.degrees.iter() {
+    // Pair rows that added rank, against pair rows that added none.
+    let _useful = degree.candidate_rank_contribution;
+    let _wasted = degree.dependent_candidate_rows;
+}
+
+// Where the computation was largest, and how redundant its rows were overall.
+let (_degree, _peak_entries) = statistics.degrees.peak_degree().unwrap();
+assert!(statistics.dependent_row_fraction() <= 1.0);
+```
+
+**The measure is rank attribution, not zero-row counting.** A batch's rows are of two kinds: the
+two halves of each critical pair, and the reducer multiples symbolic preprocessing adds so the
+matrix can perform the reductions polynomial division would. Reducer rows have distinct leading
+monomials by construction, so they are linearly independent and **none of them ever reduces to
+zero** — every zero row is a dependent pair row, and a pair contributes two rows, so the zero-row
+count is not a count of useless pairs in either direction. What is informative is how much rank the
+pair rows added on top of the reducer block, which is `rank - reducer_rows`; that is exact and does
+not depend on the order elimination took the rows in, because rank does not.
+
+Two further quantities are kept apart deliberately:
+
+| Figure | What it is |
+|---|---|
+| `max_pair_degree` | the highest lcm degree any batch was *selected* at |
+| `max_monomial_degree` | the highest degree any monomial reached as a matrix *column* |
+
+The second is in general larger, because reducer multiples carry monomials above the lcm that
+produced them. **Neither is the solving degree or the degree of regularity**, which are properties
+of the ideal rather than of a run.
+
+`profile_degrees` is off by default for the same reason `measure_stages` is: the shipping path
+should contain no profiling. When it is on, it costs a map insertion per batch and one scan of each
+matrix's column vector — per batch, not per row. The rank attribution itself is free either way,
+since it is arithmetic on counters the elimination already returns. A profiled run returns exactly
+the basis an unprofiled one does, which is asserted over the whole correctness corpus.
 
 #### Choosing a strategy
 

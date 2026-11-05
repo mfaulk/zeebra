@@ -17,8 +17,8 @@ pub use buchberger::{
     buchberger, buchberger_with_criteria, buchberger_with_statistics, Statistics,
 };
 pub use f4::{
-    f4, f4_observed, f4_reported, f4_with_options, trace_batches, CacheMode, F4Error, F4Options,
-    F4Statistics, ReducerSelection, ReductionStrategy,
+    f4, f4_observed, f4_reported, f4_with_options, trace_batches, CacheMode, DegreeProfile,
+    DegreeStatistics, F4Error, F4Options, F4Statistics, ReducerSelection, ReductionStrategy,
 };
 pub use fglm::{
     classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,

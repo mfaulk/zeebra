@@ -183,9 +183,66 @@ pub struct BatchStatistics {
     /// monomials by construction. The unstructured path finds the same thing by accident where it
     /// happens, so this is comparable between the two.
     pub free_pivots: usize,
+
+    /// Distinct leading monomials among the input rows.
+    ///
+    /// `reducer_rows` of them come from the reducer block, whose leading monomials are distinct by
+    /// construction, and the rest are the distinct lcms of the batch's pairs. Every one is a pivot
+    /// column of the echelon form, which makes `rank - input_leading_monomials` exactly the number
+    /// of new basis elements — see [`super::degrees`] for the identity and its test.
+    pub input_leading_monomials: usize,
+
+    /// The lcm degree the batch was selected at: the largest pair degree in it.
+    ///
+    /// Zero for an empty batch. The main loop selects one degree at a time, so for every batch it
+    /// drives this is *the* degree; a caller calling [`super::reduce_batch`] with pairs of mixed
+    /// degree gets the largest, which is what the candidate-degree comparison below needs.
+    pub batch_degree: u64,
+
+    /// The smallest total degree of any new basis element this batch produced.
+    pub min_candidate_degree: Option<u64>,
+
+    /// The largest total degree of any new basis element this batch produced.
+    pub max_candidate_degree: Option<u64>,
+
+    /// New basis elements whose own total degree is below [`Self::batch_degree`].
+    ///
+    /// Mutants: relations arriving at a lower degree than the schedule that found them. Always
+    /// counted — it is one `degree()` call per candidate, and candidates are rare — because
+    /// M22-D's question is whether they occur at all.
+    pub candidates_below_batch_degree: usize,
+
+    /// The largest total degree of any monomial appearing as a matrix column.
+    ///
+    /// Zero unless [`F4Options::profile_degrees`](super::F4Options::profile_degrees) is set: it is
+    /// a scan of the column vector, which costs nothing against building the matrix but is still
+    /// work the shipping path has no use for.
+    pub max_column_degree: u64,
 }
 
 impl BatchStatistics {
+    /// Rows that are halves of a critical pair rather than reduction scaffolding.
+    pub fn candidate_rows(&self) -> usize {
+        self.rows.saturating_sub(self.reducer_rows)
+    }
+
+    /// Rank the pair rows added on top of the reducer block.
+    ///
+    /// Reducer rows have distinct leading monomials, so they span a space of dimension exactly
+    /// `reducer_rows`; everything the elimination found above that came from the pairs. Exact and
+    /// independent of the order the rows were eliminated in, because rank is.
+    pub fn candidate_rank_contribution(&self) -> usize {
+        self.elimination.rank.saturating_sub(self.reducer_rows)
+    }
+
+    /// Pair rows that added no rank.
+    ///
+    /// Equal to [`BatchStatistics::elimination`]'s zero-row count, since reducer rows never reduce
+    /// to zero. Named for what it measures rather than how it is computed.
+    pub fn dependent_candidate_rows(&self) -> usize {
+        self.candidate_rows()
+            .saturating_sub(self.candidate_rank_contribution())
+    }
     /// Bytes of matrix entries live at this batch's peak.
     ///
     /// What [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes) is enforced on.
@@ -335,6 +392,33 @@ pub struct F4Statistics {
 
     /// Summed over every batch: pivots established without a row operation.
     pub free_pivots: usize,
+
+    /// Summed over every batch: rank the pair rows added on top of the reducer block.
+    ///
+    /// The useful-work figure. See [`super::degrees`] for why this and not the zero-row count.
+    pub candidate_rank_contribution: usize,
+
+    /// Summed over every batch: pair rows that added no rank.
+    pub dependent_candidate_rows: usize,
+
+    /// Summed over every batch: new basis elements of degree below their batch's selection degree.
+    pub mutant_elements: usize,
+
+    /// The largest total degree of any monomial that appeared as a matrix column.
+    ///
+    /// **Not the same quantity as [`F4Statistics::max_pair_degree`]**, and in general larger:
+    /// reducer multiples carry monomials above the lcm their batch was selected at. Neither figure
+    /// is the solving degree or the degree of regularity, which are properties of the ideal and not
+    /// of a run. Zero unless
+    /// [`F4Options::profile_degrees`](super::F4Options::profile_degrees) is set.
+    pub max_monomial_degree: u64,
+
+    /// What happened at each selection degree.
+    ///
+    /// Empty unless [`F4Options::profile_degrees`](super::F4Options::profile_degrees) is set. The
+    /// counters above are sums and maxima over the whole run; this is the same work broken out by
+    /// the degree it was done at.
+    pub degrees: super::degrees::DegreeProfile,
 }
 
 impl F4Statistics {
@@ -388,6 +472,10 @@ impl F4Statistics {
         self.divisor_queries += batch.divisor_queries;
         self.divisor_scan_steps += batch.divisor_scan_steps;
         self.free_pivots += batch.free_pivots;
+        self.candidate_rank_contribution += batch.candidate_rank_contribution();
+        self.dependent_candidate_rows += batch.dependent_candidate_rows();
+        self.mutant_elements += batch.candidates_below_batch_degree;
+        self.max_monomial_degree = self.max_monomial_degree.max(batch.max_column_degree);
         if batch.structured {
             self.structured_batches += 1;
         }
@@ -481,6 +569,21 @@ impl F4Statistics {
             0.0
         } else {
             self.reducer_rows as f64 / rows as f64
+        }
+    }
+
+    /// The fraction of pair rows that added no rank.
+    ///
+    /// M22's first research question — *what fraction of F4's work is redundant* — in one number.
+    /// It is deliberately stated over **pair rows** rather than over pairs: a pair contributes two
+    /// rows and either, neither, or both can be dependent, so there is no pair-level reading of
+    /// this figure. Zero when no pair row was built.
+    pub fn dependent_row_fraction(&self) -> f64 {
+        let built = self.dependent_candidate_rows + self.candidate_rank_contribution;
+        if built == 0 {
+            0.0
+        } else {
+            self.dependent_candidate_rows as f64 / built as f64
         }
     }
 }
