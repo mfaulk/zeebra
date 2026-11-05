@@ -15,6 +15,7 @@ mod gcd;
 mod lagrange_interpolation;
 mod polynomial_trait;
 mod pow_mod;
+mod power_permutation;
 mod roots;
 mod univariate_parser;
 
@@ -27,6 +28,10 @@ pub use gcd::gcd;
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
 pub use polynomial_trait::Polynomial;
 pub use pow_mod::pow_mod;
+pub use power_permutation::{
+    inverse_exponent, is_permutation_exponent, is_permutation_polynomial, permutation_exponents,
+    PowerPermutation,
+};
 pub use roots::roots;
 use std::cmp::max;
 

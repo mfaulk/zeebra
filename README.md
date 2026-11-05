@@ -2195,6 +2195,80 @@ division.
 Splitting is randomized, so this takes an rng and the order of the returned factors is
 unspecified.
 
+## Permutation Polynomials
+An arithmetization-friendly hash is built from a **power permutation**: Poseidon's S-box is
+`x -> x^d`, and that map is a bijection of GF(q) exactly when `gcd(d, q - 1) = 1` — it fixes zero,
+and on the multiplicative group, which is cyclic of order `q - 1`, raising to the `d`th power is
+injective precisely when `d` is invertible modulo the group order. That inverse is the exponent of
+the **compositional inverse**, since `(x^d)^e = x^{de} = x` when `de = 1 (mod q - 1)`. The test, the
+enumeration of admissible exponents, and the inverse map are therefore all one piece of arithmetic
+modulo `q - 1`.
+
+```rust
+use zeebra::{
+    fields::{BabyBear, KoalaBear},
+    inverse_exponent, is_permutation_exponent, permutation_exponents, FiniteField, KnownOrder,
+    PowerPermutation,
+};
+
+// KoalaBear, the field the 2026 Poseidon challenges use: p - 1 = 2^24 * 127, which 3 does not
+// divide, so the challenge's `alpha = 3` is admissible.
+let q = KoalaBear::order_u128().unwrap();
+assert!(is_permutation_exponent(3, q));
+assert_eq!(inverse_exponent(3, q), Some(1420470955));
+
+// The S-box, and the map an attacker inverts.
+let sbox = PowerPermutation::<KoalaBear>::new(3).unwrap();
+let x = KoalaBear::new(12345);
+assert_eq!(sbox.invert(&sbox.apply(&x)), x);
+assert_eq!(sbox.inverse().apply(&x), sbox.invert(&x));
+
+// BabyBear factors differently -- p - 1 = 2^27 * 3 * 5 -- so the cube map is not a permutation
+// there, and the smallest S-box exponent above the identity is 7.
+let q = BabyBear::order_u128().unwrap();
+assert!(!is_permutation_exponent(3, q));
+assert_eq!(permutation_exponents(q).find(|&d| d > 1), Some(7));
+```
+
+`permutation_exponents` is lazy and yields one representative per distinct map — the admissible
+residues in `1..=q-2` — which over a 31-bit field is around `2^31` items, so a caller after the
+small exponents an S-box would use should stop early rather than collect.
+
+Exponents are `u128` because `FiniteField::pow` takes a `u128` exponent, so a power map over a
+field whose order exceeds that is not expressible in the first place. `PowerPermutation::new`
+panics for such a field, and the 254- and 255-bit prime fields are out of reach here.
+
+Deciding whether an *arbitrary* polynomial permutes GF(q) is a much larger subject — Hermite's
+criterion, and families such as the Dickson polynomials — and none of it is implemented.
+`is_permutation_polynomial` accordingly returns `Option<bool>` and answers only for the shapes whose
+answer is immediate: a monomial `c x^d` with `c != 0`, which permutes iff `x^d` does, and an affine
+`a x + b`, which permutes every field when `a != 0`. Anything else is `None`, and that is "not
+decided here" rather than "not a permutation":
+
+```rust
+use zeebra::{fields::Zp7, is_permutation_polynomial, FiniteField, UnivariatePolynomial};
+
+let monomial = |d: usize, c: u64| {
+    let mut coefficients = vec![Zp7::new(0); d + 1];
+    coefficients[d] = Zp7::new(c);
+    UnivariatePolynomial::<Zp7>::new(&coefficients)
+};
+
+// gcd(5, 6) = 1, and the leading coefficient only composes a bijection with a bijection.
+assert_eq!(is_permutation_polynomial(&monomial(5, 3)), Some(true));
+// gcd(3, 6) = 3.
+assert_eq!(is_permutation_polynomial(&monomial(3, 1)), Some(false));
+
+// x^3 + x happens to permute GF(7), but establishing that is not in scope.
+let f = UnivariatePolynomial::<Zp7>::new(&[Zp7::new(0), Zp7::new(1), Zp7::new(0), Zp7::new(1)]);
+assert_eq!(is_permutation_polynomial(&f), None);
+```
+
+This changes nothing about `grobner::research::poseidon`, whose `alpha` stays what each challenge
+specifies: a different exponent is a different cryptographic problem, not a variation on the same
+one. What these utilities are for is a sweep that varies `alpha` deliberately and measures what the
+solving degree does.
+
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
 
