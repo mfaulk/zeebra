@@ -17,8 +17,9 @@ Six families of random multivariate quadratic systems over three fields, in two 
 | VI | GF(31) | signature | `n ≈ 1.5m` | **yes** |
 
 GF(31) needed **no new arithmetic**: `PrimeFieldElement64<31>` already existed. The 32-bit prime
-field of issue #62 would make it faster and is an independent optimization, not a prerequisite —
-which was worth settling before the first importer PR, because the plan's §6.2 left it ambiguous.
+field of issue #62 has since landed as `Zp31`, and was an independent optimization rather than a
+prerequisite — which was worth settling before the first importer PR, because the plan's §6.2 left
+it ambiguous.
 
 GF(2^8) is the one real gap, and it is interface work rather than mathematics: the binary and
 extension field modules exist and are not publicly exported. Deliberate scope, and deliberately
@@ -165,5 +166,8 @@ coefficient vectors and every dead slice recorded as the experiment it is.
 - **`n = 55` and up** are far beyond the current solvers; `SUPPORTED_DIMENSIONS` is `[10, 15, 20]`
   and an unsupported size is `MqError::UnsupportedDimension` rather than a panic. Compiling
   dimensions that cannot be used would be worse than saying so.
-- **A 32-bit prime field** (#62) would halve the bytes the elimination moves over GF(31). Measured
-  gain unknown; independent of this importer.
+- **A 32-bit prime field** (#62) landed, as `Zp31`. It halves the bytes a *dense* elimination moves
+  and is worth 2.8x there, but the solver's default `Backend::Adaptive` gains nothing measurable —
+  0.98x to 1.04x — because a sparse entry is `(usize, F)` and the index's alignment pads it to 16
+  bytes at either width. Measured in
+  `docs/MILESTONE-SIMD-PARALLELISM.md` §8; the importer is unaffected either way.

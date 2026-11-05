@@ -117,18 +117,22 @@ mod tests {
     use super::{two_adic_decomposition, two_adic_root_of_unity};
     use crate::{
         fields::{
-            Bls12_381Fr, Bn254Fr, PrimeFieldElement64, Zp13, Zp18446744069414584321, Zp2147483647,
-            Zp65537,
+            BabyBear, Bls12_381Fr, Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64, Zp13,
+            Zp18446744069414584321, Zp2147483647, Zp65537,
         },
         integers::big_uint::BigUInt,
         KnownOrder, One, Zero,
     };
 
-    /// KoalaBear, `2^31 - 2^24 + 1`, the field the 2026 Poseidon challenges are over.
-    type KoalaBear = PrimeFieldElement64<2_130_706_433>;
-
     /// Goldilocks, `2^64 - 2^32 + 1`.
     type Goldilocks = Zp18446744069414584321;
+
+    /// KoalaBear backed by a `u64` rather than a `u32`.
+    ///
+    /// The same field as [`KoalaBear`], at the other storage width, so the two must report the
+    /// same two-adicity — which is the point of deriving it from the order rather than declaring
+    /// it per type.
+    type KoalaBear64 = PrimeFieldElement64<2_130_706_433>;
 
     /// The decomposition of a handful of small orders, worked out by hand.
     #[test]
@@ -178,7 +182,10 @@ mod tests {
         decomposition_reconstructs_the_group_order::<Zp13>();
         decomposition_reconstructs_the_group_order::<Zp65537>();
         decomposition_reconstructs_the_group_order::<Zp2147483647>();
+        decomposition_reconstructs_the_group_order::<Mersenne31>();
+        decomposition_reconstructs_the_group_order::<BabyBear>();
         decomposition_reconstructs_the_group_order::<KoalaBear>();
+        decomposition_reconstructs_the_group_order::<KoalaBear64>();
         decomposition_reconstructs_the_group_order::<Goldilocks>();
         decomposition_reconstructs_the_group_order::<Bn254Fr>();
         decomposition_reconstructs_the_group_order::<Bls12_381Fr>();
@@ -195,8 +202,12 @@ mod tests {
         // 2^31 - 1 is a Mersenne prime: q - 1 = 2 * (2^30 - 1), so there is no NTT here beyond
         // size two. This is the field most of the crate's F4 benchmarks use.
         assert_eq!(Zp2147483647::two_adicity(), 1);
-        // 2^31 - 2^24 + 1, chosen for exactly this property.
+        // 2^31 - 2^24 + 1 and 2^31 - 2^27 + 1, both chosen for exactly this property.
         assert_eq!(KoalaBear::two_adicity(), 24);
+        assert_eq!(BabyBear::two_adicity(), 27);
+        // A field's two-adicity is a property of its order, not of how its residues are stored.
+        assert_eq!(KoalaBear64::two_adicity(), KoalaBear::two_adicity());
+        assert_eq!(Mersenne31::two_adicity(), Zp2147483647::two_adicity());
         // 2^64 - 2^32 + 1.
         assert_eq!(Goldilocks::two_adicity(), 32);
         // 2^16 + 1.
@@ -233,7 +244,10 @@ mod tests {
         roots_have_exact_order::<Zp13>(1, 8);
         roots_have_exact_order::<Zp65537>(2, 8);
         roots_have_exact_order::<Zp2147483647>(3, 8);
+        roots_have_exact_order::<Mersenne31>(3, 8);
+        roots_have_exact_order::<BabyBear>(4, 8);
         roots_have_exact_order::<KoalaBear>(4, 8);
+        roots_have_exact_order::<KoalaBear64>(4, 8);
         roots_have_exact_order::<Goldilocks>(5, 8);
         roots_have_exact_order::<Bn254Fr>(6, 8);
         roots_have_exact_order::<Bls12_381Fr>(7, 8);

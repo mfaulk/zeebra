@@ -270,6 +270,8 @@ cargo run --release --example solve_one            # systems in, verified soluti
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
 cargo run --release --example solve_auto           # four policies against an offline best-of-two
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
+cargo run --release --example field_width          # what a 4-byte field element is worth, per
+cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
 cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
@@ -430,8 +432,10 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md),
 [`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md),
 [`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md),
-[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md), and
-[`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md).
+[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md),
+[`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md),
+[`docs/MILESTONE-DEGREE-AWARE-F4.md`](docs/MILESTONE-DEGREE-AWARE-F4.md), and
+[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md).
 
 ## Finite Fields
 
@@ -458,6 +462,7 @@ one four times as wide. `cargo bench --bench field_arithmetic`, per operation:
 
 | field | width | mul | add | sub | inverse |
 |---|---:|---:|---:|---:|---:|
+| `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | 227 ns |
 | `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | 246 ns |
 | `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | 509 ns |
 | `PrimeFieldElement128` | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
@@ -479,6 +484,80 @@ whole computation, because both modules are private and no bench target can reac
 - `ExtensionFieldElement<P, N, M>` reduces once per output coefficient instead of once per partial
   product, O(N) instead of O(N^2), under a compile-time overflow bound; the per-multiplication heap
   allocation is gone.
+
+### A 32-bit prime field
+
+`PrimeFieldElement32<P>` is the same field as `PrimeFieldElement64<P>` for any modulus both can
+hold, in half the bytes. Montgomery form with R = 2^32, the representation unobservable in the same
+two ways; the one place the arithmetic is not a mechanical substitution is that `t + m*P` needs 65
+bits only when P exceeds 2^31, and that predicate is on the const generic, so every declared
+modulus gets a reduction with no carry handling in it.
+
+```rust
+use zeebra::{fields::{BabyBear, Mersenne31, Zp2147483647}, FiniteField, KnownOrder};
+
+assert_eq!(std::mem::size_of::<Mersenne31>(), 4);
+assert_eq!(std::mem::size_of::<Zp2147483647>(), 8);
+assert_eq!(Mersenne31::order_u128(), Zp2147483647::order_u128());
+
+let a = Mersenne31::new(827376);
+assert_eq!(a.pow(2).value(), 1651245630);   // the canonical residue, not the Montgomery form
+assert_eq!(BabyBear::order_u128(), Some(2013265921));
+```
+
+Declared: `Zp31` (Fukuoka MQ types III and VI), `Zp65537_32`, `Mersenne31`, `BabyBear`
+(`2^31 - 2^27 + 1`) and `KoalaBear` (`2^31 - 2^24 + 1`, the 2026 Poseidon challenge prime). The
+last two are NTT-friendly; `Zp65537_32` and `Zp2147483647` are the same mathematical fields as
+`Zp65537` and `Mersenne31`'s 64-bit twin, so a caller picks a width rather than a field.
+
+**What it is worth, and where.** `cargo run --release --example field_width`. The kernel is
+`target -= factor * source` with the nonzero counters the dense backend maintains, at a fixed
+*entry* count so that both widths do the same number of cell updates:
+
+| working set (u32/u64) | u64 ns/entry | u32 ns/entry | u32 GB/s | AVX2 8 lanes | AVX2 GB/s |
+|---|---:|---:|---:|---:|---:|
+| 8 / 16 KB | 1.802 | 0.765 | 15.7 | **0.264** | 45.4 |
+| 256 / 512 KB | 1.770 | 0.751 | 16.0 | **0.253** | 47.5 |
+| 16 / 32 MB | 1.783 | 0.753 | 15.9 | **0.262** | 45.8 |
+| 128 / 256 MB | 1.897 | 0.786 | 15.3 | **0.446** | 26.9 |
+
+Two things in that table correct the premise it was built on. **The scalar kernel is ALU-bound at
+both widths, not bandwidth-bound**: ns/entry is flat to within 7% over a working set spanning four
+orders of magnitude — the 256 MB row re-ran at 1.804 — and 15.9 GB/s is well under what one core
+can pull. So the 2.36x is not
+halved bytes — it is that a 64-bit Montgomery reduction is 128-bit arithmetic that does not
+vectorize, and a 32-bit one is 64-bit arithmetic that does. **Only the AVX2 kernel is fast enough
+for the bytes to bind**, and it is where halving them pays: 45 GB/s in cache falling to 26.9 GB/s
+out of it, which at 24 bytes an entry would have been 0.89 ns rather than 0.446.
+
+That also reverses M19-D's answer. At four lanes over `u64` hand-written AVX2 ran 0.86x to 1.07x
+against autovectorization; at eight lanes over `u32` it runs **1.7x to 3.0x**, against a scalar
+comparand LLVM did vectorize (`vpmuludq` present in both, verified in the artifact). No intrinsics
+are shipped — the kernel lives in the example, cross-checked cell for cell and counter for counter
+against the scalar one — but the question is no longer closed.
+
+Whole eliminations, same matrices at both widths:
+
+| | u64 | u32 | ratio |
+|---|---:|---:|---:|
+| dense echelon, 1500x1500 at 5% | 2515.6 ms, 17.2 MB | 882.9 ms, 8.6 MB | 2.85x |
+| dense echelon, 3000x3000 at 2% | 19789.6 ms, 68.7 MB | 6868.0 ms, 34.3 MB | 2.88x |
+| F4 elimination, katsura-6 grevlex, `Backend::Dense` | 70.78 ms | 25.27 ms | 2.80x |
+| F4 elimination, katsura-6 grevlex, `Backend::Sparse` | 35.03 ms | 25.90 ms | 1.35x |
+| F4 elimination, katsura-6 grevlex, `Backend::Adaptive` | 6.60 ms | 6.41 ms | 1.03x |
+
+**The last row is why no benchmark switched its field.** `Backend::Adaptive` is what
+`F4Options::default()` selects and it is 4x faster than the dense backend at either width, so it is
+the configuration that matters — and it gains nothing, because its cost is sparse-index traversal
+and scatter/gather into a buffer rather than cell traffic. The sparse backend gains little for a
+related reason: a sparse entry is `(usize, F)`, which the index's alignment pads to **16 bytes at
+either width**, so sparse storage does not shrink at all and `F4Options::live_entry_allowance` is
+unchanged. The narrower field is a 2-3x win on the dense path, a memory halving wherever cells are
+stored bare, and the enabler for eight-lane SIMD. It is not a free 2x on F4 as shipped.
+
+The dense entry-budget conversion in `linalg::dense::rows` does move, and not by the factor a
+reader would guess: `cells_per_entry` goes from two to **four**, since the entry cost is pinned at
+16 bytes by the index while the cell cost halves.
 
 ### 254- and 255-bit prime fields
 
@@ -592,6 +671,55 @@ Every field type in the crate implements both traits. Two consequences for anyth
 
 `docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 
+## Dense Matrices
+
+`linalg::Matrix<T>` is a dense matrix over any `T: Ring`, stored row-major, with the `matrix!`
+macro for small literals and `zero`, `identity`, `from_diag` and `new` for the rest. Rows are
+reachable by `row`, `row_mut`, `rows` and `rows_mut`; columns by `column` and `columns`, which walk
+the buffer at a stride of `num_columns` rather than materializing a `transpose()`. Over a
+`FiniteField` there are also `rank`, `inverse` and `determinant`.
+
+```rust
+use zeebra::{fields::Zp541, linalg::Matrix, matrix, FiniteField};
+
+type F = Zp541;
+
+let a = matrix![
+    F::new(1), F::new(2);
+    F::new(3), F::new(4)
+];
+assert_eq!(
+    a.column(1).copied().collect::<Vec<F>>(),
+    vec![F::new(2), F::new(4)]
+);
+assert_eq!(a.columns().count(), 2);
+
+// [A | I], the augmented matrix an inversion reduces.
+let augmented = a.hconcat(&Matrix::identity(2)).unwrap();
+assert_eq!(augmented.shape(), (2, 4));
+
+// The other dimension has to agree, and the error reports both shapes when it does not.
+assert!(a.vconcat(&Matrix::identity(3)).is_err());
+
+// The transfer matrix of the Fibonacci recurrence: its nth power holds F(n+1) and F(n).
+let fibonacci = matrix![
+    F::new(1), F::new(1);
+    F::new(1), F::new(0)
+];
+assert_eq!(fibonacci.pow(10).unwrap()[[0, 1]], F::new(55));
+```
+
+`pow` is repeated squaring, so a large exponent costs log-many multiplications; it returns
+`Err(NotSquare)` for a non-square matrix, including at exponent zero, where there is no size the
+identity could take. `hconcat` and `vconcat` return `Err(IncompatibleShapes)` carrying both shapes.
+
+Two gaps are deliberate. There is no mutable column iterator — handing out disjoint `&mut` down a
+strided column of a row-major buffer is where the borrow checker stops being free, and nothing in
+the crate needs it yet. And `Matrix<T>` does not implement `Ring`, so a matrix cannot yet be a
+polynomial coefficient: `Ring` has no fallible operations, and only *square* matrices form one, so
+that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime check inside
+`mul`. [#132](https://github.com/mfaulk/zeebra/issues/132) has the discussion.
+
 ## Number-Theoretic Transform
 
 `fft::evaluate` and `fft::interpolate` are the forward and inverse transforms over an `FFTDomain`
@@ -628,15 +756,21 @@ assert_eq!(interpolate(&values, &domain), p);
 
 | field | s | largest transform |
 |---|---|---|
-| `Zp2147483647` — Mersenne-31, `2^31 - 1` | **1** | 2 |
-| `PrimeFieldElement64<2130706433>` — KoalaBear | 24 | 2^24 |
+| `Mersenne31` / `Zp2147483647` — `2^31 - 1` | **1** | 2 |
+| `KoalaBear` — `2^31 - 2^24 + 1` | 24 | 2^24 |
+| `BabyBear` — `2^31 - 2^27 + 1` | 27 | 2^27 |
 | `Zp18446744069414584321` — Goldilocks | 32 | 2^32 |
 | `Bn254Fr` | 28 | 2^28 |
 | `Bls12_381Fr` | 32 | 2^32 |
 
+`two_adicity` is a provided method on `KnownOrder`, so it reads the same from a 32-bit, 64-bit or
+254-bit backing; `Mersenne31` and `Zp2147483647` are the same field at two storage widths and
+report the same s.
+
 **Mersenne-31 admits no transform above size two**, which matters because it is the field most of
-this crate's F4 benchmarks use. KoalaBear, the field the 2026 Poseidon challenges are over, is
-NTT-friendly by construction and needs no new type — `PrimeFieldElement64<2130706433>` is it.
+this crate's F4 benchmarks use. `BabyBear` and `KoalaBear` — the latter being the prime the 2026
+Poseidon challenges are over — are NTT-friendly by construction and are what to reach for when a
+transform is wanted over a small field.
 
 `FiniteField::pow_limbs` takes its exponent as little-endian limbs, which is what makes the above
 possible at all: the odd part of BN254's `q - 1` is 226 bits, so `pow`'s `u128` cannot hold it.
@@ -1254,11 +1388,78 @@ set, not a general preprocessor and not nonlinear elimination. An affine relatio
 after some nonlinear cancellation is not found, and nothing looks for one. A generator that
 substitutes to a nonzero constant is **kept**, so an inconsistent system still reports `{1}`.
 
+#### The challenge registry
+
+`grobner::research::registry` is the frozen list of public problems this project measures itself
+against: the three 2026 Poseidon-31 CICO targets, a nine-row faithful reduced-round ladder at the
+official state width, the small planted surrogates M21 and M22 measured, and the Fukuoka GF(31)
+toy examples. A `ChallengeManifest` says what a **problem** is — objective, parameters, target, and
+how a claimed answer is checked by something that is not this crate — where an `InstanceManifest`
+says what a *file* is.
+
+Three things keep it honest.
+
+**`BenchmarkClass` is part of every row.** A witness for a `t = 2` planted instance and a witness
+for the official `t = 16` target are both "solved" in a column that adds them together, and they
+are not comparable in any direction. `Significance` is therefore *computed* from the class and the
+external status rather than written by a report:
+
+```rust
+use zeebra::{fields::PrimeFieldElement64, grobner::research::{
+    challenge, BenchmarkClass, ExternalStatus, Significance, KOALABEAR_PRIME}};
+
+type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+
+let official = challenge("poseidon31-cico-rf6-rp8").expect("registered");
+assert_eq!(official.class, BenchmarkClass::Official);
+assert_eq!(official.external, ExternalStatus::SolvedExternally { verified: "2026-05-06" });
+
+// 14 free inputs and 16·6 + 8 S-box variables, against those plus two output constraints.
+assert_eq!((official.variables(), official.equations()), (Some(118), Some(106)));
+
+// The strongest claim available on a challenge that is already solved publicly.
+assert_eq!(official.significance(true),
+           Significance::Reproduction { externally_verified: "2026-05-06" });
+assert_eq!(official.significance(false), Significance::NoWitness);
+
+// A reduction's witness is a real result about a different problem, and says so.
+let reduced = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+assert_eq!(reduced.significance(true),
+           Significance::ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" });
+
+// The registry is executable: a runner takes its instance from here, so there is no second copy
+// of the constants to drift from these.
+let instance = official.cico_instance::<K>().expect("builds");
+assert_eq!(instance.variables(), 118);
+```
+
+**Identity is a digest over the problem, not over the paperwork.** `ChallengeManifest::digest` is
+SHA-256 of a canonical form covering the family, the objective tag, the parameters and the target.
+A corrected URL, a paid bounty or a reworded verifier leaves it alone; a changed round count does
+not. That is what lets a comparison refuse to compare two runs of *different mathematical
+problems*, which is the one failure a benchmark harness cannot be allowed to make quietly.
+
+**The generator is pinned separately.** A parameter checksum cannot notice a changed generator: if
+the Grain LFSR or the Cauchy construction changed, every registered instance would become a
+different permutation with an unchanged identity. `derived_digest` hashes the round constants and
+MDS matrix, and three of them are pinned in tests.
+
+`dispatch_cico` bridges the const generic — `CicoInstance::system::<N>()` needs `N` at compile time
+and the registry has fifteen distinct `N` — in the same shape as `MqVisitor` does for the MQ family.
+
+The registry is frozen by `test_the_registry_is_frozen`, which pins every id and digest, so
+redefining a registered problem fails a test rather than silently changing what an earlier
+measurement meant. See
+[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md) for the
+full table and for what the three 2026 CICO targets' external status implies about what a result
+there could claim.
+
 #### External instances: the Fukuoka MQ Challenge
 
 `grobner::research::MqInstance` imports instances from the
 [Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
-no new arithmetic — `PrimeFieldElement64<31>` already exists — and the GF(2) and GF(2^8) families
+no new arithmetic — `PrimeFieldElement64<31>` already exists, and `Zp31` is the same field in four
+bytes — and the GF(2) and GF(2^8) families
 are refused by name, because `binary_field` and `extension_field` are not publicly exported.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,

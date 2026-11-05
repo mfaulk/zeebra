@@ -1,8 +1,10 @@
 //! Prime field arithmetic.
 //!
-//! Three fields spanning the sizes the project cares about: a 31-bit Mersenne prime, the largest
-//! 64-bit prime, and a 68-bit prime held in a `u128`. The first two share an implementation and
-//! differ only in operand size; the third exercises the separate 128-bit type.
+//! Four widths spanning the sizes the project cares about: a 31-bit Mersenne prime held in a
+//! `u32` and in a `u64`, the largest 64-bit prime, and a 68-bit prime held in a `u128`. The
+//! middle two share an implementation and differ only in operand size; `p31_u32` is the same
+//! modulus as `p31` over a separate 4-byte type, so the pair isolates storage width at a fixed
+//! field; the last exercises the separate 128-bit type.
 //!
 //! Operands are drawn in advance and the loop consumes them in order, so the measurement covers
 //! the arithmetic and not the generation.
@@ -21,7 +23,10 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
-    fields::{Bls12_381Fr, Bn254Fr, PrimeFieldElement128, Zp18446744073709551557, Zp2147483647},
+    fields::{
+        Bls12_381Fr, Bn254Fr, Mersenne31, PrimeFieldElement128, Zp18446744073709551557,
+        Zp2147483647,
+    },
     FiniteField,
 };
 
@@ -166,6 +171,9 @@ type Zp128 = PrimeFieldElement128<221360928884514619393>;
 
 fn benches(c: &mut Criterion) {
     bench_field::<Zp2147483647>(c, "p31");
+    // The same modulus in four bytes rather than eight: `p31` against `p31_u32` is the storage
+    // width alone, with the field held fixed.
+    bench_field::<Mersenne31>(c, "p31_u32");
     bench_field::<Zp18446744073709551557>(c, "p64");
     bench_field::<Zp128>(c, "p68");
     // The cryptographic scalar fields. Named by width so the ordering in the report matches the

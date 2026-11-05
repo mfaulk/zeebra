@@ -17,6 +17,13 @@ pub enum Error {
     /// There were not enough elements to fill the array.
     NotEnoughElements { num_elements: usize },
 
+    /// Two matrices could not be combined because their shapes disagree. Each shape is
+    /// `(num_rows, num_columns)`.
+    IncompatibleShapes {
+        left: (usize, usize),
+        right: (usize, usize),
+    },
+
     /// The matrix is not square.
     NotSquare { num_rows: usize, num_columns: usize },
 
@@ -38,6 +45,11 @@ impl Display for Error {
             Error::NotEnoughElements { num_elements } => {
                 write!(f, "Not enough elements: {}", num_elements)
             }
+            Error::IncompatibleShapes { left, right } => write!(
+                f,
+                "Incompatible shapes: {}x{} and {}x{}",
+                left.0, left.1, right.0, right.1
+            ),
             Error::NotSquare {
                 num_rows,
                 num_columns,

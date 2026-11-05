@@ -43,6 +43,7 @@ derivation.
 | field | q | s | odd part m | element |
 |---|---|---|---|---|
 | Mersenne-31 | `2^31 - 1` | **1** | 30 bits | 8 B |
+| BabyBear | `2^31 - 2^27 + 1` | **27** | 4 bits | 8 B |
 | KoalaBear | `2^31 - 2^24 + 1` | **24** | 7 bits | 8 B |
 | Goldilocks | `2^64 - 2^32 + 1` | **32** | 32 bits | 8 B |
 | BN254 `Fr` | 254 bits | **28** | 226 bits | 32 B |
@@ -58,10 +59,14 @@ derivation.
    transform actually depends on, which a non-primitive n-th root would fail.
 
 **Mersenne-31 has two-adicity 1.** The field almost every F4 benchmark in this crate runs over
-admits no power-of-two transform above size two. That is why the sweep includes KoalaBear: #62's
-"equivalent small NTT-friendly prime field" needs no new code at all, since
-`PrimeFieldElement64<2130706433>` is NTT-friendly today — #62 is about storage width, not about
-this.
+admits no power-of-two transform above size two. That is why the sweep includes KoalaBear. #62's
+"equivalent small NTT-friendly prime field" turned out to need no new mathematics: #62 is about
+storage width, and `two_adicity` is a property of the order, so `fields::KoalaBear` and
+`fields::BabyBear` (now 32-bit backed, s = 24 and 27) report the same values as the 64-bit-backed
+types of the same moduli. The sweep uses the 64-bit backing throughout so that
+`size_of::<F>()` is 8 across all three narrow fields and the byte figures are comparable; over the
+32-bit types every peak figure halves and nothing else changes, since each stage is linear in
+`size_of::<F>()`.
 
 ### 1.2 The transform is now real over the wide fields
 

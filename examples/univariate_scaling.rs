@@ -50,12 +50,17 @@ use zeebra::{
 
 // === the fields ===
 
+// All four are backed by a `u64`, so `size_of::<F>()` is 8 for the three narrow ones and the peak
+// byte figures are comparable across them. `fields::Mersenne31` and `fields::KoalaBear` are the
+// same two fields backed by a `u32`; every peak figure below would halve over those, and nothing
+// else about the curves would change, since the stages are linear in `size_of::<F>()`.
+
 /// Mersenne-31, `2^31 - 1`. The field almost every F4 benchmark in this crate uses.
-type Mersenne31 = PrimeFieldElement64<2_147_483_647>;
+type Mersenne31In64 = PrimeFieldElement64<2_147_483_647>;
 
 /// KoalaBear, `2^31 - 2^24 + 1`. The field the 2026 Poseidon challenges are over, chosen for
 /// NTT-friendliness.
-type KoalaBear = PrimeFieldElement64<2_130_706_433>;
+type KoalaBearIn64 = PrimeFieldElement64<2_130_706_433>;
 
 /// Goldilocks, `2^64 - 2^32 + 1`.
 type Goldilocks = PrimeFieldElement64<18_446_744_069_414_584_321>;
@@ -502,10 +507,10 @@ fn main() {
 
     let run_all = selector == "all";
     if run_all || selector == "mersenne31" {
-        measure_field::<Mersenne31>("Mersenne-31, 2^31 - 1", budget, 0x4d31);
+        measure_field::<Mersenne31In64>("Mersenne-31, 2^31 - 1", budget, 0x4d31);
     }
     if run_all || selector == "koalabear" {
-        measure_field::<KoalaBear>("KoalaBear, 2^31 - 2^24 + 1", budget, 0x4b0a);
+        measure_field::<KoalaBearIn64>("KoalaBear, 2^31 - 2^24 + 1", budget, 0x4b0a);
     }
     if run_all || selector == "goldilocks" {
         measure_field::<Goldilocks>("Goldilocks, 2^64 - 2^32 + 1", budget, 0x601d);
