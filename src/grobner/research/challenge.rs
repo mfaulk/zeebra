@@ -440,6 +440,76 @@ impl Display for Significance {
     }
 }
 
+/// What attack method has been publicly disclosed for a problem, if any.
+///
+/// Deliberately separate from [`ExternalStatus`]. A program can verify a submission without naming
+/// the submitter, and a paper can describe an attack at the same parameters without being that
+/// submission — so "verified on this date" and "this is how it was done" are two different claims.
+/// Folding them into one field would attribute a method to a submission on no evidence, which is
+/// exactly the mistake [`Self::Published::attributed_to_submission`] exists to prevent.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DisclosedMethod {
+    /// Solved externally, and nobody has published how.
+    ///
+    /// The honest state for a solved problem with no technical report, and not a synonym for
+    /// "brute force" or for any other guess.
+    Unknown,
+
+    /// There is no external solution whose method could be disclosed.
+    ///
+    /// For a problem derived here, or one published with its answer.
+    NotApplicable,
+
+    /// A method published at these parameters.
+    Published {
+        /// What the method is, in a few words.
+        method: &'static str,
+
+        /// Where it is written down.
+        source: &'static str,
+
+        /// The cost the source reports, including the hardware it reports it on.
+        ///
+        /// Carried as prose because a figure without its hardware is not comparable to anything.
+        reported_cost: &'static str,
+
+        /// Whether this publication is *known* to be the submission the program verified.
+        ///
+        /// False wherever the program does not name first submitters, which is the usual case.
+        /// A reader must not infer attribution from the mere coincidence of parameters.
+        attributed_to_submission: bool,
+    },
+}
+
+impl Display for DisclosedMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unknown => write!(f, "no public method"),
+            Self::NotApplicable => write!(f, "no external solution"),
+            // The source is part of the line, not only of the JSON record: a cost figure a
+            // reader cannot trace is not checkable, and this string is what the scoreboard's
+            // markdown prints.
+            Self::Published {
+                method,
+                source,
+                reported_cost,
+                attributed_to_submission,
+            } => write!(
+                f,
+                "{} — {} [{}]{}",
+                method,
+                reported_cost,
+                source,
+                if *attributed_to_submission {
+                    ""
+                } else {
+                    ", not attributed to the verified submission"
+                }
+            ),
+        }
+    }
+}
+
 /// A public problem, with everything needed to construct it and to check an answer to it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChallengeManifest {
@@ -463,6 +533,11 @@ pub struct ChallengeManifest {
 
     /// What the outside world has recorded, independently of zeebra.
     pub external: ExternalStatus,
+
+    /// What attack method has been publicly disclosed, if any.
+    ///
+    /// Outside [`Self::canonical`], so disclosing a method never changes a problem's identity.
+    pub method: DisclosedMethod,
 
     /// How a claimed solution is checked **without** trusting the solver or the generator.
     pub verifier: &'static str,
@@ -743,6 +818,33 @@ impl ChallengeManifest {
             ]),
         ));
         fields.push((
+            "disclosed_method",
+            Json::object(match self.method {
+                DisclosedMethod::Unknown => vec![("state", Json::string("unknown"))],
+                DisclosedMethod::NotApplicable => {
+                    vec![("state", Json::string("not_applicable"))]
+                }
+                DisclosedMethod::Published {
+                    method,
+                    source,
+                    reported_cost,
+                    attributed_to_submission,
+                } => vec![
+                    ("state", Json::string("published")),
+                    ("method", Json::string(method)),
+                    ("source", Json::string(source)),
+                    ("reported_cost", Json::string(reported_cost)),
+                    // A boolean, not the string "true"/"false": a nonempty string is truthy in
+                    // several languages a consumer might be written in, so a string here would
+                    // make every row read as attributed.
+                    (
+                        "attributed_to_submission",
+                        Json::Bool(attributed_to_submission),
+                    ),
+                ],
+            }),
+        ));
+        fields.push((
             "external_status",
             Json::object(match self.external {
                 ExternalStatus::NoneRecorded { as_of } => vec![
@@ -782,6 +884,7 @@ impl Display for ChallengeManifest {
             writeln!(f, "reward          {}", reward)?;
         }
         writeln!(f, "external        {}", self.external)?;
+        writeln!(f, "method          {}", self.method)?;
         writeln!(f, "objective       {}", self.objective.tag())?;
         for line in self.parameters.canonical_lines() {
             writeln!(f, "  {}", line)?;
@@ -969,6 +1072,46 @@ const OFFICIAL_ROUNDS: [(usize, &str, &str); 3] = [
     (10, "$15,000", "2026-07-06"),
 ];
 
+/// The method to record when nothing has been published, derived from the external status.
+///
+/// A problem solved externally with no located report is [`DisclosedMethod::Unknown`] — the one
+/// state that must not be guessed at. Everything else has no external solution whose method could
+/// be disclosed.
+fn default_method(external: ExternalStatus) -> DisclosedMethod {
+    match external {
+        // Solved by somebody, and no report located. The one state that must not be guessed at.
+        ExternalStatus::SolvedExternally { .. } => DisclosedMethod::Unknown,
+        // Nothing has been solved externally, so there is no method to disclose.
+        ExternalStatus::NoneRecorded { .. }
+        | ExternalStatus::PublishedWithAnswer
+        | ExternalStatus::NotAPublicProblem => DisclosedMethod::NotApplicable,
+    }
+}
+
+/// The attack method published for an official target, by its partial-round count.
+///
+/// None is attributed to the submission the program verified: the program does not name first
+/// submitters, so a paper at the same parameters is evidence that the parameters fall, not that
+/// this is how they fell. `R_P = 10` is solved and has no public method, and the program allows a
+/// report to stay private until 2027-01-01. See `docs/research/elimination-beyond-grobner.md` §2.
+fn official_method(r_p: usize) -> DisclosedMethod {
+    match r_p {
+        6 => DisclosedMethod::Published {
+            method: "Villard-style bivariate resultant, one full round skipped",
+            source: "eprint 2026/1905, Bak and Hostettler, Table 4",
+            reported_cost: "1 d 17 h on 128 CPU cores",
+            attributed_to_submission: false,
+        },
+        8 => DisclosedMethod::Published {
+            method: "round skip, interpolation, Graeffe root finding; no resultant",
+            source: "eprint 2026/1254, Sanso and Vitto, Section 4.2 and Table 1",
+            reported_cost: "7 h on 96 RTX 5090 GPUs",
+            attributed_to_submission: false,
+        },
+        _ => DisclosedMethod::Unknown,
+    }
+}
+
 /// The frozen reduced-round ladder: `t = 16`, `k = 2`, the official constants, fewer rounds.
 ///
 /// Chosen **before** any of it was run, which is the only way a ladder measures a frontier rather
@@ -1019,6 +1162,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
                 ..INITIATIVE
             },
             external: ExternalStatus::SolvedExternally { verified },
+            method: official_method(r_p),
             verifier: CICO_VERIFIER,
             notes: "Perm+(0xc09de4, 0xee6282, X_1..X_14) = (0, 0, Y_1..Y_14) over KoalaBear. The \
                     program also ships a relaxed verifier accepting a low-bit match; that is a \
@@ -1046,6 +1190,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             objective: Objective::CicoExact,
             program: INITIATIVE,
             external: ExternalStatus::NotAPublicProblem,
+            method: default_method(ExternalStatus::NotAPublicProblem),
             verifier: CICO_VERIFIER,
             notes:
                 "The official field, state width, k, constants and objective; fewer rounds. The \
@@ -1091,6 +1236,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             objective: Objective::CicoExact,
             program: INITIATIVE,
             external: ExternalStatus::NotAPublicProblem,
+            method: default_method(ExternalStatus::NotAPublicProblem),
             verifier: CICO_VERIFIER,
             notes: "A planted target, so a solution is known to exist and \"found nothing\" is \
                     distinguishable from \"is broken\". Regression and profiling only.",
@@ -1141,6 +1287,12 @@ pub fn registry() -> Vec<ChallengeManifest> {
              claimed in April and May 2025.",
         ),
     ] {
+        // Bound once so the status and the method it implies cannot drift apart: these are the
+        // *unsolved* tiers of the 2025 program, so there is no external solution whose method
+        // could be disclosed.
+        let external = ExternalStatus::NoneRecorded {
+            as_of: "2026-11-05",
+        };
         challenges.push(ChallengeManifest {
             id,
             schema: ChallengeManifest::SCHEMA,
@@ -1160,9 +1312,8 @@ pub fn registry() -> Vec<ChallengeManifest> {
                 reward: Some(reward),
                 ..INITIATIVE
             },
-            external: ExternalStatus::NoneRecorded {
-                as_of: "2026-11-05",
-            },
+            external,
+            method: default_method(external),
             verifier: "the program's own verifier; this crate generates no system for this \
                        objective and so has nothing to check",
             notes,
@@ -1247,6 +1398,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             objective: Objective::MqRoot,
             program: FUKUOKA,
             external,
+            method: default_method(external),
             verifier: MQ_VERIFIER,
             notes,
         });
@@ -1282,7 +1434,8 @@ mod tests {
 
     use super::{
         challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeManifest,
-        ChallengeParameters, CicoTarget, CicoVisitor, ExternalStatus, Objective, Significance,
+        ChallengeParameters, CicoTarget, CicoVisitor, DisclosedMethod, ExternalStatus, Json,
+        Objective, Significance,
     };
     use crate::{
         fields::PrimeFieldElement64,
@@ -1291,6 +1444,158 @@ mod tests {
     };
 
     type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+
+    /// The disclosed method reaches the JSON record with `attributed_to_submission` as a boolean.
+    ///
+    /// Typed on purpose. A nonempty string is truthy in several languages a consumer might be
+    /// written in, so serializing `"false"` would make every row read as attributed to the
+    /// verified submission — the one inference this field exists to prevent. The digest test
+    /// cannot catch this, because the method is deliberately outside the digest.
+    #[test]
+    fn test_json_types_the_attribution_flag_as_a_boolean() {
+        // Rendered and parsed back, so the assertion is on the type in the document rather than
+        // on the Rust value that produced it.
+        let text = challenge("poseidon31-cico-rf6-rp8")
+            .expect("registered")
+            .to_json()
+            .to_json();
+        let parsed = Json::parse(&text).expect("the record is valid JSON");
+        let method = parsed
+            .get("disclosed_method")
+            .expect("disclosed_method is recorded");
+
+        assert_eq!(
+            method.get("attributed_to_submission"),
+            Some(&Json::Bool(false)),
+            "the flag must be a JSON boolean, not a string: {text}"
+        );
+        // The source and its hardware travel with the method, so a reader can check the figure.
+        assert_eq!(
+            method.get("source").and_then(Json::as_str),
+            Some("eprint 2026/1254, Sanso and Vitto, Section 4.2 and Table 1")
+        );
+        assert_eq!(
+            method.get("reported_cost").and_then(Json::as_str),
+            Some("7 h on 96 RTX 5090 GPUs")
+        );
+
+        // An unknown method says so, and carries no flag that could be misread.
+        let unknown = Json::parse(
+            &challenge("poseidon31-cico-rf6-rp10")
+                .expect("registered")
+                .to_json()
+                .to_json(),
+        )
+        .expect("valid JSON");
+        let unknown = unknown.get("disclosed_method").expect("recorded");
+        assert_eq!(unknown.get("state").and_then(Json::as_str), Some("unknown"));
+        assert_eq!(unknown.get("attributed_to_submission"), None);
+    }
+
+    /// Each official target records the attack method publicly disclosed for it, or `Unknown`.
+    ///
+    /// `R_P = 10` is the one that matters: it is solved and verified externally, and no method has
+    /// been published, so anything other than `Unknown` would be an invention.
+    #[test]
+    fn test_the_official_targets_record_their_disclosed_method() {
+        let registry = registry();
+        let method_of = |id: &str| {
+            registry
+                .iter()
+                .find(|c| c.id == id)
+                .expect("registered")
+                .method
+        };
+
+        match method_of("poseidon31-cico-rf6-rp6") {
+            DisclosedMethod::Published { method, .. } => {
+                assert!(method.contains("Villard"), "{method}")
+            }
+            other => panic!("R_P = 6 has a published resultant attack, got {other:?}"),
+        }
+        match method_of("poseidon31-cico-rf6-rp8") {
+            DisclosedMethod::Published { method, .. } => {
+                assert!(method.contains("Graeffe"), "{method}")
+            }
+            other => panic!("R_P = 8 has a published univariate attack, got {other:?}"),
+        }
+        assert_eq!(
+            method_of("poseidon31-cico-rf6-rp10"),
+            DisclosedMethod::Unknown,
+            "no method is published for R_P = 10"
+        );
+    }
+
+    /// No disclosed method claims to be the submission the program verified.
+    ///
+    /// The program does not name first submitters, so a paper describing an attack at the same
+    /// parameters is not thereby the verified submission. This asserts the registry never says it
+    /// is on the present evidence — the field exists so that it *can* be set when it is known.
+    #[test]
+    fn test_no_disclosed_method_is_attributed_to_a_verified_submission() {
+        for challenge in registry() {
+            if let DisclosedMethod::Published {
+                attributed_to_submission,
+                source,
+                ..
+            } = challenge.method
+            {
+                assert!(
+                    !attributed_to_submission,
+                    "{} attributes {} to the verified submission",
+                    challenge.id, source
+                );
+            }
+        }
+    }
+
+    /// Disclosing a method does not change a problem's identity.
+    ///
+    /// The invariant the whole design rests on: the digest covers the mathematics, and a method is
+    /// paperwork. Checked by digesting a row and then digesting it again under every variant,
+    /// rather than by trusting that `canonical` happens not to mention the field.
+    #[test]
+    fn test_disclosing_a_method_does_not_change_identity() {
+        let original = registry()
+            .into_iter()
+            .find(|c| c.id == "poseidon31-cico-rf6-rp10")
+            .expect("registered");
+        let expected = original.digest();
+
+        for method in [
+            DisclosedMethod::Unknown,
+            DisclosedMethod::NotApplicable,
+            DisclosedMethod::Published {
+                method: "something else entirely",
+                source: "nowhere",
+                reported_cost: "no time at all",
+                attributed_to_submission: true,
+            },
+        ] {
+            let mut altered = original.clone();
+            altered.method = method;
+            assert_eq!(
+                altered.digest(),
+                expected,
+                "{method:?} changed the identity"
+            );
+        }
+    }
+
+    /// A problem nobody posed has no external method to disclose.
+    #[test]
+    fn test_a_derived_problem_reports_no_applicable_method() {
+        for challenge in registry() {
+            if challenge.external == ExternalStatus::NotAPublicProblem {
+                assert_eq!(
+                    challenge.method,
+                    DisclosedMethod::NotApplicable,
+                    "{} is derived here",
+                    challenge.id
+                );
+            }
+        }
+    }
 
     /// Every registered id and identity digest, pinned.
     ///

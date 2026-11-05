@@ -1321,8 +1321,9 @@ impl Scoreboard {
                 }
             ));
             out.push_str(
-                "| problem | identity | vars | eqs | best result | external status |\n\
-                 |---|---|---:|---:|---|---|\n",
+                "| problem | identity | vars | eqs | best result | external status | \
+                 published method |\n\
+                 |---|---|---:|---:|---|---|---|\n",
             );
             let best = self.best();
             for manifest in members {
@@ -1343,7 +1344,7 @@ impl Scoreboard {
                     },
                 };
                 out.push_str(&format!(
-                    "| `{}` | `{}` | {} | {} | {} | {} |\n",
+                    "| `{}` | `{}` | {} | {} | {} | {} | {} |\n",
                     manifest.id,
                     manifest.short_digest(),
                     manifest
@@ -1359,6 +1360,13 @@ impl Scoreboard {
                         crate::grobner::research::ExternalStatus::NotAPublicProblem =>
                             "—".to_string(),
                         status => status.to_string(),
+                    },
+                    // Separate from the column before it on purpose: a programme can verify a
+                    // submission without naming the submitter, so "verified on this date" and
+                    // "this is how it was done" are two claims and the table keeps them apart.
+                    match manifest.method {
+                        crate::grobner::research::DisclosedMethod::NotApplicable => "—".to_string(),
+                        method => method.to_string(),
                     },
                 ));
             }

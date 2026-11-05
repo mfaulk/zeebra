@@ -20,8 +20,8 @@ pub mod specialization;
 
 pub use challenge::{
     challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeManifest,
-    ChallengeParameters, ChallengeProgram, CicoTarget, CicoVisitor, ExternalStatus, Objective,
-    Significance,
+    ChallengeParameters, ChallengeProgram, CicoTarget, CicoVisitor, DisclosedMethod,
+    ExternalStatus, Objective, Significance,
 };
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};
