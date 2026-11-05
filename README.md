@@ -691,7 +691,7 @@ the stage that was 96% of the conversion — and nothing in the corpus is slower
 
 The batch *size* is what makes that last clause true. A bigger batch shares more closure and wins on
 katsura and cyclic; on the planted family a reduction is one step, so the closure is nearly all the
-work and a bigger batch is pure overhead — one unbounded batch is 1.5x **slower** than the scalar
+work and a bigger batch is pure overhead — one unbounded batch is 1.3x **slower** than the scalar
 path on planted-10. `BorderBatch::recommended()` uses 64 targets, which is within 13% of the best
 size on both families and faster than scalar on every system.
 

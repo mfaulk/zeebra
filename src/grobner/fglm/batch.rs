@@ -53,8 +53,10 @@ pub enum BorderBatchSize {
     ///
     /// The largest closure and the most sharing, and **not the right choice everywhere**. It is the
     /// fastest size on katsura and cyclic and the slowest on the planted family, where a reduction
-    /// is one step and the closure is most of the work — planted-10 takes 52.4 ms unbounded against
-    /// 28.8 ms at a size of one. Kept for measurement and for a caller who knows their staircase.
+    /// is one step and the closure is most of the work — planted-10 takes about 41 ms unbounded
+    /// against 27 ms at a size of one, measured in §6.7 of
+    /// `docs/MILESTONE-FGLM-SCALABILITY.md`. Kept for measurement and for a caller who knows their
+    /// staircase.
     Unbounded,
 
     /// At most this many targets per batch, in the border's own descending order.
@@ -394,6 +396,12 @@ pub(super) fn closure<const N: usize, F: FiniteField>(
 /// `reduce(u_1)` cannot involve `u_2`, and the `k` answers are the same `k` answers the scalar path
 /// would give.
 ///
+/// The buffer is cleared and read over the region a target can dirty rather than the closure's full
+/// width. `buffer[start] = one` is the only seed and a reducer row leading at `c` has its other
+/// entries at columns after `c`, so every write for a target lands at or after its leading column
+/// and `[0, start)` stays zero. Targets arrive in the border's descending order, so `start` grows
+/// across a batch and the saving approaches the full width by its last target.
+///
 /// # Panics
 /// If a target is not in the closure, which means it was not among the monomials the closure was
 /// built from.
@@ -404,12 +412,23 @@ pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
     let mut buffer: Vec<F> = vec![F::zero(); closure.columns.len()];
     let mut results = Vec::with_capacity(targets.len());
 
+    // The previous target's leading column, below which the buffer is known to be zero. Starts at
+    // the width because a freshly allocated buffer is zero everywhere.
+    let mut dirty_from = closure.columns.len();
+
     for target in targets {
         let start = *closure
             .column_of
             .get(target)
             .expect("a target outside the closure it was built from");
-        buffer.iter_mut().for_each(|slot| *slot = F::zero());
+        debug_assert!(
+            buffer[..dirty_from].iter().all(|slot| slot.is_zero()),
+            "the buffer below the previous target's column must still be zero"
+        );
+        buffer[dirty_from..]
+            .iter_mut()
+            .for_each(|slot| *slot = F::zero());
+        dirty_from = start;
         buffer[start] = F::one();
 
         // Descending the columns once. A reducer row leading at `c` has every other entry strictly
@@ -433,11 +452,14 @@ pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
             );
         }
 
-        let remainder: Remainder<N, F> = buffer
+        // From `start`, not from zero: `buffer[start] = one` is the only seed and every write below
+        // lands at a column at or after it, so nothing before `start` can be nonzero.
+        let remainder: Remainder<N, F> = buffer[start..]
             .iter()
             .enumerate()
             .filter(|(_, value)| !value.is_zero())
-            .map(|(column, value)| {
+            .map(|(offset, value)| {
+                let column = start + offset;
                 debug_assert!(
                     closure.reducer_of_column[column].is_none(),
                     "a reducible monomial survived the reduction"
@@ -723,6 +745,38 @@ mod tests {
                         monomial
                     );
                 }
+            }
+        }
+    }
+
+    /// A target whose column is below the previous target's gets the same remainder regardless.
+    ///
+    /// The reduction buffer is only cleared over the region the previous target could have dirtied,
+    /// `[previous start, len)`. Targets arrive in the border's descending order, so `start`
+    /// normally grows and that region covers everything written; this feeds them *ascending*
+    /// instead, so each `start` is below the last and the cleared region is a strict subset of the
+    /// buffer. A buffer cleared from the wrong index leaves a stale coefficient at a column the
+    /// next target never reaches, which this catches.
+    #[test]
+    fn test_a_target_below_the_previous_one_is_unaffected_by_it() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        for system in [katsura::<5, F>(), cyclic::<5, F>()] {
+            let (_, _, border, monic) = setup(&system, order);
+            assert!(border.len() > 4);
+            let closed =
+                closure(&border, &monic, order, &BorderBatch::unbounded()).expect("within limits");
+
+            // The border descends, so reversing it makes every `start` smaller than the last.
+            let mut ascending = border.clone();
+            ascending.reverse();
+            let together = reduce_targets(&ascending, &closed);
+            for (position, target) in ascending.iter().enumerate() {
+                let alone = reduce_targets(std::slice::from_ref(target), &closed);
+                assert_eq!(
+                    together[position], alone[0],
+                    "NF({}) depends on the target reduced before it",
+                    target
+                );
             }
         }
     }
