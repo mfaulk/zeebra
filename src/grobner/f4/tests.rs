@@ -2945,3 +2945,68 @@ fn test_a_lower_degree_pair_is_selected_before_the_current_degree_finishes() {
         next.iter().map(|p| p.degree).collect::<Vec<_>>()
     );
 }
+
+/// `f4_observed_reported` keeps both the observer's view and the statistics of a refusal.
+///
+/// The two existing entry points each drop one of them: `f4_observed` returns `Err` with no
+/// statistics, and `f4_reported` has no observer. A computation that is *expected* not to finish
+/// needs both — the statistics to say how large the matrices got, and the observer to say how far
+/// the batches got, since F4 has no cooperative time check for a supervisor to read.
+#[test]
+fn test_observed_and_reported_together() {
+    use crate::grobner::f4::{f4_observed_reported, BatchObserver};
+    use crate::grobner::pairs::CriticalPair;
+
+    /// Records the selection degree of every batch it is shown.
+    struct Watch(Vec<u64>);
+    impl<const N: usize, G: FiniteField> BatchObserver<N, G> for Watch {
+        fn batch(
+            &mut self,
+            _basis: &crate::grobner::f4::symbolic::MonicBasis<N, G>,
+            pairs: &[CriticalPair<N>],
+        ) {
+            self.0
+                .push(pairs.iter().map(|p| p.lcm.degree()).max().unwrap_or(0));
+        }
+    }
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<5, Zp2147483647>();
+
+    // Completing: the basis is the one the ordinary entry point returns, and the observer saw
+    // every batch the statistics counted.
+    let mut watch = Watch(Vec::new());
+    let (result, statistics) =
+        f4_observed_reported(&system, order, &F4Options::default(), &mut watch);
+    let basis = result.expect("katsura-5 completes");
+    assert_eq!(basis, f4(&system, order).expect("the same system"));
+    assert_eq!(watch.0.len(), statistics.batches);
+    assert_eq!(
+        watch.0.iter().max().copied(),
+        Some(statistics.max_pair_degree),
+        "the observer's highest selection degree is the reported one"
+    );
+
+    // Refusing: the statistics survive, which is the half `f4_observed` drops, and the observer
+    // has seen one batch more than was reduced — the one the budget was crossed inside.
+    let mut watch = Watch(Vec::new());
+    let (result, statistics) = f4_observed_reported(
+        &system,
+        order,
+        &F4Options {
+            max_matrix_columns: 40,
+            ..F4Options::default()
+        },
+        &mut watch,
+    );
+    assert!(matches!(result, Err(F4Error::TooManyColumns { limit: 40 })));
+    assert_eq!(
+        statistics.bytes_per_entry,
+        F4Options::bytes_per_entry::<Zp2147483647>()
+    );
+    assert_eq!(
+        watch.0.len(),
+        statistics.batches + 1,
+        "the crossing happened inside a batch the observer had already been shown"
+    );
+}

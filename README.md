@@ -278,6 +278,7 @@ cargo run --release --example univariate_scaling   # univariate cost and memory 
 cargo run --release --example univariate_scaling -- list
 cargo run --release --example scoreboard           # registered problems, one record each, staged
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
+tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -1517,8 +1518,27 @@ a rate of 0.89% to 23.6%, which is a different claim from "solved in 2 seconds".
 ```sh
 tools/scoreboard.sh                    # smoke tier: the surrogates, nothing written
 tools/scoreboard.sh stable --write     # adds the published MQ instances, updates the tree
-cargo run --release --example scoreboard -- frontier
+tools/scoreboard.sh ladder --write     # the nine full-width t = 16 rows, one process each
+tools/scoreboard.sh campaign poseidon31-cico-t16-rf2-rp0 --seeds 8 --write
+tools/scoreboard.sh formulations poseidon31-cico-t16-rf2-rp0 --slice 1 --write
 ```
+
+The full-width rows run one process each because the wall-clock supervisor stops a run by
+abandoning its worker thread and exiting — F4 has no cooperative time check, so there is no other
+way — and that is acceptable once per process and not nine times in one. The budget that actually
+binds on those rows is the live-entry cap rather than the clock, which is deliberate: an entry
+count is reproducible anywhere, a timeout is a fact about one machine.
+
+**The first verified CICO witness at the official state width** came out of that harness:
+`t = 16`, `k = 2`, KoalaBear, the challenge's own input constants, the exact objective, `R_F = 2`
+and `R_P = 0`, with twelve of the fourteen free inputs fixed at a precommitted seed. Three of eight
+slices produced a point that `permutation_plus_linear` accepts, at **81.2 s of expected work per
+witness including the five that found nothing**. The official targets are `R_F = 6` with
+`R_P ∈ {6, 8, 10}` and all three were solved externally in 2026; this is a witness for a registered
+*reduction*, and the scoreboard says so in those words. See
+[`docs/research/full-width-poseidon.md`](docs/research/full-width-poseidon.md) for the eighteen-row
+ladder, where each row stops, and the formulation comparison — in which M22-E's winning variable
+order turns out to be **2.4x worse** at `t = 16` than the layout it beat at `t = 2`.
 
 The tree under `research/scoreboard/` is committed: the registry emitted from code, one JSON record
 per run, the accumulated history, and a generated `SCOREBOARD.md`. `Json::parse` reads back what

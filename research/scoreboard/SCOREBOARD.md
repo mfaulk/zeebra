@@ -11,8 +11,8 @@ The externally specified problems, unmodified. A witness here is a witness for t
 | `poseidon31-cico-rf6-rp6` | `f36d914ee7d2` | 116 | 104 | not attempted | solved externally, verified 2026-04-10 |
 | `poseidon31-cico-rf6-rp8` | `dfc1041fc131` | 118 | 106 | not attempted | solved externally, verified 2026-05-06 |
 | `poseidon31-cico-rf6-rp10` | `cf06393b5cd6` | 120 | 108 | not attempted | solved externally, verified 2026-07-06 |
-| `fukuoka-mq-III-n10-seed0` | `ae24edf8efc8` | 10 | 20 | **verified witness** in 124.0 ms (as published) | published with its answer |
-| `fukuoka-mq-III-n15-seed0` | `0552d3b51070` | 15 | 30 | **verified witness** in 8999.9 ms (as published) | published with its answer |
+| `fukuoka-mq-III-n10-seed0` | `ae24edf8efc8` | 10 | 20 | **verified witness** in 106.4 ms (as published) | published with its answer |
+| `fukuoka-mq-III-n15-seed0` | `0552d3b51070` | 15 | 30 | **verified witness** in 7798.5 ms (as published) | published with its answer |
 | `fukuoka-mq-III-n20-seed0` | `434135c809f6` | 20 | 40 | not attempted | published with its answer |
 | `fukuoka-mq-VI-n10-seed0` | `2558f4bccd7d` | 10 | 7 | not attempted | published with its answer |
 | `fukuoka-mq-VI-n15-seed0` | `0345980a26d8` | 15 | 10 | not attempted | published with its answer |
@@ -24,15 +24,15 @@ The official field, state width, `k`, constants and objective; fewer rounds. A w
 
 | problem | identity | vars | eqs | best result | external status |
 |---|---|---:|---:|---|---|
-| `poseidon31-cico-t16-rf2-rp0` | `56ccc99d85e0` | 46 | 34 | not attempted | — |
-| `poseidon31-cico-t16-rf2-rp2` | `af93deb46aa5` | 48 | 36 | not attempted | — |
-| `poseidon31-cico-t16-rf2-rp4` | `08e66c87a885` | 50 | 38 | not attempted | — |
-| `poseidon31-cico-t16-rf4-rp0` | `a9242143a8c6` | 78 | 66 | not attempted | — |
-| `poseidon31-cico-t16-rf4-rp2` | `80957f3ccf46` | 80 | 68 | not attempted | — |
-| `poseidon31-cico-t16-rf4-rp4` | `2d8f8531107d` | 82 | 70 | not attempted | — |
-| `poseidon31-cico-t16-rf6-rp0` | `78215e51ccef` | 110 | 98 | not attempted | — |
-| `poseidon31-cico-t16-rf6-rp2` | `4e79a017932d` | 112 | 100 | not attempted | — |
-| `poseidon31-cico-t16-rf6-rp4` | `82a1d6d3a18d` | 114 | 102 | not attempted | — |
+| `poseidon31-cico-t16-rf2-rp0` | `56ccc99d85e0` | 46 | 34 | **verified witness** in 30107.9 ms (slice(12 fixed, seed 2)) | — |
+| `poseidon31-cico-t16-rf2-rp2` | `af93deb46aa5` | 48 | 36 | stopped: max_live_nonzeros at degree 4 | — |
+| `poseidon31-cico-t16-rf2-rp4` | `08e66c87a885` | 50 | 38 | stopped: max_live_nonzeros at degree 5 | — |
+| `poseidon31-cico-t16-rf4-rp0` | `a9242143a8c6` | 78 | 66 | stopped: max_live_nonzeros at degree 4 | — |
+| `poseidon31-cico-t16-rf4-rp2` | `80957f3ccf46` | 80 | 68 | stopped: max_live_nonzeros at degree 4 | — |
+| `poseidon31-cico-t16-rf4-rp4` | `2d8f8531107d` | 82 | 70 | stopped: max_live_nonzeros at degree 4 | — |
+| `poseidon31-cico-t16-rf6-rp0` | `78215e51ccef` | 110 | 98 | stopped: max_live_nonzeros at degree 4 | — |
+| `poseidon31-cico-t16-rf6-rp2` | `4e79a017932d` | 112 | 100 | stopped: max_live_nonzeros at degree 4 | — |
+| `poseidon31-cico-t16-rf6-rp4` | `82a1d6d3a18d` | 114 | 102 | stopped: max_live_nonzeros at degree 4 | — |
 
 ## Engineering surrogates
 
@@ -40,10 +40,10 @@ Surrogates: reduced width, planted targets. Evidence about the implementation, n
 
 | problem | identity | vars | eqs | best result | external status |
 |---|---|---:|---:|---|---|
-| `poseidon-t2-rf2-rp0-planted` | `9e98ebc3abec` | 5 | 5 | **verified witness** in 0.9 ms (as generated) | — |
-| `poseidon-t2-rf2-rp2-planted` | `84cde35887fd` | 7 | 7 | **verified witness** in 167.2 ms (as generated) | — |
-| `poseidon-t2-rf4-rp0-planted` | `ebd238585cc0` | 9 | 9 | **verified witness** in 393.1 ms (as generated) | — |
-| `poseidon-t3-rf2-rp1-planted` | `036ea475c0b1` | 9 | 8 | stopped: max_matrix_columns (a Macaulay matrix needed more than the 60000 columns allowed, at degree 11; last completed stage generation) | — |
+| `poseidon-t2-rf2-rp0-planted` | `9e98ebc3abec` | 5 | 5 | **verified witness** in 1.0 ms (as generated) | — |
+| `poseidon-t2-rf2-rp2-planted` | `84cde35887fd` | 7 | 7 | **verified witness** in 156.6 ms (as generated) | — |
+| `poseidon-t2-rf4-rp0-planted` | `ebd238585cc0` | 9 | 9 | **verified witness** in 363.6 ms (as generated) | — |
+| `poseidon-t3-rf2-rp1-planted` | `036ea475c0b1` | 9 | 8 | stopped: max_matrix_columns at degree 11 | — |
 
 ## Where the unfinished runs stopped
 
@@ -51,5 +51,29 @@ A higher degree is **not** nearer a solution: this table is a diagnostic, not a 
 
 | problem | formulation | outcome | deg | last deg done | max cols | peak MB |
 |---|---|---|---:|---:|---:|---:|
-| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns (a Macaulay matrix needed more than the 60000 columns allowed, at degree 11; last completed stage generation) | 11 | 10 | 42229 | 155.3 |
+| `poseidon31-cico-t16-rf2-rp0` | as generated | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 36284 | 108.2 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 0) | basis only, no witness | 4 | 4 | 17424 | 102.8 |
+| `poseidon31-cico-t16-rf2-rp2` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 50148 | 195.1 |
+| `poseidon31-cico-t16-rf2-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 40182 | 212.9 |
+| `poseidon31-cico-t16-rf2-rp4` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 70244 | 311.9 |
+| `poseidon31-cico-t16-rf2-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 8642 | 24.8 |
+| `poseidon31-cico-t16-rf4-rp0` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 81800 | 246.2 |
+| `poseidon31-cico-t16-rf4-rp0` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 12861 | 22.0 |
+| `poseidon31-cico-t16-rf4-rp2` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 21098 | 24.0 |
+| `poseidon31-cico-t16-rf4-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 15363 | 23.7 |
+| `poseidon31-cico-t16-rf4-rp4` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 24441 | 29.8 |
+| `poseidon31-cico-t16-rf4-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 18706 | 26.2 |
+| `poseidon31-cico-t16-rf6-rp0` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 28794 | 30.6 |
+| `poseidon31-cico-t16-rf6-rp0` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 23059 | 25.0 |
+| `poseidon31-cico-t16-rf6-rp2` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 31296 | 34.9 |
+| `poseidon31-cico-t16-rf6-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 25561 | 29.3 |
+| `poseidon31-cico-t16-rf6-rp4` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 34639 | 40.7 |
+| `poseidon31-cico-t16-rf6-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 28904 | 35.1 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 0) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 3) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 4) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 5) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 7) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
+| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
+| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
 

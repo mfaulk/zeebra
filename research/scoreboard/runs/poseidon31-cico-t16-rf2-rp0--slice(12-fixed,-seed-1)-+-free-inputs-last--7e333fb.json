@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf2-rp0",
+  "challenge_digest": "56ccc99d85e099ce212311850170489f95b86495dc36d3823cdc9f14f24f7dad",
+  "class": "faithful-reduction",
+  "formulation": "slice(12 fixed, seed 1) + free-inputs-last",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 1 (12 values)",
+    "relabel variables: free-inputs-last"
+  ],
+  "outcome": "verified_witness",
+  "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+  "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs, after inverting every transformation applied here",
+  "elapsed_nanos": 49560261771,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 57896160,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 46,
+        "equations": 46,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 49353976787,
+      "estimated_peak_bytes": 161490728,
+      "detail": {
+        "max_matrix_rows": 25264,
+        "max_matrix_columns": 21057,
+        "max_pair_degree": 4,
+        "pairs_considered": 6455,
+        "pairs_reduced": 6455,
+        "elements_added": 571
+      }
+    },
+    {
+      "stage": "conversion",
+      "elapsed_nanos": 121436443,
+      "estimated_peak_bytes": 1876704,
+      "detail": {
+        "quotient_dimension": 81
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 26948995,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "lex_basis_elements": 46
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 3386,
+      "estimated_peak_bytes": null,
+      "detail": {}
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 4,
+    "max_matrix_rows": 25264,
+    "max_matrix_columns": 21057,
+    "peak_live_nonzeros": 10082642,
+    "peak_estimated_bytes": 161490728,
+    "pairs_reduced": 6455,
+    "elements_added": 571,
+    "quotient_dimension": 81
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "7e333fb",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=300 tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp0 --slice 1 --layout free-inputs-last"
+}
