@@ -325,6 +325,57 @@ pub trait KnownOrder: FiniteField {
         Self::try_primitive_element(rng).unwrap_or_else(|e| panic!("{e}"))
     }
 
+    /// True if this element generates the whole multiplicative group.
+    ///
+    /// An element fails to generate exactly when its order is a proper divisor of `q - 1`, and
+    /// every proper divisor divides `(q - 1) / r` for some prime `r | q - 1`, so those quotients
+    /// are the only exponents worth testing — the same factorization and the same reasoning as
+    /// [`Self::try_primitive_element`]'s search, which is how that search can now be checked
+    /// against something other than itself.
+    ///
+    /// Fails if the order does not fit in a `u128`, since the factorization does not either.
+    fn try_is_generator<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<bool, RootOfUnityError> {
+        let group_order = Self::order_u128().ok_or(RootOfUnityError::OrderTooWide)? - 1;
+        if self.is_zero() {
+            return Ok(false);
+        }
+
+        let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
+        Ok(prime_factors
+            .iter()
+            .all(|r| self.pow(group_order / big_uint_to_u128(r)) != Self::one()))
+    }
+
+    /// True if this element generates the whole multiplicative group.
+    ///
+    /// # Panics
+    /// Panics if the order does not fit in a `u128`. Use [`Self::try_is_generator`] over a field
+    /// whose width is a runtime choice.
+    fn is_generator<R: RngCore + CryptoRng>(&self, rng: &mut R) -> bool {
+        self.try_is_generator(rng).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// True if this element has order exactly `n`.
+    ///
+    /// `self^n = 1` and `self^(n/r) != 1` for each prime `r | n`. This factors only `n`, never
+    /// `q - 1`, so unlike [`Self::try_is_generator`] it is available over the wide fields — which
+    /// is what makes it the check on [`Self::try_two_adic_root_of_unity`]'s construction.
+    ///
+    /// False for `n = 0`, which no element satisfies.
+    fn is_primitive_nth_root<R: RngCore + CryptoRng>(&self, n: u64, rng: &mut R) -> bool {
+        if n == 0 || self.pow(n as u128) != Self::one() {
+            return false;
+        }
+
+        let (prime_factors, _powers) = factor(&BigUInt::new_from_u64(n), rng);
+        prime_factors
+            .iter()
+            .all(|r| self.pow(n as u128 / big_uint_to_u128(r)) != Self::one())
+    }
+
     /// A primitive nth root of unity: an element of order exactly `n`.
     ///
     /// Fails unless `n` divides `q - 1`, which is when such an element exists at all, and unless
@@ -557,6 +608,81 @@ mod tests {
     fn test_the_panicking_wrapper_still_panics() {
         let mut rng = StdRng::seed_from_u64(13);
         let _ = Zp13::root_of_unity(5, &mut rng);
+    }
+
+    /// A primitive root mod 13 is recognized as a generator, and an element of order 3 is not.
+    #[test]
+    fn test_is_generator_separates_a_primitive_root_from_the_rest() {
+        let mut rng = StdRng::seed_from_u64(29);
+        // 2 has order 12 mod 13; 3 has order 3, since 3^3 = 27 = 1.
+        assert!(Zp13::new(2).is_generator(&mut rng));
+        assert!(!Zp13::new(3).is_generator(&mut rng));
+        assert!(!Zp13::new(12).is_generator(&mut rng)); // order 2
+        assert!(!Zp13::one().is_generator(&mut rng));
+        assert!(!Zp13::zero().is_generator(&mut rng));
+    }
+
+    /// Whatever the search returns is a generator, over every field it can search.
+    ///
+    /// The predicate and the search share the factorization but not the acceptance test, so this
+    /// is the check `primitive_element` never had on its own result.
+    #[test]
+    fn test_the_search_returns_something_the_predicate_accepts() {
+        fn search_agrees_with_the_predicate<F: KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let g = F::primitive_element(&mut rng);
+            assert!(g.is_generator(&mut rng), "{g} is not a generator");
+        }
+
+        search_agrees_with_the_predicate::<Zp13>(31);
+        search_agrees_with_the_predicate::<Zp2147483647>(37);
+        search_agrees_with_the_predicate::<BinaryFieldElement<X8_X4_X3_X_1>>(41);
+        search_agrees_with_the_predicate::<ExtensionFieldElement<13, 4, Modulus13Pow4>>(43);
+    }
+
+    /// Checking a generator of a field whose order exceeds a `u128` is an error, not a panic.
+    #[test]
+    fn test_is_generator_over_a_wide_field_is_an_error() {
+        let mut rng = StdRng::seed_from_u64(47);
+        assert_eq!(
+            Bn254Fr::one().try_is_generator(&mut rng),
+            Err(RootOfUnityError::OrderTooWide)
+        );
+    }
+
+    /// An element of order exactly n is a primitive nth root; one of order dividing n is not.
+    #[test]
+    fn test_is_primitive_nth_root_requires_the_exact_order() {
+        let mut rng = StdRng::seed_from_u64(53);
+        let w = Zp13::try_root_of_unity(6, &mut rng).expect("6 divides 12");
+        assert!(w.is_primitive_nth_root(6, &mut rng));
+        // w^2 has order 3 and w^3 has order 2, so neither is a primitive 6th root.
+        assert!(!w.pow(2).is_primitive_nth_root(6, &mut rng));
+        assert!(!w.pow(3).is_primitive_nth_root(6, &mut rng));
+        assert!(w.pow(2).is_primitive_nth_root(3, &mut rng));
+        assert!(w.pow(3).is_primitive_nth_root(2, &mut rng));
+    }
+
+    /// One is the only primitive first root of unity, and no element is a primitive 0th root.
+    #[test]
+    fn test_the_degenerate_orders_of_is_primitive_nth_root() {
+        let mut rng = StdRng::seed_from_u64(59);
+        assert!(Zp13::one().is_primitive_nth_root(1, &mut rng));
+        assert!(!Zp13::new(2).is_primitive_nth_root(1, &mut rng));
+        assert!(!Zp13::one().is_primitive_nth_root(0, &mut rng));
+        assert!(!Zp13::zero().is_primitive_nth_root(1, &mut rng));
+    }
+
+    /// The nth-root predicate works over a field too wide to have a findable generator.
+    ///
+    /// It factors only `n`, never `q - 1`, which is the whole reason it exists separately.
+    #[test]
+    fn test_is_primitive_nth_root_works_over_a_wide_field() {
+        let mut rng = StdRng::seed_from_u64(61);
+        let w = Bn254Fr::two_adic_root_of_unity(10, &mut rng);
+        assert!(w.is_primitive_nth_root(1 << 10, &mut rng));
+        assert!(!w.is_primitive_nth_root(1 << 11, &mut rng));
+        assert!(!(w * w).is_primitive_nth_root(1 << 10, &mut rng));
     }
 
     /// Zero to a zero exponent is one, as it is for `pow`; zero to any other is zero.
