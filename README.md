@@ -222,8 +222,16 @@ cargo run --release --example fglm_shape           # shape position, and what th
 cargo run --release --example fglm_ablation        # every strategy combination, one table
 cargo run --release --example fglm_ablation -- list
 cargo run --release --example solve_one            # systems in, verified solutions out, both routes
+cargo run --release --example solve_baseline       # both routes with resources and outcome class
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
+
+`solve_baseline` is M21-0's baseline: both routes on every corpus system, reporting what each
+*cost* and which of the mathematically distinct outcomes it reached — a verified point, no
+base-field point, an inconsistent ideal, a positive-dimensional ideal, or a crossed budget. It
+takes about 30 seconds, nearly all of it katsura-7's direct-lex attempt failing. See
+[`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md)
+§4 for the table and what it decided.
 
 `f4_statistics` prints matrix dimensions, how many reductions each matrix absorbed, how much of
 each matrix was reduction scaffolding, and how much elimination filled it in. It asserts that the
@@ -332,8 +340,9 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md),
 [`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md),
 [`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md),
-[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md), and
-[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md).
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md),
+[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md), and
+[`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md).
 
 ## Finite Fields
 
