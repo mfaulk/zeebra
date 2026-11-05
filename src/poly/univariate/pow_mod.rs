@@ -9,6 +9,7 @@
 //! cost depends on `log(exponent)` rather than on the exponent itself.
 
 use crate::{
+    integers::{bit, highest_set_bit},
     poly::univariate::{Polynomial, UnivariatePolynomial},
     FiniteField,
 };
@@ -68,20 +69,6 @@ pub fn pow_mod_limbs<F: FiniteField>(
     }
 
     result
-}
-
-/// Bit `index` of `limbs`, counted from the least significant bit of the least significant limb.
-#[inline]
-fn bit(limbs: &[u64], index: usize) -> bool {
-    limbs[index / 64] >> (index % 64) & 1 == 1
-}
-
-/// The index of the highest set bit of `limbs`, or `None` if `limbs` is zero.
-fn highest_set_bit(limbs: &[u64]) -> Option<usize> {
-    limbs
-        .iter()
-        .rposition(|&limb| limb != 0)
-        .map(|position| position * 64 + (63 - limbs[position].leading_zeros() as usize))
 }
 
 /// The remainder of `p` on division by `modulus`.

@@ -1,5 +1,6 @@
 //! Finite fields
 
+mod batch_inverse;
 mod binary_field;
 mod extension_field;
 mod finite_field;
@@ -9,7 +10,9 @@ mod prime_field_128;
 mod prime_field_256;
 mod prime_field_32;
 mod prime_field_64;
+pub mod two_adic;
 
+pub use batch_inverse::{batch_inverse, batch_invert};
 pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
 pub use prime_field_128::PrimeFieldElement128;
 pub use prime_field_256::{

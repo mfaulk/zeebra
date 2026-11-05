@@ -24,8 +24,8 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::{
-        Bls12_381Fr, Bn254Fr, Mersenne31, PrimeFieldElement128, Zp18446744073709551557,
-        Zp2147483647,
+        batch_invert, Bls12_381Fr, Bn254Fr, Mersenne31, PrimeFieldElement128,
+        Zp18446744073709551557, Zp2147483647,
     },
     FiniteField,
 };
@@ -159,6 +159,23 @@ fn bench_field<F: FiniteField>(c: &mut Criterion, name: &str) {
                 for x in values.iter() {
                     black_box(black_box(x).inverse());
                 }
+            })
+        },
+    );
+
+    // Montgomery's trick over the same operands as `isolated/inverse`: one inversion and
+    // `3(n-1)` multiplications against n inversions. The two are directly comparable because the
+    // operand set is identical, and the ratio between them is the whole case for `batch_inverse`.
+    // The clone is inside the measurement because the in-place routine needs to own its input;
+    // `isolated/inverse` does not clone, so this is charged the copy and still has to win.
+    group.bench_with_input(
+        BenchmarkId::new("batch/inverse", name),
+        &nonzero,
+        |bencher, values| {
+            bencher.iter(|| {
+                let mut owned = values.to_vec();
+                batch_invert(black_box(&mut owned));
+                black_box(owned);
             })
         },
     );

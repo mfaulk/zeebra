@@ -14,10 +14,21 @@ use crate::{
 /// n must be a power of 2.
 pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolynomial<F> {
     assert_eq!(x.len(), w.size());
-    let n = F::new(w.size() as u64);
+
+    // `c / n` would invert n once per coefficient: `Div` on a field element is multiplication by
+    // `inverse()`, and nothing memoizes it. One inversion for the whole vector instead.
+    //
+    // n is invertible whenever the domain exists at all: a primitive nth root of unity requires
+    // n | q - 1, so n is coprime to the characteristic. `inverse` still panics if a caller built
+    // a domain by hand over a field where it is not.
+    let size_inverse = F::new(w.size() as u64).inverse();
+
     let w_inv = w.inverse();
     let unscaled_coefficients = evaluate(&UnivariatePolynomial::new(x), &w_inv);
-    let coefficients: Vec<_> = unscaled_coefficients.into_iter().map(|c| c / n).collect();
+    let coefficients: Vec<_> = unscaled_coefficients
+        .into_iter()
+        .map(|c| c * size_inverse)
+        .collect();
     UnivariatePolynomial::new(&coefficients)
 }
 
@@ -60,6 +71,31 @@ mod tests {
                 assert_eq!(p, recovered_p);
             }
         }
+    }
+
+    /// Evaluating then interpolating recovers the polynomial over both 254-bit scalar fields.
+    ///
+    /// The first NTT round trip over a field whose order needs four limbs. The domain comes from
+    /// the two-adic construction, so this exercises the whole path the wide fields previously had
+    /// no access to.
+    #[test]
+    fn test_evaluate_then_interpolate_over_the_wide_fields() {
+        use crate::fields::{Bls12_381Fr, Bn254Fr};
+
+        fn round_trip<F: FiniteField + KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for log_n in 0..=5u32 {
+                let n = 1usize << log_n;
+                let w = F::two_adic_root_of_unity(log_n, &mut rng);
+                let domain = FFTDomain::from_generator(w, n);
+                let p = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
+                let evaluations = evaluate(&p, &domain);
+                assert_eq!(interpolate(&evaluations, &domain), p, "n = {n}");
+            }
+        }
+
+        round_trip::<Bn254Fr>(31);
+        round_trip::<Bls12_381Fr>(37);
     }
 
     #[test]

@@ -124,6 +124,30 @@ pub fn f4_reported<const N: usize, F: FiniteField>(
     (basis, statistics)
 }
 
+/// [`f4_observed`] and [`f4_reported`] at once: an observer, and statistics even on refusal.
+///
+/// The combination exists for a computation that is **expected not to finish**. A frontier run
+/// needs the statistics from a crossed budget, which [`f4_observed`] discards with its `Err`, and
+/// it needs per-batch notification so that a wall-clock supervisor can say how far the computation
+/// had got when it was stopped — F4 has no cooperative time check, so the only thing that knows is
+/// an observer that was called as the batches went past.
+///
+/// # Errors
+/// As [`f4_with_options`], with the work done before the refusal in the statistics.
+pub fn f4_observed_reported<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
+    generators: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    options: &F4Options,
+    observer: &mut O,
+) -> (
+    Result<Vec<MultivariatePolynomial<N, F>>, F4Error>,
+    F4Statistics,
+) {
+    let mut statistics = new_statistics::<F>();
+    let basis = f4_into(generators, order, options, observer, &mut statistics);
+    (basis, statistics)
+}
+
 /// As [`f4_with_options`], notifying `observer` of each batch before it is reduced.
 ///
 /// The instrumentation entry point. Generic over the observer rather than taking a trait object,

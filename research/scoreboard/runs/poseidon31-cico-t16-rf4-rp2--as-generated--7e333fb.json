@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf4-rp2",
+  "challenge_digest": "80957f3ccf46927efb6c6663565e8ed3b225e222d2da511c06dbcd1e6fe6abc3",
+  "class": "faithful-reduction",
+  "formulation": "as generated",
+  "transformations": [],
+  "outcome": "stopped_at_limit",
+  "limit": {
+    "resource": "max_live_nonzeros",
+    "detail": "20009000 live nonzero entries were needed, over the limit of 20000000",
+    "degree": 5,
+    "last_completed_stage": "generation"
+  },
+  "significance": "no verified witness",
+  "verification": "no candidate was produced, so nothing was verified",
+  "elapsed_nanos": 14614458113,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 17776395,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 80,
+        "equations": 68,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 14596681718,
+      "estimated_peak_bytes": 24046480,
+      "detail": {
+        "max_matrix_rows": 1168,
+        "max_matrix_columns": 21098,
+        "max_pair_degree": 5,
+        "pairs_considered": 754,
+        "pairs_reduced": 754,
+        "elements_added": 177
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": false,
+    "max_pair_degree": 5,
+    "highest_completed_degree": 4,
+    "max_matrix_rows": 1168,
+    "max_matrix_columns": 21098,
+    "peak_live_nonzeros": 1492356,
+    "peak_estimated_bytes": 24046480,
+    "pairs_reduced": 754,
+    "elements_added": 177,
+    "quotient_dimension": null
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "7e333fb",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 120 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=120 tools/scoreboard.sh row poseidon31-cico-t16-rf4-rp2"
+}
