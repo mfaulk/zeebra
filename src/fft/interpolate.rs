@@ -14,10 +14,21 @@ use crate::{
 /// n must be a power of 2.
 pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolynomial<F> {
     assert_eq!(x.len(), w.size());
-    let n = F::new(w.size() as u64);
+
+    // `c / n` would invert n once per coefficient: `Div` on a field element is multiplication by
+    // `inverse()`, and nothing memoizes it. One inversion for the whole vector instead.
+    //
+    // n is invertible whenever the domain exists at all: a primitive nth root of unity requires
+    // n | q - 1, so n is coprime to the characteristic. `inverse` still panics if a caller built
+    // a domain by hand over a field where it is not.
+    let size_inverse = F::new(w.size() as u64).inverse();
+
     let w_inv = w.inverse();
     let unscaled_coefficients = evaluate(&UnivariatePolynomial::new(x), &w_inv);
-    let coefficients: Vec<_> = unscaled_coefficients.into_iter().map(|c| c / n).collect();
+    let coefficients: Vec<_> = unscaled_coefficients
+        .into_iter()
+        .map(|c| c * size_inverse)
+        .collect();
     UnivariatePolynomial::new(&coefficients)
 }
 
