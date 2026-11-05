@@ -504,14 +504,31 @@ pub struct PairQueue<const N: usize> {
     /// [`PairSchedule::needs_the_monomial_order`] schedules read this, and for the others any value
     /// gives the same queue — which [`PairQueue::scheduled`] relies on to keep the old constructor.
     order: MonomialOrder,
+
+    /// Pairs a selection heuristic set aside, still part of the pair set.
+    ///
+    /// **Not discarded, and not "handled".** A heuristic is not a theorem, so a pair it declines to
+    /// select now has to remain available — and it has to remain available *as an unprocessed
+    /// pair*, which is a stronger requirement than merely being retrievable:
+    ///
+    /// - Gebauer–Möller's criterion B minimizes the pending set, so a deferred pair must be visible
+    ///   to it or the installation would differ from the published one. It is: see
+    ///   [`PairQueue::push_pairs_from_leads`], which scans this list alongside the heap.
+    /// - The chain criterion's witnesses are pairs that have been *processed*, and a deferred pair
+    ///   has not been. [`PairQueue::defer_degree`] therefore moves pairs without recording them as
+    ///   handled, which is why it does not go through [`PairQueue::pop`].
+    ///
+    /// Empty unless a selection strategy defers, and emptied by
+    /// [`PairQueue::promote_deferred`] before the computation can end.
+    deferred: Vec<CriticalPair<N>>,
 }
 
 impl<const N: usize> Default for PairQueue<N> {
     /// An empty queue under the baseline schedule.
     ///
-    /// Hand-written rather than derived because the queue now carries a [`MonomialOrder`], which
-    /// has no `Default` — deliberately, since no order is the obvious one. The baseline schedule
-    /// does not read it.
+    /// Hand-written rather than derived because the queue carries a [`MonomialOrder`], which has no
+    /// `Default` — deliberately, since no order is the obvious one. The baseline schedule does not
+    /// read it.
     fn default() -> Self {
         Self::new()
     }
@@ -549,6 +566,7 @@ impl<const N: usize> PairQueue<N> {
             track_handled: false,
             schedule,
             order,
+            deferred: Vec::new(),
         }
     }
 
@@ -695,16 +713,18 @@ impl<const N: usize> PairQueue<N> {
         // Criterion B. Applied to the old pairs before the new ones are inserted, as published:
         // a new pair (g, h) has lcm(LM g, LM h) = lcm(LM g, LM h), so the equality guard would
         // keep it regardless, but following the published order keeps the two sets distinct.
+        let condition = |pair: &CriticalPair<N>| {
+            divides(&lead_h, &pair.lcm)
+                && Monomial::lcm(&leads[pair.left], &lead_h) != pair.lcm
+                && Monomial::lcm(&lead_h, &leads[pair.right]) != pair.lcm
+        };
+
         let stale: Vec<PairKey> = self
             .pending
             .iter()
             .map(|Reverse(entry)| &entry.pair)
             .filter(|pair| !self.removed.contains(&(pair.left, pair.right)))
-            .filter(|pair| {
-                divides(&lead_h, &pair.lcm)
-                    && Monomial::lcm(&leads[pair.left], &lead_h) != pair.lcm
-                    && Monomial::lcm(&lead_h, &leads[pair.right]) != pair.lcm
-            })
+            .filter(|pair| condition(pair))
             .map(|pair| (pair.left, pair.right))
             .collect();
         for key in stale {
@@ -712,6 +732,13 @@ impl<const N: usize> PairQueue<N> {
             self.live -= 1;
             counts.gebauer_moller += 1;
         }
+
+        // The deferred pairs are part of the pair set, so criterion B applies to them too. Removing
+        // them here rather than after promotion is what makes a deferring strategy's pair-set
+        // minimization identical to a non-deferring one's, instead of merely similar.
+        let before = self.deferred.len();
+        self.deferred.retain(|pair| !condition(pair));
+        counts.gebauer_moller += before - self.deferred.len();
 
         // Criterion M. `accepted` holds the indices `g` whose pair with `h` survived, in the order
         // they were examined, which is the published algorithm's intermediate set `D`.
@@ -774,13 +801,97 @@ impl<const N: usize> PairQueue<N> {
     /// The next pair: of minimum lcm degree, and within that degree whichever the schedule ranks
     /// first.
     pub fn pop(&mut self) -> Option<CriticalPair<N>> {
+        self.take(true)
+    }
+
+    /// Take the top pair, recording it as handled only if `processed`.
+    ///
+    /// `processed = false` is deferral, and the flag is not a convenience: the chain criterion may
+    /// only discard a pair on the strength of witnesses that have been *reduced*, so a pair that
+    /// left the pending set without being reduced must not enter `handled`. Letting it would close
+    /// the justification loop the criterion's soundness argument rules out.
+    fn take(&mut self, processed: bool) -> Option<CriticalPair<N>> {
         self.drop_stale_top();
         let Reverse(ScheduledPair { pair, .. }) = self.pending.pop()?;
         self.live -= 1;
-        if self.track_handled {
+        if processed && self.track_handled {
             self.handled.insert((pair.left, pair.right));
         }
         Some(pair)
+    }
+
+    /// The lcm degree the next batch would be selected at, or `None` if nothing is pending.
+    ///
+    /// For a selection strategy that has to decide how large a batch to ask for *before* asking:
+    /// the cap depends on the degree, and the degree is only knowable from the queue. Takes `&mut`
+    /// because establishing it means skipping any lazily deleted entries at the top, which is the
+    /// same work `select_batch` would have done.
+    pub fn next_degree(&mut self) -> Option<u64> {
+        self.drop_stale_top();
+        self.pending.peek().map(|Reverse(entry)| entry.pair.degree)
+    }
+
+    /// How many pending pairs are at `degree`.
+    ///
+    /// A scan of the heap, so a caller should ask only when it needs the answer. It exists because
+    /// "did the cap bind?" is a question about the degree being selected and not about the queue:
+    /// `len()` counts pairs at every degree, and using it would charge a cap with withholding
+    /// pairs it was never offered.
+    pub fn pending_at_degree(&self, degree: u64) -> usize {
+        self.pending
+            .iter()
+            .map(|Reverse(entry)| &entry.pair)
+            .filter(|pair| pair.degree == degree)
+            .filter(|pair| !self.removed.contains(&(pair.left, pair.right)))
+            .count()
+    }
+
+    /// Pairs waiting, pending and deferred together.
+    ///
+    /// What a main loop has to test to know whether it is finished: an empty pending set with
+    /// deferred pairs left is not a finished computation.
+    pub fn has_work(&self) -> bool {
+        self.live > 0 || !self.deferred.is_empty()
+    }
+
+    /// Pairs set aside by a selection heuristic.
+    pub fn deferred_len(&self) -> usize {
+        self.deferred.len()
+    }
+
+    /// Move every pending pair of `degree` into the deferred set, and return how many.
+    ///
+    /// For a selection strategy that has decided it has taken enough of this degree and wants to
+    /// move on. The pairs are **not** recorded as handled — see [`PairQueue::deferred`] — and they
+    /// remain visible to Gebauer–Möller, so the pair set is minimized exactly as it would have
+    /// been had they stayed pending.
+    pub fn defer_degree(&mut self, degree: u64) -> usize {
+        let mut moved = 0;
+        loop {
+            self.drop_stale_top();
+            match self.pending.peek() {
+                Some(Reverse(next)) if next.pair.degree == degree => {
+                    let pair = self.take(false).expect("peeked at a pair that is there");
+                    self.deferred.push(pair);
+                    moved += 1;
+                }
+                _ => return moved,
+            }
+        }
+    }
+
+    /// Return every deferred pair to the pending set, and report how many.
+    ///
+    /// **This is what makes a deferring strategy complete**: the computation cannot end while
+    /// deferred pairs remain, so every pair is eventually processed or discarded by a criterion that
+    /// is a theorem. A deferral is a decision about *when*, never about *whether*.
+    pub fn promote_deferred(&mut self) -> usize {
+        let promoted = std::mem::take(&mut self.deferred);
+        let count = promoted.len();
+        for pair in promoted {
+            self.push(pair);
+        }
+        count
     }
 
     /// Every remaining pair of minimum lcm degree, up to `limit` of them.

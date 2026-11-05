@@ -17,6 +17,7 @@ use std::{
 
 use crate::{
     grobner::{
+        f4::hilbert_driven::HilbertSelection,
         f4::symbolic::CacheMode,
         pairs::{PairCriteria, PairSchedule},
     },
@@ -170,6 +171,25 @@ pub struct F4Options {
     /// Which criteria may discard a critical pair before a matrix is built. See [`PairCriteria`].
     pub criteria: PairCriteria,
 
+    /// Whether a Hilbert prediction may influence how many pairs a degree contributes to one
+    /// batch. See [`HilbertSelection`].
+    ///
+    /// **Not a criterion, and not a completeness risk.** Neither limiting mode discards a pair:
+    /// a capped batch leaves the rest pending, and a deferred degree's pairs are promoted back
+    /// before the computation can end. A wrong prediction therefore costs batches and never the
+    /// answer — which is asserted over the correctness corpus, because the prediction is wrong on
+    /// exactly the systems this milestone is about.
+    pub hilbert: HilbertSelection,
+
+    /// Check the returned basis independently before returning it.
+    ///
+    /// Off by default: the algorithm's completeness does not rest on it, and the check is
+    /// `|G|²/2` normal forms. On when a caller wants the plan's §8.3 establishment of the result
+    /// rather than an inference from the strategy having run — and whenever a measurement needs
+    /// §8.5's total-including-the-check figure. A failed check is
+    /// [`F4Error::CertificationFailed`], never a returned basis.
+    pub certify: bool,
+
     /// In what order the pairs of one degree are taken. See [`PairSchedule`].
     ///
     /// A schedule discards nothing, so this cannot change the basis — only which pairs share a
@@ -223,6 +243,8 @@ impl F4Options {
             reducer_selection: ReducerSelection::FirstApplicable,
             criteria: PairCriteria::PRODUCT_ONLY,
             schedule: PairSchedule::DegreeThenLcm,
+            hilbert: HilbertSelection::Off,
+            certify: false,
             reducer_cache: CacheMode::Off,
             measure_stages: false,
             profile_degrees: false,
@@ -327,8 +349,10 @@ impl Default for F4Options {
 
 /// Why an F4 computation stopped without a basis.
 ///
-/// Every variant means a limit in [`F4Options`] was crossed. There is deliberately no variant for
-/// "finished but incomplete": a successful return is always a complete reduced Gröbner basis.
+/// Every variant but one means a limit in [`F4Options`] was crossed; the exception is
+/// [`F4Error::CertificationFailed`], which means the computation finished and its result failed an
+/// independent check. There is deliberately no variant for "finished but incomplete": a successful
+/// return is always a complete reduced Gröbner basis.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum F4Error {
     /// Symbolic preprocessing needed more rows than allowed.
@@ -368,6 +392,19 @@ pub enum F4Error {
 
     /// The options cannot be satisfied by any computation.
     InvalidOptions { reason: &'static str },
+
+    /// The computation finished and the basis failed its independent check.
+    ///
+    /// Not a crossed limit, and the one variant that is not. It exists so that
+    /// [`F4Options::certify`] has somewhere to report to **without** a code path that returns a
+    /// basis which failed: the enum still has no variant meaning "finished but incomplete", and
+    /// this one means "finished, checked, and the check said no" — which is a refusal, not a
+    /// partial answer.
+    ///
+    /// Reaching it would be a defect rather than a resource outcome: no strategy in this crate
+    /// discards a critical pair on heuristic grounds. It is wired up because a correctness claim
+    /// that cannot fail is not a check.
+    CertificationFailed { reason: &'static str },
 }
 
 impl Display for F4Error {
@@ -404,6 +441,11 @@ impl Display for F4Error {
             Self::InvalidOptions { reason } => {
                 write!(f, "the options are unsatisfiable: {}", reason)
             }
+            Self::CertificationFailed { reason } => write!(
+                f,
+                "the computed basis failed its independent check: {}",
+                reason
+            ),
         }
     }
 }
