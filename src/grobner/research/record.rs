@@ -21,7 +21,10 @@
 //! measurements at all — so an instance does not change when a different workstation runs it, and
 //! two records over the same manifest are comparable by construction.
 
-use std::{fmt::Write as _, time::Duration};
+use std::{
+    fmt::{Display, Formatter, Write as _},
+    time::Duration,
+};
 
 use crate::grobner::{Attempt, OutcomeClass, SolvePlan};
 
@@ -130,6 +133,308 @@ impl Json {
         }
     }
 
+    /// Parse the subset this type emits.
+    ///
+    /// Exists because a scoreboard **accumulates**: `results/history.json` is read, extended and
+    /// written back, and a writer with no reader would mean either losing the history on every run
+    /// or carrying a dependency to read back what eighty lines wrote. Round-tripping is asserted,
+    /// including by a property test over arbitrary values.
+    ///
+    /// Strict within the subset: no floats, since nothing here emits one and accepting one would
+    /// let a number that cannot round-trip into a record. Everything else RFC 8259 allows is
+    /// accepted, including `\u` escapes and surrogate pairs.
+    ///
+    /// # Errors
+    /// [`JsonError`], naming the byte offset.
+    pub fn parse(text: &str) -> Result<Self, JsonError> {
+        let bytes = text.as_bytes();
+        let mut at = 0usize;
+        let value = Self::parse_value(bytes, &mut at)?;
+        Self::skip_whitespace(bytes, &mut at);
+        if at != bytes.len() {
+            return Err(JsonError {
+                at,
+                reason: "trailing input",
+            });
+        }
+        Ok(value)
+    }
+
+    fn skip_whitespace(bytes: &[u8], at: &mut usize) {
+        while *at < bytes.len() && matches!(bytes[*at], b' ' | b'\t' | b'\n' | b'\r') {
+            *at += 1;
+        }
+    }
+
+    fn parse_value(bytes: &[u8], at: &mut usize) -> Result<Self, JsonError> {
+        Self::skip_whitespace(bytes, at);
+        let start = *at;
+        match bytes.get(start) {
+            None => Err(JsonError {
+                at: start,
+                reason: "unexpected end of input",
+            }),
+            Some(b'n') => Self::expect(bytes, at, b"null", Json::Null),
+            Some(b't') => Self::expect(bytes, at, b"true", Json::Bool(true)),
+            Some(b'f') => Self::expect(bytes, at, b"false", Json::Bool(false)),
+            Some(b'"') => Self::parse_string(bytes, at).map(Json::Str),
+            Some(b'[') => {
+                *at += 1;
+                let mut items = Vec::new();
+                loop {
+                    Self::skip_whitespace(bytes, at);
+                    if bytes.get(*at) == Some(&b']') {
+                        *at += 1;
+                        return Ok(Json::Array(items));
+                    }
+                    if !items.is_empty() {
+                        Self::expect_byte(bytes, at, b',')?;
+                    }
+                    Self::skip_whitespace(bytes, at);
+                    // A `]` here would be a trailing comma, which the loop above only accepts
+                    // before the first item.
+                    if bytes.get(*at) == Some(&b']') {
+                        return Err(JsonError {
+                            at: *at,
+                            reason: "trailing comma in array",
+                        });
+                    }
+                    items.push(Self::parse_value(bytes, at)?);
+                }
+            }
+            Some(b'{') => {
+                *at += 1;
+                let mut fields: Vec<(String, Json)> = Vec::new();
+                loop {
+                    Self::skip_whitespace(bytes, at);
+                    if bytes.get(*at) == Some(&b'}') {
+                        *at += 1;
+                        return Ok(Json::Object(fields));
+                    }
+                    if !fields.is_empty() {
+                        Self::expect_byte(bytes, at, b',')?;
+                    }
+                    Self::skip_whitespace(bytes, at);
+                    let key = Self::parse_string(bytes, at)?;
+                    Self::skip_whitespace(bytes, at);
+                    Self::expect_byte(bytes, at, b':')?;
+                    fields.push((key, Self::parse_value(bytes, at)?));
+                }
+            }
+            Some(_) => Self::parse_integer(bytes, at),
+        }
+    }
+
+    fn expect(
+        bytes: &[u8],
+        at: &mut usize,
+        literal: &[u8],
+        value: Json,
+    ) -> Result<Json, JsonError> {
+        if bytes.len() >= *at + literal.len() && &bytes[*at..*at + literal.len()] == literal {
+            *at += literal.len();
+            Ok(value)
+        } else {
+            Err(JsonError {
+                at: *at,
+                reason: "not a JSON literal",
+            })
+        }
+    }
+
+    fn expect_byte(bytes: &[u8], at: &mut usize, byte: u8) -> Result<(), JsonError> {
+        Self::skip_whitespace(bytes, at);
+        if bytes.get(*at) == Some(&byte) {
+            *at += 1;
+            Ok(())
+        } else {
+            Err(JsonError {
+                at: *at,
+                reason: "expected a delimiter",
+            })
+        }
+    }
+
+    fn parse_integer(bytes: &[u8], at: &mut usize) -> Result<Json, JsonError> {
+        let start = *at;
+        if bytes.get(*at) == Some(&b'-') {
+            *at += 1;
+        }
+        let digits = *at;
+        while *at < bytes.len() && bytes[*at].is_ascii_digit() {
+            *at += 1;
+        }
+        if *at == digits {
+            return Err(JsonError {
+                at: start,
+                reason: "not a number",
+            });
+        }
+        // A float is rejected rather than truncated: a record that held one would not round-trip,
+        // which is the whole reason this type has no float variant.
+        if matches!(bytes.get(*at), Some(b'.') | Some(b'e') | Some(b'E')) {
+            return Err(JsonError {
+                at: *at,
+                reason: "floats are not part of this subset",
+            });
+        }
+        std::str::from_utf8(&bytes[start..*at])
+            .expect("ASCII digits")
+            .parse::<i128>()
+            .map(Json::Int)
+            .map_err(|_| JsonError {
+                at: start,
+                reason: "integer out of range",
+            })
+    }
+
+    fn parse_string(bytes: &[u8], at: &mut usize) -> Result<String, JsonError> {
+        Self::skip_whitespace(bytes, at);
+        if bytes.get(*at) != Some(&b'"') {
+            return Err(JsonError {
+                at: *at,
+                reason: "expected a string",
+            });
+        }
+        *at += 1;
+        let mut out = String::new();
+        loop {
+            let byte = *bytes.get(*at).ok_or(JsonError {
+                at: *at,
+                reason: "unterminated string",
+            })?;
+            match byte {
+                b'"' => {
+                    *at += 1;
+                    return Ok(out);
+                }
+                b'\\' => {
+                    *at += 1;
+                    let escape = *bytes.get(*at).ok_or(JsonError {
+                        at: *at,
+                        reason: "unterminated escape",
+                    })?;
+                    *at += 1;
+                    match escape {
+                        b'"' => out.push('"'),
+                        b'\\' => out.push('\\'),
+                        b'/' => out.push('/'),
+                        b'b' => out.push('\u{08}'),
+                        b'f' => out.push('\u{0c}'),
+                        b'n' => out.push('\n'),
+                        b'r' => out.push('\r'),
+                        b't' => out.push('\t'),
+                        b'u' => {
+                            let first = Self::parse_hex4(bytes, at)?;
+                            // A high surrogate is only half a character, and the writer emits
+                            // non-ASCII as UTF-8 rather than as escapes — but another producer may
+                            // not, and half a character is not a decoding.
+                            let code = if (0xD800..0xDC00).contains(&first) {
+                                if bytes.get(*at) != Some(&b'\\')
+                                    || bytes.get(*at + 1) != Some(&b'u')
+                                {
+                                    return Err(JsonError {
+                                        at: *at,
+                                        reason: "lone high surrogate",
+                                    });
+                                }
+                                *at += 2;
+                                let second = Self::parse_hex4(bytes, at)?;
+                                if !(0xDC00..0xE000).contains(&second) {
+                                    return Err(JsonError {
+                                        at: *at,
+                                        reason: "bad low surrogate",
+                                    });
+                                }
+                                0x10000 + ((first - 0xD800) << 10) + (second - 0xDC00)
+                            } else {
+                                first
+                            };
+                            out.push(char::from_u32(code).ok_or(JsonError {
+                                at: *at,
+                                reason: "not a scalar value",
+                            })?);
+                        }
+                        _ => {
+                            return Err(JsonError {
+                                at: *at,
+                                reason: "unknown escape",
+                            })
+                        }
+                    }
+                }
+                byte if byte < 0x20 => {
+                    return Err(JsonError {
+                        at: *at,
+                        reason: "unescaped control character",
+                    })
+                }
+                _ => {
+                    // Multi-byte UTF-8 passes through whole: find the character's length from the
+                    // string slice rather than byte by byte.
+                    let rest = std::str::from_utf8(&bytes[*at..]).map_err(|_| JsonError {
+                        at: *at,
+                        reason: "invalid UTF-8",
+                    })?;
+                    let c = rest.chars().next().expect("nonempty");
+                    out.push(c);
+                    *at += c.len_utf8();
+                }
+            }
+        }
+    }
+
+    fn parse_hex4(bytes: &[u8], at: &mut usize) -> Result<u32, JsonError> {
+        if *at + 4 > bytes.len() {
+            return Err(JsonError {
+                at: *at,
+                reason: "truncated \\u escape",
+            });
+        }
+        let text = std::str::from_utf8(&bytes[*at..*at + 4]).map_err(|_| JsonError {
+            at: *at,
+            reason: "truncated \\u escape",
+        })?;
+        let value = u32::from_str_radix(text, 16).map_err(|_| JsonError {
+            at: *at,
+            reason: "bad \\u escape",
+        })?;
+        *at += 4;
+        Ok(value)
+    }
+
+    /// The value at `key`, for an object.
+    pub fn get(&self, key: &str) -> Option<&Json> {
+        match self {
+            Self::Object(fields) => fields.iter().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
+    /// The items, for an array.
+    pub fn items(&self) -> &[Json] {
+        match self {
+            Self::Array(items) => items,
+            _ => &[],
+        }
+    }
+
+    /// The string, for a string.
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::Str(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// The integer, for an integer.
+    pub fn as_int(&self) -> Option<i128> {
+        match self {
+            Self::Int(n) => Some(*n),
+            _ => None,
+        }
+    }
+
     /// A JSON string literal, escaped per RFC 8259 §7.
     fn write_string(out: &mut String, s: &str) {
         out.push('"');
@@ -153,6 +458,24 @@ impl Json {
         out.push('"');
     }
 }
+
+/// Why a JSON text could not be read.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct JsonError {
+    /// Byte offset into the input.
+    pub at: usize,
+
+    /// What was wrong there.
+    pub reason: &'static str,
+}
+
+impl Display for JsonError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} at byte {}", self.reason, self.at)
+    }
+}
+
+impl std::error::Error for JsonError {}
 
 /// One route the planner ran, as a record.
 ///
@@ -477,6 +800,112 @@ mod tests {
         assert_eq!(
             Json::Array(vec![Json::int(1i32), Json::int(2i32)]).to_json(),
             "[\n  1,\n  2\n]"
+        );
+    }
+
+    /// Everything the writer emits reads back identically.
+    ///
+    /// The property that makes `results/history.json` safe to accumulate: the scoreboard reads the
+    /// file it wrote last time, extends it and writes it back, so a lossy round trip would silently
+    /// corrupt every historical record it touched.
+    #[test]
+    fn test_round_trip() {
+        let value = Json::object([
+            ("schema", Json::int(1i32)),
+            ("null", Json::Null),
+            ("yes", Json::Bool(true)),
+            ("no", Json::Bool(false)),
+            ("negative", Json::int(-17i32)),
+            ("big", Json::Int(i128::from(u64::MAX))),
+            (
+                "escaped",
+                Json::string("a\"b\\c\nd\te\u{08}f\u{0c}g\u{1f}h"),
+            ),
+            ("unicode", Json::string("Gröbner 🦓 ∎")),
+            ("empty_array", Json::Array(vec![])),
+            ("empty_object", Json::Object(vec![])),
+            (
+                "nested",
+                Json::Array(vec![
+                    Json::object([("inner", Json::Array(vec![Json::int(1i32), Json::Null]))]),
+                    Json::string(""),
+                ]),
+            ),
+        ]);
+        let text = value.to_json();
+        assert_eq!(Json::parse(&text), Ok(value.clone()));
+        // And the parse of the parse's own output is the same again.
+        assert_eq!(
+            Json::parse(&Json::parse(&text).expect("valid").to_json()),
+            Ok(value)
+        );
+    }
+
+    /// Accessors reach into a parsed value.
+    #[test]
+    fn test_reading_a_parsed_value() {
+        let parsed =
+            Json::parse(r#"{ "runs": [ {"challenge": "x", "elapsed_nanos": 42} ], "count": 1 }"#)
+                .expect("valid");
+        assert_eq!(parsed.get("count").and_then(Json::as_int), Some(1));
+        let runs = parsed.get("runs").expect("present").items();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].get("challenge").and_then(Json::as_str), Some("x"));
+        assert_eq!(
+            runs[0].get("elapsed_nanos").and_then(Json::as_int),
+            Some(42)
+        );
+        assert_eq!(runs[0].get("absent"), None);
+        // Wrong-shape access returns nothing rather than panicking.
+        assert_eq!(parsed.as_int(), None);
+        assert_eq!(parsed.items(), &[]);
+    }
+
+    /// Malformed input is refused with an offset, and a float is refused on purpose.
+    #[test]
+    fn test_malformed_input() {
+        for (text, reason) in [
+            ("", "unexpected end of input"),
+            // Truncation is reported as whatever was expected next, with the offset to find it by.
+            ("{", "expected a string"),
+            ("[", "unexpected end of input"),
+            ("[1,]", "trailing comma in array"),
+            ("{\"a\" 1}", "expected a delimiter"),
+            ("{a: 1}", "expected a string"),
+            ("\"unterminated", "unterminated string"),
+            ("nul", "not a JSON literal"),
+            ("1 2", "trailing input"),
+            ("-", "not a number"),
+            ("\"\\q\"", "unknown escape"),
+            ("\"\\ud834\"", "lone high surrogate"),
+            // A float is not a parse failure in RFC 8259; it is one *here*, because this type
+            // has no float variant and 0.1 does not round-trip.
+            ("0.5", "floats are not part of this subset"),
+            ("1e3", "floats are not part of this subset"),
+        ] {
+            let error = Json::parse(text).expect_err(text);
+            assert_eq!(error.reason, reason, "{}", text);
+            assert!(error.to_string().contains("at byte"));
+        }
+
+        // A raw control character inside a string is invalid JSON, not merely ugly.
+        assert_eq!(
+            Json::parse("\"a\nb\"").expect_err("control").reason,
+            "unescaped control character"
+        );
+    }
+
+    /// Escapes another producer might emit are accepted.
+    #[test]
+    fn test_escapes_from_other_producers() {
+        assert_eq!(
+            Json::parse(r#""\u0041\u00e9\u002f\/""#),
+            Ok(Json::string("Aé//"))
+        );
+        // A surrogate pair is one character.
+        assert_eq!(
+            Json::parse(r#""\ud83e\udd93""#),
+            Ok(Json::string("\u{1f993}"))
         );
     }
 

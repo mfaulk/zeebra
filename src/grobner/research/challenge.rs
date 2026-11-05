@@ -111,6 +111,12 @@ pub enum ExternalStatus {
 
     /// Published together with its answer, so that an implementation can check itself.
     PublishedWithAnswer,
+
+    /// Nobody posed this. It is a reduction or a surrogate derived here.
+    ///
+    /// Distinct from [`Self::NoneRecorded`], which is a dated statement about a *public* problem.
+    /// Reporting a derived instance as having no recorded solution would imply someone had looked.
+    NotAPublicProblem,
 }
 
 impl Display for ExternalStatus {
@@ -123,6 +129,7 @@ impl Display for ExternalStatus {
                 write!(f, "solved externally, verified {}", verified)
             }
             Self::PublishedWithAnswer => write!(f, "published with its answer"),
+            Self::NotAPublicProblem => write!(f, "derived here; not a public problem"),
         }
     }
 }
@@ -463,6 +470,13 @@ impl ChallengeManifest {
             (BenchmarkClass::Official, ExternalStatus::NoneRecorded { as_of }) => {
                 Significance::NoPublicSolutionRecorded { as_of }
             }
+            // An official problem cannot be a derived one; the registry has no such row and a
+            // hand-built manifest that claimed both gets the weakest reading.
+            (BenchmarkClass::Official, ExternalStatus::NotAPublicProblem) => {
+                Significance::SurrogateWitness {
+                    why: "the manifest calls itself official and not public",
+                }
+            }
         }
     }
 
@@ -653,6 +667,9 @@ impl ChallengeManifest {
                 ],
                 ExternalStatus::PublishedWithAnswer => {
                     vec![("state", Json::string("published_with_answer"))]
+                }
+                ExternalStatus::NotAPublicProblem => {
+                    vec![("state", Json::string("not_a_public_problem"))]
                 }
             }),
         ));
@@ -906,9 +923,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             },
             objective: Objective::CicoExact,
             program: INITIATIVE,
-            external: ExternalStatus::NoneRecorded {
-                as_of: "2026-11-05",
-            },
+            external: ExternalStatus::NotAPublicProblem,
             verifier: CICO_VERIFIER,
             notes:
                 "The official field, state width, k, constants and objective; fewer rounds. The \
@@ -953,9 +968,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             },
             objective: Objective::CicoExact,
             program: INITIATIVE,
-            external: ExternalStatus::NoneRecorded {
-                as_of: "2026-11-05",
-            },
+            external: ExternalStatus::NotAPublicProblem,
             verifier: CICO_VERIFIER,
             notes: "A planted target, so a solution is known to exist and \"found nothing\" is \
                     distinguishable from \"is broken\". Regression and profiling only.",

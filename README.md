@@ -273,6 +273,8 @@ cargo run --release --example field_width          # what a 4-byte field element
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
 cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
+cargo run --release --example scoreboard           # registered problems, one record each, staged
+tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -1368,6 +1370,75 @@ measurement meant. See
 [`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md) for the
 full table and for what the three 2026 CICO targets' external status implies about what a result
 there could claim.
+
+#### The scoreboard
+
+`grobner::research::Scoreboard` collects what runs established about registered problems, and its
+job is to refuse three specific mistakes.
+
+**Comparing different problems.** A `RunRecord` references its problem by identity *digest*, not by
+name. `Scoreboard::add` looks the problem up in the registry and refuses a run whose digest no
+longer matches — the problem was redefined after the run, so the measurement is about something
+else. `Comparison::of` refuses two runs of different problems outright, and deliberately does not
+compare ids.
+
+**Ranking unfinished runs.** `Scoreboard::best` returns verified witnesses only. Two computations
+that crossed a budget at degrees 9 and 11 are not ordered: a higher degree is not nearer a
+solution. Those appear in their own table, under a heading that says it is a diagnostic.
+
+**Quoting a difference the hardware cannot resolve.** `Comparison::runtime_readable` is false inside
+±20%, which is the band M22 declined to read on this machine. The comparison is still reported, with
+the flag.
+
+```rust
+use std::time::Duration;
+use zeebra::grobner::research::{
+    challenge, Comparison, Environment, GrobnerFrontier, RunOutcome, RunRecord, Stage, StageCost};
+
+fn run(id: &str, formulation: &str, millis: u64, bytes: usize) -> RunRecord {
+    let manifest = challenge(id).expect("registered");
+    let mut run = RunRecord::new(&manifest, formulation);
+    run.outcome = RunOutcome::VerifiedWitness;
+    run.stages = vec![StageCost::new(Stage::Grobner, Duration::from_millis(millis))];
+    run.frontier = Some(GrobnerFrontier { completed: true, peak_estimated_bytes: bytes,
+                                          ..GrobnerFrontier::default() });
+    run
+}
+
+// Two formulations of one problem: M22-E's last-round-first result on this instance.
+let baseline = run("poseidon-t2-rf4-rp0-planted", "as generated", 352, 3_800_000);
+let candidate = run("poseidon-t2-rf4-rp0-planted", "last-round-first", 219, 2_900_000);
+let comparison = Comparison::of(&baseline, &candidate).expect("the same problem");
+assert_eq!(comparison.speedup_per_mille, 1_607);          // 1.607x, as two integers
+assert_eq!(comparison.memory_reduction_basis_points, 2_369);
+assert!(comparison.runtime_readable);
+
+// A different problem is refused rather than rendered.
+let elsewhere = run("poseidon-t2-rf2-rp2-planted", "as generated", 143, 1_700_000);
+assert!(Comparison::of(&baseline, &elsewhere).is_err());
+```
+
+Costs are recorded **per stage** — generation, Gröbner, conversion, univariate, verification —
+because M20 measured that over a wide field the cost is not in the matrices, and a single total
+hides the stage that dominates. The runner therefore drives `f4_reported`, then
+`fglm_to_lex_with_options`, then `solve_from_lex_basis` itself rather than calling
+`solve_one_planned`.
+
+A randomized specialization campaign is summarized by `Campaign`, which reports the slices that
+found **nothing** alongside the one that worked: work per witness is the whole campaign's time over
+the witnesses, and the success rate carries a 95% Wilson interval. One witness in twenty slices is
+a rate of 0.89% to 23.6%, which is a different claim from "solved in 2 seconds".
+
+```sh
+tools/scoreboard.sh                    # smoke tier: the surrogates, nothing written
+tools/scoreboard.sh stable --write     # adds the published MQ instances, updates the tree
+cargo run --release --example scoreboard -- frontier
+```
+
+The tree under `research/scoreboard/` is committed: the registry emitted from code, one JSON record
+per run, the accumulated history, and a generated `SCOREBOARD.md`. `Json::parse` reads back what
+`Json::to_json` writes — round-tripping is asserted — so the history accumulates rather than being
+overwritten, with no dependency to read eighty lines of writer.
 
 #### External instances: the Fukuoka MQ Challenge
 

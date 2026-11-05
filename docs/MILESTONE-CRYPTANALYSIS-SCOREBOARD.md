@@ -184,18 +184,26 @@ including the failures** — a fast successful slice is misleading if its succes
 
 ```text
 research/scoreboard/
-  challenges/        the registry, emitted from code so it cannot drift
-  runs/              one JSON record per run, named by instance and commit
-  results/best.json  the best correct result per instance per class
-  results/history.json
-  SCOREBOARD.md      generated
+  challenges/           the registry, emitted from code so it cannot drift
+  runs/                 one JSON record per run, named by problem, formulation and commit
+  results/best.json     the fastest verified witness per problem
+  results/history.json  accumulated across runs and milestones
+  SCOREBOARD.md         generated
 tools/
-  render-scoreboard  JSON to Markdown, Python standard library only
-  compare-scoreboard two runs, refusing to compare different digests
+  scoreboard.sh         the measurement protocol: private target dir, pinned cores, a tier
 ```
 
 `research/instances/` stays gitignored and un-redistributed; `research/scoreboard/` is committed,
 because a scoreboard nobody can read from the repository is not one.
+
+**The renderer and the comparison are in the crate, not in a separate script, and this is a
+deliberate departure from the plan's Python tool.** The one rule this machinery exists to enforce
+is "these two runs are of the same mathematical problem"; a second implementation of it in another
+language would be a second place for it to be wrong, and it would not be covered by the test suite.
+What stays in `tools/` is the part that is genuinely not the crate's business: the private target
+directory, the core pinning, and the tier selection. The committed JSON remains the machine-readable
+interface for anyone else's tooling, and `Json::parse` round-trips it (asserted) so the history can
+be accumulated rather than overwritten.
 
 ## 5. What was decided in M23-0
 
@@ -214,6 +222,40 @@ the same shape as `MqVisitor`. The dimensions compiled are exactly the registere
 **Significance is computed, not written.** `ChallengeManifest::significance(verified)` returns one of
 five variants from the class and the external status. `NoPublicSolutionRecorded` says in its own
 `Display` that it is not a priority claim.
+
+## 5a. What was decided in M23-A
+
+**A run references its problem by digest, and a stale identity is refused.** `Scoreboard::add`
+looks the problem up in the registry and compares digests; a mismatch is
+`ScoreboardError::StaleIdentity` rather than a row in a table. The same check runs again on the way
+out in `to_json`, so an emitted file cannot carry an identity the registry no longer describes.
+`Comparison::of` refuses two different digests outright — and it does **not** compare ids, because
+two runs can agree on a name and disagree on what it means.
+
+**Unfinished runs are not ranked.** `Scoreboard::best` returns verified witnesses only. Ranking two
+crossed budgets against each other would assert that a higher degree is nearer a solution, which is
+false; those rows go to a separate table whose heading says it is a diagnostic. This is the plan's
+§4.3B rule, enforced by the type rather than by the prose around it.
+
+**The ±20% band is in the code.** `Comparison::runtime_readable` is false inside it. A difference
+that cannot be read is still reported — with that flag — rather than quoted or dropped.
+
+**Stages are measured by running the pipeline in stages.** The runner calls `f4_reported`, then
+`fglm_to_lex_with_options`, then `solve_from_lex_basis`, each timed, rather than going through
+`solve_one_planned`. That is what makes a per-stage table possible at all; the cost is that the
+planner's route choice is not exercised there, which `solve_baseline` and `cryptanalysis_ladder`
+still cover.
+
+**A campaign reports its failures.** `Campaign::work_per_witness` is the whole campaign's time over
+the witnesses — as two integers, since a record holds no floats — and is `None` when there were
+none, where a division would produce an infinity presented as a measurement. The success rate
+carries a 95% Wilson interval in basis points: at 1 witness in 20 slices that is 0.89% to 23.6%,
+where the normal approximation's lower bound is negative and therefore not a probability.
+
+**`Json` gained a parser.** The history file is read, extended and written back, and a writer with
+no reader would mean either losing every earlier milestone's results on each run or carrying a
+dependency to read back what eighty lines wrote. Floats are rejected rather than accepted and
+truncated, which keeps the no-float invariant on the way in as well as out.
 
 ## 6. Sub-milestones
 
@@ -306,7 +348,18 @@ run.
 
 ```sh
 cargo test --lib grobner::research::challenge   # the registry's freeze and faithfulness tests
+cargo test --lib grobner::research::scoreboard  # the refusals: stale identity, different problems
+cargo test --lib grobner::research::record      # the JSON round trip
 cargo test --lib util::sha256                   # FIPS 180-4 vectors
+
+tools/fetch-mq-challenge.sh                     # for the MQ rows
+tools/scoreboard.sh                             # smoke tier, writes nothing
+tools/scoreboard.sh stable --write              # regenerates research/scoreboard/
 ```
+
+Set `CARGO_TARGET_DIR` to a path inside the worktree for anything measured. The default target
+directory is shared between worktrees of this repository and keyed by package and profile rather
+than by checkout, so two checkouts overwrite each other's `libzeebra.rlib` — which surfaces as an
+example failing to compile against exports that are plainly present. `tools/scoreboard.sh` sets it.
 
 Later workstreams add their own commands to this section as they land.
