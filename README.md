@@ -427,8 +427,10 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-FGLM-SOLVING.md`](docs/MILESTONE-FGLM-SOLVING.md),
 [`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md),
 [`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md),
-[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md), and
-[`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md).
+[`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md),
+[`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md),
+[`docs/MILESTONE-DEGREE-AWARE-F4.md`](docs/MILESTONE-DEGREE-AWARE-F4.md), and
+[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md).
 
 ## Finite Fields
 
@@ -1174,6 +1176,72 @@ The sweep is deliberately bounded: it is Gaussian elimination on the affine part
 set, not a general preprocessor and not nonlinear elimination. An affine relation that appears only
 after some nonlinear cancellation is not found, and nothing looks for one. A generator that
 substitutes to a nonzero constant is **kept**, so an inconsistent system still reports `{1}`.
+
+#### The challenge registry
+
+`grobner::research::registry` is the frozen list of public problems this project measures itself
+against: the three 2026 Poseidon-31 CICO targets, a nine-row faithful reduced-round ladder at the
+official state width, the small planted surrogates M21 and M22 measured, and the Fukuoka GF(31)
+toy examples. A `ChallengeManifest` says what a **problem** is — objective, parameters, target, and
+how a claimed answer is checked by something that is not this crate — where an `InstanceManifest`
+says what a *file* is.
+
+Three things keep it honest.
+
+**`BenchmarkClass` is part of every row.** A witness for a `t = 2` planted instance and a witness
+for the official `t = 16` target are both "solved" in a column that adds them together, and they
+are not comparable in any direction. `Significance` is therefore *computed* from the class and the
+external status rather than written by a report:
+
+```rust
+use zeebra::{fields::PrimeFieldElement64, grobner::research::{
+    challenge, BenchmarkClass, ExternalStatus, Significance, KOALABEAR_PRIME}};
+
+type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+
+let official = challenge("poseidon31-cico-rf6-rp8").expect("registered");
+assert_eq!(official.class, BenchmarkClass::Official);
+assert_eq!(official.external, ExternalStatus::SolvedExternally { verified: "2026-05-06" });
+
+// 14 free inputs and 16·6 + 8 S-box variables, against those plus two output constraints.
+assert_eq!((official.variables(), official.equations()), (Some(118), Some(106)));
+
+// The strongest claim available on a challenge that is already solved publicly.
+assert_eq!(official.significance(true),
+           Significance::Reproduction { externally_verified: "2026-05-06" });
+assert_eq!(official.significance(false), Significance::NoWitness);
+
+// A reduction's witness is a real result about a different problem, and says so.
+let reduced = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+assert_eq!(reduced.significance(true),
+           Significance::ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" });
+
+// The registry is executable: a runner takes its instance from here, so there is no second copy
+// of the constants to drift from these.
+let instance = official.cico_instance::<K>().expect("builds");
+assert_eq!(instance.variables(), 118);
+```
+
+**Identity is a digest over the problem, not over the paperwork.** `ChallengeManifest::digest` is
+SHA-256 of a canonical form covering the family, the objective tag, the parameters and the target.
+A corrected URL, a paid bounty or a reworded verifier leaves it alone; a changed round count does
+not. That is what lets a comparison refuse to compare two runs of *different mathematical
+problems*, which is the one failure a benchmark harness cannot be allowed to make quietly.
+
+**The generator is pinned separately.** A parameter checksum cannot notice a changed generator: if
+the Grain LFSR or the Cauchy construction changed, every registered instance would become a
+different permutation with an unchanged identity. `derived_digest` hashes the round constants and
+MDS matrix, and three of them are pinned in tests.
+
+`dispatch_cico` bridges the const generic — `CicoInstance::system::<N>()` needs `N` at compile time
+and the registry has fifteen distinct `N` — in the same shape as `MqVisitor` does for the MQ family.
+
+The registry is frozen by `test_the_registry_is_frozen`, which pins every id and digest, so
+redefining a registered problem fails a test rather than silently changing what an earlier
+measurement meant. See
+[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md) for the
+full table and for what the three 2026 CICO targets' external status implies about what a result
+there could claim.
 
 #### External instances: the Fukuoka MQ Challenge
 
