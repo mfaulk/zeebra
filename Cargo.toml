@@ -17,6 +17,21 @@ keywords = ["zkp", "zero-knowledge", "algebra", "cryptography"]
 # green and vacuous: the crate had no executable examples at all, only `text` and `ignore` fences.
 doctest = true
 
+# The unit suite is not a benchmark. `bench` defaults to true, so `cargo bench -- --test` built
+# the lib as a bench target and ran all ~1400 unit tests in *one process* under the built-in
+# harness — a second, worse-isolated run of what `cargo nextest` already covers with a process
+# per test. It broke `util::peak_memory`, whose subject is `VmHWM`, a process-wide high-water
+# mark: in a shared process the other tests leave the mark well above live RSS, so touching
+# 32 MB no longer raises it by 32 MB and the assertion fails. See #170.
+bench = false
+
+# Same reason, and this target carries no `#[test]`s at all — so under `cargo bench` it was a
+# whole-crate link for a harness with nothing to run. Declared explicitly only to set the flag;
+# autodiscovery still governs the path, and in edition 2021 naming one bin does not suppress it.
+[[bin]]
+name = "zeebra-differential"
+bench = false
+
 [dependencies]
 lazy_static = "1.4.0"
 pest = "2.7"

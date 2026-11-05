@@ -131,7 +131,7 @@ jobs:
 
   bench-smoke:
     name: Benchmarks run
-    # Pushes to main and manual runs only. Criterion's `--test` mode executes all 455 benchmark
+    # Pushes to main and manual runs only. Criterion's `--test` mode executes all 493 benchmark
     # cases once each, which is ~40s warm on a fast machine and several minutes on a shared
     # runner. That is worth paying after a merge, where latency does not block anything, and not
     # on every pull request. A benchmark that stops *compiling* still breaks the `--all-targets`
@@ -149,6 +149,12 @@ jobs:
       # `cargo bench -- --test`, not `cargo test --benches`: with `test = false` on the benchmark
       # targets the latter now selects nothing and would pass vacuously. This runs each case once
       # and takes no measurements.
+      #
+      # It selects exactly the eight criterion targets. It used to select ten: `bench` defaults to
+      # true, so the lib and the one `src/bin` were built as bench targets too and `--test` ran
+      # their unit tests here, in one process, under the built-in harness — duplicating the
+      # nextest jobs above with worse isolation, and failing a `VmHWM` test that depends on it.
+      # Both now carry `bench = false`; see #170 and the comments in `Cargo.toml`.
       #
       # `--profile ci-release` for exactly that reason. A bare `cargo bench` resolves
       # `[profile.bench]`, which inherits `release`, so it links all eight criterion binaries
