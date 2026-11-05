@@ -460,15 +460,17 @@ scope and must not be smuggled into the first importer PR.
 
 ## 8. Sub-milestones
 
-| ID | Deliverable | Depends on |
-|---|---|---|
-| **M21-0** | This document, the M20-C handoff, and §4's baseline | M20-C |
-| **M21-A** | Instance manifests and the Fukuoka MQ importer | M21-0 |
-| **M21-B** | Faithful reduced-round Poseidon generation and external verification | M21-0 |
-| **M21-C** | Structural analysis, typed outcomes, failure-aware diagnostics | M21-0 |
-| **M21-D** | Automatic planning and bounded fallback | M21-C |
-| **M21-E** | Specialization of underdetermined systems | M21-A/M21-B interfaces |
-| **M21-I** | Integrated experiments, comparison, milestone report | all |
+Parent tracking issue: #90.
+
+| ID | Deliverable | Issue | Depends on |
+|---|---|---|---|
+| **M21-0** | This document, the M20-C handoff, and §4's baseline | #91 | M20-C |
+| **M21-A** | Instance manifests and the Fukuoka MQ importer | #92 | M21-0 |
+| **M21-B** | Faithful reduced-round Poseidon generation and external verification | #93 | M21-0 |
+| **M21-C** | Structural analysis, typed outcomes, failure-aware diagnostics | #94 | M21-0 |
+| **M21-D** | Automatic planning and bounded fallback | #95 | M21-C |
+| **M21-E** | Specialization of underdetermined systems | #96 | M21-A/M21-B interfaces |
+| **M21-I** | Integrated experiments, comparison, milestone report | #97 | all |
 
 M21-A, M21-B and M21-C are independent and suitable for separate worktrees. M21-D must not start
 before M21-C, for the reason in §1. Concurrent work on `SolveOptions`, `SolveError` or the F4/FGLM
@@ -495,7 +497,7 @@ option types should be avoided; M21-C owns them for the duration.
 - [x] Experiment schema and corpus specified (§7)
 - [x] Validation requirements specified (§7.3)
 - [x] Public API proposals stated (§6)
-- [ ] Architecture approved — the exit criterion
+- [ ] Architecture approved — the exit criterion (#91)
 
 ### M21-C
 
