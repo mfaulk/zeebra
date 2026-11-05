@@ -577,11 +577,16 @@ Open:
    entry ones, `F4Options::max_live_bytes` and `FglmOptions::max_span_bytes`, both defaulting to
    the 320 MB the entry budgets already described at 16 bytes an entry. The `Backend::Dense`
    densification is reported rather than budgeted, and §5.2 says why.
-6. **Whether a generator is ever needed over a wide field.** `primitive_element` and
-   `root_of_unity` are `unimplemented!()` for `PrimeFieldElement256`, since finding one means
-   factoring a 254-bit `q - 1`. Nothing in the crate needs them, and the FFT's uses are
-   test-only. If an FFT over a wide field is ever wanted, the two-adic root of unity is derivable
-   from the field's two-adicity without factoring — 28 for BN254, 32 for BLS12-381.
+6. ~~**Whether a generator is ever needed over a wide field.**~~ Resolved in D2 (#83): a
+   *generator* is still never needed, but a *root of unity* is, and it needs no generator. The
+   two-adic construction in `src/fields/two_adic.rs` derives s and the odd part of `q - 1` by
+   shifting, then raises a non-square to the odd part — no factorization anywhere.
+   `PrimeFieldElement256::root_of_unity` now serves any power-of-two order, so there is an NTT
+   over both wide fields; `primitive_element` remains `unimplemented!()`, and a non-power-of-two
+   order still panics. The two-adicity values this section quoted as a note — 28 for BN254, 32 for
+   BLS12-381 — are now computed from the moduli and checked three ways, including against
+   `ark_ff::FftField::TWO_ADICITY`. See [`docs/research/fast-univariate.md`](research/fast-univariate.md)
+   §1, which also records what each univariate stage then costs against degree.
 
 ## 8. Acceptance criteria
 
