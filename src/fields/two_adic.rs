@@ -11,7 +11,9 @@
 
 use rand::{CryptoRng, RngCore};
 
-use crate::{integers::lowest_set_bit, FiniteField, KnownOrder};
+use crate::{
+    fields::finite_field::RootOfUnityError, integers::lowest_set_bit, FiniteField, KnownOrder,
+};
 
 /// The two-adicity s and odd part m of `q - 1`, for q given as little-endian 64-bit limbs.
 ///
@@ -31,18 +33,22 @@ pub fn two_adic_decomposition(order_limbs: &[u64]) -> (u32, Vec<u64>) {
 /// Expected to draw twice: `z^m` has order exactly `2^s` precisely when z is a non-square, which
 /// half of the nonzero elements are.
 ///
-/// # Panics
-/// Panics if `log_n` exceeds the field's two-adicity, since no such root exists there.
-pub fn two_adic_root_of_unity<F: KnownOrder, R: RngCore + CryptoRng>(log_n: u32, rng: &mut R) -> F {
+/// Fails if `log_n` exceeds the field's two-adicity, since no such root exists there.
+pub fn try_two_adic_root_of_unity<F: KnownOrder, R: RngCore + CryptoRng>(
+    log_n: u32,
+    rng: &mut R,
+) -> Result<F, RootOfUnityError> {
     let (s, odd_part) = two_adic_decomposition(F::order_limbs());
-    assert!(
-        log_n <= s,
-        "no primitive 2^{log_n}-th root of unity exists: the two-adicity of this field is {s}"
-    );
+    if log_n > s {
+        return Err(RootOfUnityError::TwoAdicityExceeded {
+            log_n,
+            two_adicity: s,
+        });
+    }
 
     // The only first root of unity is 1, and the loop below would square `s - 1` times for it.
     if log_n == 0 {
-        return F::one();
+        return Ok(F::one());
     }
 
     // `z^m` lies in the 2-Sylow subgroup whatever z is, and generates it exactly when
@@ -60,7 +66,15 @@ pub fn two_adic_root_of_unity<F: KnownOrder, R: RngCore + CryptoRng>(log_n: u32,
 
     // Squaring halves the order, so `s - log_n` of them leave order exactly `2^log_n`.
     root = repeated_squaring(root, s - log_n);
-    root
+    Ok(root)
+}
+
+/// A primitive `2^log_n`-th root of unity, panicking if the field holds none.
+///
+/// # Panics
+/// Panics if `log_n` exceeds the field's two-adicity.
+pub fn two_adic_root_of_unity<F: KnownOrder, R: RngCore + CryptoRng>(log_n: u32, rng: &mut R) -> F {
+    try_two_adic_root_of_unity(log_n, rng).unwrap_or_else(|e| panic!("{e}"))
 }
 
 /// `x^(2^times)`.

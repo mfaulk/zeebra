@@ -6,7 +6,7 @@ mod interpolate;
 
 use crate::FiniteField;
 
-pub use domain::FFTDomain;
+pub use domain::{DomainError, FFTDomain};
 pub use evaluate::evaluate;
 pub use interpolate::interpolate;
 

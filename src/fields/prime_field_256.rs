@@ -29,7 +29,7 @@ use serde::{
 use crate::{
     fields::{
         montgomery_256::{self, LIMBS},
-        trim_limbs, KnownOrder,
+        trim_limbs, KnownOrder, RootOfUnityError,
     },
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
@@ -273,32 +273,35 @@ impl<M: PrimeModulus256> KnownOrder for PrimeFieldElement256<M> {
         trim_limbs(&Self::ORDER_LIMBS)
     }
 
-    fn primitive_element<R: RngCore + CryptoRng>(_rng: &mut R) -> Self {
-        // The default searches by testing candidate orders against the prime factors of q - 1,
-        // which means factoring a 254-bit integer. That is not a computation this crate should
-        // start by accident, and no algorithm in it needs a generator of a field this large.
-        unimplemented!(
-            "finding a generator of a 254-bit field's multiplicative group needs the \
-             factorization of q - 1"
-        )
+    /// No generator: [`RootOfUnityError::NoKnownGenerator`], rather than a search.
+    ///
+    /// The default searches by testing candidate orders against the prime factors of q - 1, which
+    /// means factoring a 254-bit integer. That is not a computation this crate should start by
+    /// accident, and no algorithm in it needs a generator of a field this large.
+    fn try_primitive_element<R: RngCore + CryptoRng>(
+        _rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        Err(RootOfUnityError::NoKnownGenerator)
     }
 
     /// A primitive nth root of unity, for n a power of two.
     ///
     /// The default would factor `q - 1` to find a generator. For a power-of-two n the two-adic
     /// construction needs no generator at all — see [`two_adic`](super::two_adic) — and a
-    /// power-of-two n is the only kind the NTT uses. Any other n still needs the factorization
-    /// and still panics.
-    ///
-    /// # Panics
-    /// Panics unless n is a power of two no larger than `2^s`, for s the field's two-adicity.
-    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
-        assert!(
-            n.is_power_of_two(),
-            "a root of unity of order {n} in a 254-bit field needs the factorization of q - 1; \
-             only a power-of-two order is reachable from the two-adicity alone"
-        );
-        Self::two_adic_root_of_unity(n.trailing_zeros(), rng)
+    /// power-of-two n is the only kind the NTT uses. Any other n still needs the factorization,
+    /// and so is [`RootOfUnityError::NoKnownGenerator`] however many elements of that order the
+    /// field holds.
+    fn try_root_of_unity<R: RngCore + CryptoRng>(
+        n: u64,
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        if n == 0 {
+            return Err(RootOfUnityError::OrderDoesNotDivide { n });
+        }
+        if !n.is_power_of_two() {
+            return Err(RootOfUnityError::NoKnownGenerator);
+        }
+        Self::try_two_adic_root_of_unity(n.trailing_zeros(), rng)
     }
 }
 
@@ -895,13 +898,28 @@ mod tests {
 
     /// An order that is not a power of two still needs the factorization of `q - 1`.
     #[test]
-    #[should_panic(expected = "needs the factorization of q - 1")]
-    fn test_root_of_unity_of_non_power_of_two_order_panics() {
+    fn test_root_of_unity_of_non_power_of_two_order_is_an_error() {
         let mut rng = StdRng::seed_from_u64(22);
-        let _ = Bn254Fr::root_of_unity(3, &mut rng);
+        assert_eq!(
+            Bn254Fr::try_root_of_unity(3, &mut rng),
+            Err(RootOfUnityError::NoKnownGenerator)
+        );
     }
 
     /// An order beyond `2^s` does not exist in the field, and is refused rather than approximated.
+    #[test]
+    fn test_root_of_unity_beyond_the_two_adicity_is_an_error() {
+        let mut rng = StdRng::seed_from_u64(23);
+        assert_eq!(
+            Bn254Fr::try_root_of_unity(1 << 29, &mut rng),
+            Err(RootOfUnityError::TwoAdicityExceeded {
+                log_n: 29,
+                two_adicity: 28,
+            })
+        );
+    }
+
+    /// The panicking form of the same request still aborts, for the call sites that take it.
     #[test]
     #[should_panic(expected = "the two-adicity of this field is 28")]
     fn test_root_of_unity_beyond_the_two_adicity_panics() {
@@ -911,10 +929,12 @@ mod tests {
 
     /// Finding a generator of the whole multiplicative group is still not attempted.
     #[test]
-    #[should_panic(expected = "factorization of q - 1")]
-    fn test_primitive_element_is_still_unimplemented() {
+    fn test_primitive_element_is_still_not_searched_for() {
         let mut rng = StdRng::seed_from_u64(24);
-        let _ = Bn254Fr::primitive_element(&mut rng);
+        assert_eq!(
+            Bn254Fr::try_primitive_element(&mut rng),
+            Err(RootOfUnityError::NoKnownGenerator)
+        );
     }
 
     /// Equal elements hash equally, which `Hash`'s contract with `Eq` requires.

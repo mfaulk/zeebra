@@ -32,7 +32,7 @@ pub mod util;
 #[cfg(test)]
 pub(crate) mod test_support;
 
-pub use fft::{evaluate, interpolate, powers_of, FFTDomain};
+pub use fft::{evaluate, interpolate, powers_of, DomainError, FFTDomain};
 pub use fields::{FiniteField, KnownOrder, ParseFieldElementError};
 pub use identities::{One, Zero};
 pub use poly::{

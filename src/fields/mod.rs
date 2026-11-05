@@ -13,7 +13,9 @@ mod prime_field_64;
 pub mod two_adic;
 
 pub use batch_inverse::{batch_inverse, batch_invert};
-pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
+pub use finite_field::{
+    trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, RootOfUnityError,
+};
 pub use prime_field_128::PrimeFieldElement128;
 pub use prime_field_256::{
     Bls12_381Fr, Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256,

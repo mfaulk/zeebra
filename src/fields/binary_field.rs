@@ -1141,14 +1141,16 @@ mod tests {
         }
     }
 
-    /// `n` must divide the order of the multiplicative group.
+    /// `n` must divide the order of the multiplicative group, and otherwise is an error value.
     #[test]
-    #[should_panic(expected = "must divide the group order")]
     fn test_root_of_unity_rejects_n_not_dividing_the_group_order() {
         use rand::{prelude::StdRng, SeedableRng};
         let mut rng = StdRng::seed_from_u64(5);
         // 4 does not divide 255, the group order of GF(256).
-        let _r = Gf256::root_of_unity(4, &mut rng);
+        assert_eq!(
+            Gf256::try_root_of_unity(4, &mut rng),
+            Err(crate::fields::RootOfUnityError::OrderDoesNotDivide { n: 4 })
+        );
     }
 
     /// Rabin's irreducibility test over GF(2), built on the bit-pattern arithmetic above.
