@@ -5,6 +5,7 @@ mod buchberger;
 pub mod differential;
 pub mod f4;
 pub mod fglm;
+pub mod hilbert;
 pub mod pairs;
 pub mod planning;
 pub mod reference;
@@ -25,6 +26,10 @@ pub use fglm::{
     BorderIndex, BorderStatistics, ColumnTarget, FglmError, FglmMemory, FglmOptions,
     FglmStageTimings, FglmStatistics, IdealClass, MultiplicationOperator, OperatorConstruction,
     OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics,
+};
+pub use hilbert::{
+    is_homogeneous, leading_generators_by_degree, monomials_of_degree, top_forms, DegreeAgreement,
+    HilbertComparison, HilbertError, HilbertSeries, SemiregularSeries,
 };
 pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue, PairSchedule};
 pub use planning::{

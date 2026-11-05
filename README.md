@@ -215,6 +215,7 @@ cargo run --release --example f4_profile -- list   # the configurations availabl
 cargo run --release --example f4_degrees           # F4, work and useful work per degree
 cargo run --release --example f4_schedule          # critical-pair order, and batch size, apart
 cargo run --release --example f4_schedule -- list  # the instances available
+cargo run --release --example hilbert_study         # the semiregular model against the measurement
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
@@ -272,6 +273,13 @@ controlled Poseidon family — where the `t = 3` and `t = 2` nine-variable insta
 the same algebraic dimension** (`N - E = t - 2k`), so the `t = 3` system is also run with one free
 input pinned, which matches the equation counts without changing the round structure. Needs
 `tools/fetch-mq-challenge.sh` for the MQ sections; the rest runs without it.
+
+`hilbert_study` is M22-B's measurement: the exact Hilbert function of each computed basis's
+leading-term ideal against the semiregular prediction, degree by degree, with the first
+disagreement and its sign reported. It covers textbook regular sequences, random homogeneous
+quadratics, deliberate counterexamples, the Fukuoka type III top forms *and* the published
+inhomogeneous instances, and reduced-round Poseidon. See
+[`docs/research/hilbert-functions.md`](docs/research/hilbert-functions.md) for the tables.
 
 `f4_schedule` is M22-A's measurement: three deterministic critical-pair orders on one table per
 instance, with the computed basis asserted equal to the baseline's on every row. Ordering and batch
@@ -1391,6 +1399,60 @@ criterion reduces fewer pairs than Gebauer–Möller does.
 `grobner::solve` still uses `buchberger`. The sparse linear algebra F4 is built on is reusable on
 its own, as `linalg::sparse`, with the dense representations as `linalg::dense`;
 `linalg::echelon` is the backend-selecting interface over both.
+
+### Hilbert functions
+
+`grobner::hilbert` computes the Hilbert function of a monomial ideal exactly, and the semiregular
+prediction for a sequence of given degrees, and compares them. It is **diagnostic**: nothing in the
+crate discards work on the strength of a prediction.
+
+```rust
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::katsura, f4,
+             hilbert::{HilbertComparison, HilbertSeries}}, MonomialOrder};
+
+let order = MonomialOrder::GradedReverseLexicographic;
+let basis = f4(&katsura::<5, Zp2147483647>(), order).unwrap();
+
+// Exact, from the computed basis's leading-term ideal.
+let series = HilbertSeries::of_basis(&basis, order).unwrap();
+assert_eq!(series.values(5).unwrap(), vec![1, 4, 6, 4, 1, 0]);
+
+// Against the model for the generators' degrees: (1, 2, 2, 2, 2).
+let comparison = HilbertComparison::new(&basis, order, &[1, 2, 2, 2, 2], 8).unwrap();
+assert_eq!(comparison.first_disagreement, None);     // katsura-5 is "generic enough"
+assert_eq!(comparison.predicted_degree_of_regularity, Some(5));
+```
+
+The exact side is a closed form, not an enumeration: counting the degree-8 monomials outside a
+leading-term ideal in twenty variables is 2.7 million divisibility sweeps, and the same count at
+degree 12 is 141 million. Instead the series is built as `numerator(z) / (1 − z)^n` by the standard
+recursion on `0 → R/(L:p) → R/L → R/(L+<p>) → 0`.
+
+Two budgets bound it, for two different resources. `DEFAULT_NODE_BUDGET` bounds the recursion, which
+is exponential in the worst case. `DEFAULT_COEFFICIENT_BUDGET` bounds any one series' length,
+because a numerator is one plus the summed generator degrees and a monomial's exponents are `u32` —
+so `<x^100000000>` is representable and its honest numerator is 1.6 GB. **F4's matrix budgets do not
+cover this**, and under `HilbertSelection` it runs before the first matrix is built. Either crossing
+makes the prediction unavailable rather than killing the process: the count lands in
+`HilbertCounts::predictions_unavailable` and the computation proceeds as ordinary F4.
+The result is cross-checked two ways: against direct enumeration on small ideals, and by summing it
+to `dim_F R/I` and comparing with the standard monomials `QuotientBasis` enumerates independently.
+
+**The prediction is a prediction.** `Π(1 − z^{d_i}) / (1 − z)^n` is exact for a regular sequence,
+conjectural for a generic overdetermined one, and has no standing on a structured system. Measured
+on this repository's corpus it is **exact at every degree** on random homogeneous quadratics and on
+the Fukuoka type III top forms, and wrong on every deliberately structured system — and the *sign*
+of the error is what matters. Negative error (predicted below observed) overestimates the ideal, so
+a selection cap built on it is too large: wasteful, never incomplete. Positive error is the
+dangerous direction, and it is the direction the **inhomogeneous** systems fail in. On the published
+Fukuoka type III `n=10` instance the model says degree 4 has nothing left, and F4 finds 85 of its
+168 basis elements there. See
+[`docs/research/hilbert-functions.md`](docs/research/hilbert-functions.md).
+
+Inhomogeneous input has no graded Hilbert function, and the module does not pretend otherwise:
+`hilbert::top_forms` gives each generator's highest-degree homogeneous component, which is the
+object the MQ literature's semiregularity assumption is about and is a *different ideal* — of
+`x^2 + y` it is `x^2`, whose variety is a line where the original's is a parabola.
 
 `grobner::trace_batches` runs a computation and returns every batch it reduced, each as the basis
 at the time plus the pairs selected. That is what lets a stage be benchmarked or counted on real
