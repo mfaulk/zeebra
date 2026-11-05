@@ -26,13 +26,16 @@ pub use fglm::{
     OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics,
 };
 pub use pairs::{CriterionCounts, CriticalPair, PairCriteria, PairQueue};
-pub use planning::{analyze, SystemShape};
+pub use planning::{
+    analyze, solve_one_planned, Attempt, Choice, OutcomeClass, PlanBudget, PlannedSolveOptions,
+    SolvePlan, SolvePolicy, SystemShape,
+};
 pub use s_polynomial::s_polynomial;
 pub use solve::solve;
 pub use solve_zero_dimensional::{
-    solve_one, solve_one_reported, solve_one_with_options, solve_one_with_outcome,
-    solve_zero_dimensional, solve_zero_dimensional_with_options, SolveError, SolveOptions,
-    SolveOutcome, SolveStatistics, SolveStrategy,
+    solve_from_lex_basis, solve_one, solve_one_reported, solve_one_with_options,
+    solve_one_with_outcome, solve_zero_dimensional, solve_zero_dimensional_with_options,
+    SolveError, SolveOptions, SolveOutcome, SolveStatistics, SolveStrategy,
 };
 
 #[cfg(test)]
