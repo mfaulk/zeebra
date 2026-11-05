@@ -9,6 +9,7 @@ mod prime_field_128;
 mod prime_field_256;
 mod prime_field_32;
 mod prime_field_64;
+pub mod two_adic;
 
 pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
 pub use prime_field_128::PrimeFieldElement128;

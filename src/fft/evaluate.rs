@@ -194,6 +194,31 @@ mod tests {
         let _domain = FFTDomain::<F>::from_generator(F::new(2), 4);
     }
 
+    /// The transform agrees with evaluating the polynomial at each power of w, one at a time.
+    ///
+    /// Over BN254's scalar field, where there was no transform at all until `root_of_unity`
+    /// stopped being `unimplemented!()`. Direct Horner evaluation shares no code with the
+    /// recursive split, so this pins the wide-field NTT against an independent computation
+    /// rather than against itself.
+    #[test]
+    fn test_evaluate_agrees_with_direct_evaluation_over_bn254_fr() {
+        use crate::{fields::Bn254Fr, KnownOrder};
+
+        let mut rng = StdRng::seed_from_u64(20261105);
+        for log_n in 0..=5u32 {
+            let n = 1usize << log_n;
+            let w = Bn254Fr::two_adic_root_of_unity(log_n, &mut rng);
+            let domain = FFTDomain::from_generator(w, n);
+            let p = UnivariatePolynomial::<Bn254Fr>::rand(n as u64 - 1, &mut rng);
+
+            let transformed = evaluate(&p, &domain);
+            assert_eq!(transformed.len(), n);
+            for (i, value) in transformed.iter().enumerate() {
+                assert_eq!(*value, p.eval(&domain[i]), "n = {n}, point {i}");
+            }
+        }
+    }
+
     #[test]
     #[should_panic]
     // Panics if the degree of p >= n.

@@ -25,6 +25,7 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Differential testing of the zero-dimensional pipeline against Singular
 - [x] Batched border reduction and adaptive operator storage: 14x on katsura-7's conversion
 - [x] 254- and 255-bit prime fields, with F4, FGLM and solving over them end to end
+- [x] Two-adic roots of unity without factoring `q - 1`, so the NTT runs over the wide fields
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -273,6 +274,8 @@ cargo run --release --example field_width          # what a 4-byte field element
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
 cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
+cargo run --release --example univariate_scaling   # univariate cost and memory against degree
+cargo run --release --example univariate_scaling -- list
 cargo run --release --example scoreboard           # registered problems, one record each, staged
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
@@ -614,9 +617,11 @@ What the representation means for a caller:
   does deserialization. `from_limbs_reduced` is the separately named constructor that reduces.
 - `random` is masked rejection sampling. Reducing a uniform 256-bit draw modulo a 254-bit prime
   would favour the low residues.
-- `primitive_element` and `root_of_unity` are `unimplemented!()`. Finding a generator of the
-  multiplicative group means factoring a 254-bit `q - 1`, which no algorithm here needs and which
-  should not start by accident.
+- `primitive_element` is `unimplemented!()`: finding a generator of the multiplicative group
+  means factoring a 254-bit `q - 1`, which no algorithm here needs and which should not start by
+  accident. `root_of_unity` works for any **power-of-two** order, through the two-adic
+  construction below, and panics for any other — that order is the one that needs the
+  factorization.
 
 The whole stack works over these fields, not just the arithmetic:
 `grobner::mod`'s `test_the_whole_pipeline_over_bn254_fr` and its BLS12-381 twin take a planted
@@ -647,9 +652,9 @@ assert_eq!(Zp2147483647::order_u128(), Some(2147483647));
 
 `KnownOrder` gives the order q and the characteristic p as little-endian 64-bit limbs — a width
 that covers 64-, 128- and 256-bit orders without allocating — plus `order_u128` and
-`characteristic_u128` for callers that need a machine integer and can fail without one, and
-`primitive_element` and `root_of_unity`. For an extension field q = p^k, so the order and the
-characteristic are genuinely different; both are reported.
+`characteristic_u128` for callers that need a machine integer and can fail without one, plus
+`primitive_element`, `root_of_unity`, `two_adicity` and `two_adic_root_of_unity`. For an extension
+field q = p^k, so the order and the characteristic are genuinely different; both are reported.
 
 The split is there because a 254-bit prime field has no order that fits in a machine integer, and
 because **nothing in the algebraic core asks for one**: the multivariate polynomials, the linear
@@ -716,6 +721,86 @@ the crate needs it yet. And `Matrix<T>` does not implement `Ring`, so a matrix c
 polynomial coefficient: `Ring` has no fallible operations, and only *square* matrices form one, so
 that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime check inside
 `mul`. [#132](https://github.com/mfaulk/zeebra/issues/132) has the discussion.
+
+## Number-Theoretic Transform
+
+`fft::evaluate` and `fft::interpolate` are the forward and inverse transforms over an `FFTDomain`
+of size `2^k`, built from a primitive `2^k`-th root of unity.
+
+Over a 254-bit field there was no way to obtain one: the generic construction raises a *generator*
+of the multiplicative group to `(q - 1) / n`, and finding a generator means factoring a 254-bit
+`q - 1`. The two-adic construction needs no generator. Writing `q - 1 = 2^s * m` with m odd — both
+read off `q - 1` by shifting — the 2-Sylow subgroup is cyclic of order `2^s`, and `z^m` generates it
+for any non-square z, which half the field is:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    evaluate, fields::Bn254Fr, interpolate, FFTDomain, KnownOrder, Polynomial,
+    UnivariatePolynomial,
+};
+
+// Derived from the compiled-in modulus, so it cannot disagree with the field.
+assert_eq!(Bn254Fr::two_adicity(), 28);
+
+let mut rng = StdRng::seed_from_u64(1);
+// A primitive 8th root of unity. `root_of_unity(8, &mut rng)` reaches the same construction.
+let w = Bn254Fr::two_adic_root_of_unity(3, &mut rng);
+let domain = FFTDomain::from_generator(w, 8);
+
+let p = UnivariatePolynomial::<Bn254Fr>::rand(7, &mut rng);
+let values = evaluate(&p, &domain);
+assert_eq!(interpolate(&values, &domain), p);
+```
+
+`two_adicity()` is the ceiling on every power-of-two transform over the field, since a primitive
+`2^k`-th root of unity exists exactly for `k <= s`:
+
+| field | s | largest transform |
+|---|---|---|
+| `Mersenne31` / `Zp2147483647` — `2^31 - 1` | **1** | 2 |
+| `KoalaBear` — `2^31 - 2^24 + 1` | 24 | 2^24 |
+| `BabyBear` — `2^31 - 2^27 + 1` | 27 | 2^27 |
+| `Zp18446744069414584321` — Goldilocks | 32 | 2^32 |
+| `Bn254Fr` | 28 | 2^28 |
+| `Bls12_381Fr` | 32 | 2^32 |
+
+`two_adicity` is a provided method on `KnownOrder`, so it reads the same from a 32-bit, 64-bit or
+254-bit backing; `Mersenne31` and `Zp2147483647` are the same field at two storage widths and
+report the same s.
+
+**Mersenne-31 admits no transform above size two**, which matters because it is the field most of
+this crate's F4 benchmarks use. `BabyBear` and `KoalaBear` — the latter being the prime the 2026
+Poseidon challenges are over — are NTT-friendly by construction and are what to reach for when a
+transform is wanted over a small field.
+
+`FiniteField::pow_limbs` takes its exponent as little-endian limbs, which is what makes the above
+possible at all: the odd part of BN254's `q - 1` is 226 bits, so `pow`'s `u128` cannot hold it.
+
+### What the univariate stages cost
+
+`cargo run --release --example univariate_scaling` sweeps six stages by doubling degree until a
+wall-clock budget is exceeded, reporting time, the local scaling exponent, and **peak live heap
+bytes** from a counting allocator. On a 64-core/300 GB workstation at one second per measurement:
+
+| stage | exponent | KoalaBear | BN254 `Fr` | peak bytes |
+|---|---|---|---|---|
+| `mul`, schoolbook | 2 | 2^15 | 2^13 | `4 n B` |
+| `div`, long division | 2 | 2^15 | 2^13 | `6 n B` |
+| `evaluate` (NTT) | 1 | **2^23** | **2^21** | `7 n B` |
+| `interpolate` (iNTT) | 1 | 2^22 | 2^18 | `9 n B` |
+| `lagrange_interpolate` | 3 | 2^10 | 2^9 | `8 n B` |
+| `roots` | 2 | 2^12 | 2^8 | `12 n B` |
+
+`B = size_of::<F>()` — 8 bytes for a 64-bit field, 32 for a 254-bit one, so **4x**. That is not
+the 2.5x the F4 budgets are written in: those count sparse `(usize, F)` entries, whose 8-byte index
+word is paid whatever the field is and dilutes the ratio. A dense coefficient array has no index
+word, so a byte budget carried over from the F4 side under-estimates this layer by 1.6x.
+
+The two transforms are the only quasi-linear stages. Multiplication has no NTT-based path at all,
+and interpolation at arbitrary abscissae — what an evaluation-interpolation resultant needs — is
+cubic. [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the
+full curves, the gap list, and what each stage would need to go further.
 
 ## Gröbner Bases
 
