@@ -44,6 +44,13 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --doc
 ```
 
+The shell tooling under `scripts/agent/` is checked separately, by CI's `agent-scripts` job:
+
+```sh
+shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh
+bash scripts/agent/test/zb-claim-test.sh
+```
+
 The Rust examples in this file are **compiled and run** by `cargo test --doc`, through a
 `cfg(doctest)` item in `src/lib.rs`, so they cannot drift from the API they document. Blocks that
 are illustrative rather than executable are fenced `text`.
@@ -2285,6 +2292,27 @@ This changes nothing about `grobner::research::poseidon`, whose `alpha` stays wh
 specifies: a different exponent is a different cryptographic problem, not a variation on the same
 one. What these utilities are for is a sweep that varies `alpha` deliberately and measures what the
 solving degree does.
+
+## Parallel Development
+
+Several coding agents work this repository against one shared board, so issues double as the
+coordination substrate: an agent claims an issue before starting, keeps the claim alive while it
+works, and releases it when done. Claims carry a four-hour lease and expire, so an agent that dies
+mid-task does not strand the work behind a label nobody can clear.
+
+```sh
+./scripts/agent/zb-claim.sh orient                 # open, unclaimed, unblocked, best first
+./scripts/agent/zb-claim.sh claim 119 "<intent>"   # comment + label + board In Progress
+./scripts/agent/zb-claim.sh heartbeat 119          # extend the lease
+./scripts/agent/zb-claim.sh reap                   # claims whose lease expired
+./scripts/agent/zb-claim.sh release 119            # finished; or --abandon to hand back
+```
+
+The protocol, the staleness rule, and the rules for fanning out writers are in
+[CLAUDE.md](CLAUDE.md#multi-agent-coordination-claiming-work). The one invariant worth repeating
+here: every read exits **0 = data, 1 = genuinely empty, 2 = the read failed**, because a
+rate-limited `gh` prints nothing and exits 0, and treating that as "nothing is claimed" would hand
+the same issue to every agent at once.
 
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
