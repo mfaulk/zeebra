@@ -63,20 +63,49 @@ mod tests {
         );
     }
 
-    /// Touching 32 MB raises the reported peak by most of 32 MB.
+    /// Current resident size, which the peak is a high-water mark of.
+    ///
+    /// Only the test needs this: the peak is the figure a measurement reports, and the current size
+    /// is here to know how far *below* the peak the process is sitting.
+    #[cfg(target_os = "linux")]
+    fn resident_bytes() -> u64 {
+        std::fs::read_to_string("/proc/self/status")
+            .expect("readable on Linux")
+            .lines()
+            .find_map(|line| line.strip_prefix("VmRSS:"))
+            .and_then(|rest| rest.split_whitespace().next())
+            .and_then(|kb| kb.parse::<u64>().ok())
+            .expect("VmRSS is present")
+            * 1024
+    }
+
+    /// Touching memory raises the reported peak by most of what was touched.
     ///
     /// The property the figure is read for, and the only one asserted: that it responds to real
     /// resident memory. It is deliberately not asserted to stay raised afterwards — see
     /// [`peak_resident_bytes`] on why that does not hold everywhere.
+    ///
+    /// # Why the ballast is not a constant
+    ///
+    /// The peak is a **high-water mark**, so touching 32 MB raises it only when the process is
+    /// already within 32 MB of its own peak. Under the built-in harness every test shares one
+    /// process, so a test that allocated 150 MB and freed it leaves this one 150 MB below the mark
+    /// and a fixed 32 MB of ballast cannot move it — which is exactly what happened when M23 added
+    /// tests that build 46-variable polynomial systems. The gap is therefore measured and closed
+    /// first. Under `cargo nextest`, which CI uses, each test has its own process and the gap is
+    /// nearly zero.
     #[cfg(target_os = "linux")]
     #[test]
     fn test_touching_memory_raises_the_peak() {
         const BALLAST: u64 = 32 * 1024 * 1024;
 
         let before = peak_resident_bytes().expect("readable");
+        // Close the distance to the existing high-water mark, then exceed it by the ballast.
+        let gap = before.saturating_sub(resident_bytes());
+        let ballast_bytes = gap + BALLAST;
         // Written to rather than merely allocated, so the pages are really resident. Every page is
         // touched, which `vec![0u8; _]` alone does not guarantee.
-        let mut ballast = vec![0u8; BALLAST as usize];
+        let mut ballast = vec![0u8; ballast_bytes as usize];
         for slot in ballast.iter_mut().step_by(4096) {
             *slot = 1;
         }
@@ -86,10 +115,11 @@ mod tests {
         // is process-wide, so another test's free can land between the two readings.
         assert!(
             during >= before + BALLAST / 4 * 3,
-            "{} is not {} bytes above {}",
+            "{} is not {} bytes above {} (gap to the mark was {})",
             during,
             BALLAST / 4 * 3,
-            before
+            before,
+            gap
         );
         // Kept alive to here so the pages cannot be reclaimed before the reading above.
         drop(ballast);
