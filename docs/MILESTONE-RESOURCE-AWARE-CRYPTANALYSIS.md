@@ -743,6 +743,29 @@ option types should be avoided; M21-C owns them for the duration.
 - [ ] The fallback order of §4.3 is re-measured, and the policy's order follows the measurement
       rather than this document — **M21-I**
 
+### M21-A
+
+- [x] A versioned manifest separates input definitions from measured results — `InstanceManifest`
+      carries no timing or memory field, pinned by a test
+- [x] Every mathematical claim is tagged `Proved` or `Observed`; a quotient dimension read from one
+      computation is an observation
+- [x] Redistribution terms are a required field, and the Fukuoka data is **not committed** — "All
+      Rights Reserved" with no stated licence, fetched by `tools/fetch-mq-challenge.sh` and pinned
+      by SHA-256
+- [x] The GF(31) importer needs no new arithmetic; a 32-bit prime field (#62) is an independent
+      optimization, and GF(2)/GF(2^8) are refused by name with what is missing
+- [x] The monomial layout is **verified rather than assumed** — four candidates evaluated at a
+      published answer, exactly one vanishing — and implemented by sorting with the order the file
+      declares rather than as an index pattern
+- [x] Strict validation: a short row, a miscounted `m`, a missing header, an out-of-range
+      coefficient, and a header/body field mismatch are each refused with the position named
+- [x] `const N` dispatch over a documented finite set, with an unsupported size an error rather
+      than a panic
+- [x] One genuine instance imported, solved, and independently verified — type III `n=10` seed 0 in
+      111 ms, recovering the published point, checked in both directions
+- [x] A second instance imported and put to use — type VI `n=10` seed 0, underdetermined, 7 of 8
+      slices giving verified witnesses (§10.3)
+
 ### M21-E
 
 - [x] Substitution is correct on hand-derived examples, **and the slice is the substitution plus
@@ -801,6 +824,28 @@ took an RNG *and* a seed and recorded the seed beside values it had not produced
 caught — a field named `seed` that reproduces nothing is worse than no field. Values chosen rather
 than drawn go through `Specialization::new`, which records no seed and claims none. §10.1 is what happens when the count is wrong, and
 both rows used the same ranking.
+
+## 10.3 A real underdetermined instance, solved by specialization
+
+Fukuoka MQ Challenge type VI (signature), `n = 10`, seed 0: **7 quadratics in 10 unknowns over
+GF(31)**, so `n > m` and the ideal is positive-dimensional — refused outright by the
+zero-dimensional solvers, correctly.
+
+Fixing `n − m = 3` variables squares the system. Eight seeded slices:
+
+| | |
+|---|---:|
+| verified witnesses | **7 of 8** |
+| dead slices | 1 (`EmptySlice`) |
+| per slice | ~460 ms |
+
+Every witness is verified against the **imported coefficient vectors**, which were themselves
+checked against the challenge's published answer. So this is a published underdetermined instance
+solved end to end on data this project did not generate — M21-E's acceptance criterion met on real
+rather than synthetic input, and M21-A's second family put to use rather than merely parsed.
+
+It is a *toy* example. `n = 10` is 45 variables short of the smallest unsolved challenge and
+nothing here is a competitive result; see `docs/research/fukuoka-mq.md` §4.
 
 ## 11. Risks
 

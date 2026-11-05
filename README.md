@@ -88,6 +88,16 @@ cargo test --release --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
+One more needs data this repository does not redistribute. The Fukuoka MQ Challenge files are
+"All Rights Reserved" with no stated licence, so the test against a genuine instance is opt-in for
+the same reason:
+
+```sh
+tools/fetch-mq-challenge.sh
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_a_published_instance_is_reproduced
+```
+
 Two other `#[ignore]`d tests are unimplemented placeholders — a `BigUInt` sampling distribution
 check and a rare division branch — and they panic if run. A bare `cargo test -- --ignored`
 therefore reports those two as failures; the commands above select the tests that are meant to
@@ -225,6 +235,7 @@ cargo run --release --example solve_one            # systems in, verified soluti
 cargo run --release --example solve_baseline       # both routes with resources and outcome class
 cargo run --release --example solve_auto           # four policies against an offline best-of-two
 cargo run --release --example specialize_slices    # seeded slices of an underdetermined system
+cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -773,6 +784,16 @@ cargo test --release --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
+One more needs data this repository does not redistribute. The Fukuoka MQ Challenge files are
+"All Rights Reserved" with no stated licence, so the test against a genuine instance is opt-in for
+the same reason:
+
+```sh
+tools/fetch-mq-challenge.sh
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_a_published_instance_is_reproduced
+```
+
 ### Solving zero-dimensional systems
 
 `grobner::solve_one` finds one solution and stops; `grobner::solve_zero_dimensional` finds every
@@ -968,6 +989,33 @@ system — seven witnesses at three fixed, ten dead at six fixed — which close
 evidence on both sides rather than asserting it. Each slice comes from its own seed, and
 `Specialization::seeded` builds the RNG from it, so `seed()` is a promise that the slice
 reconstructs; `Specialization::new` takes chosen values and records no seed.
+
+#### External instances: the Fukuoka MQ Challenge
+
+`grobner::research::MqInstance` imports instances from the
+[Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
+no new arithmetic — `PrimeFieldElement64<31>` already exists — and the GF(2) and GF(2^8) families
+are refused by name, because `binary_field` and `extension_field` are not publicly exported.
+
+The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
+which is what the file's own `Order` header names. It is implemented by sorting with
+`MonomialOrder::GradedReverseLexicographic` rather than as an index pattern, and it was *verified*
+rather than assumed: four candidate layouts were evaluated at a published answer and exactly one
+makes every polynomial vanish. A monomial-order translation error is the failure mode an importer
+has, and it is silent.
+
+On type III `n=10` seed 0 — 20 quadratics in 10 unknowns — zeebra reconstructs the system, confirms
+it vanishes at the published answer, and independently recovers that same point in **111 ms** with
+`D = 1`. Both directions matter: a wrong layout could vanish at one point by accident, but it could
+not also be solved to the same one. This is a *toy* example at 45 variables short of the smallest
+unsolved challenge, and is not a competitive result.
+
+**The instance data is not redistributed here** — the files are "All Rights Reserved" with no
+stated licence. `tools/fetch-mq-challenge.sh` fetches them into `research/instances/mq/` and
+verifies the SHA-256 that `Provenance` pins; the test against a genuine instance is `#[ignore]`d
+for the same reason the Singular one is. `docs/research/fukuoka-mq.md` records the format, the
+verification, and one quirk worth knowing: coefficients are uniform over `0..=31`, not `0..=30`, so
+**zero is twice as likely as any other coefficient** in the published GF(31) data.
 
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
