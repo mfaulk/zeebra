@@ -806,6 +806,71 @@ Only `Err` means the computation could not be completed, and `SolveOptions` boun
 branches, returned solutions, and the F4 and FGLM limits underneath. An exceeded budget is an error
 rather than a truncated list.
 
+#### Which answer, and what it cost
+
+`Ok(None)` collapses two different answers: the equations may contradict each other, or they may
+simply have no base-field solution while the variety is nonempty over an extension.
+`solve_one_with_outcome` separates them and returns the diagnostics alongside:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{fields::Zp2147483647, grobner::{solve_one_with_outcome, SolveOptions, SolveOutcome},
+             MultivariatePolynomial};
+
+type F = Zp2147483647;
+let parse = |s| MultivariatePolynomial::<2, F>::parse(s, ["x", "y"]).unwrap();
+let options = SolveOptions::default();
+
+// 1 is in the ideal: the equations contradict each other.
+let contradiction = vec![parse("x - 1"), parse("x - 2")];
+let (outcome, _) =
+    solve_one_with_outcome(&contradiction, &mut StdRng::seed_from_u64(1), &options).unwrap();
+assert_eq!(outcome, SolveOutcome::Inconsistent);
+
+// 2^31 - 1 is 3 mod 4, so -1 is not a square: zero-dimensional, and no point in the field.
+let no_point = vec![parse("x^2 + 1"), parse("y")];
+let (outcome, statistics) =
+    solve_one_with_outcome(&no_point, &mut StdRng::seed_from_u64(1), &options).unwrap();
+assert_eq!(outcome, SolveOutcome::NoBaseFieldPoint);
+
+// And what the route cost, which `solve_one` discards.
+assert!(statistics.f4.is_some());
+```
+
+Every `SolveOutcome` variant is an answer; a crossed budget is still an `Err` and can never appear
+as one. `SolveStatistics` carries the Gröbner stage's `F4Statistics` and, on the converting route,
+the `FglmStatistics`, with `estimated_peak_bytes` the larger of the two stage estimates. That
+figure is an estimate of the *representation* — on katsura-7 under lex it is 320 MB against a
+measured 1,303 MB of process RSS, so use `util::peak_resident_bytes` when the question is about the
+process.
+
+#### Structural analysis, which decides nothing
+
+`grobner::analyze` reads a system's shape off its terms without computing anything:
+
+```rust
+use zeebra::{fields::Zp2147483647, grobner::analyze, MultivariatePolynomial};
+
+type F = Zp2147483647;
+let system: Vec<MultivariatePolynomial<3, F>> = ["x*y - 1", "x^2 - z"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, ["x", "y", "z"]).unwrap())
+    .collect();
+
+let shape = analyze(&system);
+assert_eq!(shape.quadratic_generators, 2);
+assert_eq!(shape.occurrences, vec![2, 1, 1]);      // per variable, generators it appears in
+assert!(!shape.constant_contradiction);
+// Least-constrained variable first. A ranking, not a recommendation.
+assert_eq!(shape.specialization_candidates(), vec![1, 2, 0]);
+```
+
+`constant_contradiction` is the only sound conclusion in `SystemShape` — a nonzero constant
+generator puts 1 in the ideal by itself. **Nothing else there bounds the quotient dimension or the
+solving degree.** In particular `generators == variables` proves nothing: cyclic-4 is four
+equations in four variables and positive-dimensional, katsura-4 is four in four and
+zero-dimensional, and the two agree on every column `analyze` reports.
+
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
 on a 14-variable system with 16384 solutions that is 1.9 ms against 1.6 s, a factor of **830**.
@@ -901,6 +966,31 @@ elimination backend allocates, which under `Backend::Dense` is `rows * columns` 
 function of the shape alone. `max_estimated_bytes` is the two added, per batch, maxed over batches.
 None of them accounts for the monomial-to-column map, the basis's term vectors, or allocator
 overhead; for the process figure use `util::peak_resident_bytes`.
+
+#### What the computation did before it ran out of room
+
+`f4` and `f4_with_options` discard their counters on the error path, which is the case where they
+say most. `f4_reported` keeps them:
+
+```rust
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::katsura, f4_reported, F4Error, F4Options},
+             MonomialOrder};
+
+let options = F4Options { max_batches: Some(2), ..F4Options::default() };
+let (result, statistics) = f4_reported(
+    &katsura::<6, Zp2147483647>(),
+    MonomialOrder::GradedReverseLexicographic,
+    &options,
+);
+
+assert_eq!(result.unwrap_err(), F4Error::TooManyBatches { limit: 2 });
+assert_eq!(statistics.batches, 2);        // the work done before the refusal
+assert!(statistics.max_matrix_rows > 0);
+```
+
+A crossed budget still cannot be mistaken for a finished one: the basis lives inside the `Result`,
+so an incomplete computation has no basis to hand back, and the statistics beside it describe work
+rather than an answer.
 
 #### Choosing a strategy
 

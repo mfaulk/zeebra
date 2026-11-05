@@ -14,7 +14,7 @@ use crate::{
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         buchberger,
-        f4::{f4, f4_with_options, F4Error, F4Options},
+        f4::{f4, f4_reported, f4_with_options, F4Error, F4Options},
         reference::buchberger_reference,
         s_polynomial,
     },
@@ -1831,6 +1831,80 @@ fn test_the_byte_budget_is_what_makes_a_budget_mean_the_same_at_every_field_widt
         4 * narrow.max_dense_buffer_bytes
     );
     assert!(wide.max_estimated_bytes >= wide.peak_live_bytes());
+}
+
+/// `f4_reported` keeps the counters on the error path, where `f4_with_options` drops them. M21-C.
+#[test]
+fn test_reported_statistics_survive_a_crossed_budget() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<6, Zp2147483647>();
+
+    // Enough batches to do real work, not enough to finish.
+    let options = F4Options {
+        max_batches: Some(2),
+        ..F4Options::default()
+    };
+
+    let (result, statistics) = f4_reported(&system, order, &options);
+    assert_eq!(result.unwrap_err(), F4Error::TooManyBatches { limit: 2 });
+
+    // The whole point: the work done before the refusal is reported rather than lost.
+    assert_eq!(statistics.batches, 2);
+    assert!(statistics.max_matrix_rows > 0);
+    assert!(statistics.max_matrix_columns > 0);
+    assert!(statistics.max_live_nonzeros > 0);
+    assert_eq!(statistics.bytes_per_entry, 16);
+    assert_eq!(
+        statistics.peak_live_bytes(),
+        statistics.max_live_nonzeros * 16
+    );
+
+    // And `f4_with_options` reports none of it, which is why this entry point exists.
+    assert!(f4_with_options(&system, order, &options).is_err());
+
+    // The same options that succeed give the same statistics through either entry point, so the
+    // diagnostic path is not a second implementation of the main loop.
+    let unlimited = F4Options::default();
+    let (reported_basis, reported) = f4_reported(&system, order, &unlimited);
+    let (observed_basis, observed) =
+        f4_with_options(&system, order, &unlimited).expect("within limits");
+    assert_eq!(reported_basis.expect("within limits"), observed_basis);
+    assert_eq!(reported, observed);
+}
+
+/// A crossed budget never yields a basis, whichever entry point asked. M21-C.
+///
+/// The hazard the plan names: a partial basis returned as though it were finished. It is
+/// structurally impossible here — the basis and the error occupy the same `Result`, so there is no
+/// value to hand back — and this pins that rather than trusting it.
+#[test]
+fn test_a_crossed_budget_yields_no_basis() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<6, Zp2147483647>();
+
+    for options in [
+        F4Options {
+            max_batches: Some(1),
+            ..F4Options::default()
+        },
+        F4Options {
+            max_live_nonzeros: 1,
+            ..F4Options::default()
+        },
+        F4Options {
+            max_live_bytes: 16,
+            ..F4Options::default()
+        },
+        F4Options {
+            max_matrix_rows: 1,
+            ..F4Options::default()
+        },
+    ] {
+        let (result, statistics) = f4_reported(&system, order, &options);
+        assert!(result.is_err(), "{:?} should not have finished", options);
+        // Statistics are still structurally sound: nothing claims more than it did.
+        assert!(statistics.elements_added <= statistics.pairs_reduced + system.len());
+    }
 }
 
 /// A computation that builds no matrix still reports the field's entry size.
