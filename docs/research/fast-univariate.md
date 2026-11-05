@@ -117,7 +117,7 @@ source.
 | mul | 1.93 – 2.14 → **2** | schoolbook; there is no NTT-based multiply |
 | div | 1.63 – 2.12 → **2** | in-place long division, after §2 |
 | ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive |
-| intt | 0.92 – 1.18 → **1** | `fft::interpolate` |
+| intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed |
 | lagrange | 2.68 – 2.98 → **3** | `lagrange_interpolate` at arbitrary abscissae |
 | roots | 1.64 – 2.01 → **2** | `roots`, dominated by `x^q mod f` |
 
@@ -153,12 +153,19 @@ The NTT is the stage in good shape: 232 ns per element over a 31-bit field at si
 over a 254-bit one at 2^21 — a 4.5x ratio against the 4x element-width ratio, so the transform is
 paying for the wider arithmetic and almost nothing else.
 
-At a matched size of `2^18`, `intt` costs **2.4x** `ntt` over KoalaBear and **8.6x** over BN254.
-The gap is inversions: `FFTDomain::inverse` inverts every one of the n powers individually, and
-`interpolate` divides each of the n coefficients by n — which, since `Div` is `mul` by `inverse`,
-is a second inversion per coefficient. 2n inversions where two would do, and inversion is the
-operation whose cost relative to multiplication grows most with field width, which is why the
-penalty is 3.6x larger on the wide field.
+At a matched size of `2^18`, `intt` cost **2.4x** `ntt` over KoalaBear, 5.2x over Goldilocks and
+**8.6x** over BN254 when these rows were taken. The gap was inversions: `FFTDomain::inverse`
+inverted every one of the n powers individually, and `interpolate` divided each of the n
+coefficients by n — which, since `Div` is `mul` by `inverse`, is a second inversion per
+coefficient. 2n inversions where two would do, and inversion is the operation whose cost relative
+to multiplication grows most with field width, which is why the penalty was largest on the wide
+field.
+
+**#118 has since removed it.** Batch inversion in `FFTDomain::inverse` and one hoisted `1/n` in
+`interpolate` bring that ratio to **1.02x, 1.07x and 1.10x** respectively, and the largest `intt`
+this budget reaches to `2^23`, `2^23` and `2^20`. The `intt` rows in §3.1 are therefore the
+pre-#118 figures, kept because every other row in the table was taken in the same run; peak bytes
+are unchanged at `9 n B`. See [`batch-inversion.md`](batch-inversion.md) §2.3.
 
 ### 3.2 Memory as a function of degree, in bytes
 

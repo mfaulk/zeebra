@@ -38,7 +38,7 @@ pub fn batch_invert<F: FiniteField>(xs: &mut [F]) {
             continue;
         }
         prefixes.push(running);
-        running = running * *x;
+        running *= *x;
     }
 
     if prefixes.is_empty() {
@@ -60,7 +60,7 @@ pub fn batch_invert<F: FiniteField>(xs: &mut [F]) {
         index -= 1;
         let original = *x;
         *x = inverse_of_prefix * prefixes[index];
-        inverse_of_prefix = inverse_of_prefix * original;
+        inverse_of_prefix *= original;
     }
     debug_assert_eq!(index, 0, "every prefix product must be consumed");
 }
