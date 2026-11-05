@@ -75,6 +75,18 @@ version explicitly:
 rustup run stable cargo clippy --all-targets --all-features -- -D warnings
 ```
 
+A test of a property that should hold over *every* field is written once and expanded per field by
+`for_each_field!`, or by `for_each_small_field!` where the body enumerates the field. Each
+expansion is named after its field, so a failure says which one:
+
+```text
+macros::field_types::tests::the_ring_laws_hold::gf13_pow_4 ... ok
+macros::field_types::tests::the_ring_laws_hold::bn254_fr ... ok
+```
+
+The alternative was a trait law tested for whichever field the author had in mind, which is how the
+coverage became uneven in the first place.
+
 Some tests compare the optimized Gröbner engine against the naive reference implementation, or
 factor large integers, on inputs slow enough to take minutes. They are `#[ignore]`d so the default
 suite stays fast, and need release mode to finish in reasonable time:
@@ -626,11 +638,11 @@ What the representation means for a caller:
   does deserialization. `from_limbs_reduced` is the separately named constructor that reduces.
 - `random` is masked rejection sampling. Reducing a uniform 256-bit draw modulo a 254-bit prime
   would favour the low residues.
-- `primitive_element` is `unimplemented!()`: finding a generator of the multiplicative group
-  means factoring a 254-bit `q - 1`, which no algorithm here needs and which should not start by
-  accident. `root_of_unity` works for any **power-of-two** order, through the two-adic
-  construction below, and panics for any other — that order is the one that needs the
-  factorization.
+- `try_primitive_element` returns `Err(RootOfUnityError::NoKnownGenerator)`: finding a generator of
+  the multiplicative group means factoring a 254-bit `q - 1`, which no algorithm here needs and
+  which should not start by accident. `try_root_of_unity` works for any **power-of-two** order,
+  through the two-adic construction below, and refuses any other — that order is the one that
+  needs the factorization.
 
 The whole stack works over these fields, not just the arithmetic:
 `grobner::mod`'s `test_the_whole_pipeline_over_bn254_fr` and its BLS12-381 twin take a planted
@@ -662,8 +674,70 @@ assert_eq!(Zp2147483647::order_u128(), Some(2147483647));
 `KnownOrder` gives the order q and the characteristic p as little-endian 64-bit limbs — a width
 that covers 64-, 128- and 256-bit orders without allocating — plus `order_u128` and
 `characteristic_u128` for callers that need a machine integer and can fail without one, plus
-`primitive_element`, `root_of_unity`, `two_adicity` and `two_adic_root_of_unity`. For an extension
-field q = p^k, so the order and the characteristic are genuinely different; both are reported.
+`primitive_element`, `root_of_unity`, `two_adicity`, `two_adic_root_of_unity`, the predicates
+`is_generator` and `is_primitive_nth_root`, and `sqrt`. For an extension field q = p^k, so the
+order and the characteristic are genuinely different; both are reported.
+
+Constructing a generator or a root of unity **fails as a value**. Whether `n` divides `q - 1`, and
+whether a field has a generator this crate will look for, are facts about the field and the
+requested order rather than programmer errors, so `try_primitive_element`, `try_root_of_unity` and
+`try_two_adic_root_of_unity` return `Result<Self, RootOfUnityError>`:
+
+```rust
+use zeebra::{fields::{RootOfUnityError, Zp13}, KnownOrder};
+use rand::{prelude::StdRng, SeedableRng};
+
+let mut rng = StdRng::seed_from_u64(1);
+
+// 6 divides 12, so Z/13 holds an element of order exactly 6.
+let w = Zp13::try_root_of_unity(6, &mut rng).expect("6 divides q - 1");
+assert!(w.is_primitive_nth_root(6, &mut rng));
+
+// 5 does not.
+assert_eq!(
+    Zp13::try_root_of_unity(5, &mut rng),
+    Err(RootOfUnityError::OrderDoesNotDivide { n: 5 }),
+);
+```
+
+The names without `try_` are kept as thin panicking wrappers, so existing call sites are
+unchanged; the fallible form is the one an implementation overrides. `is_generator` needs the
+factorization of `q - 1` and so is fallible for the same reason, while `is_primitive_nth_root`
+factors only `n` and therefore works over the 254-bit fields — which is what makes it the
+independent check on the two-adic construction rather than a restatement of it.
+
+#### Square roots, and which elements have one
+
+`sqrt` is Tonelli-Shanks, and one implementation covers every field in the crate because what
+changes between them is the two-adicity of `q - 1` rather than the algorithm:
+
+```rust
+use zeebra::{fields::{legendre_symbol, Zp65537}, FiniteField, KnownOrder};
+use rand::{prelude::StdRng, SeedableRng};
+
+let mut rng = StdRng::seed_from_u64(1);
+let x = Zp65537::new(7);
+
+match x.sqrt(&mut rng) {
+    Some(r) => assert_eq!(r * r, x),
+    None => assert_eq!(legendre_symbol(&x), -1),
+}
+```
+
+`legendre_symbol` is Euler's criterion: 0 on zero, 1 on the squares, -1 on the rest. Over a prime
+field it is the Legendre symbol; over an extension field of odd characteristic it is the same
+character on the larger group. In characteristic two squaring is a bijection, so every element is a
+square and the root is `x^(q/2)` — a different computation, reached by the same call.
+
+With `q = 3 (mod 4)` the two-adicity is 1, Tonelli-Shanks degenerates to the single exponentiation
+`a^((q+1)/4)`, and no random element is consumed at all; the rng is drawn from only to find a
+quadratic non-residue, which only the correction loop needs. Of the two roots `±r`, which one is
+returned is unspecified.
+
+`integers::jacobi_symbol` is the integer counterpart, by the binary algorithm, so it needs no
+factorization. For prime `n` it agrees with `legendre_symbol` on the same residue — two
+computations sharing no code, which is how each is checked — and for composite `n` it is not a
+residue test at all: `(2/15) = 1` though 2 is not a square mod 15.
 
 The split is there because a 254-bit prime field has no order that fits in a machine integer, and
 because **nothing in the algebraic core asks for one**: the multivariate polynomials, the linear
