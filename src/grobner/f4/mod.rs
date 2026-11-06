@@ -382,6 +382,15 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             }
         }
 
+        // Once per batch, after the basis and the queue have both been mutated by the previous
+        // iteration and before this one reads them. Recomputes every cached field rather than
+        // trusting it; see `MonicBasis::check`. Debug-only, so release pays nothing.
+        #[cfg(debug_assertions)]
+        {
+            monic.check();
+            pending.check(&leads);
+        }
+
         observer.batch(&monic, &batch);
 
         let outcome = reduce_batch_in(&monic, &batch, order, options, &mut cache)?;

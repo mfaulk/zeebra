@@ -984,6 +984,150 @@ impl<const N: usize> PairQueue<N> {
         self.deferred.len()
     }
 
+    /// Recompute every derived field from `leads` and compare it to what is stored.
+    ///
+    /// `leads` is a parameter because a pair carries indices and monomials but deliberately not the
+    /// two leading monomials (see [`CriticalPair::larger_multiplier`]), so there is nothing to
+    /// recompute against without them. The caller holding both is F4's main loop.
+    ///
+    /// What this catches that the type system does not: `live` drifting from the heap, a pair whose
+    /// lcm or multipliers no longer match the leads it names, the pending and deferred sets
+    /// overlapping — which would let one pair be processed twice — and a deferred pair recorded as
+    /// handled, which would let the chain criterion use an unprocessed pair as a witness and
+    /// discard a pair that is not redundant.
+    ///
+    /// Modelled on Singular's `kTest_TS` (`kernel/GBEngine/kutil.cc`), which checks `S`, `T`, `L`
+    /// and their cross-indices against each other rather than in isolation; see
+    /// `docs/research/singular-engine-notes.md` §6.
+    ///
+    /// Debug-only, like `MonicBasis::check`, and the call site is gated the same way.
+    ///
+    /// # Panics
+    /// If any stored field disagrees with its recomputation.
+    #[cfg(debug_assertions)]
+    pub(crate) fn check(&self, leads: &[Monomial<N>]) {
+        // `live` is maintained by hand across push, pop, lazy deletion and deferral, and a drift
+        // in it is silent: it is what `is_empty` reads, so too low ends a computation early.
+        let live = self
+            .pending
+            .iter()
+            .filter(|entry| {
+                !self
+                    .removed
+                    .contains(&(entry.0.pair.left, entry.0.pair.right))
+            })
+            .count();
+        assert_eq!(
+            self.live, live,
+            "PairQueue: live is {} but the heap holds {live} entries not in `removed`",
+            self.live
+        );
+
+        let mut pending_keys: HashSet<PairKey> = HashSet::new();
+        for entry in &self.pending {
+            let pair = &entry.0.pair;
+            self.check_pair(pair, leads, "pending");
+            if !self.removed.contains(&(pair.left, pair.right)) {
+                pending_keys.insert((pair.left, pair.right));
+            }
+            assert_eq!(
+                entry.0.schedule,
+                self.schedule,
+                "PairQueue: heap entry ({}, {}) carries schedule {} but the queue is {}",
+                pair.left,
+                pair.right,
+                entry.0.schedule.name(),
+                self.schedule.name()
+            );
+        }
+
+        for pair in &self.deferred {
+            self.check_pair(pair, leads, "deferred");
+            let key = (pair.left, pair.right);
+            assert!(
+                !pending_keys.contains(&key),
+                "PairQueue: pair ({}, {}) is both pending and deferred, so it could be \
+                 processed twice",
+                pair.left,
+                pair.right
+            );
+            assert!(
+                !self.handled.contains(&key),
+                "PairQueue: deferred pair ({}, {}) is recorded as handled, so the chain \
+                 criterion could use an unprocessed pair as a witness",
+                pair.left,
+                pair.right
+            );
+        }
+
+        // A rank computed from a missing count would silently order every pair equal. The counts
+        // are append-only precisely so that a pair's rank cannot change under it.
+        if self.schedule.ranks_by_term_count() {
+            assert!(
+                self.term_counts.len() >= leads.len(),
+                "PairQueue: schedule {} ranks by term count but only {} of {} counts are recorded",
+                self.schedule.name(),
+                self.term_counts.len(),
+                leads.len()
+            );
+        }
+    }
+
+    /// One pair's lcm, degree, multipliers and index bounds, recomputed from `leads`.
+    #[cfg(debug_assertions)]
+    fn check_pair(&self, pair: &CriticalPair<N>, leads: &[Monomial<N>], set: &str) {
+        let (left, right) = (pair.left, pair.right);
+        assert!(
+            left < right,
+            "PairQueue {set} pair ({left}, {right}): indices are not ordered"
+        );
+        assert!(
+            right < leads.len(),
+            "PairQueue {set} pair ({left}, {right}): right is out of bounds for {} leads",
+            leads.len()
+        );
+
+        let lcm = Monomial::lcm(&leads[left], &leads[right]);
+        assert_eq!(
+            pair.lcm, lcm,
+            "PairQueue {set} pair ({left}, {right}): lcm {} disagrees with lcm of its leads, {lcm}",
+            pair.lcm
+        );
+        assert_eq!(
+            pair.degree,
+            lcm.degree(),
+            "PairQueue {set} pair ({left}, {right}): degree {} disagrees with lcm degree {}",
+            pair.degree,
+            lcm.degree()
+        );
+
+        // The two multipliers are the quotients, assigned by degree. Recomputing both and
+        // comparing as a pair catches a swap, which comparing degrees alone would not.
+        let from_left = lcm
+            .checked_div(&leads[left])
+            .expect("an lcm is divisible by each of its leads");
+        let from_right = lcm
+            .checked_div(&leads[right])
+            .expect("an lcm is divisible by each of its leads");
+        let (larger, smaller) = if from_left.degree() >= from_right.degree() {
+            (from_left, from_right)
+        } else {
+            (from_right, from_left)
+        };
+        assert_eq!(
+            pair.larger_multiplier, larger,
+            "PairQueue {set} pair ({left}, {right}): larger_multiplier {} disagrees with the \
+             recomputed {larger}",
+            pair.larger_multiplier
+        );
+        assert_eq!(
+            pair.smaller_multiplier, smaller,
+            "PairQueue {set} pair ({left}, {right}): smaller_multiplier {} disagrees with the \
+             recomputed {smaller}",
+            pair.smaller_multiplier
+        );
+    }
+
     /// Move every pending pair of `degree` into the deferred set, and return how many.
     ///
     /// For a selection strategy that has decided it has taken enough of this degree and wants to
@@ -1478,6 +1622,110 @@ mod tests {
 
     fn monomials<const N: usize>(exponents: &[[u32; N]]) -> Vec<Monomial<N>> {
         exponents.iter().map(|e| Monomial::new(e)).collect()
+    }
+
+    /// Three leads and a queue seeded from them, for the checker tests.
+    #[cfg(debug_assertions)]
+    fn checkable() -> (Vec<Monomial<3>>, PairQueue<3>) {
+        let leads = monomials::<3>(&[[2, 0, 0], [0, 2, 0], [0, 0, 2]]);
+        let mut counts = CriterionCounts::default();
+        let queue = PairQueue::seeded_from_leads(&leads, &PairCriteria::NONE, &mut counts);
+        (leads, queue)
+    }
+
+    /// The checker accepts a queue its own constructor seeded.
+    ///
+    /// The control: without it the corruption tests would pass against a checker that rejected
+    /// every queue.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_the_queue_checker_accepts_a_well_formed_queue() {
+        let (leads, queue) = checkable();
+        queue.check(&leads);
+    }
+
+    /// A `live` count that has drifted from the heap is caught, and named.
+    ///
+    /// `live` is maintained by hand across push, pop, lazy deletion and deferral, and it is what
+    /// `is_empty` reads — so a count that is too low ends a computation early with a basis that is
+    /// not a Gröbner basis.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "live is")]
+    fn test_a_drifted_live_count_is_caught() {
+        let (leads, mut queue) = checkable();
+        queue.live -= 1;
+        queue.check(&leads);
+    }
+
+    /// A pair whose lcm no longer matches the leads it names is caught.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "disagrees with lcm of its leads")]
+    fn test_a_stale_pair_lcm_is_caught() {
+        let (leads, mut queue) = checkable();
+        let mut entries: Vec<_> = queue.pending.drain().collect();
+        entries[0].0.pair.lcm = Monomial::<3>::new(&[7, 7, 7]);
+        queue.pending.extend(entries);
+        queue.check(&leads);
+    }
+
+    /// Multipliers swapped between the two legs are caught.
+    ///
+    /// Recomputing both and comparing them as a pair is what catches this; comparing their degrees
+    /// would not, since a swap preserves the multiset of degrees.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "multiplier")]
+    fn test_swapped_multipliers_are_caught() {
+        let leads = monomials::<3>(&[[2, 0, 0], [0, 1, 0]]);
+        let mut counts = CriterionCounts::default();
+        let mut queue = PairQueue::seeded_from_leads(&leads, &PairCriteria::NONE, &mut counts);
+        let mut entries: Vec<_> = queue.pending.drain().collect();
+        let pair = &mut entries[0].0.pair;
+        assert_ne!(
+            pair.larger_multiplier, pair.smaller_multiplier,
+            "the fixture needs multipliers of different degrees for a swap to be visible"
+        );
+        std::mem::swap(&mut pair.larger_multiplier, &mut pair.smaller_multiplier);
+        queue.pending.extend(entries);
+        queue.check(&leads);
+    }
+
+    /// A pair that is both pending and deferred is caught.
+    ///
+    /// It could otherwise be processed twice: once from the heap and once after
+    /// [`PairQueue::promote_deferred`].
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "both pending and deferred")]
+    fn test_a_pair_in_both_sets_is_caught() {
+        let (leads, mut queue) = checkable();
+        let duplicate = queue
+            .pending
+            .peek()
+            .expect("the fixture seeds pairs")
+            .0
+            .pair
+            .clone();
+        queue.deferred.push(duplicate);
+        queue.check(&leads);
+    }
+
+    /// A deferred pair recorded as handled is caught.
+    ///
+    /// The chain criterion's witnesses must have been *processed*; a deferred pair has not been, so
+    /// this state would let it witness a discard that is not justified.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "recorded as handled")]
+    fn test_a_deferred_pair_recorded_as_handled_is_caught() {
+        let (leads, mut queue) = checkable();
+        let moved = queue.pending.pop().expect("the fixture seeds pairs").0.pair;
+        queue.live -= 1;
+        queue.handled.insert((moved.left, moved.right));
+        queue.deferred.push(moved);
+        queue.check(&leads);
     }
 
     fn drain<const N: usize>(mut queue: PairQueue<N>) -> Vec<(usize, usize)> {

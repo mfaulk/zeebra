@@ -139,6 +139,16 @@ CI runs the suite twice: once in debug, and once in release in a separate job. B
 are checked because a release build takes different paths — `debug-assertions` and
 `overflow-checks` are off, so every
 `debug_assert`-guarded invariant goes unchecked and integer arithmetic wraps instead of panicking.
+
+The debug run checks more than the release one in a second way. F4 validates its whole engine state
+once per batch under `cfg(debug_assertions)`: `MonicBasis::check` recomputes every element's leading
+monomial, monicity and term ordering and compares them to what is stored, and `PairQueue::check`
+recomputes each pending and deferred pair's lcm, degree and multipliers from the leading monomials
+it names, confirms the live count against the heap, and confirms the pending and deferred sets are
+disjoint. A failure names the field and the index. None of it is compiled in release, so **a
+`--release` or `--profile ci-release` run does not perform these checks** — which is a reason to run
+the debug suite and not only the fast one.
+
 Release is also the configuration every benchmark uses, so
 
 ```sh
