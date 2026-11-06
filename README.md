@@ -372,6 +372,7 @@ cargo run --release --example grobner_statistics   # Buchberger
 cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
+cargo run --release --example f4_memory            # F4, memory attributed per structure
 cargo run --release --example f4_degrees           # F4, work and useful work per degree
 cargo run --release --example f4_schedule          # critical-pair order, and batch size, apart
 cargo run --release --example f4_schedule -- list  # the instances available
@@ -455,6 +456,15 @@ unattributed cost cannot hide. It takes the name of a configuration — `baselin
 `recommended` for what `F4Options::default()` is — so the effect of one optimization can be read
 off against another's. The timing comes from
 `F4Options::measure_stages`, which reads a clock four times per batch and is off by default.
+
+`f4_memory` is the same question for bytes rather than for time, and it exists because the answer
+turned out not to be the matrix. It runs a tracking `#[global_allocator]` beside the solver's own
+counters, measures each batch's symbolic preprocessing and matrix construction on the batches F4
+really selected — including the batch that is **refused**, which no `F4Statistics` field describes —
+and prints each named structure's share against the measured peak. `ZEEBRA_MAX_ENTRIES` and
+`ZEEBRA_WALL_SECONDS` set the entry cap and `max_wall_time`, so a rung of the
+`docs/research/f4-resource-scaling.md` ladder reproduces here with the attribution attached. Pass
+`mq <instance>` for a registered MQ instance, whose files `tools/fetch-mq-challenge.sh` fetches.
 
 `f4_degrees` is M22-0's baseline: one table per system giving, for each lcm degree, the pairs
 selected and discarded, the split of matrix rows into reducer scaffolding and pair halves, **the
@@ -2566,11 +2576,17 @@ overhead; for the process figure use `util::peak_resident_bytes`.
 **How much that omits, measured.** On Fukuoka MQ type III `n = 20` at the default 20,000,000-entry
 budget, the accounted figure is 195 MB and the process peaks at **14.75 GB — 75x more**. The
 omission also does not move with the budget: three caps spanning 5x all peak within 0.01% of each
-other, and two caps large enough that the entry bound never fires plateau at a *lower* figure than
-the capped runs while doing strictly more work. So the entry budget cannot be scaled as a proxy for
-memory even roughly — what it omits is not a function of what it bounds.
-[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) has the ladder and
-the one causal reading it rules out; #237 is the attribution work.
+other. So the entry budget cannot be scaled as a proxy for memory even roughly — what it omits is
+not a function of what it bounds.
+
+**Where it goes, attributed.** 88% of that peak is **one `VecDeque<Monomial<20>>`**: symbolic
+preprocessing enqueues every term of every row and deduplicates only on pop, so the queue reaches
+162 million monomials at 80 bytes each while the matrix it is building does not exist yet. The basis
+— held twice, and three times during interreduction — is another 6.5%. The pair heap, the obvious
+suspect at `O(|G|²)` pairs, is **0.03%**. `F4Statistics` reports the counts:
+`max_pending_monomials`, `monomials_enqueued`, `peak_pair_queue`, `peak_basis_terms`.
+[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §9 has the full table
+and the method; `cargo run --release --example f4_memory` reproduces it on any system.
 
 #### What the computation did before it ran out of room
 
@@ -2596,6 +2612,42 @@ assert!(statistics.max_matrix_rows > 0);
 A crossed budget still cannot be mistaken for a finished one: the basis lives inside the `Result`,
 so an incomplete computation has no basis to hand back, and the statistics beside it describe work
 rather than an answer.
+
+#### Stopping on a wall clock, and keeping the report
+
+`F4Options::max_wall_time` is `None` by default, so no clock is read on the shipping path. When it
+is set it is checked **once per batch**, which is what makes the counters a crossing leaves behind
+describe whole batches rather than a matrix caught halfway through being built. One batch is always
+reduced before the check can fire, so the report is never empty:
+
+```rust
+use std::time::Duration;
+use zeebra::{fields::Zp2147483647, grobner::{benchmark_systems::katsura, f4_reported, F4Options, StopKind},
+             MonomialOrder};
+
+let options = F4Options { max_wall_time: Some(Duration::ZERO), ..F4Options::default() };
+let (result, statistics) = f4_reported(
+    &katsura::<5, Zp2147483647>(),
+    MonomialOrder::GradedReverseLexicographic,
+    &options,
+);
+
+let error = result.unwrap_err();
+assert_eq!(error.stop_kind(), StopKind::Time);   // never StopKind::Resource
+assert_eq!(error.limit_name(), "max_wall_time");
+assert_eq!(statistics.batches, 1);               // the report is never empty
+assert!(statistics.max_matrix_rows > 0);
+```
+
+**A time stop is type-level distinct from a resource stop**, through `F4Error::stop_kind`. An entry
+or byte count is a property of the system and crosses at the same degree on any machine; an elapsed
+time is a fact about one box under one load. A consumer that ranks stops against each other matches
+`StopKind` rather than enumerating variants, so a wall clock can never be ranked against a budget.
+
+It does not replace an external supervisor: a single batch can be arbitrarily long, so the elapsed
+time at a crossing is the budget *plus* whatever the batch in progress still needed, and both are
+reported. What the cooperative stop adds is that it **returns**, and a return carries the statistics
+an abandoned worker thread cannot.
 
 #### Degree by degree, and which of the work was useful
 

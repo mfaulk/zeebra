@@ -7,6 +7,11 @@ budget**?
 The answer is both narrower and more interesting than the question. More budget buys almost
 nothing, and — separately — **the budget is not what bounds the memory.**
 
+> **M25 (#237) added §9**, which attributes the memory the budget does not see. 88% of peak RSS is
+> **one `VecDeque<Monomial<20>>`** in symbolic preprocessing. §9.4 withdraws §6a's reading that the
+> 14 GB is reached on the refusal path, and §6a's argument for keeping the entry cap "because it is
+> the bound that yields a report" is retracted there too. Sections 1-8 are left as they were taken.
+
 ## 1. What M23 left open
 
 M23's full-width frontier ran at 20 000 000 live entries, 200 000 columns, and a wall clock that
@@ -144,11 +149,16 @@ shape of the omission**, neither of which the caveat carries:
 above. A caveat a careful reader discounts anyway is a caveat that needs a figure next to it, and
 adding this one to README is the cheapest item in #237.
 
-Where the untracked 98.7% goes is **not established here** and should not be guessed from this
+Where the untracked 98.7% goes was **not established here** and should not be guessed from this
 measurement. The step's coincidence with a degree boundary points at degree-5 symbolic
 preprocessing — and README's three named categories are the obvious candidates — but attributing it
 needs a profile, not an inference from one correlation. That is #237's first task, and it is a
 different piece of work from raising a cap.
+
+> **Resolved in §9 (M25, #237).** It is degree-5 symbolic preprocessing, and specifically **one
+> `VecDeque<Monomial<20>>`**: 88% of peak RSS is the pre-deduplication monomial queue. None of
+> README's three named categories is the answer, and neither is the error path §6a suspected. The
+> correlation with the degree boundary was real; the mechanism is not the one it suggested.
 
 ## 6. The stop rule, and its verdict
 
@@ -259,3 +269,138 @@ ZEEBRA_MAX_ENTRIES=20000000 ZEEBRA_WALL_SECONDS=900 \
 Vary `ZEEBRA_MAX_ENTRIES` for the other rungs. For the peak-RSS column, background the binary
 directly — `taskset` execs and keeps the pid, `timeout` forks and does not (§2) — and poll
 `/proc/<pid>/status` for `VmHWM`. Take timings under `tools/benchlock.sh`; the peaks do not need it.
+
+## 9. The attribution (M25, #237)
+
+§5 said where the untracked 98.7% goes was "not established here". This establishes it, by
+measurement rather than by correlation, and the answer is one data structure.
+
+### 9.1 The instrument
+
+`examples/f4_memory.rs`. Two instruments at once, because neither alone would settle it:
+
+| instrument | what it gives | what it cannot give |
+|---|---|---|
+| a tracking `#[global_allocator]` (LIVE/PEAK atomics) | the **peak live heap of a named stage**, exactly, temporaries included | which `Vec` the bytes went to |
+| the solver's own counters x `size_of` | a **named structure's** payload share | the slack a `HashMap`'s capacity or a `Vec`'s doubling leaves |
+| `/proc/<pid>/status` `VmHWM` | what the machine paid | which stage raised it |
+
+The stages are measured **on the real batches**, not on a reimplemented main loop: a
+`BatchObserver` receives each batch as F4 selected it and re-runs symbolic preprocessing and matrix
+construction under the allocator before the library does them for real. That costs the stages twice
+in wall time (99.1 s against the uninstrumented 71 s) and nothing in peak memory, since each copy
+is dropped before the next allocation.
+
+**The batch that matters is the batch that is refused**, and no `F4Statistics` field describes it:
+`reduce_batch_in` returns `Err` with nothing to attach the refused batch's counters to. The probe
+sees it because the observer is called *before* the batch is reduced. That is why the figures below
+cannot be read off a scoreboard record, and why the campaign in §3 could not have produced them.
+
+### 9.2 The 20 000 000-entry rung, attributed
+
+`fukuoka-mq-III-n20-seed0`, grevlex, 200 000 columns, `max_live_bytes` set clear of the entry cap,
+pinned to cores 0-7, release at `-C target-cpu=x86-64-v3`. Three batches completed; the fourth, at
+**degree 5**, refused during construction. `Monomial<20>` is `[u32; 20]` = **80 B**; a matrix entry
+is `(usize, Zp31)` = **16 B**.
+
+| site | measured MB | share of `VmHWM` | method |
+|---|---:|---:|---|
+| **symbolic preprocessing's pending monomial queue** | **12 374** | **88.4%** | 162 188 194 monomials at the queue's high-water x 80 B |
+| the basis, held twice | 905 | 6.5% | 5 389 241 terms x (80 + 8) B x 2 copies |
+| **matrix entries — the budgeted quantity** | **186** | **1.3%** | `max_live_nonzeros` 12 212 087 x 16 B + 40 588 B of dense buffer |
+| preprocessed row vector | 5.9 | 0.04% | 64 062 rows x `PreprocessedRow<20>` = 96 B |
+| `examined` + `covered` monomial sets | 5.3 | 0.04% | 34 210 distinct monomials x 81 B x 2 sets |
+| pair heap | 4.5 | 0.03% | 16 874 entries x `ScheduledPair<20>` = 280 B |
+| pair criteria sets | 0.3 | 0.00% | 19 422 keys x 16 B |
+| unnamed remainder | ~515 | 3.7% | allocator slack and completed batches' column structures |
+| **measured `VmHWM`** | **13 996** | 100% | `/proc/<pid>/status`, polled on the solver's own pid |
+
+Named sites account for **96%** of peak RSS. The two stage measurements bracket it: symbolic
+preprocessing's peak live heap is **20 499 MB** and construction adds **317 MB** on top.
+
+**Why the allocator's 21 674 MB exceeds `VmHWM`'s 13 996 MB, and why that is the mechanism rather
+than an inconsistency.** A `VecDeque` grows by doubling, so at 162 188 194 elements its capacity is
+2^28 = 268 435 456 slots — `20 480 MiB` of 80-byte monomials in **one allocation**, which is
+20 499 MB less the 11 MB of sets and rows, to within rounding. Only 60% of that capacity is ever
+written, and `VmHWM` counts *touched pages*. So:
+
+- the allocator figure is the queue's **capacity**: 20 480 MB;
+- the resident figure is the queue's **payload**: 12 374 MB;
+- and the ratio between them is exactly the doubling slack.
+
+That is the whole explanation of the 14 GB, and it is a property of one `VecDeque`.
+
+### 9.3 The same mechanism at the degree-4 rung
+
+| | 10 000 000 cap | 20 000 000 cap |
+|---|---:|---:|
+| batches completed | 2 | 3 |
+| degree refused at | 4 | 5 |
+| basis at peak | 278 elements / 240 551 terms | 1 318 / 5 389 241 |
+| rows in the refused closure | 10 297 | 64 062 |
+| **queue high-water** | **6 196 886 monomials / 473 MB** | **162 188 194 / 12 374 MB** |
+| symbolic preprocessing's peak live heap | 644 MB | 20 499 MB |
+| matrix entries (budgeted) | 5.8 MB | 186 MB |
+| measured `VmHWM` | **608 MB** | **13 996 MB** |
+| queue as a share of `VmHWM` | **78%** | **88%** |
+
+608 MB here against §3's 617 MB from the scoreboard binary, which also holds the challenge data and
+the record machinery — the same row. **The queue dominates at both rungs**, so this is not a
+degree-5 phenomenon; it is what symbolic preprocessing costs at every degree, scaling with the
+closure.
+
+### 9.4 Two hypotheses the measurement kills
+
+**The pair heap is not the problem.** It was the top-ranked suspect on size grounds — `O(B²)` pairs
+at 280 B each, which at `B = 10 000` would be the whole gap. Measured: **4.5 MB, 0.03%**. The
+estimate assumed a basis an order of magnitude larger than the one this instance actually reaches
+(1 318 elements before interreduction).
+
+**The refusal path is not the problem** — §6a's conclusion that "14.07 GB is reached on the refusal
+path and not on the path that proceeds" is **withdrawn**. The peak occurs inside symbolic
+preprocessing, *before any matrix exists* and therefore before any budget can be crossed; the
+process is observed at 1.3 GB resident while still running, after the 14 GB mark has been set. §6a
+named `f4_observed_reported`'s retained clone of the system as a suspect: that clone is 40
+polynomials of 20 variables, a few tens of kilobytes, and it lives in the harness rather than in the
+library.
+
+§6a reached the refusal-path reading from a sound deduction over an unsound premise. The deduction:
+the capped and uncapped runs are *identical* until the first budget crossing, so a peak the capped
+run reaches before crossing must also be reached by the uncapped run — and if the uncapped run peaks
+lower, the capped run's extra must come after the crossing. That is valid. The premise it rests on is
+§6a's 4 978 MB for the uncapped rungs, and the determinism argument now says that figure must be
+wrong: the uncapped run passes through the same degree-5 symbolic preprocessing, which costs 20 499 MB
+of heap whatever the entry cap is, because the only budget that stage reads is `max_matrix_rows`.
+Two independent runs of very different length agreeing to 20 kB (4 977 776 and 4 977 796 kB) is
+itself a signature of a poller that stopped early rather than of a plateau — see §2 for the earlier
+probe in this document that was wrong by 7 000x.
+
+### 9.5 What this changes
+
+- **`max_live_bytes` is not a process-memory limit and must not be read as one.** Its corrected doc
+  comment now enumerates what it does bound — the `SparseRow` payload of one batch's matrix, at that
+  batch's peak — and what no budget in F4 bounds. The name is kept: `max_entry_bytes` would describe
+  the scope better, and renaming it would make every figure recorded against the old name ambiguous,
+  which is the objection that made it a second budget rather than a redefinition of
+  `max_live_nonzeros` in the first place.
+- **An RSS backstop would belong in symbolic preprocessing, not beside the entry budget.** The peak
+  is reached before a matrix exists, so a second limit checked where the entry budget is checked
+  would be checked after the damage. The queue is the thing to bound, and #305 proposes bounding it
+  directly, which is cheaper and reproducible where a resident-size limit is neither.
+- **No default changed**, so every figure in §3, §4, §6 and §6a still reproduces.
+
+### 9.6 Reproducing §9
+
+```sh
+tools/fetch-mq-challenge.sh
+cargo build --release --example f4_memory
+
+ZEEBRA_MAX_ENTRIES=20000000 taskset --cpu-list 0-7 \
+  ./target/release/examples/f4_memory mq fukuoka-mq-III-n20-seed0
+```
+
+The example reads `VmHWM` itself, so the pid hazard of §2 does not arise; an external poller must
+still read the binary's own pid. `ZEEBRA_WALL_SECONDS` sets `F4Options::max_wall_time`, a
+**cooperative** per-batch budget rather than a supervisor, which is what makes an uncapped rung
+measurable at all: it stops between batches and returns, so the statistics survive. Peak-RSS runs
+do not need `tools/benchlock.sh`; the elapsed times quoted here are not results.
