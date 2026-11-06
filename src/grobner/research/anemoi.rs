@@ -126,6 +126,18 @@ pub enum AnemoiError {
 
     /// A zero-round instance, which is the linear layer and not a permutation family.
     NoRounds,
+
+    /// The requested `const N` is not the model's variable count.
+    ///
+    /// Exact rather than "at least": a spare position is an unconstrained variable, so the ideal
+    /// gains a free coordinate and the zero-dimensional solvers refuse a system that was meant to
+    /// be solvable.
+    WrongDimension {
+        /// Variables the system has.
+        needed: usize,
+        /// The dimension it was requested at.
+        requested: usize,
+    },
 }
 
 impl Display for AnemoiError {
@@ -147,6 +159,12 @@ impl Display for AnemoiError {
                 alpha, prime
             ),
             Self::NoRounds => write!(f, "an Anemoi instance needs at least one round"),
+            Self::WrongDimension { needed, requested } => write!(
+                f,
+                "the system has {} variables and was requested at {}; spare positions would be \
+                 unconstrained variables",
+                needed, requested
+            ),
         }
     }
 }
