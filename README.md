@@ -574,14 +574,20 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md),
 [`docs/MILESTONE-LARGE-PRIME-FIELDS.md`](docs/MILESTONE-LARGE-PRIME-FIELDS.md),
 [`docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md`](docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md),
-[`docs/MILESTONE-DEGREE-AWARE-F4.md`](docs/MILESTONE-DEGREE-AWARE-F4.md), and
-[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md).
+[`docs/MILESTONE-DEGREE-AWARE-F4.md`](docs/MILESTONE-DEGREE-AWARE-F4.md),
+[`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md), and
+[`docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md).
 
-The next milestone is planned rather than measured:
-[`docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md)
-reproduces a published cryptanalytic attack end to end, extends the resultant frontier from four
-rounds to six, and calibrates against an external solver on identical problems. Nothing in it is a
-measurement yet, and its §13 states what each outcome level would mean.
+The last of those reproduced a published cryptanalytic attack end to end, extended the verified resultant
+frontier from four rounds to **six** with a witness checked through the permutation, and calibrated
+against an external solver on identical problems — where the published Anemoi conversion wall
+**does not reproduce**: 46 s here against 6.13 h reported, and a within-run conversion/basis ratio
+of 1.71 against 2 367.
+
+That milestone's §10.1 is worth reading on its own. It scores the plan's own predictions and finds
+that every one about a stage already measured held, while three of four about quantities nobody had
+measured were wrong by more than an order of magnitude — one by 838x. The cost-model table exists so
+that is visible rather than quietly absorbed.
 
 ## Finite Fields
 
