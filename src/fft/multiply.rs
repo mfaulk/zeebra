@@ -66,6 +66,32 @@ use crate::{
 /// 32-byte row does **not** fall to 256: Karatsuba is still 1.18x ahead at product degree 254 over
 /// BN254, so taking #161's schoolbook crossing would have moved the threshold the wrong way. Both
 /// corrections come from measuring the route the dispatcher has rather than the one it had.
+///
+/// # The 4-byte row is contingent, and the other two are not
+///
+/// Only the 4-byte tier's schoolbook loop autovectorizes — a 64-bit Montgomery reduction is
+/// 128-bit arithmetic LLVM does not vectorize and a 32-bit one is 64-bit arithmetic it does, which
+/// is `docs/MILESTONE-SIMD-PARALLELISM.md` §8.3's finding. So only the 4-byte tier's threshold
+/// depends on whether that vectorization happened, and **under this crate's `lto = "fat"` with
+/// `codegen-units = 1` it is not stable against things that are not the source.** The same source
+/// at the same commit, built two ways:
+///
+/// | build | `vpmuludq` in the artifact | schoolbook at operand 1024 | Karatsuba | crossing |
+/// |---|---:|---:|---:|---|
+/// | `cargo build --release --examples` | 91 | 295.4 µs | 81.5 µs | (2046, 4094] → 4096 |
+/// | `cargo build --release --example multiplication_dispatch` | **0** | 527.2 µs | 141.0 µs | (510, 1022] → 1024 |
+///
+/// Both scalar routes lose 1.74x–1.77x together and the transform does not move at all (98.1 µs
+/// against 100.6), which is what identifies the cause as the 4-byte inner loop rather than
+/// anything in the dispatch. The 8- and 32-byte crossings are **identical in both artifacts**, as
+/// the paragraph above predicts they must be.
+///
+/// **4096 is the vectorized figure, and it is shipped because that is the state the library is
+/// normally in**: `univariate_scaling`, `karatsuba_crossover`, `field_width` and
+/// `cryptanalysis_ladder` all carry `vpmuludq` at this commit. A consumer whose own binary loses
+/// the vectorization will see the transform win from product degree 1024 rather than 4096, and
+/// Karatsuba at most 2.00x behind it in between. `multiply_above` takes an explicit threshold for
+/// exactly this kind of caller. Tracked as #244.
 pub fn fft_multiplication_crossover<F: FiniteField>() -> u32 {
     match std::mem::size_of::<F>() {
         0..=4 => 4096,

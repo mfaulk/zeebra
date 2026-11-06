@@ -748,6 +748,33 @@ erring that way is bounded and visible — on Zp65537 between 256 and 512 the tr
 1.60x ahead — where erring the other way pays the transform's fixed setup on every product in the
 band.
 
+##### The 4-byte crossing is contingent on a codegen decision (#244)
+
+Measured four times at 4096 and twice at 1024, and the variable turned out not to be the source.
+The same commit built two ways:
+
+| build | `vpmuludq` in the artifact | schoolbook @1024 | Karatsuba | crossing |
+|---|---:|---:|---:|---|
+| `cargo build --release --examples` | 91 | 295.4 µs | 81.5 µs | (2046, 4094] → **4096** |
+| `cargo build --release --example multiplication_dispatch` | **0** | 527.2 µs | 141.0 µs | (510, 1022] → 1024 |
+
+Both scalar routes lose 1.73x–1.78x together and the transform does not move (98.1 µs against
+100.6), which locates the cause in the 4-byte coefficient loop: its autovectorization is present in
+one artifact and absent in the other. Under `lto = "fat"` with `codegen-units = 1`, building one
+example gives the linker a different set of roots than building all of them.
+
+Only the 4-byte tier can do this, and §8.3 of `MILESTONE-SIMD-PARALLELISM.md` says why it must be
+the only one: a 64-bit Montgomery reduction is 128-bit arithmetic LLVM does not vectorize and a
+32-bit one is 64-bit arithmetic it does. The 8- and 32-byte crossings measured **identical in both
+artifacts**, which is the control for that reading.
+
+**4096 ships**, because every committed example carries `vpmuludq` at this commit —
+`univariate_scaling` 54, `karatsuba_crossover` 45, `field_width` 56, `cryptanalysis_ladder` 89 — so
+that is the state the library is normally in, and a consumer that loses it sees Karatsuba at most
+2.00x behind the transform in the band between 1024 and 4096. The deeper problem, that a shipped
+constant is contingent on a codegen decision and that no 4-byte figure in these documents records
+which state it was taken in, is #244.
+
 ##### Mersenne-31: the fallback measured, since it is the only route there
 
 Two-adicity 1, so no domain exists past two points and `multiply_above` takes its
