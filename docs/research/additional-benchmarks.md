@@ -24,6 +24,36 @@ prerequisite and the first two are the ones worth doing.
 
 Rejected: UOV, MAYO, Arion, XHash8, and STAP Zoo as a dependency. See §7.
 
+> **Security status update, 2026-11-06 — it does not change the shortlist, and it changes what the
+> shortlist may be said to be *about*.** eprint **2026/1281** (Bak, Bariant, Hostettler, Neiger,
+> *Resultants Meet Resultant: Improving CICO-1 and CICO-2 Attacks on ZK-Friendly Permutations*), cited
+> in no zeebra document when this survey was written, reports:
+>
+> "Our attacks improve upon the best known ones against several instances of Anemoi, Rescue and
+> Griffin, **successfully breaking 128-bit and 256-bit security instances of Rescue in the CICO-1
+> setting and full-round instances of Anemoi and Griffin in the CICO-2 setting for the first time.**
+> Our implementation of the attack confirms the practicality of the approach."
+>
+> So **candidates 1 and 2 are broken at full rounds in CICO-2.** Three consequences:
+>
+> 1. **They remain good benchmarks.** Their value here was never that the primitives are unbroken —
+>    it was redistributable reference data (candidate 1) and published witnesses (candidate 2). Both
+>    survive intact. The reduced-round rungs are reproduction targets either way.
+> 2. **§3.3 and §4 are stale on security.** §3.3's "41 rather than 37 rounds would be needed for
+>    256-bit security" and §4's "full-round Griffin is 10 rounds … the paper extrapolates
+>    ≈ 4.2·10¹¹ s on one core" are both superseded as *security* statements. They stand as
+>    *difficulty scales*, which is how §3.3 and §4 already instruct them to be used.
+> 3. **The method is the one zeebra has been studying.** The attack is resultant-based, finishing
+>    with fast bivariate resultants and, in practice, **Villard's algorithm (ISSAC 2018)** — the same
+>    machinery the scoreboard's `poseidon31-cico-rf6-rp6` row names and that
+>    [`resultant-elimination.md`](resultant-elimination.md) measures. Reported practical complexities
+>    `Õ((αⁿD_I)^γ₂)` and `Õ(D_I^γ₁)` for CICO-2 and CICO-1, with `1.2 ≤ γ₁ ≤ 1.25 ≤ γ₂ ≤ 1.33`.
+>
+> **Why this family and not Poseidon:** the technique exploits **α-inversions** `x ↦ x^{1/α}`, which
+> Rescue, Arion, Anemoi, Griffin and XHash8/12 all use and Poseidon does not. That also makes it
+> directly relevant to #203, whose Rescue-Prime target has `x^{1/α}` as its central modelling
+> obstacle — the thing #203 records as gap 2 is the thing this attack is built around.
+
 Ranking rationale, in one line each:
 
 1. **Anemoi via `six-worlds-anemoi`** — the only candidate whose external reference point is
@@ -68,6 +98,27 @@ M₄ = [[5,7,1,3],
 It depends on `t` alone — no randomness, no field-specific choice — so it is a dependency on a
 *source*, not on a guess. This is the answer to investigation task 2 for Griffin: **reconstructible
 from the paper plus one named function of the reference implementation.**
+
+> **Corrected, 2026-11-06: it *is* in the paper — the Griffin paper, not FreeLunch's restatement of
+> it.** §9 recorded eprint 2022/403 as unread, and this section was written from FreeLunch's
+> Definition 11. 2022/403 (*Horst Meets Fluid-SPN: Griffin for Zero-Knowledge Applications*, full
+> version) has been read, and its Equation (7) gives the linear layer outright: for `t = 4t′ ≥ 8`,
+>
+> `M = M″ × M′ = M′ × M″`, with `M′ = diag(M₄, …, M₄)` and `M″ = circ(2·I, I, …, I)`
+>
+> which is **exactly** the `M₄[i mod 4][j mod 4]`-doubled-on-the-diagonal-block construction
+> recovered above, and the same `M₄`. So the reconstruction was right and the dependency is on the
+> **specification**, not on a reference implementation — a stronger footing than this section
+> claimed. The `t ∈ {3, 4}` cases are given there too, with `M₄` noted as `M⁸,⁴_{4,4}` from the
+> designers' efficiency work at `α = 2`.
+>
+> **And the `(δ, µ)` ambiguity is resolved by the specification as well.** 2022/403: the constants
+> `(α₂, β₂)` are chosen by a SHAKE-based PRNG, and the rest are **derived** as
+> `αᵢ = (i − 1) · α₂` and `βᵢ = (i − 1)² · β₂` for `i = 3 … t−1`. With `(α₂, β₂) = (4, 7)` that is
+> `αᵢ = 4(i−1)`, `βᵢ = 7(i−1)²` — **the second reading in the table below**, the one the published
+> witnesses selected 5/5. So the witness test and the specification agree, and §2's conclusion that
+> "the published input/output pairs are a decision procedure" stands with the specification now
+> confirming its verdict rather than merely not contradicting it.
 
 **The `(δ, µ)` index convention is ambiguous, and the witness decides it.** The appendix gives
 `δᵢ = 4(i+1)`, `µᵢ = 7(i+1)²` for `i = 0, …, r-1`, but `δ` and `µ` are indexed by *branch*, of which
@@ -163,6 +214,31 @@ It is also the one number here that must be tagged `Claim::Observed` and not `Cl
 are measurements from one implementation, and the designers' corresponding statement is a
 conjecture. The manifest's Proved/Observed distinction exists for precisely this.
 
+> **Superseded, 2026-11-06. The conjecture is proven, so this is `Claim::Proved`.** eprint 2025/814
+> was unreadable from this environment when §3.4 was written; it has since been read. Its
+> **Proposition 4 (Quotient ring dimension for Anemoi)** states, for `l ≥ 1` and
+> `α ∈ {3, 5, 7, 11}`, that the dimension of the quotient ring basis of the DRL (resp. WDRL)
+> Gröbner basis of `Anemoi(N, α, l)` is
+>
+> `d_I = |B_GDRL| = |B_GWDRL| := (α + 2)^(N·l)`
+>
+> with the paper saying so in as many words: "In [29] `d_I` for Anemoi is conjectured as
+> `d_I = (α+2)^N` for `l = 1` with experimental evidences. **We prove and extend this conjecture.**"
+> So the equality is proven, and it generalizes past `ℓ = 1` to `(α+2)^(N·l)` — the table above is the
+> `l = 1` row of a wider result.
+>
+> A second, weaker and independent confirmation: eprint 2025/2040's Table 1 gives
+> `D_I ≤ (d+2)^(k·R)` for Anemoi with `2k = t` as a proven **upper bound** under its genericity
+> assumptions. Two papers, an equality and a bound, agreeing with the measurement.
+>
+> **The proof also hands over the basis structure**, which is worth more to an implementer than the
+> dimension. Proposition 2 gives `G_DRL` as exactly: `l` equations of degree 1 with leading terms
+> `y_{i,0}`; `2Nl` equations of degree `α` with leading term `y_{i,j}^α` or `s_{i,j}^α`; and `Nl`
+> equations of degree 2 with leading terms `y_{i,j} s_{i,j}`, the last acting as "filter equations"
+> that remove multiples from the quotient basis. **A fully specified Gröbner basis with explicit
+> leading monomials** — so zeebra can verify it by Buchberger's criterion on the input generators
+> rather than computing one, and can check the standard-monomial enumeration term by term.
+
 ### 3.3 The round numbers under attack
 
 Six Worlds, Table 1, for `α = 3` and `ω = 2`, gives minimum round numbers in each of its six worlds
@@ -192,6 +268,20 @@ until the paper itself has been read, and the numeric `d_I` columns of its Table
 not be quoted at all: the values increment by one per round and so appear to be `log₂ d_I`, which
 the captions do not say.
 
+> **Both caveats lifted, 2026-11-06. eprint 2025/814 has been read.** Cite it directly rather than
+> the thesis.
+>
+> **And the `d_I` prohibition can go, with the explanation.** The columns are not `log₂ d_I` — they
+> are `(α+2)^N` **written with superscripts**, which PDF text extraction flattens. The eprint's
+> Table 7 extracts as `52, 53, 54, 55, 56, 57, 58` for `α = 3, N = 2…8`; those are `5², 5³, …, 5⁸`.
+> Likewise `72…76` for `α = 5` are `7²…7⁶`, `92…95` are `9²…9⁵`, and `132…134` are `13²…13⁴`. Exactly
+> `(α+2)^N`, consistent with Proposition 4 (§3.2).
+>
+> So the caveat was **right to exist and wrong in its hypothesis**: the refusal to quote numbers that
+> could not be interpreted was correct, and the interpretation offered was not. Worth recording in
+> that shape, because the failure mode — superscripts lost in extraction, producing a plausible
+> arithmetic-looking sequence — will recur with any table of powers.
+
 What is unambiguous, and what makes `ACICO` worth a model: experiments on `p = 1481823929` (31 bits)
 on an Intel Xeon Gold 6342 @ 2.80 GHz with 48 GB RAM, using SageMath, msolve, Singular, Macaulay2,
 NTL and FLINT, give a **solving degree that does not grow with the number of rounds** — 9, 30, 42
@@ -199,6 +289,58 @@ and 66 for `α = 3, 5, 7, 11` — with the Gröbner basis computed "for more tha
 single-digit milliseconds. The entire cost is the univariate-polynomial step and the factoring after
 it. That corroborates §3.2 from an independent direction and sharpens it: under the right model the
 basis is free and conversion is everything.
+
+**All of that is confirmed from the eprint, and it is stronger than stated.** Table 6 gives
+`d_solv = 9, 30, 42, 66` for `α = 3, 5, 7, 11` — **constant not only in rounds but across
+`l = 1, 2, 3`** — with `T_GB` of 2.16 ms at `α=3, l=1` on 21 rounds, and the caption confirming "we
+were able to compute the Gröbner basis for more than 100 rounds".
+
+### 3.4.1 Table 7 is the measurement #224 (D5) was waiting for
+
+The eprint's Tables 7–9 time **three** routes to the univariate polynomial on the same instances —
+SparseFGLM, `polyDet`, and **Wiedemann on the multiplication matrix**. From Table 7 (`l = 1`,
+`q = 1481823929`), seconds:
+
+| `α` | `N` | `d_I` | SparseFGLM | polyDet | **Wiedemann** | factoring |
+|---:|---:|---:|---:|---:|---:|---:|
+| 3 | 4 | `5⁴` | 0.287 | 1045.4 | **6.85** | 0.41 |
+| 3 | 6 | `5⁶` | 1008.2 | — | **110.5** | 128.2 |
+| 3 | 8 | `5⁸` | *fails* | *fails* | **1212.9** | 14567.5 |
+| 5 | 5 | `7⁵` | *fails* | *fails* | **131.0** | 278.1 |
+| 7 | 4 | `9⁴` | *fails* | *fails* | **47.0** | 61.7 |
+
+`T_GB` across every row is **0.0005–0.0013 s** — the basis really is free, which is what §3.4 claimed
+and now has numbers for.
+
+**Wiedemann beats both alternatives and reaches two rounds further than SparseFGLM**, and the paper
+gives the reason: "our polynomials are extremely sparse as well as the multiplication matrices, so
+SparseFGLM and Wiedemann algorithm are performing better than `polyDet`". #58's record is titled
+"won't-do for F4, **deferred for FGLM**", and its grounds for refusing F4 were that F4's operator is
+transformed in place and destroyed, whereas FGLM's multiplication operator is a fixed black box
+applied repeatedly. **This is published evidence that Wiedemann on that fixed operator is the best of
+three methods on an arithmetization-oriented primitive, and the only one that scales.**
+
+The paper even supplies a selection rule, which is what `src/grobner/planning/` would need. With `Z`
+the sparsity of the multiplication matrices, `n` variables and `k` sought: repeated Wiedemann beats
+SparseFGLM when `(n − k) log(d_I) ≥ (k − 1) Z`; at `n = k = 1` the two coincide.
+
+Note the last column: factoring overtakes everything at `α = 3, N = 8` (14 567 s against Wiedemann's
+1 213 s). So the wall moves from conversion to **root finding**, which is `src/poly/univariate/` and
+`docs/research/fast-univariate.md` §4.4's "quadratic, and it is the binding stage".
+
+### 3.4.2 Shape position is proven, not assumed
+
+§3.4 said `ACICO` "admits a proof that the system is in shape position". Confirmed: §5 of the eprint
+proves the Shape form for a class of constrained zero-dimensional ideals, and §6.2 applies it to
+`I = ⟨ACICO⟩`. The authors' own framing of why this matters: "As far from our knowledge, all the
+algebraic cryptanalysis done so far, **blindly applied the FGLM algorithm**, searching for this
+advantageous structure."
+
+The condition is general rather than Anemoi-specific — systems whose polynomials have the form
+`f_i := c_i x_i^(α_i) + q_i(x_1, …, x_n)` with `deg_≺(q_i) < deg_≺(LM(f_i))` under a generic order.
+**That is syntactically checkable**, so zeebra could establish shape position for a generated system
+without running `src/grobner/fglm/shape.rs`' detector at all — and conversely, a family where the
+condition holds but the detector misses it is a detector defect. #201 owns this.
 
 ## 4. Griffin and the FreeLunch line
 
