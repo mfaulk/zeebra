@@ -125,6 +125,14 @@ pub struct GraeffeStats {
 /// leading coefficient `-1` at odd degree, and [PC] Lemma 2's `GT_2 . GT_2 = GT_4` holds only up
 /// to a unit. With it, `f = prod (x - r_i)` transforms to exactly `prod (x - r_i^2)`.
 ///
+/// # Memory
+/// `3 n B` live at the peak, for `n` the domain size: the forward values of `f_e` reused as the
+/// combine's output buffer, plus the `2 n B` that `interpolate` holds. Both halves' value vectors
+/// are scoped so that only one of them outlives the combine, and the parity-split coefficient
+/// vectors are dropped before the inverse transform runs. Worth doing explicitly: since #161 took
+/// `evaluate` to `1 n B` and `interpolate` to `2 n B` — their floors — the naive form's live set is
+/// this function's own temporaries rather than the kernel's.
+///
 /// # Panics
 /// Panics if the domain holds `deg f` points or fewer, which is a choice the caller made.
 pub fn graeffe_2_over_domain<F: FiniteField>(
@@ -139,16 +147,35 @@ pub fn graeffe_2_over_domain<F: FiniteField>(
         domain.size()
     );
 
-    let coefficients = f.coefficients();
-    let even: Vec<F> = coefficients.iter().step_by(2).copied().collect();
-    let odd: Vec<F> = coefficients.iter().skip(1).step_by(2).copied().collect();
-    let even_values = evaluate(&UnivariatePolynomial::new(&even), domain);
-    let odd_values = evaluate(&UnivariatePolynomial::new(&odd), domain);
+    // `values` starts as `f_e` on the domain and becomes `f_e^2 - x f_o^2` in place. The odd half's
+    // values and both parity-split coefficient vectors live only inside this block.
+    let values = {
+        let coefficients = f.coefficients();
+        let even =
+            UnivariatePolynomial::new(&coefficients.iter().step_by(2).copied().collect::<Vec<F>>());
+        let odd = UnivariatePolynomial::new(
+            &coefficients
+                .iter()
+                .skip(1)
+                .step_by(2)
+                .copied()
+                .collect::<Vec<F>>(),
+        );
+        let mut even_values = evaluate(&even, domain);
+        let odd_values = evaluate(&odd, domain);
+        for (point, (even_value, odd_value)) in domain
+            .powers()
+            .iter()
+            .zip(even_values.iter_mut().zip(odd_values.iter()))
+        {
+            *even_value = *even_value * *even_value - *point * (*odd_value * *odd_value);
+        }
+        even_values
+    };
 
-    let values: Vec<F> = (0..domain.size())
-        .map(|j| even_values[j] * even_values[j] - domain[j] * (odd_values[j] * odd_values[j]))
-        .collect();
     let transformed = interpolate(&values, domain);
+    // `scale` below allocates another `n B`, and the values are spent.
+    drop(values);
 
     if degree % 2 == 1 {
         transformed.scale(&-F::one())
@@ -348,14 +375,19 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
 
     // `beta_0 = q - 1`. The fold is a no-op at every degree this is called at, and is here so the
     // induction the descent relies on starts where [PC] Algorithm 2 line 1 puts it.
-    let mut retained: Vec<UnivariatePolynomial<F>> = Vec::with_capacity(two_adicity as usize + 1);
-    let mut current = fold_cyclic(f, cyclic_modulus(&odd_part, two_adicity, 0));
-    retained.push(current.clone());
+    //
+    // Every `G_(2^i)` is moved into `retained` rather than cloned into it, and the next step reads
+    // the vector's last element. One full-degree copy per step would otherwise be live alongside
+    // the transform's own buffers, which since #161 took the kernel to its `1 n B` floor is the
+    // larger of the two.
+    let base_fold = fold_if_needed(f, cyclic_modulus(&odd_part, two_adicity, 0));
+    let base: &UnivariatePolynomial<F> = base_fold.as_ref().unwrap_or(f);
+    let mut retained: Vec<UnivariatePolynomial<F>> = Vec::with_capacity(two_adicity as usize);
 
     let forward_start = Instant::now();
     let mut domain: Option<FFTDomain<F>> = None;
     for step in 1..=two_adicity {
-        let degree = current.degree();
+        let degree = retained.last().unwrap_or(base).degree();
         let points = (degree as usize + 1).next_power_of_two().max(2);
         let log_n = points.trailing_zeros();
         if log_n > two_adicity {
@@ -376,9 +408,15 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
             domain = Some(FFTDomain::from_generator(generator, points));
         }
 
-        current = graeffe_2_over_domain(&current, domain.as_ref().expect("built above"));
-        current = fold_cyclic(&current, cyclic_modulus(&odd_part, two_adicity, step));
-        retained.push(current.clone());
+        let transformed = graeffe_2_over_domain(
+            retained.last().unwrap_or(base),
+            domain.as_ref().expect("built above"),
+        );
+        let beta = cyclic_modulus(&odd_part, two_adicity, step);
+        match fold_if_needed(&transformed, beta) {
+            Some(folded) => retained.push(folded),
+            None => retained.push(transformed),
+        }
 
         stats.graeffe_steps += 1;
         stats.transforms += 3;
@@ -386,16 +424,26 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
         stats.total_transform_elements += 3 * points;
     }
     stats.forward_time = forward_start.elapsed();
-    stats.final_degree = current.degree();
+    let fully_transformed = retained.last().unwrap_or(base);
+    stats.final_degree = fully_transformed.degree();
+    // What this call holds, which excludes the caller's `f`: the retained `G_(2^i)` for
+    // `i = 1..=k`, plus the folded `G_(2^0)` only when the fold actually materialized one.
     stats.stored_coefficients = retained
         .iter()
+        .chain(base_fold.as_ref())
         .map(|polynomial| polynomial.coefficients().len())
         .sum();
 
     // === the subgroup search ===
 
     let subgroup_start = Instant::now();
-    let candidates = subgroup_roots(&current, &odd_part, subgroup_order, &mut stats, rng);
+    let candidates = subgroup_roots(
+        fully_transformed,
+        &odd_part,
+        subgroup_order,
+        &mut stats,
+        rng,
+    );
     stats.subgroup_time = subgroup_start.elapsed();
     stats.candidates = candidates.len();
 
@@ -403,7 +451,7 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
 
     let descent_start = Instant::now();
     for candidate in candidates {
-        if let Some(root) = descend(&retained, candidate, rng) {
+        if let Some(root) = descend(base, &retained, candidate, rng) {
             if f.eval(&root).is_zero() {
                 stats.descent_time = descent_start.elapsed();
                 return Ok((Some(root), stats));
@@ -429,25 +477,29 @@ fn scale_variable<F: FiniteField>(f: &UnivariatePolynomial<F>, c: &F) -> Univari
     UnivariatePolynomial::new(&scaled)
 }
 
-/// `f mod (x^beta - 1)`, by folding coefficient `i` onto `i mod beta`.
+/// `f mod (x^beta - 1)`, by folding coefficient `i` onto `i mod beta`, or `None` if `f` already
+/// has degree below `beta` and the reduction would do nothing.
 ///
 /// `max(deg f + 1 - beta, 0)` additions and no division, which is [P937] §5.2's point about
-/// Algorithm 2 line 6. `None` leaves `f` alone, for a modulus too wide to index with.
-fn fold_cyclic<F: FiniteField>(
+/// Algorithm 2 line 6. A `beta` of `None` is a modulus too wide to index with, where the fold is
+/// likewise a no-op.
+fn fold_if_needed<F: FiniteField>(
     f: &UnivariatePolynomial<F>,
     beta: Option<usize>,
-) -> UnivariatePolynomial<F> {
+) -> Option<UnivariatePolynomial<F>> {
     let coefficients = f.coefficients();
     let beta = match beta {
         Some(beta) if beta >= 1 && coefficients.len() > beta => beta,
-        _ => return f.clone(),
+        // `None` rather than a clone: the caller keeps what it already has, so a step whose
+        // modulus is above the degree costs nothing instead of one full-degree copy.
+        _ => return None,
     };
 
     let mut folded = vec![F::zero(); beta];
     for (index, coefficient) in coefficients.iter().enumerate() {
         folded[index % beta] += *coefficient;
     }
-    UnivariatePolynomial::new(&folded)
+    Some(UnivariatePolynomial::new(&folded))
 }
 
 /// `beta_i = (q - 1) / 2^i = 2^(two_adicity - i) * odd_part`, as a `usize` if it fits.
@@ -512,15 +564,22 @@ fn subgroup_roots<F: KnownOrder, R: RngCore + CryptoRng>(
 
 /// `alpha` from `alpha^(2^k)`, by un-squaring against each retained `G_{2^i}` in turn.
 ///
-/// `retained[i]` is `G_{2^i}` reduced, so `retained[0]` is `f` itself and the loop runs from the
-/// top down. [PC] Algorithm 2 line 8 at `q_i = 2`.
+/// `retained[j]` is `G_{2^(j+1)}` reduced and `base` is `G_{2^0}`, which is `f` itself unless the
+/// `beta_0` fold materialized one — `base` is not kept in `retained` so that the common case holds
+/// no copy of the input. The loop runs from the top down. [PC] Algorithm 2 line 8 at `q_i = 2`.
 fn descend<F: KnownOrder, R: RngCore + CryptoRng>(
+    base: &UnivariatePolynomial<F>,
     retained: &[UnivariatePolynomial<F>],
     mut mu: F,
     rng: &mut R,
 ) -> Option<F> {
-    for level in (0..retained.len() - 1).rev() {
-        mu = un_square(&retained[level], &mu, rng)?;
+    for level in (1..=retained.len()).rev() {
+        let g = if level == 1 {
+            base
+        } else {
+            &retained[level - 2]
+        };
+        mu = un_square(g, &mu, rng)?;
     }
     Some(mu)
 }

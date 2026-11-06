@@ -415,6 +415,30 @@ Three details read in [PC] §4.1:
 
 ### 3.5 Algorithm C — the single-root variant that was actually implemented
 
+> ## Correction to this transcription: **lines 14–18 are unusable as written outside an attack.**
+>
+> The transcription below is faithful to [P937] Algorithm 2. It is also, at lines 14–18, **not an
+> implementable root finder**, and this document did not notice when it wrote them down. Line 15's
+> loop is `r` candidate tests with `r = 2^k = 2^24` over KoalaBear, and line 17's test is
+> `P(α) = 0` — a polynomial evaluation at degree `d`. That is `2^24 × 1 594 323 ≈ 2.6 × 10^13`
+> field operations at `δ = 3^13`, **four orders of magnitude more than the Graeffe iteration lines 5
+> and 6 are there to make cheap.** The algorithm's own stated cost, `O(M(d) log r + s log s + r)`
+> below, silently charges the scan `O(r)` rather than `O(r·d)`.
+>
+> **Why the paper's version is nevertheless cheap, and the sentence that explains it.** [P937] §5.2,
+> quoted in full below: "the last loop is then performed by evaluating the permutation `P2` over an
+> input state evaluated at `α`, thus costing `O(r)` operations overall". **The candidate test is one
+> permutation call, not one polynomial evaluation.** Lines 14–18 are correct, and `O(r)`, *inside the
+> attack they were written for*, where `P` is never evaluated at all; they are `O(r·d)` for anyone
+> who has a polynomial and wants its root. This document transcribed the lines without transcribing
+> the condition that makes them affordable, which is exactly the failure mode §3.8 exists to catch.
+>
+> **The replacement.** [PC] Algorithm 2 line 8's gcd descent (§3.3 line 8, §3.9), which needs no
+> scan at all: `k = 24` folds, each linear in the degree it folds, **measured at 58.8 ms of a
+> 3.11 s call** (§4.4.1). `src/poly/univariate/graeffe.rs` implements Algorithm C's lines 1–8 and
+> [PC]'s line 8 in place of lines 14–18. §3.9 also costs out the two batched alternatives that keep
+> the scan.
+
 [P937] Algorithm 2, which is what [P937]'s Poseidon2-64 attack ran. Written for `p − 1 = r·s` with
 `r = 2^k`:
 
@@ -456,7 +480,8 @@ Why each step is the way it is, read in [P937] §5.2:
   the candidate test is a permutation call, not a polynomial evaluation. **That is the step that
   makes the attack's verification stage free, and it is why §9's component list has the permutation
   evaluator as a load-bearing piece rather than an afterthought.**
-- Total cost, [P937] §5.2: `O(M(d) log r + s log s + r)`.
+- Total cost, [P937] §5.2: `O(M(d) log r + s log s + r)`. **The `r` term is the scan, charged one
+  operation per candidate — see the correction at the head of this section for when that holds.**
 - [P937] §5.2 states the standing assumption plainly: "for the sake of exposition we will assume
   that it has at most one root and that this is non-zero."
 
@@ -501,13 +526,13 @@ simplicity and recovering the shortfall through the shift `τ` and the recursion
 | `GT_2` by three same-size NTTs, with sign `(−1)^d` | read — [P937] §5.3 | **right, and the sign is load-bearing.** Without it a monic input of odd degree transforms to leading coefficient `−1` and Lemma 2 composes only up to a unit. A 16-point domain is asserted sufficient at degree 15 |
 | Algorithm A, all lines | read — [PC] Algorithm 2 | **right**; line 8 is what this implementation's descent is |
 | Algorithm B, all lines | read — [PC] Algorithm 3 | not implemented — §6.5 is why it would be needed and §10 row 11 tracks it |
-| Algorithm C, all lines | read — [P937] Algorithm 2 | **lines 14–18 do not survive as a standalone root finder.** See §3.9 |
-| the gcd un-squaring resolves the root ambiguity | read — [PC] §3.2 commentary on line 8 | **right, and stronger than stated** — §3.9 |
-| progressive reduction thresholds | read — [P937] §5.3 | **right, and the constant is not small** — §6.4 measures it at 2.00x at `3^13` and 1.05x at `3^6` |
+| Algorithm C, all lines | read — [P937] Algorithm 2 | **lines 14–18 do not survive as a standalone root finder** — `2.6 × 10^13` operations at `r = 2^24`, and the paper's version is `O(r)` only because its candidate test is a permutation call. The correction block at the head of §3.5 states it; §3.9 states the replacement |
+| the gcd un-squaring resolves the root ambiguity | read — [PC] §3.2 commentary on line 8 | **right, and stronger than stated** — §3.9.1 proves the reduction leaves no false candidate, which neither paper claims |
+| progressive reduction thresholds | read — [P937] §5.3 | **right, and the constant is not small, and it moves the wrong way** — §6.4 measures 2.00x at `3^13` and only 1.05x at `3^6`. It bounds transform sizes; it does not bound the retained polynomials, which post-#161 is where the entire peak lives |
 | tangent Graeffe root recovery formula | read — [P937] §4.3 | not implemented; one root suffices for CICO and for this PR |
 | the 32 square roots of Algorithm B line 16, expanded | **reconstructed** — [PC] says "similar to lines 5 to 14" | **the reconstruction was unnecessary.** The descent of §3.9 needs no square root except in one degenerate branch, where `fields::sqrt` (#175) answers it in a single call. The structure removes the step rather than expanding it |
 | skip count for Zeebra's hybrid `permutation_plus_linear` | **reconstructed** — §2.3 | **still reconstructed, still untested.** Nothing in this PR touches the permutation; §10 row 8 is where it gets checked |
-| the Bluestein sizing for a non-dividing `s` | **partially read** — [P937] §5.3 names Bluestein and `q = 15`; the padding rule "sizes exceeding `2s`" is stated, the full schedule is not | **not needed over KoalaBear, and §9.1 component 10's alternative is the right one.** `s = 127` is enumerated directly at `O(s·d)` — 0.10 ms of a 13.85 s call at `3^13`, 0.0007%. No Bluestein, no `O(s^2)`, no transform at all |
+| the Bluestein sizing for a non-dividing `s` | **partially read** — [P937] §5.3 names Bluestein and `q = 15`; the padding rule "sizes exceeding `2s`" is stated, the full schedule is not | **not needed over KoalaBear, and §9.1 component 10's alternative is the right one.** `s = 127` is enumerated directly at `O(s·d)` — 0.10 ms of a 3.11 s call at `3^13`, 0.003%. No Bluestein, no `O(s^2)`, no transform at all. Over a field whose `s` is large it is the whole cost instead — §6.5 |
 
 ### 3.9 Where the implementation departs from Algorithm C, and why
 
@@ -525,16 +550,23 @@ test is one permutation call, not one polynomial evaluation.** Outside that sett
 
 So this implementation uses **[PC] Algorithm 2 line 8's descent** instead: `µ_{i−1}` is the common
 root of `G_{2^(i−1)}` and `x^2 − µ_i`, for `i = k` down to 1. That is `k = 24` folds, each linear in
-the degree it folds, and §4.4 measures the whole descent at **62.7 ms** against the iteration's
-13.77 s — 0.45%. It costs memory rather than time: the descent needs every `G_{2^i}`, which is
+the degree it folds, and §4.4 measures the whole descent at **58.8 ms** against the iteration's
+3.04 s — 1.89% post-#161, and 0.45% of the 13.85 s pre-#161 call. It costs memory rather than time: the descent needs every `G_{2^i}`, which is
 §6.4's 384 MB. Two batched alternatives were considered and are cheaper in memory but not in time:
 `P(γx) mod (x^r − 1)` followed by one `NTT_r` turns the scan into a single transform of size `2^24`
-(3.6 s by §6.1, and 134 MB), and `γ = β^(r^{-1} mod s)` gives the `r`-th root in one exponentiation
-without any square root at all, since `gcd(r, s) = 1` when `s` is the odd part. **Both are correct;
-both are slower than 62.7 ms.** Recorded because they are the right answer if the retained
-polynomials ever become the binding constraint.
+(3.64 s by §6.1 pre-#161, and ~0.86 s post-#161 at §4.4.3's measured rate, at 134 MB), and `γ = β^(r^{-1} mod s)` gives the `r`-th root in one exponentiation
+without any square root at all, since `gcd(r, s) = 1` when `s` is the odd part. **Both are correct; both are
+slower than 58.8 ms**, even post-#161 — the batched scan's single `2^24` transform is still an order
+of magnitude above the descent. Recorded because the batched scan trades 195 MB and 58.8 ms for
+134 MB and ~0.9 s, which is the right answer if the retained polynomials ever become the binding
+constraint (§6.4).
 
-**The un-squaring really is decided by the polynomial, and its degenerate case is common.**
+#### 3.9.1 An original result: the reduction introduces no surviving false candidate
+
+**Stated in neither [PC] nor [P937], and not attributed to them. This is a contribution of this
+repository, and it is offered as a proof sketch rather than a published theorem.**
+
+The un-squaring really is decided by the polynomial, and its degenerate case is common.
 `G_{2^(i−1)}` reduced modulo `x^2 − µ_i` is `a x + b` in one pass over the coefficients, and `−b/a`
 is the one of `µ_i`'s two square roots that `G_{2^(i−1)}` vanishes at. [PC]'s "there is no ambiguity
 to resolve by guessing" holds exactly. But `a = b = 0` — `x^2 − µ_i` dividing `G_{2^(i−1)}` — is not
@@ -542,9 +574,9 @@ exotic: it is what `f = x^2 − a^2` produces at the very first level, since `GT
 and both `±a` are roots of `f`. There either square root descends to a genuine root, which needs an
 argument rather than an assertion:
 
-> **Claim.** For every `i ≤ k`, the roots of `G̃_{2^i}` that lie in the subgroup of order
-> `β_i = (q−1)/2^i` are exactly `{α^(2^i) : α ∈ F_p^*, f(α) = 0}` — **no root introduced by the
-> reduction survives in the subgroup.**
+> **Claim (this repository's, not either paper's).** For every `i ≤ k`, the roots of `G̃_{2^i}` that
+> lie in the subgroup of order `β_i = (q−1)/2^i` are exactly `{α^(2^i) : α ∈ F_p^*, f(α) = 0}` —
+> **no root introduced by the reduction modulo `x^(β_i) − 1` survives in the subgroup.**
 >
 > *Base.* `β_0 = q − 1`, and `ρ^(q−1) = 1` is membership of `F_p^*`, where `G̃_0` agrees with `f`.
 >
@@ -555,11 +587,25 @@ argument rather than an assertion:
 > Reducing modulo `x^(β_{i+1}) − 1` changes nothing on the order-`β_{i+1}` subgroup, where the two
 > agree. ∎
 
-So the subgroup search produces **no false candidates at all**, and the descent has at least one
-valid child at every level and no invalid one. §4.4's `cands` column is therefore the exact count of
-distinct base-field roots of the input, which is 4–6 against four planted roots plus the random
-cofactor's own — as it should be. Not stated in either paper; it is what justifies taking the first
-zero at Algorithm C line 8 rather than looping over all `s` of them.
+**Three consequences, and they are what the claim is for.**
+
+1. The subgroup search produces **no false candidates at all**, so Algorithm C line 8's "find `i`
+   with `V[i] = 0`" may take the *first* zero rather than looping over all `s` of them. Neither
+   paper says why that is safe; [P937] §5.2 instead assumes it away — "for the sake of exposition we
+   will assume that it has at most one root and that this is non-zero."
+2. The descent has **at least one valid child at every level and no invalid one**, which is what
+   makes it deterministic: no backtracking, no bounded search, and the `a = b = 0` branch may take
+   either square root freely.
+3. §4.4's `cands` column is therefore the **exact count of distinct base-field roots of the input**,
+   not an upper bound on it. Measured at 4–6 against four planted roots plus the random cofactor's
+   own, which is the arithmetic check that the claim is not vacuous.
+
+**Caveat, stated plainly.** The step uses `β_i` even for `i < k`, which is where `(−ζ)^(β_i) = 1`
+needs `β_i` even; that holds because `β_i = 2^(k−i) · m` with `k − i ≥ 1`. It is a proof sketch
+written for this implementation, checked against every test in `graeffe.rs` and against `roots` at
+every degree the quadratic finder reaches, and **not peer-reviewed**. If it is wrong, the failure
+mode is a returned `None` where a root exists — never a wrong root, since `graeffe_root` verifies
+`f(α) = 0` before returning.
 
 
 ## 4. The reported measurements, with hardware
@@ -646,8 +692,13 @@ Dollar cost, [P937] §5.3: `P_6_8` $185 against a $4 000 prize; `P_6_9` $1 101 a
 **Measured, not estimated.** `examples/graeffe_root.rs`, `src/poly/univariate/graeffe.rs`, landing
 §10 rows 3, 4 and 6. One core of the 64-core/300 GB workstation, `taskset --cpu-list 8`, under
 `benchlock.sh`, release profile with the repository's default `Cargo.toml` settings (fat LTO,
-`codegen-units = 1`), `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`. **Pre-#161**: the NTT is
-the recursive kernel §6.1 measures, and #161's iterative in-place kernel moves every row.
+`codegen-units = 1`), `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`.
+
+**Two revisions are reported, both measured on the same machine with the same binary source.**
+The first run predates **#161**, the iterative in-place NTT, and the second follows it. Both are
+kept: the pre-#161 figures are a real measurement of a real revision, and the pair is the only
+measurement anywhere in this repository of **what #161 was worth to a downstream consumer** rather
+than to the transform in isolation.
 
 Reproduce with
 
@@ -660,91 +711,149 @@ benchlock.sh agentG taskset --cpu-list 8 \
 The input at each degree is a random cofactor times four planted linear factors — the shape an
 interpolated output coordinate leaves behind — and every returned root is asserted to be one.
 
+#### 4.4.1 Current, post-#161
+
+KoalaBear in a `u64`:
+
 | degree | `log2 d` | steps | transforms | largest `n` | `sum n / max n` | forward | subgroup | descent | **total** |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `3^6` = 729 | 9.51 | 24 | 72 | `2^10` | 68.25 | 0.0092 s | 0.13 ms | 0.06 ms | **0.0094 s** |
-| `3^7` = 2 187 | 11.09 | 24 | 72 | `2^12` | 62.81 | 0.0368 s | 0.10 ms | 0.15 ms | **0.0371 s** |
-| `3^8` = 6 561 | 12.68 | 24 | 72 | `2^13` | 59.91 | 0.0748 s | 0.09 ms | 0.36 ms | **0.0753 s** |
-| `3^9` = 19 683 | 14.26 | 24 | 72 | `2^15` | 53.98 | 0.2743 s | 0.10 ms | 1.13 ms | **0.2757 s** |
-| `3^10` = 59 049 | 15.85 | 24 | 72 | `2^16` | 50.99 | 0.5513 s | 0.11 ms | 3.12 ms | **0.5548 s** |
-| `3^11` = 177 147 | 17.43 | 24 | 72 | `2^18` | 45.00 | 1.9061 s | 0.09 ms | 7.67 ms | **1.9156 s** |
-| `3^12` = 531 441 | 19.02 | 24 | 72 | `2^20` | 39.00 | 7.0242 s | 0.09 ms | 20.67 ms | **7.0452 s** |
-| **`3^13`** = 1 594 323 | **20.60** | 24 | 72 | **`2^21`** | **36.00** | 13.7656 s | 0.10 ms | 62.68 ms | **13.8466 s** |
+| `3^6` = 729 | 9.51 | 24 | 72 | `2^10` | 68.25 | 0.0015 s | 0.13 ms | 0.05 ms | **0.0017 s** |
+| `3^7` = 2 187 | 11.09 | 24 | 72 | `2^12` | 62.81 | 0.0059 s | 0.09 ms | 0.15 ms | **0.0062 s** |
+| `3^8` = 6 561 | 12.68 | 24 | 72 | `2^13` | 59.91 | 0.0124 s | 0.10 ms | 0.41 ms | **0.0130 s** |
+| `3^9` = 19 683 | 14.26 | 24 | 72 | `2^15` | 53.98 | 0.0537 s | 0.09 ms | 1.12 ms | **0.0551 s** |
+| `3^10` = 59 049 | 15.85 | 24 | 72 | `2^16` | 50.99 | 0.1081 s | 0.10 ms | 3.12 ms | **0.1118 s** |
+| `3^11` = 177 147 | 17.43 | 24 | 72 | `2^18` | 45.00 | 0.3828 s | 0.09 ms | 7.49 ms | **0.3918 s** |
+| `3^12` = 531 441 | 19.02 | 24 | 72 | `2^20` | 39.00 | 1.5019 s | 0.09 ms | 20.70 ms | **1.5272 s** |
+| **`3^13`** = 1 594 323 | **20.60** | 24 | 72 | **`2^21`** | **36.00** | 3.0412 s | 0.10 ms | 58.76 ms | **3.1122 s** |
 
-**`3^13` completes in 13.85 s**, which is §7.2's estimate of "≈39 transforms of size `2^21` ≈ 14 s"
-to within 1%. The estimate is retained in §7.2, now marked as superseded by this row.
+**`3^13` completes in 3.11 s.** The `u32`-backed KoalaBear — the type the registered challenge
+actually uses — is **2.2662 s**.
 
-Three things the stage split says that no estimate here anticipated:
+#### 4.4.2 Superseded, pre-#161
 
-- **The forward iteration is 99.4% of the call** at `3^13` — 13.77 s of 13.85 s. The subgroup search
-  is 0.10 ms (0.0007%) and the descent 62.7 ms (0.45%). So **the whole cost is the NTT**, and #161
-  carries essentially all of it. §9.2's component-by-component table does not separate these three
-  and could not have said which dominated.
-- **The implied per-transform rate is 0.382 s at `2^21`**, against §6.1's 0.361 s for a bare
-  `evaluate` at the same size — 182.4 ns/element against 172.4. The 5.8% is the parity split, the
-  pointwise `e^2 - w o^2` combine, and the `(-1)^d` scale; i.e. **the order-2 step costs what three
-  transforms cost and almost nothing more**, which is the §3.2 claim as an arithmetic fact rather
-  than an operation count.
+The same binary source against the recursive kernel, same core, same protocol. **Retained, marked
+superseded.**
+
+| degree | forward | subgroup | descent | **total** | peak heap |
+|---|---:|---:|---:|---:|---:|
+| `3^11` = 177 147 | 1.9061 s | 0.09 ms | 7.67 ms | **1.9156 s** | 49.9 MB |
+| `3^12` = 531 441 | 7.0242 s | 0.09 ms | 20.67 ms | **7.0452 s** | 168.6 MB |
+| **`3^13`** = 1 594 323 | 13.7656 s | 0.10 ms | 62.68 ms | **13.8466 s** | 383.9 MB |
+
+`u32` KoalaBear at `3^13`, pre-#161: 12.3349 s and 192.0 MB.
+
+#### 4.4.3 What #161 was worth, here
+
+| at `3^13`, KoalaBear `u64` | pre-#161 | post-#161 | factor |
+|---|---:|---:|---:|
+| **total wall time** | 13.8466 s | **3.1122 s** | **4.45x** |
+| forward iteration | 13.7656 s | 3.0412 s | **4.53x** |
+| forward share of the call | 99.4% | **97.7%** | — |
+| subgroup search | 0.10 ms | 0.10 ms | 1.0x |
+| un-squaring descent | 62.68 ms | 58.76 ms | 1.07x |
+| implied `ns/element` at `2^21` | 182.4 | **40.3** | **4.53x** |
+| **peak live heap** | 383.9 MB | **194.7 MB** | **1.97x** |
+| process peak RSS (`VmHWM`) | 409.5 MB | 225.8 MB | 1.81x |
+| `u32` total wall time | 12.3349 s | **2.2662 s** | **5.44x** |
+| `u32` peak live heap | 192.0 MB | **97.3 MB** | 1.97x |
+
+**4.53x on the stage that was 99.4% of the call**, which is within the 4.24x `fast-univariate.md`
+§3.3 measures for a bare `evaluate` at `2^21`–`2^22` — so #161's gain passes through to this
+consumer essentially undiluted, and the small excess is the pointwise combine getting faster too.
+
+Four things the stage split says that no estimate here anticipated:
+
+- **The forward iteration was and is the whole call** — 99.4% pre-#161, 97.7% post. The subgroup
+  search is 0.10 ms either side and the descent 59–63 ms. §9.2's component-by-component table does
+  not separate these three and could not have said which dominated. The practical consequence is
+  that **this stage inherits whatever the NTT kernel does**, which #161 has just demonstrated.
+- **The implied per-transform rate tracks a bare `evaluate` to within 6%.** Pre-#161: 0.382 s per
+  `2^21`-equivalent against §6.1's 0.361 s, 182.4 ns/element against 172.4. Post-#161: 0.0845 s and
+  **40.3 ns/element**. The 5–6% is the parity split, the pointwise `e^2 - w o^2` combine and the
+  `(-1)^d` scale; i.e. **the order-2 step costs what three transforms cost and almost nothing
+  more**, which is §3.2's claim as an arithmetic fact rather than an operation count, and it holds
+  across a kernel replacement.
 - **The transform count is 72 at every degree**, because it is `3 * two_adicity` and does not depend
-  on the degree. What depends on the degree is the *sizes*, which is what the `sum n / max n` column
-  is: 36.00 at `3^13` against 72 with no reduction. See §6.4.
+  on the degree. What depends on the degree is the *sizes* — the `sum n / max n` column, 36.00 at
+  `3^13` against 72 with no reduction. See §6.4.
+- **The descent did not get faster and is now a visible share.** 62.68 ms to 58.76 ms while the
+  iteration fell 4.53x, so it went from 0.45% to 1.89% of the call. It is Horner-style folds over
+  the retained polynomials, not transforms, so #161 does not touch it. At another 4x on the forward
+  stage it would be ~7%.
 
-Memory, measured and estimated separately, both at `3^13`:
+#### 4.4.4 Memory, measured against estimated
 
-| | KoalaBear in a `u64` (8 B) | KoalaBear in a `u32` (4 B) |
-|---|---:|---:|
-| peak live heap, counting allocator | **383.9 MB** | **192.0 MB** |
-| estimated: retained `G_(2^i)` + `7 n B` at the largest transform | 274.4 MB | 137.2 MB |
-| measured / estimated | **1.40x** | 1.40x |
-| retained coefficients | 19 618 205 | 19 618 205 |
-| process peak RSS (`VmHWM`) | 409.5 MB | — |
-| total wall time | 13.8466 s | **12.3349 s** |
+Both at `3^13`, post-#161, with the pre-#161 column beside it:
 
-The estimate is **40% low**, consistently across both widths, and the gap is accounted for rather
-than noted: the descent needs every `G_(2^i)`, so each is cloned out of the iteration while the next
-is being built, and `interpolate` holds its inverse domain and its unscaled coefficient vector at
-the same time. The `u32` row is the field type the registered challenge actually uses and halves
-every byte figure at a 11% lower wall time.
+| | post-#161, `u64` | post-#161, `u32` | pre-#161, `u64` |
+|---|---:|---:|---:|
+| peak live heap, counting allocator | **194.7 MB** | **97.3 MB** | 383.9 MB |
+| estimated: retained `G_(2^i)` + `4 n B` at the largest transform | 211.3 MB | 105.6 MB | 274.4 MB (at `7 n B`) |
+| **measured / estimated** | **0.92x** | 0.92x | **1.40x** |
+| retained coefficients | 18 023 881 | 18 023 881 | 19 618 205 |
+| process peak RSS (`VmHWM`) | 225.8 MB | 114.4 MB | 409.5 MB |
 
-**Not within 64 GB of any limit.** 384 MB against this box's 300 GB, consistent with
-`fast-univariate.md` §5's finding that memory is not the constraint anywhere in this layer.
+**The sign of the estimate's error flipped, and that is the interesting part.** Pre-#161 the
+estimate was **40% low** and the gap was the kernel's temporaries plus one full-degree clone of
+every `G_(2^i)` as it left the iteration. #161 took `evaluate` to `1 n B` and `interpolate` to
+`2 n B` — their floors, `fast-univariate.md` §3.3 — which removed the kernel half; the clones were
+then the **larger** of the two remaining terms and were removed here (`graeffe_2_over_domain` scopes
+both halves' value vectors and reuses one as the combine's output; the forward loop moves each
+`G_(2^i)` into the retained vector instead of cloning it, and the `beta_0` fold borrows the caller's
+`f` rather than copying it when it is a no-op — the 1 594 324-coefficient difference in the row
+above is exactly that). What is left is **8% below** a straightforward `stored + 4 n B` estimate,
+because the largest transform's `4 n B` and the peak of the retained set do not occur at the same
+instant.
+
+So: **the estimate is now a slight over-prediction rather than a 40% under-prediction**, the gap in
+both directions is accounted for rather than noted, and the thing that dominates at `3^13` is the
+retained `G_(2^i)` — 18.0 M coefficients, 144 MB at 8 bytes, of which 11 copies are at the full
+degree because §6.4's schedule keeps 11 steps full-size.
+
+**Not within two orders of magnitude of any limit.** 195 MB against this box's 300 GB, consistent
+with `fast-univariate.md` §5's finding that memory is not the constraint anywhere in this layer.
 
 ### 4.5 The comparand, measured as far as it goes
 
-`src/poly/univariate/roots.rs` on the same inputs, from the same binary and the same run:
+`src/poly/univariate/roots.rs` on the same inputs, from the same binary and the same run. `roots`
+uses no transform, so #161 does not apply to it; the small change between the two runs is
+run-to-run variation and `41d48f3`'s iterative `pow_limbs`. **Post-#161 run:**
 
-| degree | seconds | exponent | peak bytes |
-|---:|---:|---:|---:|
-| 256 | 0.0078 | — | 24 536 |
-| 1 024 | 0.1142 | 2.03 | 98 264 |
-| 4 096 | 1.6652 | 1.96 | 393 176 |
-| 16 384 | 24.6018 | 1.92 | 1 572 824 |
-| **32 768** | **93.2490** | 1.92 | 3 145 688 |
+| degree | seconds | exponent | peak bytes | pre-#161 seconds |
+|---:|---:|---:|---:|---:|
+| 256 | 0.0071 | — | 24 536 | 0.0078 |
+| 1 024 | 0.1030 | 1.95 | 98 264 | 0.1142 |
+| 4 096 | 1.5542 | 1.97 | 393 176 | 1.6652 |
+| 16 384 | 23.1219 | 1.96 | 1 572 824 | 24.6018 |
+| **32 768** | **86.7786** | 1.91 | 3 145 688 | 93.2490 |
 
-**`roots` reaches degree 32 768 and no further inside a 60 s per-measurement budget.** The exponent
-column confirms the quadratic growth rather than assuming it (1.92–2.03 over seven doublings), and
-extrapolating from the 32 768 row to `3^13` gives
+**`roots` reaches degree 32 768 and no further inside a 60 s per-measurement budget**, in both runs.
+The exponent column confirms the quadratic growth rather than assuming it (1.91–1.97 over seven
+doublings), and extrapolating from the 32 768 row to `3^13` gives
 
 ```
-93.2490 s * (1594323 / 32768)^2  =  220 748 s  =  61.3 hours
+86.7786 s * (1594323 / 32768)^2  =  205 431 s  =  57.1 hours
 ```
 
-**That 61.3 hours is an extrapolation of `roots`, not a measurement of it.** It is consistent with
+**That 57.1 hours is an extrapolation of `roots`, not a measurement of it.** It is consistent with
 `fast-univariate.md` §5's independently-derived ~31 hours at `d = 2^20`: `3^13` is 1.52x that
-degree, so 2.3x the time, and 2.3 × 27 h ≈ 61 h.
+degree, so 2.3x the time. The pre-#161 run's extrapolation was 61.3 hours; **both are
+extrapolations and neither is a measurement at `3^13`.**
 
 So the comparison §7.2 sets up, with each half labelled:
 
 | | at `3^13` over KoalaBear | status |
 |---|---:|---|
-| `graeffe_root` | **13.85 s** | **measured** |
-| `roots` | 61.3 hours | **extrapolated** from a measured curve that stops at degree 32 768 |
-| ratio | **≈15 900x**, `2^13.96` | one measured end, one extrapolated end |
+| `graeffe_root`, post-#161 | **3.11 s** | **measured** |
+| `graeffe_root`, pre-#161 | 13.85 s | **measured**, superseded |
+| `roots` | 57.1 hours | **extrapolated** from a measured curve that stops at degree 32 768 |
+| **ratio, post-#161** | **≈66 000x**, `2^16.0` | one measured end, one extrapolated end |
+| ratio, pre-#161 | ≈15 900x, `2^13.96` | superseded |
 
 Which is the same shape as [PC] §4.2's own headline: §4.1 records that their `2^13` is likewise
-against an extrapolation their authors call optimistic, not against a run. **Four orders of
-magnitude, with one end of it extrapolated** is the honest statement, and it is the same statement
-the papers make about their own figure.
+against an extrapolation their authors call optimistic, not against a run. **Between four and five
+orders of magnitude, with one end of it extrapolated** is the honest statement, and it is the same
+statement the papers make about their own figure.
 
 ## 5. The memory-access model, its assumptions, and whether it applies here
 
@@ -991,26 +1100,35 @@ reached as `d` approaches `p − 1`.
 
 **Whether it bounded memory: yes for the transforms, no for the retained polynomials.** The largest
 transform at `3^13` is `2^21` and no transform is larger, which is the whole claim about transform
-sizes. But §4.4's 384 MB peak is dominated by the retained `G_(2^i)` — 19.6 M coefficients, of which
-12 copies are at the full degree because the schedule above keeps 11 steps full-size. §3.4 records
-[PC]'s way out ("there is no need to store all intermediate polynomials… we use interpolation to
-recover it each time it is needed"), and that is the trade this implementation does not take: it
-keeps them because [PC] Algorithm 2 line 8's descent needs them, and recomputing instead would cost
-`O(k^2)` forward steps rather than `O(k)`. **Memory bounded at a linear multiple of the degree, not
-at a constant multiple of one transform** — and 384 MB is three orders of magnitude inside this
-box's RAM, so the trade is not currently a constraint.
+sizes. But §4.4.4's 194.7 MB peak is dominated by the retained `G_(2^i)` — 18.0 M coefficients,
+144 MB at 8 bytes, of which 11 are at the full degree because the schedule above keeps 11 steps
+full-size. **That is now the whole of the peak rather than a share of it:** #161 took the transform
+term to `4 n B` at one size, i.e. 67 MB at `2^21`, so the retained set went from roughly half the
+peak to essentially all of it. §3.4 records [PC]'s way out ("there is no need to store all
+intermediate polynomials… we use interpolation to recover it each time it is needed"), and that is
+the trade this implementation does not take: it keeps them because [PC] Algorithm 2 line 8's descent
+needs them, and recomputing instead would cost `O(k^2)` forward steps rather than `O(k)`. **Memory
+bounded at a linear multiple of the degree, not at a constant multiple of one transform** — and
+195 MB is three orders of magnitude inside this box's RAM, so the trade is not currently a
+constraint. §3.9 costs out the batched `NTT_r` alternative that would remove it.
 
 ### 6.5 Goldilocks: where the method does not pay, measured
 
 Also from `examples/graeffe_root.rs`, `goldilocks degrees=256,…,4096`, same conditions:
 
-| degree | steps | transforms | forward | **subgroup** | descent | total |
-|---:|---:|---:|---:|---:|---:|---:|
-| 256 | 32 | 96 | 0.0064 s | 0.0250 s | 0.05 ms | 0.0315 s |
-| 1 024 | 32 | 96 | 0.0274 s | 0.3351 s | 0.12 ms | 0.3626 s |
-| 4 096 | 32 | 96 | 0.1080 s | **5.1409 s** | 0.40 ms | 5.2494 s |
+| degree | steps | transforms | forward | **subgroup** | descent | total | forward share |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 256 | 32 | 96 | 0.0011 s | 0.0243 s | 0.04 ms | 0.0254 s | 4.3% |
+| 1 024 | 32 | 96 | 0.0040 s | 0.3244 s | 0.10 ms | 0.3286 s | 1.2% |
+| 4 096 | 32 | 96 | 0.0183 s | **5.0725 s** | 0.38 ms | 5.0915 s | **0.36%** |
 
-**The forward iteration is 2% of the call and the subgroup search is 98%**, growing quadratically.
+Pre-#161 the same rows read 0.0315 s, 0.3626 s and 5.2494 s total with a forward stage of 0.0064 s,
+0.0274 s and 0.1080 s — so **#161 made the forward iteration 5.9x faster and the call 3% faster**,
+because the forward iteration was never the cost here. Retained, marked superseded.
+
+**The forward iteration is 0.36% of the call and the subgroup search is 99.6%**, growing
+quadratically. **#161 sharpened this finding rather than softening it**: making the transforms
+faster cannot help a stage that is not transforms.
 The reason is structural and is the point: Goldilocks' odd part is `2^32 − 1`, so `beta_i >= 2^32 − 1`
 for every `i <= 32` and **the progressive reduction never bites at any degree of interest** — the
 final polynomial still has the input's degree, the order-`s` subgroup has `2^32 − 1` elements and
@@ -1023,6 +1141,12 @@ odd-order transform of §3.2 are load-bearing rather than decorative: driving `b
 and validated, but is **not** wired into `graeffe_root`'s descent, because the backward phase for a
 mixed order `R = 2^32 · 3 · 5 · 17 · 257` needs the gcd descent at odd `q_i` as well — [PC]
 Algorithm 3 lines 10–14 — and that is a separate PR. Recorded as open in §11.
+
+One more measured detail, because it cuts against §4.4.4's estimate: over Goldilocks the peak heap
+at degree 4 096 is **2.56 MB measured against 1.31 MB estimated, a 1.95x under-prediction** —
+`estimated_bytes` models the forward iteration and the subgroup search here is `roots`, whose own
+peak is `12 n B` (`fast-univariate.md` §3.2). The estimate is calibrated for the route the method is
+designed around and says so.
 
 The contrast is the single most useful engineering fact in this document: **the Graeffe route is a
 property of the field's `p − 1`, not of the degree.** KoalaBear's odd part of 127 is what makes the
@@ -1068,11 +1192,18 @@ Against §2.4's required sizes:
 stated separately because they answer differently, and conflating them is the specific error §9.4
 warns about.
 
-> **SUPERSEDED BY MEASUREMENT, §4.4 and §4.5.** The estimate below is retained because it was
-> right: `graeffe_root` at `3^13` over KoalaBear is **13.85 s measured**, against the **≈14 s**
-> estimated here, with **36.00** transform-size-equivalents of `2^21` against the **≈39** estimated.
-> `roots` is measured to degree 32 768 and extrapolates to **61.3 hours** at `3^13`, a ratio of
-> ≈15 900x. Read §4.4 and §4.5 for the figures and §6.4 for what the reduction was actually worth.
+> **SUPERSEDED BY MEASUREMENT, §4.4 and §4.5 — and the estimate below was calibrated on the
+> pre-#161 kernel.** Its transform count was right: **36.00** transform-size-equivalents of `2^21`
+> against the **≈39** estimated. Its wall time was right *for the kernel it was built from*:
+> **13.85 s measured pre-#161** against **≈14 s** estimated, to within 1%. But the rate it used is
+> §6.1's 0.361 s per `2^21` transform, which #161 replaced.
+>
+> **What this paragraph should now read.** #161 makes a `2^21` transform ~4.24x faster
+> (`fast-univariate.md` §3.3), so 39 transforms of `2^21` is **≈3.3 s**, not ≈14 s — and the
+> measurement is **3.11 s**, still within 7% of the recalibrated estimate. `roots` is measured to
+> degree 32 768 and extrapolates to **57.1 hours** at `3^13`, so the ratio is **≈66 000x** rather
+> than ≈15 900x. Read §4.4 and §4.5 for both revisions and §6.4 for what the reduction was actually
+> worth.
 
 **GO** — the Graeffe root finder at the degree the issue's own figure names. A degree-`3^13`
 polynomial over KoalaBear needs transforms of size `2^21`; the field admits `2^24` and this box
@@ -1188,13 +1319,13 @@ component 3. Estimates, each labelled by where its rate comes from:
 | stage | size | cost | basis |
 |---|---|---:|---|
 | build the degree-`3^13` univariate by evaluation at `2^21` points | `2^21` permutation calls | **tens of seconds** | 14 rounds × ~16 S-boxes ≈ 250 field ops per call ⇒ `5×10^8` ops at ~640 M/s ≈ 0.8 s, plus MDS: `t² = 256` multiplications per round ⇒ `3.6×10^3` ops/call ⇒ `7.5×10^9` ops ≈ **12 s** |
-| interpolate `2^21` evaluations | `2^21` | **~0.4 s** | §6.1, `intt ≈ ntt` post-#118 (`fast-univariate.md` §3.1 note) |
-| Graeffe iteration, Algorithm C | 72 transforms, 36.00 `2^21`-equivalents | **13.85 s, measured** | §4.4. The estimate it replaces — "≈39 transforms of `2^21`, ~14 s" from §6.1's 0.361 s and §3.6's schedule — is **superseded** and was right to 1% |
+| interpolate `2^21` evaluations | `2^21` | **~0.4 s**, and **~0.09 s post-#161** | §6.1, `intt ≈ ntt` post-#118 (`fast-univariate.md` §3.1 note); the post-#161 figure is §4.4.3's measured 4.53x on the same transform size |
+| Graeffe iteration, Algorithm C | 72 transforms, 36.00 `2^21`-equivalents | **3.11 s, measured** (post-#161; 13.85 s pre-#161, superseded) | §4.4. The estimate both replace — "≈39 transforms of `2^21`, ~14 s" from §6.1's 0.361 s and §3.6's schedule — was right to 1% against the kernel it was calibrated on, and recalibrates to ≈3.3 s |
 | `NTT_s` at `s = 127` + subgroup scan | 127 | **negligible** | `O(s²) = 16 129` multiplications |
 | 24 square roots | — | **negligible** | 24 × `O(log p)` |
 | candidate scan, `r = 2^24` permutation calls | `2^24` | **~100 s** | `2^24 × 3.6×10^3` ops at 640 M/s ≈ 94 s; [P937] §5.2's `O(r)` observation |
 | verification through the permutation | 1 | **µs** | component 12 |
-| **one family, total** | | **≈2 minutes single-threaded** | **estimated**; only the Graeffe row above is measured |
+| **one family, total** | | **≈2 minutes single-threaded** | **estimated**; only the Graeffe row above is measured, and the candidate scan — which dominates — is a permutation-evaluation estimate that #161 does not touch |
 
 Peak memory: at `7nB`, `2^21 × 8 × 7 = 117 MB` pre-#161; post-#161 and with §3.6's reduction, a few
 tens of MB. **Memory is not the constraint at single-family scale**, consistent with
@@ -1285,15 +1416,16 @@ onward requires it merged.
 | 3 | `graeffe_2` — the order-2 transform, `(−1)^d(f_e² − x f_o²)` | **#124** | §6.3's three checks: squared roots at degree 16; `GT_2∘GT_2 == GT_4`; `deg` preserved | **landed**, `graeffe_2`, `graeffe_2_over_domain` |
 | 4 | `graeffe_l` for odd prime `ℓ`, by [PC] §3.2's product recursion | 3 | `GT_ℓ` against `∏(x − r_i^ℓ)`; `GT_{ℓ₀}∘GT_{ℓ₁} == GT_{ℓ₀ℓ₁}` | **landed** as a transform for any order, prime or not; **not** wired into row 6's descent — see §6.5 |
 | 5 | `sqrt` in `F_p` (Tonelli–Shanks) on `KnownOrder`, reusing `src/fields/two_adic.rs` | — | `x² == y` for the returned root; `None` for non-residues, cross-checked by the Euler criterion | **landed** separately as #175, `src/fields/sqrt.rs`; not reimplemented |
-| 6 | `graeffe_root` — Algorithm C of §3.5, with §3.6's progressive reduction | 3, 5 | planted roots at degrees `2^8`…`2^16` over KoalaBear and Goldilocks, cross-checked against `src/poly/univariate/roots.rs` on every size the quadratic one reaches | **landed**, with [PC] Algorithm 2 line 8's descent in place of Algorithm C's `r`-way scan — see §3.9 |
-| 7 | `(r, s)` parameter selection, measured — §9.2's open question | 6 | a sweep over `k` reporting Graeffe steps against `NTT_s` size and scan length; no assertion | **answered, not swept**: §3.9 shows the descent removes the scan, so `r = 2^two_adicity` and `s` the odd part is forced rather than chosen. No trade-off to sweep over KoalaBear |
+| 6 | `graeffe_root` — Algorithm C of §3.5, with §3.6's progressive reduction | 3, 5 | planted roots at degrees `2^8`…`2^16` over KoalaBear and Goldilocks, cross-checked against `src/poly/univariate/roots.rs` on every size the quadratic one reaches | **landed**, with [PC] Algorithm 2 line 8's descent in place of Algorithm C's `r`-way scan, which §3.5's correction block shows is unusable as transcribed — see §3.9 |
+| 7 | `(r, s)` parameter selection, measured — §9.2's open question | 6 | a sweep over `k` reporting Graeffe steps against `NTT_s` size and scan length; no assertion | **answered, not swept**: §3.5's correction and §3.9 show the descent removes the scan, so `r = 2^two_adicity` and `s` the odd part is forced rather than chosen. No trade-off to sweep over KoalaBear |
 | 8 | the round-skipping parametrization (§9.1 component 3) and `cico_univariate` | 4 (`cico_bivariate`'s pattern) | the parametrized family's last coordinate is zero at every point, asserted against `permutation_plus_linear` | open |
 | 9 | an `examples/graeffe_cico.rs` ladder: one family end-to-end on *reduced* rows, reporting §9.2's per-stage costs and `BenchmarkClass::Engineering` | 6, 8 | every witness verified through `CicoInstance::is_solution` | open, needs row 8 |
-| 10 | extend `docs/research/graeffe-root-finding.md` with §9.2's figures as **measured** rather than estimated; re-take §6.1 as a post-#161 curve | 2, 9 | — | **partly landed**: §4.4, §4.5, §6.4 and §6.5 are the root-finding half, measured. §6.1's curve still awaits #161, and §9.2's other rows still await row 8 |
+| 10 | extend `docs/research/graeffe-root-finding.md` with §9.2's figures as **measured** rather than estimated; re-take §6.1 as a post-#161 curve | 2, 9 | — | **partly landed**: §4.4, §4.5, §6.4 and §6.5 are the root-finding half, measured **both pre- and post-#161**. §6.1's own curve is still the pre-#161 one and awaits a re-take; §9.2's other rows still await row 8 |
 | 11 | `graeffe_root` over a field whose odd part is large: [PC] Algorithm 3's odd-order forward steps and the gcd descent at odd `q_i`, wiring row 4 into row 6 | 4, 6 | planted roots over Goldilocks at a degree where §6.5's quadratic fallback does not finish | open — §6.5 is the measurement that motivates it |
 
-Rows 2 and the §6.1 half of row 10 must wait for #161. Row 1 was the first PR; rows 3, 4, 6 and the
-root-finding half of 10 are the second.
+**#161 has since merged**, so row 2 and the §6.1 half of row 10 are unblocked rather than blocked.
+Row 1 was the first PR; rows 3, 4, 6 and the root-finding half of 10 are the second, measured
+against both kernels.
 
 ## 11. Marked unverified, and open
 
@@ -1322,7 +1454,8 @@ root-finding half of 10 are the second.
   reconstructed and untested, since nothing in the root-finding PR touches the permutation. The
   expansion of Algorithm B line 16 and the Bluestein sizing schedule were both **reconstructions of
   steps the implementation does not need** — §3.8's verdict column says which and why.
-- **Resolved, §3.9**: the `(r, s)` split for KoalaBear is not a trade-off. Algorithm C's `r`-way scan
+- **Resolved, §3.5's correction block and §3.9**: Algorithm C lines 14–18 are not implementable
+  outside the attack, and the `(r, s)` split for KoalaBear is therefore not a trade-off. Algorithm C's `r`-way scan
   is what made `r` a parameter worth sweeping, and the gcd descent removes the scan, so
   `r = 2^two_adicity` with `s` the odd part is forced. §10 row 7 is closed as answered rather than
   swept.
@@ -1346,10 +1479,13 @@ root-finding half of 10 are the second.
   recursive kernel**, taken under `benchlock.sh` with six other agents active. They are labelled a
   baseline for exactly that reason and PR 10 above re-takes them.
 - §4.4, §4.5, §6.4 and §6.5's figures are from a **committed** binary, `examples/graeffe_root.rs`,
-  one core (`taskset --cpu-list 8`) under `benchlock.sh`, pre-#161. Single-shot rather than a median
+  one core (`taskset --cpu-list 8`) under `benchlock.sh`. **Two revisions, both reported**: pre-#161
+  in §4.4.2 and post-#161 in §4.4.1, with §4.4.3 the difference. Single-shot rather than a median
   of interleaved runs: the ratios being reported are 10x and larger, where this machine's noise —
   which `README.md`'s crossover section needs 21 interleaved runs to see past — does not change a
-  conclusion. A 1.1x claim would need the interleaved protocol and none is made.
+  conclusion. A 1.1x claim would need the interleaved protocol and none is made. The one borderline
+  figure is §4.4.3's 1.07x on the descent, which is **reported as "did not get faster", not as a
+  7% gain.**
 - **Nothing in §4.4–§6.5 is evidence about a registered challenge.** §9.4 states the discipline and
   it is unchanged by these measurements: per-family root-finding cost is measured, the family count
   a CICO-2 witness needs is the open question above, and `2^31` is not quoted.

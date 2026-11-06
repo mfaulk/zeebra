@@ -15,6 +15,9 @@
 //!    extrapolation of this measured curve rather than a measurement.
 //! 3. **What none of it is evidence for** — printed, not left to the reader.
 //!
+//! Post-#161. The pre-#161 figures this binary first produced are kept in
+//! `docs/research/graeffe-root-finding.md` §4.4 beside the current ones.
+//!
 //! ```text
 //! cargo run --release --example graeffe_root
 //! cargo run --release --example graeffe_root -- list
@@ -64,12 +67,15 @@ const TARGET_DEGREE: usize = 1_594_323;
 /// **roots** rows measure the same shape of problem.
 const PLANTED: usize = 4;
 
-/// The pre-#161 recursive NTT's peak live heap, as a multiple of the coefficient array.
+/// One order-2 step's transform working set, as a multiple of the domain size.
 ///
-/// `docs/research/fast-univariate.md` §3.2 measures `7 n B`; §6.1's table prints it per row. Used
-/// only in the *estimated* memory column, which is printed beside the measured one rather than
-/// instead of it.
-const RECURSIVE_NTT_MULTIPLIER: usize = 7;
+/// Four, post-#161: the domain itself, the value vector that `evaluate` fills and the combine
+/// overwrites in place, and the `2 n B` that `interpolate` holds —
+/// `docs/research/fast-univariate.md` §3.3 measures `evaluate` at `1 n B` and `interpolate` at
+/// `2 n B`, both their floors. **Pre-#161 this was 7 for `evaluate` alone**, so the figure the
+/// estimate is built from changed by more than the estimate's own error. Used only in the
+/// *estimated* memory column, which is printed beside the measured one rather than instead of it.
+const TRANSFORM_PEAK_MULTIPLIER: usize = 4;
 
 /// The most field operations the subgroup search is allowed to need before a row is skipped.
 ///
@@ -192,11 +198,11 @@ struct GraeffeRow {
 /// What the implementation's memory *should* be, in bytes, from the stage's own structure.
 ///
 /// Two terms, and they are the two the report has to separate: the retained `G_{2^i}`, which is
-/// what the descent needs, and the largest transform's temporaries, which `RECURSIVE_NTT_MULTIPLIER`
-/// charges at the pre-#161 kernel's measured multiple of the coefficient array.
+/// what the descent needs and what dominates, and the largest transform's working set, charged at
+/// [`TRANSFORM_PEAK_MULTIPLIER`].
 fn estimated_bytes<F>(stats: &GraeffeStats) -> usize {
     let element = std::mem::size_of::<F>();
-    element * (stats.stored_coefficients + RECURSIVE_NTT_MULTIPLIER * stats.max_transform_size)
+    element * (stats.stored_coefficients + TRANSFORM_PEAK_MULTIPLIER * stats.max_transform_size)
 }
 
 /// Run the Graeffe ladder over F and print it.
@@ -323,8 +329,8 @@ fn graeffe_ladder<F: KnownOrder>(name: &str, degrees: &[usize], budget: Duration
     println!();
     println!(
         "`peak bytes` is peak live heap from a counting allocator, attributed to the call alone. \
-         `est. bytes` is the retained `G_(2^i)` plus {RECURSIVE_NTT_MULTIPLIER} x the largest \
-         transform, which is the pre-#161 recursive kernel's measured multiple."
+         `est. bytes` is the retained `G_(2^i)` plus {TRANSFORM_PEAK_MULTIPLIER} x the largest \
+         transform's domain size, post-#161."
     );
     println!();
     println!(
@@ -477,9 +483,10 @@ fn print_scope() {
          reconstruction through the permutation."
     );
     println!(
-        "- Timings are **pre-#161**: the NTT kernel is the recursive one that `fast-univariate.md` \
-         §3.2 measures at a `7 n B` peak, and #161's iterative in-place kernel will improve both \
-         the time and the memory columns."
+        "- Timings are **post-#161**: `evaluate` and `interpolate` are the iterative in-place \
+         kernel at their `1 n B` and `2 n B` floors (`fast-univariate.md` §3.3). The pre-#161 \
+         figures are kept in `docs/research/graeffe-root-finding.md` §4.4, marked as such, because \
+         they are what quantifies #161's effect on a downstream consumer."
     );
 }
 
