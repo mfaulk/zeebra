@@ -173,10 +173,37 @@ read 0.021, 0.018, 0.014, and Table 3's `n = 13, 14` read 0.027, 0.024, which th
 **every** pair row across the whole computation, so §3 has no such artifact. The two agree on the
 range anyway, which is the point.
 
-**What is not verified here:** the "same `D_reg` for F4 and F5" claim is attributed to their
-reference [30] (Yeh et al.), which was **not read**. It is the load-bearing step in the argument above.
-It is also uncontroversial — the degree of regularity is a property of the ideal rather than of the
-algorithm — but it is cited, not checked.
+**The load-bearing step, now checked.** The "same `D_reg` for F4 and F5" claim is attributed to their
+reference [30] — Yeh, Cheng and Yang, *Operating Degrees for XL vs. F4/F5 for Generic MQ with Number
+of Equations Linear in that of Variables*, in *Number Theory and Cryptography*, Springer 2013,
+pp. 19–33. **Read 2026-11-06.** It says, verbatim:
+
+> `F4/F5`: It suffices to know that these are "better" versions of XL2 where the matrix-building and
+> row-operation sequences are run according to certain rules to avoid redundancy, but
+> **`F4/F5/XL2` all run at the same degree** [27], which is `D_reg` for semi-regular systems.
+
+So the claim is confirmed — **with two qualifications that have to be stated, and neither overturns
+the conclusion.**
+
+1. **They assert it rather than prove it**, with "It suffices to know that", and cite it onward to
+   their own [27] (Yang and Chen, *All in the XL Family: Theory and Practice*, ICISC 2004). So the
+   chain is 2021/051 → Yeh et al. → Yang–Chen, and the last link is unread.
+2. **They gloss it with "which is `D_reg` for semi-regular systems"**, and §4.1 of this document
+   establishes that Zeebra's targets are *not* semiregular. Read narrowly, the quoted sentence is
+   therefore about a class Zeebra's instances are outside.
+
+**Why the conclusion survives qualification 2, and this is reasoning rather than citation.** F4 and
+F5 compute **the same object** — the reduced Gröbner basis of the same ideal under the same order.
+The maximum degree occurring in that basis is a property of the ideal and the order, not of the
+algorithm that finds it, so no algorithm computing it can avoid processing that degree. The "same
+operating degree" conclusion is therefore forced independently of semiregularity; what semiregularity
+buys is the *formula* for what that degree is, which this argument does not need. The clause worth
+keeping from Yeh et al. is the first half — signatures change "the matrix-building and row-operation
+sequences … to avoid redundancy" — which is precisely a statement that they remove rows and not
+columns.
+
+So: cited, now read, confirmed, and the one gap it leaves (Yang–Chen ICISC 2004) does not carry the
+argument, because the argument can be made directly.
 
 ### 4.1 The guarantee does not transfer
 
@@ -301,9 +328,10 @@ predicated on F5 being asymptotically better than F4. It is not.
   single largest gap in the first draft. Recorded rather than edited away, because the shape of the
   error is instructive: §3's ceiling was measured correctly and *interpreted backwards* for want of
   the one source that says what a ~50% row reduction is worth.
-- **Yeh et al. [30], cited by 2021/051 for "F4 and F5 have the same `D_reg`", was not read.** That is
-  the load-bearing step in §4.0's argument and hence in the decline. Uncontroversial — `D_reg` is a
-  property of the ideal, not of the algorithm — but cited rather than checked.
+- ~~**Yeh et al. [30] was not read.**~~ **Closed** — read 2026-11-06; §4.0 quotes it and records the
+  two qualifications it comes with. The claim is confirmed; its own onward citation (Yang and Chen,
+  ICISC 2004) is unread, but §4.0 shows the argument does not depend on it, since F4 and F5 compute
+  the same basis and its maximum degree is a property of the ideal rather than of the algorithm.
 - **The Eder–Faugère survey was not read**, so §5.1's GVW recommendation rests on its reputation
   rather than on its content. This is now the largest remaining gap, since §5.1 is the only question
   left open.

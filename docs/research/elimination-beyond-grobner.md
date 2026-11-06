@@ -71,25 +71,61 @@ CICO-2. What is still missing is any Zeebra measurement. §7.
 **Gröbner bases are the state of the art for `k ≥ 3` and for nothing below it.** All three of
 Zeebra's registered targets are `k = 2`.
 
-### 1.1 What is proven about `D_I`, and what is not
+### 1.1 What is proven about `D_I`, and what is not — resolved
 
-Every cost figure in this document depends on the ideal degree `D_I`, so the strength of that claim
-matters. The two papers word it differently, cite different results for it, and **neither primary
-source has been read here**:
+Every cost figure in this document depends on the ideal degree `D_I`. The first version of this
+section recorded that two sources worded the claim differently, cited different results for it, and
+that **neither primary source had been read**. Both have now been read, 2026-11-06, and so has the
+theorem one of them cites. The discrepancy is resolved and **it was a citation error, not a
+mathematical disagreement.**
 
-| claim | strength | as cited by |
+| claim | strength | source, read |
 |---|---|---|
-| `D_I ≤ d^(k·R_F+R_P)` | a proven **upper bound** | 2026/1905, citing [BBB+25]: "a proof that the degree `D_I` … is **upper bounded by** `d^(kR_F+R_P)`" |
-| `D_I = d^(c·R_F+R_P)` | stated as an **equality** | 2026/150 §4.3, citing [BSGL20, Theorem 10]: "have a degree of the ideal **equal to**" |
-| `deg Res = D_I` for CICO-2 Poseidon | an **experimental observation** | 2026/150 §4.3: "We also experimentally observed that…" |
+| `D_I ≤ d^(k·R_F+R_P)` for Poseidon | **proven upper bound**, under stated genericity | eprint **2025/2040** (`[BBB+25]`, *The Algebraic CheapLunch*), Table 1 and §4.2 |
+| `D_I = d^(c·R_F+R_P)` | asserted **equality** | 2026/150 §4.3, attributed to `[BSGL20, Theorem 10]` — **the attribution does not hold, see below** |
+| `deg Res = D_I` for CICO-2 Poseidon | **experimental observation** | 2026/150 §4.3: "We also experimentally observed that…" |
+| `deg Res = d^(2R_F+R_P)`, exactly | **measured here**, three rows, three independent checks | [`resultant-elimination.md`](resultant-elimination.md) §6.3 |
 
-So the firm result is an upper bound; the equality is asserted in one source against a different
-citation, and the resultant attaining it is an observation on the instances studied. §2 and §3 use
-the equality, which is what the sources' own cost models use — but that makes every degree and every
-derived cost in this document **an upper bound on a particular instance's**, not a prediction of it.
-For a feasibility assessment that is the conservative direction, so no conclusion here flips if only
-the bound holds. Any claim that a *specific* instance's resultant has exactly this degree would need
-[BBB+25] and [BSGL20] read, and ideally a degree measured on a small instance.
+**The misattribution.** 2026/150 §4.3 states, verbatim: "It has been shown [BSGL20, Theorem 10] that
+the systems for a CICO-c problem on Poseidon have a degree of the ideal equal to `D_I = d^(c·R_F+R_P)`."
+Theorem 10 of eprint 2020/948 (Ben-Sasson, Goldberg, Levit, *STARK Friendly Hash — Survey and
+Recommendation*) actually reads:
+
+> **Theorem 10.** The degree of the univariate polynomial of the lexicographical Gröbner basis of
+> `S_CICO0_Hades(a)` is `d^(k·R_F + P·R_P − 2k + 1)`
+
+with, for Starkad/Poseidon (`d = 3`, `P = 1`), `D = 3^(k·R_F + R_P − 2k + 1)`. **The `− 2k + 1` is
+dropped in 2026/150's rendering.** At `k = 2` that is a factor of `d^3`; 2020/948's own complexity
+table for `k = 2` correspondingly reads `3^(2R_F+R_P−3)`, not `3^(2R_F+R_P)`.
+
+**Which value is right for Zeebra's instances is settled by measurement, not by the citation.**
+`resultant-elimination.md` §6.3 measured the resultant degree on three registered `t = 16` rows and
+got `d^(2R_F+R_P)` exactly — 729 at `R_F=2, R_P=2`, where Theorem 10's formula would give
+`3^3 = 27`. The measurement is checked three ways there (uniqueness of the interpolant below a
+proven degree ceiling, agreement with a direct Sylvester determinant at points outside the
+interpolation domain, and the root lifting to an accepted pair). So **the repository's figures rest on
+a proven upper bound plus its own measurement that the bound is attained on these instances, and at
+no point on 2026/150's citation.**
+
+What that leaves open: **why Theorem 10's formula differs is not established here.** Its system is
+written `S_CICO0_Hades(a)` and may be normalized differently — the subscript and the argument are
+unexplained in the quoted statement — so this section records the numerical disagreement and
+Zeebra's measurement rather than asserting that 2020/948 is wrong.
+
+**The consequence for this document is favourable and narrower than the first version feared.** That
+version warned that "every degree and every derived cost in this document [is] an upper bound on a
+particular instance's, not a prediction of it". For the three rows §6.3 measured, the bound is
+attained and the degrees *are* predictions. For the registered targets at larger `R_P`, they remain
+upper bounds — which is still the conservative direction, so no conclusion flips.
+
+**A bonus from 2025/2040, and it belongs to the Anemoi work.** Its Table 1 also gives
+`D_I ≤ (d+2)^(k·R)` for Anemoi with `2k = t`. At `k = 1` that is `(d+2)^R` — which is exactly the
+`(α+2)^N` quotient dimension `additional-benchmarks.md` §3.2 measured from the `six-worlds-anemoi`
+logs and tagged `Claim::Observed` because "the designers' corresponding statement is a conjecture".
+**There is now a proven upper bound for it**, so a Zeebra measurement agreeing with `(α+2)^N` can be
+checked against a bound rather than only against someone else's measurement. Handed to #201.
+2025/2040's Table 1 also marks the CheapLunch genericity assumptions as **not satisfied** for Griffin
+and ArionHash, which is relevant to #202 and which §7 of `additional-benchmarks.md` did not know.
 
 Within the Gröbner approach the bottleneck has already moved off F4: [ABM23] observed that Poseidon
 CICO systems have a lower solving degree than random ones, so "the bottleneck shifts from the Gröbner
