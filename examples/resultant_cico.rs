@@ -5,11 +5,23 @@
 //! resultant's cost sits beside an F4 figure for exactly the same problem.
 //!
 //! ```text
-//! cargo run --release --example resultant_cico            # the rows this construction reaches
-//! cargo run --release --example resultant_cico -- --all   # attempt the rest; see §4 of the doc
-//! cargo run --release --example resultant_cico -- --write # record the results on the scoreboard
+//! cargo run --release --example resultant_cico              # every row the budget admits
+//! cargo run --release --example resultant_cico -- --write   # record on the scoreboard
 //! cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the scaling study
+//! cargo run --release --example resultant_cico -- --ntt-ab  # the superseded §6.5 A/B
+//! cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
+//! cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
+//!     --max-samples 6562 --wall-budget 14400      # one named row under one named budget
 //! ```
+//!
+//! # Rows and budgets
+//!
+//! `--row` is repeatable and restricts the ladder to the rows named. `--max-samples` and
+//! `--wall-budget` are the two budgets, and a row over either is **costed and skipped** with its
+//! arithmetic printed rather than started. There is no `--all`: it removed the guard entirely,
+//! which put a 12.9-day row beside a bounded one, and a budget is not a thing to switch off
+//! wholesale. `--build-only` times `cico_bivariate` alone and stops, which is the one bounded
+//! measurement a row past the budget still supports.
 //!
 //! # Concurrency
 //!
@@ -48,10 +60,19 @@
 //! interpolation never sampled, which is what distinguishes a recovered polynomial from its own
 //! evaluation table.
 //!
-//! Both interpolation routes run on the same two polynomials in the same process, and their
-//! answers are asserted equal. That is the A/B: the subgroup route trades extra determinants for a
-//! cheaper recovery, and only both figures together say which way the trade goes. On these rows it
-//! goes the wrong way — see `docs/research/resultant-elimination.md` §6.5.
+//! # The sample count, and the A/B that justifies it
+//!
+//! The sample set is sized against [JAZ] slide 22's **experimental** degree `alpha^(2 R_F + R_P)`
+//! rather than against the proven Bézout-sized bound: 730 determinants instead of 13 123 on
+//! `rf2-rp2`. The formula is unproven in its source, so the recovered polynomial is checked
+//! against a direct Sylvester determinant off the interpolation domain, and the proven path takes
+//! over if the check refuses it — see `DegreeSource`.
+//!
+//! Where the proven bound is still affordable, both counts run on the same two polynomials in the
+//! same process at the same concurrency and their coefficients are asserted equal: that is the
+//! A/B, and it is what turns "fewer samples" into "the same answer from fewer samples".
+//! `--ntt-ab` additionally re-measures the power-of-two subgroup route, whose loss is the measured
+//! negative result of `docs/research/resultant-elimination.md` §6.5.
 
 use std::time::{Duration, Instant};
 
@@ -60,8 +81,9 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::research::{
-        bivariate_resultant_ntt_with, bivariate_resultant_reference_with, challenge,
-        cico_bivariate, registry, sylvester_determinant_at, ChallengeManifest, CicoInstance,
+        bivariate_resultant_ntt_with, bivariate_resultant_predicted,
+        bivariate_resultant_reference_with, challenge, cico_bivariate, predicted_resultant_degree,
+        registry, sylvester_determinant_at, ChallengeManifest, CicoInstance, DegreeSource,
         Environment, Json, ResultantOptions, ResultantRoute, ResultantStages, RunOutcome,
         RunRecord, Scoreboard, Specialization, Stage, StageCost, KOALABEAR_PRIME,
     },
@@ -105,6 +127,131 @@ fn evaluate_symbolically(instance: &CicoInstance<K>, fixed: &[K]) -> Bivariate {
     }
 }
 
+/// Samples a row may take before it is costed and skipped rather than started.
+///
+/// 16 384 admits both four-round rows under the proven bound and the predicted count alike. The
+/// six-round rows start at 6 562 samples, and it is the wall-clock budget rather than this that
+/// refuses them: those samples are order-1 458 determinants.
+const DEFAULT_MAX_SAMPLES: usize = 16_384;
+
+/// Predicted determinant wall clock a row may take before it is costed and skipped, in seconds.
+const DEFAULT_WALL_BUDGET_SECONDS: usize = 1_800;
+
+/// One order-162 Sylvester determinant through the generic dense LU path, measured.
+///
+/// 37 634.3 ms over 13 123 samples on the four-round reference route —
+/// `docs/research/resultant-elimination.md` §6.5. Every predicted wall clock below scales this by
+/// the dense-LU `(order/162)³` law, which is an **extrapolation** past order 162 and is labelled
+/// as one wherever it is printed.
+const DETERMINANT_MS_AT_162: f64 = 2.868;
+
+/// The matrix order that cost was measured at.
+const MEASURED_ORDER: f64 = 162.0;
+
+/// The value of a `--flag <value>` argument, if it was given and parses.
+fn flag_value(flag: &str) -> Option<usize> {
+    let args: Vec<String> = std::env::args().collect();
+    let at = args.iter().position(|a| a == flag)?;
+    args.get(at + 1)?.parse().ok()
+}
+
+/// Every value of a repeatable `--flag <value>` argument.
+fn flag_values(flag: &str) -> Vec<String> {
+    let args: Vec<String> = std::env::args().collect();
+    args.iter()
+        .enumerate()
+        .filter(|(_, a)| *a == flag)
+        .filter_map(|(at, _)| args.get(at + 1).cloned())
+        .collect()
+}
+
+/// A duration in whatever unit a reader can hold in their head.
+fn human_seconds(seconds: f64) -> String {
+    if seconds < 90.0 {
+        format!("{:.1} s", seconds)
+    } else if seconds < 5_400.0 {
+        format!("{:.1} min", seconds / 60.0)
+    } else if seconds < 172_800.0 {
+        format!("{:.2} h", seconds / 3_600.0)
+    } else {
+        format!("{:.2} d", seconds / 86_400.0)
+    }
+}
+
+/// What one registered row is predicted to cost, before anything is attempted.
+///
+/// The sample counts are exact — they come from the row's own `alpha`, `R_F` and `R_P` — and the
+/// times are extrapolations from one measured determinant at order 162.
+struct RowCost {
+    /// `R_F + R_P`.
+    rounds: usize,
+    /// The S-box exponent.
+    alpha: u32,
+    /// Full rounds.
+    r_f: usize,
+    /// Partial rounds.
+    r_p: usize,
+    /// `alpha^(2 R_F + R_P)`, the experimental degree.
+    predicted_degree: usize,
+    /// Samples the prediction needs.
+    samples: usize,
+    /// Samples the proven `2d²` bound needs.
+    proven_samples: usize,
+    /// Order of the Sylvester matrix, `2 · 3^rounds`.
+    matrix_order: usize,
+    /// Predicted determinant wall clock for `samples`, over the given worker count.
+    predicted_seconds: f64,
+    /// The same for `proven_samples`.
+    proven_seconds: f64,
+}
+
+impl RowCost {
+    /// Cost `manifest` at `workers` determinant workers.
+    fn of(manifest: &ChallengeManifest, workers: usize) -> Self {
+        let parameters = manifest.poseidon_parameters().expect("a CICO row");
+        let rounds = parameters.rounds();
+        let degree = 3usize.pow(rounds as u32);
+        let predicted_degree =
+            predicted_resultant_degree(parameters.alpha, parameters.r_f, parameters.r_p)
+                .expect("the predicted degree fits a usize");
+        let matrix_order = 2 * degree;
+        let each = DETERMINANT_MS_AT_162 / 1e3 * (matrix_order as f64 / MEASURED_ORDER).powi(3)
+            / workers.max(1) as f64;
+        let samples = predicted_degree + 1;
+        let proven_samples = 2 * degree * degree + 1;
+        Self {
+            rounds,
+            alpha: parameters.alpha,
+            r_f: parameters.r_f,
+            r_p: parameters.r_p,
+            predicted_degree,
+            samples,
+            proven_samples,
+            matrix_order,
+            predicted_seconds: samples as f64 * each,
+            proven_seconds: proven_samples as f64 * each,
+        }
+    }
+}
+
+/// `cico_bivariate` alone on one row, which is the whole of `--build-only`.
+///
+/// The build has been under 1% of every row measured, and at six rounds that is the thing in most
+/// doubt: the outputs have ~266 000 terms and the cost law behind the estimate has never been
+/// checked at that size. Timing it apart is single-threaded, interruptible and cheap, which an
+/// attempt at the determinants is not.
+fn build_alone(manifest: &ChallengeManifest, seed: u64) -> Bivariate {
+    let instance = manifest.cico_instance::<K>().expect("a registered problem");
+    let free = instance.free_inputs();
+    let variables: Vec<usize> = (2..free).collect();
+    let specialization =
+        Specialization::<46, K>::seeded(&variables, seed).expect("distinct indices");
+    let fixed: Vec<K> = (2..free)
+        .map(|i| specialization.value_of(i).expect("fixed"))
+        .collect();
+    evaluate_symbolically(&instance, &fixed)
+}
+
 /// The `--concurrency` list, defaulting to a single uncontended run.
 ///
 /// Parsed strictly: a malformed or zero entry stops the run rather than quietly becoming 1, since
@@ -137,7 +284,20 @@ fn concurrencies() -> Vec<usize> {
 
 fn main() {
     let write = std::env::args().any(|a| a == "--write");
+    let build_only = std::env::args().any(|a| a == "--build-only");
     let concurrencies = concurrencies();
+    let wanted = flag_values("--row");
+    let max_samples = flag_value("--max-samples").unwrap_or(DEFAULT_MAX_SAMPLES);
+    let wall_budget = flag_value("--wall-budget").unwrap_or(DEFAULT_WALL_BUDGET_SECONDS) as f64;
+    if std::env::args().any(|a| a == "--all") {
+        eprintln!(
+            "--all is gone: it removed the cost guard entirely, which admitted a 12.9-day row \
+             beside a bounded one. Name the row and its budget instead:\n  --row <challenge-id> \
+             --max-samples <n> --wall-budget <seconds>"
+        );
+        std::process::exit(64);
+    }
+
     let mut board = Scoreboard::new();
     println!("# M23-E: a resultant against F4 on the registered t = 16 slices\n");
     println!(
@@ -147,10 +307,15 @@ fn main() {
          permutation.\n"
     );
 
-    // Every row of M23-B's ladder, in round order. The ones past the reach of this construction
-    // are *predicted* rather than attempted, with the arithmetic shown — a spike that hung on a
-    // row it could never finish would measure the operator's patience.
-    let attempt_all = std::env::args().any(|a| a == "--all");
+    println!(
+        "Budget: at most {} samples a row, and {:.0} s of predicted determinant wall clock at the \
+         largest concurrency given. A row over either is **costed and skipped**, not attempted.\n",
+        max_samples, wall_budget
+    );
+
+    // The ladder in round order. A row the budget refuses is costed and skipped rather than
+    // started: at six rounds `rf4-rp2` is 34 single-core hours and `rf6-rp0` is 12.9 days, and a
+    // run that discovered that by hanging would measure the operator's patience.
     for id in [
         "poseidon31-cico-t16-rf2-rp0",
         "poseidon31-cico-t16-rf2-rp2",
@@ -162,31 +327,77 @@ fn main() {
         "poseidon31-cico-t16-rf6-rp2",
         "poseidon31-cico-t16-rf6-rp4",
     ] {
-        let manifest = challenge(id).expect("registered");
-        let rounds = manifest.poseidon_parameters().expect("a CICO row").rounds();
-        let degree = 3f64.powi(rounds as i32);
-        // Sample count times the cost of one Sylvester determinant: `2d^2` points and an order-`2d`
-        // matrix, so `16 d^5` field operations before any of the polynomial arithmetic.
-        let predicted = 16.0 * degree.powi(5);
-        // `1e11` rather than the `1e10` M23-E used: a four-round row went from an unfinished hour to
-        // under a minute, essentially all of it determinants, so the rows worth attempting are the
-        // ones whose *determinant* arithmetic fits. Six rounds is `3.3e15` and still does not.
-
-        if !attempt_all && predicted > 1e11 {
-            println!("## {} — {} rounds\n", manifest.id, rounds);
-            println!(
-                "- not attempted: degree `3^{}` is {:.0}, so the resultant needs about {:.0} \
-                 samples of an order-{:.0} determinant — **{:.1e} field operations** before the \
-                 bivariate arithmetic, which itself has to cube a polynomial with {:.0} terms",
-                rounds,
-                degree,
-                2.0 * degree * degree,
-                2.0 * degree,
-                predicted,
-                degree * degree / 2.0
-            );
-            println!("- `--all` attempts it anyway\n");
+        if !wanted.is_empty() && !wanted.iter().any(|named| named.as_str() == id) {
             continue;
+        }
+        let manifest = challenge(id).expect("registered");
+        let workers = concurrencies.iter().copied().max().unwrap_or(1);
+        let cost = RowCost::of(&manifest, workers);
+        println!("## {} — {} rounds\n", manifest.id, cost.rounds);
+        println!(
+            "- predicted degree `{}^(2·{} + {})` = {}, so {} samples of an order-{} determinant; \
+             the proven `2d²` bound would need {}",
+            cost.alpha,
+            cost.r_f,
+            cost.r_p,
+            cost.predicted_degree,
+            cost.samples,
+            cost.matrix_order,
+            cost.proven_samples
+        );
+        println!(
+            "- predicted determinant wall clock **{}** on {} worker{}, from the {:.3} ms measured \
+             at order 162 scaled by the dense-LU `(order/162)³` law — an extrapolation",
+            human_seconds(cost.predicted_seconds),
+            workers,
+            plural(workers),
+            DETERMINANT_MS_AT_162
+        );
+
+        // Before the budget, because the budget is on the determinants and this runs none of
+        // them. The build is the stage whose cost law is least checked: at six rounds the outputs
+        // have ~266 000 terms where every row measured so far had ~3 400.
+        if build_only {
+            let built = build_alone(&manifest, 1);
+            println!(
+                "- `--build-only`: degrees {} and {}, {} and {} terms, built in **{}** \
+                 single-threaded",
+                built.degrees[0],
+                built.degrees[1],
+                built.terms[0],
+                built.terms[1],
+                human_seconds(built.elapsed.as_secs_f64())
+            );
+            match peak_resident_bytes() {
+                Some(bytes) => println!("- peak resident **{:.2} GB**\n", bytes as f64 / 1e9),
+                None => println!("- no process memory measurement on this platform\n"),
+            }
+            continue;
+        }
+        if cost.samples > max_samples || cost.predicted_seconds > wall_budget {
+            println!(
+                "- **not attempted**: {} the budget. Raise it deliberately — `--row {} \
+                 --max-samples {} --wall-budget {:.0}` — or leave the row as a prediction\n",
+                if cost.samples > max_samples {
+                    "the sample count exceeds"
+                } else {
+                    "the predicted wall clock exceeds"
+                },
+                id,
+                cost.samples,
+                cost.predicted_seconds.ceil()
+            );
+            continue;
+        }
+        if cost.proven_seconds > wall_budget {
+            println!(
+                "- the proven `2d²` fallback is **unaffordable** here: {} samples is {}. If the \
+                 off-domain check refuses the prediction on this row, the result is *prediction \
+                 falsified, generic bound unaffordable* — a counterexample to the published \
+                 formula, and a better outcome than the witness",
+                cost.proven_samples,
+                human_seconds(cost.proven_seconds)
+            );
         }
         for record in row(&manifest, 1, &concurrencies) {
             board
@@ -291,9 +502,12 @@ fn row(manifest: &ChallengeManifest, seed: u64, concurrencies: &[usize]) -> Vec<
         .map(|i| specialization.value_of(i).expect("fixed"))
         .collect();
 
+    let predicted_degree =
+        predicted_resultant_degree(parameters.alpha, parameters.r_f, parameters.r_p)
+            .expect("the predicted degree fits a usize");
+
     let built = evaluate_symbolically(&instance, &fixed);
 
-    println!("## {} — {} rounds\n", manifest.id, rounds);
     println!(
         "- two bivariate outputs of degree {} and {} ({} and {} terms), built in {:.1} ms",
         built.degrees[0],
@@ -329,7 +543,7 @@ fn row(manifest: &ChallengeManifest, seed: u64, concurrencies: &[usize]) -> Vec<
             &f,
             &g,
             &fixed,
-            rounds,
+            (rounds, predicted_degree),
             built.elapsed,
             concurrency,
         ) else {
@@ -390,7 +604,7 @@ struct Pass {
 impl Pass {
     /// The elimination's wall clock: determinants plus recovery.
     fn elimination(&self) -> Duration {
-        self.stages.sampling + self.stages.interpolation
+        self.stages.sampling + self.stages.interpolation + self.stages.validation
     }
 }
 
@@ -412,20 +626,47 @@ fn solve(
     f: &MultivariatePolynomial<2, K>,
     g: &MultivariatePolynomial<2, K>,
     fixed: &[K],
-    rounds: usize,
+    shape: (usize, usize),
     build: Duration,
     concurrency: usize,
 ) -> Option<Pass> {
+    let (rounds, predicted_degree) = shape;
     let options = ResultantOptions::with_concurrency(concurrency);
-    let (resultant, stages) = match bivariate_resultant_ntt_with(f, g, 1, options) {
-        Ok(pair) => pair,
-        Err(error) => {
-            println!("- the resultant was refused: {}\n", error);
-            return None;
-        }
-    };
-    let elimination = stages.sampling + stages.interpolation;
+    // Sized against [JAZ] slide 22's experimental degree, and validated off the domain inside the
+    // route rather than trusted — see `DegreeSource`.
+    let (resultant, stages) =
+        match bivariate_resultant_predicted(f, g, 1, predicted_degree, options) {
+            Ok(pair) => pair,
+            Err(error) => {
+                println!("- the resultant was refused: {}\n", error);
+                return None;
+            }
+        };
+    let elimination = stages.sampling + stages.interpolation + stages.validation;
     let bezout = 3u64.pow(rounds as u32) * 3u64.pow(rounds as u32);
+    println!(
+        "- predicted degree {} from `alpha^(2 R_F + R_P)`, so {} samples against the proven \
+         bound's {}",
+        predicted_degree,
+        predicted_degree + 1,
+        stages.degree_bound + 1
+    );
+    match stages.degree_source {
+        DegreeSource::PredictionHeld { degree } => println!(
+            "- the prediction **held**: {} points outside the sample set agree with a direct \
+             Sylvester determinant, so degree {} pinned the resultant",
+            stages.off_domain_checks, degree
+        ),
+        DegreeSource::PredictionFalsified { degree } => println!(
+            "- the prediction was **falsified**: degree {} did not survive the off-domain check, \
+             so the proven bound produced the answer — a counterexample to [JAZ] slide 22 on this \
+             row",
+            degree
+        ),
+        DegreeSource::Proven => println!(
+            "- the prediction is no smaller than the proven bound, so the proven path was taken"
+        ),
+    }
     match stages.route {
         ResultantRoute::Ntt { log_size } => println!(
             "- interpolated on the subgroup of order `2^{}` = {} (proven degree bound {}), so \
@@ -435,8 +676,8 @@ fn solve(
             stages.degree_bound
         ),
         ResultantRoute::Lagrange { points } => println!(
-            "- no power-of-two subgroup covers the bound {}: Lagrange at {} consecutive points",
-            stages.degree_bound, points
+            "- Lagrange at {} consecutive points (proven degree bound {})",
+            points, stages.degree_bound
         ),
     }
     println!(
@@ -455,45 +696,69 @@ fn solve(
         elimination.as_secs_f64() * 1e3
     );
 
-    // The A/B. Both routes run on the same two polynomials in the same process, stage-separated,
-    // and the two answers are compared — the subgroup route's win or loss is the difference
-    // between its padded sample count and the reference's quadratic interpolation, and nothing
-    // short of both figures distinguishes those.
-    let reference_stages = if stages.degree_bound <= AB_CONTROL_BOUND {
+    // The A/B against the **proven** sample count, on the same two polynomials in the same
+    // process and at the same concurrency: the predicted count's whole claim is that it returns
+    // the identical polynomial from far fewer determinants, and only running both says so.
+    let held = matches!(stages.degree_source, DegreeSource::PredictionHeld { .. });
+    let reference_stages = if stages.degree_bound <= AB_CONTROL_BOUND && held {
         let (reference, rstages) =
             bivariate_resultant_reference_with(f, g, 1, options).expect("both involve the second");
         assert_eq!(
             reference, resultant,
-            "the subgroup route and the reference disagree"
+            "the predicted count and the proven bound disagree"
         );
         let reference_total = rstages.sampling + rstages.interpolation;
         println!(
-            "- A/B: reference route, {} consecutive points — {} determinants {:.1} ms + \
-             `lagrange_interpolate` {:.1} ms = **{:.1} ms**, same polynomial. Subgroup route is \
-             {:.2}x that.",
+            "- A/B: proven bound, {} consecutive points — {} determinants {:.1} ms + \
+             `lagrange_interpolate` {:.1} ms = **{:.1} ms**, same coefficients. The predicted \
+             count is **{:.2}x faster** on {:.2}x fewer determinants.",
             rstages.samples,
             rstages.samples,
             rstages.sampling.as_secs_f64() * 1e3,
             rstages.interpolation.as_secs_f64() * 1e3,
             reference_total.as_secs_f64() * 1e3,
-            elimination.as_secs_f64() / reference_total.as_secs_f64()
+            reference_total.as_secs_f64() / elimination.as_secs_f64(),
+            rstages.samples as f64 / stages.samples as f64
         );
         Some(rstages)
+    } else if !held {
+        println!("- A/B skipped: the answer already came from the proven path");
+        None
     } else {
         println!(
-            "- A/B skipped: the reference route's {} points exceed the control bound {}",
+            "- A/B skipped: the proven bound's {} points exceed the control bound {}, so the \
+             prediction is the only affordable route here",
             stages.degree_bound + 1,
             AB_CONTROL_BOUND
         );
         None
     };
 
+    // The superseded §6.5 comparison, kept reachable and off by default: the subgroup route pads
+    // the sample count to a power of two, which costs more determinants than the quasi-linear
+    // recovery saves. Re-measuring it costs 16 384 determinants a row.
+    if std::env::args().any(|a| a == "--ntt-ab") {
+        let (ntt, nstages) =
+            bivariate_resultant_ntt_with(f, g, 1, options).expect("both involve the second");
+        assert_eq!(ntt, resultant, "the subgroup route disagrees");
+        println!(
+            "- A/B: subgroup route, {} samples — {:.1} ms determinants + {:.1} ms inverse NTT",
+            nstages.samples,
+            nstages.sampling.as_secs_f64() * 1e3,
+            nstages.interpolation.as_secs_f64() * 1e3
+        );
+    }
+
     // The interpolated polynomial is checked against the definition at points the interpolation
-    // never saw. `degree_bound + 1` samples already determine it, so agreement at a point outside
-    // the sample set is evidence about the construction rather than a restatement of it.
-    let at = Instant::now();
-    let fresh = off_domain_check(f, g, &resultant, &stages.route, 8);
-    let independent = at.elapsed();
+    // never saw. A held prediction has already paid for that inside the route, so its count and
+    // cost are reported from there rather than by taking a second set of determinants.
+    let (fresh, independent) = if held {
+        (stages.off_domain_checks, stages.validation)
+    } else {
+        let at = Instant::now();
+        let fresh = off_domain_check(f, g, &resultant, &stages.route, 8);
+        (fresh, at.elapsed())
+    };
     println!(
         "- {} points outside the interpolation domain agree with a direct Sylvester determinant, \
          in {:.1} ms",
