@@ -19,8 +19,9 @@ specification.
 
 Both reference repositories are MIT, so their data *may* be redistributed — which the Fukuoka files
 cannot be, see [`fukuoka-mq.md`](fukuoka-mq.md) §3. Nothing is copied here that is not cited: the
-only committed reference numbers are the four CICO witnesses in `src/grobner/research/anemoi.rs`,
-each traceable to the `results/` file named above.
+only committed reference numbers are the four CICO witnesses in `src/grobner/research/anemoi.rs`
+and the per-step figures in the registry's `ReferencePoint` rows, each traceable to the `results/`
+file named above.
 
 ## 2. What was taken from the reference unchanged
 
@@ -118,7 +119,65 @@ measurement from one implementation, and the designers' corresponding statement 
 A disagreement between this and Zeebra's own `D` is a **defect in Zeebra or in the model, not a
 performance difference**, and it stops the workstream rather than becoming a table entry.
 
-## 6. The field
+## 6. The two models, and what the registry had to change
+
+`FCICO` and `PCICO` are from Six Worlds' own `models.sage`, emitted in its `o1` variable ordering —
+the ordering every committed `..._o1.txt` log was produced under, and the one that paper reports as
+the good one. Zeebra's degrevlex order is induced by the variable *indices*, so the index assignment
+**is** the ordering, and matching it is what makes the published per-row figures comparable at all.
+
+| `N` | `FCICO` variables = generators | generator degrees | `PCICO` variables = generators | generator degrees |
+|---:|---:|---|---:|---|
+| 1 | 2 | `3, 3` | 2 | `3, 2` |
+| 2 | 4 | `3, 3, 3, 3` | 3 | `3, 4, 3` |
+| 3 | 6 | `3`×6 | 4 | `3, 4, 6, 4` |
+| 4 | 8 | `3`×8 | 5 | `3, 4, 6, 8, 5` |
+| 5 | 10 | `3`×10 | 6 | `3, 4, 6, 8, 10, 6` |
+
+Both columns agree with the `n_v`, `n_e` and `degs` lines the committed logs print per round count,
+which is what `test_the_sizes_match_the_published_logs` and
+`test_the_generator_degrees_are_the_published_shapes` assert.
+
+Two things had to change in the registry, and the second is a genuine gap rather than a
+convenience.
+
+**The model is inside the identity.** `ChallengeParameters::AnemoiCico` carries it as a field, so it
+appears in `canonical_lines` as a `model fcico` / `model pcico` line. Without it, `N = 5` `FCICO` —
+ten generators of degree three — and `N = 5` `PCICO` — six of degrees up to ten — would share a
+digest, and a comparison tool keyed on the digest would compare them and report nothing wrong.
+`test_the_two_anemoi_models_are_different_problems` asserts the separation at every rung.
+
+**`ReferencePoint` is new, and it is where a published competitor figure lives.** `ExternalStatus`
+records whether and when a problem was solved elsewhere and carries no time, no memory and no
+hardware, so the Six Worlds figures had nowhere to go. A reference point carries source, parameters,
+step, reported time, reported memory, hardware and software. Three decisions worth recording:
+
+- **It sits outside `canonical()`**, for the reason programme metadata does: a corrected
+  extrapolation must not change which mathematical problem a row is.
+  `test_a_reference_point_does_not_change_identity` asserts it.
+- **The basis step and the conversion step are separate points, never one combined figure.** The
+  whole reason this family was chosen is that they are 2 400× apart at `N = 5`; a single number
+  would hide the finding.
+- **`reported_memory` is `None` on every Anemoi row, and that is a real answer.** The logs report
+  peak resident set size once per sweep — 227 MB for the whole `FCICO` run over `N = 1…8`, 225 MB
+  for `PCICO` over `N = 1…7` — so attributing either to one row would be inventing a measurement.
+
+**The class is `Official`, not `FaithfulReduction`.** The combination — reduced round counts of a
+real primitive, registered as official — has no precedent in this registry, so: `FaithfulReduction`
+means *this registry reduced an official problem*, and its `of` field has to name that problem.
+There is none. Nobody posed full-round Anemoi as a challenge and it is not registered, so an `of`
+would be a dangling reference. What is published is the ladder itself — Six Worlds ran `N = 1…8` and
+reported those rows as its own experiment — so the registered object is the published object.
+`ExternalStatus::PublishedWithAnswer` then makes `significance(true)` a `Reproduction`, the
+strongest honest claim on a solved reduced instance. The caveat `FaithfulReduction` would have
+carried structurally is carried in each row's `notes`: a result at `N = 5` says nothing about
+full-round Anemoi, which is 21 rounds at 128-bit security.
+
+`Objective::CicoExact` fits as written and no new objective was added. Anemoi CICO constrains the
+**leading** word of a `2ℓ`-word state at each end — `x_in = 0` and `x_out = 0` — which is what that
+tag means.
+
+## 7. The field
 
 `p = 2^64 − 353 = 18446744073709551263`. Odd, so `PrimeFieldElement64<P>` holds it in Montgomery
 form with no new arithmetic — `montgomery::uses_montgomery` requires only `p % 2 == 1`, and
@@ -126,7 +185,7 @@ Goldilocks is already covered at the same width. `Zp18446744073709551263` is the
 `test_multiplication_matches_wide_reduction` now covers this modulus at the boundary values. Nothing
 else in `fields` changed.
 
-## 7. Open
+## 8. Open
 
 - **`ℓ > 1` and the named hash instances.** `AnemoiSponge-BN-254` and `AnemoiSponge-BLS12-381` use
   `ℓ ∈ {1, 2}` over 255-bit fields. `Bn254Fr` and `Bls12_381Fr` exist, and `from_decimal` already
