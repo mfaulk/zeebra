@@ -1445,23 +1445,69 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     let accumulated = Json::object([("runs", Json::Array(entries))]);
     let all = Scoreboard::load(&accumulated, registry).expect("the history this program wrote");
 
+    // Two files, and the split is the contract.
+    //
+    // `best.json` is the **serial performance ranking**: `Scoreboard::best` is `best_at(1)`, so a
+    // parallel wall clock cannot displace a figure it is not comparable with. That makes it the
+    // wrong file to ask "is this problem solved?" of — a problem whose only witness is parallel is
+    // absent from it, by design and not by oversight.
+    //
+    // `solved.json` answers that question instead: one entry per problem with a verified witness at
+    // any worker count, carrying the concurrency so nothing in it can be read as a serial timing.
+    // Keeping them apart is what lets `best.json` stay a like-for-like ranking while a consumer can
+    // still discover solved status without parsing the whole history.
+    let json_for = |run: &RunRecord| {
+        let manifest = registry
+            .iter()
+            .find(|c| c.id == run.challenge)
+            .expect("checked on load");
+        run.to_json(manifest)
+    };
+
     fs::write(
         root.join("results").join("best.json"),
-        Json::object([(
-            "best",
-            Json::Array(
-                all.best()
-                    .values()
-                    .map(|run| {
-                        let manifest = registry
-                            .iter()
-                            .find(|c| c.id == run.challenge)
-                            .expect("checked on load");
-                        run.to_json(manifest)
-                    })
-                    .collect(),
+        Json::object([
+            (
+                "contract",
+                Json::string(
+                    "the fastest verified witness per problem AMONG SINGLE-THREADED RUNS. A \
+                     problem solved only on multiple workers is deliberately absent; ask \
+                     solved.json for solved status.",
+                ),
             ),
-        )])
+            (
+                "best",
+                Json::Array(all.best().values().map(|run| json_for(run)).collect()),
+            ),
+        ])
+        .to_json()
+            + "\n",
+    )
+    .expect("a writable file");
+
+    fs::write(
+        root.join("results").join("solved.json"),
+        Json::object([
+            (
+                "contract",
+                Json::string(
+                    "one verified witness per problem at ANY concurrency -- an existence claim, \
+                     not a ranking. The representative is the one using the fewest workers, ties \
+                     to the first recorded; no runtimes are compared across worker counts. Every \
+                     entry carries environment.concurrency, and an entry with concurrency > 1 is \
+                     not comparable with a figure in best.json.",
+                ),
+            ),
+            (
+                "solved",
+                Json::Array(
+                    all.verified_somehow()
+                        .values()
+                        .map(|run| json_for(run))
+                        .collect(),
+                ),
+            ),
+        ])
         .to_json()
             + "\n",
     )

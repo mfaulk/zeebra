@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "CICO witnesses recovered by the subgroup-interpolation resultant on registered t = 16 Poseidon reductions. Each entry gives the two surviving free inputs; the other twelve are Specialization::<46, K>::seeded(2..14, seed) and are therefore reproducible rather than recorded. Every entry is re-checked through CicoInstance::is_solution, which runs permutation_plus_linear, by grobner::research::resultant::tests::test_the_recorded_witnesses_verify_through_the_permutation.",
+  "note": "CICO witnesses recovered by the subgroup-interpolation resultant on registered t = 16 Poseidon reductions. Each entry gives the two surviving free inputs; the other twelve are Specialization::<46, K>::seeded(2..14, seed) and are therefore reproducible rather than recorded. Every entry is re-checked through CicoInstance::is_solution, which runs permutation_plus_linear, by grobner::research::resultant::tests::test_the_recorded_witnesses_verify_through_the_permutation. The six-round entry was recovered on 32 determinant workers and reproduced identically on a second independent run; the worker count affects only the wall clock, so it is not part of the witness and is recorded in the run file rather than here.",
   "field": "KoalaBear, q = 2^31 - 2^24 + 1 = 2130706433",
   "generator": "cargo run --release --example resultant_cico",
   "witnesses": [
@@ -51,6 +51,14 @@
       "resultant_degree": 6561,
       "first": 962963787,
       "second": 1362657760
+    },
+    {
+      "challenge": "poseidon31-cico-t16-rf2-rp4",
+      "rounds": 6,
+      "seed": 1,
+      "resultant_degree": 6561,
+      "first": 941710918,
+      "second": 475196876
     }
   ]
 }

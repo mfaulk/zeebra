@@ -977,10 +977,16 @@ fn record(
             plural(pass.concurrency)
         ),
     };
+    // Name the row. The default budgets admit it, so the bare command does reproduce this record
+    // — but it also runs every other row on the way, which for a 60-minute six-round row is an
+    // hour of unrelated work to re-derive one line.
     record.reproduce = format!(
-        "cargo run --release --example resultant_cico -- --concurrency {} --write",
-        pass.concurrency
+        "cargo run --release --example resultant_cico -- --row {} --concurrency {} --write",
+        record.challenge, pass.concurrency
     );
+    // Measured process RSS, kept apart from any `peak_estimated_bytes`: this route builds no
+    // Macaulay matrix, and on the six-round row the two would differ by four orders of magnitude.
+    record.measured_peak_resident_bytes = peak_resident_bytes().map(|b| b as usize);
     record
 }
 

@@ -39,7 +39,7 @@ The official field, state width, `k`, constants and objective; fewer rounds. A w
 |---|---|---:|---:|---|---|---|
 | `poseidon31-cico-t16-rf2-rp0` | `56ccc99d85e0` | 46 | 34 | **verified witness** in 6.0 ms (resultant, slice(12 fixed, seed 1)) | — | — |
 | `poseidon31-cico-t16-rf2-rp2` | `af93deb46aa5` | 48 | 36 | **verified witness** in 47598.5 ms (resultant, slice(12 fixed, seed 1)) | — | — |
-| `poseidon31-cico-t16-rf2-rp4` | `08e66c87a885` | 50 | 38 | **verified witness** in 3429792.3 ms on 32 workers (resultant, slice(12 fixed, seed 1)) | — | — |
+| `poseidon31-cico-t16-rf2-rp4` | `08e66c87a885` | 50 | 38 | **verified witness** in 3274316.5 ms on 32 workers (resultant, slice(12 fixed, seed 1)) | — | — |
 | `poseidon31-cico-t16-rf4-rp0` | `a9242143a8c6` | 78 | 66 | **verified witness** in 50638.1 ms (resultant, slice(12 fixed, seed 1)) | — | — |
 | `poseidon31-cico-t16-rf4-rp2` | `80957f3ccf46` | 80 | 68 | stopped: max_live_nonzeros at degree 4 | — | — |
 | `poseidon31-cico-t16-rf4-rp4` | `2d8f8531107d` | 82 | 70 | stopped: max_live_nonzeros at degree 4 | — | — |
@@ -53,7 +53,7 @@ Surrogates: reduced width, planted targets. Evidence about the implementation, n
 
 | problem | identity | vars | eqs | best result | external status | published method |
 |---|---|---:|---:|---|---|---|
-| `poseidon-t2-rf2-rp0-planted` | `9e98ebc3abec` | 5 | 5 | **verified witness** in 0.9 ms (as generated) | — | — |
+| `poseidon-t2-rf2-rp0-planted` | `9e98ebc3abec` | 5 | 5 | **verified witness** in 0.8 ms (as generated) | — | — |
 | `poseidon-t2-rf2-rp2-planted` | `84cde35887fd` | 7 | 7 | **verified witness** in 141.2 ms (as generated) | — | — |
 | `poseidon-t2-rf4-rp0-planted` | `ebd238585cc0` | 9 | 9 | **verified witness** in 348.3 ms (as generated) | — | — |
 | `poseidon-t3-rf2-rp1-planted` | `036ea475c0b1` | 9 | 8 | stopped: max_matrix_columns at degree 11 | — | — |

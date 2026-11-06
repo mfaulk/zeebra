@@ -1,4 +1,5 @@
 {
+  "contract": "the fastest verified witness per problem AMONG SINGLE-THREADED RUNS. A problem solved only on multiple workers is deliberately absent; ask solved.json for solved status.",
   "best": [
     {
       "schema": 1,
@@ -251,11 +252,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 866559,
+      "elapsed_nanos": 805384,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 11121,
+          "elapsed_nanos": 6352,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 5,
@@ -264,7 +265,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 703972,
+          "elapsed_nanos": 665199,
           "estimated_peak_bytes": 12872,
           "detail": {
             "max_matrix_rows": 71,
@@ -275,7 +276,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 85622,
+          "elapsed_nanos": 83027,
           "estimated_peak_bytes": 4680,
           "detail": {
             "quotient_dimension": 9
@@ -283,7 +284,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 65173,
+          "elapsed_nanos": 50125,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 5
@@ -291,7 +292,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 671,
+          "elapsed_nanos": 681,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -310,7 +311,7 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "ea5f554",
+        "commit": "86aaa53",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
