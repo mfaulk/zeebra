@@ -748,32 +748,98 @@ erring that way is bounded and visible — on Zp65537 between 256 and 512 the tr
 1.60x ahead — where erring the other way pays the transform's fixed setup on every product in the
 band.
 
-##### The 4-byte crossing is contingent on a codegen decision (#244)
+##### The 4-byte figures and the ISA floor they were taken at (#244)
 
-Measured four times at 4096 and twice at 1024, and the variable turned out not to be the source.
-The same commit built two ways:
+#244 was filed from this section's own measurements, reporting the 4-byte crossing as "contingent
+on a codegen decision" because the same commit measured 4096 in one artifact and 1024 in another.
+**That diagnosis was wrong, and the real cause is a trap this repository had already documented.**
 
-| build | `vpmuludq` in the artifact | schoolbook @1024 | Karatsuba | crossing |
-|---|---:|---:|---:|---|
-| `cargo build --release --examples` | 91 | 295.4 µs | 81.5 µs | (2046, 4094] → **4096** |
-| `cargo build --release --example multiplication_dispatch` | **0** | 527.2 µs | 141.0 µs | (510, 1022] → 1024 |
+The two artifacts differed by whether the shell that built them set `RUSTFLAGS`, not by the build
+invocation:
 
-Both scalar routes lose 1.73x–1.78x together and the transform does not move (98.1 µs against
-100.6), which locates the cause in the 4-byte coefficient loop: its autovectorization is present in
-one artifact and absent in the other. Under `lto = "fat"` with `codegen-units = 1`, building one
-example gives the linker a different set of roots than building all of them.
+```text
+cargo build --release                          -> -C target-cpu=x86-64-v3
+RUSTFLAGS="-D warnings" cargo build --release  -> no target-cpu at all
+RUSTFLAGS="" cargo build --release             -> no target-cpu at all
+```
 
-Only the 4-byte tier can do this, and §8.3 of `MILESTONE-SIMD-PARALLELISM.md` says why it must be
-the only one: a 64-bit Montgomery reduction is 128-bit arithmetic LLVM does not vectorize and a
-32-bit one is 64-bit arithmetic it does. The 8- and 32-byte crossings measured **identical in both
-artifacts**, which is the control for that reading.
+`RUSTFLAGS` **replaces** `target.*.rustflags` rather than adding to it. `MILESTONE-SIMD-PARALLELISM.md`
+§3.1 records this costing a silent CI regression once already — "the CI workflow set
+`RUSTFLAGS: -D warnings`, which would have discarded the ISA floor entirely" — and
+`.cargo/config.toml` warns about it in a comment. CI states both flags and is correct. The
+ad-hoc measurement commands behind #185 and #231 set only one, and so measured a baseline
+x86-64 build with no AVX2. A 4-byte Montgomery multiply vectorizes and an 8-byte one does not
+(§8.3 of that milestone), which is why only the 4-byte figures moved and why it looked like a
+property of the 4-byte kernel.
 
-**4096 ships**, because every committed example carries `vpmuludq` at this commit —
-`univariate_scaling` 54, `karatsuba_crossover` 45, `field_width` 56, `cryptanalysis_ladder` 89 — so
-that is the state the library is normally in, and a consumer that loses it sees Karatsuba at most
-2.00x behind the transform in the band between 1024 and 4096. The deeper problem, that a shipped
-constant is contingent on a codegen decision and that no 4-byte figure in these documents records
-which state it was taken in, is #244.
+Verified directly: `cargo build -v | grep target-cpu` shows `x86-64-v3` with no `RUSTFLAGS` and
+nothing at all with it set, and `tools/vec_census.sh` counts **65 vector multiplies** in the first
+artifact and **0** in the second.
+
+**The crossover constant is unaffected.** #185 shipped 4096 / 512 / 512 from runs that happened not
+to set `RUSTFLAGS`, which is the shipped configuration. Re-measured at v3 with a corrected
+instrument, the crossings are (2046, 4094], (254, 510] and (254, 510] — **4096 / 512 / 512**,
+unchanged. The 1024 figure was the artifact of a build with no AVX2 and is not a property of
+anything.
+
+**What changed to stop this recurring.** `tools/vec_census.sh` counts vector multiplies in an
+artifact and with `--require` exits nonzero when there are none — whole-artifact rather than
+symbol-filtered, because under fat LTO the kernels are inlined and no symbol named for them
+survives, so a filter reports a false negative. And `util::isa_floor()` is printed in the header of
+every measurement example here, so no figure can be recorded without its ISA beside it:
+
+```text
+ISA: x86-64-v3 or better (AVX2)
+ISA: baseline x86-64, NO AVX2 — RUSTFLAGS probably displaced the ISA floor
+```
+
+Not a `#[test]` asserting AVX2: `.cargo/config.toml` applies only when cargo runs in this directory
+and is explicitly not inherited by consumers, so such a test would fail for every downstream build.
+
+##### #231's figures, re-taken at the floor
+
+#231's A/B set `RUSTFLAGS=""`, so its figures are baseline-x86-64 ones. Re-run at v3, three
+variants from one tree — **A** pre-#231 entirely, **B** main, **C** main's `Mul` with the pre-#231
+loop order — interleaved, `taskset`-pinned, minimum of three rounds. The headline holds; two
+details do not.
+
+| field | stage | size | A pre-#231 | B main | A/B | C/B |
+|---|---|---:|---:|---:|---:|---:|
+| KoalaBear | **roots** | 2048 | 56.181 ms | 35.999 ms | **1.56x** | 1.01x |
+| KoalaBear | mul | 4096 | 4.005 ms | 0.644 ms | 6.22x | 1.01x |
+| KoalaBear | lcm | 4096 | 10.064 ms | 6.647 ms | 1.51x | 1.00x |
+| KoalaBear | **from_zeros** | 512 | 0.393 ms | 0.083 ms | **4.71x** | **5.27x** |
+| KoalaBear | div *(control)* | 4096 | 4.564 ms | 4.561 ms | 1.00x | 1.00x |
+| BN254 `Fr` | **roots** | 256 | 945.206 ms | 544.186 ms | **1.74x** | 1.01x |
+| BN254 `Fr` | mul | 1024 | 21.318 ms | 3.014 ms | 7.07x | 1.01x |
+| BN254 `Fr` | lcm | 1024 | 46.942 ms | 29.084 ms | 1.61x | 1.00x |
+| BN254 `Fr` | from_zeros | 512 | 5.270 ms | 5.561 ms | **0.95x** | 0.94x |
+| BN254 `Fr` | div *(control)* | 1024 | 19.773 ms | 21.968 ms | **0.90x** | 1.00x |
+
+**What holds.** `roots` is 1.28x–1.56x over KoalaBear and 1.39x–1.74x over BN254, against the
+1.32x–1.67x and 1.44x–1.66x #231 reported — the same conclusion from different numbers. `mul` and
+`lcm` likewise.
+
+**Two corrections to #231.**
+
+The **loop swap is worth about 5x, not 2.5x**, and it is not free. The `C/B` column isolates it:
+5.27x on KoalaBear `from_zeros` at 512 zeros, where #231 measured 2.5x at baseline — the swapped
+shape has a long inner loop, which is the shape that can vectorize, so the gain is larger exactly
+where AVX2 exists. But on BN254 the same column is **0.94x**: the swap costs 6% on a 32-byte
+element. #231's commit message and `karatsuba.rs`'s doc comment both say BN254 "does not move
+either way", which was true at baseline and is false at the floor. The trade is ~5x on 4-byte
+against ~6% on 32-byte, and it is worth making — but it is a trade and was reported as free.
+
+The **control is not flat on BN254**: `div_isolated` is 0.90x at two of three sizes, reproducibly,
+where #231 reported "flat to within 1% in 12 of 12 cells". `C/B` is 1.00x there, so the swap is not
+the cause; `div_with_remainder` contains no polynomial multiplication, so this is the `Mul` change
+perturbing its code layout under fat LTO. It is dominated — `roots` contains `div` and is still
+1.74x ahead on the same field — but #231's claim that nothing moved was a claim about the wrong
+build, and the honest statement is that a 10% layout effect on long division over a 32-byte element
+is present and unexplained.
+
+Everything #185 and #231 concluded survives; what does not survive is the precision several of
+their figures were quoted to.
 
 ##### Mersenne-31: the fallback measured, since it is the only route there
 
@@ -862,14 +928,24 @@ reaching interesting sizes.
 through `pow_mod_limbs`. `lcm` and `from_zeros` are the other two `Mul` callers worth naming;
 `Polynomial::pow`, `compose` and `shift` are built on the same operator.
 
-**#185's control anomaly was environmental, and this run says so.** That run reported KoalaBear
-`div` at 0.89x–0.91x, reproducible across its three rounds and unexplained. Two things settle it
-here. `div_with_remainder`'s machine code is **identical in both binaries** — same instruction count,
-1609, and zero `vpmuludq` in both — so there is nothing in the compiled artifact for a 10% effect
-to live in. And re-measured with an isolated arm as well as the post-`mul` one, the control is flat
-to within 1% in **12 of 12 cells** across two fields and three sizes. The original reading was the
-preceding `mul` leaving a different cache and allocator state, in a run whose sign happened to go
-one way; it went the other way on the next attempt, which a code effect would not do.
+> **This subsection's figures are baseline-x86-64 ones**, taken before #244 found that their build
+> commands set `RUSTFLAGS` and so discarded the ISA floor. The conclusions hold; the numbers are
+> superseded by "#231's figures, re-taken at the floor" above, which is the table to quote.
+
+**#185's control anomaly, and the part of this paragraph that was also wrong.** #185 reported
+KoalaBear `div` at 0.89x–0.91x, unexplained. At the time this read as settled: `div_with_remainder`
+is identical in both binaries — same instruction count, 1609, and zero `vpmuludq` in both — so there
+seemed to be nothing in the artifact for a 10% effect to live in, and re-measured with an isolated
+arm the control was flat in 12 of 12 cells.
+
+**The "zero `vpmuludq` in both" was the symptom, not the control.** Both artifacts lacked AVX2
+entirely, which is why neither had a vector multiply anywhere; the observation showed only that the
+two builds were equally crippled. Re-measured at the floor, the control is flat on KoalaBear
+(1.00x, 0.99x, 1.00x) and **0.90x on BN254** at two of three sizes, reproducibly — so a ~10% layout
+effect on long division over a 32-byte element is real and still unexplained. It is dominated:
+`roots` contains `div` and is 1.74x ahead on the same field. #185's KoalaBear reading does look
+environmental, since it does not reproduce in either ISA state; the claim that nothing moved
+anywhere does not survive.
 
 **One instrument needed pinning down afterwards.** `examples/univariate_scaling.rs`'s **mul** row
 is the quadratic baseline every crossover in §3.1 and §4.1 is quoted against, and it reached that

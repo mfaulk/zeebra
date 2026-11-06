@@ -245,7 +245,29 @@ Note that `RUSTFLAGS` **replaces** the flags in `.cargo/config.toml` rather than
 cargo takes the first source it finds and does not merge them. Repeat any flag that is still
 wanted. This is also why the CI workflow states `-C target-cpu=x86-64-v3` in its `RUSTFLAGS`
 alongside `-D warnings`: setting only the latter would silently drop the ISA floor and build CI at
-the baseline x86-64 level.
+the baseline x86-64 level. Setting `RUSTFLAGS` to the **empty string** drops it too.
+
+**This warning was not enough, so there are now two checks.** The trap cost #185 a crossover
+constant and #231 a set of figures, both measured in shells that set `RUSTFLAGS="-D warnings"` or
+`RUSTFLAGS=""` for unrelated reasons. Nothing in the output said so: a 4-byte Montgomery multiply
+vectorizes and an 8-byte one does not, so only the narrow-field numbers moved and it looked like a
+property of the kernel rather than of the build.
+
+```sh
+tools/vec_census.sh target/release/examples/multiplication_dispatch --require
+```
+
+counts vector multiplies in an artifact and exits nonzero when there are none — 65 in a build with
+the floor, 0 without it. And every measurement example prints `util::isa_floor()` in its header, so
+a figure and the ISA it was taken at are never separated:
+
+```text
+ISA: x86-64-v3 or better (AVX2)
+ISA: baseline x86-64, NO AVX2 — RUSTFLAGS probably displaced the ISA floor
+```
+
+Neither is a test asserting AVX2, because the floor is deliberately not inherited by consumers and
+such a test would fail for every downstream build.
 
 **A consumer of this crate inherits none of this.** `.cargo/config.toml` applies only when cargo
 is invoked with this directory as the working directory, and profile settings come from the
