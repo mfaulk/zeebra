@@ -383,7 +383,9 @@ Peak live entries, `first` against `fewest-terms`, with the control beside it:
 | katsura-6 | lex | **151 624** | *budget* | — | *budget* | — |
 
 *budget* is a run that exceeded `F4Options::baseline()`'s limits — 200 000 rows or 20 000 000 live
-entries — and therefore returned an error rather than a basis.
+entries — and therefore returned an error rather than a basis. The katsura-4 rows and two of the
+cyclic-4 rows are left out: a few hundred live entries is below anything worth reading, and the
+program prints all seventeen.
 
 **The control is monotone everywhere, and strongly.** `most-terms` holds more live entries than
 `fewest-terms` on every instance both finished, by 1.09x to 3.82x, and on the three lex rows it
@@ -398,7 +400,8 @@ What it measures is not a uniform improvement. The sign depends on the monomial 
   threshold on two of the three.
 - **Under grlex on the same systems it is a 25%–30% regression**, and under lex a 100%–230% one
   that twice exhausts the entry budget outright.
-- On cyclic it is small in both directions: −5.4% and −1.2%, against +36.8% on cyclic-5 grevlex.
+- On cyclic it goes both ways and mostly small: −5.4% on cyclic-4 grevlex and −1.2% on cyclic-5
+  grlex, against +36.8% on cyclic-5 grevlex and +101.7% on cyclic-5 lex.
 
 The mechanism is visible in the shape columns and is the counterpart of M16's reason for rejecting
 `LargestLeadingMonomial`. On katsura-6 grevlex the closure grows from 4 572 reducer rows to 4 756
