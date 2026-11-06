@@ -1776,6 +1776,154 @@ finish. Extractions (2) and (3) turn those from exploratory numbers into **falsi
 taken from the source** — which is the strongest form this document's open question could have been
 left in.
 
+### 9.6 The family economics, measured — `examples/graeffe_cico.rs`
+
+For #210. §9.5.1 turned §9.3's two assumptions into predictions taken from 2026/1254; this section
+checks them. Reproduce with
+
+```
+cargo run --release --example graeffe_cico -- --families 3000 --budget 25
+```
+
+A ladder of ten rows — the nine registered `t = 16, k = 2` reductions plus
+`poseidon-t3-rf2-rp1-planted`, which is `k = 1` — each family built by `cico_univariate_family`,
+root-counted, lifted, and verified through `CicoInstance::is_solution`. **17 838 families.** Every
+row would carry `BenchmarkClass::Engineering { why }`; no record is written, because that needs
+`ZEEBRA_AFFINITY`, `ZEEBRA_MACHINE` and the serialized benchmark lock.
+
+#### 9.6.1 Assumption 1 — ≈1 base-field root per family. **Confirmed.**
+
+| row | `δ` | families | mean roots | share with none | family cost |
+|---|---:|---:|---:|---:|---:|
+| `t3-rf2-rp1-planted` (`k = 1`) | 9 | 3 | 1.0000 | 0.3333 | 68.7 µs |
+| `t16-rf2-rp0` | 3 | 3 000 | 1.0013 | 0.3187 | 118.9 µs |
+| `t16-rf2-rp2` | 27 | 3 000 | 0.9960 | 0.3733 | 210.0 µs |
+| `t16-rf4-rp0` | 27 | 3 000 | 1.0217 | 0.3503 | 222.7 µs |
+| `t16-rf2-rp4` | 243 | 2 954 | 0.9939 | 0.3629 | 1.414 ms |
+| `t16-rf4-rp2` | 243 | 2 892 | 1.0152 | 0.3709 | 1.525 ms |
+| `t16-rf6-rp0` | 243 | 2 900 | 0.9762 | — | 1.547 ms |
+| `t16-rf4-rp4` | 2 187 | 45 | 0.8222 | — | 64.95 ms |
+| `t16-rf6-rp2` | 2 187 | 44 | 0.7500 | — | 65.77 ms |
+| `t16-rf6-rp4` | 19 683 | 115 | census skipped | — | 218.8 ms |
+| **pooled** | | **17 838** | **0.9997** | | |
+
+**0.9997 against a predicted 1.0.** The *distribution*, not only the mean, tracks Poisson(1) —
+`t16-rf4-rp0`, 3 000 families, observed against Poisson(1):
+
+| roots | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| observed | 0.3503 | 0.3820 | 0.1853 | 0.0633 | 0.0163 | 0.0023 | 0.0003 |
+| Poisson(1) | 0.3679 | 0.3679 | 0.1839 | 0.0613 | 0.0153 | 0.0031 | 0.0005 |
+
+The share of families with no base-field root sits at 0.35–0.37 against `1/e = 0.3679`, which is
+2026/1254 §2.2's `1 − 1/e` existence probability reproduced directly.
+
+Two honest qualifications. The `δ = 3` row departs — `{0, 1, 3}` roots at `0.3187 / 0.5213 / 0.1600`
+and *no* two-root families — and that is **correct**, not anomalous: a cubic over `F_p` has 0, 1 or 3
+roots, never exactly 2 without a repeated root. It is a low-degree artifact, and it is the reason
+`δ = 3` is a good oracle row and a poor statistics row. Second, the `δ = 2 187` rows read 0.75–0.82,
+but at 44–45 families the standard error of the mean is ≈0.15, so both are within ~1.5σ of 1.0;
+they are small-sample noise and are reported rather than smoothed.
+
+> **This settles candidate explanation 1 empirically, after §9.5.1 settled it textually.** `P_1` is
+> root-count-generic. There is no factor hiding here.
+
+#### 9.6.2 Assumption 2 — independent `1/p` filtering. **Independence confirmed; the rate is not measurable.**
+
+`0` hits in `17 901` roots tested. That is uninformative about the *rate* and the example says so:
+`1/p = 4.69e-10` predicts `8e-6` hits at this sample size, and 0 hits gives only a 95% upper bound of
+`3/n ≈ 1.7e-4`, which fails to separate `1/p` from anything below it. **No run of this example on
+this hardware can measure that rate**, and claiming otherwise would be the error §9.4 exists to stop.
+
+What *is* measurable is **independence**, which is the half of the assumption that could actually be
+wrong — §9.3 assumed it and milestone §6.3 asks for it by name. Binning the second constraint's
+residual `out[1] − C_1^out` into 256 bins gives, on 255 degrees of freedom (mean 255, sd `√510 ≈ 22.6`):
+
+| row | `χ²` | verdict |
+|---|---:|---|
+| `t16-rf2-rp0` | 234.7 | consistent with uniform |
+| `t16-rf2-rp2` | 278.1 | consistent with uniform |
+| `t16-rf4-rp0` | 201.9 | consistent with uniform |
+| `t16-rf2-rp4` | 245.4 | consistent with uniform |
+| `t16-rf4-rp2` | 234.1 | consistent with uniform |
+
+Every row is inside ±3σ. **The `(1,[1])` parametrization does not correlate the two output
+constraints**: conditioned on `P_0` vanishing, the second constrained word is uniform as far as this
+test can see. Combined with §9.5.1's reading of §4.2 — Graeffe plus one permutation evaluation per
+root, no gcd — the `1/p` factor is now confirmed from both directions.
+
+> **This also closes candidate explanation 2**, the last of §9.3's three. "More usable freedom per
+> family" would have to show up either as extra roots (§9.6.1: it does not) or as correlated
+> constraints (here: it does not). All three candidates are now eliminated, and §9.5.3's correction
+> to the *per-family cost* is the whole of the reconciliation.
+
+#### 9.6.3 Assumption 3 — `≈p` families per witness. **Confirmed as a model, and not measurable on any registered reduction — which is the finding.**
+
+This is where #210's framing has to be corrected. The issue and milestone §6.3 both ask for "the
+observed count on a row small enough to finish", on the expectation that a reduced row reduces the
+family count. **It does not.** The count is
+
+```
+families per witness  ≈  p / (roots per family)
+```
+
+and `p` is fixed by the field. Reducing `R_F` and `R_P` cuts `δ`, hence the per-family cost, and
+leaves the family count untouched. The ladder demonstrates exactly that: **`δ` spans 6 561× from
+row 2 to row 10 and the mean root count does not move off 1.0.** So `N ≈ 2^31` on
+`poseidon31-cico-t16-rf2-rp0` just as on `poseidon31-cico-rf6-rp8`, and no `k = 2` row on this
+ladder — or any reduction of it — can produce a witness. Zero witnesses were found and none was
+expected.
+
+Where it *can* be measured, it was. `poseidon-t3-rf2-rp1-planted` is `k = 1`: one output constraint
+is all there is, so a base-field root of `P_0` **is** a witness and no `1/p` filter applies.
+**1.00 families per witness, 3 witnesses verified through `CicoInstance::is_solution`** — the whole
+pipeline, parametrization through verification, end to end. That calibrates the mechanism and
+isolates the `1/p` factor at `k = 2` as the entire difference between `O(1)` families and `2^31`.
+
+Also worth recording as a structural fact rather than a bug: the two `t = 2` planted rows are
+**skipped**, because a `(1,[1])` family needs `2k + 1` disjoint support indices and `t = 2 < 3`. The
+construction has a minimum state width, and `t = 2` is below it.
+
+#### 9.6.4 Per-stage costs, and the one row that exercises the evaluation domain
+
+`t16-rf6-rp4` is the only ladder row above `SYMBOLIC_CROSSOVER`; it takes the evaluation route at
+`2^15` points with a `2^15`-size interpolation and a max Graeffe transform of `2^15`:
+
+| stage | total over 115 families | mean per family | share |
+|---|---:|---:|---:|
+| parametrization | — | 39.4 µs | 0.02% |
+| construction (`2^15` permutation evaluations) | — | 172.0 ms | **77%** |
+| interpolation (`fft::interpolate`) | — | 1.07 ms | 0.5% |
+| Graeffe root finding (`GraeffeStats`) | — | 50.5 ms | **23%** |
+| lifting + verification | — | µs | <0.01% |
+
+**This reproduces 2026/1254 §4.2's own cost ordering**: *"The dominant cost is the construction of
+the univariate polynomial and the Graeffe root-finding stage"*, and *"this final evaluation step is
+negligible compared with polynomial construction and root finding"*. Construction beats root finding
+roughly 3.4 : 1 here, and the two together are 99.98% of the family. That is a second, independent
+corroboration of §9.5.3's central move — the published loop's per-family cost is construction plus
+Graeffe and nothing else, which is exactly why §9.2's ~100 s candidate-scan row did not belong in it.
+
+The symbolic rows split differently: at `δ = 243`, construction is ~0.9–1.0 ms against ~0.44 ms of
+Graeffe, and at `δ = 3`–`27` the Graeffe descent's fixed overhead (the `s = 127` subgroup scan and 24
+squarings, which do not shrink with `δ`) actually *dominates* construction. That crossover is a
+property of the implementation, not of the attack, and no figure here should be read as a per-family
+cost for `δ = 3^13`: the ladder stops at `3^9`.
+
+#### 9.6.5 What this does and does not establish
+
+- It **does** confirm, by measurement, both inputs to §9.3's `2^31`: ≈1 root per family and
+  uncorrelated output constraints. The family count is no longer an assumption.
+- It **does** establish that the univariate `k = 2` route cannot produce a witness on any registered
+  reduction, because the family count is invariant under round reduction. A reduced row buys a
+  cheaper family, not a cheaper search.
+- It **does not** measure the `1/p` rate, and cannot. §9.5.4's named missing input — 2026/1254's `N`
+  and stage split — is therefore still the binding gap, and the `≈13×`–`≈135×` residual of §9.5.3
+  stands unclosed.
+- It **does not** touch `δ = 3^13`. The largest row here is `3^9`, four factors of three short, and
+  the construction stage scales linearly in `δ` while the ladder's per-row budget does not.
+- §9.4 applies to every figure above without exception.
+
 ## 10. Proposed PR decomposition
 
 Each row is independently reviewable, has its own oracle, and does not depend on any cryptanalytic
@@ -1792,7 +1940,7 @@ onward requires it merged.
 | 6 | `graeffe_root` — Algorithm C of §3.5, with §3.6's progressive reduction | 3, 5 | planted roots at degrees `2^8`…`2^16` over KoalaBear and Goldilocks, cross-checked against `src/poly/univariate/roots.rs` on every size the quadratic one reaches | **landed**, with [PC] Algorithm 2 line 8's descent in place of Algorithm C's `r`-way scan, which §3.5's correction block shows is unusable as transcribed — see §3.9 |
 | 7 | `(r, s)` parameter selection, measured — §9.2's open question | 6 | a sweep over `k` reporting Graeffe steps against `NTT_s` size and scan length; no assertion | **answered, not swept**: §3.5's correction and §3.9 show the descent removes the scan, so `r = 2^two_adicity` and `s` the odd part is forced rather than chosen. No trade-off to sweep over KoalaBear |
 | 8 | the round-skipping parametrization (§9.1 component 3) and `cico_univariate` | 4 (`cico_bivariate`'s pattern) | the parametrized family's constrained coordinates are the input constants at every point, asserted against `permutation_plus_linear` | **landed, #209** — `src/grobner/research/univariate_cico.rs`; the oracle is the first row of §9.5.2's table. Note the row's original wording said "last coordinate", which is the paper's input position and not Zeebra's: `CicoInstance` constrains the **first** `k` |
-| 9 | an `examples/graeffe_cico.rs` ladder: one family end-to-end on *reduced* rows, reporting §9.2's per-stage costs and `BenchmarkClass::Engineering` | 6, 8 | every witness verified through `CicoInstance::is_solution` | open, needs row 8 |
+| 9 | an `examples/graeffe_cico.rs` ladder: one family end-to-end on *reduced* rows, reporting §9.2's per-stage costs and `BenchmarkClass::Engineering` | 6, 8 | every witness verified through `CicoInstance::is_solution` | **landed, #210** — §9.6. Ten rows, 17 838 families; the three witnesses are all on the `k = 1` row, and §9.6.3 is why there are none on the others. Record-writing deliberately left to a follow-up |
 | 10 | extend `docs/research/graeffe-root-finding.md` with §9.2's figures as **measured** rather than estimated; re-take §6.1 as a post-#161 curve | 2, 9 | — | **partly landed**: §4.4, §4.5, §6.4 and §6.5 are the root-finding half, measured **both pre- and post-#161**. §6.1's own curve is still the pre-#161 one and awaits a re-take; §9.2's other rows still await row 8 |
 | 11 | `graeffe_root` over a field whose odd part is large: [PC] Algorithm 3's odd-order forward steps and the gcd descent at odd `q_i`, wiring row 4 into row 6 | 4, 6 | planted roots over Goldilocks at a degree where §6.5's quadratic fallback does not finish | open — §6.5 is the measurement that motivates it |
 
@@ -1864,7 +2012,17 @@ against both kernels.
   of magnitude at a `10^3` per-GPU factor. §9.5.4 records the **go**.
 - **Open, and now the only thing in the way**: the residual `≈13×`–`≈135×` of §9.5.3, which depends
   on an assumed per-GPU throughput factor because 2026/1254's `N` and stage split are lost. Not
-  closable from the literature. #210 measures the three family-economics quantities that bound it.
+  closable from the literature, and **#210 did not close it either** — §9.6.2 shows the `1/p` rate is
+  unmeasurable at any sample size this hardware can reach. What #210 did close is the *inputs*: ≈1
+  root per family and uncorrelated constraints are now measured, not assumed, so `2^31` is a model
+  with measured parameters rather than a model with assumed ones.
+- **Measured, §9.6.3, and it corrects #210's own framing**: the family count is **invariant under
+  round reduction**. `p / (roots per family)` has no `R_F` or `R_P` in it, and the ladder shows `δ`
+  spanning 6 561× with the mean root count fixed at 1.0. So "the observed count on a row small
+  enough to finish" does not exist at `k = 2`: no registered reduction can produce a witness, and a
+  reduced row buys a cheaper family rather than a cheaper search.
+- **Open**: nothing on this ladder reaches `δ = 3^13`. §9.6 stops at `3^9`, and §9.6.4's per-stage
+  split is measured there, not at the disclosed target.
 - **Closed by #209**: §9.5.2's `(1,[1])` construction for `permutation_plus_linear` is derived *and*
   verified. `src/grobner/research/univariate_cico.rs` asserts the constrained input coordinates at
   many random points on three reductions, that the lifted input reproduces the skipped state through

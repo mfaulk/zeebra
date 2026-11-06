@@ -48,6 +48,7 @@ pub use scoreboard::{
 pub use slices::{solve_slice, SliceOutcome};
 pub use specialization::{satisfies, specialize, Specialization, SpecializationError};
 pub use univariate_cico::{
-    cico_univariate, cico_univariate_family, degree_bound, parametrize, univariate_route,
-    CicoFamily, FamilyError, UnivariateRoute, SYMBOLIC_CROSSOVER,
+    cico_univariate, cico_univariate_family, cico_univariate_family_with_stats, degree_bound,
+    parametrize, univariate_route, CicoFamily, FamilyError, FamilyStages, UnivariateRoute,
+    SYMBOLIC_CROSSOVER,
 };
