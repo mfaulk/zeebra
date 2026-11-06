@@ -354,9 +354,32 @@ That bounds where to look next in both directions:
   two rounds — but its limit is arithmetic and written down (`16 · 3^{5·rounds}` field operations)
   where F4's is a matrix nobody can bound in advance. A cost difference of 578x at the shared
   frontier is the finding; an extension of the frontier is not.
+
+  > **Superseded, 2026-11-05.** "Both stop at two rounds" and "an extension of the frontier is not"
+  > were true of the implementation M23-E measured and are now false. The binding cost there was
+  > `lagrange_interpolate` at `O(n³)` — the third bullet below — and #162 stage 1 made it `O(n²)`.
+  > With that one change the four-round rows finish, and the registered reductions
+  > `poseidon31-cico-t16-rf2-rp2` and `-rf4-rp0` now carry **verified witnesses** at 47.6 s and
+  > 50.6 s, checked through `permutation_plus_linear` by `CicoInstance::is_solution`. F4 still stops
+  > at two rounds on the same slices, so **the resultant route does now reach further, and this is an
+  > extension of the verified attack frontier** — from two rounds to four, on faithful reduced-round
+  > instances. The two-round row also improved 8.65x, from 51.9 ms to 6.0 ms.
+  >
+  > Three things this does *not* change. It says nothing about the official `R_F = 6` targets, whose
+  > own disclosed solutions cost 7 h on 96 GPUs and 1 d 17 h on 128 CPU cores. The `16 · 3^{5·rounds}`
+  > bound still holds and still rules out six rounds. And the credit belongs to the interpolation
+  > fix, not to the subgroup-NTT route that was built to attack the same stage — that route measures
+  > **1.19–1.20x slower**, because a power-of-two domain pads 13 123 samples to 16 384 and the
+  > determinants are 98.9% of the row. See [`research/resultant-elimination.md`](research/resultant-elimination.md)
+  > §6, whose §6.4 records that determinant work is `d^5` against a quadratic interpolation's `d^4`,
+  > so no further interpolation improvement can matter for this route.
 - **And, unexpectedly, in `lagrange_interpolate`**, which M23-E measured at `O(n³)`: 7.4x–7.9x per
   doubling of the point count, 12.9 s at 2 000 points, extrapolating to about an hour at the 13 123
   the four-round row needs — against a few minutes for all of that row's determinants together.
+  **Fixed: #162 stage 1 made it `O(n²)` (measured exponent 1.86–2.12), and those 13 123 points now
+  interpolate in 1.37 s rather than an extrapolated hour. That is what moved the frontier above.**
+  The figures in this bullet are the pre-#162 measurement and are kept as the one that found the
+  defect.
   Attempting a row that does not finish is what found it, and it reordered the spike's own list of
   what to fix.
 
