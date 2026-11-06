@@ -1220,6 +1220,49 @@ impl Display for Comparison {
     }
 }
 
+/// What `research/scoreboard/results/history.json` promises a consumer, written into the file.
+///
+/// **The append-only property is load-bearing, not housekeeping.** [`Scoreboard`] keeps its runs
+/// in insertion order and [`Scoreboard::load`] preserves the order of the file, so array position
+/// is the only record of *when* a run was taken — and [`Scoreboard::verified_somehow`] reads it to
+/// break a tie on worker count. A rewrite that sorted, deduplicated or regenerated the array would
+/// leave every record present and make the rendered representative arbitrary, which is the kind of
+/// change that does not look like a change.
+///
+/// Lives here rather than in the writer because it describes an assumption of *this* module's
+/// code, and because `test_the_committed_history_declares_its_append_only_contract` compares the
+/// committed file against it character for character.
+pub const HISTORY_CONTRACT: &str = "every run ever recorded, APPEND-ONLY and in the order \
+     recorded. Array position is the only record of when a run was taken, and \
+     results/solved.json's tie-break reads it: among verified witnesses tied on \
+     environment.concurrency it keeps the LAST, because the later record is the one later code \
+     wrote and so carries at least as many fields. Appending is safe; sorting, deduplicating or \
+     regenerating this file is not, and would silently change what solved.json claims. run_count \
+     must equal runs.length.";
+
+/// What `research/scoreboard/results/best.json` promises a consumer.
+///
+/// [`Scoreboard::best`] is [`Scoreboard::best_at`] at one worker, so this file is a **like-for-like
+/// serial ranking** and a problem solved only on multiple workers is absent from it by design. Ask
+/// `solved.json` for solved status.
+pub const BEST_CONTRACT: &str = "the fastest verified witness per problem AMONG SINGLE-THREADED \
+     RUNS. A problem solved only on multiple workers is deliberately absent; ask solved.json for \
+     solved status.";
+
+/// What `research/scoreboard/results/solved.json` promises a consumer.
+///
+/// Describes [`Scoreboard::verified_somehow`], **including its dependency on the order of
+/// `history.json`** — see that method and [`HISTORY_CONTRACT`]. The string committed before M25
+/// said the tie went "to the first recorded" while the code kept the last; a contract a consumer
+/// cannot check is a contract that drifts, which is why it is a constant here and asserted against
+/// the committed file.
+pub const SOLVED_CONTRACT: &str = "one verified witness per problem at ANY concurrency -- an \
+     existence claim, not a ranking. The representative is the one using the fewest workers, ties \
+     to the LAST recorded in history.json; no runtimes are compared across worker counts. That \
+     tie-break reads the order of history.json, which is append-only -- see its contract field. \
+     Every entry carries environment.concurrency, and an entry with concurrency > 1 is not \
+     comparable with a figure in best.json.";
+
 /// Every run, with the registry's problems, rendered.
 #[derive(Clone, Debug, Default)]
 pub struct Scoreboard {
@@ -1352,6 +1395,29 @@ impl Scoreboard {
     /// later one is written by later code. Preferring the earlier one made the rendered row drop a
     /// `measured_peak_resident_bytes` that the newer record carried — a tie-break silently
     /// choosing the less complete record. Neither candidate's runtime is read either way.
+    ///
+    /// # The precondition: insertion order must be chronological
+    ///
+    /// **"Later" is read off the position in `self.runs` and nowhere else.** No record carries a
+    /// timestamp, so the tie-break is sound only while position is chronology, which rests on two
+    /// properties that are easy to break without noticing:
+    ///
+    /// * [`Self::load`] preserves the order of the `runs` array it is given, and
+    /// * `research/scoreboard/results/history.json` is **append-only** — see [`HISTORY_CONTRACT`],
+    ///   which is written into the file so that a consumer sees it too.
+    ///
+    /// Sorting, deduplicating or regenerating that history would leave every record present and
+    /// make this choice arbitrary. Both properties are pinned by tests:
+    /// `test_loading_a_history_preserves_its_recorded_order`,
+    /// `test_the_tie_break_depends_on_the_recorded_order`, and
+    /// `test_the_committed_history_declares_its_append_only_contract`.
+    ///
+    /// The cheaper alternative considered and not taken was a per-run timestamp. It would remove
+    /// the dependency, but it would also add a field to every record for the sake of a tie that
+    /// arises once in ninety-three runs, and it would not make the *rendering* of a tie any more
+    /// meaningful — the two candidates still differ only in completeness, which is what "latest"
+    /// is a proxy for. Worth revisiting if history ever stops being append-only for some other
+    /// reason.
     ///
     /// Use [`Self::best_at`] to compare runtimes within a fixed worker count.
     pub fn verified_somehow(&self) -> BTreeMap<&str, &RunRecord> {
@@ -1794,6 +1860,119 @@ mod tests {
         );
     }
 
+    /// Loading a history preserves the order the file recorded, record for record.
+    ///
+    /// The precondition `verified_somehow`'s tie-break rests on. If `load` ever sorted, deduped or
+    /// reordered, insertion order would stop meaning "when it was recorded" and the tie-break
+    /// would start choosing arbitrarily — silently, because every record would still be present.
+    #[test]
+    fn test_loading_a_history_preserves_its_recorded_order() {
+        let registry = registry();
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+        let formulations = ["first", "second", "third"];
+
+        let entries: Vec<Json> = formulations
+            .iter()
+            .map(|formulation| {
+                witness("poseidon31-cico-t16-rf2-rp4", formulation, 1_000, 1 << 20)
+                    .to_json(&manifest)
+            })
+            .collect();
+        let history = Json::object([("runs", Json::Array(entries))]);
+
+        let board = Scoreboard::load(&history, &registry).expect("a history this program wrote");
+        let order: Vec<&str> = board
+            .runs()
+            .iter()
+            .map(|run| run.formulation.as_str())
+            .collect();
+        assert_eq!(
+            order, formulations,
+            "load must preserve the recorded order; the tie-break depends on it"
+        );
+    }
+
+    /// The tie-break's answer depends on the recorded order, and the later record wins.
+    ///
+    /// The assumption stated as a test rather than as a comment: the **same two records** in the
+    /// **other order** give the other representative. That is not a defect — it is the documented
+    /// behaviour, and it is only sound because `results/history.json` is append-only, so position
+    /// in the array *is* chronology. This test fails if that stops being true in either direction:
+    /// if the ordering is lost, or if the tie-break stops reading it.
+    #[test]
+    fn test_the_tie_break_depends_on_the_recorded_order() {
+        let registry = registry();
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+
+        let at_32 = |formulation: &str, millis: u64| {
+            let mut run = witness("poseidon31-cico-t16-rf2-rp4", formulation, millis, 1 << 20);
+            run.environment.concurrency = 32;
+            run.to_json(&manifest)
+        };
+        // Deliberately the *faster* run first, so that a tie-break reading runtimes rather than
+        // order would pick it and fail this test.
+        let faster = at_32("faster, recorded first", 1_000);
+        let slower = at_32("slower, recorded second", 9_000);
+
+        for (order, expected) in [
+            (
+                vec![faster.clone(), slower.clone()],
+                "slower, recorded second",
+            ),
+            (vec![slower, faster], "faster, recorded first"),
+        ] {
+            let history = Json::object([("runs", Json::Array(order))]);
+            let board = Scoreboard::load(&history, &registry).expect("a valid history");
+            let solved = board.verified_somehow();
+            let chosen = solved
+                .get("poseidon31-cico-t16-rf2-rp4")
+                .expect("a witness exists");
+            assert_eq!(
+                chosen.formulation, expected,
+                "the representative must be the last-recorded of the tied pair"
+            );
+        }
+    }
+
+    /// The committed history declares, in the file, that it is append-only.
+    ///
+    /// The dependency is load-bearing for `solved.json`, and a consumer of the file cannot read a
+    /// Rust doc comment. `run_count` is checked against the array for the same reason: a rewrite
+    /// that dropped or reordered records is exactly what the contract forbids, and a mismatch is
+    /// the cheapest evidence of one.
+    #[test]
+    fn test_the_committed_history_declares_its_append_only_contract() {
+        let history = Json::parse(include_str!(
+            "../../../research/scoreboard/results/history.json"
+        ))
+        .expect("committed history.json parses");
+
+        let contract = history
+            .get("contract")
+            .and_then(Json::as_str)
+            .expect("history.json carries a contract string");
+        assert_eq!(
+            contract,
+            super::HISTORY_CONTRACT,
+            "the committed contract must be the one the writer emits, character for character"
+        );
+        assert!(
+            contract.contains("APPEND-ONLY"),
+            "the contract must state the append-only dependency"
+        );
+
+        let runs = history.get("runs").expect("a runs array").items();
+        let count = history
+            .get("run_count")
+            .and_then(Json::as_int)
+            .expect("a run_count");
+        assert_eq!(
+            count as usize,
+            runs.len(),
+            "run_count disagrees with the array, so the file was rewritten rather than appended to"
+        );
+    }
+
     /// The **committed** result files honour their contracts, checked as files and not as renderer output.
     ///
     /// `best.json` and `solved.json` are what a machine consumer reads, and a renderer test says
@@ -1810,6 +1989,25 @@ mod tests {
             "../../../research/scoreboard/results/solved.json"
         ))
         .expect("committed solved.json parses");
+
+        // The contract strings are the writer's own constants, character for character. The
+        // committed solved.json said the tie went "to the first recorded" while
+        // `verified_somehow` kept the last — a contract nothing checked, so it drifted. This is
+        // the check.
+        assert_eq!(
+            best.get("contract").and_then(Json::as_str),
+            Some(super::BEST_CONTRACT),
+            "best.json's contract has drifted from the writer's"
+        );
+        assert_eq!(
+            solved.get("contract").and_then(Json::as_str),
+            Some(super::SOLVED_CONTRACT),
+            "solved.json's contract has drifted from the writer's"
+        );
+        assert!(
+            super::SOLVED_CONTRACT.contains("LAST recorded"),
+            "solved.json must describe the tie-break the code actually implements"
+        );
 
         // Each states its own contract, so neither can be read as the other.
         for file in [&best, &solved] {

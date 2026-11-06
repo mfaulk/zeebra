@@ -48,7 +48,8 @@ pub use resultant::{
 };
 pub use scoreboard::{
     wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit, RunOutcome,
-    RunRecord, Scoreboard, ScoreboardError, Stage, StageCost,
+    RunRecord, Scoreboard, ScoreboardError, Stage, StageCost, BEST_CONTRACT, HISTORY_CONTRACT,
+    SOLVED_CONTRACT,
 };
 pub use slices::{solve_slice, SliceOutcome};
 pub use specialization::{satisfies, specialize, Specialization, SpecializationError};

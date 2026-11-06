@@ -47,7 +47,8 @@ use zeebra::{
             challenge, dispatch_cico, eliminate_affine, registry, Campaign, ChallengeManifest,
             ChallengeParameters, CicoVisitor, Comparison, Environment, GrobnerFrontier, Json,
             Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome, RunRecord, Scoreboard,
-            Specialization, Stage, StageCost, KOALABEAR_PRIME,
+            Specialization, Stage, StageCost, BEST_CONTRACT, HISTORY_CONTRACT, KOALABEAR_PRIME,
+            SOLVED_CONTRACT,
         },
         solve_from_lex_basis, BatchObserver, CriticalPair, F4Options, FglmOptions, IdealClass,
         SolveOptions, SolveOutcome,
@@ -1412,6 +1413,14 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
 
     // History accumulates: read what is there, append, write it back. A writer with no reader
     // would mean losing every earlier milestone's results on each run.
+    //
+    // **Append-only, and that is load-bearing rather than incidental.** Position in the `runs`
+    // array is the only record of *when* a run was recorded, and
+    // `Scoreboard::verified_somehow`'s tie-break reads it: among witnesses tied on worker count
+    // it keeps the last one, because the later record is the one later code wrote and therefore
+    // the more complete. Sorting, deduplicating or regenerating this file would leave every
+    // record present and make that choice arbitrary. The contract is written into the file
+    // below, because a consumer cannot read a Rust doc comment.
     let history_path = root.join("results").join("history.json");
     let mut entries: Vec<Json> = match fs::read_to_string(&history_path) {
         Ok(text) => Json::parse(&text)
@@ -1431,6 +1440,7 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
         &history_path,
         Json::object([
             ("schema", Json::int(RunRecord::SCHEMA)),
+            ("contract", Json::string(HISTORY_CONTRACT)),
             ("run_count", Json::size(entries_for_history.len())),
             ("runs", Json::Array(entries_for_history)),
         ])
@@ -1467,14 +1477,7 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     fs::write(
         root.join("results").join("best.json"),
         Json::object([
-            (
-                "contract",
-                Json::string(
-                    "the fastest verified witness per problem AMONG SINGLE-THREADED RUNS. A \
-                     problem solved only on multiple workers is deliberately absent; ask \
-                     solved.json for solved status.",
-                ),
-            ),
+            ("contract", Json::string(BEST_CONTRACT)),
             (
                 "best",
                 Json::Array(all.best().values().map(|run| json_for(run)).collect()),
@@ -1488,16 +1491,7 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     fs::write(
         root.join("results").join("solved.json"),
         Json::object([
-            (
-                "contract",
-                Json::string(
-                    "one verified witness per problem at ANY concurrency -- an existence claim, \
-                     not a ranking. The representative is the one using the fewest workers, ties \
-                     to the first recorded; no runtimes are compared across worker counts. Every \
-                     entry carries environment.concurrency, and an entry with concurrency > 1 is \
-                     not comparable with a figure in best.json.",
-                ),
-            ),
+            ("contract", Json::string(SOLVED_CONTRACT)),
             (
                 "solved",
                 Json::Array(
