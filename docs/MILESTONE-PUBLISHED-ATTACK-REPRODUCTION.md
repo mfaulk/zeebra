@@ -168,9 +168,14 @@ Five extractions, each of which is a number or a construction and not an impress
    and the whole discrepancy may be this one term.
 4. **The total-work model's measured terms.** `W_total = W_pre + Σ_i (W_control,i + W_poly,i +
    W_root,i + W_check,i)`. Which of these the paper reports, and the `N` it reports them over.
-5. **Whether the 7 h / 96 GPU figure is a single run or an extrapolation.** Table 1 marks four rows
-   "est." because execution logs were lost. The CICO-2 row's status decides how much weight the
-   discrepancy carries.
+5. **Whether the 7 h / 96 GPU figure is a single run or an extrapolation.** Table 1 marks three
+   rows "est." because execution logs were lost. The CICO-2 row's status decides how much weight
+   the discrepancy carries.
+
+   > **Corrected, 2026-11-06, by the reading this section asked for.** This said *four* rows, which
+   > was written from `elimination-beyond-grobner.md` at second hand. It is **three**, and all three
+   > are ZeroTest — so the CICO-2 row is a reported run and the discrepancy carried full weight
+   > rather than less. See §5.4.
 
 ### 5.2 The go/no-go, stated before reading
 
@@ -207,6 +212,54 @@ Two independent readings of two different papers agree that the degree is `3^{R_
 M24-A's first test is the one that settles it: **the parametrized family's constrained coordinate
 must be identically zero when evaluated through `permutation_plus_linear`**, at many random points.
 A construction that is wrong for the hybrid fails that test at the first point.
+
+## 5.4 What the gate returned: **go**, and `2^31` was never the error
+
+2026/1254 was read directly (#208, PR #228). The verdict is **go** against §5.2's criterion, and the
+reconciliation is the milestone's first answer to §3's third question.
+
+| extraction | verdict |
+|---|---|
+| (1) the `(1,[1])` parametrization, written out | recovered — §2.2, generalized at §3.2 |
+| (2) expected `F_p`-root count of `P_1` | recovered — and it **confirms** §9.3's ≈1 |
+| (3) what "common-root strategy" denotes | recovered — and it **confirms** §9.3's `1/p` |
+| (4) the total-work model's measured terms | `UNVERIFIED — not stated`, and unavailable *in principle*: §4.2 records the execution logs as lost |
+| (5) a run or an extrapolation | a reported **run** |
+
+**Both of §9.3's inputs survive, so `≈2^31` families stands.** The paper endorses the
+random-polynomial heuristic for `P_1` and defines its strategy as Graeffe root finding plus one
+permutation evaluation per recovered root — independent filtering, not a coupling. Two of the three
+candidate explanations are refuted on the record; the third is not needed.
+
+The factor was in **§9.2's per-family cost**, and in the comparison itself:
+
+```
+corrected per family      12 + 0.09 + 3.11  ≈ 15.2 s      (not ~120 s)
+work at N = 2^31                            ≈ 1 036 core-years
+published                 7 h × 96 GPUs     =   672 GPU-hours
+implied per-GPU factor over one core        ≈ 1.35e4
+```
+
+§9.2's ~2 minutes charged every family a ~100 s `r = 2^24` subgroup scan that belongs to Zeebra's
+*single-root descent* and not to a loop filtering ≈1 root — a stage the published attack does not
+run, and whose `W_check` the paper itself calls negligible. Residual after that: **≈13x** at a `10^3`
+per-GPU factor, 43x at `10^2.5`, 135x at `10^2`. So the gap is inside two orders of magnitude for
+any per-GPU factor above ≈140.
+
+> **The error was two separable mistakes, and neither was the family count: comparing core-years
+> against a wall clock, and charging the published loop for a stage it does not perform.**
+
+Independently anchored: 2026/1905 Table 4 gives `R_P = 6` at 1 d 17 h and `R_P = 7` at 21 d 5 h on
+128 cores — a 12.4x step per partial round, putting `R_P = 8` at ≈92 core-years by the *resultant*
+route. Two unrelated methods bracket the instance at `10^1`–`10^2` core-years against this route's
+`10^3`.
+
+**What this does not license.** The univariate route at the official `R_P = 8` is ~10^3 core-years
+and therefore out of reach, exactly as `graeffe-root-finding.md` §9.4 requires to be said. M24-A's
+deliverable is unchanged — one family end to end on reduced rows, class `Engineering { why }` — and
+is now backed by a cost model that has been reconciled against a published result rather than left
+disagreeing with one. The `10^2`–`10^3` per-GPU throughput factor is an estimate, not a measurement,
+and the verdict's margin depends on it.
 
 ---
 
@@ -263,6 +316,54 @@ and (3):
 A reduced row where a witness is actually reachable turns `2^31` from an estimate into a measured
 ratio that can be extrapolated with a stated model. **That, not a wall-clock figure, is M24-A's
 contribution to question 3.**
+
+### 6.4 What was measured, and the row this section asked for does not exist
+
+17 838 families over ten rows (#210, PR #235). Both assumptions hold, the third candidate
+explanation dies, and **the table above asks for something impossible** — which is the result.
+
+**Assumption 1 holds, distributionally and not just on average.** Pooled mean root count **0.9997**
+against a predicted 1.0, and the whole distribution tracks Poisson(1): on `t16-rf4-rp0` over 3 000
+families the no-root share is 0.3503 against `1/e = 0.3679`, which is 2026/1254 §2.2's `1 − 1/e`
+reproduced directly rather than assumed.
+
+**Assumption 2's independence holds; its rate is not measurable here.** `χ²` on the second
+constraint's residual over 256 bins at 255 dof (sd ≈ 22.6) gives 202, 234, 234, 245, 278 across
+rows — every one inside ±3σ, so conditioned on `P_0` vanishing the second constrained word is
+uniform as far as the test can see, and the parametrization does not couple the constraints. The
+*rate* is a different claim and is refused: 0 hits in 17 901 roots where `1/p` predicts `8e-6`, a
+95% upper bound of `3/n ≈ 1.7e-4` that does not separate `1/p` from anything below it. **No run on
+this hardware can measure that rate**, and the example says so in those words.
+
+So all three of §9.3's candidate explanations are eliminated — extra freedom per family would have
+had to show up either as extra roots or as correlated constraints, and neither appears — and
+§5.4's per-family cost correction is the *whole* of the reconciliation.
+
+> **The correction to this section.** §6.3's third row asks for "the observed count on a row small
+> enough to finish". **There is no such row at `k = 2`, at any round count.** The family count is
+> `p / (roots per family)`, which contains neither `R_F` nor `R_P`, and the ladder shows it
+> directly: `δ` spans **6 561x** across these rows and the mean root count never leaves 1.0. So
+> `N ≈ 2^31` on `t16-rf2-rp0` exactly as on the disclosed `rf6-rp8`.
+>
+> **Reducing rounds buys a cheaper family, not a cheaper search.** Zero witnesses on the nine
+> `k = 2` rows, and none was available to be found.
+
+Measured where it *can* be: `poseidon-t3-rf2-rp1-planted` is `k = 1`, so one output constraint is
+all there is and a root of `P_0` **is** a witness — **1.00 families per witness, 3 witnesses verified
+through `CicoInstance::is_solution`**, parametrization through verification end to end. That
+calibrates the mechanism and isolates the `1/p` factor at `k = 2` as the entire difference between
+`O(1)` families and `2^31`. It is also why the `k = 3` family and the hybrid that
+`graeffe-root-finding.md` §9.3 leaves open are the only directions that could change the trade.
+
+**One corroboration that came free.** `t16-rf6-rp4`, the only row above the symbolic crossover,
+takes the evaluation route at `2^15`: construction 172.0 ms per family (**77%**), Graeffe 50.5 ms
+(**23%**), interpolation 1.07 ms, lifting and verification µs. That reproduces 2026/1254 §4.2's own
+stated ordering — construction and root finding dominant, the final evaluation negligible — and so
+independently corroborates §5.4's central move, that the published per-family loop is those two
+stages and nothing else, which is why §9.2's ~100 s candidate-scan row never belonged in it.
+
+`δ = 3^13` is **not** reached; the largest row is `3^9`, four factors of three short. Nothing in
+§6.4 is a per-family cost for `rf6-rp8`.
 
 ---
 
@@ -358,6 +459,25 @@ Per-determinant cost, extrapolated from the measured 2.868 ms at order 162 (37 6
 Peak memory is not a concern: a 1458² dense matrix of 8-byte elements is **17.0 MB**, so 136 MB
 across eight threads, plus ~68 MB for sixteen symbolic state words of ~266 000 terms.
 
+> **Wrong by 838x, measured 2026-11-06 (#211, `resultant-elimination.md` §6.8).** The build's peak
+> is **57.0 GB**, not ~68 MB, and it is the only sentence in this document that was wrong by more
+> than three orders of magnitude. The determinant half of the paragraph stands: 17.0 MB a matrix,
+> and 544 MB across 32 workers.
+>
+> The mechanism was read rather than inferred. `SparseMultiPoly`'s multiply pushes every pairwise
+> term-product into one `Vec` and collects like terms afterwards, so cubing a degree-243 word as
+> `p*p` then `(p²)*p` makes the second multiply 118 827 × 29 768 = **3.54 × 10⁹** products —
+> **56.6 GB** at sixteen bytes an entry, for a product that is 4.3 MB. Predicted 56.6 GB, measured
+> 57.0 GB. The RSS trace is a **sawtooth with one peak per state word**, not a climb, so it is a
+> transient four orders of magnitude larger than its own result rather than a leak — which is why
+> 503 GB of RAM absorbed it. #243 is the collecting multiply that would bound it by the output.
+>
+> **What this does not change: the time, and therefore the gate.** The build completed in
+> **48.37 min** against §7.5's ~36 min estimate — **1.34x**, inside the band that estimate deserved
+> — and the row is a go on that basis. §7.5 named the build's *time* as the milestone's largest
+> unknown and was right to; it did not list the build's *memory* as a risk at all, and that is the
+> omission worth remembering.
+
 **Authorize 6 562 samples on `rf2-rp4` with a four-hour wall-clock backstop. Authorize nothing
 else.** `rf4-rp2` at 34.3 single-core hours and `rf6-rp0` at 12.9 single-core days are predictions
 to print, not rows to run — the same discipline `examples/resultant_cico.rs` already applies through
@@ -394,10 +514,62 @@ State the consequence rather than discovering it mid-run: if the off-domain chec
 the row's result. It would be the first experimental counterexample to [JAZ] slide 22's formula and
 a more interesting outcome than the witness.
 
+### 7.8 The row, run: a verified six-round witness
+
+**`poseidon31-cico-t16-rf2-rp4` solved.** 32 workers on cores 0–31, under `tools/benchlock.sh`,
+seed 1, the same slice M23-B and M23-C measured.
+
+| stage | measured | predicted (§7.4) | |
+|---|---:|---:|---|
+| symbolic bivariate build | **49.83 min** | 48.37 min (measured first) | 1.03x |
+| 6 562 order-1458 determinants, 32 workers | **9.22 min** | 7.1 min | 1.30x |
+| off-domain validation, 8 fresh points | 17.4 s | ~17 s | 1.00x |
+| interpolation at 6 562 points | 394 ms | ~0.4 s | — |
+| root finding at degree 6 561 | 4.07 s | ~4 s | 1.02x |
+| lifting and verification | 87 ms | ms | — |
+| **total** | **59.71 min** | ~57 min | **1.05x** |
+
+Peak RSS **56 987 MB**, within 0.03% of the build probe's 57 003 MB — the build is the whole
+footprint and the 32 concurrent order-1458 matrices are 544 MB beside it.
+
+> **The witness is `x = 941710918, y = 475196876`, and `permutation_plus_linear` returns zero in the
+> first two output words.** One base-field root, one candidate lifted, one verified witness,
+> checked by `CicoInstance::is_solution` — the same verifier every other registered result in this
+> repository is checked by.
+
+`Significance` reports it as `ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" }` at
+`R_F = 2, R_P = 4` against an official `R_F = 6, R_P = 8`. **It says nothing about the official
+target.** What it says is that the verified attack frontier moved from **four rounds to six** on a
+faithful reduced-round instance, by a route whose cost is written down.
+
+**Three things this row establishes beyond the witness.**
+
+1. **The published `d^{2R_F+R_P}` degree formula is confirmed at six rounds**, where it is
+   discriminating. The observed resultant degree is **6 561 against a Bézout `d²` of 531 441 — 81x
+   below it**, and 8 points outside the sample set agree with a direct Sylvester determinant. The
+   three confirmations in `resultant-elimination.md` §6.3 were all at four rounds or fewer; this is
+   the first at six, and the factor separating the two formulas is 81x rather than 9x. [JAZ] slide
+   22's claim remains experimental and is now experimentally supported one rung further out.
+2. **§7.6's warning was load-bearing and the run printed it before starting.** The proven `2d²`
+   fallback would need 1 062 883 samples — **19.29 h** — so the A/B control was skipped by the
+   budget and the prediction was the only affordable route. Had the off-domain check refused, the
+   row's result would have been *prediction falsified, generic bound unaffordable*. It held.
+3. **#179 is what made the row exist.** 6 562 samples against 1 062 883 is exactly 162x, and at the
+   measured 2.70 s of core-time per order-1458 determinant the generic bound is 19.3 h of
+   determinants where the prediction is 9.2 min on 32 cores.
+
+The only prediction materially off is the determinant stage at 1.30x: 84.3 ms of wall per
+determinant across 32 workers is 2.70 s of core-time against the 2.09 s extrapolated from order
+162 by `(order/162)³`. A dense-LU cubic law understating a 9x jump in matrix order by 29% is a
+better outcome than that extrapolation deserved, and the shortfall is in the right direction to be
+cache behaviour at order 1 458 rather than a wrong exponent.
+
 ### 7.7 Success criterion
 
 > Produce the first verified six-round full-width Poseidon reduction by Zeebra's resultant method,
 > or establish a measured, resource-attributed reason it remains impractical.
+
+**Met, by the first clause.** §7.8.
 
 A witness here would be `Significance::ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" }` at
 `R_F = 2, R_P = 4` against an official `R_F = 6, R_P = 8`. It says nothing about the official target
@@ -568,6 +740,83 @@ The same shape as M23-I, with question 3 added:
 - The resource-growth curves from §9.1, with the stop rule's verdict.
 - The next credible frontier, named with the measurement that makes it credible.
 
+### 10.1 The cost-model table
+
+Predicted against observed, with the difference **attributed** rather than noted. This is the table
+§3's third question exists for, and the entries below are the ones closed so far.
+
+| what was predicted | prediction | observed | attribution |
+|---|---|---|---|
+| univariate route, families per witness | `≈2^31` (`graeffe-root-finding.md` §9.3) | **`≈2^31` confirmed** — root count 0.9997, χ² independence inside ±3σ | the prediction was right; the surrounding claim was not |
+| univariate route, cost per family | ~2 min (§9.2) | **15.2 s** | §9.2 charged the loop a ~100 s `r = 2^24` subgroup scan belonging to Zeebra's single-root descent. A stage the published attack does not run |
+| univariate route vs the published 7 h / 96 GPUs | "four orders of magnitude after any plausible GPU factor" | **~13x** at a `10^3` per-GPU factor | two separable errors: core-years compared against a wall clock, and the stage above. §5.4 |
+| families per witness at reduced rounds | assumed to fall with `R_F`, `R_P` (§6.3) | **invariant** — `δ` spans 6 561x, root count never leaves 1.0 | the count is `p / (roots per family)` and contains neither. §6.4 |
+| the published per-family stage ordering | construction and root finding dominant, checking negligible (2026/1254 §4.2) | **77% / 23% / µs** | prediction held, and independently corroborates the attribution two rows above |
+| Sylvester determinants, parallel | "a constant factor bounded by core count" (§7.3) | **92–95% efficient to 32 cores** | prediction held |
+| `fftmul`'s reported ceiling | checker-limited, not multiply-limited (#189) | **`2^18` → `2^22`**, 16x, stop now the budget on the multiply | prediction held; the instrument was the ceiling |
+| the budget ladder's memory | "0.32 / 1.6 / 6.4 / 16 GB of entry storage" (§9.1) | **195 MB accounted inside a 14.75 GB process**, 75x | the plan predicted the wrong *quantity*. The entry budget bounds one allocation, and README said so |
+| six-round symbolic build | "peak memory is not a concern … ~68 MB" (§7.4) | **≥55 GB**, and the build is the binding stage | ~800x. §7.5's named unknown was the build's *time*; its memory was not even listed as a risk |
+
+Two patterns in that column, and they are the milestone's methodological result.
+
+**Every prediction about a stage Zeebra had already measured held.** Parallel determinants, the
+`fftmul` ceiling, the published stage ordering — all three landed.
+
+**Every prediction about a quantity nobody had measured was wrong, and three of the four were wrong
+by more than an order of magnitude.** Per-family cost, the memory of the budget ladder, and the
+six-round build's footprint were each stated with confidence in a document that had no measurement
+behind them. The `2^31` row is the sharpest case: the *number* was right and the *claim built on it*
+was wrong by four orders, which is the failure mode a cost model catches and a benchmark does not.
+
+### 10.2 The frontier view
+
+| | M23 | M24 |
+|---|---|---|
+| hardest **official** problem solved | Fukuoka MQ III `n = 15` | unchanged |
+| **faithful reduction**, resultant route | 4 rounds — `rf2-rp2`, `rf4-rp0` | 6 rounds attempted under §7.4's budget |
+| **external calibration** against another solver | none | Anemoi, 10 registered rows, `D` matched 10/10, 7 verified witnesses to `N = 5` |
+| univariate CICO route | absent | one family end to end; `k = 1` witnesses; economics measured over 17 838 families |
+| Sylvester determinants | 1 core of 128 | 32 cores at 92–95% efficiency |
+| resultant sample count | `2d²` = 13 123 | predicted `3^{2R_F+R_P}`, **17.96x** fewer on `rf2-rp2` |
+| `fftmul` reported ceiling | `2^18`, checker-limited | **`2^22`**, multiply-limited |
+| benchmark protocol | a script no reader had | `tools/benchlock.sh`, committed |
+
+### 10.3 The negative results, as results
+
+1. **The univariate route's family count is invariant under round reduction.** `p / (roots per
+   family)` contains neither `R_F` nor `R_P`; `δ` spans 6 561x across the ladder and the mean root
+   count never leaves 1.0. There is no `k = 2` reduced row where a witness is reachable, at any
+   round count. §6.4.
+2. **The `1/p` filter rate is not measurable on this hardware.** 0 hits in 17 901 roots bounds it
+   only by `3/n ≈ 1.7e-4`, which separates `1/p` from nothing. Stated rather than estimated.
+3. **Fukuoka III `n = 20` is out of reach, not out of budget** — and the evidence is the *uncapped*
+   rung, which is time-bound at four batches in forty minutes, not the `cap + ε` pattern that
+   distinguishes nothing. `f4-resource-scaling.md` §6a.
+4. **`max_live_bytes` omits at least 98.7% of peak RSS**, and my own first reading of that — a step
+   function of the degree entered — is **false**: the uncapped rungs peak *below* the capped ones
+   while doing more work. #237.
+5. **The published Anemoi FGLM wall does not reproduce.** A negative result about a reference claim
+   transferring, which happens to be favourable to this crate and therefore needs more care, not
+   less. §8a.1.
+6. **§7.4's six-round memory estimate was wrong by 838x**, and §7.5 did not list the build's memory
+   as a risk at all while correctly naming its time. #243.
+
+### 10.4 The next credible frontier, each with the measurement that makes it credible
+
+- **#243, a collecting multiply.** The six-round build's 57 GB is a transient `O(terms²)` sawtooth
+  for a 4.3 MB result — 56.6 GB predicted against 57.0 GB measured. Bounding it by its output is
+  the gate on any eight-round attempt, and on `rf4-rp2` and `rf6-rp0` at six.
+- **#237, profiling the F4 memory gap**, with the experiment sharpened by §6a: compare a capped run
+  against an uncapped one at the same point, since an error-path allocation is now as plausible as a
+  preprocessing one.
+- **Anemoi `N = 6`.** The reference prints a basis there and a dash for the conversion. Zeebra's
+  `D³` model is validated at `N = 5` to within 114x against 125x, and puts `D = 15 625` at roughly
+  1.6 h. That would **produce** a figure rather than reproduce one.
+- **A `k = 3` family, or a hybrid.** §6.4 shows reducing rounds cannot help, so these are the only
+  directions that change the univariate trade. Neither is analysed in any source read here.
+- **Axis 2 of #180, a structured Sylvester determinant.** Now the only axis left with an asymptotic
+  improvement in it, and measurable against an already-parallel baseline rather than a serial one.
+
 ---
 
 ## 11. Acceptance criteria
@@ -643,6 +892,32 @@ The stretch level is a stretch. A milestone that reproduces a published procedur
 against an external solver, extends the verified frontier by two rounds and publishes a cost model
 that explains its own earlier `2^31` error is a successful scientific milestone whether or not an
 official challenge falls out of it.
+
+### 13.1 Scored
+
+| level | verdict | on what |
+|---|---|---|
+| **Minimum** | **met** | the univariate CICO procedure reproduced end to end — parametrization through verification — with 3 witnesses through `permutation_plus_linear` on the `k = 1` row (§6.4); and Anemoi calibrated, with the machine-independent `(α+2)^N` agreeing at **10 rows of 10, both models, first run** (§8a) |
+| **Strong** | **met**, by the second clause | §13's second clause asks for "an Anemoi row where Zeebra's stage split contradicts or confirms the published wall". It **contradicts** it: within-run conversion/basis is 1.71 against Magma's 2 367 at `N = 5`, a ratio-of-ratios of 1 382x, with a verified witness at the rung where the published logs stop reporting a conversion (§8a.2). This is met independently of the six-round row |
+| **Stretch** | **not met**, and the gate explained why | the univariate route at the official `R_P = 8` is ~10^3 core-years once §5.4's cost model is corrected, and `2^31` families stands. No method here measurably improves on a published attack |
+
+The first clause of **Strong** — a verified six-round reduction — is the row running under §7.4's
+budget, and its outcome is recorded in §7.8 either way. Note that the milestone reaches Strong
+without it, which is the point of having written two clauses: the resultant row was the predictable
+advance and the Anemoi calibration was the one nobody had costed.
+
+**What M24 did not do**, stated rather than omitted:
+
+- **No official target was solved, and none was approached in a way that can be quoted as a
+  fraction.** The three 2026 CICO targets were solved externally in 2026 and the best outcome
+  available on them is a reproduction.
+- **No optimization moved a frontier.** Every frontier movement in M23 and M24 came from changing a
+  formulation or fixing an instrument. #179 and #227 are real speedups — 17.96x and 92–95% of 32
+  cores — and they bought a *round count* only because the formulation had already bought three
+  orders of magnitude.
+- **Three of four unmeasured predictions in this document were wrong by more than an order of
+  magnitude** (§10.1), and one of them was wrong by 838x. That is the milestone's methodological
+  finding and it is about this document, not about the code.
 
 ---
 
