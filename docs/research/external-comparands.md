@@ -213,6 +213,51 @@ important flag for a fair comparison: an unflagged msolve run is single-threaded
 unflagged Sagebrush run uses all 128 hardware threads (§5.3). `-v 1` echoes the whole
 configuration, `#threads` included, which is worth capturing into the run record.
 
+### 3.7 `-g 2` really does stop, and `-v 1` breaks the basis down by F4 stage
+
+Verified rather than assumed, because the whole value of msolve as a comparand rests on it.
+With `-v 1`, `-g 2` prints **one** `TIMINGS` block and stops; the default `-g 0` prints several,
+going on through genericity retries to the parametrization. So `-g 2` times the Gröbner stage
+alone and `-g 0` times basis-plus-conversion, and the difference is the conversion.
+
+Better than that, `-g 2 -v 1` decomposes the basis computation itself:
+
+```
+---------------- TIMINGS ----------------
+overall(elapsed)  …   select  …  4.3%   symbolic prep.  …  4.6%
+update  … 25.7%   convert  … 24.8%   linear algebra  …  7.9%   reduce gb  …  0.0%
+---------- COMPUTATIONAL DATA -----------
+size of basis  6      #terms in basis  31
+```
+
+Those are **Zeebra's own stage names** — selection, symbolic preprocessing, update, matrix
+conversion, linear algebra — so `docs/MILESTONE-F4-OPTIMIZATION.md` §6.2's claim that
+elimination dominates can be checked against an independent implementation stage by stage,
+not just end to end. (The percentages above are from the smoke system and are meaningless at
+3 ms; the point is the instrument, not the number.) No other comparand here exposes this.
+
+### 3.8 Failure modes, and the one that is silent
+
+`-v 0` is the default and it is **completely silent**: on the smoke system, 0 bytes of stdout,
+0 bytes of stderr, exit 0. Everything in this section is therefore invisible unless `-v 1` is
+passed, which an adapter should treat as mandatory rather than optional.
+
+| condition | exit | where | message / behaviour |
+|---|---|---|---|
+| characteristic ≥ 2^31 | **1** | stderr | `Warning: characteristic must be 0 or < 2^31` (§3.3) |
+| not in generic position, `-c 2` (default) | 0 | **stdout, only at `-v 1`** | `Ideal not in generic position, parametrizations are not correct`, then `Changing variable order for possibly more generic staircase:`, then a new variable `A` (§3.4) |
+| not in generic position, `-c 0` | **1** | stderr | `=====> Computation failed <=====` plus advice to use `-c2`; **output file is empty** |
+| no solution in the algebraic closure | 0 | output file | `[-1]:` (`main.c:94`) |
+| infinitely many solutions | 0 | output file | `[1, nvars, -1,[]]:` (`main.c:95`) |
+
+The third row is the clean one — non-zero exit, stderr, empty output — and the second is the
+trap: **msolve recovers by changing the problem, and says so only on stdout at `-v 1` while
+exiting 0.** The smoke system hits it. An adapter that runs `-v 0`, sees exit 0 and parses the
+output file gets a correct parametrization *of a system with a variable msolve added*, and
+nothing anywhere tells it so except the variable list in the output (`['x','y','z','A']`).
+**Compare the output's variable list against the input's**; that check is cheap and it is the
+only reliable signal.
+
 ---
 
 ## 4. Groebner.jl 0.10.11 on Julia 1.11.7
