@@ -71,6 +71,14 @@ const PLANTED: usize = 4;
 /// instead of it.
 const RECURSIVE_NTT_MULTIPLIER: usize = 7;
 
+/// The most field operations the subgroup search is allowed to need before a row is skipped.
+///
+/// About five minutes at this box's ~640 M field multiplications per second
+/// (`docs/research/graeffe-root-finding.md` §6.1). It exists because the per-measurement wall
+/// budget is checked *after* a measurement and this one stage can be days long over a field whose
+/// odd part is large.
+const SUBGROUP_SEARCH_OPERATION_CEILING: f64 = 2e11;
+
 // === the allocator ===
 
 /// Counts live heap bytes, so a stage's peak is exact rather than estimated.
@@ -212,8 +220,36 @@ fn graeffe_ladder<F: KnownOrder>(name: &str, degrees: &[usize], budget: Duration
             .join(":")
     );
 
+    // The odd part as a float, for the subgroup-search guard below. Saturating is harmless: a
+    // subgroup wider than a `u128` is past every threshold anyway.
+    let subgroup_order = if odd_part.len() > 2 {
+        f64::INFINITY
+    } else {
+        odd_part
+            .iter()
+            .rev()
+            .fold(0.0f64, |acc, limb| acc * 2f64.powi(64) + *limb as f64)
+    };
+
     let mut rows: Vec<GraeffeRow> = Vec::new();
     for &degree in degrees {
+        // The subgroup search is what decides whether the method pays, and it is the one stage a
+        // wall-clock budget cannot bound: the budget is only checked after a measurement, and a
+        // degree-3^13 search over Goldilocks (`s = 2^32 - 1`, so neither `s * d` nor
+        // `log q * d^2` is reachable) would run for days before the first row printed. Skipped
+        // with the reason, rather than started.
+        let enumeration = subgroup_order * degree as f64;
+        let fallback = 64.0 * degree as f64 * degree as f64;
+        if enumeration.min(fallback) > SUBGROUP_SEARCH_OPERATION_CEILING {
+            println!(
+                "\nstopped: at degree {degree} the subgroup search needs at least {:.3e} field \
+                 operations, past the {SUBGROUP_SEARCH_OPERATION_CEILING:.0e} this binary will \
+                 start. The odd part of q - 1 is too large for the method to pay at this degree.",
+                enumeration.min(fallback)
+            );
+            break;
+        }
+
         let mut rng = StdRng::seed_from_u64(seed ^ degree as u64);
         let (f, planted) = with_planted_roots::<F, _>(degree, &mut rng);
         assert_eq!(
