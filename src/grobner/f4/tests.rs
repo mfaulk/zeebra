@@ -2998,3 +2998,158 @@ fn test_observed_and_reported_together() {
         "the crossing happened inside a batch the observer had already been shown"
     );
 }
+
+/// A zero time budget stops the computation, names the degree it reached, and keeps the counters.
+///
+/// Zero rather than a small duration so the test is not a race: the check is between batches, so
+/// the first batch runs and the second is refused, whatever the machine's speed.
+#[test]
+fn test_a_time_budget_stops_with_the_degree_and_the_counters() {
+    use crate::grobner::{f4_reported, StopKind};
+    use std::time::Duration;
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<5, Zp2147483647>();
+    let options = F4Options {
+        max_wall_time: Some(Duration::ZERO),
+        ..F4Options::default()
+    };
+
+    let (result, statistics) = f4_reported(&system, order, &options);
+    let Err(F4Error::TimeBudgetExceeded {
+        degree,
+        elapsed_millis,
+        budget_millis,
+    }) = result
+    else {
+        panic!("a zero budget must stop the computation, not {:?}", result);
+    };
+
+    // The degree named is the one the refused batch was selected at, which is a real selection
+    // degree and not a sentinel.
+    assert!(degree >= 2, "{} is not a selection degree", degree);
+    assert_eq!(budget_millis, 0);
+    assert!(elapsed_millis >= budget_millis);
+
+    // The group-B counters describe the batches that did run. This is the half an abandoned
+    // worker thread cannot deliver, and the reason the stop is cooperative.
+    assert_eq!(statistics.batches, 1, "exactly the first batch was reduced");
+    assert!(statistics.max_matrix_rows > 0);
+    assert!(statistics.max_matrix_columns > 0);
+    assert!(statistics.max_live_nonzeros > 0);
+    assert!(statistics.max_estimated_bytes > 0);
+    assert!(statistics.pairs_reduced > 0);
+    assert_eq!(
+        statistics.bytes_per_entry,
+        F4Options::bytes_per_entry::<Zp2147483647>()
+    );
+
+    // Type-level, not by name: a consumer that ranks resource stops cannot reach this one.
+    let error = result.expect_err("already matched");
+    assert_eq!(error.stop_kind(), StopKind::Time);
+    assert_ne!(error.stop_kind(), StopKind::Resource);
+    assert_eq!(error.limit_name(), "max_wall_time");
+}
+
+/// Every other stop is classified as a resource stop, a caller mistake, or a failed certification.
+///
+/// Guards the distinction the time stop rests on: if a resource variant were ever classified as
+/// `Time`, or the time variant as `Resource`, a frontier would start comparing a wall clock
+/// against an entry count.
+#[test]
+fn test_stop_kinds_keep_clocks_and_budgets_apart() {
+    use crate::grobner::StopKind;
+
+    for error in [
+        F4Error::TooManyRows { limit: 1 },
+        F4Error::TooManyColumns { limit: 1 },
+        F4Error::TooManyNonzeros {
+            nonzeros: 2,
+            limit: 1,
+        },
+        F4Error::TooManyLiveBytes { bytes: 2, limit: 1 },
+        F4Error::TooManyBatches { limit: 1 },
+        F4Error::TooManyBasisElements {
+            elements: 2,
+            limit: 1,
+        },
+    ] {
+        assert_eq!(error.stop_kind(), StopKind::Resource, "{:?}", error);
+    }
+    assert_eq!(
+        F4Error::InvalidOptions { reason: "" }.stop_kind(),
+        StopKind::Caller
+    );
+    assert_eq!(
+        F4Error::CertificationFailed { reason: "" }.stop_kind(),
+        StopKind::Certification
+    );
+    assert_eq!(
+        F4Error::TimeBudgetExceeded {
+            degree: 3,
+            elapsed_millis: 10,
+            budget_millis: 1,
+        }
+        .stop_kind(),
+        StopKind::Time
+    );
+}
+
+/// No time budget means no stop, and the default leaves one unset.
+#[test]
+fn test_no_time_budget_by_default() {
+    assert_eq!(F4Options::default().max_wall_time, None);
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<4, Zp2147483647>();
+    let basis = f4(&system, order).expect("katsura-4 completes");
+    let (result, _) = f4_reported(&system, order, &F4Options::default());
+    assert_eq!(result.expect("the same system completes"), basis);
+}
+
+/// Symbolic preprocessing's monomial queue is counted, and its peak is below what it enqueued.
+///
+/// The counters the memory attribution rests on: `monomials_enqueued` is the pre-deduplication
+/// total, so it must exceed the distinct monomials tested, and the queue's high-water mark must
+/// not exceed what was ever put in it.
+#[test]
+fn test_the_monomial_queue_is_counted() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<5, Zp2147483647>();
+    let (_, statistics) = f4_with_options(&system, order, &F4Options::default())
+        .expect("katsura-5 completes under the default");
+
+    assert!(statistics.monomials_enqueued > 0);
+    assert!(statistics.max_pending_monomials > 0);
+    assert!(
+        statistics.max_pending_monomials <= statistics.monomials_enqueued,
+        "the queue cannot hold more than was enqueued: {} > {}",
+        statistics.max_pending_monomials,
+        statistics.monomials_enqueued
+    );
+    assert!(
+        statistics.monomials_enqueued > statistics.divisor_queries,
+        "every term of every row is enqueued and only the distinct ones are tested: {} vs {}",
+        statistics.monomials_enqueued,
+        statistics.divisor_queries
+    );
+}
+
+/// The pair queue's footprint and the basis's peak size are reported, and the heap holds the live
+/// pairs plus whatever lazy deletion left behind.
+#[test]
+fn test_the_unbudgeted_structures_are_reported() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<5, Zp2147483647>();
+    let (basis, statistics) = f4_with_options(&system, order, &F4Options::default())
+        .expect("katsura-5 completes under the default");
+
+    let footprint = statistics.peak_pair_queue;
+    assert!(footprint.heap_entries > 0);
+    assert!(footprint.heap_entries >= footprint.live);
+
+    // The basis is largest at the end of the loop, before interreduction removes the redundant
+    // elements, so the peak is at least what came out.
+    assert!(statistics.peak_basis_elements >= basis.len());
+    assert!(statistics.peak_basis_terms >= statistics.peak_basis_elements);
+}

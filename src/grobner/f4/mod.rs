@@ -130,9 +130,13 @@ pub fn f4_reported<const N: usize, F: FiniteField>(
 ///
 /// The combination exists for a computation that is **expected not to finish**. A frontier run
 /// needs the statistics from a crossed budget, which [`f4_observed`] discards with its `Err`, and
-/// it needs per-batch notification so that a wall-clock supervisor can say how far the computation
-/// had got when it was stopped — F4 has no cooperative time check, so the only thing that knows is
-/// an observer that was called as the batches went past.
+/// it needs per-batch notification so that an external supervisor can say how far the computation
+/// had got if it had to be abandoned outright.
+///
+/// For a wall clock, prefer [`F4Options::max_wall_time`]: a cooperative stop **returns**, so the
+/// statistics come back through this function's second element and the observer is not the only
+/// account of the state. An external supervisor remains the right backstop for a single batch that
+/// outlasts the budget, which no per-batch check can interrupt.
 ///
 /// # Errors
 /// As [`f4_with_options`], with the work done before the refusal in the statistics.
@@ -398,17 +402,24 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         }
 
         // The cooperative time check, beside the batch limit and for the same reason: a budget
-        // crossed between batches leaves the statistics describing whole batches. `clock` is
+        // crossed between batches leaves the statistics describing whole batches. `wall_clock` is
         // `Some` only when a budget was asked for, so the default path reads no clock at all —
         // which is why this is not folded into `total_clock`, whose own activation is tied to
         // stage measurement.
+        //
+        // `statistics.batches > 0` is the one condition, and it is the point of the whole
+        // mechanism rather than a guard against an edge case: #284 exists because a time-bounded
+        // run reported no matrix statistics at all, and a stop before the first matrix would
+        // reproduce that with a different error. One batch is therefore always reduced, so the
+        // report is never empty. A budget too small to admit a single batch is not satisfiable by
+        // any faster code, only by a smaller problem.
         if let (Some(clock), Some(budget)) = (wall_clock.as_ref(), options.max_wall_time) {
             let elapsed = clock.elapsed();
-            if elapsed >= budget {
+            if statistics.batches > 0 && elapsed >= budget {
                 return Err(F4Error::TimeBudgetExceeded {
                     degree,
-                    elapsed_millis: elapsed.as_millis().min(u64::MAX as u128) as u64,
-                    budget_millis: budget.as_millis().min(u64::MAX as u128) as u64,
+                    elapsed_millis: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
+                    budget_millis: budget.as_millis().min(u128::from(u64::MAX)) as u64,
                 });
             }
         }
@@ -475,6 +486,11 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             // Only the pairs involving the new element are new.
             pending.push_pairs_from_leads(&leads, added, &options.criteria, &mut criteria_counts);
         }
+
+        // Sampled again here, and this is the sample that matters: the one above is taken after
+        // `select_batch` drained a degree, which is a local *minimum* of the heap. The pairs of
+        // this batch's new elements have just been pushed, so this is the high-water mark.
+        statistics.peak_pair_queue = statistics.peak_pair_queue.max(&pending.footprint());
     }
 
     statistics.criteria = criteria_counts;

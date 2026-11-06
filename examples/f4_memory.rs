@@ -48,7 +48,7 @@ use zeebra::{
         research::mq::MqInstance,
         BatchObserver, CriticalPair, F4Options, F4Statistics,
     },
-    util::peak_resident_bytes,
+    util::{isa_floor, peak_resident_bytes},
     FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
@@ -515,6 +515,11 @@ fn read_mq(name: &str) -> Option<MqInstance> {
 }
 
 fn main() {
+    // The build, not the CPU: `RUSTFLAGS` REPLACES `target.*.rustflags`, so an artifact can
+    // silently lose the repository's `-C target-cpu=x86-64-v3` floor. A figure that does not say
+    // which floor it was taken at is not comparable with one that does.
+    println!("# F4 memory attribution\n\n- built for {}", isa_floor());
+
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let entries: usize = std::env::var("ZEEBRA_MAX_ENTRIES")
         .ok()
@@ -528,11 +533,19 @@ fn main() {
         };
         // The frontier budget `examples/scoreboard.rs` runs the ladder under: ten times the
         // columns, a byte cap set high enough that the entry count binds, and a batch cap.
+        // `ZEEBRA_WALL_SECONDS` becomes a *cooperative* budget rather than a supervisor, which is
+        // what makes an uncapped rung measurable: it stops between batches and returns, so the
+        // attribution describes whole batches and the statistics survive. §6a's uncapped rungs
+        // were abandoned in a worker thread and could report neither.
         let options = F4Options {
             max_matrix_columns: 200_000,
             max_live_nonzeros: entries,
             max_live_bytes: 64_000_000_000,
             max_batches: Some(10_000),
+            max_wall_time: std::env::var("ZEEBRA_WALL_SECONDS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .map(Duration::from_secs),
             ..F4Options::default()
         };
         let Some(instance) = read_mq(name) else {
