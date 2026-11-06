@@ -12,6 +12,7 @@ mod dense_polynomial_arithmetic;
 mod div_with_remainder;
 mod factorize;
 mod gcd;
+mod karatsuba;
 mod lagrange_interpolation;
 mod polynomial_trait;
 mod pow_mod;
@@ -25,6 +26,10 @@ pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialPa
 pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
 pub use gcd::gcd;
+// Measurement hooks for `examples/karatsuba_crossover.rs`, not API: the dispatcher-facing entry
+// point is the `pub(crate)` `karatsuba::multiply_karatsuba`.
+#[doc(hidden)]
+pub use karatsuba::{karatsuba_base_case_unstable, karatsuba_unstable};
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
 // The cubic textbook form, for differential testing against the quadratic one. Not public: it was
 // not public before, and it is strictly slower. Re-exported here, unused for now, so that #162's

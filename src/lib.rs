@@ -44,6 +44,8 @@ pub use poly::{
     Monomial, MonomialOrder, MultivariatePolynomial, Polynomial, PolynomialParams,
     PowerPermutation, UnivariatePolynomial,
 };
+#[doc(hidden)]
+pub use poly::{karatsuba_base_case_unstable, karatsuba_unstable};
 pub use rings::Ring;
 
 /// The README's code examples, compiled and run.

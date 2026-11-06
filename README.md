@@ -303,6 +303,8 @@ cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
+cargo run --release --example karatsuba_crossover  # Karatsuba against schoolbook, per field width
+cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example batch_inversion      # batch inversion: routine, integration,
 cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
 cargo run --release --example scoreboard           # registered problems, one record each, staged
@@ -997,6 +999,12 @@ let b = UnivariatePolynomial::<Zp65537>::new(&[Zp65537::new(3), Zp65537::new(4)]
 // Degree 2, so this is the schoolbook route — and the same answer either way.
 assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
 ```
+
+A Karatsuba helper now exists beside the schoolbook `Mul` but is **not wired into it**: the
+multiplication dispatcher is a separate change, so `mul`'s row above is unaffected.
+`cargo run --release --example karatsuba_crossover` measures the helper against schoolbook and
+reports the crossover per field element width, which is not one number — see
+[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) §4.1.
 
 ## Gröbner Bases
 

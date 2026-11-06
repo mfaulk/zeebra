@@ -9,6 +9,8 @@ pub use univariate::{
     is_permutation_polynomial, lagrange_interpolate, permutation_exponents, pow_mod, roots,
     Polynomial, PolynomialParams, PowerPermutation, UnivariatePolynomial,
 };
+#[doc(hidden)]
+pub use univariate::{karatsuba_base_case_unstable, karatsuba_unstable};
 
 #[cfg(test)]
 pub(crate) use univariate::trace_to_gf2;
