@@ -58,20 +58,88 @@
 //! not support. The structural invariant is itself checked against an independent Buchberger basis
 //! in `test_certification_agrees_with_buchberger`.
 //!
+//! # Which pair criteria a verifier may apply, and which it may not
+//!
+//! (3) names `|G|(|G|−1)/2` pairs and most of them are redundant by the same theorems the engines
+//! prune with. Enabling one here is a different risk from enabling one in an engine: a criterion
+//! wrongly applied during a computation costs an incomplete basis, which this check would then
+//! catch, whereas one wrongly applied *here* is a **silent false pass** — it blesses a basis
+//! that is not a Gröbner basis, and nothing downstream looks again.
+//!
+//! What has to hold is this. Write `B` for the pairs actually reduced. Buchberger's criterion in
+//! its standard-representation form — Becker and Weispfenning, *Gröbner Bases*, Thm 5.48 — gives
+//! that `G` is a Gröbner basis of `<G>` as soon as **every** pair's S-polynomial has a standard
+//! representation modulo `G`. Reducing to zero produces one, so the pairs in `B` are discharged
+//! directly; a pruned pair has to be discharged by a theorem whose hypotheses are about `G` alone.
+//! Two qualify:
+//!
+//! - **The product criterion.** Relatively prime leading monomials, so `S(g_i, g_j)` reduces to
+//!   zero modulo `{g_i, g_j}` alone (Cox, Little and O'Shea, Sec 2.9, Prop 4). Unconditional: it
+//!   names no other pair, so it cannot take part in a circular justification, and it holds of the
+//!   two polynomials whatever else `G` contains.
+//! - **Gebauer–Möller's criteria B, M and F.** [`PairQueue::seeded_from_leads`] replays the
+//!   published `UPDATE` over `G` in index order. Its justification for dropping a pair descends in
+//!   (insertion stage, lcm under divisibility), and **both coordinates are functions of the leading
+//!   monomials and the index order**, which a verifier reconstructs exactly because it reconstructs
+//!   the pair set the same way. Nothing in it refers to a reduction having happened.
+//!
+//! One does not:
+//!
+//! - **The chain criterion as [`PairQueue::is_discarded`] applies it.** It justifies a discard by a
+//!   witness `k` whose pairs with `i` and `j` *have already been processed*, and a verification pass
+//!   has processed nothing. The hypothesis is not merely hard to establish, it is unavailable;
+//!   reading "handled" as "present in the basis" is the classic unsound shortcut and would mark
+//!   almost every pair prunable.
+//!
+//! The static-basis chain criterion that *would* be sound is the strict one: a witness `k` with
+//! `LM(g_k)` dividing `lcm(LM g_i, LM g_j)` and **both** `lcm(LM g_i, LM g_k)` and
+//! `lcm(LM g_k, LM g_j)` different from it. Both witness lcms then divide the pair's strictly, so a
+//! minimal counterexample — a discarded pair with no standard representation whose lcm is minimal
+//! among such — would have its two witness pairs discharged by the induction hypothesis, and the
+//! chain lemma (Cox, Little and O'Shea, Sec 2.9) would give it a standard representation after all.
+//!
+//! It is **not implemented**, because it is measurably empty here. `examples/certification_criteria`
+//! counts the pairs Gebauer–Möller keeps that have such a witness: **zero**, on katsura-5,
+//! katsura-6, cyclic-5 and both Poseidon instances, against 26 to 568 pairs kept. Structurally that
+//! is what one would expect — criterion B is that same strict test with the later-inserted element
+//! as the witness, and criterion M covers the witnesses from within one insertion stage — so what
+//! survives Gebauer–Möller is essentially the pairs every one of whose divisor witnesses has a leg
+//! with an lcm *equal* to the pair's own. That is exactly the case needing reduction history, which
+//! a verifier does not have. Pruning it is deferred rather than rejected: the number to re-measure
+//! before writing it is the `strict↑` column of that example.
+//!
 //! # Cost
 //!
-//! (3) is `|G|²/2` normal forms and each normal form divides against all of `G`, so certification
-//! is quadratic in the basis and not cheap: on a 105-element basis it is some 5 500 divisions.
-//! **That is the point of reporting it separately** — the plan's §8.5 requires a strategy that
-//! skips work to be compared on its total including the check, and a saving the check erases is not
-//! a saving.
+//! (3) was `|G|²/2` normal forms, each dividing against all of `G`: quadratic in the basis, 34x–67x
+//! the solve on the Poseidon instances of `docs/research/hilbert-driven.md` §5. The criteria above
+//! prune 66.7%–89.0% of those pairs on that corpus, and
+//! [`CertificationReport::s_polynomials_discarded`] reports the share alongside
+//! [`CertificationReport::s_polynomials_checked`] so that it is visible rather than inferred.
+//!
+//! What remains is still quadratic, so the check is still **reported separately** — the plan's §8.5
+//! requires a strategy that skips work to be compared on its total including the check, and a saving
+//! the check erases is not a saving.
 
 use std::time::{Duration, Instant};
 
 use crate::{
-    grobner::{pairs::divides, s_polynomial},
+    grobner::{
+        pairs::{are_relatively_prime, divides, CriterionCounts, PairCriteria, PairQueue},
+        s_polynomial,
+    },
     poly::MonomialOrder,
-    FiniteField, MultivariatePolynomial,
+    FiniteField, Monomial, MultivariatePolynomial,
+};
+
+/// The criteria certification prunes Buchberger's criterion with.
+///
+/// A constant and not a parameter. For a verifier the criteria are not a tuning knob: the chain
+/// criterion's hypothesis cannot be supplied by a verification pass at all, and an option would
+/// invite a caller to enable it. See the module documentation for the split.
+const CERTIFICATION_CRITERIA: PairCriteria = PairCriteria {
+    product: true,
+    chain: false,
+    gebauer_moller: true,
 };
 
 /// Where a basis came from, which decides what certifying it can establish.
@@ -114,6 +182,13 @@ pub struct CertificationReport {
     /// report's counts describe the work done and not the work a passing run would have done.
     pub s_polynomials_checked: usize,
 
+    /// Pairs a criterion proved redundant, so that no S-polynomial was formed for them.
+    ///
+    /// With [`Self::s_polynomials_checked`] this accounts for every one of the `|G|(|G|-1)/2` pairs
+    /// Buchberger's criterion names, on a run that reached the criterion and completed it. Reported
+    /// rather than left to be inferred, because the saving is the reason the criteria are here.
+    pub s_polynomials_discarded: usize,
+
     /// What the checks cost.
     pub elapsed: Duration,
 
@@ -138,6 +213,7 @@ impl Default for CertificationReport {
             reduced: false,
             generators_checked: 0,
             s_polynomials_checked: 0,
+            s_polynomials_discarded: 0,
             elapsed: Duration::ZERO,
             provenance: Provenance::Submitted,
         }
@@ -246,30 +322,85 @@ fn certify_with<const N: usize, F: FiniteField>(
     report.generators_in_basis = true;
     report.generators_checked = generators_checked;
 
-    // (3) Buchberger's criterion.
+    // (3) Buchberger's criterion, over the pairs no criterion proves redundant.
     let nonzero: Vec<&MultivariatePolynomial<N, F>> =
         basis.iter().filter(|p| !p.is_zero()).collect();
-    let mut checked = 0;
-    for (index, f) in nonzero.iter().enumerate() {
-        for g in nonzero.iter().skip(index + 1) {
-            checked += 1;
-            if !s_polynomial(f, g, order)
-                .normal_form(basis, order)
-                .is_zero()
-            {
-                report.s_polynomials_checked = checked;
-                report.elapsed = at.elapsed();
-                return report;
-            }
-        }
+    let check = check_buchberger_criterion(&nonzero, basis, order, &CERTIFICATION_CRITERIA);
+    report.s_polynomials_checked = check.checked;
+    report.s_polynomials_discarded = check.discarded;
+    if !check.held {
+        report.elapsed = at.elapsed();
+        return report;
     }
     report.buchberger_criterion = true;
-    report.s_polynomials_checked = checked;
 
     // (4) Reducedness.
     report.reduced = is_reduced(&nonzero, basis, order);
     report.elapsed = at.elapsed();
     report
+}
+
+/// What Buchberger's criterion cost and whether it held.
+struct PairCheck {
+    /// Every S-polynomial that was formed reduced to zero.
+    held: bool,
+
+    /// Pairs whose S-polynomial was formed and reduced.
+    checked: usize,
+
+    /// Pairs a criterion proved redundant.
+    discarded: usize,
+}
+
+/// Buchberger's criterion over the pairs `criteria` does not prove redundant.
+///
+/// `criteria` is a parameter only so that the tests can exercise each criterion on its own and
+/// against the unpruned reference; the one production caller passes
+/// [`CERTIFICATION_CRITERIA`]. Stops at the first S-polynomial that does not reduce to zero, so the
+/// counts describe the work performed.
+fn check_buchberger_criterion<const N: usize, F: FiniteField>(
+    nonzero: &[&MultivariatePolynomial<N, F>],
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    criteria: &PairCriteria,
+) -> PairCheck {
+    debug_assert!(
+        !criteria.chain,
+        "the chain criterion's witnesses are pairs that have been reduced, and a verification pass \
+         has reduced nothing"
+    );
+
+    let leads: Vec<Monomial<N>> = nonzero.iter().map(|p| p.leading_monomial(order)).collect();
+    let mut counts = CriterionCounts::default();
+    let mut queue = PairQueue::<N>::seeded_from_leads(&leads, criteria, &mut counts);
+    let mut checked = 0;
+
+    while let Some(pair) = queue.pop() {
+        // Gebauer–Möller's criterion F already applies this at insertion, so with both criteria on
+        // it never fires. It is here so that the product criterion also stands alone.
+        if criteria.product && are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
+            counts.product += 1;
+            continue;
+        }
+
+        checked += 1;
+        if !s_polynomial(nonzero[pair.left], nonzero[pair.right], order)
+            .normal_form(basis, order)
+            .is_zero()
+        {
+            return PairCheck {
+                held: false,
+                checked,
+                discarded: counts.total(),
+            };
+        }
+    }
+
+    PairCheck {
+        held: true,
+        checked,
+        discarded: counts.total(),
+    }
 }
 
 /// True if the basis is monic, no leading monomial divides another's, and each element is its own
@@ -315,15 +446,22 @@ fn is_reduced<const N: usize, F: FiniteField>(
 
 #[cfg(test)]
 mod tests {
-    use super::{certify_f4_output, certify_submitted_basis, Provenance};
+    use std::collections::HashSet;
+
+    use super::{
+        certify_f4_output, certify_submitted_basis, check_buchberger_criterion, Provenance,
+        CERTIFICATION_CRITERIA,
+    };
     use crate::{
         fields::Zp2147483647,
         grobner::{
             benchmark_systems::{cyclic, katsura},
             buchberger, f4,
+            pairs::{are_relatively_prime, CriterionCounts, PairCriteria, PairQueue},
+            s_polynomial,
         },
         poly::MonomialOrder,
-        FiniteField, MultivariatePolynomial,
+        FiniteField, Monomial, MultivariatePolynomial,
     };
 
     type F = Zp2147483647;
@@ -332,6 +470,93 @@ mod tests {
         MonomialOrder::GradedLexicographic,
         MonomialOrder::GradedReverseLexicographic,
     ];
+
+    /// Gebauer–Möller without the product criterion, so that each can be exercised alone.
+    const GEBAUER_MOLLER_ONLY: PairCriteria = PairCriteria {
+        product: false,
+        chain: false,
+        gebauer_moller: true,
+    };
+
+    /// Every criterion configuration a verifier may use, plus the unpruned reference.
+    const CONFIGURATIONS: [(&str, PairCriteria); 4] = [
+        ("none", PairCriteria::NONE),
+        ("product", PairCriteria::PRODUCT_ONLY),
+        ("gebauer-moller", GEBAUER_MOLLER_ONLY),
+        ("certification", CERTIFICATION_CRITERIA),
+    ];
+
+    /// Buchberger's criterion over every pair, written out as the reference the pruned check must
+    /// agree with.
+    ///
+    /// Deliberately *not* [`check_buchberger_criterion`] with the criteria off: a reference sharing
+    /// the pair-set machinery could not catch a defect in it.
+    fn every_pair_holds<const N: usize>(
+        basis: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+    ) -> bool {
+        let nonzero: Vec<&MultivariatePolynomial<N, F>> =
+            basis.iter().filter(|p| !p.is_zero()).collect();
+        for (index, f) in nonzero.iter().enumerate() {
+            for g in nonzero.iter().skip(index + 1) {
+                if !s_polynomial(f, g, order)
+                    .normal_form(basis, order)
+                    .is_zero()
+                {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// The pairs certification would reduce, as indices into the nonzero elements.
+    fn kept_pairs<const N: usize>(
+        nonzero: &[&MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+    ) -> HashSet<(usize, usize)> {
+        let leads: Vec<Monomial<N>> = nonzero.iter().map(|p| p.leading_monomial(order)).collect();
+        let mut counts = CriterionCounts::default();
+        let mut queue =
+            PairQueue::<N>::seeded_from_leads(&leads, &CERTIFICATION_CRITERIA, &mut counts);
+        let mut kept = HashSet::new();
+        while let Some(pair) = queue.pop() {
+            if are_relatively_prime(&leads[pair.left], &leads[pair.right]) {
+                continue;
+            }
+            kept.insert((pair.left, pair.right));
+        }
+        kept
+    }
+
+    /// Bases with a planted defect: each element dropped in turn, each shifted by a constant, and
+    /// each replaced by its difference with its predecessor.
+    ///
+    /// The shift leaves every leading monomial alone, so the criteria prune exactly the pairs they
+    /// prune on the correct basis while the S-polynomials are no longer those of a Gröbner basis —
+    /// which is the configuration a silent false pass would need.
+    fn planted_defects<const N: usize>(
+        basis: &[MultivariatePolynomial<N, F>],
+    ) -> Vec<Vec<MultivariatePolynomial<N, F>>> {
+        let one = MultivariatePolynomial::<N, F>::one();
+        let mut out = Vec::new();
+        for dropped in 0..basis.len() {
+            let mut defect = basis.to_vec();
+            defect.remove(dropped);
+            out.push(defect);
+        }
+        for index in 0..basis.len() {
+            let mut defect = basis.to_vec();
+            defect[index] = &basis[index] + &one;
+            out.push(defect);
+        }
+        for index in 1..basis.len() {
+            let mut defect = basis.to_vec();
+            defect[index] = &basis[index] - &basis[index - 1];
+            out.push(defect);
+        }
+        out
+    }
 
     fn parse<const N: usize>(s: &str, vars: [&str; N]) -> MultivariatePolynomial<N, F> {
         MultivariatePolynomial::parse(s, vars).expect("parses")
@@ -371,11 +596,13 @@ mod tests {
         }
     }
 
-    /// Certification rejects a basis with one element removed.
+    /// Certification rejects a basis with one element removed, and no criterion changes that.
     ///
     /// The adversarial case the plan asks for, and the reason generator containment is checked and
     /// not only Buchberger's criterion: a truncated basis is still contained in the ideal, so
-    /// nothing about *where it came from* distinguishes it.
+    /// nothing about *where it came from* distinguishes it. The second half of the loop carries the
+    /// same corpus through each pair criterion separately, because pruning a pair whose
+    /// S-polynomial does not reduce to zero would turn a rejection into a silent pass.
     #[test]
     fn test_certification_detects_a_truncated_basis() {
         for order in ALL_ORDERS {
@@ -390,6 +617,21 @@ mod tests {
                 let report = certify_f4_output(&system, &truncated, order);
                 if !report.is_complete() {
                     rejected += 1;
+                }
+
+                let nonzero: Vec<&MultivariatePolynomial<5, F>> =
+                    truncated.iter().filter(|p| !p.is_zero()).collect();
+                let reference = every_pair_holds(&truncated, order);
+                for (configuration, criteria) in CONFIGURATIONS {
+                    let check = check_buchberger_criterion(&nonzero, &truncated, order, &criteria);
+                    assert_eq!(
+                        check.held,
+                        reference,
+                        "{}: dropping {} under `{}` changed Buchberger's verdict",
+                        order.name(),
+                        dropped,
+                        configuration
+                    );
                 }
             }
             assert_eq!(
@@ -522,11 +764,18 @@ mod tests {
         assert!(!report.is_complete());
     }
 
-    /// A certified basis agrees with the independent Buchberger engine.
+    /// A certified basis agrees with the independent Buchberger engine, and a planted defect in it
+    /// is still rejected under each pair criterion.
     ///
     /// The structural invariant `G ⊆ I` is not something a run can check, so this is the closest
     /// an automated check comes: a reduced Gröbner basis is unique for an ideal and an order, so
-    /// equality with a basis computed by a different algorithm establishes both containments.
+    /// equality with a basis computed by a different algorithm establishes both containments. The
+    /// defects are then carried through each criterion separately, because a criterion that pruned a
+    /// pair whose S-polynomial does not reduce to zero would turn a rejection into a silent pass.
+    /// Not every defect is one: under lex these bases have pairwise relatively prime leading
+    /// monomials, so the product criterion covers every pair and *no* perturbation that leaves the
+    /// leading monomials alone can be caught — which is why the corpus is filtered rather than
+    /// assumed.
     #[test]
     fn test_certification_agrees_with_buchberger() {
         for order in ALL_ORDERS {
@@ -543,8 +792,248 @@ mod tests {
                     name,
                     order.name()
                 );
+
+                let genuine: Vec<Vec<MultivariatePolynomial<4, F>>> = planted_defects(&basis)
+                    .into_iter()
+                    .filter(|defect| !every_pair_holds(defect, order))
+                    .collect();
+                assert!(
+                    !genuine.is_empty(),
+                    "{} under {}: no planted defect broke the criterion, so nothing is tested",
+                    name,
+                    order.name()
+                );
+                for defect in &genuine {
+                    let nonzero: Vec<&MultivariatePolynomial<4, F>> =
+                        defect.iter().filter(|p| !p.is_zero()).collect();
+                    for (configuration, criteria) in CONFIGURATIONS {
+                        assert!(
+                            !check_buchberger_criterion(&nonzero, defect, order, &criteria).held,
+                            "{} under {} with `{}`: a planted defect passed",
+                            name,
+                            order.name(),
+                            configuration
+                        );
+                    }
+                }
             }
         }
+    }
+
+    /// Every pair Buchberger's criterion names is accounted for, as checked or as discarded.
+    fn assert_the_counts_cover_every_pair<const N: usize>(
+        name: &str,
+        system: &[MultivariatePolynomial<N, F>],
+    ) {
+        for order in ALL_ORDERS {
+            let basis = f4(system, order).expect("within limits");
+            let report = certify_f4_output(system, &basis, order);
+            assert!(report.is_complete(), "{} under {}", name, order.name());
+
+            let size = basis.iter().filter(|p| !p.is_zero()).count();
+            assert_eq!(
+                report.s_polynomials_checked + report.s_polynomials_discarded,
+                size * (size - 1) / 2,
+                "{} under {}: the counts must cover every pair",
+                name,
+                order.name()
+            );
+            assert!(
+                report.s_polynomials_discarded > 0,
+                "{} under {}: the criteria must prune something",
+                name,
+                order.name()
+            );
+
+            // Ties `kept_pairs` — the model the pruned-pair tests reason with — to the pairs the
+            // production check actually reduced, so the two cannot drift apart.
+            let nonzero: Vec<&MultivariatePolynomial<N, F>> =
+                basis.iter().filter(|p| !p.is_zero()).collect();
+            assert_eq!(
+                report.s_polynomials_checked,
+                kept_pairs(&nonzero, order).len(),
+                "{} under {}: the pair set the tests model is not the one that was checked",
+                name,
+                order.name()
+            );
+        }
+    }
+
+    /// The report accounts for every pair Buchberger's criterion names, and prunes some of them.
+    #[test]
+    fn test_the_report_accounts_for_every_pair() {
+        assert_the_counts_cover_every_pair("katsura-5", &katsura::<5, F>());
+        assert_the_counts_cover_every_pair("cyclic-4", &cyclic::<4, F>());
+    }
+
+    /// The pruned check and the all-pairs check reach the same verdict, on correct bases and on
+    /// every planted defect, under each criterion alone and under both.
+    fn assert_the_criteria_never_change_the_verdict<const N: usize>(
+        name: &str,
+        system: &[MultivariatePolynomial<N, F>],
+    ) {
+        for order in ALL_ORDERS {
+            let basis = f4(system, order).expect("within limits");
+            let mut candidates = vec![basis.clone()];
+            candidates.extend(planted_defects(&basis));
+
+            let mut genuine_defects = 0;
+            let mut discarded_on_defects = 0;
+
+            for (which, candidate) in candidates.iter().enumerate() {
+                let reference = every_pair_holds(candidate, order);
+                genuine_defects += usize::from(!reference);
+
+                let nonzero: Vec<&MultivariatePolynomial<N, F>> =
+                    candidate.iter().filter(|p| !p.is_zero()).collect();
+                for (configuration, criteria) in CONFIGURATIONS {
+                    let check = check_buchberger_criterion(&nonzero, candidate, order, &criteria);
+                    assert_eq!(
+                        check.held,
+                        reference,
+                        "{} under {}, candidate {} with criteria `{}`: the criteria changed the \
+                         verdict",
+                        name,
+                        order.name(),
+                        which,
+                        configuration
+                    );
+                    if !reference {
+                        discarded_on_defects += check.discarded;
+                    }
+                }
+            }
+
+            assert!(
+                genuine_defects > 0,
+                "{} under {}: no planted defect was one, so nothing was tested",
+                name,
+                order.name()
+            );
+            assert!(
+                discarded_on_defects > 0,
+                "{} under {}: nothing was pruned on a defective basis, so nothing was tested",
+                name,
+                order.name()
+            );
+        }
+    }
+
+    /// Pruning the pairs never changes Buchberger's verdict, on correct or defective bases.
+    #[test]
+    fn test_the_criteria_never_change_the_buchberger_verdict() {
+        assert_the_criteria_never_change_the_verdict("katsura-4", &katsura::<4, F>());
+        assert_the_criteria_never_change_the_verdict("cyclic-4", &cyclic::<4, F>());
+        assert_the_criteria_never_change_the_verdict("katsura-5", &katsura::<5, F>());
+    }
+
+    /// A pair the criteria pruned whose S-polynomial does *not* reduce to zero is still caught, by
+    /// a pair that was kept.
+    ///
+    /// The silent false pass this whole module guards against: pruning is only sound because a
+    /// defective basis must fail on some *kept* pair too, and this asserts that over a corpus where
+    /// the situation genuinely arises rather than trusting the argument.
+    #[test]
+    fn test_a_defect_on_a_pruned_pair_is_still_caught() {
+        let mut occurrences = 0;
+
+        for order in ALL_ORDERS {
+            let basis = f4(&katsura::<5, F>(), order).expect("within limits");
+            for candidate in planted_defects(&basis) {
+                let nonzero: Vec<&MultivariatePolynomial<5, F>> =
+                    candidate.iter().filter(|p| !p.is_zero()).collect();
+                let kept = kept_pairs(&nonzero, order);
+
+                let mut a_pruned_pair_failed = false;
+                for left in 0..nonzero.len() {
+                    for right in (left + 1)..nonzero.len() {
+                        if kept.contains(&(left, right)) {
+                            continue;
+                        }
+                        if !s_polynomial(nonzero[left], nonzero[right], order)
+                            .normal_form(&candidate, order)
+                            .is_zero()
+                        {
+                            a_pruned_pair_failed = true;
+                        }
+                    }
+                }
+
+                if !a_pruned_pair_failed {
+                    continue;
+                }
+                occurrences += 1;
+                let check = check_buchberger_criterion(
+                    &nonzero,
+                    &candidate,
+                    order,
+                    &CERTIFICATION_CRITERIA,
+                );
+                assert!(
+                    !check.held,
+                    "under {}: a pruned pair failed and the pruned check passed anyway — a silent \
+                     false pass",
+                    order.name()
+                );
+            }
+        }
+
+        assert!(
+            occurrences > 0,
+            "no planted defect ever landed on a pruned pair, so the test proves nothing"
+        );
+    }
+
+    /// One criterion, on a basis it prunes pairs from, still does not hide a planted defect.
+    fn assert_a_criterion_cannot_hide_a_defect(name: &str, criteria: PairCriteria) {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&katsura::<5, F>(), order).expect("within limits");
+        let mut defect = basis.clone();
+        defect[0] = &basis[0] + &MultivariatePolynomial::<5, F>::one();
+
+        assert!(
+            !every_pair_holds(&defect, order),
+            "the planted defect must actually be one, or {} is not being tested",
+            name
+        );
+
+        let nonzero: Vec<&MultivariatePolynomial<5, F>> =
+            defect.iter().filter(|p| !p.is_zero()).collect();
+        let all = nonzero.len() * (nonzero.len() - 1) / 2;
+
+        // That the criterion prunes this basis is established independently of the check, which
+        // stops at the first failure and so cannot be asked how much it would have pruned.
+        let mut counts = CriterionCounts::default();
+        let leads: Vec<Monomial<5>> = nonzero.iter().map(|p| p.leading_monomial(order)).collect();
+        let queue = PairQueue::<5>::seeded_from_leads(&leads, &criteria, &mut counts);
+        let prunable = all - queue.len()
+            + (0..nonzero.len())
+                .flat_map(|i| ((i + 1)..nonzero.len()).map(move |j| (i, j)))
+                .filter(|&(i, j)| criteria.product && are_relatively_prime(&leads[i], &leads[j]))
+                .count();
+        assert!(
+            prunable > 0,
+            "{} prunes nothing on this basis, so the test proves nothing",
+            name
+        );
+
+        let check = check_buchberger_criterion(&nonzero, &defect, order, &criteria);
+        assert!(!check.held, "{} hid a planted defect", name);
+    }
+
+    /// The product criterion does not hide a planted defect on a basis it prunes pairs from.
+    #[test]
+    fn test_the_product_criterion_cannot_hide_a_planted_defect() {
+        assert_a_criterion_cannot_hide_a_defect(
+            "the product criterion",
+            PairCriteria::PRODUCT_ONLY,
+        );
+    }
+
+    /// Gebauer–Möller does not hide a planted defect on a basis it prunes pairs from.
+    #[test]
+    fn test_gebauer_moller_cannot_hide_a_planted_defect() {
+        assert_a_criterion_cannot_hide_a_defect("Gebauer–Möller", GEBAUER_MOLLER_ONLY);
     }
 
     /// Certification stops at the first failure, and says which one it was.
