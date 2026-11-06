@@ -879,7 +879,22 @@ that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime
 ## Number-Theoretic Transform
 
 `fft::evaluate` and `fft::interpolate` are the forward and inverse transforms over an `FFTDomain`
-of size `2^k`, built from a primitive `2^k`-th root of unity.
+of size `2^k`, built from a primitive `2^k`-th root of unity. Both are the same iterative in-place
+radix-2 kernel — a bit-reversal permutation followed by `log n` passes of butterflies over the
+domain's own powers, read with a stride — so there is no recursion, no per-level allocation, and
+one twiddle multiplication per two outputs. `interpolate` is that kernel over the batch-inverted
+domain, scaled by `1/n`.
+
+**The transform zero-pads internally.** A polynomial of any degree below `n` is extended to the
+domain size inside `evaluate`, so a caller hands over unpadded operands and chooses only `n` — the
+domain size is the caller's because only the caller knows how large a result it needs. A polynomial
+of degree `n` or more still panics: `n` evaluations cannot determine it. That stays a panic rather
+than becoming a `DomainError`-style typed failure because of where #120 drew that line — a fact
+about the field is a value, a programmer error is a panic, and a caller that supplied both the
+polynomial and the domain already knows whether `deg(p) < n`. The transform also panics on a domain
+that is not the powers of a *primitive* `n`th root of unity: `try_from_generator` rejects those, but
+`FFTDomain::new` takes a vector of powers unchecked and `FFTDomain::split` returns domains that are
+not power sequences at all.
 
 Over a 254-bit field there was no way to obtain one: the generic construction raises a *generator*
 of the multiplicative group to `(q - 1) / n`, and finding a generator means factoring a 254-bit
@@ -943,8 +958,8 @@ and so is in the crossover section below:
 |---|---|---|---|---|
 | `mul`, schoolbook | 2 | 2^15 | 2^13 | `4 n B` |
 | `div`, long division | 2 | 2^15 | 2^13 | `6 n B` |
-| `evaluate` (NTT) | 1 | **2^23** | **2^21** | `7 n B` |
-| `interpolate` (iNTT) | 1 | **2^23** | **2^20** | `9 n B` |
+| `evaluate` (NTT) | 1 | **2^24** | **2^22** | `1 n B` |
+| `interpolate` (iNTT) | 1 | **2^24** | **2^22** | `2 n B` |
 | `lagrange_interpolate` | 2 | 2^14 | 2^12 | `5 n B` |
 | `roots` | 2 | 2^12 | 2^8 | `12 n B` |
 
@@ -956,13 +971,30 @@ word, so a byte budget carried over from the F4 side under-estimates this layer 
 The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
 2.4x, 5.2x and 8.6x. The whole gap was the `2n` inversions batch inversion removed — see
-[`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Interpolation at
-arbitrary abscissae — what an evaluation-interpolation resultant needs — is quadratic: it was
-cubic, at 2^10 and 2^9, until #162 built the numerator product `prod (x - x_i)` once and divided it
-down by synthetic division. An evaluation-interpolation resultant turns out not to need arbitrary
-abscissae at all, since it chooses where it samples — `bivariate_resultant_ntt` takes its Sylvester
-determinants on a power-of-two subgroup and recovers the polynomial with one `interpolate` — but on
-the CICO slices the determinants dominate either way.
+[`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Replacing the
+recursive split with the iterative kernel was worth a further **3.7x to 6.1x on the narrow fields
+and 2.0x to 2.7x on BN254**, took the peaks from `7 n B` and `9 n B` to `1 n B` and `2 n B`, and
+removed the `n log n` hardware integer divisions the recursion's `i % k` compiled to —
+`tools/div_census.sh` counts them in the release artifact, 4 before and 0 after:
+
+```text
+cargo build --release --example univariate_scaling
+tools/div_census.sh target/release/examples/univariate_scaling
+tools/div_census.sh target/release/examples/univariate_scaling zeebra::poly   # any symbol prefix
+```
+
+KoalaBear's forward transform now covers the field's entire two-adic range inside one second, and
+the schoolbook/NTT crossover `fft_multiplication_crossover` encodes moves **down one doubling** —
+measured product degree 1022 to 510 on an 8-byte element and 510 to 254 on a 32-byte one, so the
+constant it returns is now too high by a factor of two to four. Recalibrating it belongs to the
+dispatch work, not here.
+
+Interpolation at arbitrary abscissae — what an evaluation-interpolation resultant needs — is
+quadratic: it was cubic, at 2^10 and 2^9, until #162 built the numerator product `prod (x - x_i)`
+once and divided it down by synthetic division. An evaluation-interpolation resultant turns out not
+to need arbitrary abscissae at all, since it chooses where it samples — `bivariate_resultant_ntt`
+takes its Sylvester determinants on a power-of-two subgroup and recovers the polynomial with one
+`interpolate` — but on the CICO slices the determinants dominate either way.
 [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the full curves, the
 superseded figures, the gap list, and what each stage would need to go further; the subproduct tree
 that would make it `O(n log^2 n)` is not written.

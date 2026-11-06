@@ -4,6 +4,7 @@ mod domain;
 mod evaluate;
 mod interpolate;
 pub(crate) mod multiply;
+mod transform;
 
 use crate::FiniteField;
 

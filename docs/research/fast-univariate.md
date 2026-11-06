@@ -127,8 +127,8 @@ source.
 | mul | 1.93 – 2.14 → **2** | schoolbook, which is what `Mul` does |
 | fftmul | 0.90 – 1.15 → **1** | `multiply` through the transform — **measured separately**, §4.1 |
 | div | 1.63 – 2.12 → **2** | in-place long division, after §2 |
-| ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive |
-| intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed |
+| ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive — **superseded, see §3.3** |
+| intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed — **superseded, see §3.3** |
 | lagrange | 2.68 – 2.98 → **3** | arbitrary abscissae — **superseded, see §4.3** |
 | roots | 1.64 – 2.01 → **2** | `roots`, dominated by `x^q mod f` |
 
@@ -201,6 +201,10 @@ this budget reaches to `2^23`, `2^23` and `2^20`. The `intt` rows in §3.1 are t
 pre-#118 figures, kept because every other row in the table was taken in the same run; peak bytes
 are unchanged at `9 n B`. See [`batch-inversion.md`](batch-inversion.md) §2.3.
 
+**#161 has since replaced the transform itself.** Every `ntt` and `intt` figure in §3.1 and §3.2
+is therefore a pre-#161 figure, kept here because the other four stages' rows were taken in the
+same run and are unaffected. §3.3 is the current measurement.
+
 ### 3.2 Memory as a function of degree, in bytes
 
 The measured peak is exactly proportional to `n * size_of::<F>()` in every stage, with an integer
@@ -210,8 +214,8 @@ constant:
 |---|---|---|---|
 | mul | `4 n B` | 32 n | 128 n |
 | div | `6 n B` | 48 n | 192 n |
-| ntt | `7 n B` | 56 n | 224 n |
-| intt | `9 n B` | 72 n | 288 n |
+| ntt | `7 n B` — **superseded, now `1 n B`; see §3.3** | 56 n | 224 n |
+| intt | `9 n B` — **superseded, now `2 n B`; see §3.3** | 72 n | 288 n |
 | lagrange | `8 n B` | 64 n | 256 n |
 | roots | `12 n B` | 96 n | 384 n |
 
@@ -233,6 +237,209 @@ The constants are unsurprising once named — `mul` holds two inputs and a produ
 length, and `UnivariatePolynomial::new` copies the product once; `ntt`'s 7 is the recursive split's
 live coefficient and domain vectors summing to a geometric series over the recursion path. They
 are reported as measured rather than derived because the measurement is the claim.
+
+**#161 has since removed the transform's share of this.** The two `n B` constants above were the
+recursion's, and §3.3 records what replaced them, measured the same way.
+
+### 3.3 The iterative transform (#161), measured against the recursion it replaced
+
+The recursive Cooley–Tukey split in `src/fft/evaluate.rs` was replaced by an iterative in-place
+radix-2 kernel: a bit-reversal permutation, then `log n` passes of butterflies over `FFTDomain`'s
+own powers read with a stride. `evaluate` and `interpolate` share that kernel, the inverse
+direction being the same pass over the batch-inverted domain.
+
+Three costs went with the recursion. Two `i % k` operations per output element per level, where
+`k = n / 2` is a runtime value LLVM cannot see is a power of two; `n` twiddle multiplications per
+level where `n / 2` suffice, since `w[i + k] = -w[i]`; and an allocation per level, per split half,
+and per `UnivariatePolynomial::new` copy.
+
+**Protocol.** Two instances built from one tree — `origin/main` at `418d080` and the same tree with
+the kernel replaced — run interleaved as `before, after, before, after`, each `cargo run --release
+--example univariate_scaling` with `budget=1.0`, pinned with `taskset --cpu-list 0-7` per
+`tools/scoreboard.sh`, `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`. Release profile,
+`-C target-cpu=x86-64-v3` from `.cargo/config.toml`. Each cell below is the **minimum of the two
+rounds**, the convention `examples/batch_inversion.rs` already uses: on a shared workstation the
+minimum is the least contaminated estimate. `mul`, `div`, `lagrange` and `roots` reached identical
+sizes on both sides in both rounds, which is the control.
+
+The pair sits at `418d080` rather than at the merge commit because the two sides have to differ only
+by the kernel. Nothing merged after `418d080` touches the measured path: #124 adds `src/fft/multiply.rs`
+as a new file and does not rewire `DensePolynomial`'s `Mul`, #165 adds `src/poly/univariate/karatsuba.rs`
+and likewise does not, and #159 is linear algebra. The `ntt` and `intt` stages call neither.
+
+#### Peak live heap bytes — measured, not estimated
+
+From the counting global allocator in the example, attributed to the measured call alone. The
+constant is exact in every row, as it was before:
+
+| field | stage | before B/element | after B/element | before | after |
+|---|---|---|---|---|---|
+| KoalaBear (`u64`-backed) | ntt | 56.0 | **8.0** | `7 n B` | **`1 n B`** |
+| KoalaBear (`u64`-backed) | intt | 72.0 | **16.0** | `9 n B` | **`2 n B`** |
+| Goldilocks | ntt | 56.0 | **8.0** | `7 n B` | **`1 n B`** |
+| Goldilocks | intt | 72.0 | **16.0** | `9 n B` | **`2 n B`** |
+| BN254 `Fr` | ntt | 224.0 | **32.0** | `7 n B` | **`1 n B`** |
+| BN254 `Fr` | intt | 288.0 | **64.0** | `9 n B` | **`2 n B`** |
+
+`1 n B` for `evaluate` is the one `vec![F::zero(); n]` that is zero-padded, transformed in place,
+and returned — the output buffer and the only allocation. `2 n B` for `interpolate` is that buffer
+plus the inverse domain, which `FFTDomain::inverse` still produces by batch inversion; the
+inversion is taken *before* the coefficient buffer exists, so `batch_invert`'s prefix-product
+scratch never becomes the maximum. The old `7` and `9` are §3.2's, kept there.
+
+**Estimated, for contrast, and reported separately because it is not a measurement:** a dense
+coefficient array of `n` elements is `n * size_of::<F>()` bytes, so a forward transform that writes
+into one buffer has a floor of `1 n B` and an inverse that also holds the inverse domain a floor of
+`2 n B`. The measured figures are exactly those floors. Nothing above the floor remains to remove
+without changing `FFTDomain` — see the follow-up note at the end of this section.
+
+#### Time, and the local scaling exponent
+
+Seconds, and the speedup as the ratio. A dash is a size the side did not reach inside the budget.
+
+| field | log2 n | ntt before | ntt after | speedup | intt before | intt after | speedup |
+|---|---|---|---|---|---|---|---|
+| KoalaBear | 18 | 0.0472 | 0.0077 | **6.13x** | 0.0414 | 0.0110 | **3.76x** |
+| KoalaBear | 19 | 0.0971 | 0.0162 | **5.99x** | 0.0850 | 0.0232 | **3.66x** |
+| KoalaBear | 20 | 0.1983 | 0.0358 | **5.54x** | 0.1917 | 0.0444 | **4.32x** |
+| KoalaBear | 21 | 0.4046 | 0.0778 | **5.20x** | 0.3914 | 0.1037 | **3.77x** |
+| KoalaBear | 22 | 0.8505 | 0.2004 | **4.24x** | 0.8606 | 0.2707 | **3.18x** |
+| KoalaBear | 23 | 1.7392 | 0.4536 | **3.83x** | 1.9688 | 0.6110 | **3.22x** |
+| KoalaBear | 24 | — | 1.0157 | — | — | 1.3437 | — |
+| Goldilocks | 18 | 0.0410 | 0.0076 | **5.39x** | 0.0412 | 0.0104 | **3.96x** |
+| Goldilocks | 19 | 0.0915 | 0.0159 | **5.75x** | 0.0925 | 0.0230 | **4.02x** |
+| Goldilocks | 20 | 0.1847 | 0.0372 | **4.97x** | 0.1817 | 0.0498 | **3.65x** |
+| Goldilocks | 21 | 0.4090 | 0.0838 | **4.88x** | 0.3854 | 0.1077 | **3.58x** |
+| Goldilocks | 22 | 0.8236 | 0.2033 | **4.05x** | 0.8363 | 0.2810 | **2.98x** |
+| Goldilocks | 23 | 1.7348 | 0.4705 | **3.69x** | 2.0329 | 0.6241 | **3.26x** |
+| Goldilocks | 24 | — | 1.0399 | — | — | 1.3648 | — |
+| BN254 `Fr` | 18 | 0.1974 | 0.0755 | **2.61x** | 0.2034 | 0.1016 | **2.00x** |
+| BN254 `Fr` | 19 | 0.4252 | 0.1607 | **2.65x** | 0.4436 | 0.2145 | **2.07x** |
+| BN254 `Fr` | 20 | 0.9169 | 0.3505 | **2.62x** | 0.9861 | 0.4751 | **2.08x** |
+| BN254 `Fr` | 21 | 1.9630 | 0.7377 | **2.66x** | 2.2704 | 0.9897 | **2.29x** |
+| BN254 `Fr` | 22 | — | 1.5558 | — | — | 2.0691 | — |
+
+The local exponent is unchanged, as it should be — the asymptotic class was never the problem:
+
+| field | stage | before | after |
+|---|---|---|---|
+| KoalaBear | ntt | 1.03 – 1.21 | 1.07 – 1.37 |
+| KoalaBear | intt | 0.91 – 1.19 | 0.94 – 1.38 |
+| Goldilocks | ntt | 1.01 – 1.21 | 1.04 – 1.28 |
+| Goldilocks | intt | 0.97 – 1.28 | 1.07 – 1.38 |
+| BN254 `Fr` | ntt | 0.93 – 1.12 | 1.06 – 1.15 |
+| BN254 `Fr` | intt | 1.03 – 1.20 | 1.06 – 1.15 |
+
+Over `2^16` and above, so that the timer resolution does not dominate. The upper end rises on the
+narrow fields: at 30 to 60 ns per element the transform is now close enough to memory-bandwidth
+bound that the last few doublings cost slightly more than a doubling. That is the right problem to
+have next, and it is not this one.
+
+The gain is **3.7x to 6.1x on the narrow fields and 2.0x to 2.7x on BN254**, and the ratio between
+those is the point: the recursion's overhead was index arithmetic and allocation, which is a fixed
+cost per element, so it is a larger fraction of a cheap field multiplication than of a 254-bit one.
+BN254 was already paying mostly for arithmetic, exactly as §3.1 read off the 4.5x-against-4x ratio.
+
+#### Largest size reached in one second
+
+§3.1's figures for the other stages stand; these are the `ntt` and `intt` rows re-measured. The
+budget is one second and the reported size is the first one to exceed it.
+
+| field | stage | before | after |
+|---|---|---|---|
+| Mersenne-31 | ntt / intt | **2** — s = 1 | **2** — s = 1, unchanged |
+| KoalaBear | ntt | 2^23 | **2^24** — the field's whole two-adic range, in 1.02 s |
+| KoalaBear | intt | 2^23 | **2^24** |
+| Goldilocks | ntt | 2^23 | **2^24** |
+| Goldilocks | intt | 2^23 | **2^24** |
+| BN254 `Fr` | ntt | 2^21 | **2^22** |
+| BN254 `Fr` | intt | 2^21 | **2^22** |
+
+KoalaBear's forward transform no longer stops on the budget at all: it stops because
+`two_adicity()` is 24 and there is no primitive `2^25`-th root of unity, and `2^24` lands within a
+percent of the one-second budget either way. Goldilocks straddles the budget at `2^24` — 1.04 s in
+one round and 0.97 s in the other, so the sweep went on to `2^25` in the second. `2^24` is the
+figure to quote and the straddle is the honest qualification on it.
+
+The sweep starts at `2^6`, which is above Mersenne-31's maximum transform size of 2, so the example
+reports that field as unreachable rather than measuring it. `src/fft/transform.rs`'s tests derive
+the highest size from `F::two_adicity()` and so do cover Mersenne-31 at sizes 1 and 2; a request for
+a primitive 4th root of unity there panics in `two_adic_root_of_unity`, which is where the bound
+belongs.
+
+#### The instruction census
+
+The issue's first claim is about an instruction, not a time, so it is checked the way
+`MILESTONE-SIMD-PARALLELISM.md` §4.1 checks for `__umodti3`: disassemble the release artifact,
+split it by symbol, and count. `tools/div_census.sh` does it, restricted to symbols under
+`zeebra::fft` because a whole-binary count also sees divisions in unrelated code and would not be
+attributable.
+
+Over `target/release/examples/univariate_scaling`:
+
+| | `div`/`idiv` under `zeebra::fft` |
+|---|---|
+| before | **4** — one in each of the four `evaluate` monomorphizations |
+| after | **0**, over 17 matching symbols |
+
+One instruction per monomorphization, not two: x86's `div` yields quotient and remainder together,
+so LLVM computes `i / k` and `i % k` with a single 32-bit `div` and derives the rest. It sits in the
+output loop, so it executes `n` times per level — `n log n` divisions over the transform, about 193
+million at `n = 2^23`. The symbols after the change include the four `evaluate` instances and four
+new `transform_in_place` instances, so the kernel is a real out-of-line symbol in each
+monomorphization and the count is looking at the code that does the work. The counts were taken on
+`574a53c`, after #124; the four before-side divisions are the same four at every base since
+27cc999.
+
+#### The multiplication crossover moves down one doubling
+
+`fft_multiplication_crossover<F>()` (#124) is a width-indexed threshold on *product* degree —
+16384 for a 4-byte element, 2048 for 5–8 bytes, 512 above — and its own doc comment attributes the
+lateness to the transform being "bound by allocation and recursion rather than by field
+arithmetic". That is the property this change removes, so the threshold is now too high. Measured
+the same way #124 measured it, from the example's `mul` and `fftmul` rows:
+
+```text
+cargo run --release --example univariate_scaling -- koalabear budget=0.02
+cargo run --release --example univariate_scaling -- bn254 budget=0.02
+```
+
+A small budget deliberately: the `fftmul` stage asserts its product against `&a * &b`, so its
+verification is quadratic in the operand degree and a one-second budget pushes that verification
+past operand `2^20`, which does not finish. Milliseconds, minimum of two interleaved rounds,
+`taskset --cpu-list 0-7`:
+
+| element | side | operand `2^8` | `2^9` | `2^10` | `2^11` | crossing |
+|---|---|---|---|---|---|---|
+| 8 B (KoalaBear in `u64`) | before | 0.10 / 0.20 | 0.50 / 0.40 | 1.80 / 0.80 | 7.70 / 1.90 | product degree **1022** |
+| 8 B | after | 0.10 / 0.00 | 0.50 / 0.10 | 2.10 / 0.10 | 8.00 / 0.30 | product degree **510** |
+| 8 B (Goldilocks) | before | 0.20 / 0.20 | 0.50 / 0.40 | 2.20 / 0.90 | 8.60 / 1.80 | product degree **1022** |
+| 8 B (Goldilocks) | after | 0.10 / 0.00 | 0.50 / 0.10 | 2.10 / 0.10 | 8.60 / 0.30 | product degree **510** |
+| 32 B (BN254 `Fr`) | before | 1.50 / 0.80 | 6.10 / 1.50 | 24.80 / 3.20 | — | product degree **510** |
+| 32 B (BN254 `Fr`) | after | 1.50 / 0.30 | 6.00 / 0.60 | 23.20 / 1.30 | — | product degree **254** |
+
+Each cell is `mul / fftmul`. The `mul` column is unchanged code and agrees between the two sides to
+within the print precision, which is the control for this table.
+
+**The crossing moves down exactly one doubling on every field measured.** Rounded up to the next
+power of two as #124 does, so the dispatcher never picks the slower route, the thresholds become
+**512** for a 5–8 byte element (from 2048) and **256** above 8 bytes (from 512). The 4-byte row is
+not measurable from this example — it sweeps the `u64`-backed narrow fields so that
+`size_of::<F>()` is 8 throughout — so 16384 is left for whoever re-measures `fields::KoalaBear`
+directly. Recalibrating the constant is #124's number and is not changed here; #185's
+schoolbook → Karatsuba → NTT dispatch depends on it, and its Karatsuba band narrows at the top by
+the same doubling.
+
+#### What is left, and what it would need
+
+`FFTDomain::inverse` is now the only remaining `n`-element allocation in `interpolate`, and
+[`batch-inversion.md`](batch-inversion.md) §4 already names the way to remove it: for a domain that
+really is the `n` powers of a primitive `n`th root, `w^-i = w^(n-i)`, so the inverse is a
+permutation of the domain — zero inversions and zero multiplications. That note recorded the
+identity as unavailable "because `FFTDomain` does not record whether it is geometric". The kernel
+now *requires* it to be, and checks a necessary condition (`w^(n/2) = -1`) in O(1), so the argument
+has changed; making the domain inverse free is a change to a public type's shape and belongs to
+whatever next needs `intt` faster. It would take `interpolate` from `2 n B` to `1 n B`.
 
 ## 4. The gap list
 
@@ -285,9 +492,14 @@ available over Mersenne-31 without falling back. §4.1.1 measures it.
 
 The transform-size ceiling is worth stating as a real bound rather than an asymptotic one: `2^24`
 for KoalaBear, `2^28` for BN254, `2^32` for Goldilocks and BLS12-381. At `7 n B`, BN254's full
-`2^28` ceiling is **60 GB** and, extrapolating from 1 032 ns/element, about **5 minutes** — so for
-BN254 the two-adicity bound, not this workstation, is what binds. BLS12-381's `2^32` would need
-962 GB, so there memory binds first, at roughly `2^30`.
+`2^28` ceiling was **60 GB** and, extrapolating from 1 032 ns/element, about **5 minutes** — so
+even then the two-adicity bound, not this workstation, was what bound BN254; BLS12-381's `2^32`
+would have needed 962 GB, so there memory bound first, at roughly `2^30`.
+
+**Both figures are superseded by §3.3.** At `1 n B` and 366 ns/element, BN254's `2^28` ceiling is
+**8.6 GB** and about **100 seconds**, and BLS12-381's `2^32` is **137 GB** — which fits on this
+workstation, so **memory no longer binds anywhere**: every field's transform is bound by its own
+two-adicity. KoalaBear's whole range now runs in under a second (§3.3).
 
 #### 4.1.1 Karatsuba, measured per element width (#165)
 
@@ -494,7 +706,8 @@ pre-#162 conclusion is kept here as the record of what the sweep said then:
 
 Both the old and the new binding stage are quasi-linear in the literature and
 quadratic-or-worse here, so what changed is which one binds, not the character of the finding. The
-NTT, the one stage with a quasi-linear implementation, reaches `2^23` in the same second.
+NTT, the one stage with a quasi-linear implementation, reaches `2^23` in the same second —
+**`2^24` after #161, which is KoalaBear's two-adic ceiling; see §3.3.**
 
 Extrapolating the measured quadratic growth of root finding to `d = 2^20`, which is the order of
 degree the resultant route would produce:
@@ -510,10 +723,11 @@ and it is the constraint because the quasi-linear algorithms are missing, not be
 are intrinsically out of reach.
 
 What quasi-linear multiplication is worth, now that it exists: one multiplication at degree `2^20`
-over BN254 is three transforms of size `2^21`, so about 6.5 s. Root finding needs `O(log q)` of
-them — 254 squarings, each a multiply plus a reduction, and a Newton-iteration reduction is a few
-multiplies — so on the order of **1 to 2 hours** against 202 days. A ~3 000x gap, of which #124
-takes the multiplication half; the rest is a subproduct tree away.
+over BN254 is three transforms of size `2^21`, so about 6.5 s — **2.2 s after #161, from §3.3's
+0.7377 s per transform.** Root finding needs `O(log q)` of them — 254 squarings, each a multiply
+plus a reduction, and a Newton-iteration reduction is a few multiplies — so on the order of **1 to
+2 hours** before #161 and **25 to 45 minutes** after, against 202 days. A ~3 000x gap before, ~6
+000x now, of which #124 takes the multiplication half; the rest is a subproduct tree away.
 
 ### 5.1 What this means for D1's reachable degrees, after #162 stage 1
 
@@ -565,8 +779,12 @@ Concretely, before D1 or D3 can run at interesting degrees:
 
 1. ~~**NTT-based multiplication** (`O(n log n)`), with a fallback for low-two-adicity fields.~~
    Done, #124 — but the measured crossover is degree ~460 to ~12000 depending on element width,
-   because the transform is allocation-bound. **An in-place iterative NTT** is what now carries
-   this item's value: it would lower every crossover and speed every stage below that uses one.
+   because the transform is allocation-bound. ~~**An in-place iterative NTT** is what now carries
+   this item's value: it would lower every crossover and speed every stage below that uses one.~~
+   Done, #161: the transform is no longer allocation-bound (`1 n B` against `7 n B`) and is 3.7x to
+   6.1x faster on the narrow fields and 2.0x to 2.7x on BN254 (§3.3). **`fft_multiplication_crossover`
+   was calibrated against the recursive kernel and is therefore now too high** — see §3.3's closing
+   note.
 2. **Fast division by Newton iteration**, which `pow_mod_limbs` would then inherit, taking root
    finding from `log q * d^2` to `log q * d log d`.
 3. **A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points, taking
