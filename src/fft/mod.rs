@@ -3,12 +3,17 @@
 mod domain;
 mod evaluate;
 mod interpolate;
+pub(crate) mod multiply;
 
 use crate::FiniteField;
 
 pub use domain::{DomainError, FFTDomain};
 pub use evaluate::evaluate;
 pub use interpolate::interpolate;
+pub use multiply::{
+    fft_multiplication_crossover, multiply, multiply_above, multiply_over_domain,
+    try_multiply_via_fft,
+};
 
 /// Split x into its even-indexed and odd-indexed elements.
 fn evens_and_odds<T: Clone>(x: &[T]) -> (Vec<T>, Vec<T>) {

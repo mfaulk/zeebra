@@ -912,9 +912,11 @@ possible at all: the odd part of BN254's `q - 1` is 226 bits, so `pow`'s `u128` 
 
 ### What the univariate stages cost
 
-`cargo run --release --example univariate_scaling` sweeps six stages by doubling degree until a
+`cargo run --release --example univariate_scaling` sweeps seven stages by doubling degree until a
 wall-clock budget is exceeded, reporting time, the local scaling exponent, and **peak live heap
-bytes** from a counting allocator. On a 64-core/300 GB workstation at one second per measurement:
+bytes** from a counting allocator. Six of them, on a 64-core/300 GB workstation at one second per
+measurement; the seventh is `fftmul`, which only means anything against `mul` at the same degree
+and so is in the crossover section below:
 
 | stage | exponent | KoalaBear | BN254 `Fr` | peak bytes |
 |---|---|---|---|---|
@@ -933,10 +935,10 @@ word, so a byte budget carried over from the F4 side under-estimates this layer 
 The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
 2.4x, 5.2x and 8.6x. The whole gap was the `2n` inversions batch inversion removed — see
-[`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Multiplication has no
-NTT-based path at all. Interpolation at arbitrary abscissae — what an evaluation-interpolation
-resultant needs — is quadratic: it was cubic, at 2^10 and 2^9, until #162 built the numerator
-product `prod (x - x_i)` once and divided it down by synthetic division.
+[`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Interpolation at
+arbitrary abscissae — what an evaluation-interpolation resultant needs — is quadratic: it was
+cubic, at 2^10 and 2^9, until #162 built the numerator product `prod (x - x_i)` once and divided it
+down by synthetic division.
 [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the full curves, the
 superseded figures, the gap list, and what each stage would need to go further; the subproduct tree
 that would make it `O(n log^2 n)` is not written.
@@ -946,6 +948,55 @@ The published Graeffe-transform root finder that those stages would serve is rea
 as pseudocode, the transform size each registered challenge requires against the ceilings above, a
 measured answer to whether this crate's NTT is access-bound, and an explicit no-go on every
 registered instance.
+
+#### The multiplication crossover, measured
+
+`multiply` picks between the schoolbook `Mul` and the transform. Where it should switch is **not**
+one number, and it is much later than the asymptotics suggest. Median of interleaved runs, pinned
+to one core, product degree against the ratio of schoolbook to transform time:
+
+| product degree | KoalaBear (4 B) | Zp65537 (8 B) | Goldilocks (8 B) | BN254 `Fr` (32 B) |
+|---:|---:|---:|---:|---:|
+| 256 | 0.03x | 0.23x | 0.20x | 0.61x |
+| 1024 | 0.10x | 0.84x | 0.73x | **2.1x** |
+| 2048 | 0.19x | **1.5x** | **1.4x** | 4.1x |
+| 8192 | 0.70x | 5.7x | 5.5x | 12.7x |
+| 16384 | **1.3x** | 11.7x | 10.4x | 23.6x |
+
+Above 1x the transform is ahead. Schoolbook therefore wins until degree ~460 over a 254-bit field,
+~1500 over a 64-bit one, and ~12000 over a 32-bit one — a 26x spread, which is why
+`fft_multiplication_crossover::<F>()` is indexed by `size_of::<F>()` and why the thresholds are
+rounded up to 512, 2048 and 16384 so the dispatcher never picks the slower route.
+
+Those ratios are medians of 21 interleaved runs pinned to one core, which is what it takes to
+resolve a 1.1x difference on this machine; the single-shot sweep above cannot.
+
+The spread is also a finding about the transform rather than about the fields. At degree 16384 it
+takes the same 13 ms over KoalaBear, Zp65537 and Goldilocks — three fields whose schoolbook times
+at that degree differ by 9x — so this NTT is bound by allocation and recursion, not by field
+arithmetic: `evaluate` rebuilds coefficient vectors and splits the domain at every level. The
+sweep's `fftmul` row says the same thing in bytes: exponent 1.0 as expected, but a peak of
+**26 `n B`** against 4 for schoolbook and 7 for a single `evaluate`, for a computation that is
+three transforms. An in-place iterative transform is the work that would move all three crossovers
+at once.
+
+`Mul` itself stays schoolbook. Choosing a domain needs a primitive `2^k`-th root of unity, which
+needs `KnownOrder` and a source of randomness — neither of which `Mul`'s signature can carry, and
+the first of which the Gröbner core deliberately does not require of a coefficient type. So the
+transform is reached through `multiply`, `multiply_above` with an explicit threshold, or
+`multiply_over_domain` when one domain serves many products:
+
+```rust
+use zeebra::{fields::Zp65537, multiply, FiniteField, Polynomial, UnivariatePolynomial};
+use rand::{prelude::StdRng, SeedableRng};
+
+let mut rng = StdRng::seed_from_u64(1);
+let a = UnivariatePolynomial::<Zp65537>::new(&[Zp65537::new(1), Zp65537::new(2)]);
+let b = UnivariatePolynomial::<Zp65537>::new(&[Zp65537::new(3), Zp65537::new(4)]);
+
+// Degree 2, so this is the schoolbook route — and the same answer either way.
+assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
+```
 
 ## Gröbner Bases
 
