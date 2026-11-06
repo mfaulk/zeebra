@@ -352,6 +352,18 @@ this document was remeasured. The sweep's product is an agreement verdict and no
 is why concurrency is admissible there and why `tools/scoreboard.sh` — whose product *is* the
 timing — was left sequential.
 
+**And taken a second time, where the product *is* a timing.** #180 parallelized the resultant
+route's Sylvester determinants — 16 384 independent evaluations of one matrix at one field element,
+3.0 ms each against the 0.52 ms per-invocation overhead above — and measured **92–95% parallel
+efficiency out to 32 cores**, taking a four-round CICO row from 49.7 s to 2.16 s. Because that
+figure is a solver speedup rather than a verdict, it needed the recording discipline the paragraph
+above said `tools/scoreboard.sh` would: `Environment::concurrency` on every run,
+`Comparison::of` refusing a cross-concurrency ratio, and `Scoreboard::best` quoting uncontended
+runs only. The scoreboard *runner* is still sequential and every row it writes still carries
+concurrency 1. See [`docs/research/resultant-elimination.md`](research/resultant-elimination.md)
+§6.6, which also records the granularity rule biting from the other side: the two-round row's
+order-18 determinants are 8.6 µs each and get **slower** at 32 workers.
+
 ## 7. Acceptance criteria, closed out
 
 | Criterion | State |

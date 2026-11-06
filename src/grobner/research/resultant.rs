@@ -43,6 +43,19 @@
 //! and at `d = 81` the padding from 13 123 to 16 384 samples costs more than the whole Lagrange
 //! solve it removes. Both are kept and `examples/resultant_cico.rs` measures them side by side —
 //! see `docs/research/resultant-elimination.md` §6.
+//!
+//! # Concurrency, and why the answer cannot depend on it
+//!
+//! Once the interpolation is quadratic the determinants are the whole cost — 99% of the four-round
+//! row, §6.4 — and they are independent: each is one evaluation of one matrix at one field element,
+//! sharing nothing. [`ResultantOptions::concurrency`] spreads them over worker threads and
+//! **defaults to 1**, so every figure recorded before this existed reproduces unchanged.
+//!
+//! The determinants are written **into their own index** rather than collected in completion order.
+//! The interpolation that consumes them is a function of the sample *sequence*, so a resultant whose
+//! coefficients depended on thread scheduling would not be reproducible — and a cryptanalysis
+//! figure that is not reproducible is not a figure. See [`sample_determinants`] for why a static
+//! split is the right shape here where the differential sweep's dynamic handout was not.
 
 use std::{
     fmt::{Display, Formatter},
@@ -214,6 +227,36 @@ impl Display for ResultantError {
 
 impl std::error::Error for ResultantError {}
 
+/// How a resultant is evaluated, as distinct from which resultant it is.
+///
+/// Nothing here changes the answer. The one knob is how many threads evaluate the independent
+/// Sylvester determinants, and it defaults to **1** so that a figure taken without it is
+/// reproduced exactly.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResultantOptions {
+    /// Worker threads over which the determinants are spread. At least 1.
+    pub concurrency: usize,
+}
+
+impl Default for ResultantOptions {
+    fn default() -> Self {
+        Self { concurrency: 1 }
+    }
+}
+
+impl ResultantOptions {
+    /// `concurrency` workers.
+    ///
+    /// # Panics
+    /// If `concurrency` is zero. Clamping it to one silently would turn a mis-parsed flag into a
+    /// single-threaded run reported as a parallel one, which is exactly the misreading the
+    /// scoreboard's `concurrency` field exists to prevent.
+    pub fn with_concurrency(concurrency: usize) -> Self {
+        assert!(concurrency >= 1, "a resultant needs at least one worker");
+        Self { concurrency }
+    }
+}
+
 /// `f` as a polynomial in `x_eliminate` with coefficients in `F[x_keep]`.
 ///
 /// Index `i` of the result is the coefficient of `x_eliminate^i`, as a univariate polynomial in
@@ -261,58 +304,71 @@ fn coefficients_in<F: FiniteField>(
 ///
 /// # Errors
 /// [`ResultantError`].
-pub fn bivariate_resultant<F: FiniteField>(
+pub fn bivariate_resultant<F: FiniteField + Send + Sync>(
     f: &MultivariatePolynomial<2, F>,
     g: &MultivariatePolynomial<2, F>,
     eliminate: usize,
 ) -> Result<UnivariatePolynomial<F>, ResultantError> {
-    let fc = coefficients_in(f, eliminate);
-    let gc = coefficients_in(g, eliminate);
-    let m = fc.len() - 1;
-    let n = gc.len() - 1;
-    if m == 0 {
-        return Err(ResultantError::NoDegreeInEliminatedVariable { argument: 0 });
-    }
-    if n == 0 {
-        return Err(ResultantError::NoDegreeInEliminatedVariable { argument: 1 });
-    }
-
-    // The resultant's degree in the surviving variable is at most `n·deg(f) + m·deg(g)`: the
-    // Sylvester matrix has `n` rows of `f`'s coefficients and `m` of `g`'s, and a determinant is a
-    // sum of products taking one entry from each row.
-    let f_degree = fc.iter().map(|c| c.degree() as usize).max().unwrap_or(0);
-    let g_degree = gc.iter().map(|c| c.degree() as usize).max().unwrap_or(0);
-    let bound = n * f_degree + m * g_degree;
-    let points = bound + 1;
-
-    Ok(lagrange_interpolate(sample_consecutively(
-        &fc, &gc, points,
-    )?))
+    bivariate_resultant_reference(f, g, eliminate).map(|(resultant, _)| resultant)
 }
 
-/// `points` Sylvester determinants at `0, 1, 2, ...`, paired with their abscissae.
-///
-/// The reference route's sampling, shared so that [`bivariate_resultant_ntt`] can time it apart
-/// from the interpolation without a second copy of the loop.
+/// The reference route's abscissae: `0, 1, 2, ...`, `points` of them.
 ///
 /// # Errors
 /// [`ResultantError::FieldTooSmall`] if the field has fewer than `points` elements.
-fn sample_consecutively<F: FiniteField>(
-    fc: &[UnivariatePolynomial<F>],
-    gc: &[UnivariatePolynomial<F>],
-    points: usize,
-) -> Result<Vec<(F, F)>, ResultantError> {
-    let mut samples: Vec<(F, F)> = Vec::with_capacity(points);
+fn consecutive_abscissae<F: FiniteField>(points: usize) -> Result<Vec<F>, ResultantError> {
+    let mut at: Vec<F> = Vec::with_capacity(points);
     for i in 0..points {
-        let at = F::new(i as u64);
+        let x = F::new(i as u64);
         // `F::new` is taken modulo the order, so for a field smaller than `points` the sample
         // points would collide and the interpolation would be of the wrong polynomial.
-        if i > 0 && at.is_zero() {
+        if i > 0 && x.is_zero() {
             return Err(ResultantError::FieldTooSmall { needed: points });
         }
-        samples.push((at, sylvester_determinant(fc, gc, at)));
+        at.push(x);
     }
-    Ok(samples)
+    Ok(at)
+}
+
+/// One Sylvester determinant per entry of `at`, in that order, over `concurrency` workers.
+///
+/// **Index, not completion order.** The output is pre-sized and split into contiguous blocks, so
+/// each slot is written by exactly one worker from exactly one abscissa. The returned sequence is
+/// therefore a function of `at` alone and not of which worker finished first — which is what makes
+/// the interpolation that consumes it reproducible.
+///
+/// The blocks are **static**, unlike the dynamic index handout
+/// [`run_sweep`](crate::grobner::differential::run_sweep) uses. That sweep hands out one index at a
+/// time because a generated system's cost spans orders of magnitude; here every sample is a
+/// determinant of the *same* order evaluated at a different point, so the blocks are equal work by
+/// construction and a shared counter would only add contention.
+fn sample_determinants<F: FiniteField + Send + Sync>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    at: &[F],
+    concurrency: usize,
+) -> Vec<F> {
+    let mut values = vec![F::zero(); at.len()];
+    if concurrency <= 1 {
+        for (slot, x) in values.iter_mut().zip(at) {
+            *slot = sylvester_determinant(fc, gc, *x);
+        }
+        return values;
+    }
+
+    // `div_ceil` so the blocks cover the whole range; a short tail means fewer threads than
+    // requested, never more, and never a sample left unevaluated.
+    let block = at.len().div_ceil(concurrency).max(1);
+    std::thread::scope(|scope| {
+        for (chunk, abscissae) in values.chunks_mut(block).zip(at.chunks(block)) {
+            scope.spawn(move || {
+                for (slot, x) in chunk.iter_mut().zip(abscissae) {
+                    *slot = sylvester_determinant(fc, gc, *x);
+                }
+            });
+        }
+    });
+    values
 }
 
 /// Where the interpolation samples live.
@@ -345,6 +401,8 @@ pub struct ResultantStages {
     pub matrix_order: usize,
     /// Sylvester determinants evaluated.
     pub samples: usize,
+    /// Worker threads the determinants were spread over. 1 for an uncontended figure.
+    pub concurrency: usize,
     /// Time spent evaluating those determinants.
     pub sampling: Duration,
     /// Time spent recovering the polynomial from them.
@@ -411,22 +469,42 @@ fn sylvester_setup<F: FiniteField>(
 /// interpolation separately so the two routes can be compared stage by stage rather than only on a
 /// total.
 ///
+/// Single-threaded. [`bivariate_resultant_reference_with`] takes the concurrency.
+///
 /// # Errors
 /// [`ResultantError`].
-pub fn bivariate_resultant_reference<F: FiniteField>(
+pub fn bivariate_resultant_reference<F: FiniteField + Send + Sync>(
     f: &MultivariatePolynomial<2, F>,
     g: &MultivariatePolynomial<2, F>,
     eliminate: usize,
 ) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
+    bivariate_resultant_reference_with(f, g, eliminate, ResultantOptions::default())
+}
+
+/// [`bivariate_resultant_reference`] with the determinants spread over `options.concurrency`
+/// workers.
+///
+/// The recovered polynomial does not depend on the concurrency — the samples are indexed, not
+/// collected — and `tests` pins that at 1, 8 and 32.
+///
+/// # Errors
+/// [`ResultantError`].
+pub fn bivariate_resultant_reference_with<F: FiniteField + Send + Sync>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+    options: ResultantOptions,
+) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
     let (fc, gc, degree_bound) = sylvester_setup(f, g, eliminate)?;
     let points = degree_bound + 1;
+    let abscissae = consecutive_abscissae::<F>(points)?;
 
     let at = Instant::now();
-    let samples = sample_consecutively(&fc, &gc, points)?;
+    let values = sample_determinants(&fc, &gc, &abscissae, options.concurrency);
     let sampling = at.elapsed();
 
     let at = Instant::now();
-    let resultant = lagrange_interpolate(samples);
+    let resultant = lagrange_interpolate(abscissae.into_iter().zip(values).collect::<Vec<_>>());
     let interpolation = at.elapsed();
 
     Ok((
@@ -436,6 +514,7 @@ pub fn bivariate_resultant_reference<F: FiniteField>(
             degree_bound,
             matrix_order: fc.len() + gc.len() - 2,
             samples: points,
+            concurrency: options.concurrency,
             sampling,
             interpolation,
         },
@@ -456,17 +535,34 @@ pub fn bivariate_resultant_reference<F: FiniteField>(
 /// determinant costs far more than a point of interpolation at these sizes, the padding is the
 /// dominant term of the comparison between the two routes — see `resultant-elimination.md` §6.
 ///
+/// Single-threaded. [`bivariate_resultant_ntt_with`] takes the concurrency.
+///
 /// # Errors
 /// [`ResultantError`].
-pub fn bivariate_resultant_ntt<F: KnownOrder>(
+pub fn bivariate_resultant_ntt<F: KnownOrder + Send + Sync>(
     f: &MultivariatePolynomial<2, F>,
     g: &MultivariatePolynomial<2, F>,
     eliminate: usize,
 ) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
+    bivariate_resultant_ntt_with(f, g, eliminate, ResultantOptions::default())
+}
+
+/// [`bivariate_resultant_ntt`] with the determinants spread over `options.concurrency` workers.
+///
+/// # Errors
+/// [`ResultantError`].
+pub fn bivariate_resultant_ntt_with<F: KnownOrder + Send + Sync>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+    options: ResultantOptions,
+) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
     let (fc, gc, degree_bound) = sylvester_setup(f, g, eliminate)?;
     let log_size = match interpolation_route::<F>(degree_bound) {
         ResultantRoute::Ntt { log_size } => log_size,
-        ResultantRoute::Lagrange { .. } => return bivariate_resultant_reference(f, g, eliminate),
+        ResultantRoute::Lagrange { .. } => {
+            return bivariate_resultant_reference_with(f, g, eliminate, options)
+        }
     };
 
     // Any primitive `2^log_size`-th root of unity serves: the recovered polynomial is the unique
@@ -478,10 +574,7 @@ pub fn bivariate_resultant_ntt<F: KnownOrder>(
     let domain = FFTDomain::from_generator(generator, size);
 
     let at = Instant::now();
-    let values: Vec<F> = domain
-        .iter()
-        .map(|point| sylvester_determinant(&fc, &gc, *point))
-        .collect();
+    let values = sample_determinants(&fc, &gc, domain.powers(), options.concurrency);
     let sampling = at.elapsed();
 
     let at = Instant::now();
@@ -495,6 +588,7 @@ pub fn bivariate_resultant_ntt<F: KnownOrder>(
             degree_bound,
             matrix_order: fc.len() + gc.len() - 2,
             samples: size,
+            concurrency: options.concurrency,
             sampling,
             interpolation,
         },
@@ -570,8 +664,9 @@ pub fn evaluate_bivariate<F: FiniteField>(f: &MultivariatePolynomial<2, F>, a: F
 #[cfg(test)]
 mod tests {
     use super::{
-        bivariate_resultant, bivariate_resultant_ntt, cico_bivariate, interpolation_route,
-        sylvester_determinant_at, ResultantError, ResultantRoute,
+        bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
+        bivariate_resultant_reference_with, cico_bivariate, interpolation_route,
+        sylvester_determinant_at, ResultantError, ResultantOptions, ResultantRoute,
     };
     use crate::{
         fields::{Mersenne31, PrimeFieldElement64, Zp13},
@@ -1147,6 +1242,153 @@ mod tests {
                 instance.is_solution(&inputs).expect("the right width"),
                 "{id} witness ({first}, {second}) is not a solution"
             );
+        }
+    }
+
+    /// The concurrency the determinants are spread over cannot be zero.
+    #[test]
+    #[should_panic(expected = "at least one worker")]
+    fn test_zero_workers_is_refused() {
+        let _ = ResultantOptions::with_concurrency(0);
+    }
+
+    /// Both routes return byte-identical coefficients at concurrency 1, 8 and 32.
+    ///
+    /// The determinism the whole parallel path rests on. The samples are written into their own
+    /// index rather than collected as they finish, so the interpolation sees the same sequence at
+    /// every worker count — and a coefficient that moved would mean the index bookkeeping is
+    /// wrong, not that the hardware is noisy.
+    #[test]
+    fn test_the_resultant_does_not_depend_on_the_concurrency() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        const WORKERS: [usize; 3] = [1, 8, 32];
+        let mut rng = StdRng::seed_from_u64(0x180);
+        for (degree_x, degree_y) in [(4u32, 4u32), (5, 3), (3, 5)] {
+            let f = random_bivariate(degree_x, degree_y, &mut rng);
+            let g = random_bivariate(degree_x, degree_y, &mut rng);
+            let mut subgroup = None;
+            let mut lagrange = None;
+            for workers in WORKERS {
+                let options = ResultantOptions::with_concurrency(workers);
+                let (ntt, stages) =
+                    bivariate_resultant_ntt_with(&f, &g, 1, options).expect("both involve y");
+                assert_eq!(stages.concurrency, workers, "the stages report the workers");
+                let (reference, _) =
+                    bivariate_resultant_reference_with(&f, &g, 1, options).expect("both involve y");
+                assert_eq!(ntt, reference, "the two routes agree at {workers} workers");
+                match (&subgroup, &lagrange) {
+                    (None, None) => {
+                        subgroup = Some(ntt);
+                        lagrange = Some(reference);
+                    }
+                    (Some(first_ntt), Some(first_reference)) => {
+                        assert_eq!(&ntt, first_ntt, "subgroup route at {workers} workers");
+                        assert_eq!(
+                            &reference, first_reference,
+                            "reference route at {workers} workers"
+                        );
+                    }
+                    _ => unreachable!("both are set together"),
+                }
+            }
+        }
+    }
+
+    /// More workers than samples leaves no sample unevaluated.
+    ///
+    /// The tail block of the static split is shorter than the rest, and a sample dropped there
+    /// would interpolate a *different* polynomial rather than fail — so the small-domain case is
+    /// checked against the single-threaded answer directly.
+    #[test]
+    fn test_more_workers_than_samples_still_evaluates_every_sample() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("x*y^2 + y + 1", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("y - x", VARS).expect("parses");
+        let (sequential, stages) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        assert!(stages.samples < 32, "fewer samples than workers");
+        for workers in [2usize, 7, 32, 64] {
+            let (parallel, _) = bivariate_resultant_ntt_with(
+                &f,
+                &g,
+                1,
+                ResultantOptions::with_concurrency(workers),
+            )
+            .expect("both involve y");
+            assert_eq!(parallel, sequential, "{workers} workers");
+        }
+    }
+
+    /// The registered slice returns the same resultant and the same witnesses at 1, 8 and 32.
+    ///
+    /// The end-to-end form of the determinism claim, on a fixed seed and a registered problem:
+    /// the witnesses are what a scoreboard row reports, and `is_solution` runs the permutation on
+    /// each, so this pins the whole pipeline rather than the sample loop alone.
+    #[test]
+    fn test_the_registered_slice_gives_the_same_witnesses_at_every_concurrency() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        use crate::{
+            grobner::research::{challenge, Specialization},
+            roots,
+        };
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let mut expected_resultant: Option<UnivariatePolynomial<Koala>> = None;
+        let mut expected_witnesses: Vec<(Koala, Koala)> = Vec::new();
+        for workers in [1usize, 8, 32] {
+            let (resultant, _) = bivariate_resultant_ntt_with(
+                &outputs[0],
+                &outputs[1],
+                1,
+                ResultantOptions::with_concurrency(workers),
+            )
+            .expect("both involve the second");
+
+            let mut witnesses: Vec<(Koala, Koala)> = Vec::new();
+            for first in roots(&resultant, &mut StdRng::seed_from_u64(7)) {
+                let specialized: Vec<Koala> = (0..=9)
+                    .map(|power| {
+                        outputs[0]
+                            .terms()
+                            .iter()
+                            .filter(|(monomial, _)| monomial.exponents()[1] as usize == power)
+                            .map(|(monomial, c)| *c * first.pow(monomial.exponents()[0] as u128))
+                            .fold(Koala::zero(), |acc, term| acc + term)
+                    })
+                    .collect();
+                for second in roots(
+                    &UnivariatePolynomial::new(&specialized),
+                    &mut StdRng::seed_from_u64(11),
+                ) {
+                    let mut inputs = vec![first, second];
+                    inputs.extend_from_slice(&fixed);
+                    if instance.is_solution(&inputs).expect("the right width") {
+                        witnesses.push((first, second));
+                    }
+                }
+            }
+            assert_eq!(witnesses.len(), 3, "the seed-1 slice has three witnesses");
+
+            match &expected_resultant {
+                None => {
+                    expected_resultant = Some(resultant);
+                    expected_witnesses = witnesses;
+                }
+                Some(first) => {
+                    assert_eq!(&resultant, first, "{workers} workers");
+                    assert_eq!(witnesses, expected_witnesses, "{workers} workers");
+                }
+            }
         }
     }
 

@@ -523,6 +523,15 @@ pub struct Environment {
     /// Logical CPUs, and whatever pinning policy was applied.
     pub cpu: String,
 
+    /// Worker threads the solver was given. **1 for every uncontended figure**, which is what
+    /// every record written before concurrency existed is read back as.
+    ///
+    /// Recorded beside [`Self::cpu`] rather than folded into it because it is the one condition the
+    /// comparison path **refuses** on rather than merely caveats: a parallel wall clock and a
+    /// single-threaded one are costs of different things, and a ratio between them read as a solver
+    /// speedup would be false. See [`Comparison::of`].
+    pub concurrency: usize,
+
     /// `RUSTFLAGS` and the profile, which decide whether two timings are comparable at all.
     pub build: String,
 
@@ -537,12 +546,17 @@ impl Environment {
             ("commit", Json::string(&self.commit)),
             ("machine", Json::string(&self.machine)),
             ("cpu", Json::string(&self.cpu)),
+            ("concurrency", Json::size(self.concurrency)),
             ("build", Json::string(&self.build)),
             ("policy", Json::string(&self.policy)),
         ])
     }
 
     /// Whether two runs were measured under conditions a runtime may be compared across.
+    ///
+    /// Concurrency is deliberately **not** here: a mismatch in it is refused by
+    /// [`Comparison::of`] rather than carried as a caveat, so this answers the narrower question
+    /// of whether the machine and the build agree.
     pub fn comparable(&self, other: &Self) -> bool {
         self.machine == other.machine && self.cpu == other.cpu && self.build == other.build
     }
@@ -620,6 +634,7 @@ impl RunRecord {
                 commit: String::new(),
                 machine: String::new(),
                 cpu: String::new(),
+                concurrency: 1,
                 build: String::new(),
                 policy: String::new(),
             },
@@ -841,6 +856,13 @@ impl RunRecord {
                 commit: field("commit"),
                 machine: field("machine"),
                 cpu: field("cpu"),
+                // Absent in every record written before concurrency was a field, and those runs
+                // were single-threaded — so the default is the fact, not a guess.
+                concurrency: environment
+                    .get("concurrency")
+                    .and_then(Json::as_int)
+                    .unwrap_or(1)
+                    .max(1) as usize,
                 build: field("build"),
                 policy: field("policy"),
             },
@@ -960,6 +982,22 @@ pub enum ScoreboardError {
         /// The second's.
         right: String,
     },
+
+    /// Two runs of the same problem were measured at different degrees of parallelism.
+    ///
+    /// Refused rather than caveated. A parallel wall clock divided by a single-threaded one is a
+    /// core count, not a solver speedup, and the ratio is the number a reader would quote. The
+    /// single-threaded figures stay comparable with each other and with every row recorded before
+    /// any of this was parallel; a scaling study compares the concurrencies itself, outside the
+    /// scoreboard.
+    DifferentConcurrency {
+        /// The problem both runs are of.
+        id: String,
+        /// The baseline's worker count.
+        baseline: usize,
+        /// The candidate's.
+        candidate: usize,
+    },
 }
 
 impl Display for ScoreboardError {
@@ -984,6 +1022,16 @@ impl Display for ScoreboardError {
                 f,
                 "refusing to compare different problems: {} against {}",
                 left, right
+            ),
+            Self::DifferentConcurrency {
+                id,
+                baseline,
+                candidate,
+            } => write!(
+                f,
+                "refusing to compare {} at concurrency {} against concurrency {}: the ratio would \
+                 be a core count rather than a speedup",
+                id, candidate, baseline
             ),
         }
     }
@@ -1023,6 +1071,11 @@ impl Comparison {
     /// [`ScoreboardError::DifferentProblems`] when the identity digests differ. The ids are not
     /// compared: two runs can agree on a name and disagree on what it means, which is the whole
     /// reason the digest exists.
+    ///
+    /// [`ScoreboardError::DifferentConcurrency`] when the two were measured on different worker
+    /// counts — the one condition that makes a ratio of wall clocks mean something other than what
+    /// it looks like. A difference in machine or build is a caveat because the comparison is still
+    /// of the same quantity measured imperfectly; a difference in concurrency is not.
     pub fn of(baseline: &RunRecord, candidate: &RunRecord) -> Result<Self, ScoreboardError> {
         if baseline.challenge_digest != candidate.challenge_digest {
             return Err(ScoreboardError::DifferentProblems {
@@ -1036,6 +1089,14 @@ impl Comparison {
                     candidate.challenge,
                     &candidate.challenge_digest[..12]
                 ),
+            });
+        }
+
+        if baseline.environment.concurrency != candidate.environment.concurrency {
+            return Err(ScoreboardError::DifferentConcurrency {
+                id: baseline.challenge.clone(),
+                baseline: baseline.environment.concurrency,
+                candidate: candidate.environment.concurrency,
             });
         }
 
@@ -1213,15 +1274,29 @@ impl Scoreboard {
         Ok(board)
     }
 
-    /// The fastest verified witness for each problem.
+    /// The fastest verified witness for each problem, among **uncontended** runs.
     ///
     /// **Witnesses only.** Runs that stopped at a limit are not ranked against each other: a
     /// higher degree does not mean less work remains, so there is no ordering to impose. Those
     /// appear in [`Self::unfinished`] instead, and in the rendered table beside this one.
+    ///
+    /// **Single-threaded only**, which is [`Self::best_at`]'s doc comment.
     pub fn best(&self) -> BTreeMap<&str, &RunRecord> {
+        self.best_at(1)
+    }
+
+    /// The same, among runs measured on `concurrency` workers.
+    ///
+    /// [`Self::best`] is `best_at(1)`, and that asymmetry is deliberate: the rendered table is the
+    /// headline a reader takes away, and a parallel wall clock dropped into it would displace the
+    /// single-threaded figure it is **not comparable with** — the same refusal
+    /// [`ScoreboardError::DifferentConcurrency`] makes explicit. A parallel figure is reported by
+    /// this method, by its own run file, and by the research document that measured it, never by
+    /// quietly becoming the row a reader reads as progress.
+    pub fn best_at(&self, concurrency: usize) -> BTreeMap<&str, &RunRecord> {
         let mut best: BTreeMap<&str, &RunRecord> = BTreeMap::new();
         for run in &self.runs {
-            if !run.outcome.is_verified_witness() {
+            if !run.outcome.is_verified_witness() || run.environment.concurrency != concurrency {
                 continue;
             }
             best.entry(run.challenge.as_str())
@@ -1422,6 +1497,7 @@ mod tests {
             commit: "deadbeef".to_string(),
             machine: "workstation".to_string(),
             cpu: "64 logical, taskset 0-7".to_string(),
+            concurrency: 1,
             build: "release, target-cpu=x86-64-v3".to_string(),
             policy: "60k columns, 400 MB".to_string(),
         }
@@ -1764,6 +1840,117 @@ mod tests {
         // 369.4 ms against 219 ms, over the whole pipeline rather than F4 alone.
         assert_eq!(comparison.speedup_per_mille, 1_686);
         assert!(comparison.caveats.is_empty(), "{:?}", comparison.caveats);
+    }
+
+    /// A parallel row is refused against a single-threaded one rather than caveated.
+    #[test]
+    fn test_a_concurrent_row_is_not_compared_against_an_uncontended_one() {
+        let baseline = witness(
+            "poseidon-t2-rf4-rp0-planted",
+            "as generated",
+            51_983,
+            3_800_000,
+        );
+        let mut parallel = witness(
+            "poseidon-t2-rf4-rp0-planted",
+            "as generated",
+            1_700,
+            3_800_000,
+        );
+        parallel.environment.concurrency = 32;
+
+        let refused = Comparison::of(&baseline, &parallel).expect_err("not comparable");
+        assert_eq!(
+            refused,
+            ScoreboardError::DifferentConcurrency {
+                id: "poseidon-t2-rf4-rp0-planted".to_string(),
+                baseline: 1,
+                candidate: 32,
+            }
+        );
+        // The message says why, so a reader does not take it for a missing-field error.
+        assert!(refused.to_string().contains("core count"), "{}", refused);
+        // Refused in both directions: a single-threaded candidate against a parallel baseline is
+        // the same false ratio upside down.
+        assert!(Comparison::of(&parallel, &baseline).is_err());
+        // And the single-core history stays comparable with itself.
+        assert!(Comparison::of(&baseline, &baseline).is_ok());
+    }
+
+    /// A parallel row never displaces the single-core figure in the headline table.
+    #[test]
+    fn test_a_parallel_row_does_not_become_the_best() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+        let single = witness(
+            "poseidon-t2-rf4-rp0-planted",
+            "as generated",
+            51_983,
+            3_800_000,
+        );
+        let mut parallel = witness(
+            "poseidon-t2-rf4-rp0-planted",
+            "as generated",
+            1_700,
+            3_800_000,
+        );
+        parallel.environment.concurrency = 32;
+        board.add(single, &registry).expect("registered");
+        board.add(parallel, &registry).expect("registered");
+
+        // The faster row is 30x quicker and still not the one quoted: it is a core count.
+        let best = board.best();
+        assert_eq!(best.len(), 1);
+        assert_eq!(
+            best["poseidon-t2-rf4-rp0-planted"].elapsed().as_millis(),
+            51_983
+        );
+        // It is reachable, just not by the headline.
+        let parallel_best = board.best_at(32);
+        assert_eq!(
+            parallel_best["poseidon-t2-rf4-rp0-planted"]
+                .elapsed()
+                .as_millis(),
+            1_700
+        );
+        // And the rendered table carries the single-core figure, not the parallel one.
+        let markdown = board.to_markdown(&registry);
+        assert!(markdown.contains("51983.0 ms"), "{}", markdown);
+        assert!(!markdown.contains("1700.0 ms"), "{}", markdown);
+    }
+
+    /// Concurrency survives a round trip, and a record written without it reads as 1.
+    #[test]
+    fn test_concurrency_round_trips_and_defaults_to_one() {
+        use crate::grobner::research::{challenge, Json};
+
+        let registry = registry();
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let mut run = RunRecord::new(&manifest, "resultant, slice(12 fixed, seed 1)");
+        run.environment = Environment {
+            concurrency: 32,
+            ..environment()
+        };
+        run.outcome = RunOutcome::VerifiedWitness;
+        run.verification = "through the permutation".to_string();
+
+        let stored = run.to_json(&manifest);
+        let history = Json::object([("runs", Json::Array(vec![stored.clone()]))]);
+        let loaded = Scoreboard::load(&Json::parse(&history.to_json()).expect("valid"), &registry)
+            .expect("registered");
+        assert_eq!(loaded.runs()[0].environment.concurrency, 32);
+
+        // A record from before the field existed: its environment has no `concurrency`, and those
+        // runs were single-threaded, so 1 is the fact rather than a guess.
+        let text = stored.to_json().replace("\"concurrency\": 32,", "");
+        assert!(!text.contains("concurrency"), "the field is gone");
+        let legacy = Json::object([(
+            "runs",
+            Json::Array(vec![Json::parse(&text).expect("still valid JSON")]),
+        )]);
+        let loaded = Scoreboard::load(&Json::parse(&legacy.to_json()).expect("valid"), &registry)
+            .expect("registered");
+        assert_eq!(loaded.runs()[0].environment.concurrency, 1);
     }
 
     /// A run that stopped, and a slice that established nothing, both survive a round trip.
