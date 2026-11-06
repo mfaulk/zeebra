@@ -1328,11 +1328,11 @@ three transforms. An in-place iterative transform is the work that would move al
 at once. **#161 did it**, and the re-taken sweep measures `12 n B`; the 26 is the pre-#161 figure,
 kept because the ratios in the table above were taken against that transform.
 
-`Mul` itself stays schoolbook. Choosing a domain needs a primitive `2^k`-th root of unity, which
-needs `KnownOrder` and a source of randomness — neither of which `Mul`'s signature can carry, and
-the first of which the Gröbner core deliberately does not require of a coefficient type. So the
-transform is reached through `multiply`, `multiply_above` with an explicit threshold, or
-`multiply_over_domain` when one domain serves many products:
+`Mul` covers the first two routes and cannot cover the third. Choosing a domain needs a primitive
+`2^k`-th root of unity, which needs `KnownOrder` and a source of randomness — neither of which
+`Mul`'s signature can carry, and the first of which the Gröbner core deliberately does not require
+of a coefficient type. So the transform is reached through `multiply`, `multiply_above` with an
+explicit threshold, or `multiply_over_domain` when one domain serves many products:
 
 ```rust
 use zeebra::{fields::Zp65537, multiply, FiniteField, Polynomial, UnivariatePolynomial};
@@ -1357,12 +1357,26 @@ cargo run --release --example karatsuba_crossover
 is the kernel measurement; [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)
 §4.1.1 has the per-width tables and §4.1.2 the dispatched ones.
 
-**`Mul` itself is still schoolbook**, and that is a measured decision rather than an omission:
-dispatching it to Karatsuba makes `roots` — the binding univariate stage — **1.28x to 1.61x**
-faster, so it should happen, but `&a * &b` is currently the oracle that `karatsuba`'s and
-`fft::multiply`'s agreement tests compare against. Changing the operator without first re-basing
-those tests onto an implementation-independent comparand would make them pass vacuously. That
-sequencing is [#231](https://github.com/mfaulk/zeebra/issues/231).
+**`Mul` dispatches too**, since #231: schoolbook below the Karatsuba base case and Karatsuba above
+it, so a caller who writes only `a * b` gets the subquadratic route without opting in. Below the
+base case it *is* the schoolbook loop, so the operator is bit-identical to what it replaced at
+every size.
+
+| stage | KoalaBear | BN254 `Fr` |
+|---|---:|---:|
+| `roots`, the binding univariate stage | **1.32x–1.67x** | **1.44x–1.66x** |
+| `lcm` | 1.17x–1.65x | 1.14x–1.66x |
+| `from_zeros` | **2.83x** | 1.04x |
+| one product | 2.08x–6.49x | 2.56x–7.31x |
+| `div_with_remainder` *(control)* | 0.99x | 1.00x |
+
+Getting there needed two things first, both of which are the interesting part. The agreement tests
+in `karatsuba` and `fft::multiply` compared against `&a * &b`, which would have made them check an
+implementation against itself, so they were re-based onto an independent oracle in
+`test_support`. And dispatching the operator initially measured **0.74x** on `from_zeros` — the
+small-product regression the issue predicted — which turned out to be `schoolbook_into` iterating
+the longer operand outside; swapping that made the same shape **2.5x** instead. The transform still
+cannot live on `Mul`, because choosing a domain needs `KnownOrder` and randomness.
 
 ## Gröbner Bases
 
