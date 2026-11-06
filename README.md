@@ -31,6 +31,8 @@ As the saying goes, you can either make software so simple that it obviously has
       compare two different problems
 - [x] A verified CICO witness at Poseidon-31's official state width `t = 16`, for a registered
       reduced-round instance
+- [x] Graeffe-transform root finding: one root at degree `3^13` over KoalaBear in 3.1 s, against an
+      extrapolated 57 hours for the quadratic finder
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -305,6 +307,9 @@ cargo run --release --example univariate_scaling -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
 cargo run --release --example karatsuba_crossover  # Karatsuba against schoolbook, per field width
 cargo run --release --example karatsuba_crossover -- bn254
+cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
+cargo run --release --example graeffe_root -- list
+cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
 cargo run --release --example batch_inversion      # batch inversion: routine, integration,
 cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
 cargo run --release --example scoreboard           # registered problems, one record each, staged
@@ -999,11 +1004,74 @@ takes its Sylvester determinants on a power-of-two subgroup and recovers the pol
 superseded figures, the gap list, and what each stage would need to go further; the subproduct tree
 that would make it `O(n log^2 n)` is not written.
 
-The published Graeffe-transform root finder that those stages would serve is read and scoped in
+The published Graeffe-transform root finder that those stages serve is read and scoped in
 [`docs/research/graeffe-root-finding.md`](docs/research/graeffe-root-finding.md), with the algorithm
-as pseudocode, the transform size each registered challenge requires against the ceilings above, a
-measured answer to whether this crate's NTT is access-bound, and an explicit no-go on every
-registered instance.
+as pseudocode, the transform size each registered challenge requires against the ceilings above, and
+a measured answer to whether this crate's NTT is access-bound. That document's §7.2 no-go was
+retracted in part: the disclosed solve's working degree is `3^13`, not a resultant's `3^18`, and it
+fits inside KoalaBear's `2^24`. The next section is the implementation.
+
+### Root finding by the Graeffe transform
+
+`graeffe_root` finds one root of a univariate polynomial in `F_p` in `O(M(d) log p)` rather than the
+`O(log q * d^2)` of `roots`, over a field whose `q - 1` has a large power of two and a **small odd
+part**. `graeffe_2` is the order-2 transform on its own and `graeffe_l` the order-`l` one.
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    fields::KoalaBear, graeffe_2, graeffe_root, FiniteField, Polynomial, UnivariatePolynomial, Zero,
+};
+
+let mut rng = StdRng::seed_from_u64(1);
+let f = UnivariatePolynomial::<KoalaBear>::from_zeros(&[KoalaBear::new(7), KoalaBear::new(11)]);
+
+// GT_2 squares the roots, so the transform of (x - 7)(x - 11) is (x - 49)(x - 121).
+let squared = UnivariatePolynomial::from_zeros(&[KoalaBear::new(49), KoalaBear::new(121)]);
+assert_eq!(graeffe_2(&f, &mut rng).unwrap(), squared);
+
+let root = graeffe_root(&f, &mut rng).unwrap().expect("f has roots in the field");
+assert!(f.eval(&root).is_zero());
+```
+
+`GT_2(f) = (-1)^d (f_e^2 - x f_o^2)` for `f(x) = f_e(x^2) + x f_o(x^2)`, which is **three transforms
+of size `d + 1`, not of `2d + 1`** — half the size an ordinary product of two degree-`d`
+polynomials needs. The `(-1)^d` makes a monic input transform to a monic output, so `prod (x - r_i)`
+maps to exactly `prod (x - r_i^2)` and `GT_2 . GT_2 = GT_4` composes without a unit.
+
+Iterating it does **not** separate roots by magnitude, which is what the real-number original is
+for. With `q - 1 = 2^k * s`, every base-field root `alpha` has `alpha^(2^k)` in the subgroup of
+order `s`, so `k` transforms drive the roots into a subgroup small enough to search outright. The
+descent back down is decided by the polynomial rather than guessed: `G_(2^(i-1))` reduced modulo
+`x^2 - mu_i` is `a x + b`, and `-b/a` is the one of `mu_i`'s two square roots it vanishes at.
+
+`cargo run --release --example graeffe_root` measures it. On a 64-core/300 GB workstation, one core,
+KoalaBear in a `u64`:
+
+| degree | transforms | largest | forward | subgroup | descent | **total** | peak heap |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| `3^11` = 177 147 | 72 | `2^18` | 0.38 s | 0.09 ms | 7.5 ms | **0.39 s** | 27 MB |
+| `3^12` = 531 441 | 72 | `2^20` | 1.50 s | 0.09 ms | 20.7 ms | **1.53 s** | 80 MB |
+| **`3^13`** = 1 594 323 | 72 | **`2^21`** | 3.04 s | 0.10 ms | 58.8 ms | **3.11 s** | 195 MB |
+
+Against `roots` on the same shape of input: it reaches degree 32 768 in 86.8 s and goes no further
+inside a 60 s budget, and extrapolating its measured quadratic growth to `3^13` gives **57 hours**.
+So about four to five orders of magnitude at that degree — with the quadratic side extrapolated, not
+measured.
+
+**97.7% of the time is the forward iteration, i.e. the NTT**, which is why #161 moved this stage
+more than it moved anything else: the same rows were **13.85 s and 384 MB** before the iterative
+kernel landed, so `3^13` is **4.45x faster and 1.97x smaller** for a change in a file this module
+only calls. `docs/research/graeffe-root-finding.md` §4.4 keeps both revisions and §4.4.3 is the
+difference. The `u32`-backed KoalaBear — the registered challenge's own type — is **2.27 s and
+97 MB**.
+
+**Only over a field whose odd part is small.** KoalaBear's is 127; Goldilocks' is `2^32 - 1`, so the
+progressive reduction never bites and the subgroup search falls back to `roots` on a polynomial of
+the input's degree — 5.07 s of a 5.09 s call at degree 4 096, so **99.6%** of it. The method is
+exact there and buys nothing, which is why the papers give Goldilocks a separate algorithm built on
+odd-order transforms. #161 sharpened that finding rather than softening it: making the transforms
+5.9x faster made the whole call 3% faster.
 
 #### The multiplication crossover, measured
 

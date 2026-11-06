@@ -12,6 +12,7 @@ mod dense_polynomial_arithmetic;
 mod div_with_remainder;
 mod factorize;
 mod gcd;
+mod graeffe;
 mod karatsuba;
 mod lagrange_interpolation;
 mod polynomial_trait;
@@ -26,6 +27,10 @@ pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialPa
 pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
 pub use gcd::gcd;
+pub use graeffe::{
+    graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root, graeffe_root_with_stats,
+    GraeffeError, GraeffeStats, SubgroupRoute,
+};
 // Measurement hooks for `examples/karatsuba_crossover.rs`, not API: the dispatcher-facing entry
 // point is the `pub(crate)` `karatsuba::multiply_karatsuba`.
 #[doc(hidden)]
