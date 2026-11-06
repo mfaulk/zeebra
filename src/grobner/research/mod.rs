@@ -33,8 +33,10 @@ pub use poseidon::{
 pub use record::{AttemptRecord, ExperimentRecord, Json};
 pub use reorder::{ReorderError, RoundLayout, VariableOrder};
 pub use resultant::{
-    bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_reference, cico_bivariate,
-    interpolation_route, sylvester_determinant_at, ResultantError, ResultantRoute, ResultantStages,
+    bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
+    bivariate_resultant_reference, bivariate_resultant_reference_with, cico_bivariate,
+    interpolation_route, sylvester_determinant_at, ResultantError, ResultantOptions,
+    ResultantRoute, ResultantStages,
 };
 pub use scoreboard::{
     wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit, RunOutcome,
