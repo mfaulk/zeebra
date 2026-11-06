@@ -6,6 +6,7 @@
 mod big_integers;
 
 mod gcd;
+mod jacobi;
 mod prime_factors;
 mod u256;
 pub mod utils;
@@ -20,6 +21,7 @@ pub use big_integers::{
     multi_word_sub::multi_word_sub,
 };
 pub use gcd::*;
+pub use jacobi::jacobi_symbol;
 pub use prime_factors::{factor, find_generator, from_prime_factorization};
 #[cfg(test)]
 use rand::{CryptoRng, RngCore};

@@ -15,7 +15,7 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    fields::{trim_limbs, KnownOrder},
+    fields::{trim_limbs, KnownOrder, RootOfUnityError},
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
     integers::{big_uint::BigUInt, factor, find_generator, utils::u128_from_parts, U256},
@@ -136,7 +136,9 @@ impl<const P: u128> KnownOrder for PrimeFieldElement128<P> {
         trim_limbs(&Self::ORDER_LIMBS)
     }
 
-    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+    fn try_primitive_element<R: RngCore + CryptoRng>(
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
         // See Algorithm 4.80 of Handbook of Applied Cryptography.
         let n = BigUInt::new_from_u128(P - 1);
         let (prime_factors, powers) = factor(&n, rng);
@@ -146,18 +148,22 @@ impl<const P: u128> KnownOrder for PrimeFieldElement128<P> {
         let words = generator.as_le_words();
         let low: u64 = words.first().cloned().unwrap_or(0);
         let hi: u64 = words.get(1).cloned().unwrap_or(0);
-        Self {
+        Ok(Self {
             value: u128_from_parts(low, hi),
-        }
+        })
     }
 
-    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
-        // n must divide the group order.
+    fn try_root_of_unity<R: RngCore + CryptoRng>(
+        n: u64,
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
         let group_order = P - 1;
-        assert_eq!(group_order % n as u128, 0);
+        if n == 0 || !group_order.is_multiple_of(n as u128) {
+            return Err(RootOfUnityError::OrderDoesNotDivide { n });
+        }
 
-        let x = Self::primitive_element(rng);
-        x.pow(group_order / n as u128)
+        let x = Self::try_primitive_element(rng)?;
+        Ok(x.pow(group_order / n as u128))
     }
 }
 

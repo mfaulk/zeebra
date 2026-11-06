@@ -10,10 +10,16 @@ mod prime_field_128;
 mod prime_field_256;
 mod prime_field_32;
 mod prime_field_64;
+mod sqrt;
 pub mod two_adic;
 
 pub use batch_inverse::{batch_inverse, batch_invert};
-pub use finite_field::{trim_limbs, FiniteField, KnownOrder, ParseFieldElementError};
+pub use binary_field::BinaryFieldElement;
+pub use extension_field::{ExtensionFieldElement, IrreduciblePolynomial};
+pub use finite_field::{
+    trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, RootOfUnityError,
+};
+pub use irreducible_polynomials::{Modulus13Pow4, X5_X2_1, X8_X4_X3_X_1};
 pub use prime_field_128::PrimeFieldElement128;
 pub use prime_field_256::{
     Bls12_381Fr, Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256,
@@ -21,6 +27,21 @@ pub use prime_field_256::{
 };
 pub use prime_field_32::PrimeFieldElement32;
 pub use prime_field_64::PrimeFieldElement64;
+pub use sqrt::legendre_symbol;
+
+// === non-prime fields ===
+//
+// Named here rather than left to callers because `for_each_field!` expands to these paths, and a
+// test body generic over the field has to be able to say which fields it means.
+
+/// GF(2^8) = GF(2)[x] / (x^8 + x^4 + x^3 + x + 1).
+pub type Gf256 = BinaryFieldElement<X8_X4_X3_X_1>;
+
+/// GF(2^5) = GF(2)[x] / (x^5 + x^2 + 1).
+pub type Gf32 = BinaryFieldElement<X5_X2_1>;
+
+/// GF(13^4) = GF(13)[x] / (x^4 + x^3 + 1), an extension of odd characteristic.
+pub type Gf13Pow4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
 
 // === 32-bit prime fields ===
 //

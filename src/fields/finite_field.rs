@@ -193,6 +193,78 @@ pub fn trim_limbs(limbs: &'static [u64]) -> &'static [u64] {
     &limbs[..num_digits(limbs)]
 }
 
+/// Why a generator or a root of unity could not be constructed.
+///
+/// Every variant is a fact about the field and the requested order rather than a programmer error:
+/// whether `n` divides `q - 1` depends on the modulus, and which field a caller instantiated is
+/// often a runtime choice. So these are returned by the `try_` constructors on [`KnownOrder`]
+/// instead of aborting the process.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RootOfUnityError {
+    /// `n` does not divide `q - 1`, so no element has order exactly `n`. Includes `n = 0`.
+    OrderDoesNotDivide { n: u64 },
+
+    /// A `2^log_n`-th root was asked of a field whose two-adicity is smaller.
+    TwoAdicityExceeded { log_n: u32, two_adicity: u32 },
+
+    /// The order does not fit in a `u128`, which the generator search needs to factor `q - 1`.
+    OrderTooWide,
+
+    /// The field declares no generator, and finding one would mean factoring a `q - 1` this
+    /// crate will not factor by accident. See [`PrimeFieldElement256`](super::PrimeFieldElement256).
+    NoKnownGenerator,
+}
+
+impl Display for RootOfUnityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OrderDoesNotDivide { n } => {
+                write!(f, "{n} does not divide q - 1, so no element has order {n}")
+            }
+            Self::TwoAdicityExceeded { log_n, two_adicity } => write!(
+                f,
+                "no primitive 2^{log_n}-th root of unity exists: the two-adicity of this field \
+                 is {two_adicity}"
+            ),
+            Self::OrderTooWide => {
+                write!(f, "the field's order does not fit in a u128")
+            }
+            Self::NoKnownGenerator => write!(
+                f,
+                "this field declares no generator, and finding one would mean factoring q - 1"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RootOfUnityError {}
+
+/// [`KnownOrder::try_primitive_element`]'s default, as a function so that a field which overrides
+/// it can still be tested against the behaviour it inherited.
+pub(crate) fn default_primitive_element<F: KnownOrder, R: RngCore + CryptoRng>(
+    rng: &mut R,
+) -> Result<F, RootOfUnityError> {
+    let group_order = F::order_u128().ok_or(RootOfUnityError::OrderTooWide)? - 1;
+    let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
+    let quotients: Vec<u128> = prime_factors
+        .iter()
+        .map(|r| group_order / big_uint_to_u128(r))
+        .collect();
+
+    loop {
+        let candidate = F::random(rng);
+        if candidate.is_zero() {
+            continue;
+        }
+        if quotients
+            .iter()
+            .all(|&exponent| candidate.pow(exponent) != F::one())
+        {
+            return Ok(candidate);
+        }
+    }
+}
+
 /// A finite field whose order is known.
 ///
 /// Separate from [`FiniteField`] so that a field whose order exceeds any machine integer can
@@ -237,47 +309,100 @@ pub trait KnownOrder: FiniteField {
     /// needs the order as an integer. A type with a cheaper construction should override it — the
     /// prime fields do, via `find_generator`, which exploits their elements being integers mod p,
     /// and a field whose provider declares a generator should return that.
-    ///
-    /// # Panics
-    /// Panics if the order does not fit in a `u128`.
-    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        let group_order = Self::order_u128()
-            .expect("searching for a primitive element needs the order as an integer")
-            - 1;
-        let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
-        let quotients: Vec<u128> = prime_factors
-            .iter()
-            .map(|r| group_order / big_uint_to_u128(r))
-            .collect();
-
-        loop {
-            let candidate = Self::random(rng);
-            if candidate.is_zero() {
-                continue;
-            }
-            if quotients
-                .iter()
-                .all(|&exponent| candidate.pow(exponent) != Self::one())
-            {
-                return candidate;
-            }
-        }
+    fn try_primitive_element<R: RngCore + CryptoRng>(
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        default_primitive_element::<Self, R>(rng)
     }
 
-    /// A primitive, non-trivial nth root of unity, x^n = 1
+    /// A primitive element, panicking if the field has none this crate can find.
+    ///
+    /// A convenience over [`Self::try_primitive_element`], which is the one to override.
     ///
     /// # Panics
-    /// Panics unless `n` divides the order of the multiplicative group, or if the order does not
-    /// fit in a `u128`.
-    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
-        let group_order = Self::order_u128()
-            .expect("constructing a root of unity needs the order as an integer")
-            - 1;
-        assert_eq!(group_order % n as u128, 0, "n must divide the group order.");
+    /// Panics with the [`RootOfUnityError`] the fallible form returns.
+    fn primitive_element<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        Self::try_primitive_element(rng).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// True if this element generates the whole multiplicative group.
+    ///
+    /// An element fails to generate exactly when its order is a proper divisor of `q - 1`, and
+    /// every proper divisor divides `(q - 1) / r` for some prime `r | q - 1`, so those quotients
+    /// are the only exponents worth testing — the same factorization and the same reasoning as
+    /// [`Self::try_primitive_element`]'s search, which is how that search can now be checked
+    /// against something other than itself.
+    ///
+    /// Fails if the order does not fit in a `u128`, since the factorization does not either.
+    fn try_is_generator<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<bool, RootOfUnityError> {
+        let group_order = Self::order_u128().ok_or(RootOfUnityError::OrderTooWide)? - 1;
+        if self.is_zero() {
+            return Ok(false);
+        }
+
+        let (prime_factors, _powers) = factor(&BigUInt::new_from_u128(group_order), rng);
+        Ok(prime_factors
+            .iter()
+            .all(|r| self.pow(group_order / big_uint_to_u128(r)) != Self::one()))
+    }
+
+    /// True if this element generates the whole multiplicative group.
+    ///
+    /// # Panics
+    /// Panics if the order does not fit in a `u128`. Use [`Self::try_is_generator`] over a field
+    /// whose width is a runtime choice.
+    fn is_generator<R: RngCore + CryptoRng>(&self, rng: &mut R) -> bool {
+        self.try_is_generator(rng).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// True if this element has order exactly `n`.
+    ///
+    /// `self^n = 1` and `self^(n/r) != 1` for each prime `r | n`. This factors only `n`, never
+    /// `q - 1`, so unlike [`Self::try_is_generator`] it is available over the wide fields — which
+    /// is what makes it the check on [`Self::try_two_adic_root_of_unity`]'s construction.
+    ///
+    /// False for `n = 0`, which no element satisfies.
+    fn is_primitive_nth_root<R: RngCore + CryptoRng>(&self, n: u64, rng: &mut R) -> bool {
+        if n == 0 || self.pow(n as u128) != Self::one() {
+            return false;
+        }
+
+        let (prime_factors, _powers) = factor(&BigUInt::new_from_u64(n), rng);
+        prime_factors
+            .iter()
+            .all(|r| self.pow(n as u128 / big_uint_to_u128(r)) != Self::one())
+    }
+
+    /// A primitive nth root of unity: an element of order exactly `n`.
+    ///
+    /// Fails unless `n` divides `q - 1`, which is when such an element exists at all, and unless
+    /// the field has a generator this crate can produce. A power-of-two `n` over a wide field
+    /// needs neither — see [`Self::try_two_adic_root_of_unity`].
+    fn try_root_of_unity<R: RngCore + CryptoRng>(
+        n: u64,
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        let group_order = Self::order_u128().ok_or(RootOfUnityError::OrderTooWide)? - 1;
+        if n == 0 || !group_order.is_multiple_of(n as u128) {
+            return Err(RootOfUnityError::OrderDoesNotDivide { n });
+        }
 
         // If g has order q - 1, then g^((q-1)/n) has order exactly n.
-        let g = Self::primitive_element(rng);
-        g.pow(group_order / n as u128)
+        let g = Self::try_primitive_element(rng)?;
+        Ok(g.pow(group_order / n as u128))
+    }
+
+    /// A primitive nth root of unity, panicking if the field holds none.
+    ///
+    /// A convenience over [`Self::try_root_of_unity`], which is the one to override.
+    ///
+    /// # Panics
+    /// Panics with the [`RootOfUnityError`] the fallible form returns.
+    fn root_of_unity<R: RngCore + CryptoRng>(n: u64, rng: &mut R) -> Self {
+        Self::try_root_of_unity(n, rng).unwrap_or_else(|e| panic!("{e}"))
     }
 
     /// The field's two-adicity: the largest s with `2^s` dividing `q - 1`.
@@ -289,16 +414,38 @@ pub trait KnownOrder: FiniteField {
         two_adic::two_adic_decomposition(Self::order_limbs()).0
     }
 
+    /// A square root of this element, or `None` if it is not a square.
+    ///
+    /// Tonelli-Shanks, over every field in the crate including characteristic two; see
+    /// [`sqrt`](super::sqrt). On [`KnownOrder`] rather than [`FiniteField`] because the exponents
+    /// it raises to are read off `q - 1`.
+    ///
+    /// Of the two roots `+-r` it is unspecified which is returned. The rng is drawn from only
+    /// where a quadratic non-residue is needed — see the module comment for when that is.
+    fn sqrt<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Option<Self> {
+        super::sqrt::sqrt(self, rng)
+    }
+
     /// A primitive `2^log_n`-th root of unity.
     ///
-    /// Unlike [`Self::root_of_unity`] this needs no generator and so no factorization of `q - 1`,
-    /// which is what makes it the only usable path over a 254-bit field. See
+    /// Unlike [`Self::try_root_of_unity`] this needs no generator and so no factorization of
+    /// `q - 1`, which is what makes it the only usable path over a 254-bit field. See
     /// [`two_adic`](super::two_adic).
+    ///
+    /// Fails only if `log_n` exceeds [`Self::two_adicity`], where no such root exists.
+    fn try_two_adic_root_of_unity<R: RngCore + CryptoRng>(
+        log_n: u32,
+        rng: &mut R,
+    ) -> Result<Self, RootOfUnityError> {
+        two_adic::try_two_adic_root_of_unity::<Self, R>(log_n, rng)
+    }
+
+    /// A primitive `2^log_n`-th root of unity, panicking if the field holds none.
     ///
     /// # Panics
     /// Panics if `log_n` exceeds [`Self::two_adicity`].
     fn two_adic_root_of_unity<R: RngCore + CryptoRng>(log_n: u32, rng: &mut R) -> Self {
-        two_adic::two_adic_root_of_unity::<Self, R>(log_n, rng)
+        Self::try_two_adic_root_of_unity(log_n, rng).unwrap_or_else(|e| panic!("{e}"))
     }
 }
 
@@ -314,12 +461,15 @@ fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
 
 #[cfg(test)]
 mod tests {
+    use rand::{prelude::StdRng, SeedableRng};
+
+    use super::{default_primitive_element, RootOfUnityError};
     use crate::{
         fields::{
             binary_field::BinaryFieldElement,
             extension_field::ExtensionFieldElement,
             irreducible_polynomials::{Modulus13Pow4, X8_X4_X3_X_1},
-            PrimeFieldElement128, Zp2147483647,
+            Bn254Fr, PrimeFieldElement128, Zp13, Zp2147483647,
         },
         FiniteField, KnownOrder, One, Zero,
     };
@@ -394,6 +544,157 @@ mod tests {
             expected = expected * expected;
         }
         assert_eq!(a.pow_limbs(&exponent), expected);
+    }
+
+    /// An order that does not divide `q - 1` is a value, not a panic.
+    #[test]
+    fn test_a_requested_order_that_does_not_divide_the_group_order_is_an_error() {
+        let mut rng = StdRng::seed_from_u64(1);
+        // Zp13 has group order 12, which 5 does not divide.
+        assert_eq!(
+            Zp13::try_root_of_unity(5, &mut rng),
+            Err(RootOfUnityError::OrderDoesNotDivide { n: 5 })
+        );
+    }
+
+    /// A zero order is rejected as an error rather than dividing by zero.
+    #[test]
+    fn test_a_zero_order_is_an_error_rather_than_a_division_by_zero() {
+        let mut rng = StdRng::seed_from_u64(2);
+        assert_eq!(
+            Zp13::try_root_of_unity(0, &mut rng),
+            Err(RootOfUnityError::OrderDoesNotDivide { n: 0 })
+        );
+    }
+
+    /// An order that does divide `q - 1` still returns a root of that exact order.
+    #[test]
+    fn test_an_order_dividing_the_group_order_yields_a_root_of_that_order() {
+        let mut rng = StdRng::seed_from_u64(3);
+        let w = Zp13::try_root_of_unity(6, &mut rng).expect("6 divides 12");
+        assert!(w.pow(6).is_one());
+        assert!(!w.pow(3).is_one());
+        assert!(!w.pow(2).is_one());
+    }
+
+    /// A field that declares no generator says so as a value.
+    #[test]
+    fn test_a_wide_field_reports_that_it_has_no_known_generator() {
+        let mut rng = StdRng::seed_from_u64(5);
+        assert_eq!(
+            Bn254Fr::try_primitive_element(&mut rng),
+            Err(RootOfUnityError::NoKnownGenerator)
+        );
+    }
+
+    /// The generator search reports an order too wide to express rather than panicking on it.
+    ///
+    /// Reached through the default implementation directly: the only field in the crate whose
+    /// order exceeds a `u128` overrides it with [`RootOfUnityError::NoKnownGenerator`], so this is
+    /// the behaviour any future wide field inherits before it overrides anything.
+    #[test]
+    fn test_the_default_generator_search_rejects_an_order_wider_than_a_u128() {
+        let mut rng = StdRng::seed_from_u64(7);
+        assert_eq!(
+            default_primitive_element::<Bn254Fr, _>(&mut rng),
+            Err(RootOfUnityError::OrderTooWide)
+        );
+    }
+
+    /// A two-adic root beyond the field's two-adicity is an error naming both exponents.
+    #[test]
+    fn test_a_two_adic_root_beyond_the_two_adicity_is_an_error() {
+        let mut rng = StdRng::seed_from_u64(11);
+        assert_eq!(
+            Bn254Fr::try_two_adic_root_of_unity(29, &mut rng),
+            Err(RootOfUnityError::TwoAdicityExceeded {
+                log_n: 29,
+                two_adicity: 28,
+            })
+        );
+    }
+
+    /// The panicking wrappers still panic, so existing call sites keep their behaviour.
+    #[test]
+    #[should_panic(expected = "does not divide q - 1")]
+    fn test_the_panicking_wrapper_still_panics() {
+        let mut rng = StdRng::seed_from_u64(13);
+        let _ = Zp13::root_of_unity(5, &mut rng);
+    }
+
+    /// A primitive root mod 13 is recognized as a generator, and an element of order 3 is not.
+    #[test]
+    fn test_is_generator_separates_a_primitive_root_from_the_rest() {
+        let mut rng = StdRng::seed_from_u64(29);
+        // 2 has order 12 mod 13; 3 has order 3, since 3^3 = 27 = 1.
+        assert!(Zp13::new(2).is_generator(&mut rng));
+        assert!(!Zp13::new(3).is_generator(&mut rng));
+        assert!(!Zp13::new(12).is_generator(&mut rng)); // order 2
+        assert!(!Zp13::one().is_generator(&mut rng));
+        assert!(!Zp13::zero().is_generator(&mut rng));
+    }
+
+    /// Whatever the search returns is a generator, over every field it can search.
+    ///
+    /// The predicate and the search share the factorization but not the acceptance test, so this
+    /// is the check `primitive_element` never had on its own result.
+    #[test]
+    fn test_the_search_returns_something_the_predicate_accepts() {
+        fn search_agrees_with_the_predicate<F: KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let g = F::primitive_element(&mut rng);
+            assert!(g.is_generator(&mut rng), "{g} is not a generator");
+        }
+
+        search_agrees_with_the_predicate::<Zp13>(31);
+        search_agrees_with_the_predicate::<Zp2147483647>(37);
+        search_agrees_with_the_predicate::<BinaryFieldElement<X8_X4_X3_X_1>>(41);
+        search_agrees_with_the_predicate::<ExtensionFieldElement<13, 4, Modulus13Pow4>>(43);
+    }
+
+    /// Checking a generator of a field whose order exceeds a `u128` is an error, not a panic.
+    #[test]
+    fn test_is_generator_over_a_wide_field_is_an_error() {
+        let mut rng = StdRng::seed_from_u64(47);
+        assert_eq!(
+            Bn254Fr::one().try_is_generator(&mut rng),
+            Err(RootOfUnityError::OrderTooWide)
+        );
+    }
+
+    /// An element of order exactly n is a primitive nth root; one of order dividing n is not.
+    #[test]
+    fn test_is_primitive_nth_root_requires_the_exact_order() {
+        let mut rng = StdRng::seed_from_u64(53);
+        let w = Zp13::try_root_of_unity(6, &mut rng).expect("6 divides 12");
+        assert!(w.is_primitive_nth_root(6, &mut rng));
+        // w^2 has order 3 and w^3 has order 2, so neither is a primitive 6th root.
+        assert!(!w.pow(2).is_primitive_nth_root(6, &mut rng));
+        assert!(!w.pow(3).is_primitive_nth_root(6, &mut rng));
+        assert!(w.pow(2).is_primitive_nth_root(3, &mut rng));
+        assert!(w.pow(3).is_primitive_nth_root(2, &mut rng));
+    }
+
+    /// One is the only primitive first root of unity, and no element is a primitive 0th root.
+    #[test]
+    fn test_the_degenerate_orders_of_is_primitive_nth_root() {
+        let mut rng = StdRng::seed_from_u64(59);
+        assert!(Zp13::one().is_primitive_nth_root(1, &mut rng));
+        assert!(!Zp13::new(2).is_primitive_nth_root(1, &mut rng));
+        assert!(!Zp13::one().is_primitive_nth_root(0, &mut rng));
+        assert!(!Zp13::zero().is_primitive_nth_root(1, &mut rng));
+    }
+
+    /// The nth-root predicate works over a field too wide to have a findable generator.
+    ///
+    /// It factors only `n`, never `q - 1`, which is the whole reason it exists separately.
+    #[test]
+    fn test_is_primitive_nth_root_works_over_a_wide_field() {
+        let mut rng = StdRng::seed_from_u64(61);
+        let w = Bn254Fr::two_adic_root_of_unity(10, &mut rng);
+        assert!(w.is_primitive_nth_root(1 << 10, &mut rng));
+        assert!(!w.is_primitive_nth_root(1 << 11, &mut rng));
+        assert!(!(w * w).is_primitive_nth_root(1 << 10, &mut rng));
     }
 
     /// Zero to a zero exponent is one, as it is for `pow`; zero to any other is zero.
