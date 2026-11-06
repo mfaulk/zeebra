@@ -25,6 +25,9 @@
 //! * [`board`] — [`CompetitiveBoard`] and its record: the durable schema and the generated
 //!   Markdown renderer the rows land in. Lives at `research/competitive/`, deliberately apart
 //!   from the cryptanalysis scoreboard.
+//! * [`corpus`] — the cross-library ladder, and the two naming hazards that produce a different
+//!   ideal without producing an error: Katsura's off-by-one indexing and affine-versus-homogenized
+//!   Cyclic. Both resolved against another engine's own distributed input files.
 //! * [`singular`] — the reference adapter, over the Singular installation the differential
 //!   harness already drives. Read it as the worked example.
 //!
@@ -51,6 +54,8 @@
 pub mod board;
 #[cfg(feature = "external-runners")]
 pub mod contract;
+#[cfg(feature = "external-runners")]
+pub mod corpus;
 pub mod process;
 #[cfg(feature = "external-runners")]
 pub mod singular;
@@ -65,6 +70,8 @@ pub use contract::{
     Invariants, LimitStop, Limits, Measurement, NotComparable, RunFailure, RunReport, RunStatus,
     Support, Task, ToolVersion, Unsupported, Verification,
 };
+#[cfg(feature = "external-runners")]
+pub use corpus::{cyclic_instance, katsura_instance, CorpusEntry, Rung, REFERENCE_CHARACTERISTIC};
 pub use process::{
     read_output, CpuBasis, Invocation, ProcessMeasurement, RssBasis, RssPolicy, SpawnError,
     Supervisor,
