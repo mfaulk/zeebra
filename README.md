@@ -303,6 +303,8 @@ cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
+cargo run --release --example karatsuba_crossover  # Karatsuba against schoolbook, per field width
+cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example batch_inversion      # batch inversion: routine, integration,
 cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
 cargo run --release --example scoreboard           # registered problems, one record each, staged
@@ -1000,6 +1002,20 @@ let b = UnivariatePolynomial::<Zp65537>::new(&[Zp65537::new(3), Zp65537::new(4)]
 // Degree 2, so this is the schoolbook route — and the same answer either way.
 assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
 ```
+
+A Karatsuba helper now exists for the band `multiply` leaves to schoolbook, but **nothing calls it
+yet** — not `Mul`, not `multiply` — so every figure above is unaffected. Its own crossover is 48
+coefficients over a 4-byte field, 16 over an 8-byte one and 4 over a 254-bit one, against the
+transform's 16384, 2048 and 512, and unlike the transform it needs nothing of the field but a
+ring, so it is available over Mersenne-31. At `2^14` it is 10.7x to 22.9x faster than schoolbook,
+at a measured exponent of 1.58–1.61 against 2.00, for `6 n B` against `Mul`'s `4 n B`.
+
+```text
+cargo run --release --example karatsuba_crossover
+```
+
+is the measurement; [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) §4.1.1
+has the per-width tables.
 
 ## Gröbner Bases
 

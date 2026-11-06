@@ -274,11 +274,99 @@ peak is **208 bytes per element** — 26 `n B` — against 32 for schoolbook and
 `evaluate`, for a computation that is three transforms. An in-place iterative transform would move
 all three crossovers at once, and is now the highest-value piece of work in the layer.
 
+**#165 adds the third route, between the two.** Karatsuba is `n^log2(3)`: subquadratic, not
+quasi-linear, so the heading above still holds and the transform is still the only quasi-linear
+path. What it does is own the band `fft_multiplication_crossover` leaves to schoolbook. Its own
+crossover is 48 coefficients at 4 bytes an element, 16 at 8 and 4 above that, against the
+transform's 16384, 2048 and 512 — so the band Karatsuba owns is **three orders of magnitude wide
+on the narrow fields** and it includes every degree `pow_mod`, `gcd` and `separate_equal_degree`
+reach today. It also needs nothing from the field but a ring, so unlike the transform it is
+available over Mersenne-31 without falling back. §4.1.1 measures it.
+
 The transform-size ceiling is worth stating as a real bound rather than an asymptotic one: `2^24`
 for KoalaBear, `2^28` for BN254, `2^32` for Goldilocks and BLS12-381. At `7 n B`, BN254's full
 `2^28` ceiling is **60 GB** and, extrapolating from 1 032 ns/element, about **5 minutes** — so for
 BN254 the two-adicity bound, not this workstation, is what binds. BLS12-381's `2^32` would need
 962 GB, so there memory binds first, at roughly `2^30`.
+
+#### 4.1.1 Karatsuba, measured per element width (#165)
+
+`src/poly/univariate/karatsuba.rs` multiplies two coefficient slices by recursive three-way
+Karatsuba down to a schoolbook base case. It is a standalone helper, called from nothing yet:
+`Mul` is untouched and `fft::multiply`'s two `a * b` call sites — below its crossover, and on the
+no-suitable-domain fallback — are where it belongs and are left for the follow-up. So every
+`mul`, `div` and `roots` figure in §3 stands unchanged and is **not** superseded. What follows
+measures the helper directly.
+
+`examples/karatsuba_crossover.rs` is the instrument. Both arms are the same code differing only in
+the base case — `usize::MAX` never recurses and so is plain schoolbook — so the inner kernel is
+identical on both sides and the measured difference is the recursion and nothing else. Each
+figure is an arm's fastest over up to 9 interleaved passes, `taskset`-pinned to cores 0–7, release
+profile (fat LTO, one codegen unit, `-C target-cpu=x86-64-v3`):
+
+```
+cargo run --release --example karatsuba_crossover
+```
+
+The base case is **not one number**, and that is the result worth recording:
+
+| field | element | base case = crossover | first measured win | speedup at `2^14` | `(n/B)^0.415` predicts |
+|---|---|---|---|---|---|
+| Mersenne-31 / KoalaBear (`u32`) | 4 B | **48** | n = 64, 1.14x | **10.7x** | 11.3x |
+| Mersenne-31 (`u64`) | 8 B | **16** | n = 16, 1.18x | **17.9x** | 17.8x |
+| Goldilocks | 8 B | **16** | n = 16, 1.10x | **16.9x** | 17.8x |
+| BN254 `Fr` | 32 B | **4** | n = 16, 1.70x | **22.9x** | 31.6x |
+
+The crossover *is* the base case, by construction rather than by measurement: below it the helper
+takes the schoolbook branch and is the same code, so there is nothing to cross. The column beside
+it is the smallest **measured** size at which the fastest Karatsuba arm beat schoolbook; the sweep
+doubles, so it brackets rather than lands on the base case.
+
+The base case falls **12x** across the widths, in the direction the cost of one field
+multiplication predicts: a 4-byte multiply is cheap and its schoolbook inner loop vectorizes, so
+the extra additions have to be amortized over a much larger leaf than they do over a 254-bit
+field, where the measurement wants to recurse almost all the way down. Carrying one threshold
+across the widths is not free — at `2^14`, using 16 everywhere costs **1.53x** on the 4-byte field
+and 1.21x on BN254; using 48 everywhere costs 1.46x on the 8-byte fields and **1.84x** on BN254.
+
+Scaling exponents, least-squares over `2^9 … 2^14` at the base case above:
+
+| field | schoolbook | Karatsuba |
+|---|---|---|
+| Mersenne-31 (4 B) | 2.001 | **1.595** |
+| Mersenne-31 (8 B) | 1.989 | **1.589** |
+| Goldilocks | 1.990 | **1.584** |
+| BN254 `Fr` | 2.015 | **1.613** |
+
+Against schoolbook's 2.00 and `log2(3) = 1.585`. The exponent has moved, and the measured
+speedups track `(n/B)^(2 - log2(3))` to within 5% on three of the four fields, which is the check
+that the recursion is firing all the way down rather than being a constant-factor win mislabelled.
+BN254 is 28% under its prediction, and that residue is the per-level additions and the
+`z1 = t - z0 - z2` passes, which are relatively dearer there because a base case of 4 makes the
+recursion 12 levels deep rather than 10.
+
+Peak live heap bytes, same counting allocator as §3.2, measured at `n = 1024`:
+
+| path | estimated | measured at `n = 1024` |
+|---|---|---|
+| slice schoolbook | `2 n B` | 2.00 `n B` |
+| slice Karatsuba | `6 n B` | 5.93–5.96 `n B` |
+| `Mul` (§3.2's `mul` row) | `4 n B` | 4.00 `n B` |
+| Karatsuba through `UnivariatePolynomial::new` | `6 n B` | 5.93–5.96 `n B` |
+
+The measured column approaches the estimate from below and reaches it: 5.47 `n B` at n = 128,
+5.93 at 1 024, 6.00 at 16 384, the shortfall being the `-1` per recursion level.
+
+The `6 n B` is the `2 n B` output plus a `4 n B` scratch arena: one allocation for the whole
+recursion rather than a `Vec` per node, with each level carving `4 ceil(m/2) - 1` elements for
+`a0 + a1`, `b0 + b1` and their product, and the series summing to `4 m`. It is **1.5x** `Mul`'s
+`4 n B`, not more, because the arena is freed before `UnivariatePolynomial::new` copies — so the
+two peaks do not stack. Whole-process peak resident for the sweep over all four fields was 7.7 MB.
+
+No null result to report: Karatsuba wins on every field measured, including the 4-byte narrow one,
+once the base case is the measured one. The honest limit is the one the issue stated in advance —
+at the degrees this crate reaches today the gain is a constant-factor 10–23x, not a change in
+which degrees are reachable, and `div` is not Karatsuba and will not move.
 
 ### 4.2 Modular composition: absent
 
