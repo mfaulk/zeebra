@@ -233,6 +233,39 @@ is invoked with this directory as the working directory, and profile settings co
 workspace being built. A downstream build gets whatever that build configures, so a dependent
 crate wanting these settings must set them itself.
 
+### Measuring on a busy machine
+
+`tools/benchlock.sh` runs one command at a time, machine-wide, and records that it did:
+
+```sh
+tools/benchlock.sh <owner-tag> <command> [args...]
+
+tools/benchlock.sh agentD cargo run --release --example univariate_scaling -- koalabear
+```
+
+Two concurrent measurements on one box contend for shared cache and memory bandwidth, so a ratio
+taken while something else ran is not a measurement of the change. The script takes an exclusive
+`flock`, appends `QUEUED` / `START` / `END` lines with the owner tag and a timestamp to
+`$HOME/.zeebra/benchlock.log` (override the directory with `ZEEBRA_BENCHLOCK_DIR`; it must be
+outside every worktree), and exits with the command's status so a failing measurement fails the
+caller. Two records whose `START`..`END` windows overlap were not taken under this protocol, and
+the log is what says so — which is what makes figures taken weeks apart, such as the pre- and
+post-#161 revisions in [`docs/research/graeffe-root-finding.md`](docs/research/graeffe-root-finding.md)
+§4.4, comparable with each other.
+
+The lock handles contention and nothing else. Also needed, per invocation:
+
+- `CARGO_TARGET_DIR` inside the caller's own worktree and `RUSTC_WRAPPER=""`, as in
+  `tools/scoreboard.sh`. The default target directory is keyed by package and profile rather than
+  by checkout, so two worktrees overwrite each other's `libzeebra.rlib` and an example links
+  against a library built from other source; the symptom is a missing export that is plainly
+  present.
+- A private scratch directory. Two callers' `tee run1.txt` collide, and a clobbered `tee` is a
+  silently wrong figure rather than a crash.
+- `timeout --signal=INT --kill-after=60s` on anything long, with a budget-killed run reported as a
+  resource-limited result rather than as a measurement. A run left past its budget holds the lock
+  against everyone else.
+
 ### Benchmarks
 
 Criterion benchmarks cover field arithmetic, sparse polynomial operations, dense and sparse linear
@@ -318,6 +351,7 @@ cargo run --release --example batch_inversion -- f4   # and the F4 headroom left
 cargo run --release --example scoreboard           # registered problems, one record each, staged
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
+tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (~2 min: two four-round rows now complete)
 cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the determinant scaling study
