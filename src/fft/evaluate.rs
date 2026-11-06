@@ -55,6 +55,16 @@ use crate::{
 /// cannot determine it, so silently transforming a truncation would be worse than refusing. Also
 /// panics if `w` is not the powers of a primitive `n`th root of unity — see
 /// [`transform_in_place`].
+///
+/// **A panic rather than a [`DomainError`](super::DomainError)-style typed failure, deliberately.**
+/// #120 drew the line where that type's own documentation draws it: a fact about the field or about
+/// a requested size that a caller cannot know without asking is a value, and a programmer error is
+/// a panic. Whether `g` has order exactly `n` in `F` is the former. Whether `deg(p) < n` is the
+/// latter — the caller supplied both the polynomial and the domain, so it already knows, and the
+/// fix is to choose a larger `n` rather than to handle a runtime value. Internal padding makes
+/// choosing `n` the caller's only remaining obligation, which is why it is reasonable to insist on
+/// it. A fallible form, if one is ever wanted, is additive in #120's shape: a `try_evaluate`
+/// beside this one.
 pub fn evaluate<F: FiniteField>(p: &impl Polynomial<F>, w: &FFTDomain<F>) -> Vec<F> {
     let d = p.degree() as usize;
     let n = w.size();

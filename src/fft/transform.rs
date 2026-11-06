@@ -36,9 +36,10 @@ pub(crate) fn transform_in_place<F: FiniteField>(values: &mut [F], domain: &[F])
         return;
     }
 
-    // The contract, checked in O(1) rather than trusted. `from_generator` only establishes
-    // `w^n = 1`, which a non-primitive root also satisfies, and `FFTDomain::split` yields a domain
-    // that is not a power sequence at all. Either would give a silently wrong transform.
+    // The contract, checked in O(1) rather than trusted. `try_from_generator` rejects a
+    // non-primitive root (#120), but `FFTDomain::new` takes a vector of powers unchecked and
+    // `FFTDomain::split` yields a domain that is not a power sequence at all. Either would give a
+    // silently wrong transform.
     assert_eq!(
         domain[n / 2],
         -F::one(),

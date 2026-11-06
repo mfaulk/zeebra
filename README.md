@@ -873,9 +873,13 @@ domain, scaled by `1/n`.
 **The transform zero-pads internally.** A polynomial of any degree below `n` is extended to the
 domain size inside `evaluate`, so a caller hands over unpadded operands and chooses only `n` — the
 domain size is the caller's because only the caller knows how large a result it needs. A polynomial
-of degree `n` or more still panics: `n` evaluations cannot determine it. A domain that is not the
-powers of a *primitive* `n`th root of unity also panics, which `FFTDomain::from_generator` alone
-does not catch, since `w^n = 1` holds for non-primitive roots too.
+of degree `n` or more still panics: `n` evaluations cannot determine it. That stays a panic rather
+than becoming a `DomainError`-style typed failure because of where #120 drew that line — a fact
+about the field is a value, a programmer error is a panic, and a caller that supplied both the
+polynomial and the domain already knows whether `deg(p) < n`. The transform also panics on a domain
+that is not the powers of a *primitive* `n`th root of unity: `try_from_generator` rejects those, but
+`FFTDomain::new` takes a vector of powers unchecked and `FFTDomain::split` returns domains that are
+not power sequences at all.
 
 Over a 254-bit field there was no way to obtain one: the generic construction raises a *generator*
 of the multiplicative group to `(q - 1) / n`, and finding a generator means factoring a 254-bit
