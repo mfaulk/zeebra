@@ -229,11 +229,77 @@ a figure produced by accident is a figure that gets quoted later. Measurements m
 serialized under `tools/benchlock.sh`, because this box runs several agents at once and a
 contended core is a silently wrong figure.
 
-**No timings are reported in this document or in any commit so far**, and the timed ladder is a
-follow-up. What has been established is the part that does not need a clock: the quotient dimension
-at all ten rows, the generator shapes against the logs, the witnesses, and that the whole pipeline
-runs end to end. When the ladder is run, §5's order is binding: dimension first, then which stage is
-the wall, then wall times last and with both machines named — or the stage split and no ratio at all.
+What was established before any clock was read: the quotient dimension at all ten rows, the
+generator shapes against the logs, the witnesses, and that the whole pipeline runs end to end. §8a
+is the ladder, run in §5's binding order.
+
+## 8a. The ladder, run — and the published wall does not reproduce
+
+`N = 1 … 4`, both models, cores 0–7, `ZEEBRA_MACHINE=fedora ZEEBRA_AFFINITY=0-7`, one row per
+acquisition of `tools/benchlock.sh`.
+
+| row | basis | conversion | univariate | total | `D` | witness |
+|---|---:|---:|---:|---:|---:|---|
+| `n1-fcico` | 51.3 µs | 21.9 µs | 102.8 µs | 176.1 µs | 5 | **verified** |
+| `n1-pcico` | 37.3 µs | 19.5 µs | 102.2 µs | 159.1 µs | 5 | **verified** |
+| `n2-fcico` | 658.5 µs | 202.5 µs | 391.3 µs | 1.252 ms | 25 | **verified** |
+| `n2-pcico` | 278.6 µs | 140.5 µs | 391.9 µs | 811.0 µs | 25 | **verified** |
+| `n3-fcico` | 11.479 ms | 5.747 ms | 7.486 ms | 24.712 ms | 125 | none — zero-dimensional, **no base-field point** |
+| `n3-pcico` | 884.9 µs | 3.690 ms | 7.384 ms | 11.959 ms | 125 | none — same |
+| `n4-fcico` | 477.30 ms | 404.09 ms | 160.39 ms | 1.0418 s | 625 | **verified** |
+| `n4-pcico` | 27.04 ms | 293.94 ms | 172.70 ms | 493.68 ms | 625 | **verified** |
+
+Every witness is checked by running the permutation, not the system that produced it. **`N = 3`
+returning no base-field point in either model is a prediction that could have failed**: the Six
+Worlds logs' own `nsols` line is 0 at that rung, and an implementation subtly wrong about the
+constants is far likelier to invent a witness than to agree on an empty set. Both models agree on
+`D = 125` there, so the system is zero-dimensional and the absence is about the base field.
+
+### 8a.1 The comparison that survives the hardware gap
+
+The published figures are Magma on a 2015 Xeon and these are Zeebra on a 2026 workstation, so no
+wall-clock ratio between them means anything. **A ratio between two stages of the same run on the
+same machine does**, and that is where the published claim lives: "the conversion, not the basis, is
+the wall."
+
+| row | Zeebra conversion / basis | Magma conversion / basis | they differ by |
+|---|---:|---:|---:|
+| `n3-fcico` | **0.50** | 11.7 | 23x |
+| `n3-pcico` | **4.17** | 32.0 | 8x |
+| `n4-fcico` | **0.85** | 242 | **286x** |
+| `n4-pcico` | **10.87** | 284 | 26x |
+| `n5-fcico` | — | 2 367 | — |
+| `n5-pcico` | — | 2 731 | — |
+
+> **For `FCICO` the published finding is contradicted, not merely attenuated: Zeebra's conversion is
+> *cheaper than its own basis* at every rung measured.** For `PCICO` the direction reproduces — the
+> conversion does dominate and does grow — but at roughly a twenty-sixth of the published ratio.
+
+The growth rates say where the difference comes from, and it is not all in the conversion:
+
+| `N = 3 → 4` | Zeebra basis | Zeebra conversion | Magma basis | Magma conversion |
+|---|---:|---:|---:|---:|
+| `FCICO` | 41.6x | **70.3x** | 16.5x | **341x** |
+| `PCICO` | 30.6x | **79.7x** | 19.9x | **176x** |
+
+So Zeebra's basis step grows *faster* per rung than Magma's (41.6x against 16.5x) and its conversion
+grows *far slower* (70.3x against 341x). The ratio moves by 1.7x per rung here and by 20.7x per rung
+there. This is the first externally calibrated evidence about `fglm`'s scaling, and it is favourable
+— which is why it needs the careful framing rather than less of it.
+
+**What this does not say.** It does not say Zeebra's FGLM is faster than Magma's; that would be a
+cross-machine claim and the stage ratios are deliberately chosen to avoid making one. It does not
+say the published figures are wrong — they are measurements of a different implementation, and
+`additional-benchmarks.md` §3.2 ranked this family first precisely because its reference point is
+raw data rather than a summary. And `D = 625` at `N = 4` is small; nothing here extrapolates past
+the rung it was measured at.
+
+### 8a.2 `N = 5`, run as a test rather than a sweep
+
+The ratios above predict the rung the published logs stop reporting. `D` goes 625 → 3 125, so a
+`D³` conversion predicts roughly **50 s** in total for `n5-fcico` where Magma's conversion alone is
+**22 057 s**. That prediction was written down before the run and `N = 5` was run separately from
+the sweep for exactly that reason — see §9 for the outcome.
 
 ## 9. Open
 
