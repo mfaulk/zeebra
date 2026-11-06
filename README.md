@@ -500,9 +500,9 @@ one four times as wide. `cargo bench --bench field_arithmetic`, per operation:
 
 | field | width | mul | add | sub | inverse |
 |---|---:|---:|---:|---:|---:|
-| `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | **101 ns** |
-| `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | **125 ns** |
-| `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | **235 ns** |
+| `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | **100 ns** |
+| `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | **124 ns** |
+| `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | **236 ns** |
 | `PrimeFieldElement128` | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
 | `Bn254Fr` | 254 | 18.71 ns | 3.69 ns | 3.41 ns | 3.77 µs |
 | `Bls12_381Fr` | 255 | 19.34 ns | 3.52 ns | 3.27 ns | 3.97 µs |
@@ -813,8 +813,8 @@ The crossover is **n = 2** in every field; a single-element batch loses by a few
 copy. The plateau is the ratio between an inversion and three multiplications, so it tracks
 whatever inversion costs — and #160 halved inversion over the fields that invert by Fermat.
 `field_arithmetic`'s `isolated/inverse` against its `batch/inverse` over the same 256 operands,
-before and after #160: **32.3x to 14.5x** over `Mersenne31`, **54.3x to 28.4x** over the largest
-64-bit prime, against **60.2x to 60.9x** over BN254 `Fr`, which does not use that route and holds
+before and after #160: **29.6x to 14.8x** over `Mersenne31`, **54.6x to 27.6x** over the largest
+64-bit prime, against **60.4x to 60.7x** over BN254 `Fr`, which does not use that route and holds
 still. Montgomery's trick still wins by more than an order of magnitude everywhere; it has less to
 beat. `docs/research/batch-inversion.md`'s table predates #160 and is its own instrument, so read
 its Mersenne-31 and Goldilocks columns as roughly halved rather than substituting these figures

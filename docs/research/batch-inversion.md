@@ -49,9 +49,9 @@ multiply.
 > it through the iterative `pow_limbs` instead of the recursive `pow`. The plateau is a ratio to
 > inversion, so for the fields that invert by Fermat it is now roughly half of what this table
 > reports. Corroborated in a different harness rather than re-measured here: `field_arithmetic`'s
-> `isolated/inverse` against its `batch/inverse` over 256 operands went from 32.3x to 14.5x over
-> `Mersenne31` and from 54.3x to 28.4x over the largest 64-bit prime, while BN254 `Fr` held at
-> 60.2x against 60.9x. Those absolute ratios are not this table's — different instrument, one
+> `isolated/inverse` against its `batch/inverse` over 256 operands went from 29.6x to 14.8x over
+> `Mersenne31` and from 54.6x to 27.6x over the largest 64-bit prime, while BN254 `Fr` held at
+> 60.4x against 60.7x. Those absolute ratios are not this table's — different instrument, one
 > fixed n — and should not be substituted into it; only the halving carries over. The two 254-bit
 > columns invert by extended Euclid and are unaffected. The crossover at n = 2 is unchanged: it is
 > set by the copy, not by the ratio. Re-running this table is the honest fix and was not #160's

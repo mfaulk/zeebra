@@ -347,38 +347,42 @@ square-and-multiply over the same exponent. #160 is the one-line-per-field subst
 `taskset --cpu-list 0-7` as `tools/scoreboard.sh` does, 256 operations per iteration divided out.
 Two binaries built from the same tree and alternated — before, after, before, after, before,
 after — so a thermal or scheduling drift hits both sides; the figure is the median of the three
-repetitions. `before` is `origin/main` at 27cc999.
+repetitions. `before` is `origin/main` at 418d080, and `git diff 418d080..26a6c19` is empty under
+`src/fields/`, `src/integers/` and `benches/field_arithmetic.rs`, so these figures are the merge
+base's as well as the measurement base's.
 
 | field | `inverse` before | `inverse` after | factor |
 |---|---:|---:|---:|
-| p31, `Zp2147483647` | 257.7 ns | **125.4 ns** | **2.05x** |
-| p31, `Mersenne31` (u32-backed) | 231.3 ns | **101.1 ns** | **2.29x** |
-| p64, largest 64-bit prime | 551.0 ns | **235.2 ns** | **2.34x** |
-| p68, `PrimeFieldElement128` | 19.33 µs | 19.11 µs | 1.01x |
-| BN254 `Fr` | 4.04 µs | 3.94 µs | 1.03x |
-| BLS12-381 `Fr` | 3.95 µs | 3.98 µs | 0.99x |
+| p31, `Zp2147483647` | 261.6 ns | **124.1 ns** | **2.11x** |
+| p31, `Mersenne31` (u32-backed) | 224.5 ns | **100.3 ns** | **2.24x** |
+| p64, largest 64-bit prime | 538.2 ns | **236.4 ns** | **2.28x** |
+| p68, `PrimeFieldElement128` | 18.58 µs | 18.62 µs | 1.00x |
+| BN254 `Fr` | 3.78 µs | 3.80 µs | 0.99x |
+| BLS12-381 `Fr` | 3.83 µs | 3.77 µs | 1.02x |
 
 The bottom three rows are **controls, not results**: #160 does not touch `PrimeFieldElement128`,
 which still calls `pow`, and the 254-bit fields invert by binary extended Euclid in
-`montgomery_256`. They move by 1–3%, which is this harness's noise floor on this machine, and they
-are what licenses reading the top three. `isolated/inverse` over the same operands agrees —
-2.28x, 2.38x and 2.26x — so the gain is not an artifact of the accumulating addition in the
-`inverse` arm.
+`montgomery_256`. They move by at most 2%, which is this harness's noise floor on this
+machine, and they are what licenses reading the top three. `isolated/inverse` over the same
+operands agrees — 2.13x, 2.23x and 2.29x, against 1.01x, 1.01x and 1.00x on the controls — so the
+gain is not an artifact of the accumulating addition in the `inverse` arm.
 
 **What it does to batch inversion.** The case for `batch_invert` is the ratio between an inversion
 and three multiplications, so halving inversion halves the ratio. `isolated/inverse` against
-`batch/inverse` over the same 256 operands, before and after: **33.6x to 16.1x** at p31, **32.3x to
-14.5x** at `Mersenne31`, **54.3x to 28.4x** at p64 — against **60.2x to 60.9x** at BN254 `Fr`,
-which holds still and is the control again. Montgomery's trick still wins by more than an order of
+`batch/inverse` over the same 256 operands, before and after: **30.1x to 15.3x** at p31, **29.6x to
+14.8x** at `Mersenne31`, **54.6x to 27.6x** at p64 — against **60.4x to 60.7x** at BN254 `Fr` and
+**37.5x to 38.1x** at p68, which hold still and are the controls again. Montgomery's trick still wins by more than an order of
 magnitude in every field; the conclusions in §5 and in `docs/research/batch-inversion.md` are
 unchanged, and only the size of the win moves. That document's table is a separate instrument at
 varying n and has not been re-run; its Mersenne-31 and Goldilocks columns should be read as roughly
 halved, and its n = 2 crossover is unaffected because the crossover is set by the copy.
 
-One honest caveat on the spread: the three `before` repetitions at p64 were 500, 620 and 551 ns,
-a ±11% band, against 237, 231 and 235 ns after. The recursive route is the noisier of the two as
-well as the slower, which is what a call chain that deep through `u128` arithmetic would predict.
-Every other arm held inside ±4% across repetitions.
+One honest caveat on the spread: the three `before` repetitions at p64 were 499, 550 and 538 ns, a
+±5% band, against 219, 237 and 236 ns after, and an earlier run of the same protocol at the
+previous merge base put `before` at 500, 620 and 551 ns — a ±11% band — for an `after` that held
+inside ±1.5%. The recursive route is the noisier of the two as well as the slower, which is what a
+call chain that deep through `u128` arithmetic would predict. The factor is stable across the two
+runs regardless: 2.05x/2.29x/2.34x then, 2.11x/2.24x/2.28x now.
 
 **§4.1's "inversion is 202 multiplies", re-derived.** A second pass measured `field/mul` and
 `field/inverse` in *one* criterion process, so the ratio is within a process rather than across
@@ -386,25 +390,30 @@ harnesses:
 
 | field | multiplies before | multiplies after | the chain actually needs |
 |---|---:|---:|---:|
-| p31 | 144 | **69** | 60 — 30 squarings + 30 products |
-| p31, u32-backed | 156 | **65** | 60 |
-| p64 | **298** | **139** | 123 — 63 squarings + 60 products |
-| p68 | 140 | 131 | 134 — 67 squarings + 67 products |
-| BN254 `Fr` | 187 | 190 | — extended Euclid, not a chain |
+| p31 | 150 | **69** | 60 — 30 squarings + 30 products |
+| p31, u32-backed | 150 | **66** | 60 |
+| p64 | **299** | **131** | 123 — 63 squarings + 60 products |
+| p68 | 134 | unchanged | 134 — 67 squarings + 67 products |
+| BN254 `Fr` | 193 | 184 | — extended Euclid, not a chain |
+| BLS12-381 `Fr` | 194 | 194 | — extended Euclid, not a chain |
 
-p64's `before` column reproduces §4.1's 298 exactly. Against the 123 multiplications that
+p64's `before` column reproduces §4.1's 298 as 299, and p68's reproduces its chain length exactly.
+The `after` cell for p68 is "unchanged" rather than a number because this single-repetition pass
+caught an outlier there — 23.9 µs against the three-repetition median of 18.6 µs — and the arm is
+one #160 does not touch, so the median above is the figure. Against the 123 multiplications that
 square-and-multiply over `q - 2` genuinely performs — 63 squarings, and one product per set bit of
-an exponent with popcount 60 — the recursion was charging **175 multiply-equivalents of pure
-overhead**, more than the arithmetic itself. After the change the gap is 16, about 13%, which is
-the bit test and the loop. The 202 figure itself was always about the 254-bit fields, and it still
-holds: they read 187–194 here and are unchanged by #160.
+an exponent with popcount 60 — the recursion was charging **176 multiply-equivalents of pure
+overhead**, more than the arithmetic itself. After the change the gap is 8, about 6%, which is the
+bit test and the loop. The 202 figure itself was always about the 254-bit fields, and it still
+holds: they read 184–194 here and are unchanged by #160.
 
 **`pow`'s own default body is left recursive, on measurement.** The obvious follow-on is to make
 the default every field inherits iterative too, since nothing wants the recursion. A third binary
 was built with exactly that — `pow` delegating to `pow_limbs(&[b as u64, (b >> 64) as u64])` — and
 measured in the same interleave. It buys nothing anywhere: p31 125.2 ns against 125.4 (the arm no
-longer reaches `pow`), p68 18.67 µs against 19.11, BN254 4.14 µs against 3.94. All inside the
-noise band the control rows establish. p68 is the explanation: a 137 ns multiply means ~137
+longer reaches `pow`), p68 18.67 µs against 19.11, BN254 4.14 µs against 3.94 — measured in the
+earlier run, whose `after` column those are the comparison against. All inside the noise band the
+control rows establish. p68 is the explanation: a 137 ns multiply means ~137
 multiplies dominate 19 µs completely, and ~128 recursive frames at a few nanoseconds each are
 about 1% of it. The recursion only mattered where the multiply was cheap, and those are exactly the
 fields #160 already fixed. So the wider change — `pow` is `pub`, and `substitute`, `compose`,
