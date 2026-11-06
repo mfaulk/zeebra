@@ -450,7 +450,7 @@ mod tests {
                 BinaryFieldElement,
             },
             finite_field::fermat_inverse_via_recursive_pow,
-            irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X_1},
+            irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X2_1, X8_X4_X3_X_1},
         },
         FiniteField, KnownOrder,
     };
@@ -1268,7 +1268,72 @@ mod tests {
     fn test_declared_moduli_are_irreducible() {
         assert!(is_irreducible_over_gf2(X5_X2_1));
         assert!(is_irreducible_over_gf2(X8_X4_X3_X_1));
+        assert!(is_irreducible_over_gf2(X8_X4_X3_X2_1));
         assert!(is_irreducible_over_gf2(X63_X_1));
+    }
+
+    /// The two degree-eight moduli define different fields: one pair of bytes, two products.
+    #[test]
+    fn test_the_two_degree_eight_moduli_are_different_fields() {
+        type Aes = BinaryFieldElement<X8_X4_X3_X_1>;
+        type Mq = BinaryFieldElement<X8_X4_X3_X2_1>;
+
+        // FIPS-197 section 4.2 works this product out by hand: 0x57 * 0x83 = 0xc1 over the AES
+        // modulus. Anchoring on a published value rather than on this crate's own output is what
+        // makes the inequality below evidence about the moduli instead of about the implementation.
+        assert_eq!((Aes::new(0x57) * Aes::new(0x83)).coefficients(), 0xc1);
+
+        // The same bit patterns, reduced modulo x^8 + x^4 + x^3 + x^2 + 1 instead.
+        let mq = (Mq::new(0x57) * Mq::new(0x83)).coefficients();
+        assert_ne!(
+            mq, 0xc1,
+            "0x11D must not agree with 0x11B here, or the two moduli would be \
+             indistinguishable on this operand pair and the test would be vacuous"
+        );
+
+        // Checked against an independent reduction: carry-less multiply, then subtract shifted
+        // copies of the modulus bit by bit. The shipped path is PCLMULQDQ plus Barrett reduction,
+        // so this shares no code with it.
+        assert_eq!(mq, reduce_bitwise(clmul(0x57, 0x83), X8_X4_X3_X2_1));
+        // And the same reference reproduces the AES product, so it is not tuned to one modulus.
+        assert_eq!(reduce_bitwise(clmul(0x57, 0x83), X8_X4_X3_X_1), 0xc1);
+
+        // Most operand pairs separate the two fields, but not every pair does, which is why one
+        // pair cannot characterize the difference: whenever the carry-less product already has
+        // degree below 8 there is nothing to reduce and both moduli return it unchanged. Every
+        // product by 1 is such a case.
+        let differing = (1u64..256)
+            .flat_map(|a| (1u64..256).map(move |b| (a, b)))
+            .filter(|(a, b)| {
+                (Aes::new(*a) * Aes::new(*b)).coefficients()
+                    != (Mq::new(*a) * Mq::new(*b)).coefficients()
+            })
+            .count();
+        assert!(
+            differing > 50_000,
+            "only {differing} of 65025 nonzero operand pairs differ between the two moduli"
+        );
+    }
+
+    /// Carry-less product of two polynomials over GF(2), by shift and xor.
+    fn clmul(a: u64, b: u64) -> u128 {
+        let mut product = 0u128;
+        for i in 0..64 {
+            if b >> i & 1 == 1 {
+                product ^= (a as u128) << i;
+            }
+        }
+        product
+    }
+
+    /// `value` reduced modulo `modulus` over GF(2), one bit at a time.
+    fn reduce_bitwise(mut value: u128, modulus: u64) -> u64 {
+        let m = modulus_degree(modulus);
+        while degree_u128(value) >= m {
+            let shift = degree_u128(value) - m;
+            value ^= (modulus as u128) << shift;
+        }
+        value as u64
     }
 
     /// The test rejects reducible input, so the certification above is not vacuous.

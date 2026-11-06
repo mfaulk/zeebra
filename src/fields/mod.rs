@@ -19,7 +19,7 @@ pub use extension_field::{ExtensionFieldElement, IrreduciblePolynomial};
 pub use finite_field::{
     trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, RootOfUnityError,
 };
-pub use irreducible_polynomials::{Modulus13Pow4, X5_X2_1, X8_X4_X3_X_1};
+pub use irreducible_polynomials::{Modulus13Pow4, X5_X2_1, X8_X4_X3_X2_1, X8_X4_X3_X_1};
 pub use prime_field_128::PrimeFieldElement128;
 pub use prime_field_256::{
     Bls12_381Fr, Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256,
@@ -34,8 +34,15 @@ pub use sqrt::legendre_symbol;
 // Named here rather than left to callers because `for_each_field!` expands to these paths, and a
 // test body generic over the field has to be able to say which fields it means.
 
-/// GF(2^8) = GF(2)[x] / (x^8 + x^4 + x^3 + x + 1).
+/// GF(2^8) = GF(2)[x] / (x^8 + x^4 + x^3 + x + 1), the AES modulus.
 pub type Gf256 = BinaryFieldElement<X8_X4_X3_X_1>;
+
+/// GF(2^8) = GF(2)[x] / (x^8 + x^4 + x^3 + x^2 + 1), the Fukuoka MQ Challenge modulus.
+///
+/// Isomorphic to [`Gf256`] and **not interchangeable with it**: the two reduce modulo different
+/// polynomials, so the same pair of bytes has two different products. A type alias rather than a
+/// comment because the distinction has to be stated at the point where an instance names its field.
+pub type Gf256Mq = BinaryFieldElement<X8_X4_X3_X2_1>;
 
 /// GF(2^5) = GF(2)[x] / (x^5 + x^2 + 1).
 pub type Gf32 = BinaryFieldElement<X5_X2_1>;
@@ -49,6 +56,14 @@ pub type Gf13Pow4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
 // once the matrix leaves L2, so the same computation over one of these moves half the bytes it
 // does over the 64-bit-backed type of the same modulus. See the README section "A 32-bit prime
 // field" for what that is worth measured, and `examples/field_width.rs` for the instrument.
+
+/// GF(2). The coefficient field of Fukuoka MQ Challenge types I and IV, and of LowMC and HFE.
+///
+/// The one declared modulus that is not odd, so it keeps the wide-remainder multiplication path
+/// rather than reaching Montgomery form — `2^32` is not invertible modulo an even number. The
+/// branch is on the const generic, so it costs nothing at run time. [`Gf32`] and [`Gf256`] are
+/// extensions of this field, reached through a different type.
+pub type Zp2 = PrimeFieldElement32<2>;
 
 /// Z mod 31. The coefficient field of Fukuoka MQ Challenge types III and VI.
 pub type Zp31 = PrimeFieldElement32<31>;
