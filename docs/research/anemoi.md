@@ -268,8 +268,8 @@ the wall."
 | `n3-pcico` | **4.17** | 32.0 | 8x |
 | `n4-fcico` | **0.85** | 242 | **286x** |
 | `n4-pcico` | **10.87** | 284 | 26x |
-| `n5-fcico` | — | 2 367 | — |
-| `n5-pcico` | — | 2 731 | — |
+| `n5-fcico` | **1.71** | 2 367 | **1 382x** |
+| `n5-pcico` | **51.0** | 2 731 | 54x |
 
 > **For `FCICO` the published finding is contradicted, not merely attenuated: Zeebra's conversion is
 > *cheaper than its own basis* at every rung measured.** For `PCICO` the direction reproduces — the
@@ -294,12 +294,46 @@ say the published figures are wrong — they are measurements of a different imp
 raw data rather than a summary. And `D = 625` at `N = 4` is small; nothing here extrapolates past
 the rung it was measured at.
 
-### 8a.2 `N = 5`, run as a test rather than a sweep
+### 8a.2 `N = 5`, run as a test rather than a sweep — and the prediction held
 
-The ratios above predict the rung the published logs stop reporting. `D` goes 625 → 3 125, so a
-`D³` conversion predicts roughly **50 s** in total for `n5-fcico` where Magma's conversion alone is
-**22 057 s**. That prediction was written down before the run and `N = 5` was run separately from
-the sweep for exactly that reason — see §9 for the outcome.
+`N = 5` is the last rung the published logs report a conversion for, and the one where that
+conversion is **6.13 hours**. The prediction was written into the runner script before the run: `D`
+goes 625 → 3 125, so a `D³` conversion predicts roughly **50 s** in total for `n5-fcico`.
+
+| row | basis | conversion | univariate | **total** | `D` | witness |
+|---|---:|---:|---:|---:|---:|---|
+| `n5-fcico` | 26.908 s | **46.07 s** | 4.0 s | **76.96 s** | 3 125 | **verified** |
+| `n5-pcico` | 0.695 s | **35.46 s** | 4.21 s | **40.36 s** | 3 125 | **verified** |
+
+Observed 76.96 s against a predicted ~50 s — **1.54x**, and the conversion's own growth was
+**114x** against the `D³` model's 125x (and 121x for `PCICO`). So the cost model that produced the
+prediction is validated at the rung it was extrapolated to, which is the thing M24 asks for over a
+bare benchmark.
+
+Both models recover the **same** witness, `8393487001060711113`, which is the cross-check the two
+models exist to permit: same primitive, same solutions, two systems.
+
+| row | Zeebra conv / basis | Magma conv / basis | ratio-of-ratios | conversion wall gap |
+|---|---:|---:|---:|---:|
+| `n5-fcico` | **1.71** | 2 367 | **1 382x** | 479x |
+| `n5-pcico` | **51.0** | 2 731 | **54x** | 439x |
+
+> **At the rung where the published conversion costs 6.13 hours, Zeebra's costs 46 seconds, and the
+> recovered witness is checked by running the permutation.**
+
+The wall gap — 479x and 439x on the conversion — is quoted here *with both machines named*
+(Magma V2.26-2 on an Intel Xeon E5-2630 v3 @ 2.40 GHz against Zeebra on this workstation, cores
+0–7) and is **not** a like-for-like solver comparison. The machine-independent figure is the
+ratio-of-ratios, and it is 1 382x for `FCICO`. Even a generous decade-of-hardware factor does not
+reach 479x, so the gap is not plausibly hardware alone — but attributing it between the algorithm,
+the implementation and the field arithmetic is not something these two columns can do.
+
+**This is the milestone's strongest externally calibrated result, and the first evidence of any kind
+about how `fglm` scales against another implementation on the same problem.** It is also the
+reverse of what the family was chosen to test: `additional-benchmarks.md` §3.2 picked Anemoi because
+the published conversion costs 2 400x the published basis, calling that "the single most useful fact
+in this issue" for a crate whose FGLM scalability has its own milestone document. That wall is real
+in Magma and does not exist here.
 
 ## 9. Open
 
@@ -312,6 +346,14 @@ the sweep for exactly that reason — see §9 for the outcome.
 - **`α ∈ {5, 7, 11}` and `p ∈ {65537, 2^32 − 209}`.** Reference data exists for all of them in the
   same logs. The registry records `α = 3` at `p = 2^64 − 353` only, because that is the row where
   the published FGLM cost is 2 400× the F4 that preceded it.
+- **`N = 6`, where the reference has no conversion figure at all.** The Six Worlds logs report a
+  basis at `N = 6` (132.5 s `FCICO`, 372.2 s `PCICO`) and a dash for the conversion — they stop
+  reporting it after `N = 5`. Zeebra converts at `D = 3 125` in 46 s, and the validated `D³` model
+  puts `D = 15 625` at roughly 1.6 h. So `N = 6` is reachable here and would produce a figure the
+  reference does not have, which is a different kind of contribution from reproducing one. It needs
+  a deliberate registry addition — the ladder is frozen at `N = 1 … 5` — and a memory estimate
+  first: operator entries go 12.6 M at `D = 3 125`, and 25x that is not obviously affordable. Filed
+  rather than attempted.
 - **`ACICO`.** A third model of the same primitive (`additional-benchmarks.md` §3.4). Cheap once the
   permutation exists, and a separate issue.
 - **The reference's own `check_polynomial_verification` has not been executed.** It needs Sage. §4
