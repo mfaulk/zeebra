@@ -391,6 +391,45 @@ monomorphization and the count is looking at the code that does the work. The co
 `574a53c`, after #124; the four before-side divisions are the same four at every base since
 27cc999.
 
+#### The multiplication crossover moves down one doubling
+
+`fft_multiplication_crossover<F>()` (#124) is a width-indexed threshold on *product* degree —
+16384 for a 4-byte element, 2048 for 5–8 bytes, 512 above — and its own doc comment attributes the
+lateness to the transform being "bound by allocation and recursion rather than by field
+arithmetic". That is the property this change removes, so the threshold is now too high. Measured
+the same way #124 measured it, from the example's `mul` and `fftmul` rows:
+
+```text
+cargo run --release --example univariate_scaling -- koalabear budget=0.02
+cargo run --release --example univariate_scaling -- bn254 budget=0.02
+```
+
+A small budget deliberately: the `fftmul` stage asserts its product against `&a * &b`, so its
+verification is quadratic in the operand degree and a one-second budget pushes that verification
+past operand `2^20`, which does not finish. Milliseconds, minimum of two interleaved rounds,
+`taskset --cpu-list 0-7`:
+
+| element | side | operand `2^8` | `2^9` | `2^10` | `2^11` | crossing |
+|---|---|---|---|---|---|---|
+| 8 B (KoalaBear in `u64`) | before | 0.10 / 0.20 | 0.50 / 0.40 | 1.80 / 0.80 | 7.70 / 1.90 | product degree **1022** |
+| 8 B | after | 0.10 / 0.00 | 0.50 / 0.10 | 2.10 / 0.10 | 8.00 / 0.30 | product degree **510** |
+| 8 B (Goldilocks) | before | 0.20 / 0.20 | 0.50 / 0.40 | 2.20 / 0.90 | 8.60 / 1.80 | product degree **1022** |
+| 8 B (Goldilocks) | after | 0.10 / 0.00 | 0.50 / 0.10 | 2.10 / 0.10 | 8.60 / 0.30 | product degree **510** |
+| 32 B (BN254 `Fr`) | before | 1.50 / 0.80 | 6.10 / 1.50 | 24.80 / 3.20 | — | product degree **510** |
+| 32 B (BN254 `Fr`) | after | 1.50 / 0.30 | 6.00 / 0.60 | 23.20 / 1.30 | — | product degree **254** |
+
+Each cell is `mul / fftmul`. The `mul` column is unchanged code and agrees between the two sides to
+within the print precision, which is the control for this table.
+
+**The crossing moves down exactly one doubling on every field measured.** Rounded up to the next
+power of two as #124 does, so the dispatcher never picks the slower route, the thresholds become
+**512** for a 5–8 byte element (from 2048) and **256** above 8 bytes (from 512). The 4-byte row is
+not measurable from this example — it sweeps the `u64`-backed narrow fields so that
+`size_of::<F>()` is 8 throughout — so 16384 is left for whoever re-measures `fields::KoalaBear`
+directly. Recalibrating the constant is #124's number and is not changed here; #185's
+schoolbook → Karatsuba → NTT dispatch depends on it, and its Karatsuba band narrows at the top by
+the same doubling.
+
 #### What is left, and what it would need
 
 `FFTDomain::inverse` is now the only remaining `n`-element allocation in `interpolate`, and
