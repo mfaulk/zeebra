@@ -229,6 +229,17 @@ pub struct BatchStatistics {
     /// it did.
     pub divisor_scan_steps: usize,
 
+    /// Monomials symbolic preprocessing enqueued, before the deduplication test.
+    pub monomials_enqueued: usize,
+
+    /// The largest the pending monomial queue grew, in monomials.
+    ///
+    /// Reported beside [`Self::dense_buffer_bytes`] and for the same reason: it is memory this
+    /// batch held and no budget counted. At twenty variables a monomial is 80 bytes, so this
+    /// exceeds [`Self::peak_live_bytes`] whenever the queue holds more than a twentieth as many
+    /// monomials as the matrix holds entries.
+    pub max_pending_monomials: usize,
+
     /// True if this batch was eliminated by the structured path rather than the one-pass echelon.
     pub structured: bool,
 
@@ -442,6 +453,43 @@ pub struct F4Statistics {
     /// Summed over every batch: basis elements examined across those tests.
     pub divisor_scan_steps: usize,
 
+    /// Summed over every batch: monomials enqueued by symbolic preprocessing before deduplication.
+    ///
+    /// See [`SymbolicCounts::monomials_enqueued`](super::SymbolicCounts::monomials_enqueued). Part
+    /// of the memory accounting rather than of the work accounting: no budget bounds this queue,
+    /// and on a system whose rows carry many terms it is the single largest allocation in the
+    /// computation.
+    pub monomials_enqueued: usize,
+
+    /// The largest the pending monomial queue grew in any batch, in monomials.
+    ///
+    /// Costs `size_of::<Monomial<N>>()` each — 80 bytes at twenty variables — and is **not**
+    /// covered by [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes). A maximum rather
+    /// than a sum: one batch's queue is dropped before the next one's is built.
+    pub max_pending_monomials: usize,
+
+    /// The pair queue at its largest, in entries, measured once per batch.
+    ///
+    /// The structure that grows as `O(B²)` in the basis size while every budget in
+    /// [`F4Options`](super::F4Options) bounds a function of one batch. Each field peaks at its own
+    /// moment, so they are maxed independently — see
+    /// [`PairQueueFootprint::max`](crate::grobner::pairs::PairQueueFootprint::max).
+    pub peak_pair_queue: crate::grobner::pairs::PairQueueFootprint,
+
+    /// Basis elements held at the computation's largest, before interreduction.
+    ///
+    /// The basis is stored twice while the loop runs — as polynomials and as a
+    /// [`MonicBasis`](super::MonicBasis) — and three times during the final interreduction. None of
+    /// it is in the entry budget.
+    pub peak_basis_elements: usize,
+
+    /// Terms summed over every basis element, at the moment the basis was largest.
+    ///
+    /// The quantity that turns [`Self::peak_basis_elements`] into bytes: a term is a
+    /// `Monomial<N>` and a field element in a hash map, so it costs more than
+    /// [`Self::bytes_per_entry`] per term and is counted by neither budget.
+    pub peak_basis_terms: usize,
+
     /// Batches eliminated by the structured path.
     pub structured_batches: usize,
 
@@ -572,6 +620,8 @@ impl F4Statistics {
         self.reducer_rows_reused += batch.reducer_rows_reused;
         self.divisor_queries += batch.divisor_queries;
         self.divisor_scan_steps += batch.divisor_scan_steps;
+        self.monomials_enqueued += batch.monomials_enqueued;
+        self.max_pending_monomials = self.max_pending_monomials.max(batch.max_pending_monomials);
         self.free_pivots += batch.free_pivots;
         self.candidate_rank_contribution += batch.candidate_rank_contribution();
         self.dependent_candidate_rows += batch.dependent_candidate_rows();

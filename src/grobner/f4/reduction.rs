@@ -226,6 +226,8 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         reducer_rows_reused: preprocessed.counts.reducer_rows_reused,
         divisor_queries: preprocessed.counts.divisor_queries,
         divisor_scan_steps: preprocessed.counts.divisor_scan_steps,
+        monomials_enqueued: preprocessed.counts.monomials_enqueued,
+        max_pending_monomials: preprocessed.counts.max_pending_monomials,
         structured,
         // The unstructured path does not distinguish a pivot it found for free from one it worked
         // for, so this is zero there. Zero is the honest answer to "how many pivots did this

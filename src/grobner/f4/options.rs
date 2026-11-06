@@ -13,6 +13,7 @@
 use std::{
     fmt::{Display, Formatter},
     mem::size_of,
+    time::Duration,
 };
 
 use crate::{
@@ -166,10 +167,11 @@ pub struct F4Options {
     /// batch nor fill-in can quietly exhaust memory. An entry is a column index and a field
     /// element, so the byte cost is roughly this times `size_of::<(usize, F)>()`.
     ///
-    /// This is a budget on the entries F4 holds, not a ceiling on the process. It does not account
-    /// for the monomial-to-column map, the term vectors of the basis, the scratch buffer
-    /// elimination merges through, or allocator overhead — all of which are bounded by the row and
-    /// column budgets but are not counted here. Treat it as the knob that keeps matrix growth
+    /// This is a budget on the entries of **one batch's matrix**, not a ceiling on the process, and
+    /// the gap between those is measured at 75x rather than being a rounding note. See
+    /// [`max_live_bytes`](Self::max_live_bytes) for the full list of what no budget here bounds —
+    /// notably symbolic preprocessing's monomial queue and the `O(|G|²)` pair queue, neither of
+    /// which the row and column budgets bound either. Treat it as the knob that keeps matrix growth
     /// recoverable, not as a memory limit.
     pub max_live_nonzeros: usize,
 
@@ -187,18 +189,78 @@ pub struct F4Options {
     /// means something different at every field width, which is what this limit fixes by being
     /// stated in the unit that is allocated.
     ///
-    /// It covers the same storage [`max_live_nonzeros`](Self::max_live_nonzeros) does and no more:
-    /// not the monomial-to-column map, not the basis's term vectors, not the dense buffer a
-    /// backend reduces through, and not allocator overhead. The dense buffers are *reported*
-    /// instead — see [`BatchStatistics::dense_buffer_bytes`](super::BatchStatistics::dense_buffer_bytes)
-    /// — because enforcing them here would make the default refuse computations the entry budget
-    /// admits, and under [`Backend::Dense`] they are a function of the shape alone, which the row
-    /// and column budgets already bound. This is still not a ceiling on the process; it is the
-    /// entry budget in bytes.
+    /// # What it bounds, exactly
+    ///
+    /// **The `Vec<(usize, F)>` payload of the [`SparseRow`](crate::linalg::sparse::SparseRow)s of
+    /// the one batch currently being reduced, at that batch's peak, and nothing else.** That is the
+    /// whole scope. In particular it does **not** bound, and nothing in F4 bounds in bytes:
+    ///
+    /// - **symbolic preprocessing's pending monomial queue**, one `Monomial<N>` per term of every
+    ///   row, pushed *before* the deduplication test and bounded by no option at all — the row
+    ///   budget stops the loop, and every surviving iteration has already enqueued a row's worth.
+    ///   At twenty variables a monomial is 80 bytes against an entry's 16, so a queue a twentieth
+    ///   the matrix's size already costs as much as the matrix. See
+    ///   [`F4Statistics::max_pending_monomials`](super::F4Statistics::max_pending_monomials).
+    /// - the `examined` and `covered` monomial sets, and the preprocessed row vector;
+    /// - the column vector, the monomial-to-column map, and the two temporaries construction
+    ///   builds them from — four copies of the column monomials, three live at once;
+    /// - **the pair queue**, which is `O(|G|²)` in the basis size while every budget here bounds a
+    ///   function of one batch, plus two lazy-deletion sets that only grow. See
+    ///   [`F4Statistics::peak_pair_queue`](super::F4Statistics::peak_pair_queue).
+    /// - **the basis**, held twice for the whole computation and three times during the final
+    ///   interreduction, at several times an entry's cost per term. See
+    ///   [`F4Statistics::peak_basis_terms`](super::F4Statistics::peak_basis_terms).
+    /// - the dense buffer a backend reduces through, which is *reported* instead — see
+    ///   [`BatchStatistics::dense_buffer_bytes`](super::BatchStatistics::dense_buffer_bytes) —
+    ///   because enforcing it here would make the default refuse computations the entry budget
+    ///   admits, and under [`Backend::Dense`] it is a function of the shape alone, which the row
+    ///   and column budgets already bound;
+    /// - the elimination scratch buffer, which grows to its high-water mark and is never shrunk;
+    /// - allocator slack: a `HashMap`'s power-of-two capacity and a `Vec`'s doubling, which the
+    ///   payload arithmetic above excludes by construction.
+    ///
+    /// # How much that is
+    ///
+    /// **Measured, not estimated.** On `fukuoka-mq-III-n20-seed0` at a 20 000 000-entry cap the
+    /// accounted peak is 195 MB and the process peaks at 14 075 MB: this budget sees **1.3%**. The
+    /// omission does not scale with the budget either, so it cannot be used as a proxy even
+    /// roughly. `docs/research/f4-resource-scaling.md` §9 has the per-site attribution and the
+    /// method; `examples/f4_memory.rs` reproduces it.
+    ///
+    /// **So this is not a ceiling on the process and must not be read as one.** It is the knob that
+    /// keeps *matrix* growth recoverable — which is what it was added for, and what it does well:
+    /// the quantity is reproducible on any machine, where a resident-size limit is not. For the
+    /// process figure use [`crate::util::peak_resident_bytes`].
+    ///
+    /// The name is deliberately unchanged. `max_entry_bytes` would describe the scope better, and
+    /// the cost of renaming it is that every figure recorded against the old name becomes
+    /// ambiguous — the same objection that made this a second budget rather than a redefinition of
+    /// [`max_live_nonzeros`](Self::max_live_nonzeros). The scope is stated here instead.
     pub max_live_bytes: usize,
 
     /// The most batches to process before giving up, or `None` for no limit.
     pub max_batches: Option<usize>,
+
+    /// How long the computation may run before giving up, or `None` — the default — for no limit.
+    ///
+    /// **Checked once per batch**, beside [`Self::max_batches`], which is what makes the statistics
+    /// a crossing leaves behind describe whole batches rather than a matrix caught halfway through
+    /// being built. `None` means no clock is read anywhere, so the shipping path contains no timing
+    /// whether or not [`Self::measure_stages`] is set.
+    ///
+    /// **Not a resource bound, and the distinction is in the type**: a crossing is
+    /// [`F4Error::TimeBudgetExceeded`], whose [`stop_kind`](F4Error::stop_kind) is
+    /// [`StopKind::Time`] and never [`StopKind::Resource`]. A wall clock is a fact about one
+    /// machine under one load, so a run stopped by it must not be compared against a run stopped
+    /// by an entry count, which is reproducible anywhere. Ranking the two together would make a
+    /// frontier depend on how busy the box was.
+    ///
+    /// It does not replace an external supervisor. A batch can be arbitrarily long — the elapsed
+    /// time at a crossing is the budget *plus* whatever the batch in progress still needed — so a
+    /// caller that must bound its own wall clock keeps a `recv_timeout` or equivalent as a hard
+    /// backstop. What this adds is that the cooperative stop **returns**, and a return carries the
+    /// statistics an abandoned thread cannot.
+    pub max_wall_time: Option<Duration>,
 
     /// The most basis elements to accumulate before giving up, or `None` for no limit.
     ///
@@ -284,6 +346,7 @@ impl F4Options {
             max_live_nonzeros: 20_000_000,
             max_live_bytes: 320_000_000,
             max_batches: None,
+            max_wall_time: None,
             max_basis_elements: None,
             elimination: Backend::Sparse,
             reduction: ReductionStrategy::Unstructured,
@@ -394,12 +457,43 @@ impl Default for F4Options {
     }
 }
 
+/// What kind of thing stopped an F4 computation.
+///
+/// Exists so that a consumer which ranks stops against each other cannot accidentally rank a wall
+/// clock against an entry count. A resource stop is a reproducible property of the system and the
+/// budget: the same system under the same budget crosses it on any machine, at the same degree,
+/// with the same counters. A time stop is a property of **one machine under one load**, so two time
+/// stops are not comparable with each other either, and a time stop compared against a resource
+/// stop makes a frontier depend on how busy the box was.
+///
+/// Matched exhaustively by anything that reports a stop, so a new variant of [`F4Error`] forces the
+/// question "is this a budget, a clock, or a caller mistake?" to be answered at the point it is
+/// added rather than defaulted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StopKind {
+    /// A budget on the work the computation holds or does: rows, columns, entries, bytes, batches,
+    /// basis elements. Reproducible, and rankable against another resource stop.
+    Resource,
+
+    /// [`F4Options::max_wall_time`] elapsed. **Never rankable against a [`Self::Resource`] stop.**
+    Time,
+
+    /// The options cannot be satisfied by any computation. A caller mistake, not an outcome.
+    Caller,
+
+    /// The computation finished and its basis failed [`F4Options::certify`]. Reaching this would be
+    /// a defect in this crate, not a resource outcome.
+    Certification,
+}
+
 /// Why an F4 computation stopped without a basis.
 ///
-/// Every variant but one means a limit in [`F4Options`] was crossed; the exception is
+/// Most variants mean a limit in [`F4Options`] was crossed. The exceptions are
 /// [`F4Error::CertificationFailed`], which means the computation finished and its result failed an
-/// independent check. There is deliberately no variant for "finished but incomplete": a successful
-/// return is always a complete reduced Gröbner basis.
+/// independent check, and [`F4Error::TimeBudgetExceeded`], which is a clock rather than a budget on
+/// the work — see [`StopKind`] for why those two have to be told apart. There is deliberately no
+/// variant for "finished but incomplete": a successful return is always a complete reduced Gröbner
+/// basis.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum F4Error {
     /// Symbolic preprocessing needed more rows than allowed.
@@ -431,6 +525,30 @@ pub enum F4Error {
     /// The computation did not finish within the allowed number of batches.
     TooManyBatches { limit: usize },
 
+    /// The computation did not finish within [`F4Options::max_wall_time`].
+    ///
+    /// **Not a resource bound.** [`Self::stop_kind`] reports [`StopKind::Time`], which is how a
+    /// consumer keeps it out of a comparison against an entry or byte count: those are facts about
+    /// a system and reproduce on any machine, and this is a fact about one machine under one load.
+    ///
+    /// `degree` is the selection degree of the batch the budget was noticed at — the batch had not
+    /// been reduced, so it is the degree the computation *reached*, one above the highest it
+    /// completed. The group-B counters that describe the work are **not** carried here; they are in
+    /// the [`F4Statistics`](super::F4Statistics) that
+    /// [`f4_reported`](crate::grobner::f4_reported) and
+    /// [`f4_observed_reported`](crate::grobner::f4_observed_reported) return beside the `Result`,
+    /// which is the whole point of a cooperative stop over an abandoned thread: the counters
+    /// survive because the function returns.
+    ///
+    /// `elapsed_millis` is at least `budget_millis`, and may exceed it by a whole batch: the check
+    /// is between batches, so a batch already in progress runs to completion. Both are reported so
+    /// the overshoot is visible rather than inferred.
+    TimeBudgetExceeded {
+        degree: u64,
+        elapsed_millis: u64,
+        budget_millis: u64,
+    },
+
     /// The basis held, or grew beyond, more elements than allowed.
     ///
     /// Applies to the generators as supplied, not only to what the computation appends: a basis
@@ -452,6 +570,44 @@ pub enum F4Error {
     /// discards a critical pair on heuristic grounds. It is wired up because a correctness claim
     /// that cannot fail is not a check.
     CertificationFailed { reason: &'static str },
+}
+
+impl F4Error {
+    /// What kind of stop this is. See [`StopKind`].
+    ///
+    /// Exhaustive rather than defaulted, so adding a variant to [`F4Error`] stops compiling here
+    /// until somebody says which kind it is.
+    pub fn stop_kind(&self) -> StopKind {
+        match self {
+            Self::TooManyRows { .. }
+            | Self::TooManyColumns { .. }
+            | Self::TooManyNonzeros { .. }
+            | Self::TooManyLiveBytes { .. }
+            | Self::TooManyBatches { .. }
+            | Self::TooManyBasisElements { .. } => StopKind::Resource,
+            Self::TimeBudgetExceeded { .. } => StopKind::Time,
+            Self::InvalidOptions { .. } => StopKind::Caller,
+            Self::CertificationFailed { .. } => StopKind::Certification,
+        }
+    }
+
+    /// A stable name for the limit that bound, for a consumer to key a record on.
+    ///
+    /// The option's own field name wherever there is one, so a recorded result says which knob to
+    /// turn. `invalid_options` and `certification` are not knobs and are named for what they are.
+    pub fn limit_name(&self) -> &'static str {
+        match self {
+            Self::TooManyRows { .. } => "max_matrix_rows",
+            Self::TooManyColumns { .. } => "max_matrix_columns",
+            Self::TooManyNonzeros { .. } => "max_live_nonzeros",
+            Self::TooManyLiveBytes { .. } => "max_live_bytes",
+            Self::TooManyBatches { .. } => "max_batches",
+            Self::TooManyBasisElements { .. } => "max_basis_elements",
+            Self::TimeBudgetExceeded { .. } => "max_wall_time",
+            Self::InvalidOptions { .. } => "invalid_options",
+            Self::CertificationFailed { .. } => "certification",
+        }
+    }
 }
 
 impl Display for F4Error {
@@ -480,6 +636,15 @@ impl Display for F4Error {
             Self::TooManyBatches { limit } => {
                 write!(f, "the computation did not finish within {} batches", limit)
             }
+            Self::TimeBudgetExceeded {
+                degree,
+                elapsed_millis,
+                budget_millis,
+            } => write!(
+                f,
+                "the computation did not finish within {} ms, and had reached degree {} after {} ms",
+                budget_millis, degree, elapsed_millis
+            ),
             Self::TooManyBasisElements { elements, limit } => write!(
                 f,
                 "the basis held {} elements, over the limit of {}",

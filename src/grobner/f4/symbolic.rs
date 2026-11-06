@@ -158,14 +158,36 @@ pub struct SymbolicCounts {
 
     /// Reducer multiples whose built terms came from the cache rather than being recomputed.
     pub reducer_rows_reused: usize,
+
+    /// Monomials pushed onto the pending queue, counted **before** the deduplication test.
+    ///
+    /// Every term of every row is enqueued and only then checked against `examined`, so this is
+    /// larger than [`Self::divisor_queries`] by the repetition factor. It is recorded because the
+    /// queue is the one structure in this stage that no [`F4Options`](super::F4Options) budget
+    /// bounds: the row budget stops the loop, and each surviving iteration has already enqueued a
+    /// row's worth of monomials.
+    pub monomials_enqueued: usize,
+
+    /// The largest the pending queue grew, in monomials.
+    ///
+    /// The queue's own high-water mark, which is what its allocation costs:
+    /// `size_of::<Monomial<N>>()` each, and a `VecDeque` never shrinks below the capacity its peak
+    /// forced. Sampled once per loop iteration rather than once per push, so the measurement is
+    /// one comparison against work that already includes a hash insert.
+    pub max_pending_monomials: usize,
 }
 
 impl SymbolicCounts {
     /// Fold another pass's counters into these.
+    ///
+    /// Sums the totals and takes the maximum of the high-water marks: two passes' peaks are not
+    /// simultaneous, so adding them would describe memory no moment ever held.
     pub fn add(&mut self, other: &Self) {
         self.divisor_queries += other.divisor_queries;
         self.divisor_scan_steps += other.divisor_scan_steps;
         self.reducer_rows_reused += other.reducer_rows_reused;
+        self.monomials_enqueued += other.monomials_enqueued;
+        self.max_pending_monomials = self.max_pending_monomials.max(other.max_pending_monomials);
     }
 }
 
@@ -815,10 +837,12 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     for row in &rows {
         for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
             pending.push_back(monomial);
+            counts.monomials_enqueued += 1;
         }
     }
 
     while let Some(monomial) = pending.pop_front() {
+        counts.max_pending_monomials = counts.max_pending_monomials.max(pending.len());
         if !examined.insert(monomial) {
             continue;
         }
@@ -847,6 +871,7 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
         covered.insert(monomial);
         for (shifted, _) in basis.shifted_terms(basis_index, &multiplier) {
             pending.push_back(shifted);
+            counts.monomials_enqueued += 1;
         }
         rows.push(PreprocessedRow {
             multiplier,
