@@ -481,6 +481,12 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-DEGREE-AWARE-F4.md`](docs/MILESTONE-DEGREE-AWARE-F4.md), and
 [`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md).
 
+The next milestone is planned rather than measured:
+[`docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md)
+reproduces a published cryptanalytic attack end to end, extends the resultant frontier from four
+rounds to six, and calibrates against an external solver on identical problems. Nothing in it is a
+measurement yet, and its §13 states what each outcome level would mean.
+
 ## Finite Fields
 
 `PrimeFieldElement64<P>` holds elements in **Montgomery form** when `P` is odd, storing
