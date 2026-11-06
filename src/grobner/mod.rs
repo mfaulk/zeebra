@@ -3,6 +3,7 @@
 pub mod benchmark_systems;
 mod buchberger;
 pub mod differential;
+pub mod external;
 pub mod f4;
 pub mod fglm;
 pub mod field_equations;

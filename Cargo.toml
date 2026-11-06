@@ -32,6 +32,22 @@ bench = false
 name = "zeebra-differential"
 bench = false
 
+[features]
+default = ["external-runners"]
+
+# Driving external Gröbner engines (msolve, Groebner.jl, Sagebrush, Singular) as subprocesses.
+#
+# **Adds no dependency**, and is on by default for that reason: the interface to every one of
+# these tools is text, so `src/grobner/external` is pure `std`. Gating it off by default would
+# only hide its tests from CI, which runs `cargo nextest run` with default features.
+#
+# The gate exists for two things it does buy. A consumer who wants none of this can switch it off
+# with `default-features = false`. And an adapter that *does* need a dependency — a Julia bridge
+# wanting a JSON parser, say — goes behind a sub-feature of this one, so the core crate never
+# acquires it. That is the "no new required dependency" guarantee, made structural rather than
+# promised.
+external-runners = []
+
 [dependencies]
 lazy_static = "1.4.0"
 pest = "2.7"
