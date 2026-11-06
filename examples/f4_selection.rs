@@ -12,6 +12,10 @@
 //! often enough across batches to be worth remembering; `reuse` is that rate and `symb/ms` is what
 //! acting on it costs.
 //!
+//! `fewest-terms` and its control `most-terms` test a second, orthogonal hypothesis: the reducer
+//! chosen *is* the row added, so the sparsest divisor is the sparsest row. Every row of every table
+//! returns the identical reduced Gröbner basis, which is asserted here and not reported.
+//!
 //! ```text
 //! cargo run --release --example f4_selection
 //! ```
@@ -63,20 +67,22 @@ fn header() {
     );
 }
 
-/// The configurations compared: each policy with the cache off, and the cache alone.
-const CONFIGURATIONS: [(&str, ReducerSelection, CacheMode); 3] = [
-    ("first", ReducerSelection::FirstApplicable, CacheMode::Off),
-    (
-        "first+count",
+/// The configurations compared: every policy with the cache off, and the baseline with it on.
+///
+/// Derived from [`ReducerSelection::ALL`], so a policy added to the enum is measured here without
+/// this program being edited — which is what that constant is for.
+fn configurations() -> Vec<(String, ReducerSelection, CacheMode)> {
+    let mut rows: Vec<(String, ReducerSelection, CacheMode)> = ReducerSelection::ALL
+        .iter()
+        .map(|&selection| (selection.name().to_string(), selection, CacheMode::Off))
+        .collect();
+    rows.push((
+        "first+count".to_string(),
         ReducerSelection::FirstApplicable,
         CacheMode::Count,
-    ),
-    (
-        "largest",
-        ReducerSelection::LargestLeadingMonomial,
-        CacheMode::Off,
-    ),
-];
+    ));
+    rows
+}
 
 fn row<const N: usize>(
     name: &str,
@@ -84,20 +90,35 @@ fn row<const N: usize>(
     orders: &[(&str, MonomialOrder)],
 ) {
     for &(order_name, order) in orders {
-        for (label, selection, cache) in CONFIGURATIONS {
+        // The basis the first configuration returned, which every later one must match. A
+        // selection policy decides which divisor reduces a monomial and nothing else, so a
+        // reduced Gröbner basis — unique for an ideal and an order — cannot move; a row that
+        // differed would be a defect, and reporting it in a column rather than failing would bury
+        // it.
+        let mut reference: Option<Vec<MultivariatePolynomial<N, F>>> = None;
+        for (label, selection, cache) in configurations() {
             let options = F4Options {
                 reducer_selection: selection,
                 reducer_cache: cache,
                 measure_stages: true,
                 ..F4Options::baseline()
             };
-            let (_, s): (Vec<_>, F4Statistics) = match f4_with_options(system, order, &options) {
+            let (basis, s): (Vec<_>, F4Statistics) = match f4_with_options(system, order, &options)
+            {
                 Ok(result) => result,
                 Err(error) => {
                     println!("{:<12} {:<8} {:<14} {}", name, order_name, label, error);
                     continue;
                 }
             };
+            match &reference {
+                Some(reference) => assert_eq!(
+                    &basis, reference,
+                    "{} {} {}: a reducer policy changed the reduced Gröbner basis",
+                    name, order_name, label
+                ),
+                None => reference = Some(basis),
+            }
             println!(
                 "{:<12} {:<8} {:<14} {:>9} {:>7} {:>7} {:>10} {:>11} {:>8.2} {:>8.2} {:>9.2} {:>7.1} {:>6.2}",
                 name,

@@ -63,6 +63,11 @@ pub enum ReductionStrategy {
 /// Any choice gives a correct closure, so this is purely a cost decision — but it is not a local
 /// one: a different divisor gives a different multiplier, hence a different row, hence different
 /// columns and a different matrix.
+///
+/// Two axes are offered. [`ReducerSelection::LargestLeadingMonomial`] ranks by **multiplier size**,
+/// which every [`PairSchedule`] does too; [`ReducerSelection::FewestTerms`] ranks by **term
+/// count**, which is orthogonal to it — the monomial being covered is the row's leading monomial
+/// under either, so what the two choices trade is the row's tail against the row's length.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ReducerSelection {
     /// The first basis element, in index order, whose leading monomial divides. The baseline.
@@ -80,6 +85,48 @@ pub enum ReducerSelection {
     /// lex instances of cyclic gain. Selectable for ablation; see
     /// `docs/MILESTONE-F4-OPTIMIZATION.md` §7.2.
     LargestLeadingMonomial,
+
+    /// The divisor with the fewest terms, which is the sparsest row the closure can be given.
+    ///
+    /// Singular's measured winner. It keeps its reduction set sorted so the first divisor found is
+    /// the preferred one, and `initBuchMoraPos` records that `posInT_EcartpLength` beat the
+    /// alternatives in a bake-off; that comparator orders by ecart and then by `pLength`, the term
+    /// count, and in a global order the ecart is zero. In F4's symbolic preprocessing the reducer
+    /// chosen *is* the row added, so the sparsest reducer is directly the sparsest row. See
+    /// `docs/research/singular-engine-notes.md` §4.
+    ///
+    /// Equal term counts are broken by the smaller basis index, because "fewest" alone is not a
+    /// total order on the basis and preprocessing has to be deterministic.
+    FewestTerms,
+
+    /// The divisor with the *most* terms. The control for [`ReducerSelection::FewestTerms`], and
+    /// not optional.
+    ///
+    /// If sparse reducer rows narrow the matrix, dense ones should widen it. A policy that beats
+    /// the baseline in both directions is measuring run-to-run variation, and without the opposite
+    /// direction there is no way to tell — which is the argument
+    /// `docs/research/pair-scheduling.md` §4 rests on for the schedules.
+    MostTerms,
+}
+
+impl ReducerSelection {
+    /// Every policy, for an ablation that should not have to be edited when one is added.
+    pub const ALL: [Self; 4] = [
+        Self::FirstApplicable,
+        Self::LargestLeadingMonomial,
+        Self::FewestTerms,
+        Self::MostTerms,
+    ];
+
+    /// A short name, for a table column.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::FirstApplicable => "first",
+            Self::LargestLeadingMonomial => "largest",
+            Self::FewestTerms => "fewest-terms",
+            Self::MostTerms => "most-terms",
+        }
+    }
 }
 
 /// Limits on an F4 computation.
@@ -536,10 +583,7 @@ mod tests {
                 ReductionStrategy::Unstructured,
                 ReductionStrategy::Structured,
             ] {
-                for reducer_selection in [
-                    ReducerSelection::FirstApplicable,
-                    ReducerSelection::LargestLeadingMonomial,
-                ] {
+                for reducer_selection in ReducerSelection::ALL {
                     for criteria in [
                         PairCriteria::NONE,
                         PairCriteria::PRODUCT_ONLY,

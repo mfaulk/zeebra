@@ -231,9 +231,17 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // queue would otherwise repeat once per pair created.
     let mut leads: Vec<Monomial<N>> = monic.leading_monomials().collect();
 
+    // How many terms each element has, which a pair cannot carry and a length-ranking schedule
+    // needs. Maintained alongside `leads`, and append-only for the reason given on
+    // `PairQueue::push_term_count`.
+    let term_counts: Vec<usize> = (0..monic.len())
+        .map(|index| monic.element(index).terms.len())
+        .collect();
+
     let mut criteria_counts = CriterionCounts::default();
-    let mut pending = PairQueue::seeded_from_leads_scheduled(
+    let mut pending = PairQueue::seeded_from_leads_ranked(
         &leads,
+        &term_counts,
         &options.criteria,
         options.schedule,
         order,
@@ -409,6 +417,7 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             // Already monic: elimination normalized every pivot to one.
             monic.push(&candidate, order);
             leads.push(monic.element(added).leading_monomial);
+            pending.push_term_count(monic.element(added).terms.len());
             basis.push(candidate);
             statistics.elements_added += 1;
 
