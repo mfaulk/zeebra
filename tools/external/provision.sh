@@ -46,26 +46,39 @@ log()  { printf '[provision] %s\n' "$*"; }
 note() { INSTALLED+=("$1"); }
 skip() { SKIPPED+=("$1"); }
 
-# fetch <url> <filename> <sha256>
+# fetch <filename> <sha256> <url>...
+#
+# Tries each URL in turn. gmplib.org in particular drops connections mid-transfer
+# ("OpenSSL SSL_read: ... unexpected eof while reading"), which under `set -e` aborts the whole
+# run, so every source that has an official mirror is given one. The sha256 is what makes a
+# mirror safe to use: a wrong file fails the check rather than being installed.
 fetch() {
-  local url="$1" out="$SRC/$2" want="$3" got
+  local out="$SRC/$1" want="$2" got url
+  shift 2
   if [ -f "$out" ]; then
     got="$(sha256sum "$out" | cut -d' ' -f1)"
     if [ "$got" = "$want" ]; then
       return 0
     fi
-    log "checksum mismatch for $2, re-downloading"
+    log "checksum mismatch for ${out##*/}, re-downloading"
     rm -f "$out"
   fi
-  log "downloading $2"
-  curl -fsSL -o "$out" "$url"
-  got="$(sha256sum "$out" | cut -d' ' -f1)"
-  if [ "$got" != "$want" ]; then
-    echo "provision: sha256 mismatch for $2" >&2
-    echo "  expected $want" >&2
-    echo "  got      $got" >&2
-    exit 1
-  fi
+  for url in "$@"; do
+    log "downloading ${out##*/} from ${url%%/*}//${url#*//}"
+    if curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "$out" "$url"; then
+      got="$(sha256sum "$out" | cut -d' ' -f1)"
+      if [ "$got" = "$want" ]; then
+        return 0
+      fi
+      echo "provision: sha256 mismatch for ${out##*/} from $url" >&2
+      echo "  expected $want" >&2
+      echo "  got      $got" >&2
+      rm -f "$out"
+    fi
+    log "failed from $url"
+  done
+  echo "provision: could not download ${out##*/} from any mirror" >&2
+  exit 1
 }
 
 mkdir -p "$PREFIX/bin" "$SRC" "$BUILD"
@@ -73,8 +86,9 @@ mkdir -p "$PREFIX/bin" "$SRC" "$BUILD"
 # --- GMP -------------------------------------------------------------------------------------
 provision_gmp() {
   if [ -f "$PREFIX/include/gmp.h" ]; then skip "GMP $GMP_VERSION"; return 0; fi
-  fetch "https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.xz" \
-        "gmp-$GMP_VERSION.tar.xz" "$GMP_SHA256"
+  fetch "gmp-$GMP_VERSION.tar.xz" "$GMP_SHA256" \
+        "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz" \
+        "https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.xz"
   tar xf "$SRC/gmp-$GMP_VERSION.tar.xz" -C "$SRC"
   rm -rf "$BUILD/gmp"; mkdir -p "$BUILD/gmp"
   log "building GMP $GMP_VERSION"
@@ -91,8 +105,9 @@ provision_gmp() {
 # FLINT needs MPFR as well as GMP; a modern FLINT does not bundle it, so it is built here.
 provision_mpfr() {
   if [ -f "$PREFIX/include/mpfr.h" ]; then skip "MPFR $MPFR_VERSION"; return 0; fi
-  fetch "https://www.mpfr.org/mpfr-$MPFR_VERSION/mpfr-$MPFR_VERSION.tar.xz" \
-        "mpfr-$MPFR_VERSION.tar.xz" "$MPFR_SHA256"
+  fetch "mpfr-$MPFR_VERSION.tar.xz" "$MPFR_SHA256" \
+        "https://ftp.gnu.org/gnu/mpfr/mpfr-$MPFR_VERSION.tar.xz" \
+        "https://www.mpfr.org/mpfr-$MPFR_VERSION/mpfr-$MPFR_VERSION.tar.xz"
   tar xf "$SRC/mpfr-$MPFR_VERSION.tar.xz" -C "$SRC"
   rm -rf "$BUILD/mpfr"; mkdir -p "$BUILD/mpfr"
   log "building MPFR $MPFR_VERSION"
@@ -111,8 +126,9 @@ provision_mpfr() {
 # run under Perl 5.42 (core `threads` was removed), so a git checkout would be a dead end.
 provision_flint() {
   if [ -f "$PREFIX/include/flint/nmod.h" ]; then skip "FLINT $FLINT_VERSION"; return 0; fi
-  fetch "https://github.com/flintlib/flint/releases/download/v$FLINT_VERSION/flint-$FLINT_VERSION.tar.gz" \
-        "flint-$FLINT_VERSION.tar.gz" "$FLINT_SHA256"
+  fetch "flint-$FLINT_VERSION.tar.gz" "$FLINT_SHA256" \
+        "https://github.com/flintlib/flint/releases/download/v$FLINT_VERSION/flint-$FLINT_VERSION.tar.gz" \
+        "https://flintlib.org/download/flint-$FLINT_VERSION.tar.gz"
   tar xzf "$SRC/flint-$FLINT_VERSION.tar.gz" -C "$SRC"
   log "building FLINT $FLINT_VERSION (slow: several minutes)"
   (
@@ -131,8 +147,8 @@ provision_flint() {
 # -Wl,-rpath bakes the prefix into the binary, so msolve runs with no LD_LIBRARY_PATH.
 provision_msolve() {
   if [ -x "$PREFIX/bin/msolve" ]; then skip "msolve $MSOLVE_VERSION"; return 0; fi
-  fetch "https://msolve.lip6.fr/downloads/v$MSOLVE_VERSION/msolve-$MSOLVE_VERSION.tar.gz" \
-        "msolve-$MSOLVE_VERSION.tar.gz" "$MSOLVE_SHA256"
+  fetch "msolve-$MSOLVE_VERSION.tar.gz" "$MSOLVE_SHA256" \
+        "https://msolve.lip6.fr/downloads/v$MSOLVE_VERSION/msolve-$MSOLVE_VERSION.tar.gz"
   tar xzf "$SRC/msolve-$MSOLVE_VERSION.tar.gz" -C "$SRC"
   log "building msolve $MSOLVE_VERSION"
   (
@@ -154,8 +170,8 @@ provision_julia() {
     skip "Julia $JULIA_VERSION"
   else
     local short="${JULIA_VERSION%.*}"
-    fetch "https://julialang-s3.julialang.org/bin/linux/x64/$short/julia-$JULIA_VERSION-linux-x86_64.tar.gz" \
-          "julia-$JULIA_VERSION-linux-x86_64.tar.gz" "$JULIA_SHA256"
+    fetch "julia-$JULIA_VERSION-linux-x86_64.tar.gz" "$JULIA_SHA256" \
+          "https://julialang-s3.julialang.org/bin/linux/x64/$short/julia-$JULIA_VERSION-linux-x86_64.tar.gz"
     log "installing Julia $JULIA_VERSION"
     tar xzf "$SRC/julia-$JULIA_VERSION-linux-x86_64.tar.gz" -C "$PREFIX"
     note "Julia $JULIA_VERSION"
