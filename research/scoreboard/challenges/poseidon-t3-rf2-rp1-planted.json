@@ -31,6 +31,7 @@
   "external_status": {
     "state": "not_a_public_problem"
   },
+  "reference_points": [],
   "verifier": "CicoInstance::is_solution rebuilds the input state and runs permutation_plus_linear, so the check goes through the permutation rather than through the polynomial system — independent of the generator and of every transformation applied to it. The program's own verifier is verify_cico_solution in poseidon-tools.",
   "notes": "A planted target, so a solution is known to exist and \"found nothing\" is distinguishable from \"is broken\". Regression and profiling only."
 }

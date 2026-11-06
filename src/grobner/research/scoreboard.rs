@@ -608,6 +608,16 @@ pub struct RunRecord {
     /// The per-attempt detail, when a planned solve ran.
     pub experiment: Option<ExperimentRecord>,
 
+    /// Peak **process** resident memory, measured, when the runner measured it.
+    ///
+    /// Deliberately not inside [`GrobnerFrontier`] and deliberately not named like
+    /// `peak_estimated_bytes`, which is an estimate of the live matrix entries at 16 bytes apiece.
+    /// The two differ by two orders of magnitude on an F4 run — 195 MB accounted inside a 14.75 GB
+    /// process on Fukuoka III `n = 20` (#237) — so a reader must never be able to mistake one for
+    /// the other. A route with no Macaulay matrix at all, like the resultant, has no frontier and
+    /// would otherwise carry no memory figure.
+    pub measured_peak_resident_bytes: Option<usize>,
+
     /// The command that reproduces this run.
     pub reproduce: String,
 }
@@ -639,6 +649,7 @@ impl RunRecord {
                 policy: String::new(),
             },
             experiment: None,
+            measured_peak_resident_bytes: None,
             reproduce: String::new(),
         }
     }
@@ -867,6 +878,12 @@ impl RunRecord {
                 policy: field("policy"),
             },
             experiment: None,
+            // Absent in every record written before the field existed. `None` means "not
+            // measured", which is the fact about those runs — it must never read as zero.
+            measured_peak_resident_bytes: value
+                .get("measured_peak_resident_bytes")
+                .and_then(Json::as_int)
+                .map(|b| b as usize),
             reproduce: value
                 .get("reproduce")
                 .and_then(Json::as_str)
@@ -933,6 +950,9 @@ impl RunRecord {
                 None => Json::Null,
             },
         ));
+        if let Some(bytes) = self.measured_peak_resident_bytes {
+            fields.push(("measured_peak_resident_bytes", Json::Int(bytes as i128)));
+        }
         fields.push(("environment", self.environment.to_json()));
         fields.push((
             "experiment",
@@ -1310,6 +1330,50 @@ impl Scoreboard {
         best
     }
 
+    /// One verified witness per problem at **any** concurrency — an existence claim, not a ranking.
+    ///
+    /// [`Self::best`] admits single-threaded runs only, so that a parallel wall clock cannot
+    /// displace the figure it is not comparable with. That rule is right and this method does not
+    /// weaken it. It exists because the *fallback* was wrong: a problem whose only witness was
+    /// parallel fell through to [`Self::unfinished`] and rendered as a resource stop, so the
+    /// headline table asserted that no witness existed for a problem that had one. An absent row is
+    /// a gap a reader can see; a row naming a limit is a false statement about what is known.
+    ///
+    /// **The representative is chosen without comparing runtimes, and that is deliberate.** Ranking
+    /// an 8-worker run against a 32-worker one would reintroduce exactly the cross-concurrency
+    /// comparison [`ScoreboardError::DifferentConcurrency`] refuses in [`Comparison::of`], and it
+    /// would do so in the one place a reader takes a figure away from. The rule is instead: the
+    /// **fewest workers**, then the **most recently recorded**. Among witnesses for one problem the
+    /// one making the smallest hardware demand is the strongest existence claim, and it is the
+    /// nearest thing to the serial figure the table is otherwise built from.
+    ///
+    /// The tie-break is "latest", not "first", and that was a correction: history is appended, so
+    /// two runs of one row at the same worker count differ by *when* they were recorded, and the
+    /// later one is written by later code. Preferring the earlier one made the rendered row drop a
+    /// `measured_peak_resident_bytes` that the newer record carried — a tie-break silently
+    /// choosing the less complete record. Neither candidate's runtime is read either way.
+    ///
+    /// Use [`Self::best_at`] to compare runtimes within a fixed worker count.
+    pub fn verified_somehow(&self) -> BTreeMap<&str, &RunRecord> {
+        let mut found: BTreeMap<&str, &RunRecord> = BTreeMap::new();
+        for run in &self.runs {
+            if !run.outcome.is_verified_witness() {
+                continue;
+            }
+            found
+                .entry(run.challenge.as_str())
+                .and_modify(|current| {
+                    // Fewest workers wins; `<=` makes a tie keep the *latest*, since `self.runs`
+                    // is in insertion order and history is appended. No runtime is read.
+                    if run.environment.concurrency <= current.environment.concurrency {
+                        *current = run;
+                    }
+                })
+                .or_insert(run);
+        }
+        found
+    }
+
     /// Runs that produced no verified witness, in insertion order.
     pub fn unfinished(&self) -> Vec<&RunRecord> {
         self.runs
@@ -1401,6 +1465,7 @@ impl Scoreboard {
                  |---|---|---:|---:|---|---|---|\n",
             );
             let best = self.best();
+            let solved = self.verified_somehow();
             for manifest in members {
                 let result = match best.get(manifest.id) {
                     Some(run) => format!(
@@ -1409,13 +1474,27 @@ impl Scoreboard {
                         run.elapsed().as_secs_f64() * 1e3,
                         run.formulation
                     ),
-                    None => match self
-                        .unfinished()
-                        .into_iter()
-                        .rfind(|r| r.challenge == manifest.id)
-                    {
-                        Some(run) => run.outcome.short(),
-                        None => "not attempted".to_string(),
+                    // A witness measured on more than one worker does not enter `best`, so that
+                    // it cannot displace a single-threaded figure. It must still be reported here:
+                    // falling straight through to `unfinished` rendered a resource stop for a
+                    // problem that is solved, which is a false statement rather than a missing one.
+                    // The concurrency is in the cell, so the figure cannot be read as serial.
+                    None => match solved.get(manifest.id) {
+                        Some(run) => format!(
+                            "**{}** in {:.1} ms on {} workers ({})",
+                            run.outcome,
+                            run.elapsed().as_secs_f64() * 1e3,
+                            run.environment.concurrency,
+                            run.formulation
+                        ),
+                        None => match self
+                            .unfinished()
+                            .into_iter()
+                            .rfind(|r| r.challenge == manifest.id)
+                        {
+                            Some(run) => run.outcome.short(),
+                            None => "not attempted".to_string(),
+                        },
                     },
                 };
                 out.push_str(&format!(
@@ -1487,8 +1566,8 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit, RunOutcome,
-        RunRecord, Scoreboard, ScoreboardError, Stage, StageCost,
+        wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Json, Limit,
+        RunOutcome, RunRecord, Scoreboard, ScoreboardError, Stage, StageCost,
     };
     use crate::grobner::research::{challenge, registry, Significance};
 
@@ -1519,6 +1598,276 @@ mod tests {
         });
         run.environment = environment();
         run
+    }
+
+    /// A problem whose only witness is parallel renders as solved, not as a resource stop.
+    ///
+    /// The defect this guards: `best` admits single-threaded runs only, so a parallel witness fell
+    /// through to `unfinished` and the headline table printed that run's limit — asserting no
+    /// witness existed for a problem that had one. A missing row is a gap; a row naming a limit is
+    /// a false statement.
+    #[test]
+    fn test_a_parallel_witness_is_not_rendered_as_a_resource_stop() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+
+        let mut stopped = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "as generated",
+            9_717,
+            1 << 20,
+        );
+        stopped.outcome = RunOutcome::StoppedAtLimit(Limit {
+            resource: "max_live_nonzeros".to_string(),
+            detail: "20000001 live nonzero entries were needed".to_string(),
+            degree: Some(5),
+            last_completed_stage: Stage::Generation,
+        });
+        stopped.frontier = Some(GrobnerFrontier::default());
+        board.add(stopped, &registry).expect("registered");
+
+        let mut parallel = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, slice(12 fixed, seed 1)",
+            3_429_792,
+            1 << 20,
+        );
+        parallel.environment.concurrency = 32;
+        board.add(parallel, &registry).expect("registered");
+
+        // The serial table still refuses the parallel figure, which is the rule that was right.
+        assert!(
+            !board.best().contains_key("poseidon31-cico-t16-rf2-rp4"),
+            "a 32-worker run must not enter the single-threaded headline"
+        );
+        assert_eq!(
+            board
+                .verified_somehow()
+                .get("poseidon31-cico-t16-rf2-rp4")
+                .map(|r| r.environment.concurrency),
+            Some(32)
+        );
+
+        let rendered = board.to_markdown(&registry);
+        let row = rendered
+            .lines()
+            .find(|l| l.contains("poseidon31-cico-t16-rf2-rp4"))
+            .expect("the row is rendered");
+        assert!(
+            row.contains("on 32 workers"),
+            "the row must state the concurrency so it cannot be read as serial: {row}"
+        );
+        assert!(
+            !row.contains("max_live_nonzeros"),
+            "a solved problem must not render as the resource stop of an earlier run: {row}"
+        );
+    }
+
+    /// The parallel fallback picks a representative without comparing runtimes across worker counts.
+    ///
+    /// `Comparison::of` refuses a cross-concurrency comparison outright, so the renderer's fallback
+    /// must not perform one by the back door. The rule is fewest workers, then first recorded: here
+    /// the 8-worker run is chosen over a 32-worker run that is **four times faster**, which is the
+    /// whole point — a faster wall clock bought with four times the cores is not a better result,
+    /// and the one place a reader takes a figure away from is the worst place to imply it is.
+    #[test]
+    fn test_the_parallel_fallback_does_not_rank_across_worker_counts() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+
+        let mut wide = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, 32 workers",
+            1_000,
+            1 << 20,
+        );
+        wide.environment.concurrency = 32;
+        board.add(wide, &registry).expect("registered");
+
+        let mut narrow = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, 8 workers",
+            4_000,
+            1 << 20,
+        );
+        narrow.environment.concurrency = 8;
+        board.add(narrow, &registry).expect("registered");
+
+        let chosen = board
+            .verified_somehow()
+            .get("poseidon31-cico-t16-rf2-rp4")
+            .map(|r| (r.environment.concurrency, r.elapsed()))
+            .expect("a witness exists");
+        assert_eq!(
+            chosen.0, 8,
+            "fewest workers must win, not the fastest wall clock"
+        );
+        assert_eq!(chosen.1, Duration::from_millis(4_000));
+
+        // And neither enters the single-threaded headline.
+        assert!(!board.best().contains_key("poseidon31-cico-t16-rf2-rp4"));
+
+        let row = board
+            .to_markdown(&registry)
+            .lines()
+            .find(|l| l.contains("poseidon31-cico-t16-rf2-rp4"))
+            .map(str::to_string)
+            .expect("the row is rendered");
+        assert!(row.contains("on 8 workers"), "{row}");
+    }
+
+    /// `measured_peak_resident_bytes` round-trips, and its absence reads as "not measured".
+    ///
+    /// It must never default to zero. A route with no Macaulay matrix carries no
+    /// `peak_estimated_bytes` either, so a zero here would be the only memory figure a reader
+    /// sees and would say the run used none.
+    #[test]
+    fn test_a_measured_peak_is_distinct_from_an_estimate_and_optional() {
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+
+        let mut run = witness("poseidon31-cico-t16-rf2-rp4", "resultant", 3_429_792, 0);
+        run.frontier = None;
+        run.measured_peak_resident_bytes = Some(56_987_300_000);
+        let json = run.to_json(&manifest).to_json();
+        assert!(json.contains("measured_peak_resident_bytes"));
+        assert!(
+            !json.contains("peak_estimated_bytes"),
+            "a route with no matrix must not emit an entry-storage estimate"
+        );
+        let back = RunRecord::from_json(&super::Json::parse(&json).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_resident_bytes, Some(56_987_300_000));
+
+        // A record written before the field existed parses as not-measured, not as zero.
+        let mut old = witness("poseidon31-cico-t16-rf2-rp4", "resultant", 1_000, 0);
+        old.measured_peak_resident_bytes = None;
+        let text = old.to_json(&manifest).to_json();
+        assert!(!text.contains("measured_peak_resident_bytes"));
+        let parsed = RunRecord::from_json(&super::Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(parsed.measured_peak_resident_bytes, None);
+    }
+
+    /// Two witnesses at the same worker count: the tie goes to the later, more complete record.
+    ///
+    /// Found by the six-round row producing two records at 32 workers, the second carrying a
+    /// `measured_peak_resident_bytes` the first predated. A "first recorded" tie-break silently
+    /// rendered the less complete one, which is the sort of thing a scoreboard should not do
+    /// quietly. Still no runtime is compared — the earlier record here is the *faster* one.
+    #[test]
+    fn test_a_tie_on_worker_count_keeps_the_later_record() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+
+        let mut earlier = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, first pass",
+            3_274_316,
+            1 << 20,
+        );
+        earlier.environment.concurrency = 32;
+        earlier.measured_peak_resident_bytes = None;
+        board.add(earlier, &registry).expect("registered");
+
+        let mut later = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, second pass",
+            3_429_792,
+            1 << 20,
+        );
+        later.environment.concurrency = 32;
+        later.measured_peak_resident_bytes = Some(56_990_154_752);
+        board.add(later, &registry).expect("registered");
+
+        let solved = board.verified_somehow();
+        let chosen = solved
+            .get("poseidon31-cico-t16-rf2-rp4")
+            .expect("a witness exists");
+        assert_eq!(
+            chosen.formulation, "resultant, second pass",
+            "the tie must keep the later record, which is the one later code wrote"
+        );
+        assert_eq!(
+            chosen.measured_peak_resident_bytes,
+            Some(56_990_154_752),
+            "and it must therefore carry the measured figure the earlier record lacked"
+        );
+    }
+
+    /// The **committed** result files honour their contracts, checked as files and not as renderer output.
+    ///
+    /// `best.json` and `solved.json` are what a machine consumer reads, and a renderer test says
+    /// nothing about them. The defect this guards is the one that reached `main`: a problem solved
+    /// only on multiple workers was absent from every machine-readable summary, so a consumer could
+    /// not discover that it had a witness at all.
+    #[test]
+    fn test_the_committed_result_files_honour_their_contracts() {
+        let best = Json::parse(include_str!(
+            "../../../research/scoreboard/results/best.json"
+        ))
+        .expect("committed best.json parses");
+        let solved = Json::parse(include_str!(
+            "../../../research/scoreboard/results/solved.json"
+        ))
+        .expect("committed solved.json parses");
+
+        // Each states its own contract, so neither can be read as the other.
+        for file in [&best, &solved] {
+            let contract = file
+                .get("contract")
+                .and_then(Json::as_str)
+                .expect("a stated contract");
+            assert!(!contract.is_empty());
+        }
+
+        let ids = |file: &Json, key: &str| -> Vec<String> {
+            file.get(key)
+                .expect("the list")
+                .items()
+                .iter()
+                .filter_map(|r| {
+                    r.get("challenge")
+                        .and_then(Json::as_str)
+                        .map(str::to_string)
+                })
+                .collect()
+        };
+        let serial = ids(&best, "best");
+        let any = ids(&solved, "solved");
+
+        // The six-round row is solved on 32 workers. It must appear in `solved.json` and must NOT
+        // appear in `best.json`, which is the serial performance ranking.
+        const PARALLEL_ONLY: &str = "poseidon31-cico-t16-rf2-rp4";
+        assert!(
+            any.iter().any(|id| id == PARALLEL_ONLY),
+            "a verified witness must be discoverable from solved.json"
+        );
+        assert!(
+            !serial.iter().any(|id| id == PARALLEL_ONLY),
+            "a 32-worker figure must not enter the single-threaded ranking"
+        );
+
+        // Every `best.json` row is single-threaded; every `solved.json` row states its concurrency.
+        let concurrency = |r: &Json| {
+            r.get("environment")
+                .and_then(|e| e.get("concurrency"))
+                .and_then(Json::as_int)
+                .unwrap_or(1)
+        };
+        for row in best.get("best").expect("the list").items() {
+            assert_eq!(concurrency(row), 1, "best.json must stay serial-only");
+        }
+        for row in solved.get("solved").expect("the list").items() {
+            assert!(concurrency(row) >= 1);
+        }
+
+        // Everything serial-best is also solved; solved is the superset.
+        for id in &serial {
+            assert!(
+                any.contains(id),
+                "{id} is in best.json but missing from solved.json"
+            );
+        }
     }
 
     /// A run whose problem has been redefined since is refused, by digest and not by name.

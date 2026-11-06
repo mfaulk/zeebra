@@ -29,6 +29,7 @@
   "external_status": {
     "state": "published_with_answer"
   },
+  "reference_points": [],
   "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
   "notes": "The signature family: n > m, so positive-dimensional as published. A specialized slice is a different problem and is registered as its own instance when run."
 }
