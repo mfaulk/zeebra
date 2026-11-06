@@ -22,6 +22,9 @@
 //!   wall-clock limit and measures its wall time, CPU time and peak RSS. Also the home of the
 //!   reasoning about *whose* peak RSS a `/proc` reading is, which is the subtlest thing in this
 //!   module.
+//! * [`board`] — [`CompetitiveBoard`] and its record: the durable schema and the generated
+//!   Markdown renderer the rows land in. Lives at `research/competitive/`, deliberately apart
+//!   from the cryptanalysis scoreboard.
 //! * [`singular`] — the reference adapter, over the Singular installation the differential
 //!   harness already drives. Read it as the worked example.
 //!
@@ -45,11 +48,17 @@
 //! two.
 
 #[cfg(feature = "external-runners")]
+pub mod board;
+#[cfg(feature = "external-runners")]
 pub mod contract;
 pub mod process;
 #[cfg(feature = "external-runners")]
 pub mod singular;
 
+#[cfg(feature = "external-runners")]
+pub use board::{
+    BoardError, CompetitiveBoard, CompetitiveRecord, Outcome, Speedup, COMPETITIVE_HISTORY_CONTRACT,
+};
 #[cfg(feature = "external-runners")]
 pub use contract::{
     order_from_tag, order_tag, Answer, Disagreement, ExternalSolver, FieldSpec, Instance,

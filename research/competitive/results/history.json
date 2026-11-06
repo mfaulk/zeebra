@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "contract": "every cross-library row ever recorded, APPEND-ONLY and in the order recorded, INCLUDING the runs that produced no answer. A row whose outcome is unsupported, stopped-by-limit or failed carries NO publishable time: see docs/research/external-comparison-protocol.md section 3. Ratios are valid only between rows agreeing on problem_digest, task, limits, machine and build, with both outcomes answered and their invariants agreed.",
+  "row_count": 0,
+  "rows": []
+}

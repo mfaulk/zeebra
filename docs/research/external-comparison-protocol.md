@@ -197,10 +197,37 @@ Every figure carries its basis:
 |---|---|---|
 | `DirectChildHighWater` | `VmHWM` of the direct child, polled while it ran. Kernel-maintained, so **exact** for a single-process solver. | another `DirectChildHighWater` |
 | `ProcessTreeSampled { interval, samples }` | max over polls of summed `VmRSS` over the child and descendants. **Sampled** — misses spikes shorter than `interval` — and an **over-count**, since shared pages are counted per process. | nothing, without saying so |
+| `AllocatorTracked` | peak bytes **allocated**, from a tracking `#[global_allocator]` inside the measured process. Zeebra's own rows only. | another `AllocatorTracked` |
 | `Unavailable` | not Linux, `/proc` unreadable, or the child exited before the first poll | nothing |
 
 A figure on one basis may not be compared with a figure on another. This is the same discipline as
 §2's estimate-versus-measurement rule, applied one level down.
+
+### Two measured cases that show why the basis has to travel with the figure
+
+Both are from this repo, and they fail in opposite directions.
+
+**Allocated is not resident, and the gap can exceed the resident peak.** On the Fukuoka III
+`n = 20` row (#237), a tracking allocator observed **21 674 MB** where `VmHWM` observed
+**13 996 MB**. The cause is not slack spread across many allocations: F4's pair queue is a
+`VecDeque` that doubles to `2^28` slots, which is a **single** reservation of 20 480 MiB, of which
+roughly 60% is never written and therefore never becomes resident. One allocation larger than the
+entire resident peak is why no amount of care in *reading* a number called "peak memory"
+distinguishes the two quantities — only recording which one it is does. `RssBasis::AllocatorTracked`
+exists so this cannot share a column with `VmHWM` by accident, and `examples/f4_memory.rs` reports
+the two separately.
+
+**A suspiciously exact number is also evidence.** A capped-versus-uncapped comparison of the same
+row returned `14 336 724 kB` — **identical to the kilobyte** — across a 50x difference in the cap
+and a 3x difference in runtime. The exactness is the finding: a sum of scattered allocations does
+not reproduce to the kilobyte across two runs that did different amounts of work, so the figure is
+dominated by one large reservation whose size the cap does not influence. That **withdraws**
+`docs/research/f4-resource-scaling.md` §6a's 4 978 MB uncapped figure as a measurement error, and
+with it the hypothesis that the refusal path was responsible.
+
+The pair is worth keeping together. In the first case a *dirty* number — two figures that disagreed
+by 55% — was the signal. In the second a *clean* one was. Neither would have been readable without
+knowing which quantity had been measured.
 
 ### Attribution within the harness's own rows
 
