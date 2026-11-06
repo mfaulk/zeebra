@@ -39,7 +39,7 @@ pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
-pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy};
+pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy, StopKind};
 pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
 pub use statistics::{BatchStatistics, F4Statistics, HilbertCounts, StageClock, StageTimings};
 pub use symbolic::{
@@ -47,6 +47,8 @@ pub use symbolic::{
     MonicBasis, MonicElement, Preprocessed, PreprocessedRow, ReducerCache, RowBudgetExceeded,
     RowKind, SymbolicCounts,
 };
+
+use std::time::Instant;
 
 use crate::{
     grobner::{
@@ -194,6 +196,12 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, F4Error> {
     let total_clock = StageClock::new(options.measure_stages);
 
+    // `Some` only when a time budget was asked for. An `Option<Instant>` rather than an always-on
+    // clock because the shipping path must contain no timing at all: `None` means the per-batch
+    // check below reads nothing. Separate from `total_clock`, whose activation is tied to stage
+    // measurement and which a caller may therefore have left off.
+    let wall_clock = options.max_wall_time.map(|_| Instant::now());
+
     // A batch of no pairs makes no progress, so a zero limit is unsatisfiable rather than merely
     // strict. Rejected here, which is also what keeps `PairQueue::select_batch`'s precondition
     // from being reachable through this function.
@@ -237,6 +245,13 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     let term_counts: Vec<usize> = (0..monic.len())
         .map(|index| monic.element(index).terms.len())
         .collect();
+
+    // Terms across the whole basis, maintained rather than rescanned: the basis is stored twice
+    // while the loop runs and three times during interreduction, and a term costs several times
+    // what a matrix entry does, so this is the figure that says how much of a run's memory the
+    // entry budget cannot see. Incremental because the shipping path must not pay for an O(|G|)
+    // scan per batch.
+    let mut basis_terms: usize = term_counts.iter().sum();
 
     let mut criteria_counts = CriterionCounts::default();
     let mut pending = PairQueue::seeded_from_leads_ranked(
@@ -382,6 +397,30 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             }
         }
 
+        // The cooperative time check, beside the batch limit and for the same reason: a budget
+        // crossed between batches leaves the statistics describing whole batches. `clock` is
+        // `Some` only when a budget was asked for, so the default path reads no clock at all —
+        // which is why this is not folded into `total_clock`, whose own activation is tied to
+        // stage measurement.
+        if let (Some(clock), Some(budget)) = (wall_clock.as_ref(), options.max_wall_time) {
+            let elapsed = clock.elapsed();
+            if elapsed >= budget {
+                return Err(F4Error::TimeBudgetExceeded {
+                    degree,
+                    elapsed_millis: elapsed.as_millis().min(u64::MAX as u128) as u64,
+                    budget_millis: budget.as_millis().min(u64::MAX as u128) as u64,
+                });
+            }
+        }
+
+        // The structures no budget bounds, sampled once per batch. Every figure here is a field
+        // read or a maintained running total, so this is not a scan; see
+        // `F4Statistics::peak_pair_queue` for why the pair queue in particular has to be reported
+        // separately from the matrix.
+        statistics.peak_pair_queue = statistics.peak_pair_queue.max(&pending.footprint());
+        statistics.peak_basis_elements = statistics.peak_basis_elements.max(basis.len());
+        statistics.peak_basis_terms = statistics.peak_basis_terms.max(basis_terms);
+
         // Once per batch, after the basis and the queue have both been mutated by the previous
         // iteration and before this one reads them. Recomputes every cached field rather than
         // trusting it; see `MonicBasis::check`. Debug-only, so release pays nothing.
@@ -427,6 +466,7 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
             monic.push(&candidate, order);
             leads.push(monic.element(added).leading_monomial);
             pending.push_term_count(monic.element(added).terms.len());
+            basis_terms += monic.element(added).terms.len();
             basis.push(candidate);
             statistics.elements_added += 1;
 
@@ -439,6 +479,12 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
     statistics.criteria = criteria_counts;
     statistics.pairs_eliminated_by_product_criterion = criteria_counts.product;
+
+    // The basis is largest when the loop ends, and the last batch's appends came after the last
+    // per-batch sample. Taken before interreduction, which is where the basis is held three times
+    // over.
+    statistics.peak_basis_elements = statistics.peak_basis_elements.max(basis.len());
+    statistics.peak_basis_terms = statistics.peak_basis_terms.max(basis_terms);
 
     // Timed separately: on katsura-6 under lex it is the majority of the computation, which no
     // per-batch counter would have revealed — 59 matrices and a six-element answer, with the cost

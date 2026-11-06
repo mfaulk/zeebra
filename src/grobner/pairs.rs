@@ -513,6 +513,53 @@ impl CriterionCounts {
     }
 }
 
+/// How much a [`PairQueue`] holds, counted in entries.
+///
+/// Exists because the pair queue is `O(B²)` in the basis size `B` while a Macaulay matrix is a
+/// function of one batch, so on a system whose basis grows the queue outgrows the thing every
+/// [`F4Options`](super::f4::F4Options) budget bounds. `heap_entries` and `live` differ by the
+/// lazily deleted pairs, which still occupy the heap.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PairQueueFootprint {
+    /// Entries in the binary heap, including the lazily deleted ones. One
+    /// `ScheduledPair<N>` each, plus whatever slack the heap's doubling leaves.
+    pub heap_entries: usize,
+
+    /// Pairs actually waiting: `heap_entries` less the lazily deleted ones.
+    pub live: usize,
+
+    /// Keys in the Gebauer-Möller removal set. Monotonically growing; nothing is ever retired.
+    pub removed: usize,
+
+    /// Keys in the chain criterion's handled set. Monotonically growing, for the same reason.
+    pub handled: usize,
+
+    /// Pairs a selection heuristic set aside, which are promoted back before the loop can end.
+    pub deferred: usize,
+}
+
+impl PairQueueFootprint {
+    /// Entries in the two lazy-deletion sets, each a [`PairKey`].
+    pub fn criteria_keys(&self) -> usize {
+        self.removed + self.handled
+    }
+
+    /// The larger of two footprints, field by field.
+    ///
+    /// Field by field rather than by a single ordering: the heap and the criteria sets peak at
+    /// different moments, and a summary that picked one moment's values would understate whichever
+    /// structure was not peaking then.
+    pub fn max(&self, other: &Self) -> Self {
+        Self {
+            heap_entries: self.heap_entries.max(other.heap_entries),
+            live: self.live.max(other.live),
+            removed: self.removed.max(other.removed),
+            handled: self.handled.max(other.handled),
+            deferred: self.deferred.max(other.deferred),
+        }
+    }
+}
+
 /// The critical pairs still to be processed, lowest lcm degree first.
 ///
 /// A min-heap, so adding the pairs of a newly found basis element costs a logarithmic insertion
@@ -982,6 +1029,21 @@ impl<const N: usize> PairQueue<N> {
     /// Pairs set aside by a selection heuristic.
     pub fn deferred_len(&self) -> usize {
         self.deferred.len()
+    }
+
+    /// What the queue currently occupies, in entries rather than in bytes.
+    ///
+    /// Entries and not bytes because only the caller knows `N`, and `size_of` is what turns one
+    /// into the other. Every count here is a field read, so a main loop may take it once per batch
+    /// without paying for a scan.
+    pub fn footprint(&self) -> PairQueueFootprint {
+        PairQueueFootprint {
+            heap_entries: self.pending.len(),
+            live: self.live,
+            removed: self.removed.len(),
+            handled: self.handled.len(),
+            deferred: self.deferred.len(),
+        }
     }
 
     /// Recompute every derived field from `leads` and compare it to what is stored.
