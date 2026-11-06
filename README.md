@@ -1580,6 +1580,37 @@ let instance = official.cico_instance::<K>().expect("builds");
 assert_eq!(instance.variables(), 118);
 ```
 
+**`DisclosedMethod` is separate from `ExternalStatus`.** A program can verify a submission without
+naming the submitter, and a paper can describe an attack at the same parameters without being that
+submission — so "verified on this date" and "this is how it was done" are two claims, and the
+registry keeps them apart:
+
+```rust
+use zeebra::grobner::research::{challenge, DisclosedMethod};
+
+// The R_P = 8 target was solved by a univariate route, published by Sanso and Vitto.
+let rp8 = challenge("poseidon31-cico-rf6-rp8").expect("registered");
+match rp8.method {
+    DisclosedMethod::Published { method, attributed_to_submission, .. } => {
+        assert!(method.contains("Graeffe"));
+        // The program does not name first submitters, so this is an attack at the same
+        // parameters and not, on the present evidence, *the* verified submission.
+        assert!(!attributed_to_submission);
+    }
+    other => panic!("expected a published method, got {}", other),
+}
+
+// R_P = 10 is solved and verified externally, and no method has been published. `Unknown` is the
+// honest value; it is not a synonym for brute force or for anything else.
+let rp10 = challenge("poseidon31-cico-rf6-rp10").expect("registered");
+assert_eq!(rp10.method, DisclosedMethod::Unknown);
+```
+
+Disclosing a method never changes a problem's identity, which
+`test_disclosing_a_method_does_not_change_identity` pins.
+[`docs/research/elimination-beyond-grobner.md`](docs/research/elimination-beyond-grobner.md) §2 has
+every published method and its reported cost.
+
 **Identity is a digest over the problem, not over the paperwork.** `ChallengeManifest::digest` is
 SHA-256 of a canonical form covering the family, the objective tag, the parameters and the target.
 A corrected URL, a paid bounty or a reworded verifier leaves it alone; a changed round count does
