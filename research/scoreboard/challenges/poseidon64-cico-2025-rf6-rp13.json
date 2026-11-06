@@ -31,6 +31,7 @@
     "state": "none_recorded",
     "as_of": "2026-11-05"
   },
+  "reference_points": [],
   "verifier": "the program's own verifier; this crate generates no system for this objective and so has nothing to check",
   "notes": "Perm(X_1..X_7, 0) = (Y_1..Y_7, 0) over 2^64 - 2^32 + 1 with a degree-7 S-box, the 40-bit tier, listed as unsolved on 2026-11-05. The lower tiers of this family were claimed in April and May 2025."
 }

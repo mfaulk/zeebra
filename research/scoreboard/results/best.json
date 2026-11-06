@@ -72,6 +72,7 @@
         "commit": "7e333fb",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -150,6 +151,7 @@
         "commit": "7e333fb",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -232,6 +234,7 @@
         "commit": "9c8b80d",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
       },
@@ -248,11 +251,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 899263,
+      "elapsed_nanos": 866559,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 13145,
+          "elapsed_nanos": 11121,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 5,
@@ -261,7 +264,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 721176,
+          "elapsed_nanos": 703972,
           "estimated_peak_bytes": 12872,
           "detail": {
             "max_matrix_rows": 71,
@@ -272,7 +275,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 102354,
+          "elapsed_nanos": 85622,
           "estimated_peak_bytes": 4680,
           "detail": {
             "quotient_dimension": 9
@@ -280,7 +283,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 61827,
+          "elapsed_nanos": 65173,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 5
@@ -288,7 +291,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 761,
+          "elapsed_nanos": 671,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -307,9 +310,10 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "bf0528e",
+        "commit": "ea5f554",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -388,6 +392,7 @@
         "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -466,6 +471,7 @@
         "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS=default",
         "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
       },
@@ -540,6 +546,7 @@
         "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS from .cargo/config.toml",
         "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
       },
@@ -614,6 +621,7 @@
         "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS from .cargo/config.toml",
         "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
       },
@@ -688,6 +696,7 @@
         "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
         "build": "release, RUSTFLAGS from .cargo/config.toml",
         "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
       },

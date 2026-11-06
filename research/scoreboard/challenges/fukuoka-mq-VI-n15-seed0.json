@@ -29,6 +29,7 @@
   "external_status": {
     "state": "published_with_answer"
   },
+  "reference_points": [],
   "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
   "notes": "Five surplus variables rather than three, so a specialization campaign has a larger slice space."
 }

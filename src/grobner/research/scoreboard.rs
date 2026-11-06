@@ -1310,6 +1310,32 @@ impl Scoreboard {
         best
     }
 
+    /// The fastest verified witness per problem at **any** concurrency.
+    ///
+    /// [`Self::best`] deliberately admits only single-threaded runs, so that a parallel wall clock
+    /// cannot displace the figure it is not comparable with. That rule is right and this method
+    /// does not weaken it — nothing here is ranked against a `best` row. It exists because the
+    /// *fallback* was wrong: a problem whose only witness is parallel fell through to
+    /// [`Self::unfinished`] and rendered as a resource stop, so the headline table asserted that no
+    /// witness existed for a problem that had one. An absent row is a gap; a row claiming a limit
+    /// was hit is a false statement about what is known.
+    pub fn best_any_concurrency(&self) -> BTreeMap<&str, &RunRecord> {
+        let mut best: BTreeMap<&str, &RunRecord> = BTreeMap::new();
+        for run in &self.runs {
+            if !run.outcome.is_verified_witness() {
+                continue;
+            }
+            best.entry(run.challenge.as_str())
+                .and_modify(|current| {
+                    if run.elapsed() < current.elapsed() {
+                        *current = run;
+                    }
+                })
+                .or_insert(run);
+        }
+        best
+    }
+
     /// Runs that produced no verified witness, in insertion order.
     pub fn unfinished(&self) -> Vec<&RunRecord> {
         self.runs
@@ -1401,6 +1427,7 @@ impl Scoreboard {
                  |---|---|---:|---:|---|---|---|\n",
             );
             let best = self.best();
+            let parallel_best = self.best_any_concurrency();
             for manifest in members {
                 let result = match best.get(manifest.id) {
                     Some(run) => format!(
@@ -1409,13 +1436,27 @@ impl Scoreboard {
                         run.elapsed().as_secs_f64() * 1e3,
                         run.formulation
                     ),
-                    None => match self
-                        .unfinished()
-                        .into_iter()
-                        .rfind(|r| r.challenge == manifest.id)
-                    {
-                        Some(run) => run.outcome.short(),
-                        None => "not attempted".to_string(),
+                    // A witness measured on more than one worker does not enter `best`, so that
+                    // it cannot displace a single-threaded figure. It must still be reported here:
+                    // falling straight through to `unfinished` rendered a resource stop for a
+                    // problem that is solved, which is a false statement rather than a missing one.
+                    // The concurrency is in the cell, so the figure cannot be read as serial.
+                    None => match parallel_best.get(manifest.id) {
+                        Some(run) => format!(
+                            "**{}** in {:.1} ms on {} workers ({})",
+                            run.outcome,
+                            run.elapsed().as_secs_f64() * 1e3,
+                            run.environment.concurrency,
+                            run.formulation
+                        ),
+                        None => match self
+                            .unfinished()
+                            .into_iter()
+                            .rfind(|r| r.challenge == manifest.id)
+                        {
+                            Some(run) => run.outcome.short(),
+                            None => "not attempted".to_string(),
+                        },
                     },
                 };
                 out.push_str(&format!(
@@ -1519,6 +1560,69 @@ mod tests {
         });
         run.environment = environment();
         run
+    }
+
+    /// A problem whose only witness is parallel renders as solved, not as a resource stop.
+    ///
+    /// The defect this guards: `best` admits single-threaded runs only, so a parallel witness fell
+    /// through to `unfinished` and the headline table printed that run's limit — asserting no
+    /// witness existed for a problem that had one. A missing row is a gap; a row naming a limit is
+    /// a false statement.
+    #[test]
+    fn test_a_parallel_witness_is_not_rendered_as_a_resource_stop() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+
+        let mut stopped = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "as generated",
+            9_717,
+            1 << 20,
+        );
+        stopped.outcome = RunOutcome::StoppedAtLimit(Limit {
+            resource: "max_live_nonzeros".to_string(),
+            detail: "20000001 live nonzero entries were needed".to_string(),
+            degree: Some(5),
+            last_completed_stage: Stage::Generation,
+        });
+        stopped.frontier = Some(GrobnerFrontier::default());
+        board.add(stopped, &registry).expect("registered");
+
+        let mut parallel = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, slice(12 fixed, seed 1)",
+            3_429_792,
+            1 << 20,
+        );
+        parallel.environment.concurrency = 32;
+        board.add(parallel, &registry).expect("registered");
+
+        // The serial table still refuses the parallel figure, which is the rule that was right.
+        assert!(
+            !board.best().contains_key("poseidon31-cico-t16-rf2-rp4"),
+            "a 32-worker run must not enter the single-threaded headline"
+        );
+        assert_eq!(
+            board
+                .best_any_concurrency()
+                .get("poseidon31-cico-t16-rf2-rp4")
+                .map(|r| r.environment.concurrency),
+            Some(32)
+        );
+
+        let rendered = board.to_markdown(&registry);
+        let row = rendered
+            .lines()
+            .find(|l| l.contains("poseidon31-cico-t16-rf2-rp4"))
+            .expect("the row is rendered");
+        assert!(
+            row.contains("on 32 workers"),
+            "the row must state the concurrency so it cannot be read as serial: {row}"
+        );
+        assert!(
+            !row.contains("max_live_nonzeros"),
+            "a solved problem must not render as the resource stop of an earlier run: {row}"
+        );
     }
 
     /// A run whose problem has been redefined since is refused, by digest and not by name.

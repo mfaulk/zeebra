@@ -30,6 +30,7 @@
     "state": "none_recorded",
     "as_of": "2026-11-05"
   },
+  "reference_points": [],
   "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
   "notes": "The smallest size in the real challenge rather than the toy examples. Registered to show the gap and deliberately not implemented: SUPPORTED_DIMENSIONS stops at 20, and its file checksum is empty because this registry does not hold those bytes."
 }

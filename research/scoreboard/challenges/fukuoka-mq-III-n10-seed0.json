@@ -29,6 +29,7 @@
   "external_status": {
     "state": "published_with_answer"
   },
+  "reference_points": [],
   "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
   "notes": "The overdetermined encryption family. Published with its answer so an implementation can check itself; 45 variables short of the smallest real challenge."
 }
