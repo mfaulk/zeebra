@@ -459,6 +459,25 @@ Per-determinant cost, extrapolated from the measured 2.868 ms at order 162 (37 6
 Peak memory is not a concern: a 1458² dense matrix of 8-byte elements is **17.0 MB**, so 136 MB
 across eight threads, plus ~68 MB for sixteen symbolic state words of ~266 000 terms.
 
+> **Wrong by 838x, measured 2026-11-06 (#211, `resultant-elimination.md` §6.8).** The build's peak
+> is **57.0 GB**, not ~68 MB, and it is the only sentence in this document that was wrong by more
+> than three orders of magnitude. The determinant half of the paragraph stands: 17.0 MB a matrix,
+> and 544 MB across 32 workers.
+>
+> The mechanism was read rather than inferred. `SparseMultiPoly`'s multiply pushes every pairwise
+> term-product into one `Vec` and collects like terms afterwards, so cubing a degree-243 word as
+> `p*p` then `(p²)*p` makes the second multiply 118 827 × 29 768 = **3.54 × 10⁹** products —
+> **56.6 GB** at sixteen bytes an entry, for a product that is 4.3 MB. Predicted 56.6 GB, measured
+> 57.0 GB. The RSS trace is a **sawtooth with one peak per state word**, not a climb, so it is a
+> transient four orders of magnitude larger than its own result rather than a leak — which is why
+> 503 GB of RAM absorbed it. #243 is the collecting multiply that would bound it by the output.
+>
+> **What this does not change: the time, and therefore the gate.** The build completed in
+> **48.37 min** against §7.5's ~36 min estimate — **1.34x**, inside the band that estimate deserved
+> — and the row is a go on that basis. §7.5 named the build's *time* as the milestone's largest
+> unknown and was right to; it did not list the build's *memory* as a risk at all, and that is the
+> omission worth remembering.
+
 **Authorize 6 562 samples on `rf2-rp4` with a four-hour wall-clock backstop. Authorize nothing
 else.** `rf4-rp2` at 34.3 single-core hours and `rf6-rp0` at 12.9 single-core days are predictions
 to print, not rows to run — the same discipline `examples/resultant_cico.rs` already applies through
@@ -697,6 +716,55 @@ six-round build's footprint were each stated with confidence in a document that 
 behind them. The `2^31` row is the sharpest case: the *number* was right and the *claim built on it*
 was wrong by four orders, which is the failure mode a cost model catches and a benchmark does not.
 
+### 10.2 The frontier view
+
+| | M23 | M24 |
+|---|---|---|
+| hardest **official** problem solved | Fukuoka MQ III `n = 15` | unchanged |
+| **faithful reduction**, resultant route | 4 rounds — `rf2-rp2`, `rf4-rp0` | 6 rounds attempted under §7.4's budget |
+| **external calibration** against another solver | none | Anemoi, 10 registered rows, `D` matched 10/10, 7 verified witnesses to `N = 5` |
+| univariate CICO route | absent | one family end to end; `k = 1` witnesses; economics measured over 17 838 families |
+| Sylvester determinants | 1 core of 128 | 32 cores at 92–95% efficiency |
+| resultant sample count | `2d²` = 13 123 | predicted `3^{2R_F+R_P}`, **17.96x** fewer on `rf2-rp2` |
+| `fftmul` reported ceiling | `2^18`, checker-limited | **`2^22`**, multiply-limited |
+| benchmark protocol | a script no reader had | `tools/benchlock.sh`, committed |
+
+### 10.3 The negative results, as results
+
+1. **The univariate route's family count is invariant under round reduction.** `p / (roots per
+   family)` contains neither `R_F` nor `R_P`; `δ` spans 6 561x across the ladder and the mean root
+   count never leaves 1.0. There is no `k = 2` reduced row where a witness is reachable, at any
+   round count. §6.4.
+2. **The `1/p` filter rate is not measurable on this hardware.** 0 hits in 17 901 roots bounds it
+   only by `3/n ≈ 1.7e-4`, which separates `1/p` from nothing. Stated rather than estimated.
+3. **Fukuoka III `n = 20` is out of reach, not out of budget** — and the evidence is the *uncapped*
+   rung, which is time-bound at four batches in forty minutes, not the `cap + ε` pattern that
+   distinguishes nothing. `f4-resource-scaling.md` §6a.
+4. **`max_live_bytes` omits at least 98.7% of peak RSS**, and my own first reading of that — a step
+   function of the degree entered — is **false**: the uncapped rungs peak *below* the capped ones
+   while doing more work. #237.
+5. **The published Anemoi FGLM wall does not reproduce.** A negative result about a reference claim
+   transferring, which happens to be favourable to this crate and therefore needs more care, not
+   less. §8a.1.
+6. **§7.4's six-round memory estimate was wrong by 838x**, and §7.5 did not list the build's memory
+   as a risk at all while correctly naming its time. #243.
+
+### 10.4 The next credible frontier, each with the measurement that makes it credible
+
+- **#243, a collecting multiply.** The six-round build's 57 GB is a transient `O(terms²)` sawtooth
+  for a 4.3 MB result — 56.6 GB predicted against 57.0 GB measured. Bounding it by its output is
+  the gate on any eight-round attempt, and on `rf4-rp2` and `rf6-rp0` at six.
+- **#237, profiling the F4 memory gap**, with the experiment sharpened by §6a: compare a capped run
+  against an uncapped one at the same point, since an error-path allocation is now as plausible as a
+  preprocessing one.
+- **Anemoi `N = 6`.** The reference prints a basis there and a dash for the conversion. Zeebra's
+  `D³` model is validated at `N = 5` to within 114x against 125x, and puts `D = 15 625` at roughly
+  1.6 h. That would **produce** a figure rather than reproduce one.
+- **A `k = 3` family, or a hybrid.** §6.4 shows reducing rounds cannot help, so these are the only
+  directions that change the univariate trade. Neither is analysed in any source read here.
+- **Axis 2 of #180, a structured Sylvester determinant.** Now the only axis left with an asymptotic
+  improvement in it, and measurable against an already-parallel baseline rather than a serial one.
+
 ---
 
 ## 11. Acceptance criteria
@@ -772,6 +840,32 @@ The stretch level is a stretch. A milestone that reproduces a published procedur
 against an external solver, extends the verified frontier by two rounds and publishes a cost model
 that explains its own earlier `2^31` error is a successful scientific milestone whether or not an
 official challenge falls out of it.
+
+### 13.1 Scored
+
+| level | verdict | on what |
+|---|---|---|
+| **Minimum** | **met** | the univariate CICO procedure reproduced end to end — parametrization through verification — with 3 witnesses through `permutation_plus_linear` on the `k = 1` row (§6.4); and Anemoi calibrated, with the machine-independent `(α+2)^N` agreeing at **10 rows of 10, both models, first run** (§8a) |
+| **Strong** | **met**, by the second clause | §13's second clause asks for "an Anemoi row where Zeebra's stage split contradicts or confirms the published wall". It **contradicts** it: within-run conversion/basis is 1.71 against Magma's 2 367 at `N = 5`, a ratio-of-ratios of 1 382x, with a verified witness at the rung where the published logs stop reporting a conversion (§8a.2). This is met independently of the six-round row |
+| **Stretch** | **not met**, and the gate explained why | the univariate route at the official `R_P = 8` is ~10^3 core-years once §5.4's cost model is corrected, and `2^31` families stands. No method here measurably improves on a published attack |
+
+The first clause of **Strong** — a verified six-round reduction — is the row running under §7.4's
+budget, and its outcome is recorded in §7.8 either way. Note that the milestone reaches Strong
+without it, which is the point of having written two clauses: the resultant row was the predictable
+advance and the Anemoi calibration was the one nobody had costed.
+
+**What M24 did not do**, stated rather than omitted:
+
+- **No official target was solved, and none was approached in a way that can be quoted as a
+  fraction.** The three 2026 CICO targets were solved externally in 2026 and the best outcome
+  available on them is a reproduction.
+- **No optimization moved a frontier.** Every frontier movement in M23 and M24 came from changing a
+  formulation or fixing an instrument. #179 and #227 are real speedups — 17.96x and 92–95% of 32
+  cores — and they bought a *round count* only because the formulation had already bought three
+  orders of magnitude.
+- **Three of four unmeasured predictions in this document were wrong by more than an order of
+  magnitude** (§10.1), and one of them was wrong by 838x. That is the milestone's methodological
+  finding and it is about this document, not about the code.
 
 ---
 
