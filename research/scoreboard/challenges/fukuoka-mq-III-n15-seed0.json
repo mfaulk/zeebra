@@ -23,6 +23,9 @@
     "reward": null,
     "redistribution": "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved; instance files are not redistributed here and are fetched by tools/fetch-mq-challenge.sh"
   },
+  "disclosed_method": {
+    "state": "not_applicable"
+  },
   "external_status": {
     "state": "published_with_answer"
   },

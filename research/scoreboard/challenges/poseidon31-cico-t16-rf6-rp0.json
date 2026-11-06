@@ -25,6 +25,9 @@
     "reward": null,
     "redistribution": "parameters and objective are published on the program's page; the round constants are derived, not redistributed"
   },
+  "disclosed_method": {
+    "state": "not_applicable"
+  },
   "external_status": {
     "state": "not_a_public_problem"
   },

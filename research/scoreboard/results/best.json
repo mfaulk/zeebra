@@ -248,11 +248,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 973682,
+      "elapsed_nanos": 899263,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 12063,
+          "elapsed_nanos": 13145,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 5,
@@ -261,7 +261,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 691098,
+          "elapsed_nanos": 721176,
           "estimated_peak_bytes": 12872,
           "detail": {
             "max_matrix_rows": 71,
@@ -272,7 +272,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 82656,
+          "elapsed_nanos": 102354,
           "estimated_peak_bytes": 4680,
           "detail": {
             "quotient_dimension": 9
@@ -280,7 +280,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 187274,
+          "elapsed_nanos": 61827,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 5
@@ -288,7 +288,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 591,
+          "elapsed_nanos": 761,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -307,7 +307,7 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7e333fb",
+        "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
@@ -326,11 +326,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 156562829,
+      "elapsed_nanos": 141212267,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 4749,
+          "elapsed_nanos": 5230,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 7,
@@ -339,7 +339,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 138170612,
+          "elapsed_nanos": 137481884,
           "estimated_peak_bytes": 1657192,
           "detail": {
             "max_matrix_rows": 1027,
@@ -350,7 +350,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 2888749,
+          "elapsed_nanos": 2897957,
           "estimated_peak_bytes": 330000,
           "detail": {
             "quotient_dimension": 81
@@ -358,7 +358,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 15497948,
+          "elapsed_nanos": 825703,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 7
@@ -366,7 +366,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 771,
+          "elapsed_nanos": 1493,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -385,7 +385,7 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7e333fb",
+        "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
@@ -404,11 +404,11 @@
       "outcome": "verified_witness",
       "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
       "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
-      "elapsed_nanos": 363610376,
+      "elapsed_nanos": 348298514,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 5781,
+          "elapsed_nanos": 4058,
           "estimated_peak_bytes": null,
           "detail": {
             "variables": 9,
@@ -417,7 +417,7 @@
         },
         {
           "stage": "grobner",
-          "elapsed_nanos": 343468962,
+          "elapsed_nanos": 342345903,
           "estimated_peak_bytes": 3806968,
           "detail": {
             "max_matrix_rows": 1862,
@@ -428,7 +428,7 @@
         },
         {
           "stage": "conversion",
-          "elapsed_nanos": 4836515,
+          "elapsed_nanos": 5046716,
           "estimated_peak_bytes": 446632,
           "detail": {
             "quotient_dimension": 81
@@ -436,7 +436,7 @@
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 15297916,
+          "elapsed_nanos": 900445,
           "estimated_peak_bytes": null,
           "detail": {
             "lex_basis_elements": 9
@@ -444,7 +444,7 @@
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 1202,
+          "elapsed_nanos": 1392,
           "estimated_peak_bytes": null,
           "detail": {}
         }
@@ -463,7 +463,7 @@
       },
       "campaign": null,
       "environment": {
-        "commit": "7e333fb",
+        "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS=default",
@@ -485,12 +485,12 @@
       ],
       "outcome": "verified_witness",
       "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
-      "verification": "3 candidates checked by running permutation_plus_linear; 3 verified",
-      "elapsed_nanos": 51858487,
+      "verification": "3 candidate pairs checked by running permutation_plus_linear (3 verified); the resultant itself checked against a direct Sylvester determinant at 8 points outside the interpolation domain",
+      "elapsed_nanos": 6021863,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 2796634,
+          "elapsed_nanos": 2732695,
           "estimated_peak_bytes": null,
           "detail": {
             "bivariate_degree": 9,
@@ -499,34 +499,193 @@
         },
         {
           "stage": "elimination",
-          "elapsed_nanos": 31069690,
+          "elapsed_nanos": 2187773,
           "estimated_peak_bytes": null,
           "detail": {
             "resultant_degree": 81,
-            "bezout_bound": 81
+            "bezout_bound": 81,
+            "degree_bound": 162,
+            "samples": 256,
+            "matrix_order": 18,
+            "sampling_us": 2181,
+            "interpolation_us": 6,
+            "reference_samples": 163,
+            "reference_sampling_us": 1378,
+            "reference_interpolation_us": 257
           }
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 17468962,
+          "elapsed_nanos": 1003761,
           "estimated_peak_bytes": null,
           "detail": {
-            "roots": 3
+            "roots": 3,
+            "lifted_pairs": 3,
+            "lifting_us": 111
           }
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 523201,
+          "elapsed_nanos": 97634,
           "estimated_peak_bytes": null,
           "detail": {
-            "witnesses": 3
+            "witnesses": 3,
+            "off_domain_checks": 8
           }
         }
       ],
       "grobner_frontier": null,
       "campaign": null,
       "environment": {
-        "commit": "744fdf9",
+        "commit": "bf0528e",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS from .cargo/config.toml",
+        "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
+      },
+      "experiment": null,
+      "reproduce": "cargo run --release --example resultant_cico -- --write"
+    },
+    {
+      "schema": 1,
+      "challenge": "poseidon31-cico-t16-rf2-rp2",
+      "challenge_digest": "af93deb46aa5e57cc3af5cc7c4c0f6bbfd71448aa928a08351c3ff2f4b1f72b9",
+      "class": "faithful-reduction",
+      "formulation": "resultant, slice(12 fixed, seed 1)",
+      "transformations": [
+        "specialize free inputs 2..14 at seed 1",
+        "evaluate the 34 S-box variables away: two bivariate polynomials of degree 81",
+        "eliminate the second unknown by a Sylvester resultant"
+      ],
+      "outcome": "verified_witness",
+      "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+      "verification": "1 candidate pairs checked by running permutation_plus_linear (1 verified); the resultant itself checked against a direct Sylvester determinant at 8 points outside the interpolation domain",
+      "elapsed_nanos": 47598516827,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 393749161,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "bivariate_degree": 81,
+            "terms": 3403
+          }
+        },
+        {
+          "stage": "elimination",
+          "elapsed_nanos": 47126158475,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "resultant_degree": 729,
+            "bezout_bound": 6561,
+            "degree_bound": 13122,
+            "samples": 16384,
+            "matrix_order": 162,
+            "sampling_us": 47125666,
+            "interpolation_us": 491,
+            "reference_samples": 13123,
+            "reference_sampling_us": 40258545,
+            "reference_interpolation_us": 1521469
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 53372757,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "roots": 1,
+            "lifted_pairs": 1,
+            "lifting_us": 952
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 25236434,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "witnesses": 1,
+            "off_domain_checks": 8
+          }
+        }
+      ],
+      "grobner_frontier": null,
+      "campaign": null,
+      "environment": {
+        "commit": "bf0528e",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS from .cargo/config.toml",
+        "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
+      },
+      "experiment": null,
+      "reproduce": "cargo run --release --example resultant_cico -- --write"
+    },
+    {
+      "schema": 1,
+      "challenge": "poseidon31-cico-t16-rf4-rp0",
+      "challenge_digest": "a9242143a8c6300c90fc3c6da4ead21fea7824f61aac5621412031afe741349d",
+      "class": "faithful-reduction",
+      "formulation": "resultant, slice(12 fixed, seed 1)",
+      "transformations": [
+        "specialize free inputs 2..14 at seed 1",
+        "evaluate the 64 S-box variables away: two bivariate polynomials of degree 81",
+        "eliminate the second unknown by a Sylvester resultant"
+      ],
+      "outcome": "verified_witness",
+      "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+      "verification": "2 candidate pairs checked by running permutation_plus_linear (2 verified); the resultant itself checked against a direct Sylvester determinant at 8 points outside the interpolation domain",
+      "elapsed_nanos": 50638100572,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 376291627,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "bivariate_degree": 81,
+            "terms": 3403
+          }
+        },
+        {
+          "stage": "elimination",
+          "elapsed_nanos": 46325247925,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "resultant_degree": 6561,
+            "bezout_bound": 6561,
+            "degree_bound": 13122,
+            "samples": 16384,
+            "matrix_order": 162,
+            "sampling_us": 46324764,
+            "interpolation_us": 483,
+            "reference_samples": 13123,
+            "reference_sampling_us": 37113629,
+            "reference_interpolation_us": 1512234
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 3914077829,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "roots": 2,
+            "lifted_pairs": 2,
+            "lifting_us": 1902
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 22483191,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "witnesses": 2,
+            "off_domain_checks": 8
+          }
+        }
+      ],
+      "grobner_frontier": null,
+      "campaign": null,
+      "environment": {
+        "commit": "bf0528e",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "build": "release, RUSTFLAGS from .cargo/config.toml",

@@ -24,6 +24,9 @@
     "reward": "$15,000",
     "redistribution": "parameters and objective are published on the program's page; the round constants are derived, not redistributed"
   },
+  "disclosed_method": {
+    "state": "unknown"
+  },
   "external_status": {
     "state": "solved_externally",
     "verified": "2026-07-06"

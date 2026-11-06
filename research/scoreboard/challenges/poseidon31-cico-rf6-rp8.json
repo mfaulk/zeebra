@@ -24,6 +24,13 @@
     "reward": "$10,000",
     "redistribution": "parameters and objective are published on the program's page; the round constants are derived, not redistributed"
   },
+  "disclosed_method": {
+    "state": "published",
+    "method": "round skip, interpolation, Graeffe root finding; no resultant",
+    "source": "eprint 2026/1254, Sanso and Vitto, Section 4.2 and Table 1",
+    "reported_cost": "7 h on 96 RTX 5090 GPUs",
+    "attributed_to_submission": false
+  },
   "external_status": {
     "state": "solved_externally",
     "verified": "2026-05-06"
