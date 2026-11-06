@@ -167,10 +167,11 @@ pub struct F4Options {
     /// batch nor fill-in can quietly exhaust memory. An entry is a column index and a field
     /// element, so the byte cost is roughly this times `size_of::<(usize, F)>()`.
     ///
-    /// This is a budget on the entries F4 holds, not a ceiling on the process. It does not account
-    /// for the monomial-to-column map, the term vectors of the basis, the scratch buffer
-    /// elimination merges through, or allocator overhead — all of which are bounded by the row and
-    /// column budgets but are not counted here. Treat it as the knob that keeps matrix growth
+    /// This is a budget on the entries of **one batch's matrix**, not a ceiling on the process, and
+    /// the gap between those is measured at 75x rather than being a rounding note. See
+    /// [`max_live_bytes`](Self::max_live_bytes) for the full list of what no budget here bounds —
+    /// notably symbolic preprocessing's monomial queue and the `O(|G|²)` pair queue, neither of
+    /// which the row and column budgets bound either. Treat it as the knob that keeps matrix growth
     /// recoverable, not as a memory limit.
     pub max_live_nonzeros: usize,
 
@@ -188,14 +189,53 @@ pub struct F4Options {
     /// means something different at every field width, which is what this limit fixes by being
     /// stated in the unit that is allocated.
     ///
-    /// It covers the same storage [`max_live_nonzeros`](Self::max_live_nonzeros) does and no more:
-    /// not the monomial-to-column map, not the basis's term vectors, not the dense buffer a
-    /// backend reduces through, and not allocator overhead. The dense buffers are *reported*
-    /// instead — see [`BatchStatistics::dense_buffer_bytes`](super::BatchStatistics::dense_buffer_bytes)
-    /// — because enforcing them here would make the default refuse computations the entry budget
-    /// admits, and under [`Backend::Dense`] they are a function of the shape alone, which the row
-    /// and column budgets already bound. This is still not a ceiling on the process; it is the
-    /// entry budget in bytes.
+    /// # What it bounds, exactly
+    ///
+    /// **The `Vec<(usize, F)>` payload of the [`SparseRow`](crate::linalg::sparse::SparseRow)s of
+    /// the one batch currently being reduced, at that batch's peak, and nothing else.** That is the
+    /// whole scope. In particular it does **not** bound, and nothing in F4 bounds in bytes:
+    ///
+    /// - **symbolic preprocessing's pending monomial queue**, one `Monomial<N>` per term of every
+    ///   row, pushed *before* the deduplication test and bounded by no option at all — the row
+    ///   budget stops the loop, and every surviving iteration has already enqueued a row's worth.
+    ///   At twenty variables a monomial is 80 bytes against an entry's 16, so a queue a twentieth
+    ///   the matrix's size already costs as much as the matrix. See
+    ///   [`F4Statistics::max_pending_monomials`](super::F4Statistics::max_pending_monomials).
+    /// - the `examined` and `covered` monomial sets, and the preprocessed row vector;
+    /// - the column vector, the monomial-to-column map, and the two temporaries construction
+    ///   builds them from — four copies of the column monomials, three live at once;
+    /// - **the pair queue**, which is `O(|G|²)` in the basis size while every budget here bounds a
+    ///   function of one batch, plus two lazy-deletion sets that only grow. See
+    ///   [`F4Statistics::peak_pair_queue`](super::F4Statistics::peak_pair_queue).
+    /// - **the basis**, held twice for the whole computation and three times during the final
+    ///   interreduction, at several times an entry's cost per term. See
+    ///   [`F4Statistics::peak_basis_terms`](super::F4Statistics::peak_basis_terms).
+    /// - the dense buffer a backend reduces through, which is *reported* instead — see
+    ///   [`BatchStatistics::dense_buffer_bytes`](super::BatchStatistics::dense_buffer_bytes) —
+    ///   because enforcing it here would make the default refuse computations the entry budget
+    ///   admits, and under [`Backend::Dense`] it is a function of the shape alone, which the row
+    ///   and column budgets already bound;
+    /// - the elimination scratch buffer, which grows to its high-water mark and is never shrunk;
+    /// - allocator slack: a `HashMap`'s power-of-two capacity and a `Vec`'s doubling, which the
+    ///   payload arithmetic above excludes by construction.
+    ///
+    /// # How much that is
+    ///
+    /// **Measured, not estimated.** On `fukuoka-mq-III-n20-seed0` at a 20 000 000-entry cap the
+    /// accounted peak is 195 MB and the process peaks at 14 075 MB: this budget sees **1.3%**. The
+    /// omission does not scale with the budget either, so it cannot be used as a proxy even
+    /// roughly. `docs/research/f4-resource-scaling.md` §9 has the per-site attribution and the
+    /// method; `examples/f4_memory.rs` reproduces it.
+    ///
+    /// **So this is not a ceiling on the process and must not be read as one.** It is the knob that
+    /// keeps *matrix* growth recoverable — which is what it was added for, and what it does well:
+    /// the quantity is reproducible on any machine, where a resident-size limit is not. For the
+    /// process figure use [`crate::util::peak_resident_bytes`].
+    ///
+    /// The name is deliberately unchanged. `max_entry_bytes` would describe the scope better, and
+    /// the cost of renaming it is that every figure recorded against the old name becomes
+    /// ambiguous — the same objection that made this a second budget rather than a redefinition of
+    /// [`max_live_nonzeros`](Self::max_live_nonzeros). The scope is stated here instead.
     pub max_live_bytes: usize,
 
     /// The most batches to process before giving up, or `None` for no limit.

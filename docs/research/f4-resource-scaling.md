@@ -215,9 +215,18 @@ the same point, which is a sharper experiment than profiling either alone.
 
 **A run killed by the wall clock reports no matrix statistics at all** — "F4 has no cooperative time
 check, so no matrix statistics exist for a run killed this way". So the group-B metrics M23 §4.3
-defines are available only for runs that stop at a *resource* bound, and a time-bound run is
-diagnostically poorer than an entry-bound one. That is an argument for keeping the entry cap as the
-primary budget even though it does not bound memory: it is the bound that yields a report.
+defines were available only for runs that stop at a *resource* bound, and a time-bound run was
+diagnostically poorer than an entry-bound one. ~~That is an argument for keeping the entry cap as
+the primary budget even though it does not bound memory: it is the bound that yields a report.~~
+
+> **Retracted in M25 by #284.** The argument rested on a missing feature, not on a property of
+> either bound. `F4Options::max_wall_time` is now checked once per batch and *returns*
+> `F4Error::TimeBudgetExceeded`, so a time-bound run carries the full group-B counters out with it —
+> §9.1 is measured on exactly such a run. The entry cap keeps one real advantage over a wall clock,
+> stated positively: an entry count is a property of the system and reproduces on any machine, while
+> an elapsed time is a fact about one box under one load. That is why `F4Error::stop_kind`
+> distinguishes `StopKind::Resource` from `StopKind::Time` and why the two must never be ranked
+> against each other. It is not because one of them yields a report and the other does not.
 
 So, for this instance: **out of reach, not out of budget** — and "out of reach" is a statement about
 the S-box-per-variable grevlex formulation under F4 and nothing else. M23's §5b.4 reached the same
