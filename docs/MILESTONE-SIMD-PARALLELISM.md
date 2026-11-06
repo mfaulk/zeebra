@@ -473,17 +473,18 @@ held for the whole suite so nothing else on the workstation was running.
 
 `cargo run --release --example elimination_density -- katsura-6/grevlex` and `katsura-7/grevlex`.
 Milliseconds over every matrix the instance builds; the mean of three runs on katsura-6 and two on
-katsura-7, which agreed to within 1.4%. The dense column excludes the conversions the backend pays
-around the algorithm.
+katsura-7, which agreed to within 1.4%. The dense rows exclude the conversions the backend pays
+around the algorithm, in the milliseconds and in the per-operation figure alike; the harness reports
+the conversion-inclusive figure, and `examples/elimination_density.rs` says so where it prints it.
 
 | instance | backend | row operations | before | after | before ns/op | after ns/op | change |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | katsura-6 grevlex | `Sparse` | 44 023 | 17.42 | 15.71 | 395.7 | 356.8 | **−9.8%** |
 | katsura-6 grevlex | `Adaptive` | 44 023 | 10.31 | 9.43 | 234.3 | 214.2 | **−8.6%** |
-| katsura-6 grevlex | `Dense` | 44 023 | 44.41 | 43.84 | 1063.0 | 1049.5 | −1.3% |
+| katsura-6 grevlex | `Dense` | 44 023 | 44.41 | 43.84 | 1008.8 | 995.8 | −1.3% |
 | katsura-7 grevlex | `Sparse` | 608 356 | 658.58 | 594.00 | 1082.6 | 976.4 | **−9.8%** |
 | katsura-7 grevlex | `Adaptive` | 608 356 | 295.40 | 280.11 | 485.6 | 460.4 | **−5.2%** |
-| katsura-7 grevlex | `Dense` | 608 356 | 1346.72 | 1327.05 | 3021.2 | 2987.1 | −1.5% |
+| katsura-7 grevlex | `Dense` | 608 356 | 1346.72 | 1327.05 | 2213.3 | 2181.9 | −1.5% |
 
 `row_operations` is **identical on both sides and across all three backends**, which is what makes
 the nanoseconds-per-operation column a statement about the cost of an operation rather than about
@@ -585,7 +586,7 @@ instruction cannot produce and a removed competitor for cache can: the hash tabl
 
 Three further readings line up with that and not with the ALU account:
 
-- **`Backend::Dense` is the null result**, −1.3% and −1.5%. Its per-operation cost is 3.0 µs, a
+- **`Backend::Dense` is the null result**, −1.3% and −1.5%. Its per-operation cost is 2.2 µs, a
   scan of a full dense row, so the pivot store is a vanishing share of both its time and its cache
   footprint. This is the bound the issue warned about, and it is where it predicted it.
 - **`Adaptive` gains less on katsura-7 (−5.2%) than on katsura-6 (−8.6%)**, the reverse of the
