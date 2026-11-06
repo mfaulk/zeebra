@@ -117,6 +117,14 @@ should hold.
 
 ### 2.1 `R_P = 8` — the univariate route, and the most useful result for Zeebra
 
+> **This section is no longer the sole authority for 2026/1254.** For #208,
+> [`graeffe-root-finding.md`](graeffe-root-finding.md) §9.5 read the PDF directly and extracted §2.2's
+> `(1,[1])` construction in full, §2.1's and §4.2's operational definition of the "common-root
+> strategy" (**independent `1/p` filtering of `P_1`'s roots, not a gcd**), §4.2's cost model and what
+> it does *not* report, and Table 1's run-versus-estimate status. It also derives the construction for
+> Zeebra's hybrid `permutation_plus_linear`. This section remains the authority for §3's
+> degree-annihilation framework and the `((3,2),[3])` ZeroTest skip, which §9.5 did not need.
+
 Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on Poseidon* (2026/1254). The paper's contribution
 is degree annihilation, but §4.2 is explicit that the CICO-2 `R_P = 8` instance "was solved first,
 before the degree-annihilation technique was developed. This attack used a classical parametrization,
@@ -400,7 +408,7 @@ supplied locally and extracted with `pdftotext`.
 
 | source | status | cited here |
 |---|---|---|
-| **2026/1254** Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on Poseidon* | read | §2.1, §3.1, §3.2, §6.1 |
+| **2026/1254** Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on Poseidon* | read; §2.2, §4.2 and Table 1 re-read from the PDF for #208 in `graeffe-root-finding.md` §9.5 | §2.1, §3.1, §3.2, §6.1 |
 | **2026/1905** Bak–Hostettler, *A Better Bivariate Resultant Attack on Round-Reduced Poseidon* | read | §1, §2.2, §2.3, §4, §6.2, §6.3 |
 | **2025/1916** Zhao–Sanso–Vitto–Ding, *Graeffe-Based Attacks on Poseidon and NTT Lower Bounds* | read | named as the Graeffe machinery reference, §6.1 |
 | **2025/950** Zhao–Ding, *Breaking Poseidon Challenges with Graeffe Transforms…* | read | the FFT 4/3-power memory-access lower bound; its CICO-1 scope and its remark on >1 zero, now superseded by §4 |
