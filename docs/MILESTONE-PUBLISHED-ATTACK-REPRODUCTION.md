@@ -168,9 +168,14 @@ Five extractions, each of which is a number or a construction and not an impress
    and the whole discrepancy may be this one term.
 4. **The total-work model's measured terms.** `W_total = W_pre + Σ_i (W_control,i + W_poly,i +
    W_root,i + W_check,i)`. Which of these the paper reports, and the `N` it reports them over.
-5. **Whether the 7 h / 96 GPU figure is a single run or an extrapolation.** Table 1 marks four rows
-   "est." because execution logs were lost. The CICO-2 row's status decides how much weight the
-   discrepancy carries.
+5. **Whether the 7 h / 96 GPU figure is a single run or an extrapolation.** Table 1 marks three
+   rows "est." because execution logs were lost. The CICO-2 row's status decides how much weight
+   the discrepancy carries.
+
+   > **Corrected, 2026-11-06, by the reading this section asked for.** This said *four* rows, which
+   > was written from `elimination-beyond-grobner.md` at second hand. It is **three**, and all three
+   > are ZeroTest — so the CICO-2 row is a reported run and the discrepancy carried full weight
+   > rather than less. See §5.4.
 
 ### 5.2 The go/no-go, stated before reading
 
@@ -207,6 +212,54 @@ Two independent readings of two different papers agree that the degree is `3^{R_
 M24-A's first test is the one that settles it: **the parametrized family's constrained coordinate
 must be identically zero when evaluated through `permutation_plus_linear`**, at many random points.
 A construction that is wrong for the hybrid fails that test at the first point.
+
+## 5.4 What the gate returned: **go**, and `2^31` was never the error
+
+2026/1254 was read directly (#208, PR #228). The verdict is **go** against §5.2's criterion, and the
+reconciliation is the milestone's first answer to §3's third question.
+
+| extraction | verdict |
+|---|---|
+| (1) the `(1,[1])` parametrization, written out | recovered — §2.2, generalized at §3.2 |
+| (2) expected `F_p`-root count of `P_1` | recovered — and it **confirms** §9.3's ≈1 |
+| (3) what "common-root strategy" denotes | recovered — and it **confirms** §9.3's `1/p` |
+| (4) the total-work model's measured terms | `UNVERIFIED — not stated`, and unavailable *in principle*: §4.2 records the execution logs as lost |
+| (5) a run or an extrapolation | a reported **run** |
+
+**Both of §9.3's inputs survive, so `≈2^31` families stands.** The paper endorses the
+random-polynomial heuristic for `P_1` and defines its strategy as Graeffe root finding plus one
+permutation evaluation per recovered root — independent filtering, not a coupling. Two of the three
+candidate explanations are refuted on the record; the third is not needed.
+
+The factor was in **§9.2's per-family cost**, and in the comparison itself:
+
+```
+corrected per family      12 + 0.09 + 3.11  ≈ 15.2 s      (not ~120 s)
+work at N = 2^31                            ≈ 1 036 core-years
+published                 7 h × 96 GPUs     =   672 GPU-hours
+implied per-GPU factor over one core        ≈ 1.35e4
+```
+
+§9.2's ~2 minutes charged every family a ~100 s `r = 2^24` subgroup scan that belongs to Zeebra's
+*single-root descent* and not to a loop filtering ≈1 root — a stage the published attack does not
+run, and whose `W_check` the paper itself calls negligible. Residual after that: **≈13x** at a `10^3`
+per-GPU factor, 43x at `10^2.5`, 135x at `10^2`. So the gap is inside two orders of magnitude for
+any per-GPU factor above ≈140.
+
+> **The error was two separable mistakes, and neither was the family count: comparing core-years
+> against a wall clock, and charging the published loop for a stage it does not perform.**
+
+Independently anchored: 2026/1905 Table 4 gives `R_P = 6` at 1 d 17 h and `R_P = 7` at 21 d 5 h on
+128 cores — a 12.4x step per partial round, putting `R_P = 8` at ≈92 core-years by the *resultant*
+route. Two unrelated methods bracket the instance at `10^1`–`10^2` core-years against this route's
+`10^3`.
+
+**What this does not license.** The univariate route at the official `R_P = 8` is ~10^3 core-years
+and therefore out of reach, exactly as `graeffe-root-finding.md` §9.4 requires to be said. M24-A's
+deliverable is unchanged — one family end to end on reduced rows, class `Engineering { why }` — and
+is now backed by a cost model that has been reconciled against a published result rather than left
+disagreeing with one. The `10^2`–`10^3` per-GPU throughput factor is an estimate, not a measurement,
+and the verdict's margin depends on it.
 
 ---
 
@@ -263,6 +316,54 @@ and (3):
 A reduced row where a witness is actually reachable turns `2^31` from an estimate into a measured
 ratio that can be extrapolated with a stated model. **That, not a wall-clock figure, is M24-A's
 contribution to question 3.**
+
+### 6.4 What was measured, and the row this section asked for does not exist
+
+17 838 families over ten rows (#210, PR #235). Both assumptions hold, the third candidate
+explanation dies, and **the table above asks for something impossible** — which is the result.
+
+**Assumption 1 holds, distributionally and not just on average.** Pooled mean root count **0.9997**
+against a predicted 1.0, and the whole distribution tracks Poisson(1): on `t16-rf4-rp0` over 3 000
+families the no-root share is 0.3503 against `1/e = 0.3679`, which is 2026/1254 §2.2's `1 − 1/e`
+reproduced directly rather than assumed.
+
+**Assumption 2's independence holds; its rate is not measurable here.** `χ²` on the second
+constraint's residual over 256 bins at 255 dof (sd ≈ 22.6) gives 202, 234, 234, 245, 278 across
+rows — every one inside ±3σ, so conditioned on `P_0` vanishing the second constrained word is
+uniform as far as the test can see, and the parametrization does not couple the constraints. The
+*rate* is a different claim and is refused: 0 hits in 17 901 roots where `1/p` predicts `8e-6`, a
+95% upper bound of `3/n ≈ 1.7e-4` that does not separate `1/p` from anything below it. **No run on
+this hardware can measure that rate**, and the example says so in those words.
+
+So all three of §9.3's candidate explanations are eliminated — extra freedom per family would have
+had to show up either as extra roots or as correlated constraints, and neither appears — and
+§5.4's per-family cost correction is the *whole* of the reconciliation.
+
+> **The correction to this section.** §6.3's third row asks for "the observed count on a row small
+> enough to finish". **There is no such row at `k = 2`, at any round count.** The family count is
+> `p / (roots per family)`, which contains neither `R_F` nor `R_P`, and the ladder shows it
+> directly: `δ` spans **6 561x** across these rows and the mean root count never leaves 1.0. So
+> `N ≈ 2^31` on `t16-rf2-rp0` exactly as on the disclosed `rf6-rp8`.
+>
+> **Reducing rounds buys a cheaper family, not a cheaper search.** Zero witnesses on the nine
+> `k = 2` rows, and none was available to be found.
+
+Measured where it *can* be: `poseidon-t3-rf2-rp1-planted` is `k = 1`, so one output constraint is
+all there is and a root of `P_0` **is** a witness — **1.00 families per witness, 3 witnesses verified
+through `CicoInstance::is_solution`**, parametrization through verification end to end. That
+calibrates the mechanism and isolates the `1/p` factor at `k = 2` as the entire difference between
+`O(1)` families and `2^31`. It is also why the `k = 3` family and the hybrid that
+`graeffe-root-finding.md` §9.3 leaves open are the only directions that could change the trade.
+
+**One corroboration that came free.** `t16-rf6-rp4`, the only row above the symbolic crossover,
+takes the evaluation route at `2^15`: construction 172.0 ms per family (**77%**), Graeffe 50.5 ms
+(**23%**), interpolation 1.07 ms, lifting and verification µs. That reproduces 2026/1254 §4.2's own
+stated ordering — construction and root finding dominant, the final evaluation negligible — and so
+independently corroborates §5.4's central move, that the published per-family loop is those two
+stages and nothing else, which is why §9.2's ~100 s candidate-scan row never belonged in it.
+
+`δ = 3^13` is **not** reached; the largest row is `3^9`, four factors of three short. Nothing in
+§6.4 is a per-family cost for `rf6-rp8`.
 
 ---
 
