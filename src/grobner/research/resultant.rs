@@ -26,14 +26,37 @@
 //! it also vanishes when both leading coefficients vanish. So every root of the resultant is a
 //! candidate and each candidate must be checked — here, by running the permutation. Nothing in
 //! this module decides that a candidate is a solution.
+//!
+//! # Where the samples are taken, and why it turns out not to matter
+//!
+//! [`bivariate_resultant`] samples at consecutive field elements and interpolates with
+//! `lagrange_interpolate`. [`bivariate_resultant_ntt`] takes the *same* determinants on a
+//! power-of-two multiplicative subgroup instead, so the recovery is one inverse NTT; it is the
+//! same resultant of the same two polynomials, only the abscissae differ, and it falls back to the
+//! reference route on a field whose two-adicity admits no large enough subgroup.
+//!
+//! **The subgroup route loses on this problem shape, and the reason is structural rather than an
+//! implementation detail.** A degree-`d` bivariate pair needs about `2d²` samples of an order-`2d`
+//! determinant, so the determinants cost `d^5` while a quadratic Lagrange interpolation costs
+//! `d^4`: the interpolation cannot dominate again. Forcing the sample count up to the next power
+//! of two therefore buys an `O(n log n)` recovery at the price of extra `O(d^3)` determinants,
+//! and at `d = 81` the padding from 13 123 to 16 384 samples costs more than the whole Lagrange
+//! solve it removes. Both are kept and `examples/resultant_cico.rs` measures them side by side —
+//! see `docs/research/resultant-elimination.md` §6.
 
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    time::{Duration, Instant},
+};
+
+use rand::{prelude::StdRng, SeedableRng};
 
 use crate::{
     grobner::research::poseidon::{CicoInstance, PoseidonError},
+    interpolate,
     linalg::Matrix,
     poly::{lagrange_interpolate, Monomial, Polynomial, UnivariatePolynomial},
-    FiniteField, KnownOrder, MultivariatePolynomial,
+    FFTDomain, FiniteField, KnownOrder, MultivariatePolynomial,
 };
 
 /// The constrained output words of a CICO instance, as polynomials in its first two free inputs.
@@ -262,6 +285,23 @@ pub fn bivariate_resultant<F: FiniteField>(
     let bound = n * f_degree + m * g_degree;
     let points = bound + 1;
 
+    Ok(lagrange_interpolate(sample_consecutively(
+        &fc, &gc, points,
+    )?))
+}
+
+/// `points` Sylvester determinants at `0, 1, 2, ...`, paired with their abscissae.
+///
+/// The reference route's sampling, shared so that [`bivariate_resultant_ntt`] can time it apart
+/// from the interpolation without a second copy of the loop.
+///
+/// # Errors
+/// [`ResultantError::FieldTooSmall`] if the field has fewer than `points` elements.
+fn sample_consecutively<F: FiniteField>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    points: usize,
+) -> Result<Vec<(F, F)>, ResultantError> {
     let mut samples: Vec<(F, F)> = Vec::with_capacity(points);
     for i in 0..points {
         let at = F::new(i as u64);
@@ -270,9 +310,220 @@ pub fn bivariate_resultant<F: FiniteField>(
         if i > 0 && at.is_zero() {
             return Err(ResultantError::FieldTooSmall { needed: points });
         }
-        samples.push((at, sylvester_determinant(&fc, &gc, at)));
+        samples.push((at, sylvester_determinant(fc, gc, at)));
     }
-    Ok(lagrange_interpolate(samples))
+    Ok(samples)
+}
+
+/// Where the interpolation samples live.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ResultantRoute {
+    /// The multiplicative subgroup of order `2^log_size`, recovered by one inverse NTT.
+    Ntt {
+        /// `log2` of the domain size.
+        log_size: u32,
+    },
+
+    /// `points` consecutive field elements `0, 1, 2, ...`, recovered by Lagrange interpolation.
+    ///
+    /// The reference route, used when the field has no power-of-two subgroup large enough. It is
+    /// cubic in `points`, which is why it is not the default where a subgroup exists.
+    Lagrange {
+        /// Number of samples, one more than the degree bound.
+        points: usize,
+    },
+}
+
+/// What one resultant cost, by stage.
+#[derive(Clone, Copy, Debug)]
+pub struct ResultantStages {
+    /// Where the samples were taken.
+    pub route: ResultantRoute,
+    /// The proven bound `n·deg_x(f) + m·deg_x(g)` on the resultant's degree.
+    pub degree_bound: usize,
+    /// Order of the Sylvester matrix, `deg_y(f) + deg_y(g)`.
+    pub matrix_order: usize,
+    /// Sylvester determinants evaluated.
+    pub samples: usize,
+    /// Time spent evaluating those determinants.
+    pub sampling: Duration,
+    /// Time spent recovering the polynomial from them.
+    pub interpolation: Duration,
+}
+
+/// The interpolation route for a resultant of degree at most `degree_bound` over `F`.
+///
+/// The smallest power-of-two subgroup with more than `degree_bound` elements, when the field's
+/// two-adicity admits one: `degree_bound + 1` samples determine a polynomial of degree at most
+/// `degree_bound`, and a domain of that size or larger is therefore exact. Fields whose
+/// two-adicity is too small — Mersenne-31's is 1 — get the reference route rather than a domain
+/// that does not exist.
+pub fn interpolation_route<F: KnownOrder>(degree_bound: usize) -> ResultantRoute {
+    let points = degree_bound + 1;
+    let log_size = points.next_power_of_two().trailing_zeros();
+    if log_size <= F::two_adicity() {
+        ResultantRoute::Ntt { log_size }
+    } else {
+        ResultantRoute::Lagrange { points }
+    }
+}
+
+/// The Sylvester matrix's coefficient rows and the resultant's proven degree bound.
+///
+/// # Errors
+/// [`ResultantError::NoDegreeInEliminatedVariable`].
+#[allow(clippy::type_complexity)]
+fn sylvester_setup<F: FiniteField>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+) -> Result<
+    (
+        Vec<UnivariatePolynomial<F>>,
+        Vec<UnivariatePolynomial<F>>,
+        usize,
+    ),
+    ResultantError,
+> {
+    let fc = coefficients_in(f, eliminate);
+    let gc = coefficients_in(g, eliminate);
+    let m = fc.len() - 1;
+    let n = gc.len() - 1;
+    if m == 0 {
+        return Err(ResultantError::NoDegreeInEliminatedVariable { argument: 0 });
+    }
+    if n == 0 {
+        return Err(ResultantError::NoDegreeInEliminatedVariable { argument: 1 });
+    }
+
+    // The resultant's degree in the surviving variable is at most `n·deg_x(f) + m·deg_x(g)`: the
+    // Sylvester matrix has `n` rows of `f`'s coefficients and `m` of `g`'s, and a determinant is a
+    // sum of products taking one entry from each row.
+    let f_degree = fc.iter().map(|c| c.degree() as usize).max().unwrap_or(0);
+    let g_degree = gc.iter().map(|c| c.degree() as usize).max().unwrap_or(0);
+    Ok((fc, gc, n * f_degree + m * g_degree))
+}
+
+/// `Res_{x_eliminate}(f, g)` by the reference route, with its two stages timed apart.
+///
+/// The A/B partner of [`bivariate_resultant_ntt`]: same answer as [`bivariate_resultant`], which
+/// is a thin wrapper over this, but reporting the determinant evaluations and the Lagrange
+/// interpolation separately so the two routes can be compared stage by stage rather than only on a
+/// total.
+///
+/// # Errors
+/// [`ResultantError`].
+pub fn bivariate_resultant_reference<F: FiniteField>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
+    let (fc, gc, degree_bound) = sylvester_setup(f, g, eliminate)?;
+    let points = degree_bound + 1;
+
+    let at = Instant::now();
+    let samples = sample_consecutively(&fc, &gc, points)?;
+    let sampling = at.elapsed();
+
+    let at = Instant::now();
+    let resultant = lagrange_interpolate(samples);
+    let interpolation = at.elapsed();
+
+    Ok((
+        resultant,
+        ResultantStages {
+            route: ResultantRoute::Lagrange { points },
+            degree_bound,
+            matrix_order: fc.len() + gc.len() - 2,
+            samples: points,
+            sampling,
+            interpolation,
+        },
+    ))
+}
+
+/// `Res_{x_eliminate}(f, g)`, interpolated on a power-of-two subgroup, with stage costs.
+///
+/// Same resultant as [`bivariate_resultant`] — the determinant of the same Sylvester matrix in the
+/// same variable — recovered from samples on a multiplicative subgroup instead of at consecutive
+/// field elements, so the interpolation is one inverse NTT rather than a Lagrange solve.
+/// [`interpolation_route`] picks the domain and falls back to
+/// [`bivariate_resultant_reference`] when the field's two-adicity admits none.
+///
+/// The domain is sized against the **proven** bound `n·deg_x(f) + m·deg_x(g)`, not against the
+/// smaller degree a Poseidon slice is observed to have. That costs samples: for the four-round
+/// slice the bound is 13 122, so 13 123 samples would do and the domain is `2^14 = 16 384`. Since a
+/// determinant costs far more than a point of interpolation at these sizes, the padding is the
+/// dominant term of the comparison between the two routes — see `resultant-elimination.md` §6.
+///
+/// # Errors
+/// [`ResultantError`].
+pub fn bivariate_resultant_ntt<F: KnownOrder>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
+    let (fc, gc, degree_bound) = sylvester_setup(f, g, eliminate)?;
+    let log_size = match interpolation_route::<F>(degree_bound) {
+        ResultantRoute::Ntt { log_size } => log_size,
+        ResultantRoute::Lagrange { .. } => return bivariate_resultant_reference(f, g, eliminate),
+    };
+
+    // Any primitive `2^log_size`-th root of unity serves: the recovered polynomial is the unique
+    // one of degree below the domain size agreeing with the determinant on the subgroup, so it
+    // does not depend on which generator enumerates it. The seed is fixed to keep the run
+    // reproducible.
+    let size = 1usize << log_size;
+    let generator = F::two_adic_root_of_unity(log_size, &mut StdRng::seed_from_u64(0x5e5a17a27));
+    let domain = FFTDomain::from_generator(generator, size);
+
+    let at = Instant::now();
+    let values: Vec<F> = domain
+        .iter()
+        .map(|point| sylvester_determinant(&fc, &gc, *point))
+        .collect();
+    let sampling = at.elapsed();
+
+    let at = Instant::now();
+    let resultant = interpolate(&values, &domain);
+    let interpolation = at.elapsed();
+
+    Ok((
+        resultant,
+        ResultantStages {
+            route: ResultantRoute::Ntt { log_size },
+            degree_bound,
+            matrix_order: fc.len() + gc.len() - 2,
+            samples: size,
+            sampling,
+            interpolation,
+        },
+    ))
+}
+
+/// `det Syl(f, g)` in `x_eliminate`, with the surviving variable set to `at`.
+///
+/// The independent check on an interpolated resultant: one scalar determinant, sharing no code
+/// with the interpolation. Evaluating it at a point *outside* the interpolation domain tests the
+/// recovered polynomial against the definition rather than against its own samples.
+///
+/// # Errors
+/// [`ResultantError::NoDegreeInEliminatedVariable`].
+pub fn sylvester_determinant_at<F: FiniteField>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+    at: F,
+) -> Result<F, ResultantError> {
+    let fc = coefficients_in(f, eliminate);
+    let gc = coefficients_in(g, eliminate);
+    if fc.len() == 1 {
+        return Err(ResultantError::NoDegreeInEliminatedVariable { argument: 0 });
+    }
+    if gc.len() == 1 {
+        return Err(ResultantError::NoDegreeInEliminatedVariable { argument: 1 });
+    }
+    Ok(sylvester_determinant(&fc, &gc, at))
 }
 
 /// `det Syl(f, g)` with the surviving variable set to `at`.
@@ -318,18 +569,48 @@ pub fn evaluate_bivariate<F: FiniteField>(f: &MultivariatePolynomial<2, F>, a: F
 
 #[cfg(test)]
 mod tests {
-    use super::{bivariate_resultant, cico_bivariate, ResultantError};
+    use super::{
+        bivariate_resultant, bivariate_resultant_ntt, cico_bivariate, interpolation_route,
+        sylvester_determinant_at, ResultantError, ResultantRoute,
+    };
     use crate::{
-        fields::{PrimeFieldElement64, Zp13},
+        fields::{Mersenne31, PrimeFieldElement64, Zp13},
+        grobner::research::KOALABEAR_PRIME,
+        identities::One,
         poly::{Polynomial, UnivariatePolynomial},
-        FiniteField, MultivariatePolynomial, Zero,
+        FiniteField, Monomial, MultivariatePolynomial, Zero,
     };
 
     type F = Zp13;
+    type Koala = PrimeFieldElement64<KOALABEAR_PRIME>;
     const VARS: [&str; 2] = ["x", "y"];
 
     fn parse(text: &str) -> MultivariatePolynomial<2, F> {
         MultivariatePolynomial::parse(text, VARS).expect("a bivariate polynomial")
+    }
+
+    /// A bivariate polynomial with the given degree in each variable and random coefficients.
+    ///
+    /// The top coefficient in the eliminated variable is forced nonzero so that the Sylvester
+    /// matrix really has the order the degrees claim.
+    fn random_bivariate<R: rand::RngCore + rand::CryptoRng>(
+        degree_x: u32,
+        degree_y: u32,
+        rng: &mut R,
+    ) -> MultivariatePolynomial<2, Koala> {
+        let mut terms: Vec<(Monomial<2>, Koala)> = Vec::new();
+        for i in 0..=degree_x {
+            for j in 0..=degree_y {
+                let mut c = Koala::random(rng);
+                if i == degree_x && j == degree_y && c.is_zero() {
+                    c = Koala::one();
+                }
+                if !c.is_zero() {
+                    terms.push((Monomial::new(&[i, j]), c));
+                }
+            }
+        }
+        MultivariatePolynomial::new(&terms)
     }
 
     /// `Res_y(y - a, y - b) = a - b` up to sign: the textbook case, checked against a hand value.
@@ -564,5 +845,373 @@ mod tests {
         let g = MultivariatePolynomial::<2, Big>::parse("x^9 - y^9 + x + 7", VARS).expect("ok");
         let resultant = bivariate_resultant(&f, &g, 1).expect("both involve y");
         assert_eq!(resultant.degree(), 81, "9 x 9 = 81, and it is reached");
+    }
+
+    /// The subgroup route returns the same polynomial as Lagrange on randomized pairs.
+    #[test]
+    fn test_the_subgroup_route_agrees_with_lagrange_on_random_pairs() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(20261105);
+        for degree_x in 1..=4u32 {
+            for degree_y in 1..=4u32 {
+                for _ in 0..4 {
+                    let f = random_bivariate(degree_x, degree_y, &mut rng);
+                    let g = random_bivariate(degree_x, degree_y, &mut rng);
+                    let reference = bivariate_resultant(&f, &g, 1).expect("both involve y");
+                    let (fast, stages) =
+                        bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+                    assert!(
+                        matches!(stages.route, ResultantRoute::Ntt { .. }),
+                        "KoalaBear has a subgroup for {degree_x}/{degree_y}"
+                    );
+                    assert_eq!(fast, reference, "degrees {degree_x}, {degree_y}");
+                }
+            }
+        }
+    }
+
+    /// Eliminating the other variable also agrees between the two routes.
+    #[test]
+    fn test_the_subgroup_route_agrees_when_the_first_variable_is_eliminated() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(7);
+        for _ in 0..8 {
+            let f = random_bivariate(3, 2, &mut rng);
+            let g = random_bivariate(2, 3, &mut rng);
+            let reference = bivariate_resultant(&f, &g, 0).expect("both involve x");
+            let (fast, _) = bivariate_resultant_ntt(&f, &g, 0).expect("both involve x");
+            assert_eq!(fast, reference);
+        }
+    }
+
+    /// A common factor gives the identically zero resultant on the subgroup route too.
+    #[test]
+    fn test_the_subgroup_route_on_a_zero_resultant() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("y^2 - x^2", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("y^3 - x^2*y", VARS).expect("parses");
+        let (resultant, _) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        assert!(resultant.is_zero());
+        assert_eq!(resultant, bivariate_resultant(&f, &g, 1).expect("ok"));
+    }
+
+    /// With no surviving variable in either input the resultant is a nonzero constant.
+    #[test]
+    fn test_the_subgroup_route_on_a_constant_resultant() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("y^2 + 1", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("y^2 + 2", VARS).expect("parses");
+        let (resultant, stages) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        assert_eq!(stages.degree_bound, 0, "no x in either input");
+        assert_eq!(resultant.degree(), 0);
+        assert!(!resultant.is_zero());
+        assert_eq!(resultant, bivariate_resultant(&f, &g, 1).expect("ok"));
+    }
+
+    /// An input of degree zero in the surviving variable is handled by the subgroup route.
+    #[test]
+    fn test_the_subgroup_route_with_one_input_of_degree_zero_in_x() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("y^2 + y + 1", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("y - x", VARS).expect("parses");
+        let (resultant, _) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        assert_eq!(resultant, bivariate_resultant(&f, &g, 1).expect("ok"));
+        // Substituting y = x into f gives x^2 + x + 1, whose roots are the common ones.
+        for at in 0u64..32 {
+            let x = Koala::new(at);
+            let expected = x * x + x + Koala::one();
+            assert_eq!(resultant.eval(&x).is_zero(), expected.is_zero(), "at {at}");
+        }
+    }
+
+    /// A vanishing leading coefficient is still recovered, though zero is not in the subgroup.
+    ///
+    /// The multiplicative subgroup never contains 0, so unlike the reference route this one never
+    /// samples the point where `f`'s leading coefficient in `y` vanishes — and the interpolated
+    /// polynomial is nonetheless correct there.
+    #[test]
+    fn test_the_subgroup_route_with_a_vanishing_leading_coefficient() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("x*y^2 + y + 1", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("y - x", VARS).expect("parses");
+        let (resultant, _) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        assert_eq!(resultant, bivariate_resultant(&f, &g, 1).expect("ok"));
+        assert_eq!(
+            resultant.eval(&Koala::zero()),
+            sylvester_determinant_at(&f, &g, 1, Koala::zero()).expect("both involve y")
+        );
+    }
+
+    /// An input free of the eliminated variable is refused by the subgroup route by argument.
+    #[test]
+    fn test_the_subgroup_route_refuses_degree_zero_in_the_eliminated_variable() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("x^2 + 1", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("y - x", VARS).expect("parses");
+        assert_eq!(
+            bivariate_resultant_ntt(&f, &g, 1).err(),
+            Some(ResultantError::NoDegreeInEliminatedVariable { argument: 0 })
+        );
+        assert_eq!(
+            bivariate_resultant_ntt(&g, &f, 1).err(),
+            Some(ResultantError::NoDegreeInEliminatedVariable { argument: 1 })
+        );
+    }
+
+    /// A field whose two-adicity is too small dispatches to the reference route, not to garbage.
+    ///
+    /// Mersenne-31 has two-adicity 1, so no power-of-two subgroup above size two exists at all.
+    #[test]
+    fn test_a_field_without_a_large_enough_subgroup_dispatches_to_lagrange() {
+        let f = MultivariatePolynomial::<2, Mersenne31>::parse("x^2*y^2 + y + 1", VARS)
+            .expect("parses");
+        let g = MultivariatePolynomial::<2, Mersenne31>::parse("x*y^2 + 3*y + x", VARS)
+            .expect("parses");
+        let (resultant, stages) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        assert_eq!(
+            stages.route,
+            ResultantRoute::Lagrange {
+                points: stages.degree_bound + 1
+            }
+        );
+        assert_eq!(resultant, bivariate_resultant(&f, &g, 1).expect("ok"));
+    }
+
+    /// The domain chosen for the four-round shape is 2^14, which covers the proven bound 13 123.
+    #[test]
+    fn test_the_domain_covers_the_degree_bound() {
+        // Two polynomials of degree 81 in each variable: the bound is 81·81 + 81·81 = 13 122.
+        let bound = 2 * 81 * 81;
+        assert_eq!(bound, 13_122);
+        assert_eq!(
+            interpolation_route::<Koala>(bound),
+            ResultantRoute::Ntt { log_size: 14 }
+        );
+        // `> bound` rather than `>= bound + 1`: the domain must hold more points than the bound,
+        // which is what makes the interpolation exact.
+        assert!(1usize << 14 > bound, "16 384 > 13 122");
+        // Exactly at a power of two the domain is that power, and one above it doubles.
+        assert_eq!(
+            interpolation_route::<Koala>(255),
+            ResultantRoute::Ntt { log_size: 8 }
+        );
+        assert_eq!(
+            interpolation_route::<Koala>(256),
+            ResultantRoute::Ntt { log_size: 9 }
+        );
+        // Beyond KoalaBear's two-adicity of 24 there is no domain and the reference is used.
+        assert_eq!(
+            interpolation_route::<Koala>(1 << 24),
+            ResultantRoute::Lagrange {
+                points: (1 << 24) + 1
+            }
+        );
+        // Mersenne-31's two-adicity is 1, so only a bound of 0 or 1 has a domain.
+        assert_eq!(
+            interpolation_route::<Mersenne31>(1),
+            ResultantRoute::Ntt { log_size: 1 }
+        );
+        assert_eq!(
+            interpolation_route::<Mersenne31>(2),
+            ResultantRoute::Lagrange { points: 3 }
+        );
+    }
+
+    /// The recovered resultant agrees with the determinant at points outside the domain.
+    ///
+    /// The independent check the four-round run uses: the subgroup is the set of `2^k`-th roots of
+    /// unity, so any element whose order is odd — 0 included — lies outside it.
+    #[test]
+    fn test_the_recovered_resultant_agrees_off_the_interpolation_domain() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(99);
+        let f = random_bivariate(4, 4, &mut rng);
+        let g = random_bivariate(4, 4, &mut rng);
+        let (resultant, stages) = bivariate_resultant_ntt(&f, &g, 1).expect("both involve y");
+        let ResultantRoute::Ntt { log_size } = stages.route else {
+            panic!("KoalaBear has a subgroup here");
+        };
+        let domain_size = 1u128 << log_size;
+        let mut checked = 0;
+        for at in 0u64..64 {
+            let x = Koala::new(at);
+            // In the subgroup exactly when x^{2^k} = 1; skip those, they are the samples.
+            if x.pow(domain_size).is_one() {
+                continue;
+            }
+            assert_eq!(
+                resultant.eval(&x),
+                sylvester_determinant_at(&f, &g, 1, x).expect("both involve y"),
+                "at {at}"
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "some point lies outside the domain");
+    }
+
+    /// The registered two-round slice, end to end on the subgroup route.
+    ///
+    /// The A/B control: same instance, same seed, same three witnesses through the permutation as
+    /// `test_the_registered_full_width_slice_end_to_end`, but interpolated on the subgroup.
+    #[test]
+    fn test_the_registered_slice_end_to_end_on_the_subgroup_route() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        use crate::{
+            grobner::research::{challenge, Specialization},
+            roots,
+        };
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+        let (resultant, stages) =
+            bivariate_resultant_ntt(&outputs[0], &outputs[1], 1).expect("both involve the second");
+        assert_eq!(stages.route, ResultantRoute::Ntt { log_size: 8 });
+        assert_eq!(resultant.degree(), 81, "9 x 9, the Bézout bound exactly");
+        assert_eq!(
+            resultant,
+            bivariate_resultant(&outputs[0], &outputs[1], 1).expect("ok"),
+            "the two routes return the same polynomial"
+        );
+
+        let mut verified = 0;
+        for first in roots(&resultant, &mut StdRng::seed_from_u64(7)) {
+            let specialized: Vec<Koala> = (0..=9)
+                .map(|power| {
+                    outputs[0]
+                        .terms()
+                        .iter()
+                        .filter(|(monomial, _)| monomial.exponents()[1] as usize == power)
+                        .map(|(monomial, c)| *c * first.pow(monomial.exponents()[0] as u128))
+                        .fold(Koala::zero(), |acc, term| acc + term)
+                })
+                .collect();
+            for second in roots(
+                &UnivariatePolynomial::new(&specialized),
+                &mut StdRng::seed_from_u64(11),
+            ) {
+                let mut inputs = vec![first, second];
+                inputs.extend_from_slice(&fixed);
+                if instance.is_solution(&inputs).expect("the right width") {
+                    verified += 1;
+                }
+            }
+        }
+        assert_eq!(
+            verified, 3,
+            "the same three witnesses the reference route finds"
+        );
+    }
+
+    /// Every witness in the committed fixture is accepted by the instance's own verifier.
+    ///
+    /// The fixture is the retained artifact for the four-round rows, whose own run takes about a
+    /// minute: the coordinates are checked here in milliseconds, by `is_solution` — which runs
+    /// `permutation_plus_linear` — and not by anything in this module.
+    #[test]
+    fn test_the_recorded_witnesses_verify_through_the_permutation() {
+        use crate::grobner::research::{challenge, Json, Specialization};
+
+        let text = include_str!("../../../research/witnesses/resultant-cico-t16.json");
+        let fixture = Json::parse(text).expect("the committed fixture");
+        let witnesses = fixture.get("witnesses").expect("a witness list").items();
+        assert!(!witnesses.is_empty());
+
+        for witness in witnesses {
+            let id = witness
+                .get("challenge")
+                .and_then(Json::as_str)
+                .expect("an id");
+            let seed = witness.get("seed").and_then(Json::as_int).expect("a seed") as u64;
+            let first = Koala::new(witness.get("first").and_then(Json::as_int).expect("x") as u64);
+            let second =
+                Koala::new(witness.get("second").and_then(Json::as_int).expect("y") as u64);
+
+            let manifest = challenge(id).expect("a registered challenge");
+            let instance = manifest.cico_instance::<Koala>().expect("builds");
+            let free = instance.free_inputs();
+            let variables: Vec<usize> = (2..free).collect();
+            let specialization =
+                Specialization::<46, Koala>::seeded(&variables, seed).expect("distinct indices");
+            let mut inputs = vec![first, second];
+            inputs.extend((2..free).map(|i| specialization.value_of(i).expect("fixed")));
+
+            assert!(
+                instance.is_solution(&inputs).expect("the right width"),
+                "{id} witness ({first}, {second}) is not a solution"
+            );
+        }
+    }
+
+    /// The four-round row completes and returns a witness the permutation accepts.
+    ///
+    /// Ignored by default: 16 384 Sylvester determinants of order 162 is about a minute, which is
+    /// not a unit test. It is the generator behind the fixture above, and the degree assertion is
+    /// the interesting part — 729, well below the Bézout bound of 6 561.
+    #[test]
+    #[ignore = "about a minute: 16 384 order-162 determinants"]
+    fn test_the_four_round_row_completes_on_the_subgroup_route() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        use crate::{
+            grobner::research::{challenge, Specialization},
+            roots,
+        };
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp2").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+        let (resultant, stages) =
+            bivariate_resultant_ntt(&outputs[0], &outputs[1], 1).expect("both involve the second");
+        assert_eq!(stages.route, ResultantRoute::Ntt { log_size: 14 });
+        assert_eq!(stages.degree_bound, 13_122);
+        assert_eq!(resultant.degree(), 729, "below the Bézout bound of 6 561");
+
+        // Independent of the interpolation: the recovered polynomial against the determinant at a
+        // point the subgroup does not contain.
+        let off_domain = Koala::new(3);
+        assert!(!off_domain.pow(1u128 << 14).is_one());
+        assert_eq!(
+            resultant.eval(&off_domain),
+            sylvester_determinant_at(&outputs[0], &outputs[1], 1, off_domain).expect("ok")
+        );
+
+        let mut verified = 0;
+        for first in roots(&resultant, &mut StdRng::seed_from_u64(7)) {
+            let mut specialized: Vec<Koala> = Vec::new();
+            for (monomial, c) in outputs[0].terms() {
+                let power = monomial.exponents()[1] as usize;
+                if specialized.len() <= power {
+                    specialized.resize(power + 1, Koala::zero());
+                }
+                specialized[power] += *c * first.pow(monomial.exponents()[0] as u128);
+            }
+            for second in roots(
+                &UnivariatePolynomial::new(&specialized),
+                &mut StdRng::seed_from_u64(11),
+            ) {
+                let mut inputs = vec![first, second];
+                inputs.extend_from_slice(&fixed);
+                if instance.is_solution(&inputs).expect("the right width") {
+                    verified += 1;
+                }
+            }
+        }
+        assert_eq!(verified, 1, "one base-field witness at four rounds");
     }
 }

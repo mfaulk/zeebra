@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "note": "CICO witnesses recovered by the subgroup-interpolation resultant on registered t = 16 Poseidon reductions. Each entry gives the two surviving free inputs; the other twelve are Specialization::<46, K>::seeded(2..14, seed) and are therefore reproducible rather than recorded. Every entry is re-checked through CicoInstance::is_solution, which runs permutation_plus_linear, by grobner::research::resultant::tests::test_the_recorded_witnesses_verify_through_the_permutation.",
+  "field": "KoalaBear, q = 2^31 - 2^24 + 1 = 2130706433",
+  "generator": "cargo run --release --example resultant_cico",
+  "witnesses": [
+    {
+      "challenge": "poseidon31-cico-t16-rf2-rp0",
+      "rounds": 2,
+      "seed": 1,
+      "resultant_degree": 81,
+      "first": 2085997036,
+      "second": 1438941859
+    },
+    {
+      "challenge": "poseidon31-cico-t16-rf2-rp0",
+      "rounds": 2,
+      "seed": 1,
+      "resultant_degree": 81,
+      "first": 6826675,
+      "second": 500509587
+    },
+    {
+      "challenge": "poseidon31-cico-t16-rf2-rp0",
+      "rounds": 2,
+      "seed": 1,
+      "resultant_degree": 81,
+      "first": 1924328385,
+      "second": 390953979
+    },
+    {
+      "challenge": "poseidon31-cico-t16-rf2-rp2",
+      "rounds": 4,
+      "seed": 1,
+      "resultant_degree": 729,
+      "first": 733129951,
+      "second": 708928921
+    },
+    {
+      "challenge": "poseidon31-cico-t16-rf4-rp0",
+      "rounds": 4,
+      "seed": 1,
+      "resultant_degree": 6561,
+      "first": 772376111,
+      "second": 336711495
+    },
+    {
+      "challenge": "poseidon31-cico-t16-rf4-rp0",
+      "rounds": 4,
+      "seed": 1,
+      "resultant_degree": 6561,
+      "first": 962963787,
+      "second": 1362657760
+    }
+  ]
+}

@@ -25,10 +25,22 @@
 //!
 //! # What is measured
 //!
-//! Per row: the time to build the two bivariate polynomials, their actual degree against `3^rounds`,
-//! the resultant's actual degree against the Bézout bound `3^rounds × 3^rounds`, the univariate
-//! root count, and whether a candidate verifies **through the permutation**. Nothing here decides
-//! a candidate is a solution: a resultant root is a necessary condition, so every one is checked.
+//! Per row, stage-separated: the time to build the two bivariate polynomials and their actual
+//! degree against `3^rounds`; the Sylvester determinant evaluations and the interpolation,
+//! reported apart because they are the two costs an implementation would attack separately; the
+//! resultant's actual degree against the Bézout bound `3^rounds × 3^rounds`; root finding; lifting
+//! each root to a candidate pair; and verification **through the permutation**. Nothing here
+//! decides a candidate is a solution: a resultant root is a necessary condition, so every one is
+//! checked.
+//!
+//! The resultant itself is also checked against a direct Sylvester determinant at points the
+//! interpolation never sampled, which is what distinguishes a recovered polynomial from its own
+//! evaluation table.
+//!
+//! Both interpolation routes run on the same two polynomials in the same process, and their
+//! answers are asserted equal. That is the A/B: the subgroup route trades extra determinants for a
+//! cheaper recovery, and only both figures together say which way the trade goes. On these rows it
+//! goes the wrong way — see `docs/research/resultant-elimination.md` §6.5.
 
 use std::time::{Duration, Instant};
 
@@ -37,14 +49,25 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::research::{
-        bivariate_resultant, challenge, cico_bivariate, registry, ChallengeManifest, CicoInstance,
-        Environment, Json, RunOutcome, RunRecord, Scoreboard, Specialization, Stage, StageCost,
+        bivariate_resultant_ntt, bivariate_resultant_reference, challenge, cico_bivariate,
+        registry, sylvester_determinant_at, ChallengeManifest, CicoInstance, Environment, Json,
+        ResultantRoute, RunOutcome, RunRecord, Scoreboard, Specialization, Stage, StageCost,
         KOALABEAR_PRIME,
     },
-    roots, FiniteField, MultivariatePolynomial, Polynomial, UnivariatePolynomial, Zero,
+    roots,
+    util::peak_resident_bytes,
+    FiniteField, MultivariatePolynomial, One, Polynomial, UnivariatePolynomial, Zero,
 };
 
 type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+
+/// Degree bound up to which the reference route is also run, as an A/B control.
+///
+/// 16 384 covers both four-round rows, whose bound is 13 122. That was unaffordable while
+/// `lagrange_interpolate` was cubic — an extrapolated hour — and is affordable now that #162 made
+/// it quadratic, which is exactly why the comparison is worth printing: the reference pays 1.4 s
+/// of interpolation and saves 3 261 determinants against the subgroup route, and wins.
+const AB_CONTROL_BOUND: usize = 16_384;
 
 /// What the symbolic evaluation produced for one row.
 struct Bivariate {
@@ -103,7 +126,11 @@ fn main() {
         // Sample count times the cost of one Sylvester determinant: `2d^2` points and an order-`2d`
         // matrix, so `16 d^5` field operations before any of the polynomial arithmetic.
         let predicted = 16.0 * degree.powi(5);
-        if !attempt_all && predicted > 1e10 {
+        // `1e11` rather than the `1e10` M23-E used: a four-round row went from an unfinished hour to
+        // under a minute, essentially all of it determinants, so the rows worth attempting are the
+        // ones whose *determinant* arithmetic fits. Six rounds is `3.3e15` and still does not.
+
+        if !attempt_all && predicted > 1e11 {
             println!("## {} — {} rounds\n", manifest.id, rounds);
             println!(
                 "- not attempted: degree `3^{}` is {:.0}, so the resultant needs about {:.0} \
@@ -236,21 +263,86 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     let f = built.outputs[0].clone();
     let g = built.outputs[1].clone();
 
-    let at = Instant::now();
-    let resultant = match bivariate_resultant(&f, &g, 1) {
-        Ok(resultant) => resultant,
+    let (resultant, stages) = match bivariate_resultant_ntt(&f, &g, 1) {
+        Ok(pair) => pair,
         Err(error) => {
             println!("- the resultant was refused: {}\n", error);
             return None;
         }
     };
-    let elimination = at.elapsed();
+    let elimination = stages.sampling + stages.interpolation;
     let bezout = 3u64.pow(rounds as u32) * 3u64.pow(rounds as u32);
+    match stages.route {
+        ResultantRoute::Ntt { log_size } => println!(
+            "- interpolated on the subgroup of order `2^{}` = {} (proven degree bound {}), so \
+             recovery is one inverse NTT",
+            log_size,
+            1usize << log_size,
+            stages.degree_bound
+        ),
+        ResultantRoute::Lagrange { points } => println!(
+            "- no power-of-two subgroup covers the bound {}: Lagrange at {} consecutive points",
+            stages.degree_bound, points
+        ),
+    }
+    println!(
+        "- {} Sylvester determinants of order {} in {:.1} ms; interpolation {:.1} ms",
+        stages.samples,
+        stages.matrix_order,
+        stages.sampling.as_secs_f64() * 1e3,
+        stages.interpolation.as_secs_f64() * 1e3
+    );
     println!(
         "- resultant of degree {} against a Bézout bound of {}, in {:.1} ms",
         resultant.degree(),
         bezout,
         elimination.as_secs_f64() * 1e3
+    );
+
+    // The A/B. Both routes run on the same two polynomials in the same process, stage-separated,
+    // and the two answers are compared — the subgroup route's win or loss is the difference
+    // between its padded sample count and the reference's quadratic interpolation, and nothing
+    // short of both figures distinguishes those.
+    let reference_stages = if stages.degree_bound <= AB_CONTROL_BOUND {
+        let (reference, rstages) =
+            bivariate_resultant_reference(&f, &g, 1).expect("both involve the second");
+        assert_eq!(
+            reference, resultant,
+            "the subgroup route and the reference disagree"
+        );
+        let reference_total = rstages.sampling + rstages.interpolation;
+        println!(
+            "- A/B: reference route, {} consecutive points — {} determinants {:.1} ms + \
+             `lagrange_interpolate` {:.1} ms = **{:.1} ms**, same polynomial. Subgroup route is \
+             {:.2}x that.",
+            rstages.samples,
+            rstages.samples,
+            rstages.sampling.as_secs_f64() * 1e3,
+            rstages.interpolation.as_secs_f64() * 1e3,
+            reference_total.as_secs_f64() * 1e3,
+            elimination.as_secs_f64() / reference_total.as_secs_f64()
+        );
+        Some(rstages)
+    } else {
+        println!(
+            "- A/B skipped: the reference route's {} points exceed the control bound {}",
+            stages.degree_bound + 1,
+            AB_CONTROL_BOUND
+        );
+        None
+    };
+
+    // The interpolated polynomial is checked against the definition at points the interpolation
+    // never saw. `degree_bound + 1` samples already determine it, so agreement at a point outside
+    // the sample set is evidence about the construction rather than a restatement of it.
+    let at = Instant::now();
+    let fresh = off_domain_check(&f, &g, &resultant, &stages.route, 8);
+    let independent = at.elapsed();
+    println!(
+        "- {} points outside the interpolation domain agree with a direct Sylvester determinant, \
+         in {:.1} ms",
+        fresh,
+        independent.as_secs_f64() * 1e3
     );
 
     let at = Instant::now();
@@ -263,27 +355,59 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     );
 
     // Each root of the resultant is a *necessary* condition on the first unknown. The second is
-    // recovered by substituting and taking a common root, and the pair is then checked by running
-    // the permutation — the only thing that decides whether it is a solution.
+    // recovered by substituting and taking a common root — the lifting stage — and the pair is
+    // then checked by running the permutation, which is the only thing that decides it.
+    let at = Instant::now();
+    let pairs: Vec<(K, K)> = candidates
+        .iter()
+        .flat_map(|first| {
+            extend(&f, &g, *first)
+                .into_iter()
+                .map(move |second| (*first, second))
+        })
+        .collect();
+    let lifting = at.elapsed();
+    println!(
+        "- {} candidate pairs lifted from {} roots in {:.1} ms",
+        pairs.len(),
+        candidates.len(),
+        lifting.as_secs_f64() * 1e3
+    );
+
     let at = Instant::now();
     let mut witnesses = 0usize;
-    for first in &candidates {
-        for second in extend(&f, &g, *first) {
-            let mut inputs = vec![*first, second];
-            inputs.extend_from_slice(&fixed);
-            if instance.is_solution(&inputs).unwrap_or(false) {
-                witnesses += 1;
-            }
+    for (first, second) in &pairs {
+        let mut inputs = vec![*first, *second];
+        inputs.extend_from_slice(&fixed);
+        if instance.is_solution(&inputs).unwrap_or(false) {
+            witnesses += 1;
+            println!("  - witness: x = {}, y = {}", first, second);
         }
     }
     let verification = at.elapsed();
     println!(
-        "- {} verified witnesses, checked through the permutation in {:.1} ms",
+        "- {} verified witnesses, checked through `permutation_plus_linear` in {:.1} ms",
         witnesses,
         verification.as_secs_f64() * 1e3
     );
-    let total = built.elapsed + elimination + root_finding + verification;
-    println!("- **total {:.1} ms**\n", total.as_secs_f64() * 1e3);
+    let total = built.elapsed + elimination + independent + root_finding + lifting + verification;
+    println!("- **total {:.1} ms**", total.as_secs_f64() * 1e3);
+    // The estimate is the live dense arrays: the sample vector, the domain and its inverse, and
+    // the recovered coefficients, each of `samples` field elements.
+    let estimated = 4 * stages.samples * std::mem::size_of::<K>();
+    match peak_resident_bytes() {
+        Some(bytes) => println!(
+            "- peak resident {:.1} MB measured process-wide; {:.1} MB estimated for the \
+             interpolation's live arrays\n",
+            bytes as f64 / 1e6,
+            estimated as f64 / 1e6
+        ),
+        None => println!(
+            "- {:.1} MB estimated for the interpolation's live arrays; no process measurement on \
+             this platform\n",
+            estimated as f64 / 1e6
+        ),
+    }
 
     let mut record = RunRecord::new(
         manifest,
@@ -304,19 +428,42 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
         RunOutcome::SliceEstablishedNothing
     };
     record.verification = format!(
-        "{} candidates checked by running permutation_plus_linear; {} verified",
-        candidates.len(),
-        witnesses
+        "{} candidate pairs checked by running permutation_plus_linear ({} verified); the \
+         resultant itself checked against a direct Sylvester determinant at {} points outside \
+         the interpolation domain",
+        pairs.len(),
+        witnesses,
+        fresh
     );
+    let mut eliminated = StageCost::new(Stage::Elimination, elimination)
+        .with("resultant_degree", resultant.degree() as i64)
+        .with("bezout_bound", bezout as i64)
+        .with("degree_bound", stages.degree_bound as i64)
+        .with("samples", stages.samples as i64)
+        .with("matrix_order", stages.matrix_order as i64)
+        .with("sampling_us", stages.sampling.as_micros() as i64)
+        .with("interpolation_us", stages.interpolation.as_micros() as i64);
+    if let Some(rstages) = reference_stages {
+        eliminated = eliminated
+            .with("reference_samples", rstages.samples as i64)
+            .with("reference_sampling_us", rstages.sampling.as_micros() as i64)
+            .with(
+                "reference_interpolation_us",
+                rstages.interpolation.as_micros() as i64,
+            );
+    }
     record.stages = vec![
         StageCost::new(Stage::Generation, built.elapsed)
             .with("bivariate_degree", built.degrees[0] as i64)
             .with("terms", built.terms[0] as i64),
-        StageCost::new(Stage::Elimination, elimination)
-            .with("resultant_degree", resultant.degree() as i64)
-            .with("bezout_bound", bezout as i64),
-        StageCost::new(Stage::Univariate, root_finding).with("roots", candidates.len() as i64),
-        StageCost::new(Stage::Verification, verification).with("witnesses", witnesses as i64),
+        eliminated,
+        StageCost::new(Stage::Univariate, root_finding + lifting)
+            .with("roots", candidates.len() as i64)
+            .with("lifted_pairs", pairs.len() as i64)
+            .with("lifting_us", lifting.as_micros() as i64),
+        StageCost::new(Stage::Verification, verification + independent)
+            .with("witnesses", witnesses as i64)
+            .with("off_domain_checks", fresh as i64),
     ];
     record.environment = Environment {
         commit: commit(),
@@ -334,6 +481,52 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     };
     record.reproduce = "cargo run --release --example resultant_cico -- --write".to_string();
     Some(record)
+}
+
+/// How many fresh points agree with a direct Sylvester determinant.
+///
+/// Fresh means *outside the interpolation domain*: the subgroup of `2^k`-th roots of unity is
+/// exactly the elements with `x^(2^k) = 1`, so anything else was never sampled. A polynomial of
+/// degree below the domain size that agrees with the determinant on the whole domain **and** at a
+/// point off it can only be the resultant.
+fn off_domain_check(
+    f: &MultivariatePolynomial<2, K>,
+    g: &MultivariatePolynomial<2, K>,
+    resultant: &UnivariatePolynomial<K>,
+    route: &ResultantRoute,
+    wanted: usize,
+) -> usize {
+    let in_domain: Box<dyn Fn(&K) -> bool> = match route {
+        ResultantRoute::Ntt { log_size } => {
+            let order = 1u128 << log_size;
+            Box::new(move |x: &K| x.is_zero() || x.pow(order).is_one())
+        }
+        // Consecutive points `0, 1, ..., points - 1`.
+        ResultantRoute::Lagrange { points } => {
+            let points = *points as u64;
+            Box::new(move |x: &K| (0..points).any(|i| *x == K::new(i)))
+        }
+    };
+
+    let mut rng = StdRng::seed_from_u64(0x00ff_d01a);
+    let mut agreed = 0usize;
+    let mut drawn = 0usize;
+    while agreed < wanted && drawn < 4 * wanted {
+        let x = K::random(&mut rng);
+        drawn += 1;
+        if in_domain(&x) {
+            continue;
+        }
+        let direct = sylvester_determinant_at(f, g, 1, x).expect("both involve the second");
+        assert_eq!(
+            resultant.eval(&x),
+            direct,
+            "the interpolated resultant disagrees with the determinant at {}",
+            x
+        );
+        agreed += 1;
+    }
+    agreed
 }
 
 /// The commit this was built from.
