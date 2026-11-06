@@ -514,10 +514,62 @@ State the consequence rather than discovering it mid-run: if the off-domain chec
 the row's result. It would be the first experimental counterexample to [JAZ] slide 22's formula and
 a more interesting outcome than the witness.
 
+### 7.8 The row, run: a verified six-round witness
+
+**`poseidon31-cico-t16-rf2-rp4` solved.** 32 workers on cores 0–31, under `tools/benchlock.sh`,
+seed 1, the same slice M23-B and M23-C measured.
+
+| stage | measured | predicted (§7.4) | |
+|---|---:|---:|---|
+| symbolic bivariate build | **49.83 min** | 48.37 min (measured first) | 1.03x |
+| 6 562 order-1458 determinants, 32 workers | **9.22 min** | 7.1 min | 1.30x |
+| off-domain validation, 8 fresh points | 17.4 s | ~17 s | 1.00x |
+| interpolation at 6 562 points | 394 ms | ~0.4 s | — |
+| root finding at degree 6 561 | 4.07 s | ~4 s | 1.02x |
+| lifting and verification | 87 ms | ms | — |
+| **total** | **59.71 min** | ~57 min | **1.05x** |
+
+Peak RSS **56 987 MB**, within 0.03% of the build probe's 57 003 MB — the build is the whole
+footprint and the 32 concurrent order-1458 matrices are 544 MB beside it.
+
+> **The witness is `x = 941710918, y = 475196876`, and `permutation_plus_linear` returns zero in the
+> first two output words.** One base-field root, one candidate lifted, one verified witness,
+> checked by `CicoInstance::is_solution` — the same verifier every other registered result in this
+> repository is checked by.
+
+`Significance` reports it as `ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" }` at
+`R_F = 2, R_P = 4` against an official `R_F = 6, R_P = 8`. **It says nothing about the official
+target.** What it says is that the verified attack frontier moved from **four rounds to six** on a
+faithful reduced-round instance, by a route whose cost is written down.
+
+**Three things this row establishes beyond the witness.**
+
+1. **The published `d^{2R_F+R_P}` degree formula is confirmed at six rounds**, where it is
+   discriminating. The observed resultant degree is **6 561 against a Bézout `d²` of 531 441 — 81x
+   below it**, and 8 points outside the sample set agree with a direct Sylvester determinant. The
+   three confirmations in `resultant-elimination.md` §6.3 were all at four rounds or fewer; this is
+   the first at six, and the factor separating the two formulas is 81x rather than 9x. [JAZ] slide
+   22's claim remains experimental and is now experimentally supported one rung further out.
+2. **§7.6's warning was load-bearing and the run printed it before starting.** The proven `2d²`
+   fallback would need 1 062 883 samples — **19.29 h** — so the A/B control was skipped by the
+   budget and the prediction was the only affordable route. Had the off-domain check refused, the
+   row's result would have been *prediction falsified, generic bound unaffordable*. It held.
+3. **#179 is what made the row exist.** 6 562 samples against 1 062 883 is exactly 162x, and at the
+   measured 2.70 s of core-time per order-1458 determinant the generic bound is 19.3 h of
+   determinants where the prediction is 9.2 min on 32 cores.
+
+The only prediction materially off is the determinant stage at 1.30x: 84.3 ms of wall per
+determinant across 32 workers is 2.70 s of core-time against the 2.09 s extrapolated from order
+162 by `(order/162)³`. A dense-LU cubic law understating a 9x jump in matrix order by 29% is a
+better outcome than that extrapolation deserved, and the shortfall is in the right direction to be
+cache behaviour at order 1 458 rather than a wrong exponent.
+
 ### 7.7 Success criterion
 
 > Produce the first verified six-round full-width Poseidon reduction by Zeebra's resultant method,
 > or establish a measured, resource-attributed reason it remains impractical.
+
+**Met, by the first clause.** §7.8.
 
 A witness here would be `Significance::ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" }` at
 `R_F = 2, R_P = 4` against an official `R_F = 6, R_P = 8`. It says nothing about the official target
