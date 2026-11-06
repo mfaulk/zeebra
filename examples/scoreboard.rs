@@ -1359,6 +1359,9 @@ fn detect_environment() -> Environment {
                 .unwrap_or(0),
             std::env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unpinned".to_string())
         ),
+        // Every solver this runner drives is single-threaded. The field exists so that a row which
+        // is not cannot be compared against one of these by accident.
+        concurrency: 1,
         build: format!(
             "{}, RUSTFLAGS={}",
             if cfg!(debug_assertions) {
