@@ -1,6 +1,6 @@
 # M23 — Cryptanalysis Scoreboard and Structural Attack Development
 
-**Status:** open (M23-0 merged)
+**Status:** complete
 **Prerequisite:** M22, merged
 **Research issues:** #65, #71, #73 (registry and schema), #77 (methodology), #78, #81 (full-width
 generation and solving-degree), #79 (formulation comparison), #70, #80 (external coverage), #82,
@@ -115,8 +115,9 @@ pinned in `test_the_derived_constants_are_pinned` for that reason.
 
 ### 4.2 The frozen registry
 
-Twenty-two problems, frozen before the benchmark ran. `test_the_registry_is_frozen` pins every id
-and digest, so redefining a row fails a test; adding one is a deliberate edit.
+Twenty-two problems, frozen before the benchmark ran — and three more added in M23-D, which the
+freeze test caught as an addition rather than a redefinition. `test_the_registry_is_frozen` pins
+every id and digest, so redefining a row fails a test; adding one is a deliberate edit.
 
 | id | class | vars | eqs | external status |
 |---|---|---:|---:|---|
@@ -146,6 +147,14 @@ and digest, so redefining a row fails a test; adding one is a deliberate edit.
 `N − E = t − 2k = 12` on every Poseidon row with `k = 2`, whatever the rounds — the underdetermined
 direction M22-E found to matter more than state width does not shrink along the ladder, which is
 why §6's M23-B benchmarks slices as well as the unspecialized system.
+
+M23-D added `poseidon256-cico-2025-rf6-rp11`, `poseidon256-cico-2025-rf6-rp16` and
+`poseidon64-cico-2025-rf6-rp13`: three tiers of the initiative's **2025** program that it still
+lists as unsolved. Their objective constrains the *trailing* words rather than the leading ones —
+`Perm(X1,...,X14,0,0) = (Y1,...,Y14,0,0)` — which is a different ideal and not a relabelling, so
+`Objective::CicoExactTrailing` names it and nothing generates it. They are the only rows in the
+registry with no public solution recorded, and both `cico_instance` and `dispatch_cico` refuse them
+by name. See `docs/research/poseidon.md` §5a.
 
 The last row is registered and deliberately not implemented. `SUPPORTED_DIMENSIONS` stops at 20,
 its file checksum is empty because this repository does not hold those bytes, and its purpose is to
@@ -257,6 +266,158 @@ no reader would mean either losing every earlier milestone's results on each run
 dependency to read back what eighty lines wrote. Floats are rejected rather than accepted and
 truncated, which keeps the no-float invariant on the way in as well as out.
 
+## 5b. The milestone report
+
+### 5b.1 What public problem can zeebra solve?
+
+Three answers, at three levels of fidelity, and the scoreboard keeps them apart.
+
+| class | hardest solved | evidence |
+|---|---|---|
+| official | Fukuoka MQ type III `n = 15` | the published answer, recovered without being given it, `D = 1`, 7.9 s |
+| faithful reduction | Poseidon-31 CICO at **`t = 16`**, `R_F = 2`, `R_P = 0`, sliced | 3 witnesses in 8 precommitted slices, each checked by running the permutation |
+| engineering surrogate | `t = 2`, `R_F = 4`, planted | 371 ms |
+
+**The `t = 16` witness is the milestone's result.** It is a 14-word input whose first two words are
+the challenge's own `0xc09de4, 0xee6282` and for which `permutation_plus_linear` returns zero in the
+first two output words, exactly, over KoalaBear at the official state width with the official
+objective. `Significance` reports it as `ReducedInstanceWitness { of: "poseidon31-cico-rf6-rp8" }`:
+a real result about a genuinely easier problem, and not evidence about any official target.
+
+Is it a reproduction or a first? Neither — it is a witness for a *reduction*, which is a third
+thing, and the type says so rather than leaving it to a sentence. The three official CICO targets
+were solved externally in 2026; the strongest claim available on them is a reproduction, and zeebra
+has not produced one.
+
+### 5b.2 Where does the computation stop, and which stage got cheaper?
+
+**Nothing got cheaper.** M23 added no optimization, and the three formulations it compared are all
+*slower* than the generated layout at full width. What it produced instead is the first map of where
+the wall is:
+
+| | small instances (M21/M22) | full width (M23-B) |
+|---|---|---|
+| bound that binds | columns, 60 000 | **live entries, 20 000 000** |
+| degree at the stop | 11 | **4 to 6** |
+| direction of difficulty | the underdetermined surplus | the state width itself |
+
+Fourteen of eighteen full-width rows cross the entry cap at degree 4 or 5. The degree reached
+*falls* as the instance widens. So the obstacle at `t = 16` is matrix **density early**, not support
+growth late, and a strategy aimed at the column count is aimed at a bound that no longer binds
+first. Every M22 workstream — pair order, batch caps, Hilbert-driven selection — was aimed at
+exactly that bound.
+
+And the stage split is unambiguous on every instance that finishes: F4 is 99.5% of the full-width
+run, the conversion 0.12 s at `D = 81`, the univariate search 0.02 s, the verification 4 µs. On
+Fukuoka `n = 15` it is 7 873 ms of F4 against 0.1 ms of conversion. That answers the EF program's
+stage question for these instances: over a 31-bit field with a small quotient dimension, there is
+nothing outside F4 worth optimizing. It is also the reverse of M20's finding over a 254-bit field,
+where root-finding dominated — so "which stage dominates" is a property of the instance and the
+field, not of the pipeline.
+
+### 5b.3 What M23 corrects
+
+**M22-E's variable-ordering result does not transfer.** `last-round-first` was 1.67x faster on the
+`t = 2` surrogates and is **0.42x** at `t = 16` — 2.4x slower, with 2.5x the peak memory. The
+mechanism is unchanged; what changed is that the first round introduces sixteen variables rather
+than two, so there is no small block to front-load. This is the clearest vindication of the
+milestone's premise: an optimization validated on a surrogate was not evidence about the real
+width, and only measuring against a registered full-width problem showed it.
+
+**A campaign over trials that never finished has no success rate.** The first type VI `n = 15`
+campaign printed "0 witnesses in 8 slices; success rate 0.00% to 32.44%" when all eight slices had
+crossed the entry cap. That is a claim about the instance from trials that tested the budget.
+`Campaign::stopped`, `decided()` and a `None` interval now make it impossible to state.
+
+**An affine elimination can cost more than it saves.** Projecting the full-width slice to 32
+variables makes F4 1.16x faster and the run 1.5x slower, because the sweep itself takes 19.95 s
+against the 4.2 s it saves. At `t = 2` the sweep was microseconds and nobody had measured it.
+
+### 5b.4 Which bottleneck most limits further progress
+
+**The Macaulay matrix's density at degree 4–5 in the S-box-per-variable formulation**, and the
+formulation is the part worth attacking.
+
+The evidence that it is the formulation rather than the engine is M23-E: on the *same* registered
+slice, eliminating the 32 S-box variables by straight-line evaluation and taking one resultant
+solves in **52 ms** what F4 takes **30 142 ms** to solve — a 578x difference — and returns all
+three base-field witnesses where F4 returns the first. The S-box-per-variable formulation exists to
+hold the degree at 3 and pays 32 variables for it; when only two inputs are free, those variables
+are the whole cost and the degree it avoids (`3^rounds`) is affordable.
+
+That bounds where to look next in both directions:
+
+- **Not** in F4's scheduling. M22 measured 7%–14.5% on structural counters there, and M23-B shows
+  the binding bound is a different one.
+- **In the formulation**, where the measured factor is nearly three orders of magnitude on the
+  instance shape that matters. The resultant route does **not** reach further than F4 — both stop at
+  two rounds — but its limit is arithmetic and written down (`16 · 3^{5·rounds}` field operations)
+  where F4's is a matrix nobody can bound in advance. A cost difference of 578x at the shared
+  frontier is the finding; an extension of the frontier is not.
+- **And, unexpectedly, in `lagrange_interpolate`**, which M23-E measured at `O(n³)`: 7.4x–7.9x per
+  doubling of the point count, 12.9 s at 2 000 points, extrapolating to about an hour at the 13 123
+  the four-round row needs — against a few minutes for all of that row's determinants together.
+  Attempting a row that does not finish is what found it, and it reordered the spike's own list of
+  what to fix.
+
+### 5b.5 The same instances across three milestones
+
+Historical results are preserved rather than overwritten — `results/history.json` is appended, never
+rewritten from loaded records — so the same problem can be followed across milestones. Two views,
+kept apart because they answer different questions.
+
+**Identical instances, same configuration.** This is the regression view, and it should be flat:
+
+| instance | M21 | M22 | M23 |
+|---|---|---|---|
+| Fukuoka III `n=10` | 111 ms | 118.6 ms uncapped, **32.7 ms** at a 64-pair cap | 114 ms |
+| Poseidon `t=2 R_F=4` surrogate | 371 ms | 351.9 ms, **218.7 ms** last-round-first | 371 ms |
+| Poseidon `t=3 R_F=2 R_P=1` | column budget at 18 167 ms | 18 167 ms, 42 229 columns | 17 091 ms, 42 229 columns |
+
+It is flat, which is what it should be: M23 added no optimization. The one thing this view shows is
+that **the scoreboard's figures are the default configuration's** — M22's 3.6x on Fukuoka `n = 10`
+came from a 64-pair batch cap that M22 deliberately did not make the default, so the scoreboard
+reproduces M21's number and not M22's best. A scoreboard that quoted the best configuration per row
+would not describe what the library does.
+
+**Advance to harder instances.** This is the frontier view:
+
+| problem | M21 | M22 | M23 |
+|---|---|---|---|
+| Fukuoka III `n=15` | not established | basis computed, 3 829 ms capped | **verified witness, and it is the published answer**, 7 874 ms |
+| Fukuoka III `n=20` | — | — | stopped at the entry cap, degree 5 |
+| Fukuoka VI `n=10` | dead slices measured | witnesses on two slices | **6 witnesses in 8 slices**, 0.8 s per witness, rate 40.9%–92.9% |
+| Fukuoka VI `n=15` | — | — | eight slices, **no verdict**: all crossed the entry cap at degree 9 |
+| Poseidon `t = 16`, any rounds | no attempt | not the main benchmark | **verified witness** at `R_F=2, R_P=0` sliced; an eighteen-row ladder with every stop named |
+| a non-Gröbner elimination | — | deferred | a resultant, **578x** faster on the same slice |
+
+### 5b.6 One deviation from the plan, with its reason
+
+The plan asked for content hashes of "any equivalent transformed representation". M23 records a
+transformation by **name and seed** — `slice(12 fixed, seed 1) + last-round-first` — and not by a
+digest of the transformed system. A digest would pin *which* system was measured, which the name
+and the seed already do (`Specialization::seeded` promises the slice reconstructs); what it would
+not do is establish equivalence, since two presentations of one ideal have different digests by
+construction. The equivalence evidence used instead is stronger: all four formulations of the
+full-width slice report the same quotient dimension `D = 81` — an invariant no relabelling or affine
+projection can move — and each recovers a witness that passes the permutation check after its own
+inverse is applied.
+
+### 5b.7 What M23 does not claim
+
+- No official target was solved, and the three CICO targets were solved externally by other attacks
+  in 2026. Nothing here is a step toward them that can be quantified as a fraction.
+- The full-width witness is at `R_F = 2, R_P = 0` against an official `R_F = 6, R_P ∈ {6, 8, 10}`.
+  The 2025 program's tiers at comparable round counts — over a *different* objective — were claimed
+  by others in 2024 and 2025, which says those round counts are reachable by some attack and not by
+  this one.
+- Every figure comes from one machine under a stated budget, and runtime differences inside ±20%
+  are not read.
+- The scoreboard's numbers are the **default** configuration's. M22 measured a 64-pair batch cap at
+  3.6x on Fukuoka III `n = 10` and deliberately did not make it the default; the scoreboard
+  therefore reproduces M21's 114 ms rather than M22's 32.7 ms on that row. A scoreboard that quoted
+  the best configuration per row would not describe what the library does.
+
 ## 6. Sub-milestones
 
 | phase | workstream | deliverable |
@@ -268,6 +429,18 @@ truncated, which keeps the no-float invariant on the way in as well as out.
 | M23-D | external benchmark expansion | Fukuoka III `n=15` witness, VI `n=15` campaign, one historical EF target |
 | M23-E | resultant feasibility | a bounded spike on one small instance, with the negative result recorded if that is the result |
 | M23-I | integration | scoreboard with history, M21/M22/M23 comparison, milestone report |
+
+### What each one produced
+
+| phase | PR | outcome |
+|---|---|---|
+| M23-0 | #143 | 22 problems frozen with digests; SHA-256 hand-written; `Significance` computed |
+| M23-A | #145 | run records, three refusals, stage-split costs, campaign statistics, a JSON reader |
+| M23-B | #152 | eighteen full-width rows; **a verified witness at `t = 16`**; the binding bound moves to live entries |
+| M23-C | #152 | four formulations compared; M22-E's winner is 2.4x **worse** at full width |
+| M23-D | #153 | Fukuoka `n = 15` recovers the published answer; three open 2025 tiers registered; the campaign-rate correction |
+| M23-E | #157 | a resultant solves the same slice **578x** faster than F4, and reaches no further |
+| M23-I | #158 | the scoreboard, the history, and §5b's report |
 
 ### Acceptance criteria
 
@@ -309,6 +482,15 @@ Three tiers, because a scoreboard that runs everything on every pull request sto
 | stable suite | on `main` and on demand | runtime and memory across commits, on one machine with a stated affinity policy |
 | frontier | on demand | larger budgets, new full-width or larger MQ attempts |
 
+**The stable suite does not run on CI, and that is deliberate.** Every figure in these documents
+comes from one workstation, pinned, under a stated budget; a GitHub-hosted runner's timings are not
+comparable with them, so a scheduled job there would produce numbers that could not be put in the
+same table. CI runs the correctness smoke tier — which asserts outcomes, not durations — and the
+stable and frontier tiers are run by hand on the designated machine through
+`tools/scoreboard.sh`, whose records carry the machine, the build and the affinity so a reader can
+see which runs are comparable. `workflow_dispatch` is available for a branch that wants the smoke
+tier on demand.
+
 Performance comparisons state the machine, the compiler flags and the core-affinity policy, and
 follow the A/B discipline M19 settled on: two binaries from one tree, interleaved, pinned. This
 machine's run-to-run variation is about 6%, and M22 declined to read runtime differences inside
@@ -343,6 +525,27 @@ process memory.
 
 No part of this is met by weakening a problem, silently changing a constraint, or omitting a failed
 run.
+
+## 9a. Definition of done, item by item
+
+| item | status |
+|---|---|
+| a generated scoreboard with immutable identifiers and historical results | **met** — `research/scoreboard/`, rendered from the accumulated history |
+| all three official CICO targets registered and independently checkable | **met** — and their external status recorded with dates |
+| a full-width reduced-round ladder attempted under controlled budgets | **met** — eighteen rows, every stop a reproducible resource bound |
+| at least one full-width structural transformation validated and measured | **met** — four formulations, same `D`, same witness, measured apart |
+| a harder Fukuoka benchmark investigated, outcome documented either way | **met** — III `n = 15` solved to the published answer, III `n = 20` out of reach, VI `n = 15` undecided, VI `n = 10` measured at 0.8 s per witness |
+| separate F4, FGLM, root-solving and verification figures wherever reached | **met** — every run record carries the stage split |
+| a comparison against a fundamentally different elimination method | **met** — M23-E, 578x on the same slice |
+| a report naming the bottleneck that most limits further progress | **met** — §5b.4 |
+
+Two things the milestone did **not** do, stated rather than omitted:
+
+- **No optimization.** Nothing here made any instance faster. The three formulations compared are
+  all slower than the generated layout at full width, and the one route that is dramatically faster
+  — the resultant — is an elimination method rather than an improvement to the engine.
+- **No official target.** The hardest official problem solved is a Fukuoka toy example published
+  with its answer. The `t = 16` witness is for a registered reduction.
 
 ## 10. Reproducing
 

@@ -77,11 +77,21 @@ mod tests {
     /// resident memory. It is deliberately not asserted to stay raised afterwards — see
     /// [`peak_resident_bytes`] on why that does not hold everywhere.
     ///
-    /// The baseline is `VmRSS` and not `VmHWM`, which is what this asserted until #170. Both
-    /// figures are process-wide, but `VmHWM` is a high-water mark: under a harness that shares one
-    /// process across tests it sits wherever the suite's largest transient left it, arbitrarily
-    /// far above live RSS, and no ballast this test can afford will clear that. Live RSS has no
-    /// such history, so what is left is only concurrent noise, which the slack below absorbs.
+    /// # Why the baseline is `VmRSS` and not the peak
+    ///
+    /// The peak is a **high-water mark**, so touching 32 MB raises it above the *previous peak*
+    /// only when the process is already within 32 MB of that mark. Under the built-in harness
+    /// every test shares one process, so a test that allocated 150 MB and freed it leaves this one
+    /// 150 MB below the mark and no fixed ballast can move it — which is what broke this test when
+    /// M23 added tests that build 46-variable polynomial systems.
+    ///
+    /// Baselining on live RSS removes that history: after the ballast is resident the live size is
+    /// `before + 32 MB`, and the peak is at least the live size, whatever the mark was beforehand.
+    /// The alternative is to measure the gap to the mark and allocate `gap + 32 MB`, which this did
+    /// briefly; that keeps the peak as the baseline but makes the allocation as large as the
+    /// suite's largest freed transient, so it grows with exactly the thing that broke the fixed
+    /// ballast. A constant 32 MB is enough here. Under `cargo nextest`, which CI uses, each test
+    /// has its own process and the gap is nearly zero either way.
     #[cfg(target_os = "linux")]
     #[test]
     fn test_touching_memory_raises_the_peak() {

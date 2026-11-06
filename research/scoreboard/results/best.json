@@ -158,6 +158,88 @@
     },
     {
       "schema": 1,
+      "challenge": "fukuoka-mq-VI-n10-seed0",
+      "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+      "class": "official",
+      "formulation": "slice(3 fixed, seed 7)",
+      "transformations": [
+        "specialize variables 7..10 at seed 7"
+      ],
+      "outcome": "verified_witness",
+      "significance": "reproduction of a challenge solved externally on publication",
+      "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+      "elapsed_nanos": 577755073,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 86694,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 10,
+            "equations": 10
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 566307707,
+          "estimated_peak_bytes": 4673744,
+          "detail": {
+            "max_matrix_rows": 4980,
+            "max_matrix_columns": 5102,
+            "max_pair_degree": 9,
+            "pairs_considered": 337,
+            "pairs_reduced": 337,
+            "elements_added": 65
+          }
+        },
+        {
+          "stage": "conversion",
+          "elapsed_nanos": 10930707,
+          "estimated_peak_bytes": 879216,
+          "detail": {
+            "quotient_dimension": 128
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 407592,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "lex_basis_elements": 10
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 22373,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": {
+        "completed": true,
+        "max_pair_degree": 9,
+        "highest_completed_degree": 9,
+        "max_matrix_rows": 4980,
+        "max_matrix_columns": 5102,
+        "peak_live_nonzeros": 289558,
+        "peak_estimated_bytes": 4673744,
+        "pairs_reduced": 337,
+        "elements_added": 65,
+        "quotient_dimension": 128
+      },
+      "campaign": null,
+      "environment": {
+        "commit": "9c8b80d",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+    },
+    {
+      "schema": 1,
       "challenge": "poseidon-t2-rf2-rp0-planted",
       "challenge_digest": "9e98ebc3abecbf51f044e0f54f48e5969aeaa95509d074170fc3edd4410dfcb1",
       "class": "engineering",
@@ -395,83 +477,63 @@
       "challenge": "poseidon31-cico-t16-rf2-rp0",
       "challenge_digest": "56ccc99d85e099ce212311850170489f95b86495dc36d3823cdc9f14f24f7dad",
       "class": "faithful-reduction",
-      "formulation": "slice(12 fixed, seed 2)",
+      "formulation": "resultant, slice(12 fixed, seed 1)",
       "transformations": [
-        "specialize free inputs 2..14 at seed 2 (12 values)"
+        "specialize free inputs 2..14 at seed 1",
+        "evaluate the 32 S-box variables away: two bivariate polynomials of degree 9",
+        "eliminate the second unknown by a Sylvester resultant"
       ],
       "outcome": "verified_witness",
       "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
-      "verification": "no candidate was produced, so nothing was verified",
-      "elapsed_nanos": 30107857915,
+      "verification": "3 candidates checked by running permutation_plus_linear; 3 verified",
+      "elapsed_nanos": 51858487,
       "stages": [
         {
           "stage": "generation",
-          "elapsed_nanos": 51650576,
+          "elapsed_nanos": 2796634,
           "estimated_peak_bytes": null,
           "detail": {
-            "variables": 46,
-            "equations": 46,
-            "free_inputs": 14
+            "bivariate_degree": 9,
+            "terms": 55
           }
         },
         {
-          "stage": "grobner",
-          "elapsed_nanos": 29913306997,
-          "estimated_peak_bytes": 102778752,
+          "stage": "elimination",
+          "elapsed_nanos": 31069690,
+          "estimated_peak_bytes": null,
           "detail": {
-            "max_matrix_rows": 20866,
-            "max_matrix_columns": 17424,
-            "max_pair_degree": 4,
-            "pairs_considered": 5815,
-            "pairs_reduced": 5815,
-            "elements_added": 545
-          }
-        },
-        {
-          "stage": "conversion",
-          "elapsed_nanos": 121906186,
-          "estimated_peak_bytes": 1891792,
-          "detail": {
-            "quotient_dimension": 81
+            "resultant_degree": 81,
+            "bezout_bound": 81
           }
         },
         {
           "stage": "univariate",
-          "elapsed_nanos": 20990469,
+          "elapsed_nanos": 17468962,
           "estimated_peak_bytes": null,
           "detail": {
-            "lex_basis_elements": 46
+            "roots": 3
           }
         },
         {
           "stage": "verification",
-          "elapsed_nanos": 3687,
+          "elapsed_nanos": 523201,
           "estimated_peak_bytes": null,
-          "detail": {}
+          "detail": {
+            "witnesses": 3
+          }
         }
       ],
-      "grobner_frontier": {
-        "completed": true,
-        "max_pair_degree": 4,
-        "highest_completed_degree": 4,
-        "max_matrix_rows": 20866,
-        "max_matrix_columns": 17424,
-        "peak_live_nonzeros": 6414960,
-        "peak_estimated_bytes": 102778752,
-        "pairs_reduced": 5815,
-        "elements_added": 545,
-        "quotient_dimension": 81
-      },
+      "grobner_frontier": null,
       "campaign": null,
       "environment": {
-        "commit": "7e333fb",
+        "commit": "744fdf9",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
-        "build": "release, RUSTFLAGS=default",
-        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 180 s as a backstop"
+        "build": "release, RUSTFLAGS from .cargo/config.toml",
+        "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
       },
       "experiment": null,
-      "reproduce": "ZEEBRA_WALL_SECONDS=180 tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp0 --slice 2"
+      "reproduce": "cargo run --release --example resultant_cico -- --write"
     }
   ]
 }
