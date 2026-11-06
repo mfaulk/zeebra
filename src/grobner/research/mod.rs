@@ -17,6 +17,7 @@ pub mod resultant;
 pub mod scoreboard;
 pub mod slices;
 pub mod specialization;
+pub mod univariate_cico;
 
 pub use challenge::{
     challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeManifest,
@@ -44,3 +45,7 @@ pub use scoreboard::{
 };
 pub use slices::{solve_slice, SliceOutcome};
 pub use specialization::{satisfies, specialize, Specialization, SpecializationError};
+pub use univariate_cico::{
+    cico_univariate, cico_univariate_family, degree_bound, parametrize, univariate_route,
+    CicoFamily, FamilyError, UnivariateRoute, SYMBOLIC_CROSSOVER,
+};
