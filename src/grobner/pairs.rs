@@ -217,6 +217,15 @@ pub fn are_relatively_prime<const N: usize>(a: &Monomial<N>, b: &Monomial<N>) ->
 ///
 /// - [`PairSchedule::SmallMultiplierDegree`] is the degree heuristic.
 /// - [`PairSchedule::SmallMultiplierMonomial`] is the published ordering.
+///
+/// # Multiplier size against term count, which is a different axis
+///
+/// Every schedule above ranks by the size of the multiplier. [`PairSchedule::ShortPair`] ranks by
+/// how many terms the two polynomials have, which is orthogonal to all of them: two pairs with the
+/// same lcm and the same multipliers can have S-polynomials of very different length. It is
+/// `slimgb`'s `pair_weighted_length` (Singular, `kernel/GBEngine/tgb.cc`) specialized to a prime
+/// field, where the coefficient-size factors drop out and the score is `terms(i) + terms(j) - 2`.
+/// See `docs/research/singular-engine-notes.md` §4.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PairSchedule {
     /// Lowest lcm degree first, then the lcm and the two indices. The measured baseline.
@@ -246,16 +255,38 @@ pub enum PairSchedule {
 
     /// Within a degree, the *largest* larger multiplier monomial first. The control for the above.
     LargeMultiplierMonomial,
+
+    /// Within a degree, the pair whose S-polynomial is expected to be shortest first.
+    ///
+    /// The score is `slimgb`'s `pair_weighted_length` over a prime field —
+    /// `terms(left) + terms(right) - 2` — and the mechanism is that the two pair rows are the
+    /// shifted basis elements, so a pair of sparse polynomials is two sparse rows and fewer
+    /// monomials for symbolic preprocessing to cover. Orthogonal to the multiplier-size schedules:
+    /// it says nothing about the shift and they say nothing about the length.
+    ///
+    /// Needs the basis's term counts, which a pair does not carry —
+    /// [`PairQueue::seeded_from_leads_ranked`] is how they get in.
+    ShortPair,
+
+    /// Within a degree, the pair whose S-polynomial is expected to be *longest* first.
+    ///
+    /// The control for [`PairSchedule::ShortPair`], and not optional. If preferring short pairs
+    /// narrows the matrix, preferring long ones should widen it; a heuristic that beats the
+    /// baseline in both directions is measuring run-to-run variation, and without the opposite
+    /// direction there is no way to tell.
+    LongPair,
 }
 
 impl PairSchedule {
     /// Every schedule, for an ablation that should not have to be edited when one is added.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::DegreeThenLcm,
         Self::SmallMultiplierDegree,
         Self::LargeMultiplierDegree,
         Self::SmallMultiplierMonomial,
         Self::LargeMultiplierMonomial,
+        Self::ShortPair,
+        Self::LongPair,
     ];
 
     /// A short name, for a table column.
@@ -266,6 +297,8 @@ impl PairSchedule {
             Self::LargeMultiplierDegree => "large-multiplier-degree",
             Self::SmallMultiplierMonomial => "small-multiplier-monomial",
             Self::LargeMultiplierMonomial => "large-multiplier-monomial",
+            Self::ShortPair => "short-pair",
+            Self::LongPair => "long-pair",
         }
     }
 
@@ -277,6 +310,14 @@ impl PairSchedule {
             self,
             Self::SmallMultiplierMonomial | Self::LargeMultiplierMonomial
         )
+    }
+
+    /// True if the schedule ranks by how many terms the paired polynomials have.
+    ///
+    /// Those schedules need data a pair does not carry, so the queue has to be given the basis's
+    /// term counts; see [`PairQueue::push_term_count`].
+    pub fn ranks_by_term_count(&self) -> bool {
+        matches!(self, Self::ShortPair | Self::LongPair)
     }
 }
 
@@ -290,15 +331,26 @@ impl PairSchedule {
 struct ScheduledPair<const N: usize> {
     schedule: PairSchedule,
     order: MonomialOrder,
+
+    /// `terms(left) + terms(right) - 2`, the key [`PairSchedule::ShortPair`] ranks by. Zero under
+    /// every other schedule, which does not read it.
+    ///
+    /// Here rather than on [`CriticalPair`] because it is not a property of the pair: it needs the
+    /// two polynomials, and a pair deliberately carries leading monomials and indices only. The
+    /// queue's term-count table supplies it, so within one queue it *is* a function of the pair —
+    /// which is what keeps the `Ord` below consistent with the `Eq` beside it.
+    pair_length: u64,
+
     pair: CriticalPair<N>,
 }
 
 /// Equality on the pair alone, so that `Ord` and `Eq` cannot disagree.
 ///
-/// Derived equality would compare the schedule and the order too, and `Ord` below returns `Equal`
-/// exactly when the two pairs are the same pair — so two entries with equal pairs and different
-/// schedules would be ordered equal and compare unequal, which `Ord`'s contract forbids. The queue
-/// never holds mixed schedules, so this is unreachable rather than a bug being papered over; it is
+/// Derived equality would compare the schedule, the order and the length too, and `Ord` below
+/// returns `Equal` exactly when the two pairs are the same pair — so two entries with equal pairs
+/// and different schedules would be ordered equal and compare unequal, which `Ord`'s contract
+/// forbids. The queue never holds mixed schedules, and its term-count table is append-only so a
+/// pair's length never changes, so this is unreachable rather than a bug being papered over; it is
 /// written this way so that the types agree without depending on that.
 impl<const N: usize> PartialEq for ScheduledPair<N> {
     fn eq(&self, other: &Self) -> bool {
@@ -346,6 +398,8 @@ impl<const N: usize> Ord for ScheduledPair<N> {
                 PairSchedule::LargeMultiplierMonomial => order
                     .cmp(&theirs.larger_multiplier, &mine.larger_multiplier)
                     .then(order.cmp(&theirs.smaller_multiplier, &mine.smaller_multiplier)),
+                PairSchedule::ShortPair => self.pair_length.cmp(&other.pair_length),
+                PairSchedule::LongPair => other.pair_length.cmp(&self.pair_length),
             })
             .then_with(|| fallback(mine, theirs))
     }
@@ -521,6 +575,14 @@ pub struct PairQueue<const N: usize> {
     /// Empty unless a selection strategy defers, and emptied by
     /// [`PairQueue::promote_deferred`] before the computation can end.
     deferred: Vec<CriticalPair<N>>,
+
+    /// How many terms each basis element has, in index order, for a length-ranking schedule.
+    ///
+    /// Append-only, which is the invariant a pair's rank rests on: the rank is computed when the
+    /// pair is pushed, so a count that changed under an index would let two entries for the same
+    /// pair rank differently. Empty unless the caller records them; see
+    /// [`PairQueue::push_term_count`].
+    term_counts: Vec<usize>,
 }
 
 impl<const N: usize> Default for PairQueue<N> {
@@ -567,7 +629,17 @@ impl<const N: usize> PairQueue<N> {
             schedule,
             order,
             deferred: Vec::new(),
+            term_counts: Vec::new(),
         }
+    }
+
+    /// Record how many terms the next basis element has, for a schedule that ranks by it.
+    ///
+    /// Append-only by construction, so the counts a pushed pair was ranked with cannot be
+    /// rewritten. The basis both engines maintain is append-only too, so this is the shape the
+    /// data already has: call it once per element, before that element's pairs are pushed.
+    pub fn push_term_count(&mut self, terms: usize) {
+        self.term_counts.push(terms);
     }
 
     /// The schedule this queue selects under.
@@ -621,7 +693,30 @@ impl<const N: usize> PairQueue<N> {
         order: MonomialOrder,
         counts: &mut CriterionCounts,
     ) -> Self {
+        Self::seeded_from_leads_ranked(leads, &[], criteria, schedule, order, counts)
+    }
+
+    /// As [`PairQueue::seeded_from_leads_scheduled`], with the basis's term counts.
+    ///
+    /// The counts are only read by a [`PairSchedule::ranks_by_term_count`] schedule, which cannot
+    /// be driven without them; for every other schedule an empty slice gives the same queue, which
+    /// is what lets [`PairQueue::seeded_from_leads_scheduled`] keep its signature.
+    ///
+    /// # Panics
+    /// If `term_counts` is shorter than `leads` under a length-ranking schedule — see
+    /// [`PairQueue::push_term_count`].
+    pub fn seeded_from_leads_ranked(
+        leads: &[Monomial<N>],
+        term_counts: &[usize],
+        criteria: &PairCriteria,
+        schedule: PairSchedule,
+        order: MonomialOrder,
+        counts: &mut CriterionCounts,
+    ) -> Self {
         let mut queue = Self::scheduled_in(schedule, order);
+        for &terms in term_counts {
+            queue.push_term_count(terms);
+        }
         for right in 0..leads.len() {
             queue.push_pairs_from_leads(leads, right, criteria, counts);
         }
@@ -777,11 +872,41 @@ impl<const N: usize> PairQueue<N> {
     /// schedule" an invariant rather than a convention.
     fn push(&mut self, pair: CriticalPair<N>) {
         self.live += 1;
+        let pair_length = self.pair_length(&pair);
         self.pending.push(Reverse(ScheduledPair {
             schedule: self.schedule,
             order: self.order,
+            pair_length,
             pair,
         }));
+    }
+
+    /// `slimgb`'s `pair_weighted_length` over a prime field: `terms(left) + terms(right) - 2`.
+    ///
+    /// Zero under a schedule that does not rank by it, so the term counts are only required where
+    /// they are read. A basis element has at least one term — a zero polynomial has no leading
+    /// monomial and is not one — so the published `- 2` cannot go negative.
+    ///
+    /// # Panics
+    /// If a length-ranking schedule has no recorded count for either index. Refused rather than
+    /// defaulted, for [`PairQueue::scheduled`]'s reason: a schedule silently ranking every pair
+    /// equal would fall through to the baseline's tiebreak and look like a measurement of itself.
+    fn pair_length(&self, pair: &CriticalPair<N>) -> u64 {
+        if !self.schedule.ranks_by_term_count() {
+            return 0;
+        }
+        let terms = |index: usize| -> u64 {
+            let count = self.term_counts.get(index).unwrap_or_else(|| {
+                panic!(
+                    "{} ranks by term count and basis element {} has none recorded: \
+                     seed the queue with seeded_from_leads_ranked",
+                    self.schedule.name(),
+                    index
+                )
+            });
+            *count as u64
+        };
+        (terms(pair.left) + terms(pair.right)).saturating_sub(2)
     }
 
     /// Drop lazily deleted entries from the top of the heap, so that the top is a pending pair.
@@ -1363,6 +1488,29 @@ mod tests {
         keys
     }
 
+    /// Term counts for a basis of `n` elements, spread so a length-ranking schedule has something
+    /// to order by rather than ranking every pair equal.
+    fn term_counts(n: usize) -> Vec<usize> {
+        (0..n).map(|index| 1 + (index * 3) % 5).collect()
+    }
+
+    /// A seeded queue under any schedule, including the ones that need the term counts.
+    fn seeded_under<const N: usize>(
+        leads: &[Monomial<N>],
+        criteria: &PairCriteria,
+        schedule: PairSchedule,
+        counts: &mut CriterionCounts,
+    ) -> PairQueue<N> {
+        PairQueue::seeded_from_leads_ranked(
+            leads,
+            &term_counts(leads.len()),
+            criteria,
+            schedule,
+            ORDER,
+            counts,
+        )
+    }
+
     /// The chain criterion discards a pair once both of its witness's pairs have been handled.
     #[test]
     fn test_chain_criterion_discards_a_pair_with_handled_witnesses() {
@@ -1630,13 +1778,7 @@ mod tests {
 
         for schedule in PairSchedule::ALL {
             let mut counts = CriterionCounts::default();
-            let mut queue = PairQueue::seeded_from_leads_scheduled(
-                &leads,
-                &PairCriteria::NONE,
-                schedule,
-                ORDER,
-                &mut counts,
-            );
+            let mut queue = seeded_under(&leads, &PairCriteria::NONE, schedule, &mut counts);
             assert_eq!(queue.schedule(), schedule);
 
             let mut degrees = Vec::new();
@@ -1740,13 +1882,7 @@ mod tests {
         ] {
             let of = |schedule| {
                 let mut counts = CriterionCounts::default();
-                let queue = PairQueue::seeded_from_leads_scheduled(
-                    &leads,
-                    &criteria,
-                    schedule,
-                    ORDER,
-                    &mut counts,
-                );
+                let queue = seeded_under(&leads, &criteria, schedule, &mut counts);
                 let mut keys = drain(queue);
                 keys.sort_unstable();
                 (keys, counts)
@@ -1780,13 +1916,7 @@ mod tests {
         for schedule in PairSchedule::ALL {
             let of = || {
                 let mut counts = CriterionCounts::default();
-                let queue = PairQueue::seeded_from_leads_scheduled(
-                    &leads,
-                    &PairCriteria::ALL,
-                    schedule,
-                    ORDER,
-                    &mut counts,
-                );
+                let queue = seeded_under(&leads, &PairCriteria::ALL, schedule, &mut counts);
                 (drain(queue), counts)
             };
             let first = of();
@@ -1807,13 +1937,7 @@ mod tests {
 
         for schedule in PairSchedule::ALL {
             let mut counts = CriterionCounts::default();
-            let mut queue = PairQueue::seeded_from_leads_scheduled(
-                &leads,
-                &PairCriteria::NONE,
-                schedule,
-                ORDER,
-                &mut counts,
-            );
+            let mut queue = seeded_under(&leads, &PairCriteria::NONE, schedule, &mut counts);
             let total = queue.len();
 
             let mut taken = Vec::new();
@@ -1857,13 +1981,7 @@ mod tests {
 
         for schedule in PairSchedule::ALL {
             let mut counts = CriterionCounts::default();
-            let mut queue = PairQueue::seeded_from_leads_scheduled(
-                &leads,
-                &CHAIN_ONLY,
-                schedule,
-                ORDER,
-                &mut counts,
-            );
+            let mut queue = seeded_under(&leads, &CHAIN_ONLY, schedule, &mut counts);
             let total = queue.len();
 
             let mut kept = 0;
@@ -1989,6 +2107,81 @@ mod tests {
         let _ = PairQueue::<3>::scheduled(PairSchedule::SmallMultiplierMonomial);
     }
 
+    /// Within a degree, `ShortPair` takes the pair with the fewest terms first and `LongPair` the
+    /// pair with the most.
+    #[test]
+    fn test_a_length_schedule_orders_within_a_degree() {
+        // Leading monomials x^4, x^3*y, x, y^4. Pairs (0,1) and (2,3) both have lcm degree five,
+        // so the degree cannot separate them. The term counts can: 5 + 1 - 2 = 4 against
+        // 1 + 1 - 2 = 0.
+        let leads = monomials::<3>(&[[4, 0, 0], [3, 1, 0], [1, 0, 0], [0, 4, 0]]);
+        let lengths = [5, 1, 1, 1];
+        let relative = |schedule| {
+            let mut discarded = CriterionCounts::default();
+            let queue = PairQueue::seeded_from_leads_ranked(
+                &leads,
+                &lengths,
+                &PairCriteria::NONE,
+                schedule,
+                ORDER,
+                &mut discarded,
+            );
+            drain(queue)
+                .into_iter()
+                .filter(|key| *key == (0, 1) || *key == (2, 3))
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(
+            relative(PairSchedule::ShortPair),
+            vec![(2, 3), (0, 1)],
+            "the shorter S-polynomial first"
+        );
+        assert_eq!(
+            relative(PairSchedule::LongPair),
+            vec![(0, 1), (2, 3)],
+            "and the control reverses it"
+        );
+    }
+
+    /// With every element the same length a length schedule ties everywhere and falls through to
+    /// the baseline's tiebreak, which is what keeps its order total.
+    #[test]
+    fn test_a_length_schedule_with_equal_counts_is_the_baseline_order() {
+        let leads = monomials::<3>(&[[2, 0, 1], [0, 2, 1], [1, 1, 0], [1, 0, 2], [0, 1, 1]]);
+        let equal = vec![3; leads.len()];
+        let of = |schedule, lengths: &[usize]| {
+            let mut discarded = CriterionCounts::default();
+            drain(PairQueue::seeded_from_leads_ranked(
+                &leads,
+                lengths,
+                &PairCriteria::NONE,
+                schedule,
+                ORDER,
+                &mut discarded,
+            ))
+        };
+
+        let baseline = of(PairSchedule::DegreeThenLcm, &[]);
+        assert_eq!(of(PairSchedule::ShortPair, &equal), baseline);
+        assert_eq!(of(PairSchedule::LongPair, &equal), baseline);
+    }
+
+    /// A length-ranking schedule driven without the term counts is refused, not defaulted.
+    #[test]
+    #[should_panic(expected = "ranks by term count")]
+    fn test_a_length_schedule_without_term_counts_is_refused() {
+        let leads = monomials::<3>(&[[2, 0, 0], [0, 2, 0]]);
+        let mut counts = CriterionCounts::default();
+        let _ = PairQueue::seeded_from_leads_scheduled(
+            &leads,
+            &PairCriteria::NONE,
+            PairSchedule::ShortPair,
+            ORDER,
+            &mut counts,
+        );
+    }
+
     /// The default schedule is the baseline, which is what the earlier milestones measured.
     #[test]
     fn test_the_default_schedule_is_the_baseline() {
@@ -1997,6 +2190,6 @@ mod tests {
             PairQueue::<3>::new().schedule(),
             PairSchedule::DegreeThenLcm
         );
-        assert_eq!(PairSchedule::ALL.len(), 5);
+        assert_eq!(PairSchedule::ALL.len(), 7);
     }
 }

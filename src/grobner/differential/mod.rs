@@ -205,7 +205,7 @@ mod tests {
     /// One list so the two cannot drift: a strategy added here is checked against the recorded
     /// oracle in CI and against a live Singular when one is present.
     fn m22_configurations() -> Vec<(&'static str, F4Options)> {
-        use crate::grobner::{HilbertSelection, PairSchedule};
+        use crate::grobner::{HilbertSelection, PairSchedule, ReducerSelection};
 
         vec![
             ("baseline", F4Options::default()),
@@ -220,6 +220,20 @@ mod tests {
                 "small-multiplier monomial",
                 F4Options {
                     schedule: PairSchedule::SmallMultiplierMonomial,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "short-pair",
+                F4Options {
+                    schedule: PairSchedule::ShortPair,
+                    ..F4Options::default()
+                },
+            ),
+            (
+                "fewest-terms",
+                F4Options {
+                    reducer_selection: ReducerSelection::FewestTerms,
                     ..F4Options::default()
                 },
             ),
@@ -310,6 +324,14 @@ mod tests {
         "small-multiplier monomial"
     );
     offline_oracle_test!(
+        test_short_pair_agrees_with_the_recorded_oracle,
+        "short-pair"
+    );
+    offline_oracle_test!(
+        test_fewest_terms_agrees_with_the_recorded_oracle,
+        "fewest-terms"
+    );
+    offline_oracle_test!(
         test_hilbert_observe_agrees_with_the_recorded_oracle,
         "hilbert observe"
     );
@@ -335,6 +357,8 @@ mod tests {
             "baseline",
             "small-multiplier degree",
             "small-multiplier monomial",
+            "short-pair",
+            "fewest-terms",
             "hilbert observe",
             "hilbert limited+4",
             "hilbert deferred+4",

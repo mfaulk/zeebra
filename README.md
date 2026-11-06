@@ -452,7 +452,7 @@ quadratics, deliberate counterexamples, the Fukuoka type III top forms *and* the
 inhomogeneous instances, and reduced-round Poseidon. See
 [`docs/research/hilbert-functions.md`](docs/research/hilbert-functions.md) for the tables.
 
-`f4_schedule` is M22-A's measurement: three deterministic critical-pair orders on one table per
+`f4_schedule` is M22-A's measurement: every compiled critical-pair order on one table per
 instance, with the computed basis asserted equal to the baseline's on every row. Ordering and batch
 sizing get a table each, deliberately — a sort and a cap varied together cannot be attributed —
 plus a cross product on one instance to check whether the two interact. `-- list` names the
@@ -475,9 +475,11 @@ storage at the instance's widest matrix. `-- list` names the instances; the larg
 default, because a dense representation of katsura-7 grevlex is 374 MB for a matrix holding 112k
 entries.
 
-`f4_selection` compares the two reducer-selection policies and the three cache modes against one
-common baseline, on one line each: the closure size, the largest matrix, the peak live entries, the
-row operations, the share of reducer multiples that had been needed before, and the stage times.
+`f4_selection` compares every reducer-selection policy and the cache against one common baseline,
+on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
+the share of reducer multiples that had been needed before, and the stage times. The policies come
+from `ReducerSelection::ALL`, so one added to the enum is measured without the program being
+edited, and every row's basis is asserted equal to the first row's.
 `f4_profile`'s configurations bundle several options together, so neither effect can be attributed
 from it alone.
 
@@ -2625,9 +2627,9 @@ field rather than one "fast" switch, so that the contribution of each can be mea
 |---|---|---|
 | `elimination` | `Backend::{Sparse, Dense, Adaptive}` | the representation elimination works in: sparse rows throughout, dense rows throughout, or sparse rows reduced through a dense accumulator |
 | `reduction` | `ReductionStrategy::{Unstructured, Structured}` | whether reducer rows are established as pivots before the pair rows are reduced against them |
-| `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial}` | which basis element symbolic preprocessing picks to reduce a monomial. `FirstApplicable` is the default and the faster of the two: picking the largest divisor minimizes the multiplier but maximizes how much of the reducer's tail stays reducible, which grows the matrix |
+| `reducer_selection` | `ReducerSelection::{FirstApplicable, LargestLeadingMonomial, FewestTerms, MostTerms}` | which basis element symbolic preprocessing picks to reduce a monomial. `FirstApplicable` is the default. `LargestLeadingMonomial` minimizes the multiplier but maximizes how much of the reducer's tail stays reducible, which grows the matrix; `FewestTerms` picks the sparsest divisor instead, which is a third less peak memory on katsura grevlex and a 25%–30% regression on the same systems under grlex. `MostTerms` is `FewestTerms`'s control |
 | `criteria` | `PairCriteria { product, chain, gebauer_moller }` | which criteria may discard a critical pair before a matrix is built |
-| `schedule` | `PairSchedule::{DegreeThenLcm, SmallMultiplierDegree, LargeMultiplierDegree, SmallMultiplierMonomial, LargeMultiplierMonomial}` | in what order the pending pairs of one degree are taken. Not a criterion — it discards nothing |
+| `schedule` | `PairSchedule::{DegreeThenLcm, SmallMultiplierDegree, LargeMultiplierDegree, SmallMultiplierMonomial, LargeMultiplierMonomial, ShortPair, LongPair}` | in what order the pending pairs of one degree are taken. Not a criterion — it discards nothing |
 | `hilbert` | `HilbertSelection::{Off, Observe, CertifiedLimited, Deferred}` | whether a Hilbert prediction caps how many pairs a degree contributes to one batch. Not a criterion either |
 | `certify` | `bool` | whether the returned basis is checked independently before being returned |
 | `reducer_cache` | `CacheMode::{Off, Count, Store}` | whether reducer multiples are remembered between batches. `Count` measures repetition without serving anything; `Store` currently behaves as `Count`, because building a multiple's terms is an integer addition per variable per term and serving them from a map costs more than that even at a 95% hit rate |
@@ -2676,6 +2678,13 @@ reducer rows — which is why preferring small multipliers is worth trying, give
 40%–99% of all rows. Each `Large…` variant is the control for its `Small…` counterpart: if
 small-multiplier-first narrows the matrix then large-multiplier-first should widen it, and a
 heuristic that beats the baseline in both directions is measuring run-to-run noise.
+
+`ShortPair` ranks by a different quantity — `terms(i) + terms(j) - 2`, which is `slimgb`'s
+`pair_weighted_length` over a prime field — and `LongPair` is its control. **Measured and rejected
+as a default:** it raises peak live entries on all seven instances and its control is inverted on
+two of them, which is the noise signature above. The same term-count axis on the *reducer* side
+(`ReducerSelection::FewestTerms`) does have an effect. Both are selectable so the result can be
+reproduced; see [`docs/research/pair-scheduling.md`](docs/research/pair-scheduling.md) §2 and §6.
 
 **The degree and monomial variants are different strategies, and only the second is the published
 one.** Sakata–Takagi rank on the larger then the smaller multiplier *under the monomial order*;
