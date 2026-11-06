@@ -4,6 +4,7 @@ mod multivariate;
 mod univariate;
 
 pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial};
+pub(crate) use univariate::multiply_dense;
 pub use univariate::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root,
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
