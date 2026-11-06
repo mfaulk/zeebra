@@ -253,14 +253,19 @@ Three costs went with the recursion. Two `i % k` operations per output element p
 level where `n / 2` suffice, since `w[i + k] = -w[i]`; and an allocation per level, per split half,
 and per `UnivariatePolynomial::new` copy.
 
-**Protocol.** Two instances built from one tree — `origin/main` at 27cc999 and the branch — run
-interleaved as `before, after, before, after`, each `cargo run --release --example
-univariate_scaling` with `budget=1.0`, pinned with `taskset --cpu-list 0-7` per
+**Protocol.** Two instances built from one tree — `origin/main` at `418d080` and the same tree with
+the kernel replaced — run interleaved as `before, after, before, after`, each `cargo run --release
+--example univariate_scaling` with `budget=1.0`, pinned with `taskset --cpu-list 0-7` per
 `tools/scoreboard.sh`, `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`. Release profile,
 `-C target-cpu=x86-64-v3` from `.cargo/config.toml`. Each cell below is the **minimum of the two
 rounds**, the convention `examples/batch_inversion.rs` already uses: on a shared workstation the
 minimum is the least contaminated estimate. `mul`, `div`, `lagrange` and `roots` reached identical
 sizes on both sides in both rounds, which is the control.
+
+The pair sits at `418d080` rather than at the merge commit because the two sides have to differ only
+by the kernel. Nothing merged after `418d080` touches the measured path: #124 adds `src/fft/multiply.rs`
+as a new file and does not rewire `DensePolynomial`'s `Mul`, #165 adds `src/poly/univariate/karatsuba.rs`
+and likewise does not, and #159 is linear algebra. The `ntt` and `intt` stages call neither.
 
 #### Peak live heap bytes — measured, not estimated
 
@@ -294,43 +299,43 @@ Seconds, and the speedup as the ratio. A dash is a size the side did not reach i
 
 | field | log2 n | ntt before | ntt after | speedup | intt before | intt after | speedup |
 |---|---|---|---|---|---|---|---|
-| KoalaBear | 18 | 0.0476 | 0.0080 | **5.95x** | 0.0447 | 0.0116 | **3.85x** |
-| KoalaBear | 19 | 0.0977 | 0.0171 | **5.71x** | 0.0864 | 0.0247 | **3.50x** |
-| KoalaBear | 20 | 0.2032 | 0.0383 | **5.31x** | 0.1912 | 0.0482 | **3.97x** |
-| KoalaBear | 21 | 0.4193 | 0.0807 | **5.20x** | 0.3895 | 0.1071 | **3.64x** |
-| KoalaBear | 22 | 0.8566 | 0.1995 | **4.29x** | 0.8365 | 0.2740 | **3.05x** |
-| KoalaBear | 23 | 1.8097 | 0.4501 | **4.02x** | 1.9523 | 0.6039 | **3.23x** |
-| KoalaBear | 24 | — | 0.9870 | — | — | 1.3273 | — |
-| Goldilocks | 18 | 0.0444 | 0.0082 | **5.41x** | 0.0452 | 0.0108 | **4.19x** |
-| Goldilocks | 19 | 0.0914 | 0.0171 | **5.35x** | 0.0904 | 0.0251 | **3.60x** |
-| Goldilocks | 20 | 0.1827 | 0.0420 | **4.35x** | 0.1953 | 0.0530 | **3.68x** |
-| Goldilocks | 21 | 0.3870 | 0.0908 | **4.26x** | 0.4216 | 0.1349 | **3.13x** |
-| Goldilocks | 22 | 0.7918 | 0.2082 | **3.80x** | 0.8652 | 0.3071 | **2.82x** |
-| Goldilocks | 23 | 1.8561 | 0.4725 | **3.93x** | 1.9784 | 0.6358 | **3.11x** |
-| Goldilocks | 24 | — | 1.0120 | — | — | 1.3148 | — |
-| BN254 `Fr` | 18 | 0.1935 | 0.0769 | **2.52x** | 0.2053 | 0.0999 | **2.06x** |
-| BN254 `Fr` | 19 | 0.4347 | 0.1620 | **2.68x** | 0.4821 | 0.2125 | **2.27x** |
-| BN254 `Fr` | 20 | 0.9703 | 0.3460 | **2.80x** | 1.0339 | 0.4630 | **2.23x** |
-| BN254 `Fr` | 21 | 2.0837 | 0.7273 | **2.86x** | — | 0.9741 | — |
-| BN254 `Fr` | 22 | — | 1.5344 | — | — | 2.0061 | — |
+| KoalaBear | 18 | 0.0472 | 0.0077 | **6.13x** | 0.0414 | 0.0110 | **3.76x** |
+| KoalaBear | 19 | 0.0971 | 0.0162 | **5.99x** | 0.0850 | 0.0232 | **3.66x** |
+| KoalaBear | 20 | 0.1983 | 0.0358 | **5.54x** | 0.1917 | 0.0444 | **4.32x** |
+| KoalaBear | 21 | 0.4046 | 0.0778 | **5.20x** | 0.3914 | 0.1037 | **3.77x** |
+| KoalaBear | 22 | 0.8505 | 0.2004 | **4.24x** | 0.8606 | 0.2707 | **3.18x** |
+| KoalaBear | 23 | 1.7392 | 0.4536 | **3.83x** | 1.9688 | 0.6110 | **3.22x** |
+| KoalaBear | 24 | — | 1.0157 | — | — | 1.3437 | — |
+| Goldilocks | 18 | 0.0410 | 0.0076 | **5.39x** | 0.0412 | 0.0104 | **3.96x** |
+| Goldilocks | 19 | 0.0915 | 0.0159 | **5.75x** | 0.0925 | 0.0230 | **4.02x** |
+| Goldilocks | 20 | 0.1847 | 0.0372 | **4.97x** | 0.1817 | 0.0498 | **3.65x** |
+| Goldilocks | 21 | 0.4090 | 0.0838 | **4.88x** | 0.3854 | 0.1077 | **3.58x** |
+| Goldilocks | 22 | 0.8236 | 0.2033 | **4.05x** | 0.8363 | 0.2810 | **2.98x** |
+| Goldilocks | 23 | 1.7348 | 0.4705 | **3.69x** | 2.0329 | 0.6241 | **3.26x** |
+| Goldilocks | 24 | — | 1.0399 | — | — | 1.3648 | — |
+| BN254 `Fr` | 18 | 0.1974 | 0.0755 | **2.61x** | 0.2034 | 0.1016 | **2.00x** |
+| BN254 `Fr` | 19 | 0.4252 | 0.1607 | **2.65x** | 0.4436 | 0.2145 | **2.07x** |
+| BN254 `Fr` | 20 | 0.9169 | 0.3505 | **2.62x** | 0.9861 | 0.4751 | **2.08x** |
+| BN254 `Fr` | 21 | 1.9630 | 0.7377 | **2.66x** | 2.2704 | 0.9897 | **2.29x** |
+| BN254 `Fr` | 22 | — | 1.5558 | — | — | 2.0691 | — |
 
 The local exponent is unchanged, as it should be — the asymptotic class was never the problem:
 
 | field | stage | before | after |
 |---|---|---|---|
-| KoalaBear | ntt | 1.03 – 1.08 | 1.04 – 1.36 |
-| KoalaBear | intt | 0.95 – 1.22 | 0.96 – 1.36 |
-| Goldilocks | ntt | 1.00 – 1.23 | 1.06 – 1.30 |
-| Goldilocks | intt | 0.99 – 1.19 | 1.05 – 1.35 |
-| BN254 `Fr` | ntt | 0.95 – 1.17 | 1.07 – 1.14 |
-| BN254 `Fr` | intt | 1.03 – 1.23 | 1.04 – 1.12 |
+| KoalaBear | ntt | 1.03 – 1.21 | 1.07 – 1.37 |
+| KoalaBear | intt | 0.91 – 1.19 | 0.94 – 1.38 |
+| Goldilocks | ntt | 1.01 – 1.21 | 1.04 – 1.28 |
+| Goldilocks | intt | 0.97 – 1.28 | 1.07 – 1.38 |
+| BN254 `Fr` | ntt | 0.93 – 1.12 | 1.06 – 1.15 |
+| BN254 `Fr` | intt | 1.03 – 1.20 | 1.06 – 1.15 |
 
 Over `2^16` and above, so that the timer resolution does not dominate. The upper end rises on the
 narrow fields: at 30 to 60 ns per element the transform is now close enough to memory-bandwidth
 bound that the last few doublings cost slightly more than a doubling. That is the right problem to
 have next, and it is not this one.
 
-The gain is **4x to 6x on the narrow fields and 2.1x to 2.9x on BN254**, and the ratio between
+The gain is **3.7x to 6.1x on the narrow fields and 2.0x to 2.7x on BN254**, and the ratio between
 those is the point: the recursion's overhead was index arithmetic and allocation, which is a fixed
 cost per element, so it is a larger fraction of a cheap field multiplication than of a 254-bit one.
 BN254 was already paying mostly for arithmetic, exactly as §3.1 read off the 4.5x-against-4x ratio.
@@ -343,16 +348,18 @@ budget is one second and the reported size is the first one to exceed it.
 | field | stage | before | after |
 |---|---|---|---|
 | Mersenne-31 | ntt / intt | **2** — s = 1 | **2** — s = 1, unchanged |
-| KoalaBear | ntt | 2^23 | **2^24** — the field's whole two-adic range, in 0.99 s |
+| KoalaBear | ntt | 2^23 | **2^24** — the field's whole two-adic range, in 1.02 s |
 | KoalaBear | intt | 2^23 | **2^24** |
 | Goldilocks | ntt | 2^23 | **2^24** |
 | Goldilocks | intt | 2^23 | **2^24** |
 | BN254 `Fr` | ntt | 2^21 | **2^22** |
-| BN254 `Fr` | intt | 2^20 | **2^22** |
+| BN254 `Fr` | intt | 2^21 | **2^22** |
 
 KoalaBear's forward transform no longer stops on the budget at all: it stops because
-`two_adicity()` is 24 and there is no primitive `2^25`-th root of unity. BN254's `intt` gains two
-doublings rather than one because §3.1's `2^20` was the pre-#118 figure for it.
+`two_adicity()` is 24 and there is no primitive `2^25`-th root of unity, and `2^24` lands within a
+percent of the one-second budget either way. Goldilocks straddles the budget at `2^24` — 1.04 s in
+one round and 0.97 s in the other, so the sweep went on to `2^25` in the second. `2^24` is the
+figure to quote and the straddle is the honest qualification on it.
 
 The sweep starts at `2^6`, which is above Mersenne-31's maximum transform size of 2, so the example
 reports that field as unreachable rather than measuring it. `src/fft/transform.rs`'s tests derive
@@ -373,15 +380,16 @@ Over `target/release/examples/univariate_scaling`:
 | | `div`/`idiv` under `zeebra::fft` |
 |---|---|
 | before | **4** — one in each of the four `evaluate` monomorphizations |
-| after | **0**, over 12 matching symbols |
+| after | **0**, over 17 matching symbols |
 
 One instruction per monomorphization, not two: x86's `div` yields quotient and remainder together,
 so LLVM computes `i / k` and `i % k` with a single 32-bit `div` and derives the rest. It sits in the
 output loop, so it executes `n` times per level — `n log n` divisions over the transform, about 193
-million at `n = 2^23`. The 12 symbols after the change are the four `evaluate` instances plus the
-four `transform_in_place` instances plus `evens_and_odds` and `FFTDomain::from_generator`; the
-kernel is a real out-of-line symbol in each monomorphization, so the count is looking at the code
-that does the work.
+million at `n = 2^23`. The symbols after the change include the four `evaluate` instances and four
+new `transform_in_place` instances, so the kernel is a real out-of-line symbol in each
+monomorphization and the count is looking at the code that does the work. The counts were taken on
+`574a53c`, after #124; the four before-side divisions are the same four at every base since
+27cc999.
 
 #### What is left, and what it would need
 
@@ -734,8 +742,8 @@ Concretely, before D1 or D3 can run at interesting degrees:
    Done, #124 — but the measured crossover is degree ~460 to ~12000 depending on element width,
    because the transform is allocation-bound. ~~**An in-place iterative NTT** is what now carries
    this item's value: it would lower every crossover and speed every stage below that uses one.~~
-   Done, #161: the transform is no longer allocation-bound (`1 n B` against `7 n B`) and is 4x to
-   6x faster on the narrow fields and 2.0x to 2.7x on BN254 (§3.3). **`fft_multiplication_crossover`
+   Done, #161: the transform is no longer allocation-bound (`1 n B` against `7 n B`) and is 3.7x to
+   6.1x faster on the narrow fields and 2.0x to 2.7x on BN254 (§3.3). **`fft_multiplication_crossover`
    was calibrated against the recursive kernel and is therefore now too high** — see §3.3's closing
    note.
 2. **Fast division by Newton iteration**, which `pow_mod_limbs` would then inherit, taking root
