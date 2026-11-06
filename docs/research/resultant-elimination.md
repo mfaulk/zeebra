@@ -521,6 +521,64 @@ every record written before it existed; `Comparison::of` returns
 parallelized a differential sweep whose product was an agreement verdict and therefore needed none
 of this.
 
+### 6.8 The six-round build, measured — and it is memory, not time
+
+The six-round attempt (#211) is costed in `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §7.4, which
+flags the symbolic build as the one stage whose cost law nothing had checked: it has been under 1%
+of every row measured here, and at six rounds the outputs grow from ~3 400 terms to ~266 000. §7.5
+of that plan therefore asks for `cico_bivariate` to be timed **alone** on
+`poseidon31-cico-t16-rf2-rp4` before any determinants are authorized. It was, single-threaded on
+one pinned core under `tools/benchlock.sh`:
+
+| | §7.4's estimate | **measured** | |
+|---|---:|---:|---|
+| elapsed | ~36 min | **48.37 min** | 1.34x — the same order, so the time estimate holds |
+| peak RSS | ~68 MB | **57.0 GB** | **838x** |
+
+The outputs are two bivariate polynomials of degree 729 with **266 815 terms** each, which is
+exactly `(729+1)(729+2)/2`: the dense bivariate triangle, with no cancellation anywhere in six
+rounds. So the term-count extrapolation was right and the memory estimate was not.
+
+**The mechanism, read rather than guessed.** `SparseMultiPoly`'s multiply materialises every
+pairwise term-product in one `Vec` and collects like terms afterwards, so its transient is
+`O(|a|·|b|)` entries however few distinct monomials the product has. `cico_bivariate` cubes sixteen
+degree-243 words as `p * p` then `(p²) * p`:
+
+| step | term-products | at 16 bytes an entry |
+|---|---:|---:|
+| `p * p` | 29 768² = 8.86 × 10⁸ | 14.2 GB |
+| `(p²) * p` | 118 827 × 29 768 = 3.54 × 10⁹ | **56.6 GB** |
+| the product's actual size | 266 815 terms | 4.3 MB |
+
+56.6 GB predicted against 57.0 GB measured, and the RSS trace is a **sawtooth** with one peak per
+state word rather than a monotonic climb — each word's transient is freed before the next
+allocates. It is a transient four orders of magnitude larger than the result it builds, not a leak.
+
+Two consequences:
+
+1. **The build is now a binding stage, and binds on memory first.** 48.4 minutes is about half of
+   §7.4's whole ~1–1.5 h estimate for the row, where the build has been 0.8% of every row before
+   it. A collecting or chunked multiply would bound the live set by the output size instead of the
+   product count — tracked in #243, with the caveat that a map insert per product may cost more
+   time than `push` plus one sort, so it is a memory win that has to be measured for time.
+2. **§7.4's "peak memory is not a concern" is wrong by 838x**, in the direction that matters: 57 GB
+   is 11% of this workstation's RAM for one single-threaded build, and two concurrent six-round
+   builds would be noticed by every other process on the box.
+
+Measured with `--row poseidon31-cico-t16-rf2-rp4 --build-only`, which runs before the budget check
+on purpose: the budget is on the determinants and the build runs none of them, so the build of a
+row whose determinants are unaffordable is still a bounded, interruptible measurement. Peak RSS
+from `VmHWM`, polled externally and cross-checked against `util::peak_resident_bytes`, which reads
+the same field. Reported as an upper bound on the elapsed: this agent's own `cargo build` and
+`cargo test` ran on eight unrelated cores during part of the window, which the lock does not
+serialize and which inflates a memory-bandwidth-bound figure rather than deflating it.
+
+**No determinants were run on this row.** At six rounds the proven `2d²` fallback is 1 062 882
+order-1 458 determinants — 25.7 single-core days — so a falsified prediction there would be
+reported as *prediction falsified, generic bound unaffordable* rather than retried, and
+`examples/resultant_cico` now prints that consequence before it starts a row instead of discovering
+it mid-run.
+
 ## 7. The deeper consequence
 
 It is about the **formulation**, not the algorithm. Three orders of magnitude separate two ways of
