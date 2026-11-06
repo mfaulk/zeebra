@@ -45,6 +45,18 @@ multiplications: 35x over Mersenne-31, 38x over both 254-bit fields, and 68–90
 whose `inverse` is an exponentiation by a 64-bit exponent and so the dearest relative to its
 multiply.
 
+> **The Mersenne-31 and Goldilocks columns predate #160**, which halved Fermat inversion by routing
+> it through the iterative `pow_limbs` instead of the recursive `pow`. The plateau is a ratio to
+> inversion, so for the fields that invert by Fermat it is now roughly half of what this table
+> reports. Corroborated in a different harness rather than re-measured here: `field_arithmetic`'s
+> `isolated/inverse` against its `batch/inverse` over 256 operands went from 32.3x to 14.5x over
+> `Mersenne31` and from 54.3x to 28.4x over the largest 64-bit prime, while BN254 `Fr` held at
+> 60.2x against 60.9x. Those absolute ratios are not this table's — different instrument, one
+> fixed n — and should not be substituted into it; only the halving carries over. The two 254-bit
+> columns invert by extended Euclid and are unaffected. The crossover at n = 2 is unchanged: it is
+> set by the copy, not by the ratio. Re-running this table is the honest fix and was not #160's
+> scope.
+
 Per-element cost at the plateau is 7.6 ns over Mersenne-31 and 96 ns over BN254 — a 12.6x ratio
 against the 4x element-width ratio, which is the wide field's multiplication showing through now
 that the inversion is gone.
