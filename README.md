@@ -1719,7 +1719,7 @@ Three more comparands — **msolve**, **Groebner.jl** and **Sagebrush** — are 
 user prefix by one script, with pinned versions and no root:
 
 ```sh
-tools/external/provision.sh          # idempotent; builds GMP, MPFR, FLINT, msolve; installs Julia
+tools/external/provision.sh          # ~5 min cold, 0.2 s warm; no root needed
 . tools/external/env.sh              # PATH, LD_LIBRARY_PATH, JULIA_DEPOT_PATH
 tools/external/smoke/smoke.sh        # all four on one system; non-zero exit on disagreement
 ```

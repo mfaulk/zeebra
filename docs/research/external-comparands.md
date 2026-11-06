@@ -517,10 +517,30 @@ correctness gate #259 requires before any timing is quoted. Real measurement bel
 Reproduce:
 
 ```bash
-tools/external/provision.sh          # idempotent; ~0.2 s warm, ~10 min cold
+tools/external/provision.sh          # idempotent
 . tools/external/env.sh
 tools/external/smoke/smoke.sh        # exits non-zero on disagreement
 ```
+
+**This was verified cold, not only warm.** `provision.sh` was run against an empty throwaway
+prefix (`ZEEBRA_EXT_PREFIX=…/coldprefix`) and `smoke.sh` against that prefix alone; all four
+tools came out agreeing as above. Measured, at `-j32`:
+
+| stage | cold time | note |
+|---|---|---|
+| GMP 6.3.0 | 23 s | |
+| MPFR 4.2.2 | 11 s | |
+| FLINT 3.6.0 | 26 s | the "several minutes" in the script's own log line is pessimistic at `-j32` |
+| msolve 0.11.0 | 43 s | |
+| Julia 1.11.7 + Groebner.jl | 2 m 33 s | the bulk: a 286 MB download, then precompilation |
+| Sagebrush clone + driver | 33 s | |
+| **total** | **4 m 49 s** | 3.1 GB on disk |
+
+Warm, a re-run is **0.2 s** and reports everything as already present. The cold run also
+caught a real defect: the first attempt died on `set -e` at
+`OpenSSL SSL_read: … unexpected eof while reading` from gmplib.org, which is why `fetch` now
+retries and falls back to `ftp.gnu.org` (the pinned sha256 is what makes a mirror safe to
+accept).
 
 ---
 
