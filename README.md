@@ -973,6 +973,39 @@ the 2.5x the F4 budgets are written in: those count sparse `(usize, F)` entries,
 word is paid whatever the field is and dilutes the ratio. A dense coefficient array has no index
 word, so a byte budget carried over from the F4 side under-estimates this layer by 1.6x.
 
+**Division is an operator.** `/` and `%` on `UnivariatePolynomial` are the quotient and the
+remainder of that `div` row, in all four owned/borrowed combinations plus `/=` and `%=`. Each runs
+the whole division, so a caller wanting both halves should call `Polynomial::div_with_remainder`,
+which returns the pair. That trait method used to be named `div`; it carries its full name now
+because an inherent `div(&self, ..)` loses method resolution to `Div::div`, which takes `self` by
+value, and every `p.div(&q)` would otherwise have silently become the quotient alone. `lcm(a, b)`
+is `a * b / gcd(a, b)` renormalized monic, and zero when either argument is zero:
+
+```rust
+use zeebra::{fields::Zp7, gcd, lcm, Polynomial, UnivariatePolynomial};
+
+type P = UnivariatePolynomial<Zp7>;
+let f = P::try_from("1 + 2x + x^2").unwrap(); // (x + 1)^2
+let g = P::try_from("6 + x^2").unwrap(); // x^2 - 1 = (x + 1)(x + 6), since 6 = -1 mod 7
+
+assert_eq!(gcd(&f, &g), P::try_from("1 + x").unwrap());
+// (x + 1)^2 (x + 6) = x^3 + x^2 - x - 1
+assert_eq!(lcm(&f, &g), P::try_from("6 + 6x + x^2 + x^3").unwrap());
+
+// `/` and `%` are the two halves of one long division; `div_with_remainder` returns both.
+let (quotient, remainder) = f.div_with_remainder(&g);
+assert_eq!(&f / &g, quotient);
+assert_eq!(&f % &g, remainder);
+```
+
+Both stay quadratic, and that is a decision rather than an omission. Newton-inversion division is
+`O(M(d))` and half-GCD is `O(M(d) log d)`, but `M(d)` *at the operator* is still schoolbook: `Mul`
+cannot choose an NTT domain from its signature, and Karatsuba is not wired into it either (§4.1 of
+[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)). With a quadratic `M`
+underneath, neither is faster than long division — so both are gated on that dispatch work rather
+than written against a multiplication that would make them slower. §4.5 of the same document has
+the arithmetic.
+
 The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
 2.4x, 5.2x and 8.6x. The whole gap was the `2n` inversions batch inversion removed — see
