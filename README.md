@@ -767,7 +767,9 @@ Every field type in the crate implements both traits. Two consequences for anyth
 - `F::order()` and `F::characteristic()` are gone. Add `F: KnownOrder` and call `order_limbs()`,
   or `order_u128()` where the old `u128` is what you want.
 - `inverse()` is a required method rather than a provided one. Its only sensible default was
-  `a^(q-2)`, which needs the order; a field whose order does not fit in a `u128` cannot have it.
+  `a^(q-2)`, which needs the order — and the order is in `KnownOrder`, not here. A field that has
+  one writes Fermat as `pow_limbs` over a `q - 2` subtracted on the limbs, so no width caps that
+  route; a field without one, or with a faster inversion, writes its own.
 
 `docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 

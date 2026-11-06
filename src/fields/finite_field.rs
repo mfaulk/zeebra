@@ -166,9 +166,10 @@ where
     /// The multiplicative inverse of this element.
     ///
     /// Required rather than provided: the obvious default is `a^(q-2)`, which needs the field's
-    /// order as a machine integer and so cannot exist for a field whose order does not fit in
-    /// one. Implementations over a cardinality that does fit may write exactly that; the rest
-    /// delegate to their own inversion.
+    /// order, and the order lives in [`KnownOrder`] precisely so that `FiniteField` does not
+    /// demand it. An implementation that has an order writes Fermat as
+    /// `self.pow_limbs(&FERMAT_EXPONENT_LIMBS)` — no width limit, since both the exponent and the
+    /// walk are over limbs; the rest delegate to their own inversion.
     ///
     /// # Panics
     /// Panics if `self` is zero. Use [`Self::checked_div`] where zero is possible — pivot
