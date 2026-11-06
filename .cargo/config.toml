@@ -22,3 +22,28 @@
 # help it.
 [target.'cfg(target_arch = "x86_64")']
 rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+# No compiler cache for this crate, measured rather than assumed.
+#
+# `sccache` is a reasonable default for a many-crate workspace and a poor one here, because this is
+# one large crate built under `lto = "fat"` with `codegen-units = 1`. Measured on 2026-11-06, three
+# `cargo build --release --lib` runs into fresh output directories with the cache warm: **44 of 48
+# units hit and the wall clock did not move** — 83.1 s, 82.4 s, 79.4 s. The hits are all cheap leaf
+# dependencies. The one unit that matters, `zeebra` itself, is **79.2 s of the ~83 s** and misses,
+# because at least one dependency rlib is not byte-reproducible across output directories and
+# `sccache` hashes `--extern` rlib *contents*, so every crate downstream of it re-keys.
+#
+# Worse, `sccache` is only cacheable at all with `CARGO_INCREMENTAL=0`, and that costs the edit loop
+# directly: `cargo check` after a one-line change is 1.9 s at 0 against 0.7 s at 1. So the default
+# trades 2.7x off the loop you run hundreds of times for 4% of a build you run occasionally.
+#
+# An empty string **disables** a wrapper configured further up the tree — on the development
+# workstation `~/projects/.cargo/config.toml` sets one for every project under it. Note that the
+# `RUSTC_WRAPPER` environment variable overrides this file, so the environment must not set it for
+# this to take effect; see the README section "Build configuration".
+#
+# This is also the setting that prevented a class of confusing failure. A cached stale `libzeebra`
+# rlib surfaces as an example failing to compile against `pub use` items that are plainly present,
+# which has cost this project several debugging sessions.
+[build]
+rustc-wrapper = ""
