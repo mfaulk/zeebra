@@ -3,12 +3,14 @@
 Deliverable for B5 (#223), a child of the MQ-algorithms epic #66. B5's instruction was to read the
 ceiling off instruments that already exist before contemplating an implementation, because **the upper
 bound on what any selection-strategy change can win is already measured and had never been read
-off.** This is that reading. No new code; four existing examples, plus three papers — the third
-being F5's own, which §4.4 shows settles the matter from the algorithm's author.
+off.** This is that reading. No new code; four existing examples, plus five papers — including F5's
+own (§4.4) and the survey that closes the citation chain and retracts one of this document's own
+arguments (§4.0.1, §4.2, §5.1).
 
 **The headline: 33–60% of F4's pair rows add no rank, which bounds the whole direction at about 2×,
-and that is not worth a rewrite of F4's core.** Recorded as a won't-do in the style of #58, with one
-narrow question kept open in §5.1.
+and a ~2× constant factor does not justify adopting the signature apparatus.** Recorded as a
+won't-do in the style of #58. **Nothing is left open** — the one question §5.1 held back resolved
+negatively once the survey was read, and every source #223 named is now read.
 
 **Revision note.** The first version of this document reported the ceiling and recommended "spike
 further, narrowly — neither implement nor decline", because it had not read Ding, Zhang and Deaton,
@@ -187,11 +189,43 @@ So the claim is confirmed — **with two qualifications that have to be stated, 
 the conclusion.**
 
 1. **They assert it rather than prove it**, with "It suffices to know that", and cite it onward to
-   their own [27] (Yang and Chen, *All in the XL Family: Theory and Practice*, ICISC 2004). So the
-   chain is 2021/051 → Yeh et al. → Yang–Chen, and the last link is unread.
+   their own [27] (Yang and Chen, *All in the XL Family: Theory and Practice*, ICISC 2004).
+   **Read 2026-11-06, so the chain is now closed; see §4.0.1.**
 2. **They gloss it with "which is `D_reg` for semi-regular systems"**, and §4.1 of this document
    establishes that Zeebra's targets are *not* semiregular. Read narrowly, the quoted sentence is
    therefore about a class Zeebra's instances are outside.
+
+#### 4.0.1 The chain, closed — and the published claim is narrower than the one used here
+
+Yang and Chen's **Proposition 4** proves the first half and attributes the second:
+
+> We have shown that **XL+XL2 and F5 operates at the same apparent degree `D_g`.** Further ([30]) the
+> signature, i.e. the underlying degree, of the polynomials in the matrix/system built by **F5 is the
+> same as the classical Buchberger algorithm, which is the same as classical XL**.
+
+Their **[30] is Faugère's ISSAC 2002 F5 paper** — read for §4.4. So the citation chain terminates and
+every link in it has been read: 2021/051 → Yeh–Cheng–Yang → Yang–Chen → Faugère 2002.
+
+**But the published statement carries hypotheses the conclusion here does not.** Proposition 4 is
+stated **"for large `q`"**, and the surrounding Eq. 5 holds "for all `D < min(q, D_reg)`" with
+
+`D_reg := min{D : [t^D] (1 − t)^(m−n−1) (1 + t)^m ≤ 0}`
+
+— the large-field degree of regularity. Yeh et al. then added "which is `D_reg` for semi-regular
+systems" on top. So the cited support is **weakest exactly where much of this crate's corpus lives**:
+Fukuoka types I, II and IV are over `GF(2)`, types III and VI over `GF(31)`, LowMC and HFE over
+`GF(2)` — none of them "large `q`". That eprint 2021/051's §4.2 gives *two* `D_reg` formulas, one for
+`D_reg ≤ q` and one for `D_reg < q`, is the same point from the other side.
+
+**The decline is unaffected, because it uses none of that.** The argument below is that F4 and F5
+compute the same reduced basis under the same order, so the maximum degree in it is a property of the
+ideal and no algorithm computing it can avoid that degree — true over any field, large or small. What
+the literature supplies is a *formula* for what the degree is, and the formula is what carries the
+hypotheses.
+
+Worth stating plainly because the shape is unusual: **the published version of the equal-degree claim
+is narrower than the version this decline rests on, and the version it rests on is elementary.** That
+is a better position than depending on the citation would have been.
 
 **Why the conclusion survives qualification 2, and this is reasoning rather than citation.** F4 and
 F5 compute **the same object** — the reduced Gröbner basis of the same ideal under the same order.
@@ -238,6 +272,34 @@ selection), `grobner/f4/symbolic.rs` (reducer selection constrained by signature
 for efficiency), `grobner/f4/macaulay.rs` (rows carrying signatures), `grobner/f4/reduction.rs` (row
 operations preserving or combining them). That is the whole of F4's core, which makes it a rewrite
 rather than an optimization — and `#58`'s precedent is to record that and decline.
+
+> **Retracted, 2026-11-06. The "rewrite rather than an optimization" claim is overstated, and the
+> survey says so.** Eder and Faugère's §13, *s-reductions using linear algebra*, is directly about
+> hosting signature criteria inside F4-style reduction:
+>
+> "Here we present a variant of F4 that uses signature-based criteria to detect reductions to zero
+> resp. rows reducing to zero in advance. This leads to **smaller changes in the implementation of
+> some subalgorithms of F4** corresponding to the switch from usual polynomial reduction to
+> s-reduction. Albrecht and Perry describe a possible implementation of this, called **F4/5**."
+>
+> So an F4-hosted signature variant is published, implemented, and characterised as *smaller changes
+> to some subalgorithms*. Two of its stated differences (Algorithmic Property 13.1) are even
+> favourable: F4/5 proceeds **by increasing degree rather than by index** — the module order `<d-pot`
+> rather than `<pot` — which is what Zeebra's F4 already does, and it orders generators by increasing
+> rather than decreasing index.
+>
+> **This paragraph's module list may still be right about what gets touched; its conclusion about the
+> magnitude is not, and it was my inference rather than anything a source said.** The decline does
+> not depend on it — §4.0's ~2× bound and §4.4's overconstrained argument are each sufficient — so
+> the retraction removes a leg the conclusion was not standing on.
+>
+> One related note from the same survey, which matters if this is ever revisited: **MatrixF5 is the
+> wrong variant for this crate regardless.** "MatrixF5 … is efficient once the system of polynomial
+> equations is **dense**. Clearly, this is not always the case, and thus, selecting S-pairs to be
+> reduced is more convenient compared to building full Macaulay matrices at a given degree."
+> `examples/elimination_density.rs` measures Zeebra's global densities at a fraction of a percent, so
+> F4/5 and not MatrixF5 would be the shape. MatrixF5 also needs a **degree bound `D`** as an extra
+> parameter, which `f4/hilbert_driven.rs` does supply.
 
 A further casualty: `examples/f4_selection.rs` prices two reducer-selection policies and three cache
 modes. Under a signature algorithm the reducer choice is constrained by signatures, so those policies
@@ -372,6 +434,26 @@ rewritable criterion catches any of that residue is unknown and is the only thin
 measuring.** It is a bounded question with an existing instrument, and it does not commit the crate
 to anything.
 
+> **Resolved negatively, 2026-11-06. The premise was wrong: GVW's rewritable criterion is not a
+> standalone pair criterion.** Eder and Faugère's survey has been read, and it is defined on
+> **signatures** `s(α)`, under a **module monomial order on `R^m`** rather than a monomial order on
+> `R`, and its rewritability check — their Algorithm 3 — takes the S-pair together with **`G ∪ H`**
+> and a **rewrite order `⋗`**, where `H` is a Gröbner basis for the **syzygy module** and Koszul
+> syzygies are added to it explicitly (their Algorithm 2, line 3). A *rewrite basis* is defined by the
+> canonical rewriter in a signature not being regular top s-reducible.
+>
+> So the criterion **presupposes the entire signature apparatus** — a signature on every basis
+> element, a compatible module order, and a tracked syzygy basis. **There is no criterion-without-the-framework
+> to graft beside Gebauer–Möller**, which is exactly what this section proposed.
+>
+> The survey also places F5's criterion *inside* the same framework rather than as an alternative at a
+> different cost: Remark 6.5 — "Restricting Lemma 6.4 to principal syzygies and the compatible module
+> monomial order `<pot` we get a statement **equivalent to the F5 criterion**". Its Table 1 lists GVW
+> as generalizing G2V, with SB and SSG "coincid[ing] with GVW". One family, one apparatus.
+>
+> **So nothing is left open and this document is a complete won't-do.** The residue §2 and §3 identify
+> is real, and no cheap criterion is available to attack it.
+
 What should **not** happen: any change to `f4/reduction.rs` or `f4/macaulay.rs`, and any work
 predicated on F5 being asymptotically better than F4. It is not.
 
@@ -386,11 +468,17 @@ predicated on F5 being asymptotically better than F4. It is not.
   two qualifications it comes with. The claim is confirmed; its own onward citation (Yang and Chen,
   ICISC 2004) is unread, but §4.0 shows the argument does not depend on it, since F4 and F5 compute
   the same basis and its maximum degree is a property of the ideal rather than of the algorithm.
-- **The Eder–Faugère survey was not read**, so §5.1's GVW recommendation rests on its reputation
-  rather than on its content. This is now the largest remaining gap, since §5.1 is the only question
-  left open. (It is on arXiv at 1404.1774 and reachable, so this is cheap to close.)
-- **Yang and Chen, ICISC 2004**, the onward citation under §4.0's equal-degree claim, was not read.
-  §4.0 argues the conclusion does not depend on it.
+- ~~**The Eder–Faugère survey was not read.**~~ **Closed** — read 2026-11-06. It resolved §5.1
+  negatively (the rewritable criterion needs the whole signature apparatus) and **retracted §4.2's
+  implementation-cost claim**, which was mine and was overstated.
+- ~~**Yang and Chen, ICISC 2004, was not read.**~~ **Closed** — read 2026-11-06; §4.0.1. Its [30] is
+  Faugère's ISSAC 2002 paper, read for §4.4, so **the chain terminates and every link in it has been
+  read.** The published claim turns out narrower than the one used here, which §4.0.1 records.
+
+**Nothing named by #223 is now unread.** The decline rests on three independent legs — the measured
+ceiling (§3, corroborated on disjoint instances by 2021/051), the elementary equal-degree argument
+(§4.0, which needs no hypothesis), and F5's own author on overconstrained systems (§4.4) — and on
+none of the retracted or narrowed claims.
 - **The overlap question (B5's question 2) is still not answered.** §3 gives the ceiling and §2 gives
   Gebauer–Möller's share, but not whether they overlap. It matters less than it did: §4.0 bounds the
   prize at ~2× however the overlap falls, so the question is now only about §5.1's narrow criterion
