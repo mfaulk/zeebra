@@ -871,6 +871,18 @@ to within 1% in **12 of 12 cells** across two fields and three sizes. The origin
 preceding `mul` leaving a different cache and allocator state, in a run whose sign happened to go
 one way; it went the other way on the next attempt, which a code effect would not do.
 
+**One instrument needed pinning down afterwards.** `examples/univariate_scaling.rs`'s **mul** row
+is the quadratic baseline every crossover in §3.1 and §4.1 is quoted against, and it reached that
+baseline through `&a * &b`. With the operator dispatching, that row would silently have started
+measuring Karatsuba — the A/B above puts the same product at 3.70x and 6.49x faster at operands
+1024 and 4096, a ratio growing with size, so the row's documented exponent of 2.00 would have
+drifted toward 1.59 and every crossover quoted against it would have moved for no reason anyone
+could see. The row now calls `karatsuba_unstable(.., usize::MAX)` — a base case the recursion never
+passes, so the plain double loop — and re-measures at exponent 1.93–2.04 and 32.0 bytes an element
+over KoalaBear, which is §3.2's `4 n B` unchanged. The **fftmul** stage's comparand is still the
+operator, which is still an independent check but is no longer the same implementation as the
+**mul** row; the verification line it prints says so rather than claiming schoolbook.
+
 **The blast radius does not reach the Gröbner core.** F4, Buchberger and FGLM are `SparseMultiPoly`
 throughout; the only `Mul` sites under `grobner::` are `Monomial * Monomial` in `f4::symbolic` and
 multivariate products in tests, and `research::resultant`'s `&result * p` is multivariate too.

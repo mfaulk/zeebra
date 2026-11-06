@@ -8,10 +8,15 @@
 //! Six stages per field, each swept by doubling until one measurement exceeds a wall-clock
 //! budget:
 //!
-//! 1. **mul** — a dense product at degree `n - 1`, schoolbook, which is what `Mul` does.
+//! 1. **mul** — a dense product at degree `n - 1`, **schoolbook**, reached through
+//!    `karatsuba_unstable(.., usize::MAX)` — a base case the recursion never passes, so the plain
+//!    double loop. Not through `Mul`: since #231 the operator dispatches to Karatsuba, and this row
+//!    is the quadratic baseline every other row's crossover is quoted against (§3.1, §4.1), so it
+//!    has to keep measuring the same thing across that change. `docs/research/fast-univariate.md`
+//!    §4.1.1 has the Karatsuba curves and §4.1.2 the dispatched ones.
 //! 2. **fftmul** — the same product through the transform, so the two rows are the crossover.
 //!    Needs a domain of `2n` points and so one more power of two than **ntt** does.
-//!    **Verified against schoolbook only up to `n = 2^12`**; above that by evaluation agreement at
+//!    **Verified against the `Mul` operator only up to `n = 2^12`**; above that by evaluation agreement at
 //!    a few random points, which is `O(n)` a point. A quadratic check on a quasi-linear subject
 //!    makes the reported ceiling a property of the checker, and it moves the wrong way as the
 //!    multiply gets faster. Each curve prints the verification it actually performed.
@@ -55,8 +60,8 @@ use zeebra::{
     evaluate,
     fields::{two_adic::two_adic_decomposition, Bn254Fr, KoalaBear, PrimeFieldElement64},
     integers::highest_set_bit,
-    interpolate, lagrange_interpolate, roots, try_multiply_via_fft, FFTDomain, FiniteField,
-    KnownOrder, Polynomial, UnivariatePolynomial,
+    interpolate, karatsuba_unstable, lagrange_interpolate, roots, try_multiply_via_fft, FFTDomain,
+    FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
 // === the fields ===
@@ -89,7 +94,11 @@ const FIRST_LOG: u32 = 6;
 /// No sweep goes past `2^30`, whatever the budget allows.
 const CEILING_LOG: u32 = 30;
 
-/// Largest operand size the **fftmul** stage checks against schoolbook, as `log2 n`.
+/// Largest operand size the **fftmul** stage checks against the `Mul` operator, as `log2 n`.
+///
+/// The operator rather than schoolbook since #231, which is still an independent check — `Mul` is
+/// Karatsuba above its base case, verified against `test_support::schoolbook_product` — but it is
+/// no longer the *same* implementation as the **mul** row above.
 ///
 /// Schoolbook is `O(n^2)` and the stage's subject is quasi-linear, so a schoolbook check stops
 /// being a check and becomes the measurement: at `n = 2^20` it is on the order of `10^12` field
@@ -321,11 +330,12 @@ fn print_curve(curve: &Curve) {
 fn fftmul_verification(reached: usize) -> String {
     let bound = 1usize << SCHOOLBOOK_CHECK_LOG;
     if reached <= bound {
-        format!("every row against schoolbook, n <= {}", bound)
+        format!("every row against the `Mul` operator, n <= {}", bound)
     } else {
         format!(
-            "against schoolbook up to n = {}, and above that by evaluation agreement at {} random \
-             points per row — so no row's cost includes a check more expensive than the multiply",
+            "against the `Mul` operator up to n = {}, and above that by evaluation agreement at {} \
+             random points per row — so no row's cost includes a check more expensive than the \
+             multiply",
             bound, EVALUATION_CHECKS
         )
     }
@@ -375,7 +385,14 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
             let mut rng = StdRng::seed_from_u64(seed ^ 0x3171);
             let a = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
             let b = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
-            let (product, elapsed, bytes) = measure(|| &a * &b);
+            // Explicitly schoolbook, not `&a * &b`: see the module comment's stage 1.
+            let (product, elapsed, bytes) = measure(|| {
+                UnivariatePolynomial::<F>::new(&karatsuba_unstable(
+                    a.coefficients(),
+                    b.coefficients(),
+                    usize::MAX,
+                ))
+            });
             assert_eq!(product.degree() as usize, 2 * n - 2, "product degree");
             Ok((elapsed, bytes))
         },
