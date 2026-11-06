@@ -64,6 +64,8 @@ pub mod groebner_jl;
 pub mod msolve;
 pub mod process;
 #[cfg(feature = "external-runners")]
+pub mod sagebrush;
+#[cfg(feature = "external-runners")]
 pub mod singular;
 
 #[cfg(feature = "external-runners")]
@@ -86,5 +88,7 @@ pub use process::{
     read_output, CpuBasis, Invocation, ProcessMeasurement, RssBasis, RssPolicy, SpawnError,
     Supervisor,
 };
+#[cfg(feature = "external-runners")]
+pub use sagebrush::SagebrushSolver;
 #[cfg(feature = "external-runners")]
 pub use singular::SingularSolver;
