@@ -233,10 +233,22 @@ fn karatsuba_into<F: FiniteField>(
 /// **The shorter operand drives the outer loop**, so the inner one is as long as the inputs allow.
 /// That is not cosmetic: the iterator setup for `out[i..].iter_mut().zip(..)` is paid once per
 /// outer iteration, so a `512 x 2` product with the long operand outside pays it 512 times for two
-/// multiplies each. #231 measured that shape — the one `DensePolynomial::from_zeros` produces,
-/// folding one linear factor at a time — at **0.74x** over KoalaBear before this swap and 1.00x
-/// after. Over BN254 it did not move either way, because a 254-bit multiply is ~19 ns and the
-/// setup is ~1 ns, which is the same reason the regression was invisible on the wide field.
+/// multiplies each — and a two-element inner loop is also too short to vectorize. The shape is the
+/// one `DensePolynomial::from_zeros` produces, folding one linear factor at a time.
+///
+/// **It is a trade, not a free win**, and #244 had to re-measure it at the repository's ISA floor
+/// to see that. At `x86-64-v3`, isolating this swap alone over `from_zeros` at 512 zeros:
+///
+/// | element | long operand outer | shorter outer | |
+/// |---|---:|---:|---:|
+/// | KoalaBear, 4 B | 0.440 ms | 0.083 ms | **5.27x** |
+/// | BN254 `Fr`, 32 B | 5.206 ms | 5.561 ms | **0.94x** |
+///
+/// So ~5x on a 4-byte element and ~6% *lost* on a 32-byte one. The gain is largest exactly where
+/// AVX2 can use the long inner loop, and the loss is where a 254-bit multiply dominates anything
+/// the loop shape can do. #231 reported this as 2.5x and neutral on BN254; both of those were
+/// measured in a build whose `RUSTFLAGS` had displaced the ISA floor, so the 4-byte figure was
+/// understated and the 32-byte cost was invisible. See `docs/research/fast-univariate.md` §4.1.2.
 ///
 /// The product is symmetric, so which operand is outer is free to choose; `out` must be
 /// `a.len() + b.len() - 1` long either way.

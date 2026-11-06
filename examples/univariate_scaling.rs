@@ -720,6 +720,7 @@ fn main() {
     }
 
     println!("# Univariate cost and memory against degree");
+    println!("\nISA: {}", zeebra::util::isa_floor());
     println!();
     println!(
         "Every stage doubles its size parameter until one measurement exceeds {:.2} s. Memory is \

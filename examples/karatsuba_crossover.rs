@@ -405,6 +405,7 @@ fn main() {
     }
 
     println!("# Karatsuba against schoolbook, per field element width");
+    println!("\nISA: {}", zeebra::util::isa_floor());
     println!("\nIssue #165. Both arms are the same code, differing only in the base case;");
     println!("`schoolbook` is a base case so large the recursion never fires.");
     println!(
