@@ -142,6 +142,15 @@ cargo bench --profile ci-release -- --test
 vacuously. A benchmark that stops *compiling* still breaks the `cargo build --all-targets` step in
 the pull-request jobs.
 
+The library and the `zeebra-differential` binary are declared `bench = false`, the mirror of the
+`test = false` above. `bench` also defaults to true, so this command used to select ten targets
+rather than eight: the lib was built as a bench target and `--test` ran the whole unit suite here,
+in one process under the built-in harness, duplicating the nextest jobs with worse isolation. That
+broke `util::peak_memory`, whose subject is `VmHWM` — a process-wide high-water mark that, in a
+process shared with ~1400 other tests, sits far enough above live RSS that a 32 MB ballast cannot
+raise it. The binary has no tests at all, so its entry was a whole-crate link for nothing.
+`bench = false` does not affect `cargo test`, which still runs both.
+
 `--profile ci-release` because this job takes no measurements. A bare `cargo bench` resolves
 `[profile.bench]`, which inherits `release`, and links all eight criterion binaries under fat LTO
 at one codegen unit — settings that exist to make a measurement reproducible. Cold, for one bench
