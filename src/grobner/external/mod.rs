@@ -59,6 +59,8 @@ pub mod contract;
 #[cfg(feature = "external-runners")]
 pub mod corpus;
 #[cfg(feature = "external-runners")]
+pub mod groebner_jl;
+#[cfg(feature = "external-runners")]
 pub mod msolve;
 pub mod process;
 #[cfg(feature = "external-runners")]
@@ -76,6 +78,8 @@ pub use contract::{
 };
 #[cfg(feature = "external-runners")]
 pub use corpus::{cyclic_instance, katsura_instance, CorpusEntry, Rung, REFERENCE_CHARACTERISTIC};
+#[cfg(feature = "external-runners")]
+pub use groebner_jl::GroebnerJlSolver;
 #[cfg(feature = "external-runners")]
 pub use msolve::MsolveSolver;
 pub use process::{
