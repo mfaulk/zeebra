@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf4-rp0",
+  "challenge_digest": "a9242143a8c6300c90fc3c6da4ead21fea7824f61aac5621412031afe741349d",
+  "class": "faithful-reduction",
+  "formulation": "resultant, slice(12 fixed, seed 1)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 1",
+    "evaluate the 64 S-box variables away: two bivariate polynomials of degree 81",
+    "eliminate the second unknown by a Sylvester resultant"
+  ],
+  "outcome": "verified_witness",
+  "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+  "verification": "2 candidate pairs checked by running permutation_plus_linear (2 verified); the resultant itself checked against a direct Sylvester determinant at 8 points outside the interpolation domain",
+  "elapsed_nanos": 50638100572,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 376291627,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "bivariate_degree": 81,
+        "terms": 3403
+      }
+    },
+    {
+      "stage": "elimination",
+      "elapsed_nanos": 46325247925,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "resultant_degree": 6561,
+        "bezout_bound": 6561,
+        "degree_bound": 13122,
+        "samples": 16384,
+        "matrix_order": 162,
+        "sampling_us": 46324764,
+        "interpolation_us": 483,
+        "reference_samples": 13123,
+        "reference_sampling_us": 37113629,
+        "reference_interpolation_us": 1512234
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 3914077829,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "roots": 2,
+        "lifted_pairs": 2,
+        "lifting_us": 1902
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 22483191,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "witnesses": 2,
+        "off_domain_checks": 8
+      }
+    }
+  ],
+  "grobner_frontier": null,
+  "campaign": null,
+  "environment": {
+    "commit": "bf0528e",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "build": "release, RUSTFLAGS from .cargo/config.toml",
+    "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
+  },
+  "experiment": null,
+  "reproduce": "cargo run --release --example resultant_cico -- --write"
+}
