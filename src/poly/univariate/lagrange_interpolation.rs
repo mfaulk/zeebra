@@ -141,7 +141,8 @@ fn lagrange_polynomial<F: FiniteField>(j: usize, points: &[(F, F)]) -> Univariat
         numerator *= UnivariatePolynomial::new(&[x_k.neg(), F::one()]); // -x_k + x
         denominator *= x_j - x_k;
     }
-    let (quotient, remainder) = numerator.div(&UnivariatePolynomial::lift(&denominator));
+    let (quotient, remainder) =
+        numerator.div_with_remainder(&UnivariatePolynomial::lift(&denominator));
     assert_eq!(remainder, UnivariatePolynomial::zero());
     quotient
 }

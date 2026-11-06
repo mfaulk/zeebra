@@ -76,7 +76,7 @@ fn reduce<F: FiniteField>(
     p: &UnivariatePolynomial<F>,
     modulus: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
-    p.div(modulus).1
+    p % modulus
 }
 
 #[cfg(test)]
@@ -111,7 +111,7 @@ mod tests {
         for modulus in &moduli {
             for base in &bases {
                 for exponent in 0..=12u32 {
-                    let expected = base.pow(exponent).div(modulus).1;
+                    let expected = base.pow(exponent) % modulus;
                     assert_eq!(
                         pow_mod(base, exponent as u128, modulus),
                         expected,
@@ -148,9 +148,8 @@ mod tests {
         for i in 0..8u128 {
             for j in 0..8u128 {
                 let combined = pow_mod(&base, i + j, &modulus);
-                let separate = (&pow_mod(&base, i, &modulus) * &pow_mod(&base, j, &modulus))
-                    .div(&modulus)
-                    .1;
+                let separate =
+                    &(&pow_mod(&base, i, &modulus) * &pow_mod(&base, j, &modulus)) % &modulus;
                 assert_eq!(combined, separate, "i = {}, j = {}", i, j);
             }
         }
@@ -179,7 +178,7 @@ mod tests {
                 let a = poly(&[c0, c1]);
                 assert_eq!(
                     pow_mod(&a, q_to_the_d, &modulus),
-                    a.div(&modulus).1,
+                    &a % &modulus,
                     "a = {}",
                     a
                 );
@@ -246,9 +245,9 @@ mod tests {
         // 2^192 as limbs: the fourth limb's lowest bit.
         let exponent = [0u64, 0, 0, 1];
 
-        let mut expected = base.div(&modulus).1;
+        let mut expected = &base % &modulus;
         for _ in 0..192 {
-            expected = (&expected * &expected).div(&modulus).1;
+            expected = &(&expected * &expected) % &modulus;
         }
         assert_eq!(pow_mod_limbs(&base, &exponent, &modulus), expected);
     }

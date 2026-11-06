@@ -179,7 +179,7 @@ impl<F: FiniteField> Polynomial<F> for DensePolynomial<F> {
         result
     }
 
-    fn div(&self, divisor: &Self) -> (Self, Self) {
+    fn div_with_remainder(&self, divisor: &Self) -> (Self, Self) {
         div_with_remainder(self, divisor)
     }
 }

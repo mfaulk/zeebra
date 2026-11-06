@@ -7,7 +7,7 @@ pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial};
 pub use univariate::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root,
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
-    is_permutation_polynomial, lagrange_interpolate, permutation_exponents, pow_mod, roots,
+    is_permutation_polynomial, lagrange_interpolate, lcm, permutation_exponents, pow_mod, roots,
     GraeffeError, GraeffeStats, Polynomial, PolynomialParams, PowerPermutation, SubgroupRoute,
     UnivariatePolynomial,
 };

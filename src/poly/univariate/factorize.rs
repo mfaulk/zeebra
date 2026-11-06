@@ -105,7 +105,7 @@ pub fn factorize<F: KnownOrder, R: RngCore + CryptoRng>(
         let mut exactly_d = dividing_d;
         for e in 1..d {
             if d % e == 0 {
-                exactly_d = exactly_d.div(&distinct_of_degree[(e - 1) as usize]).0;
+                exactly_d = &exactly_d / &distinct_of_degree[(e - 1) as usize];
             }
         }
         distinct_of_degree.push(exactly_d.clone());
@@ -181,7 +181,7 @@ fn frobenius_iterated<F: KnownOrder>(
     q: &[u64],
     modulus: &UnivariatePolynomial<F>,
 ) -> UnivariatePolynomial<F> {
-    let mut result = base.div(modulus).1;
+    let mut result = base % modulus;
     for _ in 0..times {
         result = pow_mod_limbs(&result, q, modulus);
     }
@@ -236,7 +236,7 @@ fn split<F: KnownOrder, R: RngCore + CryptoRng>(
         // wrong answer.
         let divisor = gcd(g, &candidate);
         if !divisor.is_zero() && divisor.degree() > 0 && divisor.degree() < g.degree() {
-            let quotient = g.div(&divisor).0;
+            let quotient = g / &divisor;
             return (divisor, quotient);
         }
     }
@@ -255,11 +255,11 @@ fn frobenius_norm<F: KnownOrder>(
     d: u32,
 ) -> UnivariatePolynomial<F> {
     let q = F::order_limbs();
-    let mut term = h.div(g).1;
+    let mut term = h % g;
     let mut norm = term.clone();
     for _ in 1..d {
         term = pow_mod_limbs(&term, q, g);
-        norm = (&norm * &term).div(g).1;
+        norm = &(&norm * &term) % g;
     }
     norm
 }
@@ -272,13 +272,13 @@ pub(crate) fn trace_to_gf2<F: KnownOrder>(
 ) -> UnivariatePolynomial<F> {
     // q = 2^m, so m is the position of its single set bit.
     let m = characteristic_two_degree::<F>();
-    let mut term = h.div(g).1;
+    let mut term = h % g;
     let mut sum = term.clone();
     for _ in 1..(m * d) {
         term = pow_mod(&term, 2, g);
         sum = &sum + &term;
     }
-    sum.div(g).1
+    &sum % g
 }
 
 /// A uniformly random element of F[x]/(g), i.e. a polynomial of degree below `g`.
@@ -299,7 +299,7 @@ fn multiplicity_in<F: FiniteField>(
     let mut remaining = p.clone();
     let mut multiplicity = 0;
     loop {
-        let (quotient, remainder) = remaining.div(divisor);
+        let (quotient, remainder) = remaining.div_with_remainder(divisor);
         if !remainder.is_zero() {
             return multiplicity;
         }
@@ -395,7 +395,7 @@ mod tests {
         }
         for d in 1..=n / 2 {
             for divisor in monic_polynomials::<P>(d) {
-                if f.div(&divisor).1.is_zero() {
+                if (f % &divisor).is_zero() {
                     return false;
                 }
             }

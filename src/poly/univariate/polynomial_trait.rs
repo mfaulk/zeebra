@@ -65,6 +65,11 @@ where
     fn compose(&self, p: &Self) -> Self;
 
     /// Division with remainder. Returns (quotient, remainder).
+    ///
+    /// Named in full because `Div` and `Rem` are also implemented: an inherent `div` taking
+    /// `&self` would lose method resolution to `Div::div`, which takes `self` by value, and every
+    /// `p.div(&q)` would silently become the quotient alone. Callers wanting one half should use
+    /// the operator; this is for the callers that want both and will not divide twice.
     /// TODO: return a result instead of panicking if divisor is zero.
-    fn div(&self, divisor: &Self) -> (Self, Self);
+    fn div_with_remainder(&self, divisor: &Self) -> (Self, Self);
 }

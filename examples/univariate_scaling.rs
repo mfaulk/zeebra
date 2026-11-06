@@ -372,7 +372,8 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
             let mut rng = StdRng::seed_from_u64(seed ^ 0x5172);
             let dividend = UnivariatePolynomial::<F>::rand(2 * n as u64 - 2, &mut rng);
             let divisor = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
-            let ((quotient, remainder), elapsed, bytes) = measure(|| dividend.div(&divisor));
+            let ((quotient, remainder), elapsed, bytes) =
+                measure(|| dividend.div_with_remainder(&divisor));
             // The division identity, checked rather than assumed — it costs another multiply, so
             // it is outside the measurement.
             assert_eq!(&(&quotient * &divisor) + &remainder, dividend);

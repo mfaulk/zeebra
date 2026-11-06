@@ -1421,7 +1421,7 @@ mod tests {
                 let t = trace_to_gf2(&h, g, d);
                 assert_eq!(
                     pow_mod(&t, 2, g),
-                    t.div(g).1,
+                    &t % g,
                     "the trace of {} is not idempotent at d = {}",
                     h,
                     d

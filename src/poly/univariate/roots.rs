@@ -198,7 +198,7 @@ mod tests {
                 },
             );
             assert!(
-                f.div(&product).1.is_zero(),
+                (&f % &product).is_zero(),
                 "{} does not divide {}",
                 product,
                 f
