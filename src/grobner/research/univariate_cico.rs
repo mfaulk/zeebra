@@ -7,6 +7,8 @@
 //! constrained coordinates hold identically, and [`cico_univariate_family`] agrees with running the
 //! permutation on the lifted input.
 
+use std::time::{Duration, Instant};
+
 use rand::SeedableRng;
 
 use crate::{
@@ -334,6 +336,32 @@ pub fn cico_univariate_family<F: KnownOrder>(
     family: &CicoFamily<F>,
     constraint: usize,
 ) -> Result<(UnivariatePolynomial<F>, UnivariateRoute), FamilyError> {
+    let (polynomial, stages) = cico_univariate_family_with_stats(instance, family, constraint)?;
+    Ok((polynomial, stages.route))
+}
+
+/// What [`cico_univariate_family`] cost, split so that evaluation and interpolation are separate
+/// numbers rather than one construction total.
+///
+/// `interpolation` is zero on the symbolic route, where there is nothing to invert.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FamilyStages {
+    pub route: UnivariateRoute,
+    pub degree_bound: usize,
+    /// Permutation evaluations performed. Zero on the symbolic route.
+    pub evaluations: usize,
+    /// Straight-line evaluation, or the evaluation-domain sweep.
+    pub construction: Duration,
+    /// `fft::interpolate` over the evaluation domain.
+    pub interpolation: Duration,
+}
+
+/// [`cico_univariate_family`], with the construction split into its stages.
+pub fn cico_univariate_family_with_stats<F: KnownOrder>(
+    instance: &CicoInstance<F>,
+    family: &CicoFamily<F>,
+    constraint: usize,
+) -> Result<(UnivariatePolynomial<F>, FamilyStages), FamilyError> {
     let poseidon = &instance.poseidon;
     let parameters = poseidon.parameters;
     if constraint >= instance.k {
@@ -348,6 +376,7 @@ pub fn cico_univariate_family<F: KnownOrder>(
 
     match route {
         UnivariateRoute::Symbolic { .. } => {
+            let at = Instant::now();
             let state: Vec<UnivariatePolynomial<F>> = family
                 .base
                 .iter()
@@ -355,9 +384,16 @@ pub fn cico_univariate_family<F: KnownOrder>(
                 .map(|(b, d)| UnivariatePolynomial::new(&[*b, *d]))
                 .collect();
             let finished = finish_symbolic(poseidon, &state);
+            let polynomial = finished[constraint].clone() - UnivariatePolynomial::lift(&target);
             Ok((
-                finished[constraint].clone() - UnivariatePolynomial::lift(&target),
-                route,
+                polynomial,
+                FamilyStages {
+                    route,
+                    degree_bound,
+                    evaluations: 0,
+                    construction: at.elapsed(),
+                    interpolation: Duration::ZERO,
+                },
             ))
         }
         UnivariateRoute::Evaluation { log_size } => {
@@ -372,6 +408,7 @@ pub fn cico_univariate_family<F: KnownOrder>(
                 &mut rand::rngs::StdRng::seed_from_u64(0x1_1C1C0),
             );
             let domain = FFTDomain::from_generator(generator, 1usize << log_size);
+            let at = Instant::now();
             let values: Vec<F> = domain
                 .iter()
                 .map(|z| {
@@ -379,7 +416,19 @@ pub fn cico_univariate_family<F: KnownOrder>(
                     finished[constraint] - target
                 })
                 .collect();
-            Ok((interpolate(&values, &domain), route))
+            let construction = at.elapsed();
+            let at = Instant::now();
+            let polynomial = interpolate(&values, &domain);
+            Ok((
+                polynomial,
+                FamilyStages {
+                    route,
+                    degree_bound,
+                    evaluations: values.len(),
+                    construction,
+                    interpolation: at.elapsed(),
+                },
+            ))
         }
     }
 }
@@ -842,6 +891,26 @@ mod tests {
             .map(|z| finish_field(&instance.poseidon, &family.skipped_state(*z))[0] - target)
             .collect();
         assert_eq!(interpolate(&values, &domain), symbolic);
+    }
+
+    /// The stage split records the route it took, charges no interpolation on the symbolic route,
+    /// and returns the same polynomial the unsplit entry point does.
+    #[test]
+    fn the_stage_split_matches_the_unsplit_construction() {
+        let instance = instance("poseidon31-cico-t16-rf4-rp0");
+        let family = family(&instance);
+        let (split, stages) =
+            cico_univariate_family_with_stats(&instance, &family, 0).expect("constructible");
+        let (plain, route) = cico_univariate_family(&instance, &family, 0).expect("constructible");
+        assert_eq!(split, plain);
+        assert_eq!(stages.route, route);
+        assert!(matches!(stages.route, UnivariateRoute::Symbolic { .. }));
+        assert_eq!(stages.interpolation, Duration::ZERO);
+        assert_eq!(stages.evaluations, 0);
+        assert_eq!(
+            stages.degree_bound,
+            degree_bound(&instance.poseidon.parameters)
+        );
     }
 
     /// `inverse_mod` inverts the S-box exponent modulo `p - 1`, which is what lets a search point

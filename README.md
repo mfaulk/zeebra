@@ -310,6 +310,9 @@ cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
+cargo run --release --example graeffe_cico         # the univariate CICO route, and the family economics
+cargo run --release --example graeffe_cico -- --families 3000 --budget 25
+cargo run --release --example graeffe_cico -- --help
 cargo run --release --example batch_inversion      # batch inversion: routine, integration,
 cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
 cargo run --release --example scoreboard           # registered problems, one record each, staged
