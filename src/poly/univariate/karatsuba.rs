@@ -10,25 +10,36 @@
 //! slicing.
 //!
 //! The recursion stops at a schoolbook base case of [`karatsuba_base_case`] coefficients, which is
-//! measured per field width and not derived; a narrow field's multiply is cheap enough that
-//! Karatsuba's extra additions pay off much later than on a 254-bit one. See
+//! measured per field element width and not derived, and which is **not one number**: 48
+//! coefficients at 4 bytes an element, 16 at 8, and 4 above that. A 4-byte multiply is cheap and
+//! its schoolbook inner loop vectorizes, so Karatsuba's extra additions have to be amortized over
+//! a much larger leaf than they do over a 254-bit field. Below the base case the output is
+//! bit-identical to the schoolbook `Mul`'s because it *is* schoolbook. See
 //! `docs/research/fast-univariate.md` §4.1 and `examples/karatsuba_crossover.rs`.
 
 use crate::FiniteField;
 
-/// Operand length below which the recursion multiplies schoolbook, for an element of at most 8
+/// Operand length below which the recursion multiplies schoolbook, for an element of at most 4
 /// bytes. Measured, not derived; see the module comment.
-pub(crate) const KARATSUBA_BASE_CASE_NARROW: usize = 32;
+pub(crate) const KARATSUBA_BASE_CASE_32_BIT: usize = 48;
 
-/// The same, for an element wider than 8 bytes.
-pub(crate) const KARATSUBA_BASE_CASE_WIDE: usize = 16;
+/// The same, for an element of 5 to 8 bytes.
+pub(crate) const KARATSUBA_BASE_CASE_64_BIT: usize = 16;
+
+/// The same, for an element wider than 8 bytes. Measured over BN254 `Fr`, where an element is 32
+/// bytes; the 16-byte `PrimeFieldElement128` is not separately measured and takes this figure.
+pub(crate) const KARATSUBA_BASE_CASE_WIDE: usize = 4;
 
 /// The measured schoolbook base case for `F`, the single source of truth for a dispatcher.
+///
+/// Three tiers rather than two, because the measurement found three: the base case falls by 12x
+/// across the widths this crate uses, in the direction the cost of one field multiplication
+/// predicts.
 pub(crate) fn karatsuba_base_case<F: FiniteField>() -> usize {
-    if std::mem::size_of::<F>() <= 8 {
-        KARATSUBA_BASE_CASE_NARROW
-    } else {
-        KARATSUBA_BASE_CASE_WIDE
+    match std::mem::size_of::<F>() {
+        0..=4 => KARATSUBA_BASE_CASE_32_BIT,
+        5..=8 => KARATSUBA_BASE_CASE_64_BIT,
+        _ => KARATSUBA_BASE_CASE_WIDE,
     }
 }
 
@@ -211,8 +222,8 @@ fn add_into<F: FiniteField>(x: &[F], y: &[F], out: &mut [F]) {
 #[cfg(test)]
 mod tests {
     use super::{
-        karatsuba_base_case, karatsuba_unstable, multiply_karatsuba, KARATSUBA_BASE_CASE_NARROW,
-        KARATSUBA_BASE_CASE_WIDE,
+        karatsuba_base_case, karatsuba_unstable, multiply_karatsuba, KARATSUBA_BASE_CASE_32_BIT,
+        KARATSUBA_BASE_CASE_64_BIT, KARATSUBA_BASE_CASE_WIDE,
     };
     use crate::{
         fields::{Bn254Fr, KoalaBear, Mersenne31, Zp18446744069414584321},
@@ -328,13 +339,13 @@ mod tests {
         }
     }
 
-    /// Every operand length from 0 to a little past twice the narrow base case agrees with the
+    /// Every operand length from 0 to a little past twice the largest base case agrees with the
     /// definition, which pins the base case's boundary and the first two recursion levels.
     #[test]
     fn test_every_short_length_agrees_with_the_definition() {
         type F = KoalaBear;
-        for la in 0..=(2 * KARATSUBA_BASE_CASE_NARROW + 3) {
-            for lb in 0..=(2 * KARATSUBA_BASE_CASE_NARROW + 3) {
+        for la in 0..=(2 * KARATSUBA_BASE_CASE_32_BIT + 3) {
+            for lb in 0..=(2 * KARATSUBA_BASE_CASE_32_BIT + 3) {
                 let a: Vec<F> = random_coefficients(la, la as u64 + 1);
                 let b: Vec<F> = random_coefficients(lb, lb as u64 + 1_000);
                 assert_eq!(multiply_karatsuba(&a, &b), naive(&a, &b), "{} x {}", la, lb);
@@ -352,10 +363,13 @@ mod tests {
             KARATSUBA_BASE_CASE_WIDE - 1,
             KARATSUBA_BASE_CASE_WIDE,
             KARATSUBA_BASE_CASE_WIDE + 1,
-            KARATSUBA_BASE_CASE_NARROW - 1,
-            KARATSUBA_BASE_CASE_NARROW,
-            KARATSUBA_BASE_CASE_NARROW + 1,
-            2 * KARATSUBA_BASE_CASE_NARROW + 1,
+            KARATSUBA_BASE_CASE_64_BIT - 1,
+            KARATSUBA_BASE_CASE_64_BIT,
+            KARATSUBA_BASE_CASE_64_BIT + 1,
+            KARATSUBA_BASE_CASE_32_BIT - 1,
+            KARATSUBA_BASE_CASE_32_BIT,
+            KARATSUBA_BASE_CASE_32_BIT + 1,
+            2 * KARATSUBA_BASE_CASE_32_BIT + 1,
             257,
         ] {
             let a: Vec<F> = random_coefficients(len, len as u64 + 11);
@@ -373,17 +387,19 @@ mod tests {
         }
     }
 
-    /// The measured base case is the narrow constant for an 8-byte element and the wide one above
-    /// that, so a dispatcher reading `karatsuba_base_case` gets the per-width figure.
+    /// `karatsuba_base_case` returns the measured figure for each of the three element widths: 4
+    /// bytes, 8 bytes, and wider.
     #[test]
     fn test_the_base_case_is_chosen_by_element_width() {
+        assert_eq!(std::mem::size_of::<KoalaBear>(), 4);
+        assert_eq!(std::mem::size_of::<Goldilocks>(), 8);
         assert_eq!(
             karatsuba_base_case::<KoalaBear>(),
-            KARATSUBA_BASE_CASE_NARROW
+            KARATSUBA_BASE_CASE_32_BIT
         );
         assert_eq!(
             karatsuba_base_case::<Goldilocks>(),
-            KARATSUBA_BASE_CASE_NARROW
+            KARATSUBA_BASE_CASE_64_BIT
         );
         assert_eq!(karatsuba_base_case::<Bn254Fr>(), KARATSUBA_BASE_CASE_WIDE);
     }

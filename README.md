@@ -1000,11 +1000,19 @@ let b = UnivariatePolynomial::<Zp65537>::new(&[Zp65537::new(3), Zp65537::new(4)]
 assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
 ```
 
-A Karatsuba helper now exists beside the schoolbook `Mul` but is **not wired into it**: the
-multiplication dispatcher is a separate change, so `mul`'s row above is unaffected.
-`cargo run --release --example karatsuba_crossover` measures the helper against schoolbook and
-reports the crossover per field element width, which is not one number — see
-[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) §4.1.
+A Karatsuba helper now exists for the band `multiply` leaves to schoolbook, but **nothing calls it
+yet** — not `Mul`, not `multiply` — so every figure above is unaffected. Its own crossover is 48
+coefficients over a 4-byte field, 16 over an 8-byte one and 4 over a 254-bit one, against the
+transform's 16384, 2048 and 512, and unlike the transform it needs nothing of the field but a
+ring, so it is available over Mersenne-31. At `2^14` it is 10.7x to 22.9x faster than schoolbook,
+at a measured exponent of 1.58–1.61 against 2.00, for `6 n B` against `Mul`'s `4 n B`.
+
+```text
+cargo run --release --example karatsuba_crossover
+```
+
+is the measurement; [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) §4.1.1
+has the per-width tables.
 
 ## Gröbner Bases
 
