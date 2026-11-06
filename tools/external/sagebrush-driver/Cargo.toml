@@ -1,0 +1,19 @@
+# Standalone driver for Sagebrush's Groebner engine, built outside Zeebra's workspace.
+# Sagebrush is MIT OR Apache-2.0; this crate only *calls* its library, and nothing from it
+# is copied into Zeebra. See docs/research/external-comparands.md.
+[package]
+name = "sagebrush-gb-driver"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Empty table: this crate is its own workspace root, so it does not join Sagebrush's
+# engine/ workspace (whose members declare `[lints] workspace = true`).
+[workspace]
+
+[dependencies]
+sagebrush-mpoly = { path = "../src/sagebrush/engine/mpoly" }
+sagebrush-bigint = { path = "../src/sagebrush/engine/bigint" }
+
+[profile.release]
+opt-level = 3
