@@ -65,6 +65,9 @@ OPTIONS
                              Default: adaptive, the `FglmOptions` default
     --minimize-attempts <n>  Shrink candidates per failing system, 0 to disable. Default: 40
     --minimize-seconds <s>   Wall-clock for shrinking one failing system. Default: 20
+    --jobs <n>               Systems to check concurrently, one Singular each. Default: 1.
+                             The report does not depend on this: the systems are independent
+                             and it is assembled in index order whatever finishes first.
     --fixtures <path>        Write the agreeing cases as a Rust fixture module.
     --failures <dir>         Where to write failing cases. Default: target/differential-failures
     --work-dir <dir>         Scratch directory for Singular scripts. Default: a temporary one
@@ -102,17 +105,20 @@ fn main() -> ExitCode {
 }
 
 fn run(arguments: Arguments) -> Result<SweepReport, String> {
-    let mut oracle = SingularOracle::new(
+    // One oracle per job, each with its own scratch subdirectory: `interrogate` takes `&mut self`
+    // and the scratch names come from a per-oracle counter.
+    let mut oracles = SingularOracle::fleet(
         &arguments.singular,
         &arguments.work_dir,
         arguments.timeout,
         arguments.keep_files,
+        arguments.sweep.jobs,
     )
     .map_err(|e| format!("cannot prepare the oracle: {}", e))?;
 
     // Before the sweep rather than per system: the alternative is discovering that Singular is
     // absent once for each of five hundred systems.
-    let version = oracle
+    let version = oracles[0]
         .version()
         .map_err(|e| format!("cannot run Singular: {}", e))?;
 
@@ -131,14 +137,18 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
         "# operator construction: {:?}, storage: {:?}",
         arguments.sweep.fglm.operator_construction, arguments.sweep.fglm.operator_storage
     );
-    println!("# scratch in {}", oracle.work_dir().display());
+    println!(
+        "# scratch in {}, {} job(s)",
+        arguments.work_dir.display(),
+        arguments.sweep.jobs
+    );
     println!();
 
     let started = Instant::now();
     let quiet = arguments.quiet;
     let mut report = run_sweep(
         &arguments.sweep,
-        &mut oracle,
+        &mut oracles,
         &mut |index, system, outcome| {
             if quiet && outcome.agreed() {
                 return;
@@ -191,7 +201,9 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
 ///
 /// Spelled out rather than taken from `std::env::args`, so that a table regenerated through a
 /// wrapper script still records flags the tool itself accepts. Only the ones that change which
-/// systems are generated: the oracle's path and the scratch directory do not.
+/// systems are generated: the oracle's path, the scratch directory and `--jobs` do not, and
+/// including any of them would make the committed fixture header turn over on a change that
+/// cannot alter a single recorded answer.
 fn sweep_flags(arguments: &Arguments) -> String {
     let sweep = &arguments.sweep;
     let characteristics: Vec<String> = sweep
@@ -315,6 +327,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
         max_terms: 4,
         minimize_attempts: 40,
         minimize_budget: Duration::from_secs(20),
+        jobs: 1,
         fglm: FglmOptions::default(),
         f4: F4Options::default(),
     };
@@ -391,6 +404,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
                     }
                 };
             }
+            "--jobs" => sweep.jobs = number(&value()?, flag)?,
             "--minimize-attempts" => sweep.minimize_attempts = number(&value()?, flag)?,
             "--minimize-seconds" => {
                 sweep.minimize_budget = Duration::from_secs(number(&value()?, flag)?)
@@ -434,6 +448,9 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
     }
     if sweep.max_terms == 0 {
         return Err("--max-terms must be at least one".to_string());
+    }
+    if sweep.jobs == 0 {
+        return Err("--jobs must be at least one".to_string());
     }
 
     Ok(Some(Arguments {

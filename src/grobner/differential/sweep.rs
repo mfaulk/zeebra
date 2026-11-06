@@ -6,7 +6,14 @@
 //! choice would leave the small characteristics — where an implementation that assumed `2` is
 //! invertible goes wrong — to chance.
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    },
+    time::{Duration, Instant},
+};
 
 use crate::grobner::{f4::F4Options, fglm::FglmOptions};
 
@@ -50,6 +57,13 @@ pub struct SweepOptions {
     /// This is how a workstream points the oracle at a strategy under development: the sweep's
     /// 500 random systems over six fields are then checking *that* strategy, not the default one.
     pub fglm: FglmOptions,
+
+    /// How many systems to check at once. One by default.
+    ///
+    /// The systems are independent — `system(index)` is a pure function of `(seed, index)` and no
+    /// iteration reads another's result — so this is purely how much of the machine the sweep is
+    /// allowed to use. It does not change the report: see [`run_sweep`].
+    pub jobs: usize,
 
     /// The options every Gröbner basis in the sweep is computed with.
     ///
@@ -152,60 +166,194 @@ impl SweepReport {
     }
 }
 
-/// Run a sweep, reporting each system to `observe` as it completes.
+/// Run a sweep, reporting each system to `observe` in index order.
 ///
-/// `observe` is called once per system with its index, the system, and the outcome, so a caller can
-/// stream progress rather than wait for the whole run.
-pub fn run_sweep(
+/// `oracles` holds exactly one oracle per job. A worker cannot share one: [`Oracle::interrogate`]
+/// takes `&mut self`, and [`SingularOracle`](super::singular::SingularOracle) names its scratch
+/// files from a per-oracle run counter, so two workers behind one oracle would overwrite each
+/// other's script and read each other's output.
+/// [`SingularOracle::fleet`](super::singular::SingularOracle::fleet) builds a conforming set.
+///
+/// **The report is assembled in index order and not in completion order.** A seeded differential
+/// sweep whose failure list depended on which worker finished first could not be reproduced, which
+/// would defeat the point of seeding it — so each system's contribution is held against its index
+/// and absorbed in order. `observe` is called from the calling thread, in index order, for the
+/// same reason: a worker that ran ahead has its progress line held until its predecessors' are
+/// emitted. At more than one job a failing system's progress line therefore appears only after its
+/// shrink has finished, since that is where the worker's result becomes available.
+pub fn run_sweep<O: Oracle + Send>(
     options: &SweepOptions,
-    oracle: &mut impl Oracle,
+    oracles: &mut [O],
     observe: &mut dyn FnMut(usize, &GeneratedSystem, &SystemOutcome),
 ) -> SweepReport {
     assert!(
         !options.variables.is_empty() && !options.characteristics.is_empty(),
         "a sweep needs at least one variable count and one characteristic"
     );
+    assert!(options.jobs >= 1, "a sweep needs at least one job");
+    assert_eq!(
+        oracles.len(),
+        options.jobs,
+        "a sweep of {} jobs needs one oracle each",
+        options.jobs
+    );
 
+    if options.jobs == 1 {
+        return run_sequentially(options, &mut oracles[0], observe);
+    }
+    run_concurrently(options, oracles, observe)
+}
+
+/// The one-job sweep, with no channel and no threads.
+///
+/// Kept as its own path rather than as the degenerate case of the fan-out so that `--jobs 1` is
+/// the sequential sweep every recorded report was produced by, down to the order in which a
+/// progress line and a shrink happen.
+fn run_sequentially<O: Oracle>(
+    options: &SweepOptions,
+    oracle: &mut O,
+    observe: &mut dyn FnMut(usize, &GeneratedSystem, &SystemOutcome),
+) -> SweepReport {
     let mut report = SweepReport::default();
-
     for index in 0..options.systems {
         let system = options.system(index);
         let outcome = check_generated(&system, oracle, &options.fglm, &options.f4);
         observe(index, &system, &outcome);
         report.attempted += 1;
+        absorb(&mut report, resolve(&system, outcome, options, oracle));
+    }
+    report
+}
 
-        match outcome {
-            SystemOutcome::Agreed { case, agreement } => {
-                report.agreed += 1;
-                match agreement.quotient_dimension {
-                    None => report.positive_dimensional += 1,
-                    Some(0) => report.unit_ideals += 1,
-                    Some(_) => report.zero_dimensional += 1,
+/// The same sweep over `oracles.len()` workers, assembled in index order.
+fn run_concurrently<O: Oracle + Send>(
+    options: &SweepOptions,
+    oracles: &mut [O],
+    observe: &mut dyn FnMut(usize, &GeneratedSystem, &SystemOutcome),
+) -> SweepReport {
+    // Indices are handed out one at a time rather than in blocks. A system's cost spans orders of
+    // magnitude with its variable count, and the variable count cycles fastest (see
+    // `SweepOptions::system`), so any static split gives one worker every cheap system and
+    // another every expensive one.
+    let next = AtomicUsize::new(0);
+    let (sender, receiver) = mpsc::channel();
+    let mut report = SweepReport::default();
+
+    std::thread::scope(|scope| {
+        for oracle in oracles.iter_mut() {
+            let sender = sender.clone();
+            let next = &next;
+            scope.spawn(move || loop {
+                let index = next.fetch_add(1, Ordering::Relaxed);
+                if index >= options.systems {
+                    return;
                 }
-                report.agreed_cases.push(case);
-            }
-            SystemOutcome::Disagreed { case, disagreement } => {
-                report
-                    .failures
-                    .push(minimize(&system, case, disagreement, options, oracle));
-            }
-            SystemOutcome::OracleFailed { error } => {
-                report
-                    .oracle_failures
-                    .push((system.name(), error.to_string()));
-            }
-            SystemOutcome::ZeebraFailed { detail } => {
-                report.zeebra_failures.push((system.name(), detail));
-            }
-            SystemOutcome::Unsupported { detail } => {
-                report
-                    .unsupported
-                    .push(format!("{}: {}", system.name(), detail));
+                let system = options.system(index);
+                let outcome = check_generated(&system, oracle, &options.fglm, &options.f4);
+                // The worker finishes everything that needs its oracle — including the shrink of a
+                // failure, which is a loop of oracle calls — before giving up the index.
+                let observed = outcome.clone();
+                let contribution = resolve(&system, outcome, options, oracle);
+                if sender
+                    .send((index, system, observed, contribution))
+                    .is_err()
+                {
+                    return;
+                }
+            });
+        }
+        // The calling thread's own clone, dropped so the receive loop ends when the workers do.
+        drop(sender);
+
+        let mut held: BTreeMap<usize, (GeneratedSystem, SystemOutcome, Contribution)> =
+            BTreeMap::new();
+        let mut emitted = 0usize;
+        for (index, system, outcome, contribution) in receiver {
+            held.insert(index, (system, outcome, contribution));
+            while let Some((system, outcome, contribution)) = held.remove(&emitted) {
+                observe(emitted, &system, &outcome);
+                report.attempted += 1;
+                absorb(&mut report, contribution);
+                emitted += 1;
             }
         }
-    }
+    });
 
     report
+}
+
+/// What one system owes the report, once its worker is done with its oracle.
+///
+/// Exists so that the oracle work and the report assembly can happen in different orders: a worker
+/// produces this as soon as it can, and [`absorb`] folds it in when the system's index comes up.
+enum Contribution {
+    Agreed {
+        case: DifferentialCase,
+        quotient_dimension: Option<usize>,
+    },
+    Failed(Box<Failure>),
+    OracleFailed {
+        name: String,
+        error: String,
+    },
+    ZeebraFailed {
+        name: String,
+        detail: String,
+    },
+    Unsupported {
+        line: String,
+    },
+}
+
+/// Finish one system's oracle work, shrinking it if it disagreed.
+fn resolve<O: Oracle>(
+    system: &GeneratedSystem,
+    outcome: SystemOutcome,
+    options: &SweepOptions,
+    oracle: &mut O,
+) -> Contribution {
+    match outcome {
+        SystemOutcome::Agreed { case, agreement } => Contribution::Agreed {
+            case,
+            quotient_dimension: agreement.quotient_dimension,
+        },
+        SystemOutcome::Disagreed { case, disagreement } => Contribution::Failed(Box::new(
+            minimize(system, case, disagreement, options, oracle),
+        )),
+        SystemOutcome::OracleFailed { error } => Contribution::OracleFailed {
+            name: system.name(),
+            error: error.to_string(),
+        },
+        SystemOutcome::ZeebraFailed { detail } => Contribution::ZeebraFailed {
+            name: system.name(),
+            detail,
+        },
+        SystemOutcome::Unsupported { detail } => Contribution::Unsupported {
+            line: format!("{}: {}", system.name(), detail),
+        },
+    }
+}
+
+/// Fold one system's contribution into the report. Called in index order, always.
+fn absorb(report: &mut SweepReport, contribution: Contribution) {
+    match contribution {
+        Contribution::Agreed {
+            case,
+            quotient_dimension,
+        } => {
+            report.agreed += 1;
+            match quotient_dimension {
+                None => report.positive_dimensional += 1,
+                Some(0) => report.unit_ideals += 1,
+                Some(_) => report.zero_dimensional += 1,
+            }
+            report.agreed_cases.push(case);
+        }
+        Contribution::Failed(failure) => report.failures.push(*failure),
+        Contribution::OracleFailed { name, error } => report.oracle_failures.push((name, error)),
+        Contribution::ZeebraFailed { name, detail } => report.zeebra_failures.push((name, detail)),
+        Contribution::Unsupported { line } => report.unsupported.push(line),
+    }
 }
 
 /// Shrink a failing system while it keeps failing the same check.
@@ -216,12 +364,12 @@ pub fn run_sweep(
 ///
 /// **Bounded on purpose.** Each candidate costs an oracle invocation, so an unbounded search on a
 /// large failing system can take longer than the sweep that found it. The original is always kept.
-fn minimize(
+fn minimize<O: Oracle>(
     original: &GeneratedSystem,
     case: DifferentialCase,
     disagreement: Disagreement,
     options: &SweepOptions,
-    oracle: &mut impl Oracle,
+    oracle: &mut O,
 ) -> Failure {
     let mut best = original.clone();
     let mut best_case = case;
@@ -332,13 +480,23 @@ pub fn is_finding(check: Check) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{shrinks_of, SweepOptions};
+    use super::{run_sweep, shrinks_of, SweepOptions, SweepReport};
     use crate::grobner::f4::F4Options;
     use crate::grobner::{
-        differential::generator::{GeneratedSystem, SystemShape},
+        differential::{
+            comparison::DifferentialCase,
+            generator::{GeneratedSystem, SystemShape},
+            singular::{Oracle, OracleError, OracleQuery},
+        },
         fglm::FglmOptions,
     };
-    use std::time::Duration;
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        time::Duration,
+    };
 
     const SHAPE: SystemShape = SystemShape {
         variables: 3,
@@ -356,6 +514,7 @@ mod tests {
             max_terms: 4,
             minimize_attempts: 0,
             minimize_budget: Duration::from_secs(0),
+            jobs: 1,
             fglm: FglmOptions::unbounded(),
             f4: F4Options::default(),
         }
@@ -505,5 +664,239 @@ mod tests {
             assert_eq!(candidate.characteristic, 7);
             assert_eq!(candidate.variables, system.variables);
         }
+    }
+
+    /// An oracle whose answer is a pure function of its query, with no subprocess.
+    ///
+    /// Not right about anything: it claims a one-dimensional quotient with a basis of `1` for
+    /// every ideal and refuses GF(3) outright, so most of what it produces is a disagreement. That
+    /// is deliberate — the failure list is the part of a report whose order a fan-out could
+    /// disturb, and a sweep where everything agreed would not exercise it. Being a pure function
+    /// of the query is what makes the report independent of which worker asked.
+    struct SyntheticOracle {
+        /// How long each answer takes. Non-zero widens the window in which workers overlap.
+        dwell: Duration,
+
+        /// Answers in flight, and the most there have ever been, shared across the fleet.
+        concurrency: Arc<(AtomicUsize, AtomicUsize)>,
+    }
+
+    impl Oracle for SyntheticOracle {
+        fn interrogate(
+            &mut self,
+            query: &OracleQuery<'_>,
+        ) -> Result<DifferentialCase, OracleError> {
+            let (live, peak) = &*self.concurrency;
+            let now = live.fetch_add(1, Ordering::SeqCst) + 1;
+            peak.fetch_max(now, Ordering::SeqCst);
+            std::thread::sleep(self.dwell);
+            live.fetch_sub(1, Ordering::SeqCst);
+
+            if query.characteristic == 3 {
+                return Err(OracleError::Incomplete);
+            }
+            Ok(DifferentialCase {
+                name: query.name.clone(),
+                characteristic: query.characteristic,
+                variables: query.variables.iter().map(|v| v.to_string()).collect(),
+                system: query.system.to_vec(),
+                // Echoed exactly, so the oracle-input check passes and the comparison gets as far
+                // as the mathematics before it disagrees.
+                oracle_system: Some(query.system.to_vec()),
+                quotient_dimension: Some(1),
+                grevlex_basis: vec!["1".to_string()],
+                standard_monomials: vec!["1".to_string()],
+                border_normal_forms: query
+                    .border_monomials
+                    .iter()
+                    .map(|monomial| (monomial.clone(), "0".to_string()))
+                    .collect(),
+                lex_basis: Some(vec!["1".to_string()]),
+            })
+        }
+    }
+
+    /// The sweep the concurrency tests run, at `jobs` workers.
+    ///
+    /// Five variable counts of which one is unsupported, a characteristic the oracle refuses, and
+    /// a quotient-dimension cap low enough that some systems trip it: every list in the report is
+    /// populated, which `test_the_synthetic_sweep_populates_every_list` asserts.
+    ///
+    /// `minimize_budget` is ten minutes on purpose. It is a *wall-clock* bound, so a shrink cut
+    /// short by it would make the report depend on how fast the machine was and on how contended
+    /// it was; the attempt count has to be what binds for a sweep to be reproducible at all.
+    fn concurrent_options(jobs: usize) -> SweepOptions {
+        SweepOptions {
+            seed: 4_400,
+            systems: 40,
+            variables: vec![2, 3, 4, 5, 6],
+            characteristics: vec![2, 3, 7, 13, 65537, 2147483647],
+            max_degree: 3,
+            max_terms: 4,
+            minimize_attempts: 3,
+            minimize_budget: Duration::from_secs(600),
+            jobs,
+            fglm: FglmOptions {
+                max_quotient_dimension: 2,
+                ..FglmOptions::unbounded()
+            },
+            f4: F4Options::default(),
+        }
+    }
+
+    /// Run that sweep, returning the report, what `observe` saw, and the peak overlap.
+    ///
+    /// The observations are `(index, seed)` and not just the index: an index argument that merely
+    /// counts the calls would look ordered while naming the wrong system, which is the mistake the
+    /// pairing catches.
+    fn synthetic_sweep(jobs: usize, dwell: Duration) -> (SweepReport, Vec<(usize, u64)>, usize) {
+        let concurrency = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+        let mut oracles: Vec<SyntheticOracle> = (0..jobs)
+            .map(|_| SyntheticOracle {
+                dwell,
+                concurrency: Arc::clone(&concurrency),
+            })
+            .collect();
+        let mut observed: Vec<(usize, u64)> = Vec::new();
+        let report = run_sweep(
+            &concurrent_options(jobs),
+            &mut oracles,
+            &mut |index, system, _| observed.push((index, system.seed)),
+        );
+        let peak = concurrency.1.load(Ordering::SeqCst);
+        (report, observed, peak)
+    }
+
+    /// The seed in a `seed-<n>-p<p>-n<v>` name, which ascends with the sweep index.
+    fn seed_of(name: &str) -> u64 {
+        let rest = name.strip_prefix("seed-").expect("a generated name");
+        rest.split_once("-p")
+            .expect("a generated name")
+            .0
+            .parse()
+            .expect("a numeric seed")
+    }
+
+    /// Whatever each list holds, it holds in ascending index order.
+    fn assert_ascending(seeds: Vec<u64>, what: &str) {
+        assert!(
+            seeds.windows(2).all(|pair| pair[0] < pair[1]),
+            "{} is not in index order: {:?}",
+            what,
+            seeds
+        );
+    }
+
+    /// The sweep the concurrency tests use populates every list a report assembles in order.
+    #[test]
+    fn test_the_synthetic_sweep_populates_every_list() {
+        let (report, _, _) = synthetic_sweep(1, Duration::ZERO);
+        assert_eq!(report.attempted, 40);
+        assert!(!report.failures.is_empty(), "no disagreement");
+        assert!(!report.oracle_failures.is_empty(), "no oracle failure");
+        assert!(!report.zeebra_failures.is_empty(), "no Zeebra failure");
+        assert!(!report.unsupported.is_empty(), "nothing skipped");
+        assert!(
+            report.failures.iter().any(|failure| failure.shrinks > 0),
+            "nothing was shrunk, so the minimizer never ran inside a worker"
+        );
+    }
+
+    /// A sweep's report does not depend on how many workers produced it.
+    ///
+    /// The criterion the fan-out turns on. Rendered in full, so the failure list, the shrink
+    /// counts and every recorded case are compared and not only the tallies.
+    #[test]
+    fn test_concurrency_does_not_change_the_report() {
+        let sequential = format!("{:#?}", synthetic_sweep(1, Duration::ZERO).0);
+        for jobs in [2, 4, 8] {
+            assert_eq!(
+                format!("{:#?}", synthetic_sweep(jobs, Duration::ZERO).0),
+                sequential,
+                "the report at {} jobs is not the sequential report",
+                jobs
+            );
+        }
+    }
+
+    /// Every list in a concurrent report is in index order rather than completion order.
+    #[test]
+    fn test_a_concurrent_report_is_assembled_in_index_order() {
+        let (report, _, peak) = synthetic_sweep(8, Duration::from_millis(3));
+        assert!(peak >= 2, "the workers never overlapped");
+
+        assert_ascending(
+            report
+                .failures
+                .iter()
+                .map(|failure| failure.original.seed)
+                .collect(),
+            "the failure list",
+        );
+        assert_ascending(
+            report
+                .oracle_failures
+                .iter()
+                .map(|(name, _)| seed_of(name))
+                .collect(),
+            "the oracle-failure list",
+        );
+        assert_ascending(
+            report
+                .zeebra_failures
+                .iter()
+                .map(|(name, _)| seed_of(name))
+                .collect(),
+            "the Zeebra-failure list",
+        );
+        assert_ascending(
+            report
+                .unsupported
+                .iter()
+                .map(|line| seed_of(line.split(':').next().expect("a name")))
+                .collect(),
+            "the unsupported list",
+        );
+        assert_ascending(
+            report
+                .agreed_cases
+                .iter()
+                .map(|case| seed_of(&case.name))
+                .collect(),
+            "the agreed cases",
+        );
+    }
+
+    /// The progress callback sees each index once, in order, beside its own system.
+    #[test]
+    fn test_progress_is_observed_in_index_order() {
+        let options = concurrent_options(8);
+        let (report, observed, peak) = synthetic_sweep(options.jobs, Duration::from_millis(3));
+        assert!(
+            peak >= 2,
+            "the workers never overlapped, so the ordering proves nothing"
+        );
+        let expected: Vec<(usize, u64)> = (0..report.attempted)
+            .map(|index| (index, options.seed + index as u64))
+            .collect();
+        assert_eq!(
+            observed, expected,
+            "the progress callback was not called once per index, in index order, with that \
+             index's system"
+        );
+    }
+
+    /// A sweep given fewer oracles than jobs is a programming error and not a quieter sweep.
+    #[test]
+    #[should_panic(expected = "one oracle each")]
+    fn test_a_sweep_needs_one_oracle_per_job() {
+        let concurrency = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+        let mut oracles = vec![SyntheticOracle {
+            dwell: Duration::ZERO,
+            concurrency,
+        }];
+        let mut options = concurrent_options(4);
+        options.systems = 1;
+        run_sweep(&options, &mut oracles, &mut |_, _, _| {});
     }
 }
