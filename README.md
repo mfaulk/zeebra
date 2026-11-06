@@ -235,6 +235,35 @@ is invoked with this directory as the working directory, and profile settings co
 workspace being built. A downstream build gets whatever that build configures, so a dependent
 crate wanting these settings must set them itself.
 
+#### No compiler cache, and why that is the measured choice
+
+`.cargo/config.toml` sets `[build] rustc-wrapper = ""`, which **disables** any compiler cache
+configured further up the directory tree — `sccache` typically. That is deliberate, and it is a
+measurement rather than a preference. Three `cargo build --release --lib` runs into fresh output
+directories with a warm `sccache`: **44 of 48 units hit and the wall clock did not move** — 83.1 s,
+82.4 s, 79.4 s. The hits are all cheap leaf dependencies. The unit that matters is `zeebra` itself,
+**79.2 s of the ~83 s** under fat LTO at one codegen unit, and it misses, because at least one
+dependency rlib is not byte-reproducible across output directories and `sccache` hashes `--extern`
+rlib *contents* — so every crate downstream of it gets a fresh key. This crate is also the wrong
+shape for a compiler cache in the first place: one large crate whose cost is a single whole-crate
+codegen, not many small crates compiled repeatedly.
+
+The second cost is larger than the 4% saved. A compiler cache can only cache non-incremental
+builds, so using one means `CARGO_INCREMENTAL=0`, and that is paid on every edit: `cargo check`
+after a one-line change is **1.9 s** with incremental off against **0.7 s** with it on. Release and
+bench builds are unaffected either way, since cargo disables incremental compilation under LTO.
+
+Two things to know if a cache is enabled anyway:
+
+- **The `RUSTC_WRAPPER` environment variable overrides this file.** Cargo takes the environment over
+  config, so a shell that exports `RUSTC_WRAPPER=sccache` gets it regardless of what is written
+  here. Prefix the command with `RUSTC_WRAPPER=""` in that case.
+- **A stale cached `libzeebra` rlib does not look like a cache problem.** It surfaces as an example
+  or binary failing to compile against `pub use` items that are plainly present in the source. The
+  same symptom comes from sharing one `CARGO_TARGET_DIR` between two checkouts, which is why
+  `tools/scoreboard.sh` forces a private target directory and an empty wrapper for anything
+  measured.
+
 ### Measuring on a busy machine
 
 `tools/benchlock.sh` runs one command at a time, machine-wide, and records that it did:
