@@ -40,6 +40,7 @@ division, nothing could be vectorized until that was gone.
 | [#51](https://github.com/mfaulk/zeebra/issues/51) M19-F | Parallel Macaulay matrix construction | **won't do** — §6.3 |
 | [#52](https://github.com/mfaulk/zeebra/issues/52) M19-G | Parallel critical-pair criteria | **won't do** — §6.2 |
 | [#62](https://github.com/mfaulk/zeebra/issues/62) | A 32-bit prime field, which §5.3 identifies as the remaining lever | done — §8, and it reopens #49 |
+| [#159](https://github.com/mfaulk/zeebra/issues/159) | The pivot-of-column `HashMap` §4.4 names, indexed by column instead | done — §9, 28% of the default's elimination stage |
 
 ## 3. What landed
 
@@ -507,43 +508,68 @@ fit in a 32 KiB L1d; neither hashed figure does.** That is the mechanism §9.4 a
 ### 9.3 Whole computations
 
 `cargo run --release --example f4_profile -- baseline`, which selects `Backend::Sparse`. The
-elimination stage and the whole computation, milliseconds, mean of two runs. Every instance whose
+elimination stage and the whole computation, milliseconds, mean of four runs. Every instance whose
 elimination stage exceeds a millisecond.
 
 | instance | elim before | elim after | elim | total before | total after | total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| katsura-7 grevlex | 617.93 | 599.71 | −2.9% | 718.63 | 700.05 | −2.6% |
-| katsura-7 grlex | 388.51 | 375.83 | −3.3% | 479.82 | 467.05 | −2.7% |
-| katsura-6 lex | 335.38 | 313.49 | −6.5% | 448.46 | 426.65 | −4.9% |
-| katsura-6 grevlex | 16.27 | 15.13 | −7.0% | 24.54 | 23.36 | −4.8% |
-| cyclic-5 grevlex | 15.36 | 13.61 | **−11.4%** | 21.05 | 19.29 | −8.4% |
-| cyclic-5 grlex | 13.41 | 11.44 | **−14.7%** | 20.16 | 18.09 | −10.3% |
-| katsura-6 grlex | 12.79 | 12.00 | −6.2% | 21.71 | 21.09 | −2.9% |
-| cyclic-5 lex | 12.76 | 11.10 | **−13.0%** | 21.42 | 19.61 | −8.5% |
-| katsura-5 lex | 5.62 | 4.95 | −12.0% | 11.75 | 11.06 | −5.9% |
-| random-4 lex | 3.63 | 3.16 | −13.0% | 7.36 | 6.82 | −7.3% |
+| katsura-7 grevlex | 623.41 | 603.07 | −3.3% | 726.42 | 704.07 | −3.1% |
+| katsura-7 grlex | 390.27 | 377.24 | −3.3% | 482.82 | 469.56 | −2.7% |
+| katsura-6 lex | 335.86 | 315.95 | −5.9% | 451.04 | 431.80 | −4.3% |
+| katsura-6 grevlex | 16.38 | 15.34 | −6.3% | 24.74 | 23.72 | −4.1% |
+| cyclic-5 grevlex | 15.39 | 13.71 | **−10.9%** | 21.13 | 19.42 | −8.1% |
+| cyclic-5 grlex | 13.30 | 11.46 | **−13.9%** | 20.02 | 18.03 | −10.0% |
+| katsura-6 grlex | 12.87 | 11.95 | −7.1% | 21.85 | 21.07 | −3.6% |
+| cyclic-5 lex | 12.86 | 11.26 | **−12.4%** | 21.68 | 19.91 | −8.2% |
+| katsura-5 lex | 5.63 | 4.96 | −11.9% | 11.83 | 11.09 | −6.3% |
+| random-4 lex | 3.65 | 3.17 | **−13.2%** | 7.38 | 6.85 | −7.2% |
 
 The two katsura-7 rows gain least, and they are the rows where the stage is largest. §9.4 reads
 that as the elimination's own working set having pushed past the level the pivot store competes in,
 not as the change being worth less there.
 
+`cargo run --release --example f4_profile -- recommended` is the configuration
+`F4Options::default()` selects: `Backend::Adaptive`, structured elimination, preprocessing. Mean of
+three runs; the reps agreed to within 1.5%. Every instance whose elimination stage exceeds a
+millisecond — the configuration is fast enough that most are below it.
+
+| instance | elim before | elim after | elim | total before | total after | total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| katsura-7 grlex | 7.05 | 5.69 | **−19.2%** | 45.66 | 44.53 | −2.5% |
+| katsura-7 grevlex | 6.62 | 4.76 | **−28.1%** | 34.22 | 32.36 | −5.4% |
+| katsura-6 lex | 1.14 | 0.96 | −15.7% | 21.14 | 20.63 | −2.4% |
+
+This is the largest proportional gain in the milestone, and it is on the default. Two things make
+the totals move much less. First, the elimination stage is no longer where the time is under this
+configuration: katsura-7 grevlex spends 18.28 ms of its 34.17 in the final interreduction, which is
+untouched. Second, the structured path's own `interreduce_prefix` still keeps a local
+`HashMap<usize, usize>` of the same shape — it is in `src/grobner/f4/structured.rs`, outside the
+elimination layer, and outside #159. The 28.1% is therefore a lower bound on what the change is
+worth to that stage.
+
 `cargo run --release --example scoreboard -- stable`, whole solves, and
 `scoreboard row poseidon31-cico-t16-rf2-rp0 --slice 0`, a registered full-width Poseidon reduction
-at a precommitted specialization seed. Single runs each.
+at a precommitted specialization seed. **Three runs each side, and every run is listed**, because
+these rows are whole solves and run-to-run variation is several percent — on a single pair the
+Fukuoka row read −13.5%, which three runs do not support.
 
-| row | before | after | change | outcome |
-| --- | ---: | ---: | ---: | --- |
-| `fukuoka-mq-III-n15-seed0` | 9912.1 ms | 8579.0 ms | **−13.5%** | verified witness, both sides |
-| `fukuoka-mq-III-n10-seed0` | 124.2 ms | 110.4 ms | −11.1% | verified witness, both sides |
-| `poseidon31-cico-t16-rf2-rp0`, slice(12 fixed, seed 0) | 31 144.0 ms | 29 023.3 ms | −6.8% | the slice is empty — mathematically complete, not resource-limited, both sides |
-| `poseidon-t2-rf4-rp0-planted` | 388.1 ms | 374.1 ms | −3.6% | verified witness, both sides |
-| `poseidon-t2-rf2-rp2-planted` | 151.4 ms | 148.1 ms | −2.2% | verified witness, both sides |
-| `poseidon-t3-rf2-rp1-planted` | 18 963.6 ms | 18 513.8 ms | −2.4% | **resource-limited**: `max_matrix_columns` at degree 11, the same bound at the same degree on both sides |
-| `poseidon-t2-rf2-rp0-planted` | 0.9 ms | 1.2 ms | — | verified witness; under a millisecond, so the sign is not meaningful |
+| row | before, ms | after, ms | mean | outcome |
+| --- | --- | --- | ---: | --- |
+| `poseidon31-cico-t16-rf2-rp0`, slice(12 fixed, seed 0) | 31 144, 30 512, 29 697 | 29 023, 28 904, 27 632 | **−6.3%** | the slice is empty — mathematically complete, not resource-limited, on all six runs |
+| `poseidon-t3-rf2-rp1-planted` | 18 964, 19 021, 18 931 | 18 514, 19 315, 17 853 | −2.2% | **resource-limited**: `max_matrix_columns` at degree 11, the same bound at the same degree on all six runs. The spread is wider than the effect; this row says nothing. |
+| `fukuoka-mq-III-n15-seed0` | 9912, 9577, 8864 | 8579, 8930, 8111 | **−9.6%** | verified witness, all six runs |
+| `poseidon-t2-rf4-rp0-planted` | 388.1, 381.2, 398.8 | 374.1, 389.6, 373.8 | −2.6% | verified witness; the ranges overlap |
+| `poseidon-t2-rf2-rp2-planted` | 151.4, 151.9, 156.9 | 148.1, 148.7, 146.1 | −3.8% | verified witness, all six runs |
+| `fukuoka-mq-III-n10-seed0` | 124.2, 127.6, 123.3 | 110.4, 120.3, 110.0 | **−9.2%** | verified witness, all six runs |
+| `poseidon-t2-rf2-rp0-planted` | 0.9, 1.0, 0.9 | 1.2, 0.9, 0.9 | — | verified witness; under a millisecond, so the sign is not meaningful |
 
-The Fukuoka rows are over GF(31) with 30 quadratic equations in 15 variables, which is the shortest
-pivot support of anything here — and the issue predicted the share the lookup takes is largest
-where pivots are short. They are the largest whole-solve gains measured.
+The two Fukuoka rows are the largest whole-solve gains, at −9.2% and −9.6%, and they are over
+GF(31) with 30 quadratic equations in 15 variables — the shortest pivot support of anything here.
+The issue predicted the share the lookup takes is largest where pivots are short, and that is where
+it is largest.
+
+The full-width Poseidon reduction's slice gains 6.3% and reaches the same verdict on both sides. It
+is the only row here with no overlap between the two triples.
 
 ### 9.4 The bound: memory, not ALU
 
