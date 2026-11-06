@@ -22,7 +22,7 @@ use crate::{
     fields::{trim_limbs, KnownOrder, RootOfUnityError},
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
-    integers::{big_uint::BigUInt, factor, find_generator},
+    integers::{big_uint::BigUInt, factor, find_generator, limbs_minus_two},
     FiniteField, ParseFieldElementError, Ring,
 };
 
@@ -234,13 +234,19 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
             Self::zero(),
             "The zero element does not have a multiplicative inverse."
         );
-        self.pow(P as u128 - 2)
+        self.pow_limbs(&Self::FERMAT_EXPONENT_LIMBS)
     }
 }
 
 impl<const P: u64> PrimeFieldElement64<P> {
     /// The order q = p of the field, as little-endian limbs. See [`KnownOrder::order_limbs`].
     const ORDER_LIMBS: [u64; 1] = [P];
+
+    /// The Fermat inversion exponent q - 2, as little-endian limbs.
+    ///
+    /// Subtracted on the limbs rather than on a machine integer, and held at the width of
+    /// [`Self::ORDER_LIMBS`], so nothing here caps the order at the width of a `u128`.
+    const FERMAT_EXPONENT_LIMBS: [u64; 1] = limbs_minus_two(Self::ORDER_LIMBS);
 }
 
 impl<const P: u64> KnownOrder for PrimeFieldElement64<P> {

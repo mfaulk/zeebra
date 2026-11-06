@@ -33,6 +33,7 @@ use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_va
 use crate::{
     fields::{trim_limbs, KnownOrder},
     identities::{One, Zero},
+    integers::limbs_minus_two,
     FiniteField, ParseFieldElementError, Ring,
 };
 
@@ -140,7 +141,7 @@ impl<const P: u64> FiniteField for BinaryFieldElement<P> {
             Self::zero(),
             "The zero element does not have a multiplicative inverse."
         );
-        self.pow(Self::ORDER - 2)
+        self.pow_limbs(&Self::FERMAT_EXPONENT_LIMBS)
     }
 }
 
@@ -153,6 +154,12 @@ impl<const P: u64> BinaryFieldElement<P> {
 
     /// Characteristic two. See [`KnownOrder::characteristic_limbs`].
     const CHARACTERISTIC_LIMBS: [u64; 1] = [2];
+
+    /// The Fermat inversion exponent q - 2, as little-endian limbs.
+    ///
+    /// Subtracted on the limbs rather than on a machine integer, and held at the width of
+    /// [`Self::ORDER_LIMBS`], so nothing here caps the order at the width of a `u128`.
+    const FERMAT_EXPONENT_LIMBS: [u64; 2] = limbs_minus_two(Self::ORDER_LIMBS);
 }
 
 impl<const P: u64> KnownOrder for BinaryFieldElement<P> {
