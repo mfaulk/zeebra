@@ -182,10 +182,10 @@ branch (#186) — the code as merged, which later commits on that branch change 
 document — seed 1, on the development
 workstation (128 logical cores, 500 GB; `-C target-cpu=x86-64-v3` from `.cargo/config.toml`,
 `profile.release` with fat LTO and one codegen unit). **Single-threaded, unpinned, and taken under
-an exclusive benchmark lock** while five other agents were idle on it:
+the exclusive benchmark lock, `tools/benchlock.sh`** while five other agents were idle on it:
 
 ```sh
-cargo run --release --example resultant_cico
+tools/benchlock.sh agentR cargo run --release --example resultant_cico
 ```
 
 ### 6.1 Measured, stage-separated

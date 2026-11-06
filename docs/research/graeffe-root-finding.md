@@ -732,7 +732,7 @@ Dollar cost, [P937] §5.3: `P_6_8` $185 against a $4 000 prize; `P_6_9` $1 101 a
 
 **Measured, not estimated.** `examples/graeffe_root.rs`, `src/poly/univariate/graeffe.rs`, landing
 §10 rows 3, 4 and 6. One core of the 64-core/300 GB workstation, `taskset --cpu-list 8`, under
-`benchlock.sh`, release profile with the repository's default `Cargo.toml` settings (fat LTO,
+`tools/benchlock.sh`, release profile with the repository's default `Cargo.toml` settings (fat LTO,
 `codegen-units = 1`), `RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`.
 
 **Two revisions are reported, both measured on the same machine with the same binary source.**
@@ -745,7 +745,7 @@ Reproduce with
 
 ```sh
 RUSTC_WRAPPER="" CARGO_TARGET_DIR=/path/to/target cargo build --release --example graeffe_root
-benchlock.sh agentG taskset --cpu-list 8 \
+tools/benchlock.sh agentG taskset --cpu-list 8 \
   /path/to/target/release/examples/graeffe_root koalabear budget=60.0
 ```
 
@@ -989,7 +989,7 @@ The issue requires this answered by measurement "regardless of the paper's model
 Agent C is replacing `src/fft/evaluate.rs`'s recursive split with an iterative in-place kernel on
 `perf/161-iterative-ntt`, so the curve below is **explicitly a pre-#161 baseline** and was taken from
 an uncommitted throwaway binary rather than a committed benchmark, for exactly that reason. Single
-core, `taskset -c 8`, under `benchlock.sh`, KoalaBear in a `u64` (`size_of::<F>() = 8`).
+core, `taskset -c 8`, under `tools/benchlock.sh`, KoalaBear in a `u64` (`size_of::<F>() = 8`).
 
 The *arithmetic* comparand was measured in the same run and the same binary, as an independent
 `acc = acc + a[i]*b[i]` loop over a 4 KB window resident in L1: **1.560–1.572 ns per
@@ -1517,14 +1517,14 @@ against both kernels.
   directly, with attention to the expected `F_p`-root count of `P_1`, how much freedom the `(1,[1])`
   parametrization supplies per family, and what "common-root strategy" denotes operationally.
 - §6.1's figures are from **one uncommitted throwaway binary on one machine against the pre-#161
-  recursive kernel**, taken under `benchlock.sh` with six other agents active. They are labelled a
-  baseline for exactly that reason and PR 10 above re-takes them.
+  recursive kernel**, taken under `tools/benchlock.sh` with six other agents active. They are
+  labelled a baseline for exactly that reason and PR 10 above re-takes them.
 - §4.4, §4.5, §6.4 and §6.5's figures are from a **committed** binary, `examples/graeffe_root.rs`,
-  one core (`taskset --cpu-list 8`) under `benchlock.sh`. **Two revisions, both reported**: pre-#161
-  in §4.4.2 and post-#161 in §4.4.1, with §4.4.3 the difference. Single-shot rather than a median
-  of interleaved runs: the ratios being reported are 10x and larger, where this machine's noise —
-  which `README.md`'s crossover section needs 21 interleaved runs to see past — does not change a
-  conclusion. A 1.1x claim would need the interleaved protocol and none is made. The one borderline
+  one core (`taskset --cpu-list 8`) under `tools/benchlock.sh`. **Two revisions, both reported**:
+  pre-#161 in §4.4.2 and post-#161 in §4.4.1, with §4.4.3 the difference. Single-shot rather than
+  a median of interleaved runs: the ratios being reported are 10x and larger, where this machine's
+  noise — which `README.md`'s crossover section needs 21 interleaved runs to see past — does not
+  change a conclusion. A 1.1x claim would need the interleaved protocol and none is made. The one borderline
   figure is §4.4.3's 1.07x on the descent, which is **reported as "did not get faster", not as a
   7% gain.**
 - **Nothing in §4.4–§6.5 is evidence about a registered challenge.** §9.4 states the discipline and
