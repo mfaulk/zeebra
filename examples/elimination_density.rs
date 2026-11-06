@@ -13,6 +13,10 @@
 //! runs the same algorithm, so the elimination times are comparable; densifying and sparsifying is
 //! real cost but it is not the algorithm, so it is reported in its own column.
 //!
+//! The last table divides that time by `EliminationStatistics::row_operations`, which every backend
+//! reports identically. A change inside a row operation moves nanoseconds per operation and leaves
+//! the count alone; a change to the pivot rule would move the count, and is a different claim.
+//!
 //! ```text
 //! cargo run --release --example elimination_density            # the default instances
 //! cargo run --release --example elimination_density -- list    # the instances available
@@ -198,16 +202,24 @@ fn block_densities(matrix: &SparseMatrix<F>, size: usize) -> Vec<f64> {
     densities
 }
 
-/// One elimination of every matrix, under one backend.
-fn time_elimination(matrices: &[SparseMatrix<F>], backend: Backend) -> Duration {
+/// One elimination of every matrix, under one backend, with the work it reported.
+///
+/// The row-operation count is the denominator the per-operation cost is taken against. It is a
+/// function of the matrices and the pivot rule alone — every backend reports the same one — so a
+/// change in nanoseconds per operation is a change in the cost of an operation and not in how many
+/// there were.
+fn time_elimination(matrices: &[SparseMatrix<F>], backend: Backend) -> (Duration, usize) {
     let mut elapsed = Duration::ZERO;
+    let mut row_operations = 0;
     for matrix in matrices {
         let mut matrix = matrix.clone();
         let start = Instant::now();
-        row_echelon_with(backend, &mut matrix, usize::MAX).expect("unbounded cannot fail");
+        let statistics =
+            row_echelon_with(backend, &mut matrix, usize::MAX).expect("unbounded cannot fail");
         elapsed += start.elapsed();
+        row_operations += statistics.row_operations;
     }
-    elapsed
+    (elapsed, row_operations)
 }
 
 /// Densifying and sparsifying every matrix, which is what the dense backend pays before and after.
@@ -380,11 +392,28 @@ fn main() {
     );
     println!("|---|---|---|---|---|---|---|");
 
+    let mut per_operation: Vec<(String, Backend, Duration, usize, usize)> = Vec::new();
+
     for (instance, built) in &harvested {
-        let sparse = time_elimination(built, Backend::Sparse);
-        let dense = time_elimination(built, Backend::Dense);
-        let adaptive = time_elimination(built, Backend::Adaptive);
+        let (sparse, sparse_ops) = time_elimination(built, Backend::Sparse);
+        let (dense, dense_ops) = time_elimination(built, Backend::Dense);
+        let (adaptive, adaptive_ops) = time_elimination(built, Backend::Adaptive);
         let conversion = time_conversion(built);
+
+        // Pivot storage is `4 * num_columns` bytes for the widest matrix of the instance, since
+        // one index is built per elimination and freed with it; the peak is the widest.
+        let widest = built
+            .iter()
+            .map(SparseMatrix::num_columns)
+            .max()
+            .unwrap_or(0);
+        for (backend, elapsed, operations) in [
+            (Backend::Sparse, sparse, sparse_ops),
+            (Backend::Dense, dense, dense_ops),
+            (Backend::Adaptive, adaptive, adaptive_ops),
+        ] {
+            per_operation.push((instance.clone(), backend, elapsed, operations, widest));
+        }
 
         // The dense elimination as reported includes its own conversions, because the backend has
         // to perform them; the conversion column says how much of it they are.
@@ -397,6 +426,28 @@ fn main() {
             millis(conversion),
             millis(dense),
             millis(dense) / millis(sparse),
+        );
+    }
+
+    println!();
+    println!("# Per-operation cost of elimination, by backend");
+    println!("| instance | backend | ms | row operations | ns/op | widest | pivot index KiB |");
+    println!("|---|---|---|---|---|---|---|");
+    for (instance, backend, elapsed, operations, widest) in &per_operation {
+        let nanos_per_operation = if *operations == 0 {
+            f64::NAN
+        } else {
+            elapsed.as_secs_f64() * 1e9 / *operations as f64
+        };
+        println!(
+            "| {} | {:?} | {:.2} | {} | {:.1} | {} | {:.1} |",
+            instance,
+            backend,
+            millis(*elapsed),
+            operations,
+            nanos_per_operation,
+            widest,
+            *widest as f64 * 4.0 / 1024.0,
         );
     }
 }
