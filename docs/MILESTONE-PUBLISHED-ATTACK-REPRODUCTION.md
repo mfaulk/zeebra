@@ -1,6 +1,8 @@
 # M24 — Published Attack Reproduction and Cryptanalytic Frontier Extension
 
-**Status:** planned
+**Status:** complete. **Minimum and Strong met, Stretch not met** — §13.1 scores each against the
+criterion written before the work started. Every figure in this document is reproducible from §16;
+§10.1 records which of its own predictions held and which did not.
 **Prerequisite:** M23, merged; #162 stage 1, #124, #161, #175, #188 and #191 merged
 **Research issues:** #80 (C3, published attack reproduction), #84 (D3, Graeffe), #82 (D1), #85 (D4),
 #179, #180 (resultant stages), #65, #73 (benchmark corpus and schema), #189, #185 (instrument fixes)
@@ -964,16 +966,50 @@ reported as such.
 
 ## 16. Reproducing
 
-Commands that exist today and are what M24 builds on:
+**The cheap checks first.** None needs a pinned environment or the benchmark lock, and between them
+they re-verify every *result* in this document that is not a timing — including the six-round
+witness, in milliseconds:
 
 ```sh
-cargo test --lib grobner::research::challenge   # the registry's freeze and faithfulness tests
-cargo test --lib poly::univariate::graeffe      # the transform and the root finder, incl. #191
-tools/scoreboard.sh                             # smoke tier, writes nothing
-tools/scoreboard.sh stable --write              # regenerates research/scoreboard/
-cargo run --release --example resultant_cico    # the four-round rows, both routes, A/B
-cargo run --release --example graeffe_root      # root finding to degree 3^13
+cargo test --lib grobner::research::resultant::tests::test_the_recorded_witnesses_verify_through_the_permutation
+cargo test --lib grobner::research::anemoi_cico            # quotient dimension == (alpha+2)^N
+cargo test --lib grobner::research::univariate_cico        # the (1,[1]) parametrization's oracles
+cargo test --lib grobner::research::scoreboard             # the refusals, and the result-file contracts
+cargo test --lib grobner::research::challenge              # the registry's freeze and faithfulness
+cargo run --release --example anemoi_ladder dimensions     # the machine-independent Anemoi gate
 ```
+
+That first line is the important one. It reads `research/witnesses/resultant-cico-t16.json` and
+checks every recorded witness — two rounds, four rounds and **six** — through
+`permutation_plus_linear`. The six-round row took 55 minutes to *find* and takes 0.01 s to *verify*,
+which is the asymmetry a committed fixture exists to exploit.
+
+**The measurements.** Each needs `tools/benchlock.sh`, a private `CARGO_TARGET_DIR`, and
+`ZEEBRA_MACHINE`/`ZEEBRA_AFFINITY` set, per §15:
+
+```sh
+cargo run --release --example resultant_cico                  # four-round rows, both routes, A/B
+cargo run --release --example resultant_cico -- \
+    --row poseidon31-cico-t16-rf2-rp4 --concurrency 32 --write # §7.8, ~55 min, 57 GB peak
+cargo run --release --example graeffe_cico                    # §6.4's family economics
+cargo run --release --example graeffe_root                    # root finding to degree 3^13
+ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
+    cargo run --release --example anemoi_ladder row anemoi64-cico-n5-fcico   # §8a.2
+tools/scoreboard.sh                                           # smoke tier, writes nothing
+tools/scoreboard.sh stable --write                            # regenerates research/scoreboard/
+```
+
+**Reading the generated results.** `research/scoreboard/results/` holds two files with two
+contracts, and asking the wrong one is how the six-round witness went missing from the rendered
+table in the first place:
+
+| file | answers |
+|---|---|
+| `best.json` | the fastest verified witness **among single-threaded runs**. A problem solved only on multiple workers is deliberately absent |
+| `solved.json` | **is this problem solved, at any concurrency** — with `environment.concurrency` on every row |
+
+Both state their contract in the file. `test_the_committed_result_files_honour_their_contracts`
+asserts them as committed files rather than as renderer output.
 
 The resource ladder of §9.1 needs no new code:
 
