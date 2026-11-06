@@ -8,9 +8,12 @@ The answer is both narrower and more interesting than the question. More budget 
 nothing, and — separately — **the budget is not what bounds the memory.**
 
 > **M25 (#237) added §9**, which attributes the memory the budget does not see. 88% of peak RSS is
-> **one `VecDeque<Monomial<20>>`** in symbolic preprocessing. §9.4 withdraws §6a's reading that the
-> 14 GB is reached on the refusal path, and §6a's argument for keeping the entry cap "because it is
-> the bound that yields a report" is retracted there too. Sections 1-8 are left as they were taken.
+> **one `VecDeque<Monomial<20>>`** in symbolic preprocessing, reached before any matrix exists.
+> §9.4a re-runs the capped-against-uncapped comparison §6a asked for and finds the two peaks **one
+> megabyte apart in fourteen gigabytes**, so §6a's 4 978 MB uncapped figure is a measurement error
+> and its refusal-path reading is withdrawn. §6a's argument for keeping the entry cap "because it is
+> the bound that yields a report" is retracted too, by #284's cooperative time check. Sections 1-8
+> are left as they were taken, with retraction markers where a claim no longer stands.
 
 ## 1. What M23 left open
 
@@ -100,10 +103,12 @@ the degree-5 group the cap differs by **5x** — a 20M-to-100M span — and the 
 
 Five caps, two values, and within each group the budget moves the peak by nothing measurable.
 
-> **Read §6a before drawing a mechanism from this.** Two further rungs with the cap effectively
-> removed plateau at a **third** value, 4 978 MB, *below* the degree-5 group while doing strictly
-> more work. So the description above is accurate for these five rows and the obvious causal
-> reading of it — that this is what entering degree 5 costs — is **false**.
+> **Read §6a and then §9.4a before drawing a mechanism from this.** §6a reported two further rungs
+> with the cap effectively removed plateauing at a **third** value, 4 978 MB, *below* the degree-5
+> group. **§9.4a re-measures that and gets 13 997 MB** — one megabyte from the capped figure — so
+> the third value was a measurement error and the peak does not move with the cap at all. What the
+> peak does track is **which batch's symbolic preprocessing ran**, and the queue that stage builds
+> is a function of the closure rather than of any budget here.
 
 Whatever the mechanism, the magnitude is not in doubt: across every row in this document the entry
 counter accounts for at most 1.3% of peak RSS, and the gap is between **0.6 GB and 14 GB** of
@@ -205,19 +210,20 @@ Three things follow, and the first supersedes §3's framing.
 "out of reach, not out of budget" is the right answer to §1 — but the evidence is this rung, not the
 `cap + ε` pattern, which §3 now says distinguishes nothing.
 
-**The peak-RSS step is about the cap, not about the degree.** This is a correction to §4. Both
-uncapped rungs plateau at **4 978 MB** — 4 977 776 kB and 4 977 796 kB, **20 kB apart** — which is
-*below* the 14 072 MB that every capped degree-5 row reached. A run doing strictly more work peaks
-at a third of the memory. So 14.07 GB is **not what degree 5 costs**; it is reached on the path that
-ends in a refusal and not on the path that proceeds. §4's "step function of the degree entered"
-holds as a description of the five capped rows and **fails as a causal claim**, and the honest
-statement is narrower:
+~~**The peak-RSS step is about the cap, not about the degree.**~~ This was offered as a correction
+to §4. Both uncapped rungs plateau at **4 978 MB** — 4 977 776 kB and 4 977 796 kB, **20 kB
+apart** — which is *below* the 14 072 MB that every capped degree-5 row reached. A run doing
+strictly more work peaks at a third of the memory. So 14.07 GB is **not what degree 5 costs**; it is
+reached on the path that ends in a refusal and not on the path that proceeds.
 
-> Peak RSS took exactly two values across five capped rows and a third value across two uncapped
-> ones. It tracks **which stop the run is heading for**, which is not a quantity a caller can
-> choose.
+> **Withdrawn in §9.4a (M25, #237).** Re-measured on the same instance and cores, the uncapped rung
+> peaks at **13 997 MB** against the capped rung's **13 996 MB** — one megabyte apart in fourteen
+> gigabytes. The 4 978 MB above is a measurement error, and every inference drawn from it below,
+> including the refusal-path reading, falls with it. The deduction was valid; the premise was not.
+> §9.2 attributes the 14 GB to one `VecDeque<Monomial<20>>` in symbolic preprocessing, which is
+> reached **before any matrix exists** and therefore before any budget can be crossed.
 
-What produces the 14.07 GB on the refusal path specifically is **not established**, and the
+~~What produces the 14.07 GB on the refusal path specifically is **not established**, and the
 candidates are now different from §5's: the limit check fires during a batch, and `f4_observed_reported`
 retains a clone of the system for the report, so an allocation on the error path is as plausible as
 one in degree-5 preprocessing. #237's profile should compare a capped run against an uncapped one at
@@ -306,7 +312,7 @@ is `(usize, Zp31)` = **16 B**.
 | site | measured MB | share of `VmHWM` | method |
 |---|---:|---:|---|
 | **symbolic preprocessing's pending monomial queue** | **12 374** | **88.4%** | 162 188 194 monomials at the queue's high-water x 80 B |
-| the basis, held twice | 905 | 6.5% | 5 389 241 terms x (80 + 8) B x 2 copies |
+| the basis, held twice | 905 | 6.5% | 5 389 241 terms x (80 + 8) B x 2 copies, and a **lower bound** — see below |
 | **matrix entries — the budgeted quantity** | **186** | **1.3%** | `max_live_nonzeros` 12 212 087 x 16 B + 40 588 B of dense buffer |
 | preprocessed row vector | 5.9 | 0.04% | 64 062 rows x `PreprocessedRow<20>` = 96 B |
 | `examined` + `covered` monomial sets | 5.3 | 0.04% | 34 210 distinct monomials x 81 B x 2 sets |
@@ -317,6 +323,14 @@ is `(usize, Zp31)` = **16 B**.
 
 Named sites account for **96%** of peak RSS. The two stage measurements bracket it: symbolic
 preprocessing's peak live heap is **20 499 MB** and construction adds **317 MB** on top.
+
+**Every `count x size_of` row is a payload lower bound, by construction.** It excludes the slack a
+container's growth policy leaves, which is why the rows are reported beside an allocator measurement
+rather than instead of one. The basis row is the clearest case: of its two copies,
+`MonicBasis`'s is a `Vec<(Monomial<20>, Zp31)>` and costs exactly 88 B a term, while
+`MultivariatePolynomial`'s is a `HashMap<Monomial<20>, Zp31>` and costs 88 B of payload plus one
+control byte per slot in a power-of-two table — between 1.14x and 2.3x more. So 905 MB is a floor
+and the true figure is 1.0-1.5 GB, which is where most of the unnamed remainder is.
 
 **Why the allocator's 21 674 MB exceeds `VmHWM`'s 13 996 MB, and why that is the mechanism rather
 than an inconsistency.** A `VecDeque` grows by doubling, so at 162 188 194 elements its capacity is
@@ -367,13 +381,35 @@ library.
 §6a reached the refusal-path reading from a sound deduction over an unsound premise. The deduction:
 the capped and uncapped runs are *identical* until the first budget crossing, so a peak the capped
 run reaches before crossing must also be reached by the uncapped run — and if the uncapped run peaks
-lower, the capped run's extra must come after the crossing. That is valid. The premise it rests on is
-§6a's 4 978 MB for the uncapped rungs, and the determinism argument now says that figure must be
-wrong: the uncapped run passes through the same degree-5 symbolic preprocessing, which costs 20 499 MB
-of heap whatever the entry cap is, because the only budget that stage reads is `max_matrix_rows`.
-Two independent runs of very different length agreeing to 20 kB (4 977 776 and 4 977 796 kB) is
-itself a signature of a poller that stopped early rather than of a plateau — see §2 for the earlier
-probe in this document that was wrong by 7 000x.
+lower, the capped run's extra must come after the crossing. **That deduction is valid.** The premise
+is §6a's 4 978 MB for the uncapped rungs, and that is the part that fails.
+
+### 9.4a Capped against uncapped, at the same point
+
+§6a asked for exactly this comparison and named it the sharpest available experiment. Run on the
+same binary, the same instance and the same cores, differing only in the entry cap:
+
+| | 20 000 000 cap | 1 000 000 000 cap (uncapped in effect) |
+|---|---:|---:|
+| outcome | `max_live_nonzeros` at degree 5 | no entry stop; the degree-5 batch runs on |
+| **measured `VmHWM`** | **13 996 MB** | **13 997 MB** |
+
+**One megabyte apart, in 14 gigabytes.** The peak does not move with the cap at all, which is what
+the mechanism predicts and what §6a's figures contradict: the only budget symbolic preprocessing
+reads is `max_matrix_rows`, so the queue it builds at a given batch is byte-identical whatever the
+entry cap is. The entry cap cannot change a peak that is reached before the matrix exists.
+
+So **§6a's 4 978 MB is a measurement error, not a plateau**, and the "refusal path" conclusion that
+rested on it goes with it. Two independent runs of very different length agreeing to 20 kB
+(4 977 776 and 4 977 796 kB) is a signature of a poller that stopped early rather than of a physical
+limit — see §2 for the earlier probe in this very document that was wrong by 7 000x. The lesson §2
+drew applies to itself: cross-check an instrument before building an argument on a surprise.
+
+The uncapped rung also reproduces §6a's *other* observation, the one that was never in doubt: it is
+**time-bound, not entry-bound**. The degree-5 batch does not finish, and `max_wall_time` cannot
+interrupt it, because a cooperative check between batches cannot stop a batch already in progress —
+which is precisely the caveat `F4Options::max_wall_time` documents and the reason an external
+supervisor remains the right backstop.
 
 ### 9.5 What this changes
 
