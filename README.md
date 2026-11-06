@@ -311,6 +311,7 @@ cargo run --release --example scoreboard           # registered problems, one re
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
+                                                   #   (~2 min: two four-round rows now complete)
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -943,7 +944,10 @@ The two transforms are the only quasi-linear stages, and they now cost the same:
 [`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Interpolation at
 arbitrary abscissae — what an evaluation-interpolation resultant needs — is quadratic: it was
 cubic, at 2^10 and 2^9, until #162 built the numerator product `prod (x - x_i)` once and divided it
-down by synthetic division.
+down by synthetic division. An evaluation-interpolation resultant turns out not to need arbitrary
+abscissae at all, since it chooses where it samples — `bivariate_resultant_ntt` takes its Sylvester
+determinants on a power-of-two subgroup and recovers the polynomial with one `interpolate` — but on
+the CICO slices the determinants dominate either way.
 [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the full curves, the
 superseded figures, the gap list, and what each stage would need to go further; the subproduct tree
 that would make it `O(n log^2 n)` is not written.
@@ -1814,7 +1818,9 @@ overwritten, with no dependency to read eighty lines of writer.
 #### Elimination that is not a Gröbner basis
 
 `grobner::research::bivariate_resultant` computes `Res_y(f, g)` for two bivariate polynomials, as
-the determinant of their Sylvester matrix recovered by interpolating scalar determinants. The
+the determinant of their Sylvester matrix recovered by interpolating scalar determinants;
+`bivariate_resultant_ntt` computes the same resultant with the samples taken on a power-of-two
+subgroup, so the recovery is an inverse NTT rather than a cubic solve. The
 determinant construction rather than a Euclidean algorithm on purpose: evaluating a matrix and
 taking its determinant commutes with evaluation *always*, so there is no case to analyse — where
 specializing `f` at a point that kills its leading coefficient in `y` drops its degree, and the
@@ -1834,9 +1840,28 @@ and one resultant finishes it:
 578x, on the same registered problem, with every candidate checked by running the permutation. The
 S-box-per-variable formulation exists to hold the degree at 3 and pays 32 extra variables for it;
 when only two inputs are free, those variables are the whole cost and the degree it avoids is
-affordable. The resultant route's own limit is arithmetic — about `16 · 3^{5·rounds}` field
-operations — so it reaches the same two rounds F4 does and not one more: what it changes is the
-cost there, not the frontier. See
+affordable.
+
+**The four-round rows now complete, with verified witnesses** — `poseidon31-cico-t16-rf2-rp2` in
+about 40 s and `-rf4-rp0` in about 41 s, where F4 stops at two rounds and this route previously did
+too. Each witness is checked by `CicoInstance::is_solution`, which runs `permutation_plus_linear`;
+the coordinates are committed under `research/witnesses/` and re-checked by the test suite. The
+enabling change is #162 making `lagrange_interpolate` quadratic. The route's own limit is still
+arithmetic — about `16 · 3^{5·rounds}` field operations, now almost entirely the determinants — so
+six rounds remains `3.3 × 10^15` and out of reach.
+
+`bivariate_resultant_ntt` moves where the samples are taken: the *same* Sylvester determinants on a
+power-of-two multiplicative subgroup, recovered with one `fft::interpolate`, with
+`interpolation_route` falling back to `bivariate_resultant_reference` on a field whose two-adicity
+admits no domain — Mersenne-31's is 1. **It is measured slower than the reference, by 1.23x–1.40x**,
+and the reason generalizes: the sample count goes as `2d²` and each sample is an order-`2d`
+determinant, so determinant work grows as `d^5` against a quadratic interpolation's `d^4`. Padding
+13 123 samples up to 16 384 costs 10.4 s of determinants to remove 1.5 s of interpolation. Both
+routes are retained and `examples/resultant_cico.rs` runs them side by side in one process.
+
+Two other results from the same run: the resultant's degree matches the **published, unproven**
+`d^{2R_F+R_P}` on all three rows measured — 729 against a Bézout bound of 6 561 on the row with
+partial rounds — and that makes the sample count predictable rather than merely loose. See
 [`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md).
 
 #### External instances: the Fukuoka MQ Challenge

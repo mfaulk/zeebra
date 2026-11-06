@@ -203,6 +203,13 @@ tiny size: `docs/research/resultant-elimination.md` §2 measures the resultant d
 2-round slice as exactly the Bézout bound `d²`, with no collapse — consistent with the loose bound,
 not with the tighter experimental one, at a round count too small to separate them.
 
+**That has since been separated.** `resultant-elimination.md` §6.3 measures the resultant's degree
+on three registered slices, one of which has `R_P > 0` and therefore distinguishes the two formulas:
+`R_F=2 R_P=2` gives **729**, which is slide 22's `d^{2R_F+R_P}` and not slide 19's
+`d^{2(R_F−1)+R_P}` (81) nor the Bézout bound (6 561). All three rows agree with slide 22 and none
+with slide 19. Still unproven — the confirmation is experimental, as the source's own is — but no
+longer unexamined in this repository.
+
 Required radix-2 transform size is `2^ceil(log2(δ+1))` for interpolating or Graeffe-transforming a
 degree-`δ` polynomial (an order-2 Graeffe step needs only `n ≥ δ+1`, not `2δ+1` — see §3.2), and
 `2^ceil(log2(2δ+1))` for an ordinary product of two degree-`δ` polynomials.
