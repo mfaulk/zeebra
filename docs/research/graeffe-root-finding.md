@@ -49,7 +49,15 @@ are marked `UNVERIFIED`.
 > `3^11`, `3^13`, `3^15` for `R_P = 6, 8, 10`. Two independent readings of two different papers
 > agreeing on all three registered targets is the strongest evidence in either document.
 >
-> **What is now open, and it is the number that decides the gate.** §9.3 estimates ≈`p` ≈ `2^31`
+> **Closed by §9.5, 2026-11-06.** The paragraph below was written before 2026/1254 was read in this
+> document. It has since been read directly from the PDF and **§9.5 resolves the discrepancy with
+> arithmetic**: the `2^31` family count is confirmed rather than overturned — the paper endorses the
+> ≈1-root heuristic and defines its "common-root strategy" as independent filtering, so two of the
+> three candidates below are *refuted by the source* — and the apparent four orders of magnitude
+> reduce to ~1.1 once §9.2's per-family total is corrected to the stages the published algorithm
+> actually runs per family. Read §9.5 instead of the next paragraph; it is retained unedited.
+>
+> **What was open, and it was the number that decided the gate.** §9.3 estimates ≈`p` ≈ `2^31`
 > families for a CICO-2 witness, from ~1 expected `F_p`-root per family times a `1/p` chance that a
 > root satisfies the second constraint. That cannot be reconciled with 2026/1254 Table 1, which
 > reports the `R_P = 8` CICO-2 instance solved in **7 hours on 96 GPUs** — `2^31` families at §9.2's
@@ -182,8 +190,14 @@ initial linear layer but Poseidon's same-MDS-every-round and all-state round con
 partial rounds ([PC] §2.2 lists exactly those three differences; `src/grobner/research/poseidon.rs`
 applies `self.mds` throughout). The skip count depends only on whether the **initial** linear layer
 is present, which it is — so `α^{R_F+R_P−1}` is the right rule and `3^13` the right degree.
-Marked **reconstructed**: the paper states the rule for Poseidon and for Poseidon2, not for this
-hybrid, and no source read here states the hybrid case.
+
+> **No longer reconstructed, as of §9.5.** This paragraph previously read "Marked **reconstructed**:
+> the paper states the rule for Poseidon and for Poseidon2, not for this hybrid, and no source read
+> here states the hybrid case." 2026/1254 has since been read directly, and §9.5.2 derives the
+> `(1,[1])` construction for this exact hybrid from §2.2 of that paper — two affine equations in the
+> skipped state, in rows `0` and `1` of `M^{-1}`. The *degree* was never the doubtful part; the
+> *construction* was, and it is now written out rather than inferred. What remains open is not the
+> derivation but its verification, which is an assertion in code and not a reading: §9.5.2's oracle.
 
 ### 2.4 Degrees and required transform sizes, for every registered instance
 
@@ -1382,11 +1396,19 @@ must measure rather than assume**, and it is not stated for KoalaBear in any sou
 
 ### 9.3 Families needed — the number that makes §9.2 irrelevant
 
-> **SUPERSEDED PENDING VERIFICATION.** The `≈2^31` families derived below cannot be reconciled with
-> 2026/1254 Table 1, which reports this instance solved in 7 hours on 96 GPUs. The *separation*
-> between per-family cost and family count is the right discipline and is retained; the **number is
-> not to be quoted**. See the retraction at the head of this document for the three candidate
-> explanations.
+> **VERIFIED, AND THE NUMBER STANDS — but §9.2's per-family cost does not.** 2026/1254 has been read
+> directly; **§9.5** is the resolution and supersedes this block. Outcome, in one line: the `≈2^31`
+> below is **confirmed**, both of its inputs are endorsed by the paper, and the irreconcilable factor
+> was never in this section — it was in §9.2's ~2 min, which bundles a ~100 s candidate scan the
+> published algorithm does not perform once per family. The *separation* between per-family cost and
+> family count is the right discipline and is retained. **`2^31` is now quotable as the family count
+> for the univariate `k = 1` route**, with §9.5.4's two caveats: it is a model, not a measurement,
+> and #210 is what measures it.
+>
+> The block this replaces read: "**SUPERSEDED PENDING VERIFICATION.** The `≈2^31` families derived
+> below cannot be reconciled with 2026/1254 Table 1, which reports this instance solved in 7 hours on
+> 96 GPUs. … the **number is not to be quoted**. See the retraction at the head of this document for
+> the three candidate explanations." Two of those three candidates are refuted in §9.5.1.
 
 This is the separation the issue insists on, and it is where the single-family figure stops meaning
 anything.
@@ -1443,6 +1465,298 @@ that gets misquoted:
 - Per the scoreboard's own class discipline (§3), a Graeffe benchmark is
   `BenchmarkClass::Engineering { why }` — evidence about the implementation — and could not be
   anything else until it produces a witness verified through the permutation.
+
+### 9.5 2026/1254 read directly — the five extractions, and the discrepancy resolved
+
+For #208. The gate M24-0 was opened on: §9.3 derives ≈`2^31` families and 2026/1254 Table 1 reports
+the same instance solved in 7 hours on 96 GPUs. §9.3's `SUPERSEDED PENDING VERIFICATION` block and
+§11's `UNVERIFIED — not read here` entry both point here.
+
+**Obtained.** `https://web.archive.org/web/20260919192452id_/https://eprint.iacr.org/2026/1254.pdf`,
+18 pages, read with `pdftotext -layout`; §1's raw-content route worked first try and no 429 was hit.
+The cross-check, 2026/1905 (Bak–Hostettler), came from the `20260918234320` snapshot of
+`2026/1905.pdf`, 22 pages. Both are now **read here**, not at second hand.
+
+#### 9.5.1 The five extractions
+
+**(1) The `(1,[1])` parametrization — recovered, §2.2.** The notation is [11, Def 3.1]:
+`((r_F, r_P), [δ_0 … δ_{d−1}])`, abbreviated `(r_F, [δ …])` when `r_P = 0`; `r_F` counts **skipped
+full rounds**, not skipped S-boxes, and `[1]` says the state at the end of the prefix is *affine* in
+the one search parameter. Its degree law, the paper's eq. (1), is
+`deg_X P_i ≤ δ · α^{R_F+R_P−r_F−r_P}`.
+
+The construction is given for `(2,[1])` — two full rounds, no initial linear layer, constrained
+inputs in the last two coordinates — and it is the template. Let `λ^{(t−1)}, λ^{(t−2)}` be the last
+two rows of `M^{-1}` and `y` the state after the second full round's S-box layer, *before* that
+round's MDS. Substituting `z_i = y_i^{1/α}` (legitimate since `gcd(α, p−1) = 1`) turns the two input
+constraints into **two affine equations in `z`**:
+
+```
+Σ_i λ_i^(t−1) z_i  =  Σ_i λ_i^(t−1) c_i^(1) + (C_1^in + c_{t−1}^(0))^α
+Σ_i λ_i^(t−2) z_i  =  Σ_i λ_i^(t−2) c_i^(1) + (C_0^in + c_{t−2}^(0))^α
+```
+
+Pick `z*` solving both and a direction `v` solving the two *homogeneous* equations; then every point
+of the line `z(X) = z* + vX` inverts through the prefix to an input satisfying both input
+constraints. Back in the skipped state, `y_i(X) = (z*_i + v_i X)^α`, which is degree `α` in `X` —
+**but choosing `supp(v) ∩ supp(z*) = ∅` collapses it to `y_i(X) = (z*_i)^α + v_i^α X^α`**, affine in
+`Z = X^α`, and `Z ↦ X` is a bijection on `F_p`. The following MDS preserves affinity, so the prefix
+output is affine: that is what `[1]` means, and it is worth a factor `α` in the final degree.
+
+The `(1,[1])` case is stated rather than worked, §2.2 verbatim: *"With an additional initial linear
+layer, the analogous classical construction used here gives a `(1, [1])` round skip, with output
+polynomials of degree at most `α^{R_F+R_P−1}`. The initial linear layer is included in the prefix but
+is not counted as a round."* §9.5.2 does the derivation for Zeebra's hybrid.
+
+- **Degrees of freedom.** One search variable per family. `z*` ranges over a `(t−2)`-dimensional
+  affine subspace and `v` over a `(t−2)`-dimensional linear subspace — at `t = 16`, 14 and 14. A
+  *family* is a choice of `(z*, v)`; the supply of families is `≈p^28`, so supply is never the
+  binding constraint.
+- **Which constraints it forces.** The two **input** constraints, by construction, at every point of
+  the line. **Neither output constraint.** Both must still be imposed on the output polynomials
+  afterwards. This is the point §9.3 had right and it is worth stating plainly, because it is the
+  reason the family count is what it is.
+- **Family generation.** Made fully explicit at §3.2 (lines 430–465) for the five-parameter ZeroTest
+  variant, and the mechanism carries down to one parameter: a base point plus direction vectors with
+  **pairwise disjoint supports**, each direction's first entry normalized to one. The paper's
+  concrete choice there — base support `{12,13}`, direction supports `{3j, 3j+1, 3j+2}` — is for
+  **`M_{i,j} = (i − 16 − j)^{-1}`**, which is *identically* `Poseidon::cauchy_mds` at `t = 16`
+  (`src/grobner/research/poseidon.rs`, `M[i][j] = (i − t − j)^{-1}`). Zeebra and the paper are
+  working with the same matrix, so the support choice transfers without reinterpretation.
+
+**(2) The expected `F_p`-root count of `P_1` — recovered, §2.2, and §9.3 was right.** Verbatim: *"The
+random-polynomial heuristic predicts a probability of approximately `1−1/e` that a single output
+polynomial has a base-field root; this is not the probability of satisfying both output
+constraints."* `1 − 1/e` is Poisson(1)'s `P(≥1)`, so the paper is asserting **≈1 expected `F_p`-root
+per family** — exactly §9.3's assumption, taken from [PC] §2.3's "behave like random polynomials in
+practice". A counting argument gives the same answer independently of genericity: `π` is a
+permutation, so as `X` runs over the `p` points of the line the constrained output word takes each
+value about once, and `0` about once.
+
+> **Candidate explanation 1 is refuted by the source.** `P_1` is *not* more split than a random
+> polynomial, and the paper would have had to claim otherwise for the family count to fall this way.
+
+**(3) "Common-root strategy" — recovered, §2.1 and §4.2, and §9.3 was right again.** The phrase names
+a *family* of methods, and the paper is explicit about which member it used. §2.1: the classical
+low-memory CICO-2 route is a **gcd** computation, which genuinely does couple the two constraints —
+and 2026/1254 does not use it. Verbatim, §2.1: *"we follow the low-memory univariate strategy, but
+**replace the GCD computation with Graeffe-based root finding**: we recover the roots of the
+univariate polynomial corresponding to one constrained output coordinate, then evaluate the
+permutation on the input induced by each root to check whether the second output constraint is
+satisfied."* §4.2 repeats it for the challenge instance: *"Instead of computing a resultant with the
+second constrained output polynomial, we apply Graeffe-based root finding to `P_1`. Each root induces
+a candidate input, on which we evaluate the full permutation and check whether the second constrained
+output coordinate has the desired value."*
+
+> **Candidate explanation 3 is refuted by the source.** The strategy is **independent filtering of
+> `P_1`'s roots against the second constraint**, one permutation evaluation per root. The `1/p` factor
+> in §9.3 is the right factor. The word "common-root" was the trap: it is inherited from the gcd
+> method the paper abandoned.
+
+**(4) The total-work model's measured terms — `UNVERIFIED — not stated`. This is the named missing
+input.** The model is stated, §4.2:
+
+```
+W_total  =  W_pre  +  Σ_{i=1..N} ( W_control,i + W_poly,i + W_root,i + W_check,i )
+```
+
+and **not one term of it is reported, nor is `N`**. §4.2 verbatim: *"Only aggregate timings are
+available; the records do not support a breakdown by stage or a separate accounting of
+preprocessing. Software versions for the original bounty runs are also unavailable."* `N` appears
+only as the symbol in the sum and, qualitatively, as *"Several families may be needed before both
+output constraints are satisfied"* — and as a remark on [11], *"Their concrete attack also constructs
+several parametrizations and tries them in the output-solving stage."* Two **orderings** are stated
+and they are all that is: `W_poly ≈ W_root` dominate (*"The dominant cost is the construction of the
+univariate polynomial and the Graeffe root-finding stage"*), and `W_check` is negligible (*"this
+final evaluation step is negligible compared with polynomial construction and root finding"*).
+`W_control = 0` for this row — §4.2 says the CICO-2 instance *"was solved first, before the
+degree-annihilation technique was developed. This attack used a classical parametrization"*.
+
+**(5) Single run or extrapolation — recovered, Table 1, and it is a single run.** The caption:
+*"Times marked 'est.' are extrapolated using (9) because the execution logs were lost; the other
+times are previously reported values."* The CICO-2 row is **not** marked `est.`:
+
+| instance | `R_F` | `R_P` | initial linear layer | round skip | GPUs | time (h) | status |
+|---|---:|---:|---|---|---:|---:|---|
+| **CICO-2** | 6 | 8 | yes | `(1,[1])` | 96 | **7** | **previously reported** |
+| ZeroTest | 6 | 7 | no | `((3,2),[3])` | 4 | 10.45 | previously reported |
+| ZeroTest | 6 | 8 | no | `((3,2),[3])` | 4 | 49.65 | previously reported |
+| ZeroTest | 6 | 10 | no | `((3,2),[3])` | 28 | 64 | est. |
+| ZeroTest | 6 | 11 | no | `((3,2),[3])` | 28 | 192 | est. |
+| ZeroTest | 6 | 12 | no | `((3,2),[3])` | 28 | 575 | est. |
+
+So the discrepancy carries **full weight** — the figure is a claimed measurement, not a model.
+*Correction to #208 and to the milestone plan's §5.1: **three** rows are marked "est.", not four, and
+they are all ZeroTest.* The figure is nonetheless an **aggregate**: no stage split, no `N`, no
+software versions, logs lost. It is a wall clock, and extraction (4) is why it cannot be taken apart.
+
+#### 9.5.2 The `(1,[1])` construction for Zeebra's hybrid `permutation_plus_linear`
+
+§2.3's **reconstructed** marking was about this and is now discharged. `permutation_plus_linear`
+(`src/grobner/research/poseidon.rs`, via `run(state, true)`) is neither Poseidon nor Poseidon2: the
+initial linear layer is Poseidon2's, but the MDS is the same every round and the partial rounds take
+**all-state** round constants. Written out, with `k = 2`, constrained inputs in coordinates `0, 1`
+(which is what `CicoInstance::is_solution` checks — `state = constants[..k] ++ free`, so the paper's
+"last two coordinates" becomes "first two" and rows `t−1, t−2` of `M^{-1}` become rows `0, 1`, exactly
+the substitution §3.2 makes for its own ZeroTest instance):
+
+```
+x                        the permutation input;  x_0 = C_0^in,  x_1 = C_1^in  required
+initial linear layer:    s = M · x                        <- no round constants here
+round 0 (full):          u = s + c^(0);   y = u^{◦α};     then  M · y
+```
+
+Let `y` be the state after round 0's S-box layer and *before* round 0's MDS, and put
+`z_i = y_i^{1/α} = u_i`. Then `z = M·x + c^(0)`, so `x = M^{-1}(z − c^(0))`, and with `λ^{(0)},
+λ^{(1)}` the **first two rows of `M^{-1}`** the two input constraints become
+
+```
+Σ_i λ_i^(0) z_i  =  C_0^in  +  Σ_i λ_i^(0) c_i^(0)
+Σ_i λ_i^(1) z_i  =  C_1^in  +  Σ_i λ_i^(1) c_i^(0)
+```
+
+**Two affine equations in `z`, and the right-hand sides carry no `α`-th power** — which is the one
+structural difference from the paper's `(2,[1])`. There the second skipped round forces
+`(C_j^in + c_j^(0))^α` onto the right, because the input constraint has to be pushed through a cubing
+before it reaches `z`. Here the initial linear layer is linear, the single skipped round contributes
+one constant vector, and nothing is cubed. The hybrid's all-state partial-round constants are
+irrelevant: the prefix contains no partial round. The same-MDS-every-round property is likewise
+irrelevant, because only `M^{-1}` for the *initial* layer enters. **That is why the hybrid inherits
+Poseidon2's one-round skip rule, and §2.3's degree `α^{R_F+R_P−1} = 3^13` is unaffected.**
+
+Family generation, concretely:
+
+1. Choose disjoint index sets `T` (base support, `|T| = 2`) and `S` (direction support, `|S| = 3`).
+   Following §3.2's choice: `T = {12, 13}`, `S = {0, 1, 2}`.
+2. Solve the `2×2` system on `T` for `z*` supported on `T`. Solvable for *any* `T`: `M` is MDS, so
+   is `M^{-1}`, so every `2×2` minor is nonsingular.
+3. Solve the `2×3` homogeneous system on `S` for `v` supported on `S`, normalizing `v`'s first entry
+   to one. A nonzero kernel vector exists because `3 > 2`, and every `2×2` minor being nonsingular
+   forces it to have **full support on `S`** — so `supp(v) = S`, disjoint from `T` as required.
+4. `y_i(Z) = (z*_i)^α + v_i^α Z`, affine. Lift a search point `Z` to the input by
+   `x = M^{-1}(z(Z^{1/α}) − c^(0))`; equivalently work from `y` directly, `z_i = y_i(Z)^{1/α}`.
+5. A new family is a new `(T, S)` or a new solution within the same supports.
+
+**The oracle, and it is an assertion rather than a reading.** `x_0 = C_0^in` and `x_1 = C_1^in` must
+hold **identically in `Z`**, at many random `Z` and many random families, with `x` recovered as above
+and fed through `permutation_plus_linear`. A construction that has the wrong rows of `M^{-1}`, the
+wrong constant vector, or the paper's `α`-th power left on the right-hand side fails at the first
+point. That test is #209's, and until it is green this subsection is **derived but unverified** —
+derived from a source rather than guessed, which is the distinction §2 of
+`additional-benchmarks.md` draws for Griffin's linear layer, but not yet checked.
+
+#### 9.5.3 The discrepancy, resolved with arithmetic
+
+Extractions (2) and (3) **confirm both inputs to §9.3's family count**, so the count itself survives:
+
+```
+families per witness  ≈  1 root per family  ×  1/p per root  →  N ≈ p ≈ 2^31
+```
+
+That leaves only one place for a factor of `2^31` to hide: the **per-family cost**. And §9.2's ~2
+minutes is not the per-family cost of the algorithm 2026/1254 §4.2 describes. Its stage list is
+
+| §9.2 stage | per family in 2026/1254's loop? |
+|---|---|
+| build the degree-`3^13` univariate at `2^21` points, ~12 s | **yes** — `W_poly` |
+| interpolate `2^21` evaluations, ~0.09 s | **yes** — `W_poly` |
+| Graeffe, Algorithm C, **3.11 s measured** | **yes** — `W_root` |
+| `NTT_s` at `s = 127` + subgroup scan, negligible | yes, inside `W_root` |
+| 24 square roots, negligible | yes, inside `W_root` |
+| **candidate scan, `r = 2^24` permutation calls, ~100 s** | **no** |
+| verification through the permutation, µs | yes — `W_check`, "negligible" in §4.2 too |
+
+The `~100 s` row is the cost of enumerating the two-adic subgroup in Zeebra's **single-root descent**,
+not a stage of the published per-family loop — which evaluates the permutation on the **≈1** recovered
+root of `P_1`, and whose own `W_check` the paper calls negligible. It is 100 of the 120 seconds.
+Corrected to the stages the published algorithm actually runs:
+
+```
+per family, single-threaded, Zeebra's own figures:   12 + 0.09 + 3.11  ≈  15.2 s   (not ~120 s)
+total implied work at N = 2^31:                      2.15e9 × 15.2 s   ≈  1 036 core-years
+published:                      7 h × 96 GPUs        =  672 GPU-hours  =  2.42e6 GPU-s
+implied per-GPU throughput over one Zeebra core:     3.27e10 / 2.42e6  ≈  1.35e4
+```
+
+So the published figure requires each RTX 5090 to be worth `≈1.4 × 10^4` of this box's cores on this
+workload. A defensible factor for `2^21` independent permutation evaluations plus power-of-two NTTs
+on a 21 760-core GPU is `10^2`–`10^3`. The residual is therefore **≈13×** at `10^3`, **≈43×** at
+`10^2.5`, and `≈135×` at `10^2`:
+
+| reading | residual gap | orders of magnitude |
+|---|---:|---:|
+| §9.3 as written: ~8 100 core-years vs 7 h wall clock, no throughput model | `1.06e5` | **~5.0** |
+| §9.3's work vs 672 GPU-hours, no throughput model | `1.06e5` | ~5.0 |
+| corrected per-family cost, no throughput model | `1.35e4` | ~4.1 |
+| corrected per-family cost, GPU worth `10^2` cores | `135` | ~2.1 |
+| corrected per-family cost, GPU worth `10^2.5` cores | `43` | **~1.6** |
+| corrected per-family cost, GPU worth `10^3` cores | `13` | **~1.1** |
+
+**Verdict: within two orders of magnitude for any per-GPU factor above ≈140.** The "four orders of
+magnitude after any plausible GPU factor" in §9.3 and in the milestone plan's §1 was the product of
+two separable errors — comparing core-years against a wall clock without converting to a common work
+unit, and charging the published loop for a stage it does not run — and neither was in the family
+arithmetic. **Candidate explanation 2 (more usable freedom per family) is not needed to close the
+gap and remains open**; a fourth candidate, Zeebra's per-family cost itself, turns out to carry most
+of it.
+
+**Independent anchor, 2026/1905 Table 4.** Bak–Hostettler attack the *same* CICO-2 challenge family
+(Poseidon1 with the initial linear layer, `R_F = 6`, one full round skipped) by a bivariate Villard
+resultant — deterministic, no family search at all — and measure:
+
+| `R_P` | budget | time | source |
+|---:|---|---|---|
+| 6 | 128 CPU cores | 1 d 17 h | 2026/1905 |
+| 7 | 128 CPU cores | 21 d 5 h | 2026/1905 |
+| 8 | 96 GPUs | 7 h | 2026/1254, cited not re-measured |
+
+`R_P = 7` is `21 d 5 h × 128 = 7.4` core-years measured, and the `6 → 7` step costs `12.4×`, so one
+more partial round puts `R_P = 8` at **≈92 core-years** by their route. `672` GPU-hours at `10^2`–`10^3`
+cores-equivalent is `7.7`–`77` core-years. **Two independent methods bracket the total work for this
+instance at `10^1`–`10^2` core-years**, which is what makes the corrected ~1 036 core-years for the
+family-search route the *right order of magnitude for a less efficient algorithm* rather than an
+absurdity — and 2026/1905 §5.3 says as much about the comparison: *"our attack complexity grows in
+`d^{2.66 R_F}` with the number of full rounds, whereas theirs grows in `d^{R_F}`."*
+
+#### 9.5.4 Go / no-go, against §5.2 of the milestone plan
+
+The criterion was: **go** if extractions (1)–(4) are recoverable and the family count is within two
+orders of magnitude of the published cost once GPU parallelism is accounted for; **no-go** if the
+parametrization or the family-generation procedure cannot be reconstructed without guessing.
+
+| | verdict |
+|---|---|
+| (1) parametrization | **recovered**, §2.2, generalized at §3.2; hybrid derived in §9.5.2 |
+| (2) root count of `P_1` | **recovered**, §2.2 — and it confirms §9.3 |
+| (3) common-root strategy | **recovered**, §2.1 and §4.2 — and it confirms §9.3 |
+| (4) total-work model's terms | **`UNVERIFIED — not stated`** — no term, and no `N` |
+| (5) 7 h / 96 GPUs | **single run**, previously reported, not an extrapolation |
+| family count vs published cost | within two orders for any per-GPU factor `> ≈140` |
+
+**GO.** The no-go trigger is not met and is not close to met: both the parametrization and the
+family-generation procedure are written out in the source, the hybrid case follows from them by
+linear algebra rather than by guessing, and the one ambiguity that had to be resolved — which rows of
+`M^{-1}`, and whether the right-hand side carries an `α`-th power — is decided by the constrained
+input position, not chosen. Nothing here is a guessed attack.
+
+Two things are **not** resolved, and they are the honest residue:
+
+1. **`N` and the stage split are unavailable in principle, not merely unreported** — the execution
+   logs are lost and the paper says so. The named missing input is therefore
+   **`N` together with `W_poly`/`W_root` for the `R_F = 6, R_P = 8` CICO-2 run**. No future reading
+   of 2026/1254 recovers it. The `≈13×`–`≈135×` residual in §9.5.3 cannot be closed from the
+   literature and can only be closed by measurement, which is #210's whole purpose.
+2. **The `1 036` core-years is a model, not a measurement.** Only the `3.11 s` Graeffe row inside it
+   is measured; the `12 s` construction is an estimate. §9.4 applies to it unchanged: it is not a
+   figure about a registered challenge, and `BenchmarkClass::Engineering { why }` is the only class
+   it could carry.
+
+What #210 therefore measures is unchanged by this reading, and better motivated by it: the observed
+**distribution** of `F_p`-roots of `P_1` per family against the ≈1 the paper endorses, the observed
+second-constraint rate against `1/p`, and the observed families-per-witness on a row small enough to
+finish. Extractions (2) and (3) turn those from exploratory numbers into **falsifiable predictions
+taken from the source** — which is the strongest form this document's open question could have been
+left in.
 
 ## 10. Proposed PR decomposition
 
@@ -1506,16 +1820,36 @@ against both kernels.
   trade; whether #161's kernel exposes the blocked phase boundary §8 point 3 needs; and whether the
   retained `G_{2^i}` of §6.4 can be dropped for the batched `NTT_r` scan §3.9 costs out, which trades
   384 MB and 62.7 ms for 134 MB and 3.6 s.
-- `UNVERIFIED — not read here` **2026/1254** (Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on
+- **READ HERE, §9.5** — **2026/1254** (Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on
   Poseidon*) and **2026/1905** (Bak–Hostettler, *A Better Bivariate Resultant Attack on
-  Round-Reduced Poseidon*). Both were obtained and read for
-  [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md) and are quoted there; they were
-  not available to this document and they are what retracts §7.2. Any figure attributed to them here
-  is at second hand from that sibling document, which is the authority for them.
-- **Open, and it decides the gate**: the family count for the `R_P = 8` CICO-2 instance. §9.3's
-  `≈2^31` against 2026/1254 Table 1's 7 hours on 96 GPUs. Resolving this needs 2026/1254 §4.2 read
-  directly, with attention to the expected `F_p`-root count of `P_1`, how much freedom the `(1,[1])`
-  parametrization supplies per family, and what "common-root strategy" denotes operationally.
+  Round-Reduced Poseidon*). Both obtained from the Wayback raw-content route and read from the PDF
+  for #208; §9.5 records §2.2's `(1,[1])` construction, §2.1's and §4.2's definition of the
+  common-root strategy, §4.2's cost model and Table 1, and 2026/1905 Table 4. **This document no
+  longer quotes either at second hand**, and the earlier entry — "they were not available to this
+  document … Any figure attributed to them here is at second hand from
+  [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md), which is the authority for them"
+  — is struck. That sibling remains the authority for the parts of both papers §9.5 did not need:
+  §3's degree-annihilation framework, the `((3,2),[3])` ZeroTest skip, and all of 2026/1905 except
+  §5.3's Table 4.
+  - Still `UNVERIFIED — not stated` **within** 2026/1254: every term of `W_total` and the family
+    count `N`. §4.2 states the logs are lost and the timings are aggregate only, so this is
+    unavailable in principle rather than unreported. See §9.5.1 extraction (4) and §9.5.4.
+  - Not read in either paper: 2026/1254 §3.3 (the three-partial-round conditions) and Appendix-level
+    detail of 2026/1905 §4 (Villard's algorithm). Neither bears on the univariate route.
+- **RESOLVED, §9.5 — the gate is open.** The entry here read: "**Open, and it decides the gate**: the
+  family count for the `R_P = 8` CICO-2 instance. §9.3's `≈2^31` against 2026/1254 Table 1's 7 hours
+  on 96 GPUs. Resolving this needs 2026/1254 §4.2 read directly, with attention to the expected
+  `F_p`-root count of `P_1`, how much freedom the `(1,[1])` parametrization supplies per family, and
+  what 'common-root strategy' denotes operationally." All three were read. The root count is ≈1 and
+  the strategy is independent `1/p` filtering — both **as §9.3 assumed** — so `≈2^31` stands; the
+  reconcilable error was in §9.2's per-family cost, and the residual after correction is ~1.1 orders
+  of magnitude at a `10^3` per-GPU factor. §9.5.4 records the **go**.
+- **Open, and now the only thing in the way**: the residual `≈13×`–`≈135×` of §9.5.3, which depends
+  on an assumed per-GPU throughput factor because 2026/1254's `N` and stage split are lost. Not
+  closable from the literature. #210 measures the three family-economics quantities that bound it.
+- **Derived but unverified**: §9.5.2's `(1,[1])` construction for `permutation_plus_linear`. Derived
+  from 2026/1254 §2.2 plus the constrained-input position, not guessed — but the oracle that settles
+  it is an assertion in code (#209), and until that is green the construction is unconfirmed.
 - §6.1's figures are from **one uncommitted throwaway binary on one machine against the pre-#161
   recursive kernel**, taken under `benchlock.sh` with six other agents active. They are labelled a
   baseline for exactly that reason and PR 10 above re-takes them.
