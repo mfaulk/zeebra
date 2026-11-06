@@ -9,8 +9,8 @@ nothing, and — separately — **the budget is not what bounds the memory.**
 
 > **M25 (#237) added §9**, which attributes the memory the budget does not see. 88% of peak RSS is
 > **one `VecDeque<Monomial<20>>`** in symbolic preprocessing, reached before any matrix exists.
-> §9.4a re-runs the capped-against-uncapped comparison §6a asked for and finds the two peaks **one
-> megabyte apart in fourteen gigabytes**, so §6a's 4 978 MB uncapped figure is a measurement error
+> §9.4a re-runs the capped-against-uncapped comparison §6a asked for and finds the two peaks
+> **identical to the kilobyte**, so §6a's 4 978 MB uncapped figure is a measurement error
 > and its refusal-path reading is withdrawn. §6a's argument for keeping the entry cap "because it is
 > the bound that yields a report" is retracted too, by #284's cooperative time check. Sections 1-8
 > are left as they were taken, with retraction markers where a claim no longer stands.
@@ -105,8 +105,9 @@ Five caps, two values, and within each group the budget moves the peak by nothin
 
 > **Read §6a and then §9.4a before drawing a mechanism from this.** §6a reported two further rungs
 > with the cap effectively removed plateauing at a **third** value, 4 978 MB, *below* the degree-5
-> group. **§9.4a re-measures that and gets 13 997 MB** — one megabyte from the capped figure — so
-> the third value was a measurement error and the peak does not move with the cap at all. What the
+> group. **§9.4a re-measures that and gets 14 336 724 kB — the capped rung's figure to the
+> kilobyte** — so the third value was a measurement error and the peak does not move with the cap
+> at all, because it is reached before any matrix exists and no entry cap can touch it. What the
 > peak does track is **which batch's symbolic preprocessing ran**, and the queue that stage builds
 > is a function of the closure rather than of any budget here.
 
@@ -216,9 +217,8 @@ apart** — which is *below* the 14 072 MB that every capped degree-5 row reache
 strictly more work peaks at a third of the memory. So 14.07 GB is **not what degree 5 costs**; it is
 reached on the path that ends in a refusal and not on the path that proceeds.
 
-> **Withdrawn in §9.4a (M25, #237).** Re-measured on the same instance and cores, the uncapped rung
-> peaks at **13 997 MB** against the capped rung's **13 996 MB** — one megabyte apart in fourteen
-> gigabytes. The 4 978 MB above is a measurement error, and every inference drawn from it below,
+> **Withdrawn in §9.4a (M25, #237).** Re-measured on the same instance and cores, the uncapped and
+> capped rungs both peak at **14 336 724 kB** — the same number, not merely a close one. The 4 978 MB above is a measurement error, and every inference drawn from it below,
 > including the refusal-path reading, falls with it. The deduction was valid; the premise was not.
 > §9.2 attributes the 14 GB to one `VecDeque<Monomial<20>>` in symbolic preprocessing, which is
 > reached **before any matrix exists** and therefore before any budget can be crossed.
@@ -319,7 +319,15 @@ is `(usize, Zp31)` = **16 B**.
 | pair heap | 4.5 | 0.03% | 16 874 entries x `ScheduledPair<20>` = 280 B |
 | pair criteria sets | 0.3 | 0.00% | 19 422 keys x 16 B |
 | unnamed remainder | ~515 | 3.7% | allocator slack and completed batches' column structures |
-| **measured `VmHWM`** | **13 996** | 100% | `/proc/<pid>/status`, polled on the solver's own pid |
+| **measured `VmHWM`** | **13 996** | 100% | the example's own `util::peak_resident_bytes`, read after F4 returned |
+
+**Two readings of `VmHWM`, 4 MB apart, and which is which.** The shares above are against the
+example's own in-process read, 13 996 MB, taken after F4 returns — that is the figure the
+percentages divide by. The external poller, sampling `/proc/<pid>/status` every 200 ms while the run
+was live, caught **14 336 724 kB = 14 000 MB**. The 0.03% difference is because `VmHWM` is not
+reliably monotonic on this kernel (see the caveat on `util::peak_resident_bytes`), so a read after
+the fact can come back slightly below a read taken at the peak. §9.4a uses the poller's figure
+throughout, because comparing two runs needs one instrument.
 
 Named sites account for **96%** of peak RSS. The two stage measurements bracket it: symbolic
 preprocessing's peak live heap is **20 499 MB** and construction adds **317 MB** on top.
@@ -355,7 +363,8 @@ That is the whole explanation of the 14 GB, and it is a property of one `VecDequ
 | **queue high-water** | **6 196 886 monomials / 473 MB** | **162 188 194 / 12 374 MB** |
 | symbolic preprocessing's peak live heap | 644 MB | 20 499 MB |
 | matrix entries (budgeted) | 5.8 MB | 186 MB |
-| measured `VmHWM` | **608 MB** | **13 996 MB** |
+| `VmHWM`, in-process read | **608 MB** | **13 996 MB** |
+| `VmHWM`, external poller | 609 MB (623 460 kB) | 14 000 MB (14 336 724 kB) |
 | queue as a share of `VmHWM` | **78%** | **88%** |
 
 608 MB here against §3's 617 MB from the scoreboard binary, which also holds the challenge data and
@@ -391,13 +400,19 @@ same binary, the same instance and the same cores, differing only in the entry c
 
 | | 20 000 000 cap | 1 000 000 000 cap (uncapped in effect) |
 |---|---:|---:|
-| outcome | `max_live_nonzeros` at degree 5 | no entry stop; the degree-5 batch runs on |
-| **measured `VmHWM`** | **13 996 MB** | **13 997 MB** |
+| outcome | `max_live_nonzeros` at degree 5, 99.1 s | no entry stop; abandoned inside the degree-5 batch at 326 s of CPU |
+| **`VmHWM`, external poller** | **14 336 724 kB** | **14 336 724 kB** |
 
-**One megabyte apart, in 14 gigabytes.** The peak does not move with the cap at all, which is what
+**Identical to the kilobyte.** Not "close": the same number, from two runs that differ in outcome,
+in runtime by 3x, and in entry cap by 50x. The peak does not move with the cap at all, which is what
 the mechanism predicts and what §6a's figures contradict: the only budget symbolic preprocessing
 reads is `max_matrix_rows`, so the queue it builds at a given batch is byte-identical whatever the
 entry cap is. The entry cap cannot change a peak that is reached before the matrix exists.
+
+The agreement is exact because the peak is **one allocation** — a single `VecDeque` reserve of 2^28
+monomial slots — rather than a sum of many, so there is nothing for run-to-run variation to move.
+That is itself evidence for the mechanism: an aggregate of scattered allocations would not reproduce
+to the kilobyte.
 
 So **§6a's 4 978 MB is a measurement error, not a plateau**, and the "refusal path" conclusion that
 rested on it goes with it. Two independent runs of very different length agreeing to 20 kB
