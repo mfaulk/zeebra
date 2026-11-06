@@ -353,8 +353,9 @@ tools/scoreboard.sh stable --write                 # the same, pinned, updating 
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
-                                                   #   (~2 min: two four-round rows now complete)
+                                                   #   (two four-round rows, predicted sample count)
 cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the determinant scaling study
+cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -2085,6 +2086,29 @@ Two other results from the same run: the resultant's degree matches the **publis
 `d^{2R_F+R_P}` on all three rows measured — 729 against a Bézout bound of 6 561 on the row with
 partial rounds — and that makes the sample count predictable rather than merely loose. See
 [`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md).
+
+`bivariate_resultant_predicted` acts on that. `predicted_resultant_degree(alpha, r_f, r_p)` returns
+`alpha^(2 R_F + R_P)` from the instance's own parameters, and the route samples one point more than
+that rather than the Bézout-sized `2d²` — **730 determinants instead of 13 123** on
+`poseidon31-cico-t16-rf2-rp2`, and 6 562 instead of 13 123 on `-rf4-rp0`. Against the 16 384 the
+subgroup route used by default those are 22.4x and 2.5x. The predicted count is not a power of two,
+so it pairs with arbitrary-point Lagrange and not with an NTT domain, which would round 730 up to
+1 024 and return a third of the saving.
+
+The formula is **experimental and unproven in its source**, so the route validates rather than
+trusts it: the recovered polynomial is checked against a direct Sylvester determinant at points the
+interpolation never sampled, the check is part of the route rather than a flag —
+`ResultantOptions::with_off_domain_checks(0)` panics rather than disabling it — and on disagreement
+the proven `2d²` path produces the answer with `DegreeSource::PredictionFalsified` recording that
+the published formula did not hold on that row. A falsification would be a result worth more than
+the samples it saved, so it is recorded rather than silently repaired. The validation runs on the
+parallel determinant path too, which is a test.
+
+`examples/resultant_cico` selects what it attempts: `--row <challenge-id>` (repeatable),
+`--max-samples` and `--wall-budget`, with a row over either **costed and skipped** and its
+arithmetic printed. `--build-only` times `cico_bivariate` alone, which is the bounded measurement a
+row past the budget still supports. There is no `--all` — it removed the guard entirely, which put
+a 12.9-day row beside a bounded one.
 
 #### External instances: the Fukuoka MQ Challenge
 

@@ -229,22 +229,35 @@ impl std::error::Error for ResultantError {}
 
 /// How a resultant is evaluated, as distinct from which resultant it is.
 ///
-/// Nothing here changes the answer. The one knob is how many threads evaluate the independent
+/// Nothing here changes the answer. One knob is how many threads evaluate the independent
 /// Sylvester determinants, and it defaults to **1** so that a figure taken without it is
-/// reproduced exactly.
+/// reproduced exactly; the other is how many points outside the sample set
+/// [`bivariate_resultant_predicted`] checks its answer at before returning it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResultantOptions {
     /// Worker threads over which the determinants are spread. At least 1.
     pub concurrency: usize,
+
+    /// Points outside the sample set checked against a direct Sylvester determinant. At least 1.
+    ///
+    /// Only [`bivariate_resultant_predicted`] reads this: the other routes sample against a
+    /// *proven* bound and have nothing to validate.
+    pub off_domain_checks: usize,
 }
 
 impl Default for ResultantOptions {
     fn default() -> Self {
-        Self { concurrency: 1 }
+        Self {
+            concurrency: 1,
+            off_domain_checks: Self::DEFAULT_OFF_DOMAIN_CHECKS,
+        }
     }
 }
 
 impl ResultantOptions {
+    /// Off-domain checks taken unless the caller says otherwise: what the four-round rows used.
+    pub const DEFAULT_OFF_DOMAIN_CHECKS: usize = 8;
+
     /// `concurrency` workers.
     ///
     /// # Panics
@@ -253,7 +266,25 @@ impl ResultantOptions {
     /// scoreboard's `concurrency` field exists to prevent.
     pub fn with_concurrency(concurrency: usize) -> Self {
         assert!(concurrency >= 1, "a resultant needs at least one worker");
-        Self { concurrency }
+        Self {
+            concurrency,
+            ..Self::default()
+        }
+    }
+
+    /// The same options validating at `checks` points outside the sample set.
+    ///
+    /// # Panics
+    /// If `checks` is zero. An unvalidated prediction is not a result, and the same argument
+    /// applies as for a mis-parsed concurrency: silently accepting none would report an
+    /// unvalidated answer in the shape of a validated one.
+    pub fn with_off_domain_checks(mut self, checks: usize) -> Self {
+        assert!(
+            checks >= 1,
+            "a predicted sample count must be validated off the domain"
+        );
+        self.off_domain_checks = checks;
+        self
     }
 }
 
@@ -407,6 +438,49 @@ pub struct ResultantStages {
     pub sampling: Duration,
     /// Time spent recovering the polynomial from them.
     pub interpolation: Duration,
+    /// Which degree the sample count was sized against.
+    pub degree_source: DegreeSource,
+    /// Points outside the sample set checked against a direct Sylvester determinant.
+    pub off_domain_checks: usize,
+    /// Time spent on those checks, and on a predicted attempt the checks refused.
+    pub validation: Duration,
+}
+
+/// Which degree the sample count was sized against, and whether a prediction survived validation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DegreeSource {
+    /// The proven bound `n·deg_x(f) + m·deg_x(g)`, which needs no validation to be trusted.
+    Proven,
+
+    /// `alpha^(2 R_F + R_P)`, and the recovered polynomial agreed with a direct determinant at
+    /// points outside the interpolation domain.
+    PredictionHeld {
+        /// The predicted degree the sample count came from.
+        degree: usize,
+    },
+
+    /// The prediction was refused off the domain, so the proven bound produced the answer.
+    ///
+    /// A falsification of [JAZ] slide 22's experimental formula on that row, and worth more than
+    /// the samples it would have saved.
+    PredictionFalsified {
+        /// The predicted degree that did not hold.
+        degree: usize,
+    },
+}
+
+/// [JAZ] slide 22's experimental resultant degree for a Poseidon CICO slice: `alpha^(2 R_F + R_P)`.
+///
+/// **Unproven in its source**, whose own authors leave the reason open, and confirmed here on three
+/// registered slices — see `docs/research/resultant-elimination.md` §6.3. It is a prediction and
+/// not a bound, so nothing may interpolate against it without checking the recovered polynomial
+/// off the interpolation domain. [`bivariate_resultant_predicted`] does that and falls back to the
+/// proven bound when the check refuses it.
+///
+/// `None` when the power overflows `usize`.
+pub fn predicted_resultant_degree(alpha: u32, r_f: usize, r_p: usize) -> Option<usize> {
+    let exponent = u32::try_from(r_f.checked_mul(2)?.checked_add(r_p)?).ok()?;
+    usize::try_from(alpha).ok()?.checked_pow(exponent)
 }
 
 /// The interpolation route for a resultant of degree at most `degree_bound` over `F`.
@@ -515,10 +589,129 @@ pub fn bivariate_resultant_reference_with<F: FiniteField + Send + Sync>(
             matrix_order: fc.len() + gc.len() - 2,
             samples: points,
             concurrency: options.concurrency,
+            degree_source: DegreeSource::Proven,
+            off_domain_checks: 0,
+            validation: Duration::ZERO,
             sampling,
             interpolation,
         },
     ))
+}
+
+/// `Res_{x_eliminate}(f, g)` from `predicted_degree + 1` samples, **validated**.
+///
+/// The proven bound `n·deg_x(f) + m·deg_x(g)` is of Bézout size and a Poseidon slice's resultant
+/// is observed far below it ([`predicted_resultant_degree`]), so sizing the sample set against the
+/// prediction is the largest saving on this route: 730 determinants instead of 13 123 on the
+/// four-round row with partial rounds. The prediction is experimental, so this function does not
+/// trust it — the recovered polynomial is checked against a direct Sylvester determinant at
+/// `options.off_domain_checks` points the interpolation never sampled, and on disagreement the
+/// **proven** path produces the answer instead, with [`DegreeSource::PredictionFalsified`]
+/// recording that the formula did not hold on this input.
+///
+/// Samples at consecutive field elements and recovers by `lagrange_interpolate`. The predicted
+/// count is not a power of two — 730 on that row — and rounding it up to an NTT domain would give
+/// back a third of the saving to buy a recovery that `resultant-elimination.md` §6.4 shows cannot
+/// matter at any round count.
+///
+/// # Errors
+/// [`ResultantError`].
+pub fn bivariate_resultant_predicted<F: FiniteField + Send + Sync>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+    predicted_degree: usize,
+    options: ResultantOptions,
+) -> Result<(UnivariatePolynomial<F>, ResultantStages), ResultantError> {
+    let (fc, gc, degree_bound) = sylvester_setup(f, g, eliminate)?;
+    // A prediction no smaller than the proven bound saves nothing and needs no validating.
+    if predicted_degree >= degree_bound {
+        return bivariate_resultant_reference_with(f, g, eliminate, options);
+    }
+    let points = predicted_degree + 1;
+    let abscissae = consecutive_abscissae::<F>(points)?;
+
+    let at = Instant::now();
+    let values = sample_determinants(&fc, &gc, &abscissae, options.concurrency);
+    let sampling = at.elapsed();
+
+    let at = Instant::now();
+    let candidate = lagrange_interpolate(abscissae.into_iter().zip(values).collect::<Vec<_>>());
+    let interpolation = at.elapsed();
+
+    let at = Instant::now();
+    let held = agrees_off_domain(&fc, &gc, &candidate, points, options.off_domain_checks)?;
+    let validation = at.elapsed();
+
+    if held {
+        return Ok((
+            candidate,
+            ResultantStages {
+                route: ResultantRoute::Lagrange { points },
+                degree_bound,
+                matrix_order: fc.len() + gc.len() - 2,
+                samples: points,
+                concurrency: options.concurrency,
+                sampling,
+                interpolation,
+                degree_source: DegreeSource::PredictionHeld {
+                    degree: predicted_degree,
+                },
+                off_domain_checks: options.off_domain_checks,
+                validation,
+            },
+        ));
+    }
+
+    let (resultant, mut stages) = bivariate_resultant_reference_with(f, g, eliminate, options)?;
+    stages.degree_source = DegreeSource::PredictionFalsified {
+        degree: predicted_degree,
+    };
+    stages.off_domain_checks = options.off_domain_checks;
+    // The refused attempt is charged to this row: it is wall clock the row spent.
+    stages.validation = validation + sampling + interpolation;
+    Ok((resultant, stages))
+}
+
+/// Whether `candidate` agrees with `det Syl(f, g)` at `checks` points outside the sample set.
+///
+/// The samples are `0, 1, …, points − 1`; a point drawn from outside that set was never
+/// interpolated through, so agreement there is evidence about the construction rather than a
+/// restatement of it. The draws are from a fixed seed, which keeps a run reproducible, and are
+/// rejected if they land in the sample set.
+///
+/// # Errors
+/// [`ResultantError::FieldTooSmall`] if the field cannot supply `checks` points outside the sample
+/// set.
+fn agrees_off_domain<F: FiniteField>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    candidate: &UnivariatePolynomial<F>,
+    points: usize,
+    checks: usize,
+) -> Result<bool, ResultantError> {
+    let mut rng = StdRng::seed_from_u64(0x00ff_d01a);
+    let in_sample_set = |x: &F| (0..points as u64).any(|i| *x == F::new(i));
+
+    let mut agreed = 0usize;
+    let mut drawn = 0usize;
+    while agreed < checks {
+        if drawn > 8 * checks + 64 {
+            return Err(ResultantError::FieldTooSmall {
+                needed: points + checks,
+            });
+        }
+        let x = F::random(&mut rng);
+        drawn += 1;
+        if in_sample_set(&x) {
+            continue;
+        }
+        if candidate.eval(&x) != sylvester_determinant(fc, gc, x) {
+            return Ok(false);
+        }
+        agreed += 1;
+    }
+    Ok(true)
 }
 
 /// `Res_{x_eliminate}(f, g)`, interpolated on a power-of-two subgroup, with stage costs.
@@ -589,6 +782,9 @@ pub fn bivariate_resultant_ntt_with<F: KnownOrder + Send + Sync>(
             matrix_order: fc.len() + gc.len() - 2,
             samples: size,
             concurrency: options.concurrency,
+            degree_source: DegreeSource::Proven,
+            off_domain_checks: 0,
+            validation: Duration::ZERO,
             sampling,
             interpolation,
         },
@@ -665,8 +861,9 @@ pub fn evaluate_bivariate<F: FiniteField>(f: &MultivariatePolynomial<2, F>, a: F
 mod tests {
     use super::{
         bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
-        bivariate_resultant_reference_with, cico_bivariate, interpolation_route,
-        sylvester_determinant_at, ResultantError, ResultantOptions, ResultantRoute,
+        bivariate_resultant_predicted, bivariate_resultant_reference_with, cico_bivariate,
+        interpolation_route, predicted_resultant_degree, sylvester_determinant_at, DegreeSource,
+        ResultantError, ResultantOptions, ResultantRoute,
     };
     use crate::{
         fields::{Mersenne31, PrimeFieldElement64, Zp13},
@@ -853,6 +1050,246 @@ mod tests {
         assert_eq!(
             bivariate_resultant(&f, &g, 1),
             Err(ResultantError::FieldTooSmall { needed: 13 })
+        );
+    }
+
+    /// Every registered CICO row's predicted resultant degree is `alpha^(2 R_F + R_P)`.
+    ///
+    /// The three degrees `resultant-elimination.md` §6.3 confirms are in the list, and the rest
+    /// are the predictions #211 costs the six-round rows from.
+    #[test]
+    fn test_the_predicted_degree_of_each_registered_row() {
+        use crate::grobner::research::challenge;
+
+        for (id, degree) in [
+            ("poseidon31-cico-t16-rf2-rp0", 81usize),
+            ("poseidon31-cico-t16-rf2-rp2", 729),
+            ("poseidon31-cico-t16-rf4-rp0", 6_561),
+            ("poseidon31-cico-t16-rf2-rp4", 6_561),
+            ("poseidon31-cico-t16-rf4-rp2", 59_049),
+            ("poseidon31-cico-t16-rf6-rp0", 531_441),
+        ] {
+            let parameters = challenge(id)
+                .expect("registered")
+                .poseidon_parameters()
+                .expect("a CICO row");
+            assert_eq!(
+                predicted_resultant_degree(parameters.alpha, parameters.r_f, parameters.r_p),
+                Some(degree),
+                "{id}"
+            );
+        }
+    }
+
+    /// The predicted count is `degree + 1`, and on `rf2-rp2` that is 730 rather than 1 024.
+    ///
+    /// The pairing #179 warns about: 730 is not a power of two, so this route interpolates at
+    /// arbitrary points and an NTT domain would round up and give back a third of the saving.
+    #[test]
+    fn test_the_predicted_sample_count_is_not_a_power_of_two() {
+        let degree = predicted_resultant_degree(3, 2, 2).expect("fits");
+        assert_eq!(degree + 1, 730);
+        assert_ne!(730usize.next_power_of_two(), 730);
+        assert_eq!(
+            predicted_resultant_degree(3, 4, 0).expect("fits") + 1,
+            6_562
+        );
+    }
+
+    /// An interpolation sized against too small a degree is refused by the off-domain check.
+    ///
+    /// The guard that makes an unproven formula usable: claiming degree 7 for a resultant of
+    /// degree 32 recovers a wrong polynomial, the check catches it, and the proven bound is used.
+    #[test]
+    fn test_a_truncated_interpolation_is_caught_off_the_domain() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0x7c0bb1e);
+        let f = random_bivariate(4, 4, &mut rng);
+        let g = random_bivariate(4, 4, &mut rng);
+        let proven = bivariate_resultant(&f, &g, 1).expect("both involve y");
+        let (recovered, stages) =
+            bivariate_resultant_predicted(&f, &g, 1, 7, ResultantOptions::default())
+                .expect("both involve y");
+        assert_eq!(
+            stages.degree_source,
+            DegreeSource::PredictionFalsified { degree: 7 },
+            "degree 7 cannot pin a degree-32 resultant"
+        );
+        assert_eq!(stages.samples, stages.degree_bound + 1, "the proven count");
+        assert_eq!(recovered, proven, "the fallback returns the real resultant");
+    }
+
+    /// On the registered two-round slice the predicted count recovers the identical polynomial.
+    ///
+    /// 82 samples against the proven bound's 163, same coefficients, and the off-domain check
+    /// holds.
+    #[test]
+    fn test_the_predicted_count_agrees_with_the_proven_bound_on_the_registered_slice() {
+        use crate::grobner::research::{challenge, Specialization};
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let parameters = manifest.poseidon_parameters().expect("a CICO row");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let degree = predicted_resultant_degree(parameters.alpha, parameters.r_f, parameters.r_p)
+            .expect("3^4 fits");
+        let (predicted, stages) = bivariate_resultant_predicted(
+            &outputs[0],
+            &outputs[1],
+            1,
+            degree,
+            ResultantOptions::default(),
+        )
+        .expect("both involve the second");
+        assert_eq!(stages.samples, 82, "3^(2·2+0) + 1 points");
+        assert_eq!(stages.degree_bound, 162, "the proven bound, not used");
+        assert_eq!(
+            stages.degree_source,
+            DegreeSource::PredictionHeld { degree: 81 }
+        );
+        assert_eq!(
+            predicted,
+            bivariate_resultant(&outputs[0], &outputs[1], 1).expect("ok"),
+            "the same coefficients as the proven path"
+        );
+    }
+
+    /// A prediction no smaller than the proven bound takes the proven path and saves nothing.
+    #[test]
+    fn test_a_prediction_above_the_proven_bound_takes_the_proven_path() {
+        let f = MultivariatePolynomial::<2, Koala>::parse("x^2*y^2 + y + 1", VARS).expect("parses");
+        let g = MultivariatePolynomial::<2, Koala>::parse("x*y^2 + 3*y + x", VARS).expect("parses");
+        let (resultant, stages) =
+            bivariate_resultant_predicted(&f, &g, 1, 1_000, ResultantOptions::default())
+                .expect("both involve y");
+        assert_eq!(stages.degree_source, DegreeSource::Proven);
+        assert_eq!(stages.samples, stages.degree_bound + 1);
+        assert_eq!(resultant, bivariate_resultant(&f, &g, 1).expect("ok"));
+    }
+
+    /// The off-domain validation cannot be switched off: asking for none panics.
+    #[test]
+    #[should_panic(expected = "validated off the domain")]
+    fn test_the_off_domain_validation_is_not_optional() {
+        let _ = ResultantOptions::default().with_off_domain_checks(0);
+    }
+
+    /// A predicted-count resultant is identical at concurrency 1, 8 and 32.
+    ///
+    /// The samples are indexed rather than collected, so the recovered coefficients cannot depend
+    /// on which worker finished first — and the predicted route must inherit that, not only the
+    /// proven one.
+    #[test]
+    fn test_the_predicted_route_is_identical_at_every_concurrency() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0x180);
+        let f = random_bivariate(4, 4, &mut rng);
+        let g = random_bivariate(4, 4, &mut rng);
+        let (single, stages) =
+            bivariate_resultant_predicted(&f, &g, 1, 24, ResultantOptions::default())
+                .expect("both involve y");
+        for workers in [8usize, 32] {
+            let (concurrent, cstages) = bivariate_resultant_predicted(
+                &f,
+                &g,
+                1,
+                24,
+                ResultantOptions::with_concurrency(workers),
+            )
+            .expect("both involve y");
+            assert_eq!(concurrent, single, "{workers} workers");
+            assert_eq!(cstages.samples, stages.samples);
+            assert_eq!(cstages.degree_source, stages.degree_source);
+            assert_eq!(cstages.concurrency, workers);
+        }
+    }
+
+    /// The off-domain validation runs on the **parallel** determinant path too, both ways.
+    ///
+    /// The hazard of composing a guard with a rewritten loop is that it stops executing silently.
+    /// `PredictionHeld` is only reachable after the check passes and `PredictionFalsified` only
+    /// after it fails, so observing both at concurrency 8 and 32 shows the guard still decides.
+    #[test]
+    fn test_the_off_domain_validation_runs_on_the_parallel_path() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0x0ffd);
+        let f = random_bivariate(4, 4, &mut rng);
+        let g = random_bivariate(4, 4, &mut rng);
+        // The true resultant has degree 4·4 + 4·4 = 32.
+        for workers in [8usize, 32] {
+            let options = ResultantOptions::with_concurrency(workers);
+            let (_, held) =
+                bivariate_resultant_predicted(&f, &g, 1, 32, options).expect("both involve y");
+            assert_eq!(
+                held.degree_source,
+                DegreeSource::Proven,
+                "degree 32 is the proven bound itself at {workers} workers"
+            );
+
+            let (recovered, falsified) =
+                bivariate_resultant_predicted(&f, &g, 1, 11, options).expect("both involve y");
+            assert_eq!(
+                falsified.degree_source,
+                DegreeSource::PredictionFalsified { degree: 11 },
+                "the check must still refuse a short count at {workers} workers"
+            );
+            assert_eq!(
+                falsified.off_domain_checks,
+                ResultantOptions::DEFAULT_OFF_DOMAIN_CHECKS,
+                "and must have taken its checks"
+            );
+            assert_eq!(
+                recovered,
+                bivariate_resultant(&f, &g, 1).expect("ok"),
+                "the fallback is the real resultant at {workers} workers"
+            );
+        }
+    }
+
+    /// A held prediction on the parallel path records that it was validated.
+    #[test]
+    fn test_a_held_prediction_records_its_checks_on_the_parallel_path() {
+        use crate::grobner::research::{challenge, Specialization};
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let (resultant, stages) = bivariate_resultant_predicted(
+            &outputs[0],
+            &outputs[1],
+            1,
+            81,
+            ResultantOptions::with_concurrency(8).with_off_domain_checks(3),
+        )
+        .expect("both involve the second");
+        assert_eq!(
+            stages.degree_source,
+            DegreeSource::PredictionHeld { degree: 81 }
+        );
+        assert_eq!(stages.off_domain_checks, 3, "the count it was asked for");
+        assert_eq!(stages.concurrency, 8);
+        assert_eq!(
+            resultant,
+            bivariate_resultant(&outputs[0], &outputs[1], 1).expect("ok")
         );
     }
 
