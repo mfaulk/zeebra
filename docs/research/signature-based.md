@@ -3,7 +3,8 @@
 Deliverable for B5 (#223), a child of the MQ-algorithms epic #66. B5's instruction was to read the
 ceiling off instruments that already exist before contemplating an implementation, because **the upper
 bound on what any selection-strategy change can win is already measured and had never been read
-off.** This is that reading. No new code; four existing examples, plus one paper.
+off.** This is that reading. No new code; four existing examples, plus three papers — the third
+being F5's own, which §4.4 shows settles the matter from the algorithm's author.
 
 **The headline: 33–60% of F4's pair rows add no rank, which bounds the whole direction at about 2×,
 and that is not worth a rewrite of F4's core.** Recorded as a won't-do in the style of #58, with one
@@ -276,6 +277,55 @@ not about what signatures buy — and read that way it stops being the one data 
 That is the right reading to carry forward. A 26× that cannot be attributed to the mechanism under
 consideration is not support for adopting the mechanism.
 
+### 4.4 Faugère's own paper settles it, and adds the sharpest argument against
+
+The reconciliation above was an inference from §4.0's bound. The **primary source** has since been
+read — Faugère, *A new efficient algorithm for computing Gröbner bases without reduction to zero
+(F5)*, ISSAC 2002, Ver 1.2 — and it does not need inferring. Figure 9.2, Cyclic `n` modulo `p` on an
+"Inspiron PIII 1Ghz", CPU seconds:
+
+| Cyclic | 7 | 8 | 9 | 10 |
+|---|---:|---:|---:|---:|
+| F4 | 1.26 | 36.0 | 4949.1 | — |
+| F4 inc | 1.4 | 171.3 | — | — |
+| **F5** | **1.0** | **27.9** | — | — |
+| F5′ | 0.4 | 7.2 | 1002.3 | **57600** |
+| F5″ | 0.8 | 3.95 | 676.2 | — |
+
+`57600 s = 16 hours`, which places Steel's independently reported figure in the **F5′** row — the
+unpublished improved variant — and not in F5's.
+
+**Basic F5 against F4 is 1.26× on Cyclic 7 and 1.29× on Cyclic 8.** That is inside §4.0's ≤2× bound,
+from the algorithm's author, on the family §4.3 had to reach for. So §4.3's "most of that ratio must
+be something other than the signature criterion" is no longer a deduction: the author's own table
+separates basic F5 from F5′, and the paper defers F5′ and F5″ to "a future paper".
+
+**And the paper supplies an argument the decline did not have, which is the sharpest one here:**
+
+> The algorithm F5 is **not always faster** than F4: for cyclic `n` the basic version of the F5
+> algorithm is **just a little faster than F4**; the maximal efficiency of the F5 algorithm is
+> expected when the number of equations is **less or equal than** the number of variables. On the
+> contrary **bad performance is expected when the system is overconstrained**.
+
+**Zeebra's MQ targets are overconstrained by construction.** Fukuoka type III is `m = 2n` — 20
+equations in 10 variables, 30 in 15 — and it is the type Zeebra has verified witnesses on. For the
+encryption families on the record board, the designer of F5 expects it to **lose** to F4. §3's
+ceiling bounded the prize at ~2×; this says that on a large part of the target corpus the prize is
+*negative*. Note the shape of §3's own table is consistent with that and nobody noticed: the
+overdetermined Fukuoka type III rows carry 54–55% redundancy, the underdetermined type VI rows
+58–60%, and type VI is the family where the equation count is *below* the variable count.
+
+One more cap from the same source, §9.1, on the quantity §1 distinguishes as (2):
+
+> reductions to zero are unavoidable for [one example]… By reformulating these problem we obtain an
+> equivalent system with no reduction to zero! The conclusion is that **for a lot of practical
+> examples there is no reduction to zero**.
+
+**Not quoted from this paper:** its Katsura figures. The text extraction merges two tables both
+captioned "Fig 9.2: Katsura n" — one in CPU seconds, one in speedup — and the columns interleave, so
+which is which cannot be established from the extraction. The Cyclic table is unambiguous and
+externally corroborated; the Katsura one is left alone rather than guessed at.
+
 ## 5. Recommendation
 
 **Decline the F5/Matrix-F5 direction for Zeebra's F4. Keep one narrow question open.**
@@ -287,12 +337,16 @@ decline" while eprint 2021/051 was unread. With it read, the evidence points one
   degree of regularity, so the matrix has the same columns and F5 removes only rows (§4.0). The
   complexity exponent is driven by `D_reg`, which signatures do not touch. Against difficulty measured
   in powers of two, the authors' own phrase is the right one: "a modest increase in efficiency".
+- **On the overdetermined half of the corpus the expected win is negative**, per F5's own author:
+  "bad performance is expected when the system is overconstrained" (§4.4). Fukuoka types I, II and
+  III are all `m = 2n`.
 - **The measured ceiling confirms the bound rather than challenging it.** §3's 33–60% and their
   0.24–0.62 are the same answer from two independent measurements. §3's observation that the ceiling
   *rises* with difficulty looked like an argument for F5 in the first draft; it is not, because it
   rises toward ~0.6 and stops.
-- **The one favourable data point dissolves on inspection** (§4.3 as revised): a 26× that the
-  structural argument says cannot come from signatures is evidence about implementations.
+- **The one favourable data point dissolves on inspection**, and the primary source confirms it
+  rather than merely permitting the reading: Faugère's own Figure 9.2 puts basic F5 at **1.26–1.29×**
+  over F4 and attributes the 16-hour Cyclic-10 run to the unpublished **F5′** (§4.3, §4.4).
 - **The cost is a rewrite of F4's core** — `pairs.rs`, `f4/symbolic.rs`, `f4/macaulay.rs`,
   `f4/reduction.rs` — and it may invalidate rather than merely pessimize the reducer-selection
   policies M16 and M19 priced (§4.2).
@@ -334,7 +388,9 @@ predicated on F5 being asymptotically better than F4. It is not.
   the same basis and its maximum degree is a property of the ideal rather than of the algorithm.
 - **The Eder–Faugère survey was not read**, so §5.1's GVW recommendation rests on its reputation
   rather than on its content. This is now the largest remaining gap, since §5.1 is the only question
-  left open.
+  left open. (It is on arXiv at 1404.1774 and reachable, so this is cheap to close.)
+- **Yang and Chen, ICISC 2004**, the onward citation under §4.0's equal-degree claim, was not read.
+  §4.0 argues the conclusion does not depend on it.
 - **The overlap question (B5's question 2) is still not answered.** §3 gives the ceiling and §2 gives
   Gebauer–Möller's share, but not whether they overlap. It matters less than it did: §4.0 bounds the
   prize at ~2× however the overlap falls, so the question is now only about §5.1's narrow criterion
