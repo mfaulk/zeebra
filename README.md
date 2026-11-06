@@ -281,6 +281,7 @@ cargo run --release --example mq_challenge         # import and solve a Fukuoka 
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
+cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
 cargo run --release --example batch_inversion      # batch inversion: routine, integration,
 cargo run --release --example batch_inversion -- f4   # and the F4 headroom left alone
 cargo run --release --example scoreboard           # registered problems, one record each, staged
@@ -838,7 +839,7 @@ bytes** from a counting allocator. On a 64-core/300 GB workstation at one second
 | `div`, long division | 2 | 2^15 | 2^13 | `6 n B` |
 | `evaluate` (NTT) | 1 | **2^23** | **2^21** | `7 n B` |
 | `interpolate` (iNTT) | 1 | **2^23** | **2^20** | `9 n B` |
-| `lagrange_interpolate` | 3 | 2^10 | 2^9 | `8 n B` |
+| `lagrange_interpolate` | 2 | 2^14 | 2^12 | `5 n B` |
 | `roots` | 2 | 2^12 | 2^8 | `12 n B` |
 
 `B = size_of::<F>()` — 8 bytes for a 64-bit field, 32 for a 254-bit one, so **4x**. That is not
@@ -850,9 +851,12 @@ The two transforms are the only quasi-linear stages, and they now cost the same:
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
 2.4x, 5.2x and 8.6x. The whole gap was the `2n` inversions batch inversion removed — see
 [`docs/research/batch-inversion.md`](docs/research/batch-inversion.md) §2.3. Multiplication has no
-NTT-based path at all, and interpolation at arbitrary abscissae — what an evaluation-interpolation
-resultant needs — is cubic. [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the
-full curves, the gap list, and what each stage would need to go further.
+NTT-based path at all. Interpolation at arbitrary abscissae — what an evaluation-interpolation
+resultant needs — is quadratic: it was cubic, at 2^10 and 2^9, until #162 built the numerator
+product `prod (x - x_i)` once and divided it down by synthetic division.
+[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the full curves, the
+superseded figures, the gap list, and what each stage would need to go further; the subproduct tree
+that would make it `O(n log^2 n)` is not written.
 
 The published Graeffe-transform root finder that those stages would serve is read and scoped in
 [`docs/research/graeffe-root-finding.md`](docs/research/graeffe-root-finding.md), with the algorithm

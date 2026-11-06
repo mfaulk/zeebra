@@ -102,6 +102,10 @@ So the ranked list of what to fix is not what §3 guessed:
 1. **The interpolation.** `O(n³)` where Newton's divided differences are `O(n²)` and a product-tree
    or NTT evaluation is `O(n log² n)`. KoalaBear has the two-adic roots of unity for the NTT route —
    #147 landed them — and 13 123 points pad to 16 384.
+   **Fixed, in part: #162 stage 1 made `lagrange_interpolate` `O(n²)`, and the 13 123-point
+   interpolation above now takes 1.37 s measured rather than the extrapolated hour. The table in
+   this section is the pre-#162 measurement and is kept as such; see
+   [`fast-univariate.md`](fast-univariate.md) §4.3.2 for the same point counts after.**
 2. **The sample count**, 2x loose: the degree bound is `2d²` and the observed degree is `d²`.
 3. **The determinant**, which is a few minutes of the hour and therefore last.
 
