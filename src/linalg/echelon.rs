@@ -14,8 +14,6 @@
 //! `linalg` does not depend on `grobner`, and does not learn to. [`Backend`] is this module's own
 //! type; F4 holds one in its options.
 
-use std::collections::HashMap;
-
 use crate::{
     linalg::{
         dense::{
@@ -23,6 +21,7 @@ use crate::{
             dense_reduce_rows_against_pivots, dense_row_echelon,
         },
         sparse::{row_echelon_within, EliminationStatistics, SparseMatrix, SparseRow},
+        PivotIndex,
     },
     FiniteField,
 };
@@ -171,8 +170,8 @@ fn upper_block_pivots<F: FiniteField>(
     matrix: &SparseMatrix<F>,
     split: usize,
     statistics: &mut EliminationStatistics,
-) -> HashMap<usize, usize> {
-    let mut pivot_of_column: HashMap<usize, usize> = HashMap::with_capacity(split);
+) -> PivotIndex {
+    let mut pivot_of_column = PivotIndex::new(matrix.num_columns(), matrix.num_rows());
     for index in 0..split {
         let Some(column) = matrix.row(index).leading_column() else {
             statistics.zero_rows += 1;
@@ -199,7 +198,7 @@ fn upper_block_pivots<F: FiniteField>(
 fn sparse_reduce_rows_against_pivots<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
-    pivot_of_column: &mut HashMap<usize, usize>,
+    pivot_of_column: &mut PivotIndex,
     statistics: &mut EliminationStatistics,
     max_nonzeros: usize,
 ) -> Result<(), usize> {
@@ -212,8 +211,8 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
         resident -= row.nonzeros();
 
         while let Some(column) = row.leading_column() {
-            match pivot_of_column.get(&column) {
-                Some(&pivot_index) => {
+            match pivot_of_column.pivot_of(column) {
+                Some(pivot_index) => {
                     // Every pivot's leading coefficient is one, so the factor that clears this
                     // column is this row's own leading coefficient.
                     let factor = row

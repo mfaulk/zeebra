@@ -7,10 +7,11 @@
 //! are tightened lazily, because a cancellation inside a row cannot be detected without a scan
 //! and the bounds are only used to limit ranges.
 
-use std::collections::HashMap;
-
 use crate::{
-    linalg::sparse::{EliminationStatistics, SparseMatrix, SparseRow},
+    linalg::{
+        sparse::{EliminationStatistics, SparseMatrix, SparseRow},
+        PivotIndex,
+    },
     FiniteField,
 };
 
@@ -172,7 +173,7 @@ impl<F: FiniteField> DenseRows<F> {
             return Err(initial_nonzeros);
         }
 
-        let mut pivot_of_column: HashMap<usize, usize> = HashMap::new();
+        let mut pivot_of_column = PivotIndex::new(self.num_columns, self.num_rows());
         let mut resident = initial_nonzeros;
         self.eliminate_from(
             0,
@@ -192,7 +193,7 @@ impl<F: FiniteField> DenseRows<F> {
     pub(crate) fn reduce_rows_from(
         &mut self,
         split: usize,
-        pivot_of_column: &mut HashMap<usize, usize>,
+        pivot_of_column: &mut PivotIndex,
         statistics: &mut EliminationStatistics,
         max_nonzeros: usize,
     ) -> Result<(), usize> {
@@ -216,7 +217,7 @@ impl<F: FiniteField> DenseRows<F> {
     fn eliminate_from(
         &mut self,
         first: usize,
-        pivot_of_column: &mut HashMap<usize, usize>,
+        pivot_of_column: &mut PivotIndex,
         statistics: &mut EliminationStatistics,
         resident: &mut usize,
         max_nonzeros: usize,
@@ -225,8 +226,8 @@ impl<F: FiniteField> DenseRows<F> {
             *resident -= self.nonzeros[index];
 
             while let Some(column) = self.leading_column(index) {
-                match pivot_of_column.get(&column) {
-                    Some(&pivot_index) => {
+                match pivot_of_column.pivot_of(column) {
+                    Some(pivot_index) => {
                         // Every pivot's leading coefficient is one, so the factor that clears this
                         // column is this row's own leading coefficient.
                         let factor = self.cells[index * self.num_columns + column];
@@ -398,7 +399,7 @@ pub(crate) fn dense_row_echelon<F: FiniteField>(
 pub(crate) fn dense_reduce_rows_against_pivots<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
-    pivot_of_column: &mut HashMap<usize, usize>,
+    pivot_of_column: &mut PivotIndex,
     statistics: &mut EliminationStatistics,
     max_nonzeros: usize,
 ) -> Result<(), usize> {
