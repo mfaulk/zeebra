@@ -374,6 +374,8 @@ cargo run --release --example univariate_scaling -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
 cargo run --release --example karatsuba_crossover  # Karatsuba against schoolbook, per field width
 cargo run --release --example karatsuba_crossover -- bn254
+cargo run --release --example multiplication_dispatch  # schoolbook vs Karatsuba vs transform, and the crossings
+cargo run --release --example multiplication_dispatch -- koalabear max_log=17
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
@@ -1175,10 +1177,12 @@ tools/div_census.sh target/release/examples/univariate_scaling zeebra::poly   # 
 ```
 
 KoalaBear's forward transform now covers the field's entire two-adic range inside one second, and
-the schoolbook/NTT crossover `fft_multiplication_crossover` encodes moves **down one doubling** —
-measured product degree 1022 to 510 on an 8-byte element and 510 to 254 on a 32-byte one, so the
-constant it returns is now too high by a factor of two to four. Recalibrating it belongs to the
-dispatch work, not here.
+the schoolbook/NTT crossing moved **down one doubling** — measured product degree 1022 to 510 on an
+8-byte element and 510 to 254 on a 32-byte one. The dispatch work recalibrated
+`fft_multiplication_crossover` from that observation and found it could not simply adopt those
+numbers: the threshold has to be measured against **Karatsuba**, which is the route the dispatcher
+actually takes below it. It is now 4096 / 512 / 512 by element width; see the crossover section
+below.
 
 Interpolation at arbitrary abscissae — what an evaluation-interpolation resultant needs — is
 quadratic: it was cubic, at 2^10 and 2^9, until #162 built the numerator product `prod (x - x_i)`
@@ -1261,9 +1265,33 @@ odd-order transforms. #161 sharpened that finding rather than softening it: maki
 
 #### The multiplication crossover, measured
 
-`multiply` picks between the schoolbook `Mul` and the transform. Where it should switch is **not**
-one number, and it is much later than the asymptotics suggest. Median of interleaved runs, pinned
-to one core, product degree against the ratio of schoolbook to transform time:
+`multiply` dispatches over three routes by measured threshold — the schoolbook `Mul`, Karatsuba,
+then the transform — and the fallback for a field that cannot host a domain is Karatsuba rather
+than schoolbook. Where it should switch between Karatsuba and the transform is **not** one number:
+
+| element | Karatsuba base case | transform threshold | measured crossing |
+|---|---:|---:|---|
+| 4 bytes (KoalaBear) | 48 | **4096** | (2046, 4094] |
+| 8 bytes (Goldilocks) | 16 | **512** | (254, 510] |
+| 32 bytes (BN254 `Fr`) | 4 | **512** | (254, 510] |
+
+Those thresholds had to be measured against **Karatsuba**, not against schoolbook, and doing so
+moved two of the three tiers from where the schoolbook figure would have put them: the 4-byte tier
+fell 4x from an unverified 16384, and the 32-byte tier stayed at 512 rather than falling to 256,
+because Karatsuba is still 1.18x ahead at product degree 254 there.
+
+```text
+cargo run --release --example multiplication_dispatch
+cargo run --release --example multiplication_dispatch -- koalabear max_log=17
+```
+
+Over **Mersenne-31**, whose two-adicity of 1 rules the transform out at every degree, the fallback
+is the whole of what the dispatcher buys: **1.80x** at operand length 16 rising to **11.19x** at
+16384, from a route that was previously unreachable there.
+
+The older schoolbook-versus-transform figures are kept below, because they are what the `fftmul`
+rows above were taken against. Median of interleaved runs, pinned to one core, product degree
+against the ratio of schoolbook to transform time:
 
 | product degree | KoalaBear (4 B) | Zp65537 (8 B) | Goldilocks (8 B) | BN254 `Fr` (32 B) |
 |---:|---:|---:|---:|---:|
@@ -1275,8 +1303,8 @@ to one core, product degree against the ratio of schoolbook to transform time:
 
 Above 1x the transform is ahead. Schoolbook therefore wins until degree ~460 over a 254-bit field,
 ~1500 over a 64-bit one, and ~12000 over a 32-bit one — a 26x spread, which is why
-`fft_multiplication_crossover::<F>()` is indexed by `size_of::<F>()` and why the thresholds are
-rounded up to 512, 2048 and 16384 so the dispatcher never picks the slower route.
+`fft_multiplication_crossover::<F>()` is indexed by `size_of::<F>()`. The thresholds those figures
+produced — 512, 2048 and 16384 — have since been replaced by the Karatsuba-relative ones above.
 
 Those ratios are medians of 21 interleaved runs pinned to one core, which is what it takes to
 resolve a 1.1x difference on this machine; the single-shot sweep above cannot.
@@ -1309,19 +1337,23 @@ let b = UnivariatePolynomial::<Zp65537>::new(&[Zp65537::new(3), Zp65537::new(4)]
 assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
 ```
 
-A Karatsuba helper now exists for the band `multiply` leaves to schoolbook, but **nothing calls it
-yet** — not `Mul`, not `multiply` — so every figure above is unaffected. Its own crossover is 48
-coefficients over a 4-byte field, 16 over an 8-byte one and 4 over a 254-bit one, against the
-transform's 16384, 2048 and 512, and unlike the transform it needs nothing of the field but a
-ring, so it is available over Mersenne-31. At `2^14` it is 10.7x to 22.9x faster than schoolbook,
+Karatsuba owns the band between them. Unlike the transform it needs nothing of the field but a
+ring, so it is available over Mersenne-31; at `2^14` it is 10.7x to 22.9x faster than schoolbook,
 at a measured exponent of 1.58–1.61 against 2.00, for `6 n B` against `Mul`'s `4 n B`.
 
 ```text
 cargo run --release --example karatsuba_crossover
 ```
 
-is the measurement; [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) §4.1.1
-has the per-width tables.
+is the kernel measurement; [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)
+§4.1.1 has the per-width tables and §4.1.2 the dispatched ones.
+
+**`Mul` itself is still schoolbook**, and that is a measured decision rather than an omission:
+dispatching it to Karatsuba makes `roots` — the binding univariate stage — **1.28x to 1.61x**
+faster, so it should happen, but `&a * &b` is currently the oracle that `karatsuba`'s and
+`fft::multiply`'s agreement tests compare against. Changing the operator without first re-basing
+those tests onto an implementation-independent comparand would make them pass vacuously. That
+sequencing is [#231](https://github.com/mfaulk/zeebra/issues/231).
 
 ## Gröbner Bases
 

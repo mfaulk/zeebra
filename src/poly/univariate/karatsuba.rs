@@ -17,7 +17,7 @@
 //! bit-identical to the schoolbook `Mul`'s because it *is* schoolbook. See
 //! `docs/research/fast-univariate.md` §4.1 and `examples/karatsuba_crossover.rs`.
 
-use crate::FiniteField;
+use crate::{poly::univariate::UnivariatePolynomial, FiniteField, Polynomial};
 
 /// Operand length below which the recursion multiplies schoolbook, for an element of at most 4
 /// bytes. Measured, not derived; see the module comment.
@@ -46,12 +46,36 @@ pub(crate) fn karatsuba_base_case<F: FiniteField>() -> usize {
 /// The product of two coefficient slices, in ascending degree order. See the module comment for
 /// the contract.
 ///
-/// `allow(dead_code)`: this is the entry point #124's multiplication dispatcher consumes, and
-/// nothing in the crate calls it until that lands. It is exercised by this module's tests and,
-/// through `karatsuba_unstable`, by `examples/karatsuba_crossover.rs`.
-#[allow(dead_code)]
+/// Reached through [`multiply_dense`] at the polynomial level, which is what `fft::multiply`
+/// dispatches to below its own crossover.
 pub(crate) fn multiply_karatsuba<F: FiniteField>(a: &[F], b: &[F]) -> Vec<F> {
     multiply_with_base_case(a, b, karatsuba_base_case::<F>())
+}
+
+/// The product of two polynomials by the fastest route that needs nothing from the field.
+///
+/// Schoolbook below [`karatsuba_base_case`] and Karatsuba above it. The selection is
+/// [`multiply_karatsuba`]'s own internal one, not a second test here, so the base case is stated in
+/// one place; below it the output is bit-identical to the schoolbook `Mul`'s because it *is*
+/// schoolbook.
+///
+/// Why this exists beside `fft::multiply`: the transform needs a primitive `2^k`-th root of unity,
+/// so it needs [`crate::KnownOrder`] and randomness. Karatsuba needs nothing but a ring, so this is
+/// available over every field — including Mersenne-31, whose two-adicity of 1 rules a domain out at
+/// every degree above two.
+///
+/// **One allocation where the schoolbook `Mul` makes two.** `Mul` fills a `Vec` and then hands it
+/// to `DensePolynomial::new`, which copies; the kernel's `Vec` goes to `from_coefficients`, which
+/// truncates in place. So the dispatched path is not merely no worse than `Mul` below the base
+/// case — it is one `n`-element copy cheaper.
+///
+/// Total, including a zero operand: `coefficients()` is never empty, so a zero polynomial's `[0]`
+/// multiplies to a run of zeros that `from_coefficients` trims back to the zero polynomial.
+pub(crate) fn multiply_dense<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    UnivariatePolynomial::from_coefficients(multiply_karatsuba(a.coefficients(), b.coefficients()))
 }
 
 /// [`multiply_karatsuba`] with the base case chosen by the caller, so that the crossover can be

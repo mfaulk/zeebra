@@ -1,48 +1,104 @@
-//! Polynomial multiplication through the transform.
+//! Polynomial multiplication through the transform, and the dispatcher that chooses it.
 //!
 //! Evaluate both operands on a domain large enough to hold the product, multiply pointwise, and
 //! interpolate: `O(n log n)` against the schoolbook `O(d^2)` of `Mul`.
 //!
-//! `Mul` itself stays schoolbook, and not by oversight. Finding a domain needs a primitive
-//! `2^k`-th root of unity, which needs [`KnownOrder`] and a source of randomness — neither of
-//! which `Mul`'s signature can carry, and the first of which the Gröbner core deliberately does
-//! not require of a coefficient type (`test_the_grobner_stack_needs_no_field_cardinality` fails to
-//! compile if it starts to). So the transform is reached through the functions here, of which
-//! [`multiply`] is the one to call when the degree is not known in advance.
+//! [`multiply`] dispatches over **three** routes by measured threshold — schoolbook, Karatsuba,
+//! then the transform. The first two are [`multiply_dense`]'s own choice on its base case; this
+//! module chooses between that and the transform on [`fft_multiplication_crossover`]. #185 is where
+//! the three were joined, and its finding is that the threshold has to be measured against
+//! Karatsuba rather than inherited from the schoolbook-versus-transform figure.
+//!
+//! `Mul` itself stays schoolbook, and not by oversight — see `karatsuba::multiply_dense` for why
+//! the operator is a separate decision from this dispatcher, and §4.1.2 of
+//! `docs/research/fast-univariate.md` for the measurement behind leaving it alone. Finding a domain
+//! needs a primitive `2^k`-th root of unity, which needs [`KnownOrder`] and a source of randomness
+//! — neither of which `Mul`'s signature can carry, and the first of which the Gröbner core
+//! deliberately does not require of a coefficient type
+//! (`test_the_grobner_stack_needs_no_field_cardinality` fails to compile if it starts to). So the
+//! transform is reached through the functions here, of which [`multiply`] is the one to call when
+//! the degree is not known in advance.
 
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    evaluate, fft::domain::FFTDomain, fields::RootOfUnityError, interpolate, FiniteField,
-    KnownOrder, Polynomial, UnivariatePolynomial,
+    evaluate, fft::domain::FFTDomain, fields::RootOfUnityError, interpolate, poly::multiply_dense,
+    FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
 };
 
-/// The product degree at and above which the transform beats schoolbook, measured per element
-/// width.
+/// The product degree at and above which the transform beats [`multiply_dense`], measured per
+/// element width.
 ///
-/// `examples/univariate_scaling.rs`'s **mul** and **fftmul** rows are the sweep this comes from;
-/// the README's "What the univariate stages cost" records the numbers. The crossover is very late
-/// and it is **not** one number:
+/// **The comparand is Karatsuba, not schoolbook** (#185). That is the whole content of these
+/// numbers and the reason they are not the ones #124 and #161 measured: the dispatcher's question
+/// is which of the two routes it actually has is faster, and below this threshold that route is
+/// `multiply_dense`, which is Karatsuba above its own base case. Since Karatsuba is 10.7x–22.9x
+/// schoolbook at degree `2^14` (#165), a threshold calibrated against schoolbook is calibrated
+/// against a route the dispatcher never takes.
 ///
-/// | field | element | schoolbook wins until | transform's advantage at degree 16384 |
+/// `examples/multiplication_dispatch.rs` is the instrument — three arms in one process, interleaved
+/// and `taskset`-pinned, agreement checked outside the timing. Measured crossings, as the bracket
+/// between the two adjacent doublings that straddle them:
+///
+/// | field | element | Karatsuba-vs-transform crossing | threshold |
 /// |---|---|---|---|
-/// | KoalaBear | 4 bytes | degree ~12000 | 1.3x |
-/// | Zp65537, Goldilocks | 8 bytes | degree ~1500 | 10-12x |
-/// | BN254, BLS12-381 Fr | 32 bytes | degree ~460 | 24x |
+/// | KoalaBear | 4 bytes | (2046, 4094] | **4096** |
+/// | Zp65537 | 8 bytes | (126, 254] | 256 |
+/// | Goldilocks | 8 bytes | (254, 510] | **512** |
+/// | BN254 `Fr` | 32 bytes | (254, 510] | **512** |
 ///
-/// The lever is the cost of one coefficient multiplication against the transform's per-element
-/// bookkeeping, not the asymptotics: at degree 16384 the transform takes the same 13 ms over
-/// KoalaBear, Zp65537 and Goldilocks — three fields whose schoolbook times differ by 9x — which
-/// says this NTT is bound by allocation and recursion rather than by field arithmetic. Hence a
-/// width-indexed threshold: a 32-byte element makes schoolbook dearer while leaving the transform
-/// where it was.
+/// Rounded **up** to the next power of two, and for the 8-byte tier up to the later of the two
+/// fields measured, so the dispatcher errs toward the route that is cheaper at small sizes and
+/// never pays the transform's fixed cost on a product too small to amortize it. The cost of erring
+/// that way is bounded and small — on Zp65537 between 256 and 512 the transform is at most 1.60x
+/// ahead — where erring the other way pays the transform's setup on every product in the band.
 ///
-/// Rounded **up** to the next power of two from the measured crossing, so the dispatcher never
-/// picks the slower route on a field measured here.
+/// How these differ from the figures they replace, and why the direction is not uniform:
+///
+/// | element | #124 | #161's schoolbook-vs-transform | **this** |
+/// |---|---:|---:|---:|
+/// | 4 bytes | 16384 | not measurable from `univariate_scaling` | **4096** |
+/// | 8 bytes | 2048 | 512 | **512** |
+/// | 32 bytes | 512 | 256 | **512** |
+///
+/// The 4-byte row falls 4x because 16384 was never measured against anything — at product degree
+/// 32766 the transform is 2.98x ahead of Karatsuba there, so the old threshold gave that up. The
+/// 32-byte row does **not** fall to 256: Karatsuba is still 1.18x ahead at product degree 254 over
+/// BN254, so taking #161's schoolbook crossing would have moved the threshold the wrong way. Both
+/// corrections come from measuring the route the dispatcher has rather than the one it had.
+///
+/// # The 4-byte row is contingent, and the other two are not
+///
+/// Only the 4-byte tier's schoolbook loop autovectorizes — a 64-bit Montgomery reduction is
+/// 128-bit arithmetic LLVM does not vectorize and a 32-bit one is 64-bit arithmetic it does, which
+/// is `docs/MILESTONE-SIMD-PARALLELISM.md` §8.3's finding. So only the 4-byte tier's threshold
+/// depends on whether that vectorization happened, and **under this crate's `lto = "fat"` with
+/// `codegen-units = 1` it is not stable against things that are not the source.** The same source
+/// at the same commit, built two ways:
+///
+/// | build | `vpmuludq` in the artifact | schoolbook at operand 1024 | Karatsuba | crossing |
+/// |---|---:|---:|---:|---|
+/// | `cargo build --release --examples` | 91 | 295.4 µs | 81.5 µs | (2046, 4094] → 4096 |
+/// | `cargo build --release --example multiplication_dispatch` | **0** | 527.2 µs | 141.0 µs | (510, 1022] → 1024 |
+///
+/// Both scalar routes lose 1.74x–1.77x together and the transform does not move at all (98.1 µs
+/// against 100.6), which is what identifies the cause as the 4-byte inner loop rather than
+/// anything in the dispatch. The 8- and 32-byte crossings are **identical in both artifacts**, as
+/// the paragraph above predicts they must be.
+///
+/// **4096 is the vectorized figure, and it is shipped because that is the state the library is
+/// normally in**: `univariate_scaling`, `karatsuba_crossover`, `field_width` and
+/// `cryptanalysis_ladder` all carry `vpmuludq` at this commit. A consumer whose own binary loses
+/// the vectorization will see the transform win from product degree 1024 rather than 4096, and
+/// Karatsuba at most 2.00x behind it in between. `multiply_above` takes an explicit threshold for
+/// exactly this kind of caller. Tracked as #244.
 pub fn fft_multiplication_crossover<F: FiniteField>() -> u32 {
     match std::mem::size_of::<F>() {
-        0..=4 => 16384,
-        5..=8 => 2048,
+        0..=4 => 4096,
+        // The 8-byte and wider tiers coincide at this measurement. Kept as separate arms rather
+        // than collapsed: they are separate because the cost of one field multiplication differs
+        // by 11x across them, and a re-measurement is as likely to separate them again as not.
+        5..=8 => 512,
         _ => 512,
     }
 }
@@ -94,7 +150,7 @@ pub fn multiply_over_domain<F: FiniteField>(
 ///
 /// Fails if the field's two-adicity is below `log2` of the points the product needs, where no
 /// power-of-two domain of that size exists — a fact about the field, so a value rather than a
-/// panic. [`multiply`] falls back to schoolbook on exactly that failure.
+/// panic. [`multiply`] falls back to [`multiply_dense`] on exactly that failure.
 pub fn try_multiply_via_fft<F: KnownOrder, R: RngCore + CryptoRng>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -116,9 +172,11 @@ pub fn try_multiply_via_fft<F: KnownOrder, R: RngCore + CryptoRng>(
 
 /// The product of `a` and `b`, by whichever route is faster for their degree.
 ///
-/// Schoolbook below [`fft_multiplication_crossover`], the transform at or above it, and schoolbook
-/// again if the field cannot host a domain that large. Always returns the same polynomial as
-/// `a * b`.
+/// Three routes, by measured threshold: schoolbook, then Karatsuba, then the transform. The first
+/// two are [`multiply_dense`]'s own choice on `karatsuba_base_case`; this function chooses between
+/// that and the transform on [`fft_multiplication_crossover`]. A field that cannot host a domain
+/// that large falls back to `multiply_dense` rather than to schoolbook. Always returns the same
+/// polynomial as `a * b`.
 pub fn multiply<F: KnownOrder, R: RngCore + CryptoRng>(
     a: &UnivariatePolynomial<F>,
     b: &UnivariatePolynomial<F>,
@@ -142,10 +200,13 @@ pub fn multiply_above<F: KnownOrder, R: RngCore + CryptoRng>(
     }
 
     if product_degree(a, b) < crossover {
-        return a * b;
+        return multiply_dense(a, b);
     }
 
-    try_multiply_via_fft(a, b, rng).unwrap_or_else(|_| a * b)
+    // The fallback is `multiply_dense`, not schoolbook. This arm is not a rare corner: a field
+    // whose two-adicity cannot host the domain takes it at *every* degree above the crossover, and
+    // Mersenne-31 — two-adicity 1 — is one such field, so this is where its large products land.
+    try_multiply_via_fft(a, b, rng).unwrap_or_else(|_| multiply_dense(a, b))
 }
 
 /// The degree of the product, which over a field is the sum of the degrees.
@@ -169,7 +230,8 @@ mod tests {
             BabyBear, Bn254Fr, KoalaBear, Mersenne31, RootOfUnityError, Zp18446744069414584321,
             Zp65537,
         },
-        FFTDomain, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
+        karatsuba_base_case_unstable, FFTDomain, FiniteField, KnownOrder, Polynomial,
+        UnivariatePolynomial,
     };
 
     /// A polynomial of exactly the given degree: the leading coefficient is never zero.
@@ -241,44 +303,118 @@ mod tests {
         );
     }
 
-    /// The dispatcher falls back to schoolbook rather than failing on such a field.
+    /// The dispatcher falls back to `multiply_dense` rather than failing on such a field.
+    ///
+    /// The last two degrees put the product above the 4-byte transform threshold of 4096, so they
+    /// reach the `unwrap_or_else` arm — the one a field of two-adicity 1 takes at *every* degree
+    /// above the crossover — rather than only the below-crossover branch. Both are asserted equal
+    /// to schoolbook, so the fallback is exercised and not merely entered.
     #[test]
     fn test_the_dispatcher_falls_back_when_the_field_cannot_host_a_domain() {
         let mut rng = StdRng::seed_from_u64(11);
-        for degree in [1, 8, 64] {
+        assert_eq!(Mersenne31::two_adicity(), 1);
+        for degree in [1, 8, 64, 2049, 3000] {
             let a = random_polynomial::<Mersenne31, _>(degree, &mut rng);
             let b = random_polynomial::<Mersenne31, _>(degree, &mut rng);
-            assert_eq!(multiply(&a, &b, &mut rng), &a * &b, "degree {degree}");
+            let product = multiply(&a, &b, &mut rng);
+            assert_eq!(product, &a * &b, "degree {degree}");
+            assert_eq!(product.degree() as usize, 2 * degree, "degree {degree}");
         }
     }
 
-    /// The dispatcher agrees with schoolbook on both sides of the crossover.
-    ///
-    /// The threshold is a product degree of 2048 over an 8-byte field, so the last pair here takes
-    /// the transform and the rest take the schoolbook loop.
+    /// The fallback arm is reached, not merely reachable: a product degree above the crossover over
+    /// a field of two-adicity 1 has no domain, which `try_multiply_via_fft` must report as the
+    /// error `multiply_above` catches.
     #[test]
-    fn test_the_dispatcher_agrees_with_schoolbook_either_side_of_the_crossover() {
+    fn test_the_fallback_arm_is_the_one_a_low_two_adicity_field_takes() {
+        let mut rng = StdRng::seed_from_u64(1_111);
+        let degree = 2_049;
+        assert!(2 * degree >= fft_multiplication_crossover::<Mersenne31>() as usize);
+        let a = random_polynomial::<Mersenne31, _>(degree, &mut rng);
+        let b = random_polynomial::<Mersenne31, _>(degree, &mut rng);
+        assert!(
+            try_multiply_via_fft(&a, &b, &mut rng).is_err(),
+            "a two-adicity of 1 cannot host this domain, so the dispatcher's fallback is live"
+        );
+        assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
+    }
+
+    /// The dispatcher agrees with schoolbook across all three routes' thresholds.
+    ///
+    /// Over an 8-byte field the Karatsuba base case is 16 coefficients and the transform threshold
+    /// is a product degree of 512, so these operand degrees land on every route: 1 and 4 schoolbook
+    /// inside `multiply_dense`, 16 through 300 Karatsuba, 600 and 1100 the transform.
+    #[test]
+    fn test_the_dispatcher_agrees_with_schoolbook_on_every_route() {
         let mut rng = StdRng::seed_from_u64(13);
-        assert_eq!(fft_multiplication_crossover::<Zp65537>(), 2048);
-        for degree in [1, 4, 16, 64, 300, 1100] {
+        assert_eq!(fft_multiplication_crossover::<Zp65537>(), 512);
+        assert_eq!(karatsuba_base_case_unstable::<Zp65537>(), 16);
+        for degree in [1, 4, 16, 64, 300, 600, 1100] {
             let a = random_polynomial::<Zp65537, _>(degree, &mut rng);
             let b = random_polynomial::<Zp65537, _>(degree, &mut rng);
             assert_eq!(multiply(&a, &b, &mut rng), &a * &b, "degree {degree}");
         }
     }
 
+    /// Every degree from zero to past twice the widest Karatsuba base case agrees with schoolbook,
+    /// which pins the schoolbook/Karatsuba boundary inside `multiply_dense` rather than sampling
+    /// around it.
+    ///
+    /// Over a 4-byte field, where the base case is 48 — the largest of the three tiers, so this
+    /// also covers the 16 and 4 of the others.
+    #[test]
+    fn test_every_small_degree_agrees_with_schoolbook() {
+        let mut rng = StdRng::seed_from_u64(1_185);
+        for degree in 0..=100 {
+            let a = random_polynomial::<KoalaBear, _>(degree, &mut rng);
+            let b = random_polynomial::<KoalaBear, _>(degree, &mut rng);
+            let expected = &a * &b;
+            let dispatched = multiply(&a, &b, &mut rng);
+            assert_eq!(dispatched, expected, "degree {degree}");
+            assert_eq!(dispatched.degree(), expected.degree(), "degree {degree}");
+        }
+    }
+
     /// The crossover is indexed by element width, which is what the measurement varies with.
+    ///
+    /// The figures are #185's, measured against Karatsuba rather than against schoolbook; see
+    /// `fft_multiplication_crossover`'s doc comment for the table and for why the 4-byte tier fell
+    /// 4x while the 32-byte tier did not move.
     #[test]
     fn test_the_crossover_follows_the_element_width() {
         assert_eq!(std::mem::size_of::<KoalaBear>(), 4);
-        assert_eq!(fft_multiplication_crossover::<KoalaBear>(), 16384);
+        assert_eq!(fft_multiplication_crossover::<KoalaBear>(), 4096);
         assert_eq!(std::mem::size_of::<Zp18446744069414584321>(), 8);
         assert_eq!(
             fft_multiplication_crossover::<Zp18446744069414584321>(),
-            2048
+            512
         );
         assert_eq!(std::mem::size_of::<Bn254Fr>(), 32);
         assert_eq!(fft_multiplication_crossover::<Bn254Fr>(), 512);
+    }
+
+    /// Every threshold is at or above the Karatsuba base case for the same width, so the three
+    /// routes are ordered and no band is skipped.
+    ///
+    /// This is the invariant that would break silently if one of the two constants were
+    /// re-measured without the other: a transform threshold below the base case would leave
+    /// Karatsuba unreachable through `multiply`.
+    #[test]
+    fn test_the_three_routes_are_ordered_at_every_width() {
+        fn ordered<F: FiniteField>() {
+            let base_case = karatsuba_base_case_unstable::<F>() as u32;
+            let crossover = fft_multiplication_crossover::<F>();
+            assert!(
+                base_case <= crossover,
+                "base case {base_case} is above the transform crossover {crossover} for a {}-byte element",
+                std::mem::size_of::<F>()
+            );
+        }
+        ordered::<KoalaBear>();
+        ordered::<Mersenne31>();
+        ordered::<Zp65537>();
+        ordered::<Zp18446744069414584321>();
+        ordered::<Bn254Fr>();
     }
 
     /// An explicit crossover overrides the measured one, in both directions.

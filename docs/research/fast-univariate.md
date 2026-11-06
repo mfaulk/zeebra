@@ -480,6 +480,13 @@ directly. Recalibrating the constant is #124's number and is not changed here; #
 schoolbook → Karatsuba → NTT dispatch depends on it, and its Karatsuba band narrows at the top by
 the same doubling.
 
+> **#185 recalibrated it, and only one of these two figures survived.** The thresholds above are
+> the right answer to *schoolbook* against the transform, and the dispatcher's question turned out
+> to be Karatsuba against the transform — a different comparand, moving two of the three tiers in
+> directions this note could not predict. 8 bytes did land at 512; 32 bytes did **not** go to 256
+> but stayed at 512, because Karatsuba is still 1.18x ahead at product degree 254 over BN254; and
+> the 4-byte row this note left open measures **4096**, not 16384. §4.1.2 has the measurement.
+
 #### What is left, and what it would need
 
 `FFTDomain::inverse` is now the only remaining `n`-element allocation in `interpolate`, and
@@ -500,12 +507,20 @@ pad to a power of two, transform both inputs, multiply pointwise and invert. The
 row measures exponent 0.90–1.15, against 1.93–2.14 for schoolbook — 1.03–1.27 on §3's re-take
 after #189, against 1.95–2.01 for schoolbook in the same run.
 
-`Mul` itself stays schoolbook, and cannot do otherwise: choosing a domain needs a primitive
-`2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness, neither of which
-`Mul`'s signature can carry — and `KnownOrder` is exactly what the Gröbner core refuses to require
-of a coefficient type (`test_the_grobner_stack_needs_no_field_cardinality`). Mersenne-31, whose
-two-adicity of 1 rules the transform out entirely, needs no CRT or Kronecker fallback for
-correctness: `multiply` falls back to the schoolbook product on precisely that failure.
+> **#185 joined the three routes.** `multiply` now dispatches schoolbook → Karatsuba → transform,
+> and the fallback for a field that cannot host a domain is Karatsuba rather than schoolbook. The
+> schoolbook-versus-transform crossings in this subsection are therefore **no longer the thresholds
+> the dispatcher uses**; they are kept because they are what §4.1.1's and §3.3's figures were taken
+> against. §4.1.2 has the thresholds that replaced them and the measurement that produced them.
+
+`Mul` itself stays schoolbook, and cannot do otherwise *through the transform*: choosing a domain
+needs a primitive `2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness,
+neither of which `Mul`'s signature can carry — and `KnownOrder` is exactly what the Gröbner core
+refuses to require of a coefficient type (`test_the_grobner_stack_needs_no_field_cardinality`).
+Karatsuba carries no such obstacle, so whether `Mul` dispatches to *that* is a separate question;
+§4.1.2 measures it and answers it. Mersenne-31, whose two-adicity of 1 rules the transform out
+entirely, needs no CRT or Kronecker fallback for correctness: `multiply` falls back on precisely
+that failure.
 
 **The crossover is much later than the asymptotics suggest, and it is not one number.** Medians of
 21 interleaved runs pinned to one core, as the ratio of schoolbook time to transform time against
@@ -541,10 +556,15 @@ argument was built on it.
 quasi-linear, so the heading above still holds and the transform is still the only quasi-linear
 path. What it does is own the band `fft_multiplication_crossover` leaves to schoolbook. Its own
 crossover is 48 coefficients at 4 bytes an element, 16 at 8 and 4 above that, against the
-transform's 16384, 2048 and 512 — so the band Karatsuba owns is **three orders of magnitude wide
-on the narrow fields** and it includes every degree `pow_mod`, `gcd` and `separate_equal_degree`
-reach today. It also needs nothing from the field but a ring, so unlike the transform it is
-available over Mersenne-31 without falling back. §4.1.1 measures it.
+transform's 16384, 2048 and 512 as those stood here — so the band Karatsuba owns is **three orders
+of magnitude wide on the narrow fields** and it includes every degree `pow_mod`, `gcd` and
+`separate_equal_degree` reach today. It also needs nothing from the field but a ring, so unlike the
+transform it is available over Mersenne-31 without falling back. §4.1.1 measures it.
+
+> #185 narrowed the band at the top, by re-measuring the transform's thresholds against Karatsuba
+> rather than against schoolbook: 4096 / 512 / 512. The band is still **85x** wide in degree at 4
+> bytes and 32x at 8, and over Mersenne-31 it is unbounded above, since no transform exists there at
+> any degree. §4.1.2.
 
 The transform-size ceiling is worth stating as a real bound rather than an asymptotic one: `2^24`
 for KoalaBear, `2^28` for BN254, `2^32` for Goldilocks and BLS12-381. At `7 n B`, BN254's full
@@ -558,6 +578,12 @@ workstation, so **memory no longer binds anywhere**: every field's transform is 
 two-adicity. KoalaBear's whole range now runs in under a second (§3.3).
 
 #### 4.1.1 Karatsuba, measured per element width (#165)
+
+> **Superseded as a statement about what runs, not as a measurement.** The sentence below that the
+> helper "is a standalone helper, called from nothing yet" was true when written and is false after
+> #185: `multiply_dense` is now reached from `fft::multiply`'s two fallbacks. The figures in this
+> subsection are unaffected — they measure the kernel, which did not change — and §4.1.2 measures
+> the dispatched path.
 
 `src/poly/univariate/karatsuba.rs` multiplies two coefficient slices by recursive three-way
 Karatsuba down to a schoolbook base case. It is a standalone helper, called from nothing yet:
@@ -635,6 +661,200 @@ No null result to report: Karatsuba wins on every field measured, including the 
 once the base case is the measured one. The honest limit is the one the issue stated in advance —
 at the degrees this crate reaches today the gain is a constant-factor 10–23x, not a change in
 which degrees are reachable, and `div` is not Karatsuba and will not move.
+
+#### 4.1.2 The dispatcher, and the threshold that had to be re-measured (#185)
+
+#165's kernel and #124's transform landed without either calling the other. #185 joined them, and
+the work turned out to be less about the wiring than about the constant: **`fft_multiplication_crossover`
+could not be inherited from any earlier figure, in either of the two forms it was available in.**
+
+##### The correction
+
+Both earlier calibrations measured **schoolbook against the transform** — #124 at 16384 / 2048 / 512
+product degree for 4-, 8- and 32-byte elements, and #161 re-measuring the 8- and 32-byte rows one
+doubling lower at 512 / 256 (§3.3). Once Karatsuba sits between them the dispatcher's question is
+not that one. Below the threshold the route it takes is `multiply_dense`, which is Karatsuba above
+its own base case, and §4.1.1 measures Karatsuba at 10.7x–22.9x schoolbook at `2^14`. A threshold
+calibrated against schoolbook is calibrated against a route the dispatcher never takes.
+
+The expected consequence was that the crossing would move *up*, since the comparand got faster. It
+does on one tier and down on another, which is why this had to be measured rather than reasoned
+about:
+
+| element | #124 | #161, schoolbook-vs-transform | **#185, Karatsuba-vs-transform** | moved |
+|---|---:|---:|---:|---|
+| 4 bytes | 16384 | not measurable from `univariate_scaling` | **4096** | down 4x |
+| 8 bytes | 2048 | 512 | **512** | down 4x |
+| 32 bytes | 512 | 256 | **512** | unchanged |
+
+Two of the three rows would have been wrong had either earlier figure been carried over:
+
+- **The 4-byte tier was never measured against anything.** §3.3 says so explicitly — the example
+  "cannot reach product degree 16 384 on that field within the budget" — so 16384 stood as an
+  unverified bound. At product degree 32766 over KoalaBear the transform is **2.98x** ahead of
+  Karatsuba, which the old threshold gave away entirely. This is the tier the F4 and resultant
+  workloads run over.
+- **The 32-byte tier must not fall to 256.** Karatsuba is still **1.18x** ahead at product degree
+  254 over BN254 `Fr`, so taking #161's schoolbook crossing would have moved this threshold the
+  wrong way and paid the transform's setup on a band Karatsuba owns.
+
+##### The instrument
+
+`examples/multiplication_dispatch.rs`. Three arms per size, all reached through the shipped public
+API rather than through a kernel, so what is timed is the dispatched path:
+
+| arm | call | what it is |
+|---|---|---|
+| schoolbook | `&a * &b` | `DensePolynomial`'s `Mul`, unchanged |
+| dense | `multiply_above(a, b, u32::MAX, rng)` | cannot reach the transform, so exactly `multiply_dense` |
+| ntt | `multiply_above(a, b, 0, rng)` | always attempts the transform |
+
+Interleaved within each repetition and the minimum taken over up to seven, `taskset --cpu-list 4`,
+under the benchmark lock. The three arms are asserted equal to each other once per size outside the
+timing. A field whose two-adicity cannot host the domain takes arm 2 as arm 3's fallback by design,
+so those rows are marked `(fallback)` and excluded from the crossing rather than read as transforms.
+
+Microseconds, minimum of the interleaved repetitions. Operand lengths; the product degree is
+`2 len - 2`:
+
+| field | operand len | product deg | schoolbook | dense | ntt | school/dense | dense/ntt |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| KoalaBear | 1024 | 2046 | 294.3 | 81.6 | 98.8 | 3.61x | 0.83x |
+| KoalaBear | 2048 | 4094 | 1154.0 | 245.9 | 207.3 | 4.69x | **1.19x** |
+| KoalaBear | 8192 | 16382 | 18368.9 | 2280.2 | 1065.2 | 8.06x | 2.14x |
+| KoalaBear | 16384 | 32766 | 70613.0 | 6498.6 | 2157.0 | 10.87x | 2.98x |
+| KoalaBear | 65536 | 131070 | skipped | 59205.8 | 9535.6 | — | 6.21x |
+| Zp65537 | 64 | 126 | 13.0 | 6.1 | 7.8 | 2.13x | 0.78x |
+| Zp65537 | 128 | 254 | 41.0 | 14.6 | 13.1 | 2.80x | **1.12x** |
+| Goldilocks | 128 | 254 | 33.4 | 13.3 | 14.9 | 2.51x | 0.89x |
+| Goldilocks | 256 | 510 | 134.4 | 40.6 | 30.8 | 3.31x | **1.32x** |
+| BN254 `Fr` | 128 | 254 | 379.6 | 111.6 | 131.2 | 3.40x | 0.85x |
+| BN254 `Fr` | 256 | 510 | 1521.1 | 355.7 | 281.0 | 4.28x | **1.27x** |
+
+The crossings, as the bracket between the two adjacent doublings that straddle them — the sweep
+doubles, so it brackets rather than lands on them. Reproduced across three separate pinned runs,
+the KoalaBear bracket identical in all three:
+
+| field | crossing | rounded up |
+|---|---|---:|
+| KoalaBear (4 B) | (2046, 4094] | **4096** |
+| Zp65537 (8 B) | (126, 254] | 256 |
+| Goldilocks (8 B) | (254, 510] | **512** |
+| BN254 `Fr` (32 B) | (254, 510] | **512** |
+
+The two 8-byte fields land in adjacent brackets, so the tier is set to the later of them. Rounding
+up is #124's convention and errs toward the route that is cheaper at small sizes; the cost of
+erring that way is bounded and visible — on Zp65537 between 256 and 512 the transform is at most
+1.60x ahead — where erring the other way pays the transform's fixed setup on every product in the
+band.
+
+##### The 4-byte crossing is contingent on a codegen decision (#244)
+
+Measured four times at 4096 and twice at 1024, and the variable turned out not to be the source.
+The same commit built two ways:
+
+| build | `vpmuludq` in the artifact | schoolbook @1024 | Karatsuba | crossing |
+|---|---:|---:|---:|---|
+| `cargo build --release --examples` | 91 | 295.4 µs | 81.5 µs | (2046, 4094] → **4096** |
+| `cargo build --release --example multiplication_dispatch` | **0** | 527.2 µs | 141.0 µs | (510, 1022] → 1024 |
+
+Both scalar routes lose 1.73x–1.78x together and the transform does not move (98.1 µs against
+100.6), which locates the cause in the 4-byte coefficient loop: its autovectorization is present in
+one artifact and absent in the other. Under `lto = "fat"` with `codegen-units = 1`, building one
+example gives the linker a different set of roots than building all of them.
+
+Only the 4-byte tier can do this, and §8.3 of `MILESTONE-SIMD-PARALLELISM.md` says why it must be
+the only one: a 64-bit Montgomery reduction is 128-bit arithmetic LLVM does not vectorize and a
+32-bit one is 64-bit arithmetic it does. The 8- and 32-byte crossings measured **identical in both
+artifacts**, which is the control for that reading.
+
+**4096 ships**, because every committed example carries `vpmuludq` at this commit —
+`univariate_scaling` 54, `karatsuba_crossover` 45, `field_width` 56, `cryptanalysis_ladder` 89 — so
+that is the state the library is normally in, and a consumer that loses it sees Karatsuba at most
+2.00x behind the transform in the band between 1024 and 4096. The deeper problem, that a shipped
+constant is contingent on a codegen decision and that no 4-byte figure in these documents records
+which state it was taken in, is #244.
+
+##### Mersenne-31: the fallback measured, since it is the only route there
+
+Two-adicity 1, so no domain exists past two points and `multiply_above` takes its
+`unwrap_or_else` arm at every size. Before #185 that arm was schoolbook. The `ntt` column below is
+that fallback, and its agreement with the `dense` column to within 1% is the check that it *is* the
+fallback:
+
+| operand len | product deg | schoolbook us | dense us | ntt us (fallback) | school/dense |
+|---:|---:|---:|---:|---:|---:|
+| 16 | 30 | 0.3 | 0.1 | 0.2 | 1.80x |
+| 256 | 510 | 22.4 | 10.2 | 10.1 | 2.20x |
+| 1024 | 2046 | 338.6 | 91.3 | 91.4 | 3.71x |
+| 4096 | 8190 | 5297.6 | 830.2 | 830.6 | 6.38x |
+| 16384 | 32766 | 80314.3 | 7176.7 | 7237.7 | **11.19x** |
+
+So on the field every F4 benchmark in this crate runs over, where the transform is unavailable at
+every degree, the dispatcher's whole gain is this column: **1.80x at operand length 16 rising to
+11.19x at 16384**, from a route that was previously unreachable.
+
+##### `DensePolynomial::Mul`: the decision, and the measurement behind it
+
+#185 left this open deliberately, since wiring Karatsuba into the operator changes the cost of every
+polynomial product in the crate rather than of one dispatcher's fallbacks. Measured as the memory in
+`zeebra-perf-ab-method` prescribes: two binaries from one tree differing only in `Mul`'s body,
+built into private target directories, `md5sum`-checked distinct, run interleaved under
+`taskset --cpu-list 4` and the benchmark lock, minimum of three rounds.
+
+`univariate_scaling` **cannot serve as the harness** — its `fftmul` stage verifies its product
+against `&a * &b`, so the verification is quadratic in the operand degree and the sweep does not
+terminate at any budget that reaches interesting sizes. That is #189, and it was hit before it was
+avoided. The instrument instead times `roots` directly, which is the binding univariate stage per
+§5 and is `O(log q)` products at the working degree, with `div_with_remainder` as a **control**:
+long division contains no polynomial `Mul`, so a change there is not the effect.
+
+| field | stage | size | `Mul` schoolbook | `Mul` dispatching | ratio |
+|---|---|---:|---:|---:|---:|
+| KoalaBear | **roots** | 256 | 1.386 ms | 1.082 ms | **1.28x** |
+| KoalaBear | **roots** | 1024 | 17.147 ms | 11.369 ms | **1.51x** |
+| KoalaBear | **roots** | 2048 | 61.447 ms | 38.456 ms | **1.60x** |
+| KoalaBear | mul | 1024 | 0.254 ms | 0.082 ms | 3.10x |
+| KoalaBear | mul | 4096 | 3.998 ms | 0.737 ms | 5.42x |
+| KoalaBear | div *(control)* | 1024 | 0.292 ms | 0.328 ms | 0.89x |
+| KoalaBear | div *(control)* | 4096 | 4.560 ms | 5.025 ms | 0.91x |
+| BN254 `Fr` | **roots** | 64 | 68.823 ms | 51.132 ms | **1.35x** |
+| BN254 `Fr` | **roots** | 128 | 264.135 ms | 173.047 ms | **1.53x** |
+| BN254 `Fr` | **roots** | 256 | 1052.214 ms | 655.326 ms | **1.61x** |
+| BN254 `Fr` | mul | 1024 | 23.234 ms | 3.223 ms | 7.21x |
+| BN254 `Fr` | div *(control)* | 256 | 1.417 ms | 1.425 ms | 0.99x |
+| BN254 `Fr` | div *(control)* | 1024 | 21.996 ms | 22.561 ms | 0.97x |
+
+**The control is not quite flat, and that is reported rather than smoothed.** BN254's `div` moves
+0.97x–1.00x, inside the harness's noise. KoalaBear's moves **0.89x–0.91x at all three sizes and in
+all three rounds** — reproducible, and unexplained. `div_with_remainder` contains no polynomial
+multiplication, only field-element products, so this is a code-layout or inlining effect of
+removing the schoolbook loop from `Mul` under fat LTO, not a semantic one. It bounds the claim
+without overturning it: the regression is *already inside* the `roots` figures, since `pow_mod`
+reduces after every squaring, and `roots` still comes out 1.28x–1.61x ahead.
+
+One consistency check, because a 1.6x on a composite stage from a 5.4x on one of its two halves
+wants verifying. At KoalaBear degree 2048 one squaring is one `mul` at product degree 4096 plus one
+`div`: 3.998 + 4.560 = 8.56 ms schoolbook against 0.737 + 5.025 = 5.76 ms dispatching, a ratio of
+1.49x against the 1.60x measured for `roots`. The residue is the right sign and the right size —
+`roots`'s internal degrees run below the operand degree, and its gcd and equal-degree splitter
+contain further products — so the stage figure is consistent with its parts rather than with a
+harness artifact.
+
+**Decision: yes, and not in #185's change.** The measurement is unambiguous — 1.28x to 1.61x on the
+binding univariate stage, for every caller, with no API change — but it cannot land alongside the
+dispatcher, for a reason that is about test coverage rather than about performance:
+
+**`Mul` is the oracle.** `karatsuba.rs`'s `test_it_agrees_with_the_mul_operator_over_every_field_width`
+and both of its proptests compare the kernel against `&f * &g`, and the whole of `fft::multiply`'s
+test module asserts `multiply(...) == &a * &b`. If `Mul` becomes Karatsuba, every one of those
+compares an implementation against itself and passes vacuously — the same failure mode as a doctest
+that is configured off. The module does carry an independent `naive()` oracle, so the work is
+tractable: re-base both modules' agreement tests onto an implementation-independent comparand
+*first*, then change the operator. Doing both in one commit would change the agreement tests in the
+same change as the code they are the agreement for.
+
+That sequencing is #231.
 
 ### 4.2 Modular composition: absent
 
@@ -879,9 +1099,11 @@ Concretely, before D1 or D3 can run at interesting degrees:
    because the transform is allocation-bound. ~~**An in-place iterative NTT** is what now carries
    this item's value: it would lower every crossover and speed every stage below that uses one.~~
    Done, #161: the transform is no longer allocation-bound (`1 n B` against `7 n B`) and is 3.7x to
-   6.1x faster on the narrow fields and 2.0x to 2.7x on BN254 (§3.3). **`fft_multiplication_crossover`
-   was calibrated against the recursive kernel and is therefore now too high** — see §3.3's closing
-   note.
+   6.1x faster on the narrow fields and 2.0x to 2.7x on BN254 (§3.3). ~~**`fft_multiplication_crossover`
+   was calibrated against the recursive kernel and is therefore now too high**~~ — recalibrated by
+   #185, which also joined Karatsuba into the dispatch and found that the threshold had to be
+   measured against Karatsuba rather than against schoolbook: 4096 / 512 / 512, with the 4-byte
+   tier falling 4x from a figure that had never been measured. §4.1.2.
 2. **Fast division by Newton iteration**, which `pow_mod_limbs` would then inherit, taking root
    finding from `log q * d^2` to `log q * d log d`.
 3. **A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points, taking

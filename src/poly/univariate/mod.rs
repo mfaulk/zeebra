@@ -31,8 +31,11 @@ pub use graeffe::{
     graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root, graeffe_root_with_stats,
     GraeffeError, GraeffeStats, SubgroupRoute,
 };
-// Measurement hooks for `examples/karatsuba_crossover.rs`, not API: the dispatcher-facing entry
-// point is the `pub(crate)` `karatsuba::multiply_karatsuba`.
+// The schoolbook-or-Karatsuba route, which `fft::multiply` dispatches to below its own crossover.
+// Crate-internal: it is reached publicly through `fft::multiply`, and `Mul` is the operator a
+// caller reaches for otherwise.
+pub(crate) use karatsuba::multiply_dense;
+// Measurement hooks for `examples/karatsuba_crossover.rs`, not API.
 #[doc(hidden)]
 pub use karatsuba::{karatsuba_base_case_unstable, karatsuba_unstable};
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
