@@ -702,8 +702,8 @@ resolution over it and silently return the quotient alone. That is interface wor
 every operator is one call to the §2 long division, so the `div` row of §3.1 governs all of them,
 and `gcd`'s Euclidean loop costs exactly what it did.
 
-The two algorithmic items from the same issue are **not** written, and the arithmetic says they
-should not be yet:
+The two algorithmic items from the same issue are **not** written — they are #193 (Newton
+inversion) and #194 (half-GCD) — and the arithmetic says they should not be yet:
 
 | route | cost | with the `M` available at the operator |
 |---|---|---|
@@ -721,7 +721,10 @@ several multiplications per iteration instead of one pass of long division, and 
 multiplication underneath moves. §4.1.1's closing line — "`div` is not Karatsuba and will not
 move" — is the same finding from the multiplication side.
 
-So the gate is a crossover, not a date. Wiring Karatsuba into `Mul` makes `M(d) = d^1.585` for
+So the gate is a crossover, not a date, and it is #185's — specifically its open
+`DensePolynomial::Mul` dispatch question rather than its recommended first step, since wiring
+Karatsuba into `fft::multiply`'s fallbacks alone leaves `*` and `%` on the schoolbook route.
+Wiring Karatsuba into `Mul` makes `M(d) = d^1.585` for
 every field including Mersenne-31, at which point Newton inversion is `d^1.585` against long
 division's `d^2` and half-GCD is `d^1.585 log d` against Euclid's `d^2`, and both are worth
 measuring. Its base case is already measured per element width (§4.1.1: 48 / 16 / 4 bytes), so the

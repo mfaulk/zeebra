@@ -1002,9 +1002,9 @@ Both stay quadratic, and that is a decision rather than an omission. Newton-inve
 `O(M(d))` and half-GCD is `O(M(d) log d)`, but `M(d)` *at the operator* is still schoolbook: `Mul`
 cannot choose an NTT domain from its signature, and Karatsuba is not wired into it either (§4.1 of
 [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)). With a quadratic `M`
-underneath, neither is faster than long division — so both are gated on that dispatch work rather
-than written against a multiplication that would make them slower. §4.5 of the same document has
-the arithmetic.
+underneath, neither is faster than long division — so both are gated on that dispatch work (#185)
+rather than written against a multiplication that would make them slower. They are #193 and #194;
+§4.5 of the same document has the arithmetic.
 
 The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
