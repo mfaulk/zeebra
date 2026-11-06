@@ -2,7 +2,7 @@
 //!
 //! Three subcommands, and the split between them is the point.
 //!
-//! - `list` prints the ten registered rows with their published per-step figures.
+//! - `list` prints the registered rows with their published per-step figures.
 //! - `dimensions` computes `dim F_p[x]/I` and checks it against `(α + 2)^N`. **Machine-independent**,
 //!   so it needs no pinned environment and a disagreement is a defect rather than a timing.
 //! - `row <id>` runs one row through F4, FGLM and root finding, each timed separately, and
@@ -24,21 +24,46 @@ use std::time::{Duration, Instant};
 
 use rand::SeedableRng;
 use zeebra::{
-    fields::Zp18446744073709551263,
+    fields::{PrimeFieldElement64, Zp18446744073709551263},
     grobner::{
         f4_reported,
         fglm::{fglm_to_lex_with_options, FglmOptions},
         research::{
+            anemoi::{ANEMOI_17_PRIME, ANEMOI_32_PRIME, ANEMOI_64_PRIME},
             anemoi_cico::{dispatch_anemoi_cico, AnemoiCico, AnemoiCicoVisitor},
             challenge, published_quotient_dimension, registry, ChallengeManifest,
         },
         solve_from_lex_basis, F4Options, HilbertSeries, SolveOptions, SolveOutcome,
     },
-    MonomialOrder, MultivariatePolynomial,
+    KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
 
-/// The field every registered Anemoi row is over.
-type A = Zp18446744073709551263;
+/// `2^64 - 353`, the characteristic the published ladder is over.
+type A64 = Zp18446744073709551263;
+
+/// `2^32 - 209`. `PrimeFieldElement64` is const-generic, so the second characteristic of #283
+/// needed no new field code — only this line.
+type A32 = PrimeFieldElement64<ANEMOI_32_PRIME>;
+
+/// `65537`, #283's control characteristic.
+type A17 = PrimeFieldElement64<ANEMOI_17_PRIME>;
+
+/// Call `$body::<F>()` with the field the manifest's own prime names.
+///
+/// A macro rather than a trait object because every path below is generic over `F: KnownOrder` and
+/// a `dyn` boundary cannot carry the `const N` dispatch underneath it. `anemoi_cico_instance`
+/// rejects a mismatched field, so picking the wrong arm here fails loudly rather than quietly
+/// measuring Anemoi over the wrong characteristic.
+macro_rules! with_field {
+    ($prime:expr, $body:ident($($arg:expr),* $(,)?)) => {
+        match $prime {
+            ANEMOI_64_PRIME => $body::<A64>($($arg),*),
+            ANEMOI_32_PRIME => $body::<A32>($($arg),*),
+            ANEMOI_17_PRIME => $body::<A17>($($arg),*),
+            prime => panic!("no field is wired for p = {prime}"),
+        }
+    };
+}
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -103,46 +128,8 @@ fn dimensions() {
     println!("|---|---:|---:|---:|---|");
     let mut disagreements = 0;
     for manifest in anemoi_rows() {
-        let parameters = manifest.anemoi_parameters().expect("an Anemoi row");
-        let instance = manifest
-            .anemoi_cico_instance::<A>()
-            .expect("the registered field");
-        let published = *published_quotient_dimension(parameters.alpha, parameters.rounds).value();
-        let observed = match dispatch_anemoi_cico::<A, _>(&instance, Dimension) {
-            Ok(Some(dimension)) => dimension,
-            Ok(None) => {
-                println!(
-                    "| `{}` | {} | positive-dimensional | {} | **no** |",
-                    manifest.id,
-                    instance.variables(),
-                    published
-                );
-                disagreements += 1;
-                continue;
-            }
-            Err(e) => {
-                println!(
-                    "| `{}` | {} | not reached ({}) | {} | — |",
-                    manifest.id,
-                    instance.variables(),
-                    e,
-                    published
-                );
-                continue;
-            }
-        };
-        let agrees = observed == published;
-        if !agrees {
-            disagreements += 1;
-        }
-        println!(
-            "| `{}` | {} | {} | {} | {} |",
-            manifest.id,
-            instance.variables(),
-            observed,
-            published,
-            if agrees { "yes" } else { "**no**" }
-        );
+        let prime = manifest.anemoi_parameters().expect("an Anemoi row").prime;
+        disagreements += with_field!(prime, one_dimension(&manifest));
     }
     println!(
         "\nMachine-independent: no environment is pinned for this check and none is needed. The \
@@ -155,6 +142,47 @@ fn dimensions() {
         );
         std::process::exit(1);
     }
+}
+
+/// One row's quotient dimension against `(α + 2)^N`, printed; returns 1 on a disagreement.
+fn one_dimension<F: KnownOrder>(manifest: &ChallengeManifest) -> usize {
+    let parameters = manifest.anemoi_parameters().expect("an Anemoi row");
+    let instance = manifest
+        .anemoi_cico_instance::<F>()
+        .expect("the registered field");
+    let published = *published_quotient_dimension(parameters.alpha, parameters.rounds).value();
+    let observed = match dispatch_anemoi_cico::<F, _>(&instance, Dimension) {
+        Ok(Some(dimension)) => dimension,
+        Ok(None) => {
+            println!(
+                "| `{}` | {} | positive-dimensional | {} | **no** |",
+                manifest.id,
+                instance.variables(),
+                published
+            );
+            return 1;
+        }
+        Err(e) => {
+            println!(
+                "| `{}` | {} | not reached ({}) | {} | — |",
+                manifest.id,
+                instance.variables(),
+                e,
+                published
+            );
+            return 0;
+        }
+    };
+    let agrees = observed == published;
+    println!(
+        "| `{}` | {} | {} | {} | {} |",
+        manifest.id,
+        instance.variables(),
+        observed,
+        published,
+        if agrees { "yes" } else { "**no**" }
+    );
+    usize::from(!agrees)
 }
 
 /// One row, staged, with the environment pinned.
@@ -182,10 +210,17 @@ fn row(id: &str) {
     };
 
     let parameters = manifest.anemoi_parameters().expect("an Anemoi row");
+    with_field!(parameters.prime, run_row(&manifest, &machine, &affinity));
+}
+
+/// One row, over the field its own parameters name.
+fn run_row<F: KnownOrder>(manifest: &ChallengeManifest, machine: &str, affinity: &str) {
+    let parameters = manifest.anemoi_parameters().expect("an Anemoi row");
     let instance = manifest
-        .anemoi_cico_instance::<A>()
+        .anemoi_cico_instance::<F>()
         .expect("the registered field");
     println!("# {} ({})", manifest.id, manifest.class);
+    println!("- field:    p = {}", parameters.prime);
     println!("- digest:   {}", manifest.digest());
     println!("- machine:  {machine}, affinity {affinity}");
     println!("- derived:  {}", instance.anemoi.derived_digest());
@@ -203,7 +238,7 @@ fn row(id: &str) {
     }
 
     let stages =
-        dispatch_anemoi_cico::<A, _>(&instance, Solve(&instance)).expect("a compiled dimension");
+        dispatch_anemoi_cico::<F, _>(&instance, Solve(&instance)).expect("a compiled dimension");
     println!("\n| stage | elapsed | detail |");
     println!("|---|---:|---|");
     for (stage, elapsed, detail) in &stages.steps {
@@ -222,7 +257,7 @@ fn row(id: &str) {
             println!(
                 "\nwitness: Anemoi(0, {}) has first output word zero, checked through the \
                  permutation. {}",
-                witness.value(),
+                witness,
                 manifest.significance(true)
             );
         }
@@ -248,10 +283,10 @@ fn anemoi_rows() -> Vec<ChallengeManifest> {
 /// the check that runs first.
 struct Dimension;
 
-impl AnemoiCicoVisitor<A> for Dimension {
+impl<F: KnownOrder> AnemoiCicoVisitor<F> for Dimension {
     type Output = Option<u128>;
 
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, A>]) -> Option<u128> {
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Option<u128> {
         let order = MonomialOrder::GradedReverseLexicographic;
         let (basis, _) = f4_reported(system, order, &F4Options::default());
         let basis = basis.ok()?;
@@ -263,12 +298,12 @@ impl AnemoiCicoVisitor<A> for Dimension {
 }
 
 /// What one staged solve produced.
-struct Stages {
+struct Stages<F> {
     /// `(stage, elapsed, detail)`, in the order the solve took them.
     steps: Vec<(&'static str, Duration, String)>,
 
     /// The recovered free input word, if any.
-    witness: Option<A>,
+    witness: Option<F>,
 }
 
 /// F4, then FGLM, then root finding, each timed separately.
@@ -276,12 +311,12 @@ struct Stages {
 /// Separately because the published finding is that the conversion costs 2 400x the basis at
 /// `N = 5`, and a combined figure would hide it. Which stage is the wall is the result; "it was
 /// slower" is not.
-struct Solve<'a>(&'a AnemoiCico<A>);
+struct Solve<'a, F: KnownOrder>(&'a AnemoiCico<F>);
 
-impl AnemoiCicoVisitor<A> for Solve<'_> {
-    type Output = Stages;
+impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
+    type Output = Stages<F>;
 
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, A>]) -> Stages {
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Stages<F> {
         let order = MonomialOrder::GradedReverseLexicographic;
         let mut steps = Vec::new();
 

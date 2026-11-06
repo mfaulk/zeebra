@@ -40,6 +40,22 @@ use crate::{
 /// `2^64 - 353`, the 64-bit prime the Six Worlds Anemoi experiments are over.
 pub const ANEMOI_64_PRIME: u64 = 18_446_744_073_709_551_263;
 
+/// `2^32 - 209`, the 32-bit prime of the Six Worlds sweep.
+///
+/// Registered for #283: the published conversion cost at this prime is within 7% of the cost at
+/// [`ANEMOI_64_PRIME`], while the 17-bit prime below is 39x cheaper. Magma's own logs name the
+/// mechanism — `Matrix kind: Generic finite field` here and at `2^64 - 353`, `Modular FP` at
+/// `65537`.
+pub const ANEMOI_32_PRIME: u64 = 4_294_967_087;
+
+/// `2^16 + 1 = 65537`, the smallest prime of the Six Worlds sweep.
+///
+/// The control for #283. Every Zeebra prime field of this width is the same `u64` Montgomery path
+/// as `2^64 - 353`, so a within-implementation ratio that is flat across the two primes while
+/// Magma's collapses attributes the published gap to the reference's arithmetic rather than to
+/// this crate's conversion.
+pub const ANEMOI_17_PRIME: u64 = 65_537;
+
 /// The first hundred decimal digits of π after the leading 3.
 const PI_0: &str = "1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679";
 
@@ -69,8 +85,16 @@ pub struct AnemoiParameters {
 impl AnemoiParameters {
     /// The Six Worlds parameters: `α = 3`, `ℓ = 1`, `p = 2^64 - 353`, at `rounds` rounds.
     pub fn six_worlds(rounds: usize) -> Self {
+        Self::six_worlds_at(ANEMOI_64_PRIME, rounds)
+    }
+
+    /// The Six Worlds parameters at one of the sweep's primes: `α = 3`, `ℓ = 1`, `N = rounds`.
+    ///
+    /// The prime is the only free parameter because that is the comparison #283 needs — the same
+    /// system, the same model, the same round count, read at three characteristics.
+    pub fn six_worlds_at(prime: u64, rounds: usize) -> Self {
         Self {
-            prime: ANEMOI_64_PRIME,
+            prime,
             alpha: 3,
             l: 1,
             rounds,
