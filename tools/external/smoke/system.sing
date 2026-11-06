@@ -1,0 +1,28 @@
+// Singular's view of tools/external/smoke/system.ms.
+//
+// `dp` is degree reverse lexicographical; the variable order is the order declared in the ring,
+// so x > y > z. `Dp` would be degree *lexicographical* and is the easy mistake to make.
+// Coefficients print as signed representatives (-1 for p-1), which is the same element.
+
+ring r = 1073741827,(x,y,z),dp;
+ideal I = x^2+y^2+z^2-1, x*y+y*z+z*x-1, x*y*z-1;
+
+int t0 = timer;
+ideal G = std(I);
+int t1 = timer;
+G = simplify(G, 1);          // make monic; std does not normalize leading coefficients
+
+"#engine:               Singular";
+"#field characteristic: 1073741827";
+"#variable order:       x, y, z";
+"#monomial order:       degrevlex (dp)";
+"#length of basis:      ", size(G), " elements";
+"#centiseconds:         ", t1 - t0;
+"#vdim:                 ", vdim(G);
+int i;
+for (i = 1; i <= size(G); i++) { G[i]; }
+"--- leading monomials ---";
+// leadexp gives the exponent vector, which needs no parsing on the way out; leadmonom would
+// print the compact `xy` / `x2` form that every other tool spells differently.
+for (i = 1; i <= size(G); i++) { string(leadexp(G[i])); }
+exit;
