@@ -196,8 +196,9 @@ is present, which it is — so `α^{R_F+R_P−1}` is the right rule and `3^13` t
 > here states the hybrid case." 2026/1254 has since been read directly, and §9.5.2 derives the
 > `(1,[1])` construction for this exact hybrid from §2.2 of that paper — two affine equations in the
 > skipped state, in rows `0` and `1` of `M^{-1}`. The *degree* was never the doubtful part; the
-> *construction* was, and it is now written out rather than inferred. What remains open is not the
-> derivation but its verification, which is an assertion in code and not a reading: §9.5.2's oracle.
+> *construction* was, and it is now written out rather than inferred — **and asserted**: §9.5.2's
+> oracle is green in `src/grobner/research/univariate_cico.rs`, so the hybrid's `(1,[1])` family is
+> verified rather than reconstructed.
 
 ### 2.4 Degrees and required transform sizes, for every registered instance
 
@@ -1348,9 +1349,9 @@ not just the Graeffe step.
 |---|---|---|---|---|
 | 1 | the reduced-round permutation, and the verifier's `Perm+` variant | **yes** | `src/grobner/research/poseidon.rs:381` | none |
 | 2 | the registered challenge, with its identity digest and target | **yes** | `src/grobner/research/challenge.rs:1002` | none |
-| 3 | the **round-skipping parametrization** (`A_1…A_k, B` of [JAZ] slide 16; [PC] §2.3's explicit `y_i`) | **no** | — | needs `M_E^{-1}`'s last row and the affine construction; nothing in `src/` inverts the MDS for this purpose |
+| 3 | the **round-skipping parametrization** (`A_1…A_k, B` of [JAZ] slide 16; [PC] §2.3's explicit `y_i`) | **yes**, #209 | `parametrize`, `CicoFamily`, `src/grobner/research/univariate_cico.rs` | none. Derived for the hybrid in §9.5.2 and asserted there; inverts the MDS via `linalg::Matrix::inverse` and takes rows `0..k` of `M^{-1}`, not the last, because the constrained inputs are the *first* `k` coordinates |
 | 4 | symbolic evaluation of the permutation on an affine family — **bivariate** | **yes** | `cico_bivariate`, `src/grobner/research/resultant.rs:53` | `k = 2` only, and dense multivariate; a `cico_univariate` is the one-line analogue |
-| 5 | construction of the univariate output polynomial of degree `δ` | **partially** — via 4 at `k = 1` | — | at `δ = 3^13` the straight-line evaluation must be done in the *evaluation* domain, not symbolically; see §9.2 |
+| 5 | construction of the univariate output polynomial of degree `δ` | **yes**, #209 | `cico_univariate_family`, `cico_univariate`, `src/grobner/research/univariate_cico.rs` | both routes present and asserted to agree: symbolic at `δ ≤ 4096`, evaluation-domain above it at `2^ceil(log2(δ+1))` recovered by `fft::interpolate`. `3^13` routes to `2^21`, inside the `2^24` two-adicity |
 | 6 | interpolation over a power-of-two evaluation domain | **yes** | `src/fft/interpolate.rs` | sound to `2^23` KoalaBear (`fast-univariate.md` §3.1) |
 | 7 | interpolation at **arbitrary** points | yes but **cubic** | `lagrange_interpolate` | `O(n³)`, measured; stops at `n = 1 024` (`fast-univariate.md` §4.3). Only needed by the resultant route |
 | 8 | **NTT-based polynomial multiplication** | **yes**, #124 | `src/fft/multiply.rs` | none |
@@ -1361,10 +1362,14 @@ not just the Graeffe step.
 | 13 | mixed-radix NTT | **no** | — | required by every row of §7.1's no-go table; out of scope for #84 |
 | 14 | existing generic root finder, for comparison | yes, **quadratic** | `src/poly/univariate/roots.rs` | `O(log q · d²)`; the comparand the Graeffe path must beat, and §4.5 measures it to degree 32 768 |
 
-**Eleven of fourteen now exist.** 8 landed as #124, 9 and 10 as this PR, 11 as #175. The three that
-remain are **3** (the round-skipping parametrization), **5**'s evaluation-domain construction at
-`δ = 3^13`, and **13** (mixed-radix, needed only by `rf6-rp10`). The previous reading of this table —
-"the three that matter and do not are 8, 3, and 9" — stands with 8 and 9 struck.
+**Thirteen of fourteen now exist.** 8 landed as #124, 9 and 10 as the root-finding PR, 11 as #175,
+and **3 and 5 as #209**. The one that remains is **13** (mixed-radix), needed only by `rf6-rp10`,
+whose method is undisclosed and which is out of scope. This supersedes two earlier readings of the
+table: "the three that matter and do not are 8, 3, and 9", and "**Eleven of fourteen now exist** …
+The three that remain are **3**, **5**'s evaluation-domain construction at `δ = 3^13`, and **13**."
+
+Component completeness is not attack feasibility, and §9.5.3 is the reason: the route's cost is
+`N ≈ 2^31` families times the per-family cost, and only the second factor is now buildable here.
 
 ### 9.2 Single-family cost, for `R_F = 6, R_P = 8` over KoalaBear
 
@@ -1637,13 +1642,26 @@ Family generation, concretely:
    `x = M^{-1}(z(Z^{1/α}) − c^(0))`; equivalently work from `y` directly, `z_i = y_i(Z)^{1/α}`.
 5. A new family is a new `(T, S)` or a new solution within the same supports.
 
-**The oracle, and it is an assertion rather than a reading.** `x_0 = C_0^in` and `x_1 = C_1^in` must
-hold **identically in `Z`**, at many random `Z` and many random families, with `x` recovered as above
-and fed through `permutation_plus_linear`. A construction that has the wrong rows of `M^{-1}`, the
-wrong constant vector, or the paper's `α`-th power left on the right-hand side fails at the first
-point. That test is #209's, and until it is green this subsection is **derived but unverified** —
-derived from a source rather than guessed, which is the distinction §2 of
-`additional-benchmarks.md` draws for Griffin's linear layer, but not yet checked.
+**The oracle, and it is an assertion rather than a reading — and it is green.** `x_0 = C_0^in` and
+`x_1 = C_1^in` must hold **identically in `Z`**, at many random `Z` and many random families, with
+`x` recovered as above and fed through `permutation_plus_linear`. A construction that has the wrong
+rows of `M^{-1}`, the wrong constant vector, or the paper's `α`-th power left on the right-hand side
+fails at the first point.
+
+Implemented in `src/grobner/research/univariate_cico.rs` for #209, and asserted by four tests over
+the `rf2-rp0`, `rf2-rp2` and `rf4-rp0` reductions:
+
+| test | what it settles |
+|---|---|
+| `the_family_holds_the_input_constraints_at_every_point` | `x_0, x_1` are the input constants at 64 random `Z` per row — **this is the test that discharges §2.3** |
+| `the_lifted_input_reproduces_the_skipped_state` | the lifted input's first-round S-box outputs *are* `y(Z)`, so the prefix matches `run`'s own schedule and not an idealized one |
+| `the_family_polynomial_agrees_with_the_permutation` | `P_i(Z)` equals the constrained output word, minus its target, on the lifted input |
+| `the_family_polynomial_has_the_round_skipping_degree` | `deg P_i` **equals** `α^{R_F+R_P−1}` — attained, not merely bounded, so the skip is real |
+
+So this subsection is **derived and verified**: derived from a source rather than guessed, which is
+the distinction §2 of `additional-benchmarks.md` draws for Griffin's linear layer, and then checked
+against the permutation. One corroboration arrived for free: the degree test attains the bound
+exactly on all three rows, which would fail if the prefix were skipping the wrong amount of work.
 
 #### 9.5.3 The discrepancy, resolved with arithmetic
 
@@ -1773,7 +1791,7 @@ onward requires it merged.
 | 5 | `sqrt` in `F_p` (Tonelli–Shanks) on `KnownOrder`, reusing `src/fields/two_adic.rs` | — | `x² == y` for the returned root; `None` for non-residues, cross-checked by the Euler criterion | **landed** separately as #175, `src/fields/sqrt.rs`; not reimplemented |
 | 6 | `graeffe_root` — Algorithm C of §3.5, with §3.6's progressive reduction | 3, 5 | planted roots at degrees `2^8`…`2^16` over KoalaBear and Goldilocks, cross-checked against `src/poly/univariate/roots.rs` on every size the quadratic one reaches | **landed**, with [PC] Algorithm 2 line 8's descent in place of Algorithm C's `r`-way scan, which §3.5's correction block shows is unusable as transcribed — see §3.9 |
 | 7 | `(r, s)` parameter selection, measured — §9.2's open question | 6 | a sweep over `k` reporting Graeffe steps against `NTT_s` size and scan length; no assertion | **answered, not swept**: §3.5's correction and §3.9 show the descent removes the scan, so `r = 2^two_adicity` and `s` the odd part is forced rather than chosen. No trade-off to sweep over KoalaBear |
-| 8 | the round-skipping parametrization (§9.1 component 3) and `cico_univariate` | 4 (`cico_bivariate`'s pattern) | the parametrized family's last coordinate is zero at every point, asserted against `permutation_plus_linear` | open |
+| 8 | the round-skipping parametrization (§9.1 component 3) and `cico_univariate` | 4 (`cico_bivariate`'s pattern) | the parametrized family's constrained coordinates are the input constants at every point, asserted against `permutation_plus_linear` | **landed, #209** — `src/grobner/research/univariate_cico.rs`; the oracle is the first row of §9.5.2's table. Note the row's original wording said "last coordinate", which is the paper's input position and not Zeebra's: `CicoInstance` constrains the **first** `k` |
 | 9 | an `examples/graeffe_cico.rs` ladder: one family end-to-end on *reduced* rows, reporting §9.2's per-stage costs and `BenchmarkClass::Engineering` | 6, 8 | every witness verified through `CicoInstance::is_solution` | open, needs row 8 |
 | 10 | extend `docs/research/graeffe-root-finding.md` with §9.2's figures as **measured** rather than estimated; re-take §6.1 as a post-#161 curve | 2, 9 | — | **partly landed**: §4.4, §4.5, §6.4 and §6.5 are the root-finding half, measured **both pre- and post-#161**. §6.1's own curve is still the pre-#161 one and awaits a re-take; §9.2's other rows still await row 8 |
 | 11 | `graeffe_root` over a field whose odd part is large: [PC] Algorithm 3's odd-order forward steps and the gcd descent at odd `q_i`, wiring row 4 into row 6 | 4, 6 | planted roots over Goldilocks at a degree where §6.5's quadratic fallback does not finish | open — §6.5 is the measurement that motivates it |
@@ -1847,9 +1865,12 @@ against both kernels.
 - **Open, and now the only thing in the way**: the residual `≈13×`–`≈135×` of §9.5.3, which depends
   on an assumed per-GPU throughput factor because 2026/1254's `N` and stage split are lost. Not
   closable from the literature. #210 measures the three family-economics quantities that bound it.
-- **Derived but unverified**: §9.5.2's `(1,[1])` construction for `permutation_plus_linear`. Derived
-  from 2026/1254 §2.2 plus the constrained-input position, not guessed — but the oracle that settles
-  it is an assertion in code (#209), and until that is green the construction is unconfirmed.
+- **Closed by #209**: §9.5.2's `(1,[1])` construction for `permutation_plus_linear` is derived *and*
+  verified. `src/grobner/research/univariate_cico.rs` asserts the constrained input coordinates at
+  many random points on three reductions, that the lifted input reproduces the skipped state through
+  `run`, that the polynomial agrees with the permutation, and that the degree **attains**
+  `α^{R_F+R_P−1}`. This entry previously read "Derived but unverified … until that is green the
+  construction is unconfirmed."
 - §6.1's figures are from **one uncommitted throwaway binary on one machine against the pre-#161
   recursive kernel**, taken under `benchlock.sh` with six other agents active. They are labelled a
   baseline for exactly that reason and PR 10 above re-takes them.
