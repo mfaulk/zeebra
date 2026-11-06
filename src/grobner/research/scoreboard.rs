@@ -670,6 +670,25 @@ impl RunRecord {
         }
     }
 
+    /// The filename stem this run's own record is written under, without the extension.
+    ///
+    /// `<challenge>--<formulation with spaces hyphenated>--<commit>`.
+    ///
+    /// **Its uniqueness comes entirely from the formulation string.** Nothing in the name carries
+    /// the slice index or the seed, so two runs of one problem are distinguishable only because
+    /// every slice formulation happens to spell its seed out — `slice(3 fixed, seed 1)`. That is a
+    /// property of prose, not of the scheme, and `"a b"` against `"a-b"` already breaks it. The
+    /// dependency is checked rather than trusted: see [`colliding_run_file`], which the writer
+    /// calls before writing anything.
+    pub fn run_file_stem(&self) -> String {
+        format!(
+            "{}--{}--{}",
+            self.challenge,
+            self.formulation.replace(' ', "-"),
+            self.environment.commit
+        )
+    }
+
     /// True if the measured peak is this row's and not a ceiling over several.
     ///
     /// Requires both a measurement and a row count of exactly one. An absent count is **not**
@@ -1322,6 +1341,59 @@ pub const SOLVED_CONTRACT: &str = "one verified witness per problem at ANY concu
      Every entry carries environment.concurrency, and an entry with concurrency > 1 is not \
      comparable with a figure in best.json.";
 
+/// Two runs that differ but whose per-run filenames would not.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RunFileCollision {
+    /// The filename stem both runs map to.
+    pub stem: String,
+
+    /// The formulation of the run that would be overwritten.
+    pub first: String,
+
+    /// The formulation of the run that would overwrite it.
+    pub second: String,
+}
+
+impl Display for RunFileCollision {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?} and {:?} would both be written to {}.json",
+            self.first, self.second, self.stem
+        )
+    }
+}
+
+/// The first pair of runs in `runs` that differ but would share a per-run filename.
+///
+/// The failure this detects is **silent**: one record overwrites another and the directory simply
+/// has one fewer file than there were runs, with nothing to notice. `RunRecord::run_file_stem`
+/// explains why the scheme is vulnerable; this is the check that keeps it honest, and the writer
+/// calls it before writing anything so a collision stops the run instead of losing a record.
+///
+/// Two records with the **same** formulation are not a collision: that is one row rerun, and the
+/// later record legitimately replaces the earlier file.
+pub fn colliding_run_file(runs: &[RunRecord]) -> Option<RunFileCollision> {
+    let mut seen: BTreeMap<String, &str> = BTreeMap::new();
+    for run in runs {
+        let stem = run.run_file_stem();
+        match seen.get(&stem) {
+            Some(first) if *first != run.formulation.as_str() => {
+                return Some(RunFileCollision {
+                    stem,
+                    first: first.to_string(),
+                    second: run.formulation.clone(),
+                })
+            }
+            Some(_) => {}
+            None => {
+                seen.insert(stem, run.formulation.as_str());
+            }
+        }
+    }
+    None
+}
+
 /// Every run, with the registry's problems, rendered.
 #[derive(Clone, Debug, Default)]
 pub struct Scoreboard {
@@ -1916,6 +1988,82 @@ mod tests {
             chosen.measured_peak_resident_bytes,
             Some(56_990_154_752),
             "and it must therefore carry the measured figure the earlier record lacked"
+        );
+    }
+
+    /// Two formulations that differ, but whose filenames would not, are reported as a collision.
+    ///
+    /// The per-run filename is `<challenge>--<formulation>--<commit>.json`, and its uniqueness
+    /// comes entirely from the formulation string — nothing in the name carries the slice or the
+    /// seed. That works today only because every slice formulation happens to spell its seed out.
+    /// `"a b"` and `"a-b"` are enough to break it, and the failure mode is a silent overwrite: one
+    /// run's record replaces another's and the directory simply has one fewer file than runs.
+    #[test]
+    fn test_two_runs_that_would_share_a_filename_are_reported() {
+        let one = witness("poseidon31-cico-t16-rf2-rp4", "slice 3", 1_000, 1 << 20);
+        let other = witness("poseidon31-cico-t16-rf2-rp4", "slice-3", 2_000, 1 << 20);
+        assert_eq!(
+            one.run_file_stem(),
+            other.run_file_stem(),
+            "the premise of this test: the two stems are the same"
+        );
+
+        let collision = super::colliding_run_file(&[one, other]).expect("a collision");
+        assert!(collision.stem.contains("slice-3"), "{}", collision.stem);
+        assert_eq!(collision.first, "slice 3");
+        assert_eq!(collision.second, "slice-3");
+    }
+
+    /// Runs whose filenames differ are not reported, and nor is the same run recorded twice.
+    ///
+    /// The second case matters: two records with the same formulation *are* the same row rerun,
+    /// and the later one legitimately replaces the earlier file.
+    #[test]
+    fn test_distinct_filenames_and_an_honest_rerun_are_not_collisions() {
+        let runs = vec![
+            witness(
+                "poseidon31-cico-t16-rf2-rp4",
+                "slice(3 fixed, seed 0)",
+                1,
+                0,
+            ),
+            witness(
+                "poseidon31-cico-t16-rf2-rp4",
+                "slice(3 fixed, seed 1)",
+                1,
+                0,
+            ),
+            witness("poseidon31-cico-t16-rf2-rp4", "as generated", 1, 0),
+        ];
+        assert_eq!(super::colliding_run_file(&runs), None);
+
+        let rerun = vec![
+            witness("poseidon31-cico-t16-rf2-rp4", "as generated", 1, 0),
+            witness("poseidon31-cico-t16-rf2-rp4", "as generated", 2, 0),
+        ];
+        assert_eq!(
+            super::colliding_run_file(&rerun),
+            None,
+            "the same formulation twice is a rerun, not a collision"
+        );
+    }
+
+    /// The committed run files are exactly the stems the writer would produce, with none lost.
+    ///
+    /// Checks the property as *files*: a silent overwrite shows up here as a directory with fewer
+    /// entries than the history has distinct rows.
+    #[test]
+    fn test_the_committed_run_files_have_no_collisions() {
+        let history = Json::parse(include_str!(
+            "../../../research/scoreboard/results/history.json"
+        ))
+        .expect("committed history.json parses");
+        let registry = registry();
+        let board = Scoreboard::load(&history, &registry).expect("the committed history");
+        assert_eq!(
+            super::colliding_run_file(board.runs()),
+            None,
+            "two committed runs would share a per-run filename"
         );
     }
 

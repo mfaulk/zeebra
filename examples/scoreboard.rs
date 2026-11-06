@@ -44,11 +44,11 @@ use zeebra::{
         f4::symbolic::MonicBasis,
         f4_observed_reported, f4_reported, fglm_to_lex_with_options,
         research::{
-            challenge, dispatch_cico, eliminate_affine, registry, Campaign, ChallengeManifest,
-            ChallengeParameters, CicoVisitor, Comparison, Environment, GrobnerFrontier, Json,
-            Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome, RunRecord, Scoreboard,
-            Specialization, Stage, StageCost, BEST_CONTRACT, HISTORY_CONTRACT, KOALABEAR_PRIME,
-            SOLVED_CONTRACT,
+            challenge, colliding_run_file, dispatch_cico, eliminate_affine, registry, Campaign,
+            ChallengeManifest, ChallengeParameters, CicoVisitor, Comparison, Environment,
+            GrobnerFrontier, Json, Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome,
+            RunRecord, Scoreboard, Specialization, Stage, StageCost, BEST_CONTRACT,
+            HISTORY_CONTRACT, KOALABEAR_PRIME, SOLVED_CONTRACT,
         },
         solve_from_lex_basis, BatchObserver, CriticalPair, F4Options, FglmOptions, IdealClass,
         SolveOptions, SolveOutcome,
@@ -1422,13 +1422,16 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     }
 
     let runs = board.to_json(registry).expect("every run is registered");
+    // Checked before anything is written. The per-run filename's uniqueness rests on the
+    // formulation string — nothing in the name carries the slice or the seed — so two runs can
+    // silently map to one file and the directory ends up with fewer records than there were runs,
+    // with nothing to notice. Stopping is the right response: a lost record is worse than a
+    // failed write, and the message names both formulations so the fix is obvious.
+    if let Some(collision) = colliding_run_file(board.runs()) {
+        panic!("two runs would share a per-run filename: {}", collision);
+    }
     for run in board.runs() {
-        let name = format!(
-            "{}--{}--{}.json",
-            run.challenge,
-            run.formulation.replace(' ', "-"),
-            run.environment.commit
-        );
+        let name = format!("{}.json", run.run_file_stem());
         let manifest = registry
             .iter()
             .find(|c| c.id == run.challenge)
