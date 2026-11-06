@@ -921,7 +921,9 @@ mod tests {
     }
 
     proptest! {
-        /// Inversion is bit-identical to the recursive-pow reference at each declared modulus.
+        /// Inversion is bit-identical to the recursive-pow reference at the moduli
+        /// `for_each_field!` does not reach — including the one above 2^31, where `redc` takes
+        /// its carry-handling branch.
         #[test]
         fn test_inverse_is_bit_identical_to_the_reference(seed in any::<u32>()) {
             fn check<const P: u32>(seed: u32) {
@@ -932,11 +934,8 @@ mod tests {
                 assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a), "P = {P}: {seed}");
             }
 
-            check::<31>(seed);
             check::<65537>(seed);
-            check::<2147483647>(seed);
             check::<2013265921>(seed);
-            check::<2130706433>(seed);
             check::<BIG>(seed);
         }
 

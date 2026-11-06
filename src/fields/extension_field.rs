@@ -847,22 +847,19 @@ mod tests {
     }
 
     proptest! {
-        /// Inversion is bit-identical to the recursive-pow reference over the larger extensions,
-        /// including one whose order needs two limbs.
+        /// Inversion is bit-identical to the recursive-pow reference over the two extensions
+        /// wider than the `Gf13Pow4` that `for_each_field!` covers; GF((2^31-1)^2) is the one
+        /// whose order needs two limbs.
         #[test]
         fn test_inverse_is_bit_identical_to_the_reference(
-            a in F13x4::arbitrary(),
-            b in F251x4::arbitrary(),
-            c in FM31x2::arbitrary(),
+            a in F251x4::arbitrary(),
+            b in FM31x2::arbitrary(),
         ) {
             if !a.is_zero() {
                 prop_assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a));
             }
             if !b.is_zero() {
                 prop_assert_eq!(b.inverse(), fermat_inverse_via_recursive_pow(&b));
-            }
-            if !c.is_zero() {
-                prop_assert_eq!(c.inverse(), fermat_inverse_via_recursive_pow(&c));
             }
         }
     }

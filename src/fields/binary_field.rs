@@ -866,8 +866,8 @@ mod tests {
     }
 
     proptest! {
-        /// Inversion is bit-identical to the recursive-pow reference over GF(2^63), where the
-        /// exponent fills most of a limb.
+        /// Inversion is bit-identical to the recursive-pow reference over GF(2^63), the widest
+        /// binary field and wider than the `Gf256` that `for_each_field!` covers.
         #[test]
         fn test_inverse_is_bit_identical_to_the_reference(a in Gf2Pow63::arbitrary()) {
             if !a.is_zero() {

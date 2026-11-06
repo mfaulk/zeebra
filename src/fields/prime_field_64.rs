@@ -723,8 +723,9 @@ mod tests {
     }
 
     proptest! {
-        /// Inversion is bit-identical to the recursive-pow reference at each declared modulus,
-        /// including the largest 64-bit prime, where the exponent fills a whole limb.
+        /// Inversion is bit-identical to the recursive-pow reference at the moduli
+        /// `for_each_field!` does not reach — including the largest 64-bit prime, which is the
+        /// benchmark's `p64` and whose exponent fills a whole limb.
         #[test]
         fn test_inverse_is_bit_identical_to_the_reference(seed in any::<u64>()) {
             fn check<const P: u64>(seed: u64) {
@@ -737,10 +738,8 @@ mod tests {
 
             check::<7>(seed);
             check::<541>(seed);
-            check::<65537>(seed);
             check::<2147483647>(seed);
             check::<4611624995532046337>(seed);
-            check::<18446744069414584321>(seed);
             check::<18446744073709551557>(seed);
         }
     }

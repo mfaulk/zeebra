@@ -505,7 +505,7 @@ fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
 mod tests {
     use rand::{prelude::StdRng, SeedableRng};
 
-    use super::{default_primitive_element, RootOfUnityError};
+    use super::{default_primitive_element, fermat_inverse_via_recursive_pow, RootOfUnityError};
     use crate::{
         fields::{
             binary_field::BinaryFieldElement,
@@ -515,6 +515,28 @@ mod tests {
         },
         FiniteField, KnownOrder, One, Zero,
     };
+
+    // Inversion returns exactly what the pre-#160 recursive-pow route returned, over every field.
+    for_each_field!(
+        fn inverse_matches_the_recursive_pow_reference<F>() {
+            // A 254-bit order has no `u128` for the reference to take `q - 2` in, and those
+            // fields invert by extended Euclid rather than by Fermat, so there is no recursive
+            // route to compare against.
+            if F::order_u128().is_some() {
+                let mut rng = StdRng::seed_from_u64(160);
+                for _ in 0..20 {
+                    let a = F::random(&mut rng);
+                    if !a.is_zero() {
+                        assert_eq!(
+                            a.inverse(),
+                            fermat_inverse_via_recursive_pow(&a),
+                            "1/{a} changed"
+                        );
+                    }
+                }
+            }
+        }
+    );
 
     /// An order below 2^64 reports one limb, not a word padded with a zero.
     #[test]
