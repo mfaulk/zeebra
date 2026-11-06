@@ -5,6 +5,7 @@ mod buchberger;
 pub mod differential;
 pub mod f4;
 pub mod fglm;
+pub mod field_equations;
 pub mod hilbert;
 pub mod pairs;
 pub mod planning;
@@ -29,6 +30,9 @@ pub use fglm::{
     FglmStageTimings, FglmStatistics, IdealClass, MultiplicationOperator, OperatorConstruction,
     OperatorStorage, QuotientAlgebra, QuotientBasis, QuotientStatistics,
 };
+pub use field_equations::{
+    field_equations, rational_points_by_enumeration, with_field_equations, FieldEquationError,
+};
 pub use hilbert::{
     is_homogeneous, leading_generators_by_degree, monomials_of_degree, top_forms, DegreeAgreement,
     HilbertComparison, HilbertError, HilbertSeries, SemiregularSeries,
@@ -52,14 +56,14 @@ mod tests {
 
     use crate::{
         fields::{
-            Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256, PrimeModulus256,
-            Zp2147483647,
+            Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, Gf256, PrimeFieldElement256,
+            PrimeModulus256, Zp2, Zp2147483647,
         },
         grobner::{
             benchmark_systems::{cyclic, planted},
             buchberger, f4, fglm_to_lex, is_grobner_basis, solve_one,
         },
-        FiniteField, MonomialOrder, One, Zero,
+        FiniteField, KnownOrder, MonomialOrder, One, Zero,
     };
 
     /// The Gröbner stack runs over a coefficient type bounded only by `FiniteField`, with no field
@@ -143,6 +147,126 @@ mod tests {
                 "the returned point must satisfy {polynomial}"
             );
         }
+    }
+
+    /// The whole pipeline in characteristic two, which nothing exercised before #218.
+    ///
+    /// The arithmetic over `BinaryFieldElement` and over `PrimeFieldElement32<2>` is tested and
+    /// optimized, but `grep -rl "BinaryFieldElement" src/grobner/ src/linalg/` was empty: F4,
+    /// FGLM and `solve_one` over an even-characteristic field had never been run. The stack is
+    /// generic over `FiniteField` and ought to work; this is the test that says whether it does.
+    ///
+    /// Two things make characteristic two different, and both are about `planted` rather than
+    /// about the solver. Squaring is a *bijection*, so `legendre_symbol` reports every element a
+    /// square and `sqrt` is `x^(q/2)` rather than Tonelli-Shanks. And `x^2 + y^2 = (x + y)^2`
+    /// here, so `planted`'s first generator per pair is a **perfect square** and the ideal it
+    /// generates is **not radical** — see the deliberate check below. The pipeline is therefore
+    /// being asked to recover a point from a nonradical ideal, which is a harder case than the
+    /// odd-characteristic twin above faces, not an equivalent one.
+    fn the_whole_pipeline_in_characteristic_two<F: KnownOrder>(seed: u64, point: &[F; 3]) {
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        let lex = MonomialOrder::Lexicographic;
+
+        assert_eq!(
+            F::characteristic_u128(),
+            Some(2),
+            "this body is about characteristic two specifically"
+        );
+
+        let system = planted::<3, F>(point);
+
+        for polynomial in &system {
+            assert!(
+                polynomial.eval(point).is_zero(),
+                "the planted point must satisfy {polynomial}"
+            );
+        }
+
+        let source = f4(&system, grevlex).expect("within the default budgets");
+        assert!(is_grobner_basis(&source, grevlex));
+        assert_eq!(source, buchberger(&system, grevlex));
+
+        let converted = fglm_to_lex(&source, grevlex).expect("the system is zero-dimensional");
+        assert!(is_grobner_basis(&converted, lex));
+
+        // Both routes to lex must agree exactly, being reduced bases of one ideal.
+        let direct = f4(&system, lex).expect("within the default budgets");
+        assert_eq!(converted, direct);
+
+        let mut rng = StdRng::seed_from_u64(seed);
+        let solution = solve_one(&system, &mut rng)
+            .expect("the system is zero-dimensional")
+            .expect("a planted point is a base-field solution");
+        for polynomial in &system {
+            assert!(
+                polynomial.eval(&solution).is_zero(),
+                "the returned point must satisfy {polynomial}"
+            );
+        }
+    }
+
+    /// Over GF(2) itself, where `PrimeFieldElement32<2>` keeps the wide-remainder path.
+    ///
+    /// `2^32` is not invertible modulo an even number, so this is the one declared modulus that
+    /// does not reach Montgomery form. The planted point can only have coordinates in {0, 1},
+    /// which is why the "coordinates that are not small" precaution of the wide-field twin has no
+    /// analogue here: there is nothing to truncate.
+    #[test]
+    fn test_the_whole_pipeline_over_gf2() {
+        let point = [Zp2::one(), Zp2::zero(), Zp2::one()];
+        the_whole_pipeline_in_characteristic_two::<Zp2>(4, &point);
+    }
+
+    /// Over GF(2^8) under the AES modulus, where multiplication is `PCLMULQDQ` and Barrett.
+    #[test]
+    fn test_the_whole_pipeline_over_gf256() {
+        let point = [Gf256::new(0x57), Gf256::new(0x83), Gf256::new(0xc1)];
+        the_whole_pipeline_in_characteristic_two::<Gf256>(5, &point);
+    }
+
+    /// `planted` generates a nonradical ideal in characteristic two, and that is why.
+    ///
+    /// Recorded as its own test because the pipeline test above depends on it and because it is a
+    /// property of the *generator*, not of the field support: `x^2 + y^2 - (a^2 + b^2)` is
+    /// `((x + y) - (a + b))^2` once the cross terms vanish. A reader who assumed `planted` behaves
+    /// the same in every characteristic would mis-read every characteristic-two measurement taken
+    /// with it, so the degeneracy is asserted rather than described.
+    #[test]
+    fn test_planted_degenerates_to_a_square_in_characteristic_two() {
+        use crate::{Monomial, MultivariatePolynomial};
+
+        let (a, b) = (Gf256::new(0x57), Gf256::new(0x83));
+        let point = [a, b, Gf256::new(0xc1)];
+        let system = planted::<3, Gf256>(&point);
+
+        // (x0 + x1) + (a + b), squared. Addition is its own inverse here, so no signs appear.
+        let sum: MultivariatePolynomial<3, Gf256> = MultivariatePolynomial::new(&[
+            (Monomial::new(&[1, 0, 0]), Gf256::one()),
+            (Monomial::new(&[0, 1, 0]), Gf256::one()),
+            (Monomial::one(), a + b),
+        ]);
+        assert_eq!(
+            system[0],
+            sum.clone() * sum,
+            "in characteristic two planted's first generator is a perfect square"
+        );
+
+        // The same polynomial over an odd-characteristic field is *not* a square, which is what
+        // makes this a fact about the characteristic rather than about `planted`'s shape.
+        let odd = planted::<3, Zp2147483647>(&[
+            Zp2147483647::new(87),
+            Zp2147483647::new(131),
+            Zp2147483647::new(193),
+        ]);
+        let odd_sum: MultivariatePolynomial<3, Zp2147483647> = MultivariatePolynomial::new(&[
+            (Monomial::new(&[1, 0, 0]), Zp2147483647::one()),
+            (Monomial::new(&[0, 1, 0]), Zp2147483647::one()),
+            (
+                Monomial::one(),
+                Zp2147483647::new(87) + Zp2147483647::new(131),
+            ),
+        ]);
+        assert_ne!(odd[0], odd_sum.clone() * odd_sum);
     }
 
     /// The milestone's demonstration over BN254's 254-bit scalar field.

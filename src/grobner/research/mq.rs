@@ -56,11 +56,21 @@ use crate::{KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial};
 /// Which base field an instance is over.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqField {
-    /// Types I and IV. **Not importable yet**: `src/fields/binary_field.rs` is private.
+    /// Types I and IV. **Not importable yet** — but no longer for want of a field.
+    ///
+    /// `fields::Zp2` is `PrimeFieldElement32<2>` and `fields::BinaryFieldElement` has been
+    /// publicly exported since `8757b4a`; what is missing is the import path itself, the toy
+    /// dimensions these families publish (which differ from type III's and type VI's), and a
+    /// recorded decision between the two representations of GF(2). See #197.
     Gf2,
 
-    /// Types II and V. **Not importable yet**: `src/fields/extension_field.rs` is private, and
-    /// exporting it is deliberate scope rather than something to smuggle into an importer.
+    /// Types II and V. **Not importable yet** — and the reason is a modulus, not an export.
+    ///
+    /// `fields::ExtensionFieldElement` has been publicly exported since `8757b4a`, and the
+    /// challenge's own GF(2^8) — `x^8 + x^4 + x^3 + x^2 + 1`, which is **not** the AES modulus
+    /// `fields::Gf256` uses — is declared as `fields::Gf256Mq`. Reading these coefficient bytes
+    /// under the wrong one of the two would build a different system from the published one, so
+    /// the import waits on a test against a published answer file. See #197.
     Gf256,
 
     /// Types III and VI. `PrimeFieldElement64<31>`, which already exists — no new arithmetic is a
@@ -417,13 +427,14 @@ impl MqInstance {
             MqField::Gf2 => {
                 return Err(MqError::UnsupportedField {
                     field: self.field,
-                    because: "src/fields/binary_field.rs is not publicly exported",
+                    because: "the GF(2) import path is unwritten; the field exists as fields::Zp2",
                 })
             }
             MqField::Gf256 => {
                 return Err(MqError::UnsupportedField {
                     field: self.field,
-                    because: "src/fields/extension_field.rs is not publicly exported",
+                    because: "the GF(2^8) import path is unwritten; the challenge's modulus, \
+                              which is not the AES one, exists as fields::Gf256Mq",
                 })
             }
         }
@@ -834,8 +845,8 @@ Order : graded reverse lex order
         for field in [MqField::Gf2, MqField::Gf256] {
             // Built rather than parsed: the fixture's coefficients are out of range for GF(2), and
             // what is under test is `system`'s refusal rather than the parse. Note this is
-            // reported *before* the coefficient-field mismatch that `F` also has — "this crate
-            // cannot express GF(2^8)" is the more useful fact than "GF(31) is not GF(2^8)".
+            // reported *before* the coefficient-field mismatch that `F` also has — "there is no
+            // import path for GF(2^8)" is the more useful fact than "GF(31) is not GF(2^8)".
             let instance = MqInstance {
                 field,
                 variables: 3,
@@ -847,7 +858,15 @@ Order : graded reverse lex order
             match instance.system::<3, F>() {
                 Err(MqError::UnsupportedField { field: f, because }) => {
                     assert_eq!(f, field);
-                    assert!(because.contains("not publicly exported"), "{}", because);
+                    // The reason used to be "`src/fields/binary_field.rs` is not publicly
+                    // exported". That export landed in `8757b4a`, so asserting on it would now
+                    // pin a false claim; what remains missing is the import path itself.
+                    assert!(because.contains("import path is unwritten"), "{}", because);
+                    assert!(
+                        !because.contains("not publicly exported"),
+                        "both field modules are public since 8757b4a: {}",
+                        because
+                    );
                 }
                 other => panic!("expected an unsupported field, got {:?}", other),
             }
