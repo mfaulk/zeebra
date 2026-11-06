@@ -1,14 +1,23 @@
-# Signature-based criteria: the ceiling, measured before anything is built
+# Signature-based criteria: a ~2× ceiling, measured, and a won't-do
 
-Deliverable for step 1 of B5 (#223), a child of the MQ-algorithms epic #66. B5's instruction was to
-read the ceiling off instruments that already exist before contemplating an implementation, because
-**the upper bound on what any selection-strategy change can win is already measured and had never
-been read off.** This is that reading. No new code; four existing examples.
+Deliverable for B5 (#223), a child of the MQ-algorithms epic #66. B5's instruction was to read the
+ceiling off instruments that already exist before contemplating an implementation, because **the upper
+bound on what any selection-strategy change can win is already measured and had never been read
+off.** This is that reading. No new code; four existing examples, plus one paper.
 
-**The headline: the ceiling is 33–60% of pair rows, it is nowhere near small enough to close the
-question, and it rises with instance difficulty.** That is the opposite of the cheap decline B5
-thought likely. It is also not a reason to build F5 — §4 is the structural argument, and it is where
-the issue is actually decided.
+**The headline: 33–60% of F4's pair rows add no rank, which bounds the whole direction at about 2×,
+and that is not worth a rewrite of F4's core.** Recorded as a won't-do in the style of #58, with one
+narrow question kept open in §5.1.
+
+**Revision note.** The first version of this document reported the ceiling and recommended "spike
+further, narrowly — neither implement nor decline", because it had not read Ding, Zhang and Deaton,
+*How Much Can F5 really Do?* (eprint 2021/051). That paper measures the same quantity on different
+instances, **agrees with the measurement**, and supplies the structural reason a ~50% row reduction is
+worth little: F4 and F5 reach the same degree of regularity, so signatures remove rows and never
+columns, while complexity is driven by the degree. §4.0 is the engagement and §5 is the revised
+recommendation. The original reading is left visible in §6 rather than edited away — the ceiling was
+measured correctly and interpreted backwards, which is a more useful thing for a later reader to see
+than a clean document.
 
 ## 1. What is being measured, and against which engine
 
@@ -103,7 +112,71 @@ Neither changes `mutants.md` §5's decision. Both are relevant to #74, which own
 ## 4. Why the ceiling does not settle it, and what does
 
 A 33–60% ceiling says a perfect selection criterion could remove up to about half the pair rows. It
-does **not** say F5 would, and three structural facts weigh against it. This is where B5 is decided.
+does **not** say F5 would, and four structural facts weigh against it. This is where B5 is decided.
+
+**§4.0 was added after the fact and supersedes the first draft's reading of this section.** The first
+version of this document recommended "spike further, narrowly" partly because the decisive source had
+not been read. It has now, it agrees with §3's measurement, and it draws the conclusion §3 stopped
+short of.
+
+### 4.0 Ding, Zhang and Deaton measured the same thing, and it is the whole argument
+
+Ding, Zheng Zhang and Deaton, *How Much Can F5 really Do?*, eprint 2021/051 — **read 2026-11-06**,
+from a local copy. B5 required this source to be engaged rather than cited, and the first draft of
+this document did not engage it. This section is that engagement.
+
+**Their quantity is this document's quantity.** §5 of the paper: "Here we record our experimental
+results on how many rows reduce to zero in the largest matrix in the F4 algorithm." Same measurement,
+independent implementation, independent instances — random homogeneous quadratic systems over `F2`
+with and without field equations, and HFE public keys with `D = n`.
+
+**Their numbers agree with §3's**, which is the strongest thing in this document because neither
+measurement knew about the other:
+
+| their system | `n` range | zero-row proportion |
+|---|---|---|
+| homogeneous random quadratic, **with** field equations (their Table 1) | 2–13 | 0.243 – **0.617**, with outliers at 0.014–0.021 |
+| homogeneous random quadratic, **without** field equations (Table 2) | 2–9 | 0.25 – **0.559** |
+| HFE with `D = n`, with field equations (Table 3) | 5–14 | 0.257 – **0.613**, with outliers at 0.024–0.027 |
+
+Against §3's **33–60%** on Fukuoka, Poseidon and katsura. Their summary, verbatim: "the highest
+proportion of zero rows is approximately **0.617** with many of the matrices being slightly higher
+than half of zero rows."
+
+**And the argument that makes the ceiling decisive rather than encouraging** — their §4.1, verbatim:
+
+> We note that the degree of regularity for F4 and F5 are the same `D_reg` [30], the matrix that F5
+> and F5 inspired algorithms will be working with is **essentially the same size as F4 but having
+> fewer rows** due to the use of signatures.
+
+With complexity approximately `C(n + D_reg, D_reg)^ω`. So:
+
+1. F4 and F5 reach the **same degree of regularity**, hence the same **column** count.
+2. Signatures remove **rows only**, by a factor the measurement bounds at about two.
+3. Therefore **F5 cannot change the complexity exponent at all** — it is a constant-factor win on a
+   quantity driven entirely by `D_reg`, which it does not touch.
+
+Their conclusion: "If this pattern holds for larger values of `n`, then **the F5 algorithm should not
+be much better than twice as fast as F4.** As often the strength of cryptosystems are measured in the
+hundreds of bits, having no zero row reductions would be **a modest increase in efficiency**."
+
+**That reverses the sign of §3 as an argument.** A ~50% ceiling is not headroom worth a rewrite; it is
+an upper bound of ~2× on a problem whose difficulty is measured in powers of two. §3's finding that
+the ceiling *rises with difficulty* does not help either, because it rises toward ~0.6 and stops — the
+bound is a bound.
+
+**One methodological difference, and it favours this document's numbers.** They measure the single
+largest matrix, and say so twice: "Note that this is not necessarily the matrix with the largest
+percentage of zero rows." That makes their estimator noisy, and visibly so — Table 1's `n = 10, 11, 12`
+read 0.021, 0.018, 0.014, and Table 3's `n = 13, 14` read 0.027, 0.024, which they explain as
+"Sometimes, we are lucky and almost all of the rows are non-zero". `examples/f4_degrees.rs` aggregates
+**every** pair row across the whole computation, so §3 has no such artifact. The two agree on the
+range anyway, which is the point.
+
+**What is not verified here:** the "same `D_reg` for F4 and F5" claim is attributed to their
+reference [30] (Yeh et al.), which was **not read**. It is the load-bearing step in the argument above.
+It is also uncontroversial — the degree of regularity is a property of the ideal rather than of the
+algorithm — but it is cited, not checked.
 
 ### 4.1 The guarantee does not transfer
 
@@ -143,7 +216,7 @@ modes. Under a signature algorithm the reducer choice is constrained by signatur
 may become **invalid rather than merely suboptimal**, and the M16/M19 investment in them would not
 carry over.
 
-### 4.3 The one external data point, and it cuts the other way
+### 4.3 The one external data point, reconciled
 
 From Allan Steel's Magma Gröbner-basis timings page, read in place on 2026-11-06 (see #199): for
 **Cyclic 10 over GF(32003)**, Magma's optimized F4 took **17.6 days** on a 750 MHz Sunfire v880 using
@@ -153,7 +226,7 @@ From Allan Steel's Magma Gröbner-basis timings page, read in place on 2026-11-0
 > his F5 paper [ISSAC 2002], where he took **16 hours on a 1GHz PIII** (using the unpublished improved
 > **F5'** algorithm).
 
-**That is a ~26× advantage for an F5-family algorithm over an optimized F4 on identical input** — the
+**Read on its own that is a ~26× advantage for an F5-family algorithm on identical input** — the
 published F4-versus-F5 comparison #223 said the corpus lacked, and it favours F5 substantially.
 
 Three cautions that stop it being decisive, and they matter:
@@ -166,57 +239,106 @@ Three cautions that stop it being decisive, and they matter:
 - **Different machines, different years.** 17.6 days on a 750 MHz Sunfire against 16 hours on a 1 GHz
   PIII is not a clean 26×; §4 of #199 argues no 2004 wall-clock ratio is clean.
 
-And the skeptical reading has to be heard before any of this is acted on: Ding, Zhang and Deaton,
-*How Much Can F5 Really Do?* (eprint 2021/051), interrogates the F5 claims directly. **It was not read
-for this document** — see §6.
+**And §4.0 now reconciles it, which is the more useful outcome than cautioning about it.** If F4 and
+F5 reach the same `D_reg` and signatures remove rows by a factor of about two, then **an algorithmic
+26× is impossible** and most of that ratio must be something other than the signature criterion:
+Faugère's own implementation against Magma's, a different reduction strategy, or the "improved"
+part of the unpublished F5'. The Cyclic-10 figure is therefore evidence about **two implementations**,
+not about what signatures buy — and read that way it stops being the one data point favouring F5.
+
+That is the right reading to carry forward. A 26× that cannot be attributed to the mechanism under
+consideration is not support for adopting the mechanism.
 
 ## 5. Recommendation
 
-**Spike further, narrowly. Do not implement, and do not decline.**
+**Decline the F5/Matrix-F5 direction for Zeebra's F4. Keep one narrow question open.**
 
-The evidence does not support either extreme:
+This revises the first draft, which recommended "spike further, narrowly, neither implement nor
+decline" while eprint 2021/051 was unread. With it read, the evidence points one way:
 
-- **Against declining:** a 33–60% ceiling that rises with difficulty, plus a published 26× on
-  Cyclic-10, is too much to dismiss on existing data. B5's cheap-decline branch is closed.
-- **Against implementing:** the guarantee does not transfer to the target systems (§4.1), the
-  structural fit with batched echelonization is bad and would touch all four of F4's core modules
-  (§4.2), and the one favourable data point is an unpublished algorithm on a non-cryptanalytic
-  instance (§4.3).
+- **The win is bounded at about 2×, and bounded for a structural reason.** F4 and F5 reach the same
+  degree of regularity, so the matrix has the same columns and F5 removes only rows (§4.0). The
+  complexity exponent is driven by `D_reg`, which signatures do not touch. Against difficulty measured
+  in powers of two, the authors' own phrase is the right one: "a modest increase in efficiency".
+- **The measured ceiling confirms the bound rather than challenging it.** §3's 33–60% and their
+  0.24–0.62 are the same answer from two independent measurements. §3's observation that the ceiling
+  *rises* with difficulty looked like an argument for F5 in the first draft; it is not, because it
+  rises toward ~0.6 and stops.
+- **The one favourable data point dissolves on inspection** (§4.3 as revised): a 26× that the
+  structural argument says cannot come from signatures is evidence about implementations.
+- **The cost is a rewrite of F4's core** — `pairs.rs`, `f4/symbolic.rs`, `f4/macaulay.rs`,
+  `f4/reduction.rs` — and it may invalidate rather than merely pessimize the reducer-selection
+  policies M16 and M19 priced (§4.2).
+- **The guarantee does not apply to the target systems anyway** (§4.1).
 
-The next step that would actually move it, in order:
+A ≤2× constant factor, for a rewrite of the core, on instances where the motivating theorem does not
+hold. Recorded as a **won't-do in the style of #58 and of `docs/research/mutants.md` §5**, so the
+question is not reopened without new evidence. New evidence would be: a published signature-based
+result that changes `D_reg` rather than the row count, or a measurement showing the ≤2× is worth more
+than it appears because rows dominate Zeebra's cost in a way they do not dominate the complexity
+model.
 
-1. **Read eprint 2021/051.** It is reachable as a PDF and it is the cheapest input with the largest
-   potential to settle the question. It should have been in this document.
-2. **Assess GVW specifically** (B5's question 6), via the Eder–Faugère survey. The rewritable
-   criterion is reported as simpler than F5's and as subsuming it, and — the point — it is a
-   *criterion* rather than an algorithm, so it may be adoptable inside `pairs.rs` without the §4.2
-   rewrite. **If anything in this family is adoptable, it is this**, and the question is narrow.
-3. **Measure the GM-signature overlap directly.** The ceiling of §3 counts rows that added no rank;
-   it does not say whether a signature criterion would have caught *those specific* rows or only
-   rows Gebauer–Möller already discards. `examples/pair_criteria.rs` and `f4_degrees.rs` together
-   could answer this without implementing F5, and it is the measurement that would convert §3's
-   ceiling into an actual expected win. **This is the real step-2 and B5 should be recut around it.**
+### 5.1 The one question that stays open
 
-Not recommended: anything that touches `f4/reduction.rs` or `f4/macaulay.rs` before step 3.
+**Assess GVW as a *criterion*, inside `pairs.rs`, and nothing more** (B5's question 6). The rewritable
+criterion is reported as simpler than F5's and as subsuming it, and the point is that it is a pair
+criterion rather than an algorithm — so it could sit beside Gebauer–Möller without the §4.2 rewrite,
+and `examples/pair_criteria.rs` already exists to price it against GM on one table.
+
+This survives the decline above because it is cheap and because §2 leaves room for it: Gebauer–Möller
+discards 69–89% of pairs, and §3 shows 33–60% of what *survives* still adds no rank. **Whether a
+rewritable criterion catches any of that residue is unknown and is the only thing left worth
+measuring.** It is a bounded question with an existing instrument, and it does not commit the crate
+to anything.
+
+What should **not** happen: any change to `f4/reduction.rs` or `f4/macaulay.rs`, and any work
+predicated on F5 being asymptotically better than F4. It is not.
 
 ## 6. What this did not do
 
-- **eprint 2021/051 was not read**, and B5 requires it to be engaged rather than cited. §4.3 and §5
-  flag it as the first follow-up. Nothing here should be read as a verdict on the F5 claims.
-- **The Eder–Faugère survey was not read**, so §5's GVW recommendation rests on its reputation rather
-  than on its content.
-- **The overlap question (B5's question 2) is not answered.** §3 gives the ceiling and §2 gives
-  Gebauer–Möller's share, but not whether they overlap. That is §5's step 3 and it is the gap that
-  matters most.
-- **No Matrix-F5 specification was produced**, deliberately: B5 gates that behind steps 1–4 being
-  favourable, and §4.2 is not favourable.
-- **HFE was not used as a calibration instance.** #198 has since established that HFE Challenge 1's
-  input system survives at `minrank.org/challenge1.txt` and that three reduced rungs (`HFE25_96`,
-  `30_96`, `35_96`) are downloadable with published Magma times — so the F4-versus-F5 comparison this
-  document had to reach for Cyclic-10 to find may be available on an instance F5 was actually built
-  for. That is a better calibration than §4.3 and it is now cheap.
+- ~~**eprint 2021/051 was not read.**~~ **Closed** — read 2026-11-06, and §4.0 is the engagement. It
+  changed the recommendation from "spike narrowly" to "decline", so leaving it unread had been the
+  single largest gap in the first draft. Recorded rather than edited away, because the shape of the
+  error is instructive: §3's ceiling was measured correctly and *interpreted backwards* for want of
+  the one source that says what a ~50% row reduction is worth.
+- **Yeh et al. [30], cited by 2021/051 for "F4 and F5 have the same `D_reg`", was not read.** That is
+  the load-bearing step in §4.0's argument and hence in the decline. Uncontroversial — `D_reg` is a
+  property of the ideal, not of the algorithm — but cited rather than checked.
+- **The Eder–Faugère survey was not read**, so §5.1's GVW recommendation rests on its reputation
+  rather than on its content. This is now the largest remaining gap, since §5.1 is the only question
+  left open.
+- **The overlap question (B5's question 2) is still not answered.** §3 gives the ceiling and §2 gives
+  Gebauer–Möller's share, but not whether they overlap. It matters less than it did: §4.0 bounds the
+  prize at ~2× however the overlap falls, so the question is now only about §5.1's narrow criterion
+  rather than about the direction.
+- **No Matrix-F5 specification was produced**, and under §5 none should be.
+- **HFE was not used as a calibration instance**, and 2021/051 makes this more interesting rather than
+  less: its Table 3 measures HFE with `D = n` and field equations at 0.257–0.613, so the family is
+  already calibrated by someone else at the same quantity. #198 has since established that HFE
+  Challenge 1's input system survives at `minrank.org/challenge1.txt` and that three reduced rungs
+  (`HFE25_96`, `30_96`, `35_96`) are downloadable with published Magma times. A Zeebra row beside
+  their Table 3 would be a three-way check — but §5 says the direction is declined, so this is now a
+  **validation opportunity for `f4_degrees.rs` itself** rather than an argument about F5.
 - **Nothing was measured over GF(2).** #218 has since made characteristic two work, so the HFE route
-  above is open.
+  above is open — and note that 2021/051's measurements are *all* over `F2`, so a like-for-like
+  comparison needs it.
+
+### 6.1 Two things 2021/051 supplies to other issues
+
+Neither is about F5, and both are worth more to the issues they belong to than to this one.
+
+- **A closed-form `D_reg` for random quadratic systems**, their §4.2, attributed to Yeh et al. — one
+  formula for small fields (`D_reg ≤ q`) and one for large (`D_reg < q`), both as the first `d` where
+  a stated series coefficient goes negative. `src/grobner/hilbert.rs` models semiregular sequences and
+  `examples/hilbert_study.rs` compares prediction against measurement; this is a second, independent
+  prediction to compare against on the Fukuoka families. **Handed to #74.**
+- **A closed-form `D_reg` bound for HFE- and HFEv-**, their §4.3, attributed to Ding–Kleinjung and
+  Ding–Yang, together with the statement that "In 2002, Faugere experimentally showed the degree of
+  regularity of HFE is much lower than expected for a random system. For some instances of HFE, the
+  systems can even be solved polynomially." **That is exactly the anomaly #198 proposes to measure**,
+  with a formula to predict it rather than only an expectation that it exists. **Handed to #198**,
+  where it upgrades the solving-degree experiment from "check it is lower" to "check it matches a
+  published bound".
 
 ## 7. Reproducing
 
