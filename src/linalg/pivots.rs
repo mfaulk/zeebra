@@ -6,16 +6,20 @@
 //!
 //! Two representations, because neither alone is safe at both extremes. [`Store::Indexed`] is the
 //! one that matters: `4 * num_columns` bytes, one load per lookup. [`Store::Hashed`] is the
-//! fallback for the two shapes it cannot serve — more rows than a `u32` can name, and a width whose
-//! array would cost more than the matrix. Which one is in use never changes during an elimination,
-//! so the branch is perfectly predicted.
+//! fallback for the two shapes it cannot serve — more rows than a `u32` can name, and a width the
+//! sparse backend has no per-column allocation of its own to amortise an array against. Which one
+//! is in use never changes during an elimination, so the branch is perfectly predicted.
 
 use std::collections::HashMap;
 
 /// No pivot. Reserving the top `u32` costs one row index that no matrix of this size could reach.
 const VACANT: u32 = u32::MAX;
 
-/// Rows at or above which a row index does not fit alongside [`VACANT`].
+/// Row counts at or above this get the hashed store.
+///
+/// A matrix of exactly `u32::MAX` rows would in fact still fit — its last index is `u32::MAX - 1`,
+/// which is distinct from [`VACANT`] — so the guard gives up one row it could have had, in
+/// exchange for a boundary stated as the marker's own value rather than one below it.
 const MAX_INDEXED_ROWS: usize = VACANT as usize;
 
 /// Columns above which the indexed array is not built: 64 Mi columns, i.e. 256 MiB of `u32`.
