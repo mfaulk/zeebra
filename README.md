@@ -2499,6 +2499,15 @@ function of the shape alone. `max_estimated_bytes` is the two added, per batch, 
 None of them accounts for the monomial-to-column map, the basis's term vectors, or allocator
 overhead; for the process figure use `util::peak_resident_bytes`.
 
+**How much that omits, measured.** On Fukuoka MQ type III `n = 20` at the default 20,000,000-entry
+budget, the accounted figure is 195 MB and the process peaks at **14.75 GB — 75x more**. The
+omission is also *step-quantized by the highest degree the computation enters* and flat in the
+budget: two caps 5x apart that stop in degree 4 both peak at 617 MB, and two caps 2.5x apart that
+stop in degree 5 both peak at 14.07 GB. So the entry budget cannot be scaled as a proxy for memory
+even roughly — raise it and what grows is a quantity it does not count.
+[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) has the ladder, and
+#237 is the attribution work.
+
 #### What the computation did before it ran out of room
 
 `f4` and `f4_with_options` discard their counters on the error path, which is the case where they

@@ -669,6 +669,34 @@ The same shape as M23-I, with question 3 added:
 - The resource-growth curves from §9.1, with the stop rule's verdict.
 - The next credible frontier, named with the measurement that makes it credible.
 
+### 10.1 The cost-model table
+
+Predicted against observed, with the difference **attributed** rather than noted. This is the table
+§3's third question exists for, and the entries below are the ones closed so far.
+
+| what was predicted | prediction | observed | attribution |
+|---|---|---|---|
+| univariate route, families per witness | `≈2^31` (`graeffe-root-finding.md` §9.3) | **`≈2^31` confirmed** — root count 0.9997, χ² independence inside ±3σ | the prediction was right; the surrounding claim was not |
+| univariate route, cost per family | ~2 min (§9.2) | **15.2 s** | §9.2 charged the loop a ~100 s `r = 2^24` subgroup scan belonging to Zeebra's single-root descent. A stage the published attack does not run |
+| univariate route vs the published 7 h / 96 GPUs | "four orders of magnitude after any plausible GPU factor" | **~13x** at a `10^3` per-GPU factor | two separable errors: core-years compared against a wall clock, and the stage above. §5.4 |
+| families per witness at reduced rounds | assumed to fall with `R_F`, `R_P` (§6.3) | **invariant** — `δ` spans 6 561x, root count never leaves 1.0 | the count is `p / (roots per family)` and contains neither. §6.4 |
+| the published per-family stage ordering | construction and root finding dominant, checking negligible (2026/1254 §4.2) | **77% / 23% / µs** | prediction held, and independently corroborates the attribution two rows above |
+| Sylvester determinants, parallel | "a constant factor bounded by core count" (§7.3) | **92–95% efficient to 32 cores** | prediction held |
+| `fftmul`'s reported ceiling | checker-limited, not multiply-limited (#189) | **`2^18` → `2^22`**, 16x, stop now the budget on the multiply | prediction held; the instrument was the ceiling |
+| the budget ladder's memory | "0.32 / 1.6 / 6.4 / 16 GB of entry storage" (§9.1) | **195 MB accounted inside a 14.75 GB process**, 75x | the plan predicted the wrong *quantity*. The entry budget bounds one allocation, and README said so |
+| six-round symbolic build | "peak memory is not a concern … ~68 MB" (§7.4) | **≥55 GB**, and the build is the binding stage | ~800x. §7.5's named unknown was the build's *time*; its memory was not even listed as a risk |
+
+Two patterns in that column, and they are the milestone's methodological result.
+
+**Every prediction about a stage Zeebra had already measured held.** Parallel determinants, the
+`fftmul` ceiling, the published stage ordering — all three landed.
+
+**Every prediction about a quantity nobody had measured was wrong, and three of the four were wrong
+by more than an order of magnitude.** Per-family cost, the memory of the budget ladder, and the
+six-round build's footprint were each stated with confidence in a document that had no measurement
+behind them. The `2^31` row is the sharpest case: the *number* was right and the *claim built on it*
+was wrong by four orders, which is the failure mode a cost model catches and a benchmark does not.
+
 ---
 
 ## 11. Acceptance criteria
