@@ -854,6 +854,12 @@ NTT-based path at all, and interpolation at arbitrary abscissae — what an eval
 resultant needs — is cubic. [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the
 full curves, the gap list, and what each stage would need to go further.
 
+The published Graeffe-transform root finder that those stages would serve is read and scoped in
+[`docs/research/graeffe-root-finding.md`](docs/research/graeffe-root-finding.md), with the algorithm
+as pseudocode, the transform size each registered challenge requires against the ceilings above, a
+measured answer to whether this crate's NTT is access-bound, and an explicit no-go on every
+registered instance.
+
 ## Gröbner Bases
 
 `grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
