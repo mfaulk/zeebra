@@ -618,6 +618,21 @@ pub struct RunRecord {
     /// would otherwise carry no memory figure.
     pub measured_peak_resident_bytes: Option<usize>,
 
+    /// How many scoreboard rows the process that produced
+    /// `measured_peak_resident_bytes` had recorded, including this one.
+    ///
+    /// **`VmHWM` is a process high-water mark, so attribution is not free.** A process that runs
+    /// seven rows reports one figure covering all seven, and that figure is a *ceiling* over them
+    /// rather than a measurement of any one — the row with the largest footprint sets it and the
+    /// other six inherit it. `Some(1)` says the process ran this row and nothing else, which is
+    /// the only case where the figure is this row's;
+    /// [`Self::measured_peak_is_attributable`] is that check.
+    ///
+    /// `None` exactly when `measured_peak_resident_bytes` is `None`: the count is a property of
+    /// the measurement and there is nothing to qualify without one. Absent in every record
+    /// written before this field existed, where it must not be read as an attributable `1`.
+    pub measured_peak_rows_in_process: Option<usize>,
+
     /// The command that reproduces this run.
     pub reproduce: String,
 }
@@ -650,8 +665,40 @@ impl RunRecord {
             },
             experiment: None,
             measured_peak_resident_bytes: None,
+            measured_peak_rows_in_process: None,
             reproduce: String::new(),
         }
+    }
+
+    /// True if the measured peak is this row's and not a ceiling over several.
+    ///
+    /// Requires both a measurement and a row count of exactly one. An absent count is **not**
+    /// attributable: every record written before the count existed has one, and treating those as
+    /// single-row would be asserting something nobody recorded.
+    pub fn measured_peak_is_attributable(&self) -> bool {
+        self.measured_peak_resident_bytes.is_some() && self.measured_peak_rows_in_process == Some(1)
+    }
+
+    /// The measured process peak as a multiple of the accounted entry estimate.
+    ///
+    /// `measured / estimated`, and the interesting quantity rather than either figure alone: it is
+    /// what says the 16-byte-per-entry estimate is an accounting of the Macaulay matrices and not
+    /// a model of the process. 195 MB accounted inside a 14.75 GB process is a factor of 75.
+    ///
+    /// `None` unless the record carries both — a route with no Macaulay matrix, like the
+    /// resultant, has no frontier and so no estimate, and a run on a platform with no `/proc` has
+    /// no measurement. Also `None` for a zero estimate, which no ratio can use.
+    ///
+    /// Note that the ratio is only *about this row* when
+    /// [`Self::measured_peak_is_attributable`]; otherwise the numerator is a ceiling over several
+    /// rows and the ratio is an upper bound.
+    pub fn measured_to_estimated_ratio(&self) -> Option<f64> {
+        let measured = self.measured_peak_resident_bytes? as f64;
+        let estimated = self.frontier.as_ref()?.peak_estimated_bytes as f64;
+        if estimated <= 0.0 {
+            return None;
+        }
+        Some(measured / estimated)
     }
 
     /// Total wall clock across the stages.
@@ -884,6 +931,13 @@ impl RunRecord {
                 .get("measured_peak_resident_bytes")
                 .and_then(Json::as_int)
                 .map(|b| b as usize),
+            // Absent in every record written before the count existed, and absent must not read
+            // as an attributable `1` — those runs' figures cover however many rows their process
+            // ran, which is not recorded and cannot be recovered.
+            measured_peak_rows_in_process: value
+                .get("measured_peak_rows_in_process")
+                .and_then(Json::as_int)
+                .map(|rows| rows as usize),
             reproduce: value
                 .get("reproduce")
                 .and_then(Json::as_str)
@@ -950,8 +1004,13 @@ impl RunRecord {
                 None => Json::Null,
             },
         ));
+        // Omitted rather than `null` when absent, matching `ExperimentRecord`: "not measured" is
+        // the fact about those runs, and a key holding `null` invites being coerced to zero.
         if let Some(bytes) = self.measured_peak_resident_bytes {
             fields.push(("measured_peak_resident_bytes", Json::Int(bytes as i128)));
+            if let Some(rows) = self.measured_peak_rows_in_process {
+                fields.push(("measured_peak_rows_in_process", Json::size(rows)));
+            }
         }
         fields.push(("environment", self.environment.to_json()));
         fields.push((
@@ -1858,6 +1917,92 @@ mod tests {
             Some(56_990_154_752),
             "and it must therefore carry the measured figure the earlier record lacked"
         );
+    }
+
+    /// A measured peak carries the number of rows the measuring process ran, and round-trips.
+    ///
+    /// `VmHWM` is a **process** high-water mark, so a figure from a process that ran seven rows is
+    /// a ceiling over all seven and not a measurement of any one of them. One row means the figure
+    /// is attributable; more means it is not, and the record has to say which — a resource bound
+    /// read as a resource measurement is the error the whole memory vocabulary here exists to
+    /// prevent.
+    #[test]
+    fn test_a_measured_peak_records_how_many_rows_the_process_covered() {
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+
+        let mut sole = witness("poseidon31-cico-t16-rf2-rp4", "row", 1_000, 1 << 20);
+        sole.measured_peak_resident_bytes = Some(14_750_000_000);
+        sole.measured_peak_rows_in_process = Some(1);
+        assert!(sole.measured_peak_is_attributable());
+
+        let text = sole.to_json(&manifest).to_json();
+        let back = RunRecord::from_json(&Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_resident_bytes, Some(14_750_000_000));
+        assert_eq!(back.measured_peak_rows_in_process, Some(1));
+        assert!(back.measured_peak_is_attributable());
+
+        let mut shared = witness("poseidon31-cico-t16-rf2-rp4", "smoke", 1_000, 1 << 20);
+        shared.measured_peak_resident_bytes = Some(14_750_000_000);
+        shared.measured_peak_rows_in_process = Some(7);
+        assert!(
+            !shared.measured_peak_is_attributable(),
+            "a seven-row process reports a ceiling, not this row's peak"
+        );
+        let text = shared.to_json(&manifest).to_json();
+        let back = RunRecord::from_json(&Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_rows_in_process, Some(7));
+        assert!(!back.measured_peak_is_attributable());
+    }
+
+    /// With no measurement both memory keys are omitted, and absence parses as not-measured.
+    ///
+    /// Omission rather than `null`, matching `ExperimentRecord`, and the property every record
+    /// written before these fields existed depends on: absent must never read as zero, and an
+    /// absent row count must never read as an attributable figure.
+    #[test]
+    fn test_an_unmeasured_peak_omits_both_keys_and_is_not_attributable() {
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+        let mut run = witness("poseidon31-cico-t16-rf2-rp4", "row", 1_000, 1 << 20);
+        run.measured_peak_resident_bytes = None;
+        run.measured_peak_rows_in_process = None;
+
+        let text = run.to_json(&manifest).to_json();
+        assert!(!text.contains("measured_peak_resident_bytes"));
+        assert!(!text.contains("measured_peak_rows_in_process"));
+
+        let back = RunRecord::from_json(&Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_resident_bytes, None);
+        assert_eq!(back.measured_peak_rows_in_process, None);
+        assert!(!back.measured_peak_is_attributable());
+        assert_eq!(back.measured_to_estimated_ratio(), None);
+    }
+
+    /// For an F4 row the estimated-to-measured ratio is recoverable from the record alone.
+    ///
+    /// The point of populating both figures. 195 MB of accounted matrix entries inside a 14.75 GB
+    /// process is a factor of 75, and that factor is the interesting quantity — it is what says
+    /// the entry estimate is not a model of the process.
+    #[test]
+    fn test_the_estimated_to_measured_ratio_is_recoverable_from_one_record() {
+        let mut run = witness("poseidon31-cico-t16-rf2-rp4", "row", 1_000, 195_000_000);
+        run.measured_peak_resident_bytes = Some(14_750_000_000);
+        run.measured_peak_rows_in_process = Some(1);
+
+        let ratio = run
+            .measured_to_estimated_ratio()
+            .expect("both figures are present");
+        assert!(
+            (ratio - 75.64).abs() < 0.01,
+            "{} is not the 14.75 GB / 195 MB ratio",
+            ratio
+        );
+
+        // A route with no Macaulay matrix has no estimate, so there is no ratio to report.
+        run.frontier = None;
+        assert_eq!(run.measured_to_estimated_ratio(), None);
     }
 
     /// Loading a history preserves the order the file recorded, record for record.

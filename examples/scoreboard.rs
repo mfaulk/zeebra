@@ -53,6 +53,7 @@ use zeebra::{
         solve_from_lex_basis, BatchObserver, CriticalPair, F4Options, FglmOptions, IdealClass,
         SolveOptions, SolveOutcome,
     },
+    util::peak_resident_bytes,
     FiniteField, MonomialOrder, MultivariatePolynomial, Zero,
 };
 
@@ -75,6 +76,34 @@ fn f4_options() -> F4Options {
 fn policy() -> String {
     "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
         .to_string()
+}
+
+/// How many rows this process has recorded, so that a measured peak says what it covers.
+///
+/// `VmHWM` is a **process** high-water mark. The `row`, `mq` and `campaign` tiers run one row per
+/// process — `tools/scoreboard.sh`'s ladder does so deliberately — and only there is the figure
+/// attributable to the row it is recorded against. The multi-row tiers get the same figure on
+/// every row, and it is a ceiling over all of them; the count is what lets a reader tell the two
+/// apart instead of having to know which tier produced the file.
+static ROWS_RECORDED: AtomicUsize = AtomicUsize::new(0);
+
+/// Attach the measured process peak to `record`, then add it to `board`.
+///
+/// Called at every point a row is recorded, so that no tier can acquire a row without a
+/// measurement or without the count that qualifies it. The estimate it is read against is already
+/// in `record.frontier.peak_estimated_bytes`, which is what makes
+/// `RunRecord::measured_to_estimated_ratio` recoverable from one record — the whole point of
+/// populating both.
+fn add_measured(board: &mut Scoreboard, mut record: RunRecord, registry: &[ChallengeManifest]) {
+    let rows = ROWS_RECORDED.fetch_add(1, Ordering::Relaxed) + 1;
+    // Both fields or neither: the count is a property of the measurement, and a count without one
+    // would qualify nothing.
+    record.measured_peak_resident_bytes = peak_resident_bytes().map(|bytes| bytes as usize);
+    record.measured_peak_rows_in_process = record
+        .measured_peak_resident_bytes
+        .is_some()
+        .then_some(rows);
+    board.add(record, registry).expect("a registered problem");
 }
 
 fn main() {
@@ -118,7 +147,7 @@ fn main() {
         println!("- policy: {}\n", frontier_policy());
         let record = run_frontier_formulation(&manifest, &environment, slice, wall, formulation);
         report(&record);
-        board.add(record, &registry).expect("a registered problem");
+        add_measured(&mut board, record, &registry);
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
             println!("appended to research/scoreboard/");
@@ -151,7 +180,7 @@ fn main() {
         }
         for record in records {
             report(&record);
-            board.add(record, &registry).expect("a registered problem");
+            add_measured(&mut board, record, &registry);
         }
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
@@ -205,7 +234,7 @@ fn main() {
         }
 
         for record in records {
-            board.add(record, &registry).expect("a registered problem");
+            add_measured(&mut board, record, &registry);
         }
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
@@ -245,7 +274,7 @@ fn main() {
             let record = run_frontier_row(&manifest, &environment, Some(seed), wall);
             report(&record);
             tally(&mut campaign, seed, &record.outcome);
-            board.add(record, &registry).expect("a registered problem");
+            add_measured(&mut board, record, &registry);
         }
         campaign.total = at.elapsed();
 
@@ -275,7 +304,7 @@ fn main() {
         report_campaign(&campaign);
         summary.campaign = Some(campaign);
         report(&summary);
-        board.add(summary, &registry).expect("a registered problem");
+        add_measured(&mut board, summary, &registry);
 
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
@@ -300,7 +329,7 @@ fn main() {
         let manifest = challenge(id).expect("registered");
         let record = run_cico(&manifest, &environment);
         report(&record);
-        board.add(record, &registry).expect("a registered problem");
+        add_measured(&mut board, record, &registry);
     }
 
     if tier == "stable" || tier == "frontier" {
@@ -311,14 +340,14 @@ fn main() {
         let manifest = challenge("poseidon-t3-rf2-rp1-planted").expect("registered");
         let record = run_cico(&manifest, &environment);
         report(&record);
-        board.add(record, &registry).expect("a registered problem");
+        add_measured(&mut board, record, &registry);
 
         for id in ["fukuoka-mq-III-n10-seed0", "fukuoka-mq-III-n15-seed0"] {
             let manifest = challenge(id).expect("registered");
             match run_mq(&manifest, &environment) {
                 Some(record) => {
                     report(&record);
-                    board.add(record, &registry).expect("a registered problem");
+                    add_measured(&mut board, record, &registry);
                 }
                 None => println!(
                     "- {} skipped: run tools/fetch-mq-challenge.sh for the instance files",
