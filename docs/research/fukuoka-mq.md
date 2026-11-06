@@ -9,12 +9,17 @@ Six families of random multivariate quadratic systems over three fields, in two 
 
 | type | field | shape | `m` vs `n` | importable here |
 |---|---|---|---|---|
-| I | GF(2) | encryption | `m = 2n` | **no** — `src/fields/binary_field.rs` is private |
-| II | GF(2^8) | encryption | `m = 2n` | **no** — `src/fields/extension_field.rs` is private |
+| I | GF(2) | encryption | `m = 2n` | **no** — no import path; the field exists (§6) |
+| II | GF(2^8) | encryption | `m = 2n` | **no** — no import path, and the modulus differs (§2.4) |
 | III | GF(31) | encryption | `m = 2n` | **yes** |
-| IV | GF(2) | signature | `n ≈ 1.5m` | **no** |
-| V | GF(2^8) | signature | `n ≈ 1.5m` | **no** |
+| IV | GF(2) | signature | `n ≈ 1.5m` | **no** — as type I |
+| V | GF(2^8) | signature | `n ≈ 1.5m` | **no** — as type II |
 | VI | GF(31) | signature | `n ≈ 1.5m` | **yes** |
+
+**The "importable here" column used to read "`binary_field.rs` is private" and
+"`extension_field.rs` is private". That is no longer the reason** — both modules have been publicly
+exported since `8757b4a` (2026-11-05), which arrived as a side effect of #123's `for_each_field!`
+work rather than as a deliberate unblocking. §2.4 and §6 record what actually remains.
 
 GF(31) needed **no new arithmetic**: `PrimeFieldElement64<31>` already existed. The 32-bit prime
 field of issue #62 has since landed as `Zp31`, and was an independent optimization rather than a
@@ -105,11 +110,41 @@ reduced modulo seven — a different mathematical problem, whose solutions and G
 cannot be attributed to the challenge. Nothing about the resulting system looks wrong, which is
 what makes it worth a type bound rather than a convention.
 
-`check_coefficient_field` answers two separate questions in order: whether this crate can express
-the field at all (GF(2) and GF(2^8) cannot be, for reasons of module visibility), and whether the
-supplied type *is* that field. Orders are compared as limb slices rather than integers, because a
-field order need not fit a `u64` — the comparison has to be right for the wide fields M20 added,
-not only for the ones this importer reaches.
+`check_coefficient_field` answers two separate questions in order: whether this importer has a path
+for the field at all (GF(2) and GF(2^8) do not, per §2.4), and whether the supplied type *is* that
+field. Orders are compared as limb slices rather than integers, because a field order need not fit a
+`u64` — the comparison has to be right for the wide fields M20 added, not only for the ones this
+importer reaches.
+
+Note what that check does **not** catch, and §2.4 is about: order alone does not determine a
+non-prime field. Two GF(2^8)s with different irreducible polynomials have the same order and
+different arithmetic, so `F::order_limbs() == [256]` would accept either.
+
+## 2.4 GF(2^8) is not one field, and the challenge does not use the AES one
+
+`format.html` (read 2026-11-06) specifies the field as
+
+> `p(x) = x^8 + x^4 + x^3 + x^2 + 1`
+
+That is `0x11D`. `fields::Gf256` is `BinaryFieldElement<X8_X4_X3_X_1>` = `0x11B`, **the AES
+polynomial** — one bit apart, `x` where the challenge has `x^2`. Both are irreducible of degree
+eight and the two fields are isomorphic, but they are not the same field: the arithmetic reduces
+modulo different polynomials, so one pair of bytes has two products. Over the AES modulus
+`0x57 * 0x83 = 0xc1` (FIPS-197 §4.2); over the challenge's it does not, and of the 65025 nonzero
+operand pairs more than fifty thousand separate the two.
+
+So reading a type II or type V coefficient byte under `Gf256` would build **a different system from
+the published one**, with nothing about the result looking wrong — the same class of error §2.1
+guarded against for the monomial layout, which was verified rather than assumed. The layout was
+checked at the time because a type III instance was being imported; the field representation was
+not, because no GF(2^8) instance was.
+
+`fields::Gf256Mq` is the challenge's field, declared separately for that reason and certified
+irreducible by `binary_field::tests::test_declared_moduli_are_irreducible`.
+`binary_field::tests::test_the_two_degree_eight_moduli_are_different_fields` asserts the
+distinction rather than describing it. The stronger check — that a published answer file evaluates
+every polynomial to zero under `0x11D` and fails to under `0x11B` — belongs with the import itself
+and is #197's.
 
 ## 3. Redistribution
 
@@ -226,8 +261,28 @@ coefficient vectors and every dead slice recorded as the experiment it is.
 
 ## 6. Open
 
-- **GF(2^8) import** needs `extension_field` exported. Scope, not mathematics.
-- **GF(2)** likewise, via `binary_field`.
+- **GF(2^8) import** needs the import path and a check against a published answer file under the
+  **right modulus** — `Gf256Mq` (`0x11D`), not `Gf256` (`0x11B`). §2.4. The export it used to be
+  blocked on landed in `8757b4a`; the modulus is the live issue and it is a correctness one. #197.
+- **GF(2) import** needs the import path and the toy dimensions types I and IV publish, which are
+  not type III's or type VI's. The field exists two ways — `fields::Zp2`
+  (`PrimeFieldElement32<2>`, which keeps the wide-remainder path because `2^32` is not invertible
+  modulo an even number) and `BinaryFieldElement<0b11>` — and which one the importer should use is
+  a decision to record once, not per call site. #197.
+- **Characteristic 2 is no longer untested in the solver.** `grep -rl "BinaryFieldElement" src/grobner/`
+  used to be empty. `grobner::tests::test_the_whole_pipeline_over_gf2` and its `Gf256` twin now take
+  a planted system through F4, Buchberger agreement, FGLM, both routes to lex, and `solve_one`, with
+  the recovered point re-evaluated — and they passed without any change to the solver. Note that
+  `benchmark_systems::planted` **degenerates in characteristic two**: `x^2 + y^2 = (x + y)^2`, so its
+  first generator per pair is a perfect square and the ideal is nonradical. Asserted by
+  `grobner::tests::test_planted_degenerates_to_a_square_in_characteristic_two`, because a reader who
+  assumed otherwise would mis-read every characteristic-two measurement taken with that generator.
+- **Field equations are available and are not a default.** `grobner::field_equations` adjoins
+  `x_i^q - x_i`, whose degree is `q`. Over GF(2) that is degree 2 and makes the ideal radical, so
+  `dim F_2[x]/I` becomes exactly the GF(2)-point count — checked against exhaustive enumeration at
+  `n = 8`. **Over GF(31) it is degree 31**, against solving degrees of 4 to 9 measured on the type
+  III and type VI instances in §4, so for the families this importer actually reaches today the
+  answer is no. Types I and IV will want them; types III and VI will not.
 - **`n = 55` and up** are far beyond the current solvers; `SUPPORTED_DIMENSIONS` is `[10, 15, 20]`
   and an unsupported size is `MqError::UnsupportedDimension` rather than a panic. Compiling
   dimensions that cannot be used would be worse than saying so.

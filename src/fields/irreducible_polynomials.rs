@@ -19,9 +19,24 @@
 #[allow(unused)]
 pub const X5_X2_1: u64 = (1 << 5) + (1 << 2) + 1;
 
-// Bit pattern for x^8 + x^4 + x^3 + x + 1, irreducible over GF(2)
+// Bit pattern for x^8 + x^4 + x^3 + x + 1, irreducible over GF(2). 0x11B, the AES modulus.
 #[allow(unused)]
 pub const X8_X4_X3_X_1: u64 = (1 << 8) + (1 << 4) + (1 << 3) + (1 << 1) + 1;
+
+// Bit pattern for x^8 + x^4 + x^3 + x^2 + 1, irreducible over GF(2). 0x11D.
+//
+// Degree 8 and weight 5 like [`X8_X4_X3_X_1`], and one bit apart from it — x^2 where that has x.
+// Both define a GF(2^8), the two are isomorphic, and **they are not the same field**: the
+// arithmetic reduces modulo different polynomials, so one pair of bytes has two different
+// products. `binary_field::tests::test_the_two_degree_eight_moduli_are_different_fields` asserts it.
+//
+// This one is the modulus the Fukuoka MQ Challenge specifies for its GF(2^8) families, types II
+// and V (https://www.mqchallenge.org/format.html, read 2026-11-06). An importer that read those
+// coefficient bytes under the AES modulus would build a different system from the published one
+// and nothing about the result would look wrong, which is why the constant is declared separately
+// rather than reusing the one that was already here.
+#[allow(unused)]
+pub const X8_X4_X3_X2_1: u64 = (1 << 8) + (1 << 4) + (1 << 3) + (1 << 2) + 1;
 
 // Bit pattern for x^63 + x + 1, irreducible over GF(2)
 #[allow(unused)]

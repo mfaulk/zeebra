@@ -36,6 +36,8 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] The resultant route's Sylvester determinants in parallel: 92–95% efficiency out to 32 cores,
       the four-round CICO row from 49.7 s to 2.16 s, with the concurrency recorded on the
       scoreboard and a cross-concurrency comparison refused rather than quoted
+- [x] The whole solving pipeline in characteristic two, over GF(2) and GF(2^8), and field equations
+      `x^q - x` that make a quotient dimension count base-field points
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -573,7 +575,8 @@ it means. Inversion over a wide field is 202 multiplies, so pivot normalization 
 a precomputed inverse rather than divide per entry.
 
 Two other field types gained the same treatment, each measured on the operation rather than on a
-whole computation, because both modules are private and no bench target can reach them:
+whole computation, because at the time both modules were private and no bench target could reach
+them:
 
 - `BinaryFieldElement<P>` multiplies with `PCLMULQDQ` and reduces by Barrett rather than by a
   bit-at-a-time loop and long division — **212.70 to 2.02 ns** per multiply over GF(2^63). The
@@ -582,6 +585,69 @@ whole computation, because both modules are private and no bench target can reac
 - `ExtensionFieldElement<P, N, M>` reduces once per output coefficient instead of once per partial
   product, O(N) instead of O(N^2), under a compile-time overflow bound; the per-multiplication heap
   allocation is gone.
+
+Both are public now. `Gf32`, `Gf256`, `Gf13Pow4` and `Gf256Mq` are the declared instantiations.
+
+**`Gf256` and `Gf256Mq` are both GF(2^8) and are not interchangeable.** `Gf256` reduces modulo
+`x^8 + x^4 + x^3 + x + 1` (`0x11B`, the AES polynomial); `Gf256Mq` modulo
+`x^8 + x^4 + x^3 + x^2 + 1` (`0x11D`), which is what the Fukuoka MQ Challenge specifies for its
+GF(2^8) families. The two are isomorphic and the arithmetic differs: over the first
+`0x57 * 0x83 = 0xc1` (FIPS-197 §4.2), over the second it does not, and more than fifty thousand of
+the 65025 nonzero operand pairs separate them. An order check cannot tell them apart — both have
+order 256 — so the field is named at the type level rather than inferred.
+`docs/research/fukuoka-mq.md` §2.4 has the consequence for importing an instance.
+
+### Characteristic two in the solver, and field equations
+
+The Gröbner stack is generic over `FiniteField` and had never been run in even characteristic. It
+works: `grobner::tests::test_the_whole_pipeline_over_gf2` and its `Gf256` twin take a planted
+system through F4, agreement with Buchberger, FGLM, both routes to lex, and `solve_one`, with the
+recovered point re-evaluated against the original system. Neither needed a change to the solver.
+
+One trap, asserted rather than described. `benchmark_systems::planted` **degenerates in
+characteristic two**: its first generator per variable pair is `x^2 + y^2 - (a^2 + b^2)`, and since
+`x^2 + y^2 = (x + y)^2` here that is a perfect square, so the ideal is nonradical. A reader who
+assumed the generator behaves the same in every characteristic would mis-read every
+characteristic-two measurement taken with it, so
+`grobner::tests::test_planted_degenerates_to_a_square_in_characteristic_two` pins it.
+
+A system over `F_q` has two different solution sets — the points of the variety over the algebraic
+closure, and the points with coordinates in `F_q` itself. Cryptanalysis asks for the second, which
+is cut out by adjoining the field equations `x_i^q - x_i`:
+
+```rust
+use zeebra::{
+    fields::Zp2,
+    grobner::{classify_ideal, f4, field_equations::with_field_equations, IdealClass},
+    MonomialOrder, Monomial, MultivariatePolynomial, One,
+};
+
+let grevlex = MonomialOrder::GradedReverseLexicographic;
+
+// x*y, in two Boolean variables: positive-dimensional over the closure.
+let system: Vec<MultivariatePolynomial<2, Zp2>> =
+    vec![MultivariatePolynomial::new(&[(Monomial::new(&[1, 1]), Zp2::one())])];
+let bare = f4(&system, grevlex).unwrap();
+assert_eq!(classify_ideal(&bare, grevlex), IdealClass::PositiveDimensional);
+
+// Adjoining x^2 - x per variable forces zero dimension.
+let extended = with_field_equations(&system).unwrap();
+let basis = f4(&extended, grevlex).unwrap();
+assert_eq!(classify_ideal(&basis, grevlex), IdealClass::ZeroDimensional);
+```
+
+Because `x^q - x` is squarefree and splits completely over `F_q`, the extended ideal is **radical**,
+so `dim F_q[x]/I` is exactly the number of `F_q`-rational points — counted once each, however many
+times they occur in `I`. That makes a solution count a machine-independent invariant, and
+`field_equations`' tests check it against exhaustive enumeration at `n = 8` over GF(2).
+
+**Adjoining them is a judgement about `q`, not a default, and nothing here chooses for the caller.**
+The generator has degree `q`, so it only pays when `q` is below the degree the computation would
+reach anyway. Over GF(2) that is degree 2 and the answer is essentially always yes. Over GF(31) —
+Fukuoka MQ types III and VI — it is degree 31 against measured solving degrees of 4 to 9, so the
+answer is no. Over GF(65521), the Courtois MinRank challenge field, degree 65521 is absurd.
+`field_equations` refuses outright only when `q` exceeds a monomial exponent, which is a
+representation limit rather than a policy.
 
 ### A 32-bit prime field
 
@@ -603,10 +669,12 @@ assert_eq!(a.pow(2).value(), 1651245630);   // the canonical residue, not the Mo
 assert_eq!(BabyBear::order_u128(), Some(2013265921));
 ```
 
-Declared: `Zp31` (Fukuoka MQ types III and VI), `Zp65537_32`, `Mersenne31`, `BabyBear`
-(`2^31 - 2^27 + 1`) and `KoalaBear` (`2^31 - 2^24 + 1`, the 2026 Poseidon challenge prime). The
-last two are NTT-friendly; `Zp65537_32` and `Zp2147483647` are the same mathematical fields as
-`Zp65537` and `Mersenne31`'s 64-bit twin, so a caller picks a width rather than a field.
+Declared: `Zp2` (GF(2) — Fukuoka MQ types I and IV, LowMC, HFE), `Zp31` (Fukuoka MQ types III and
+VI), `Zp65537_32`, `Mersenne31`, `BabyBear` (`2^31 - 2^27 + 1`) and `KoalaBear`
+(`2^31 - 2^24 + 1`, the 2026 Poseidon challenge prime). The two Bear fields are NTT-friendly;
+`Zp65537_32` and `Zp2147483647` are the same mathematical fields as `Zp65537` and `Mersenne31`'s
+64-bit twin, so a caller picks a width rather than a field. `Zp2` is the one declared modulus that
+is not odd, so it keeps the wide-remainder path rather than reaching Montgomery form.
 
 **What it is worth, and where.** `cargo run --release --example field_width`. The kernel is
 `target -= factor * source` with the nonzero counters the dense backend maintains, at a fixed

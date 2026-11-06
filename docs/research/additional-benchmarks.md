@@ -270,6 +270,31 @@ What LowMC *is* good for, and why it is on the shortlist at rank 4:
 Fukuoka `GF(2)` and `GF(2^8)` families by name. Until that module is public, nothing in this
 candidate can be imported. Do not bundle the export with the import.
 
+> **Superseded, 2026-11-06 (#218).** The export landed in `8757b4a` (2026-11-05): `src/fields/mod.rs`
+> now `pub use`s `BinaryFieldElement`, `ExtensionFieldElement` and `IrreduciblePolynomial`. It
+> arrived as a side effect of #123's `for_each_field!` work rather than as a deliberate unblocking,
+> which is why this section did not notice. The instruction not to bundle the export with the import
+> was followed — by accident, but followed.
+>
+> What #218 then found is that the export was never the substantive obstacle, and three things were:
+>
+> - **No test exercised the Gröbner stack in characteristic two at all.** That is now closed:
+>   `grobner::tests::test_the_whole_pipeline_over_gf2` and its `Gf256` twin take a planted system
+>   through F4, Buchberger agreement, FGLM, both routes to lex and `solve_one`, and **passed with no
+>   change to the solver**. The stack was generic over `FiniteField` and the genericity held.
+> - **There was no way to adjoin field equations**, without which a `GF(2)` measurement is about the
+>   wrong ideal. `grobner::field_equations` now does, with the radicality consequence checked
+>   against exhaustive enumeration. Over `GF(2)` the generator has degree 2 and is worth adjoining;
+>   the module declines to make that choice for fields where it is not.
+> - **The representation question is open and unmeasured**: `Monomial<N>` is an exponent array where
+>   a bit set would do, and a sparse entry is `(usize, F)` padded to 16 bytes at any width — 16 bytes
+>   per bit over `GF(2)`. Unchanged, and now the only one of the three still outstanding.
+>
+> So LowMC's rank-4 placement is unchanged on its merits — its published results are still claimed
+> complexities rather than computations — but it is **no longer blocked**. #221 resumes it, and
+> notes one thing this section missed: the partial-S-box-layer sets have `s = 1`, so a 3- or 4-round
+> reduction of `(128,1,140)` is one S-box per round and genuinely small.
+
 ## 6. Consequences for the frozen registry (M23-0) and for A4 (#73)
 
 **M23-0 landed `grobner::research::challenge` while this survey was in progress, and it changes the
