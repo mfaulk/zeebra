@@ -1002,6 +1002,14 @@ and so is in the crossover section below:
 | `lagrange_interpolate` | 2 | 2^14 | 2^12 | `5 n B` |
 | `roots` | 2 | 2^12 | 2^8 | `12 n B` |
 
+`fftmul` reaches operand `2^22` over KoalaBear at the same one-second budget, peak `12 n B`. It
+used to stop at `2^18`, and that was **its own verification**: the stage asserted the transform's
+product against schoolbook, which is `O(n^2)` against a quasi-linear subject, so the reported
+ceiling got lower as the multiply got faster. It now checks against schoolbook up to `n = 2^12`
+and by evaluation agreement at four random points above that, and **prints which it did** under
+each curve — a ceiling set by a checker is not the same figure as one set by the stage. See
+[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) §3.
+
 `B = size_of::<F>()` — 8 bytes for a 64-bit field, 32 for a 254-bit one, so **4x**. That is not
 the 2.5x the F4 budgets are written in: those count sparse `(usize, F)` entries, whose 8-byte index
 word is paid whatever the field is and dilutes the ratio. A dense coefficient array has no index
@@ -1169,7 +1177,8 @@ arithmetic: `evaluate` rebuilds coefficient vectors and splits the domain at eve
 sweep's `fftmul` row says the same thing in bytes: exponent 1.0 as expected, but a peak of
 **26 `n B`** against 4 for schoolbook and 7 for a single `evaluate`, for a computation that is
 three transforms. An in-place iterative transform is the work that would move all three crossovers
-at once.
+at once. **#161 did it**, and the re-taken sweep measures `12 n B`; the 26 is the pre-#161 figure,
+kept because the ratios in the table above were taken against that transform.
 
 `Mul` itself stays schoolbook. Choosing a domain needs a primitive `2^k`-th root of unity, which
 needs `KnownOrder` and a source of randomness — neither of which `Mul`'s signature can carry, and

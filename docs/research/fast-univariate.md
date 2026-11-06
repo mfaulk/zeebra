@@ -125,7 +125,7 @@ source.
 | stage | measured exponent | what it is |
 |---|---|---|
 | mul | 1.93 – 2.14 → **2** | schoolbook, which is what `Mul` does |
-| fftmul | 0.90 – 1.15 → **1** | `multiply` through the transform — **measured separately**, §4.1 |
+| fftmul | 1.03 – 1.27 → **1** | `multiply` through the transform — **measured separately and re-taken after #189**, below |
 | div | 1.63 – 2.12 → **2** | in-place long division, after §2 |
 | ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive — **superseded, see §3.3** |
 | intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed — **superseded, see §3.3** |
@@ -137,11 +137,58 @@ numerator product and synthetic division; the exponent is now **1.86 – 2.12 �
 above is the pre-#162 measurement, kept because every other row in this table was taken in the same
 run. §4.3 has the new curves.
 
-**The `fftmul` row was not taken in that run**, since the stage did not exist then: it is a
-`budget=0.25` sweep over KoalaBear backed by a `u64`, which reached size `2^18`. The exponent is
-what the row is for and it does not depend on the budget; the reach is not comparable with §3.1's
-figures, so it is not entered there. §4.1 has the crossover, which is the measurement that matters
-for this stage and which a doubling sweep is too coarse to resolve.
+**The `fftmul` row was not taken in that run**, since the stage did not exist then, and it has
+been re-taken twice. §4.1 has the crossover, which is the measurement that matters for this stage
+and which a doubling sweep is too coarse to resolve.
+
+**The first `fftmul` figure was checker-limited, and is kept labelled as such.** It was a
+`budget=0.25` sweep over KoalaBear backed by a `u64`, reaching size `2^18`, exponent
+**0.90 – 1.15**. The budget was small by necessity rather than by choice: the stage asserted its
+product against `&a * &b`, so its *verification* was `O(n^2)` while its subject is quasi-linear, and
+`budget=1.0` drove the check past operand `2^20` — on the order of `10^12` field multiplications,
+which never finished. **`2^18` is therefore where the checker stopped, not where the multiply did**,
+and the defect got worse as the code improved: #161 made the transform 3.7–6.1x faster on the
+narrow fields, so the quadratic check dominated one doubling earlier each time.
+
+**#189 fixed the instrument**: the stage now checks against schoolbook only up to `n = 2^12`,
+where that check is milliseconds, and above it checks evaluation agreement at four random points,
+`O(n)` a point. The sweep states which it performed, on the line under each curve. Re-taken:
+
+| `fftmul` over KoalaBear in a `u64` | budget | reached | seconds there | peak bytes | exponent | what set the ceiling |
+|---|---:|---:|---:|---:|---|---|
+| before #189 | 0.25 s | `2^18` | — | — | 0.90 – 1.15 | **the schoolbook check** |
+| after #189 | 1.0 s | **`2^22`** | 1.60 | 402 653 184 | 1.03 – 1.27 | the budget, on the multiply |
+
+`2^22` = 4 194 304, a **16x** larger operand than the checker-limited figure, and the stop is
+`4194304 exceeded the budget` — the multiply's own 1.60 s, with the two-adicity ceiling of `2^23`
+for this stage over this field still unreached. The exponent range excludes the `n = 128` row,
+whose 14 µs is dominated by fixed overhead; from `n = 256` up it is 1.03 – 1.27 and the claim the
+row makes is unchanged. Peak is exactly `96` bytes per operand element throughout, i.e. `12 n B` at
+`size_of::<F>() = 8`.
+
+Correctness coverage is not reduced. Full schoolbook agreement still runs on every row to
+`n = 4096`, which is far past the degrees the unit tests use, and
+`src/fft/multiply.rs`'s own suite covers the identity directly:
+`test_the_transform_agrees_with_schoolbook` checks `try_multiply_via_fft` against `&a * &b` over
+five fields including the power-of-two product-length boundary, and
+`test_the_dispatcher_agrees_with_schoolbook_either_side_of_the_crossover` covers the route choice.
+Above `n = 4096` a wrong product differs from the true one by a nonzero polynomial of degree at
+most `2n - 2`, so four independent random points miss the error with probability below `2^-40` at
+`n = 2^20` over a 31-bit field.
+
+Protocol for the re-take: the 128-logical-core / 500 GB development workstation, one core
+(`taskset --cpu-list 8`), release profile with the repository's default `Cargo.toml` settings (fat
+LTO, `codegen-units = 1`) and `-C target-cpu=x86-64-v3` from `.cargo/config.toml`,
+`RUSTC_WRAPPER=""` and a private `CARGO_TARGET_DIR`, under [`tools/benchlock.sh`](../../tools/benchlock.sh) — the run
+queued 59 s behind another holder and its `START`..`END` window overlaps no other, per the lock's
+log. Single-shot: the figure being reported is a 16x change in reach and a scaling exponent, not a
+ratio this machine's ~6% run-to-run variation could move.
+
+```sh
+tools/benchlock.sh agentD env CARGO_TARGET_DIR="$PWD/target" RUSTC_WRAPPER="" \
+  timeout --signal=INT --kill-after=60s 1800 \
+  taskset --cpu-list 8 target/release/examples/univariate_scaling koalabear budget=1.0
+```
 
 ### 3.1 Largest size reached in one second per measurement
 
@@ -404,10 +451,13 @@ cargo run --release --example univariate_scaling -- koalabear budget=0.02
 cargo run --release --example univariate_scaling -- bn254 budget=0.02
 ```
 
-A small budget deliberately: the `fftmul` stage asserts its product against `&a * &b`, so its
-verification is quadratic in the operand degree and a one-second budget pushes that verification
-past operand `2^20`, which does not finish. Milliseconds, minimum of two interleaved rounds,
-`taskset --cpu-list 0-7`:
+A small budget deliberately, and at the time necessarily: the `fftmul` stage then asserted its
+product against `&a * &b`, so its verification was quadratic in the operand degree and a
+one-second budget pushed that verification past operand `2^20`, which does not finish. **#189 has
+since removed that constraint** — the stage checks against schoolbook only to `n = 2^12` and by
+evaluation agreement above it — so this table's budget is no longer forced, but the figures are
+kept as taken. The crossover is a small-degree measurement and a larger budget would not have
+changed it. Milliseconds, minimum of two interleaved rounds, `taskset --cpu-list 0-7`:
 
 | element | side | operand `2^8` | `2^9` | `2^10` | `2^11` | crossing |
 |---|---|---|---|---|---|---|
@@ -447,7 +497,8 @@ whatever next needs `intt` faster. It would take `interpolate` from `2 n B` to `
 
 **Closed by #124.** `multiply`, `multiply_above` and `multiply_over_domain` in `src/fft/multiply.rs`
 pad to a power of two, transform both inputs, multiply pointwise and invert. The sweep's `fftmul`
-row measures exponent 0.90–1.15, against 1.93–2.14 for schoolbook.
+row measures exponent 0.90–1.15, against 1.93–2.14 for schoolbook — 1.03–1.27 on §3's re-take
+after #189, against 1.95–2.01 for schoolbook in the same run.
 
 `Mul` itself stays schoolbook, and cannot do otherwise: choosing a domain needs a primitive
 `2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness, neither of which
@@ -480,6 +531,11 @@ rebuilds coefficient vectors and re-splits the domain at every level of the recu
 peak is **208 bytes per element** — 26 `n B` — against 32 for schoolbook and 56 for a single
 `evaluate`, for a computation that is three transforms. An in-place iterative transform would move
 all three crossovers at once, and is now the highest-value piece of work in the layer.
+
+**#161 did that, and the byte figure moved with it.** §3's re-take measures `fftmul`'s peak at
+**96 bytes per operand element** — `12 n B` — flat across every row from `n = 64` to `n = 2^22`.
+The 208-byte figure above is the pre-#161 measurement, kept because the rest of this subsection's
+argument was built on it.
 
 **#165 adds the third route, between the two.** Karatsuba is `n^log2(3)`: subquadratic, not
 quasi-linear, so the heading above still holds and the transform is still the only quasi-linear

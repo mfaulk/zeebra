@@ -11,6 +11,10 @@
 //! 1. **mul** — a dense product at degree `n - 1`, schoolbook, which is what `Mul` does.
 //! 2. **fftmul** — the same product through the transform, so the two rows are the crossover.
 //!    Needs a domain of `2n` points and so one more power of two than **ntt** does.
+//!    **Verified against schoolbook only up to `n = 2^12`**; above that by evaluation agreement at
+//!    a few random points, which is `O(n)` a point. A quadratic check on a quasi-linear subject
+//!    makes the reported ceiling a property of the checker, and it moves the wrong way as the
+//!    multiply gets faster. Each curve prints the verification it actually performed.
 //! 3. **div** — `div_with_remainder` at the shape `pow_mod` reduces at: degree `2n - 2` by
 //!    degree `n - 1`. Separated from **mul** because root finding spends its time here.
 //! 4. **ntt** — `evaluate` over a size-n domain, which needs a primitive `2^k`-th root of unity
@@ -84,6 +88,21 @@ const FIRST_LOG: u32 = 6;
 
 /// No sweep goes past `2^30`, whatever the budget allows.
 const CEILING_LOG: u32 = 30;
+
+/// Largest operand size the **fftmul** stage checks against schoolbook, as `log2 n`.
+///
+/// Schoolbook is `O(n^2)` and the stage's subject is quasi-linear, so a schoolbook check stops
+/// being a check and becomes the measurement: at `n = 2^20` it is on the order of `10^12` field
+/// multiplications and the sweep never finishes. At `2^12` it is milliseconds.
+const SCHOOLBOOK_CHECK_LOG: u32 = 12;
+
+/// Random points the **fftmul** stage checks at, once past `SCHOOLBOOK_CHECK_LOG`.
+///
+/// A wrong product differs from the true one by a nonzero polynomial of degree at most `2n - 2`,
+/// so one random point misses the error with probability at most `(2n - 2)/q` — below `2^-10` at
+/// `n = 2^20` over a 31-bit field, so four independent points miss it with probability below
+/// `2^-40`. Each point is one Horner pass, `O(n)`.
+const EVALUATION_CHECKS: usize = 4;
 
 // === the allocator ===
 
@@ -184,6 +203,11 @@ struct Curve {
     name: &'static str,
     rows: Vec<Row>,
     stop: Stop,
+    /// What the stage verified, when that is not obvious from its name.
+    ///
+    /// A stage whose check is asymptotically worse than its subject reports a ceiling set by the
+    /// check, so a reader of a table built from these rows has to be able to tell the two apart.
+    verified: Option<String>,
 }
 
 impl Curve {
@@ -209,6 +233,7 @@ fn sweep(
                 return Curve {
                     name,
                     rows,
+                    verified: None,
                     stop: Stop::Unreachable(reason),
                 }
             }
@@ -224,6 +249,7 @@ fn sweep(
                     return Curve {
                         name,
                         rows,
+                        verified: None,
                         stop: Stop::Budget(size),
                     };
                 }
@@ -233,6 +259,7 @@ fn sweep(
     Curve {
         name,
         rows,
+        verified: None,
         stop: Stop::Ceiling,
     }
 }
@@ -283,9 +310,26 @@ fn print_curve(curve: &Curve) {
         );
     }
     println!("stopped: {}", curve.stop.summary());
+    if let Some(verified) = &curve.verified {
+        println!("verified: {}", verified);
+    }
 }
 
 // === the stages ===
+
+/// One line naming exactly what the **fftmul** stage checked, given the largest size it reached.
+fn fftmul_verification(reached: usize) -> String {
+    let bound = 1usize << SCHOOLBOOK_CHECK_LOG;
+    if reached <= bound {
+        format!("every row against schoolbook, n <= {}", bound)
+    } else {
+        format!(
+            "against schoolbook up to n = {}, and above that by evaluation agreement at {} random \
+             points per row — so no row's cost includes a check more expensive than the multiply",
+            bound, EVALUATION_CHECKS
+        )
+    }
+}
 
 /// Measure every stage over F, and report the curves and the field's two-adic ceiling.
 fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<Curve> {
@@ -337,7 +381,7 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
         },
     ));
 
-    curves.push(sweep(
+    let mut fftmul = sweep(
         "fftmul: the same product through the transform",
         budget,
         |log_n| {
@@ -358,11 +402,26 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
             let (product, elapsed, bytes) = measure(|| {
                 try_multiply_via_fft(&a, &b, &mut rng).expect("the two-adicity was checked")
             });
-            // Same seed as `mul`, so this is the same product by the other route.
-            assert_eq!(product, &a * &b, "the transform's product at n = {n}");
+            if log_n <= SCHOOLBOOK_CHECK_LOG {
+                // Same seed as `mul`, so this is the same product by the other route.
+                assert_eq!(product, &a * &b, "the transform's product at n = {n}");
+            } else {
+                // Schoolbook here would cost more than the measurement it is checking, and the
+                // sweep would report where the check stopped rather than where the multiply did.
+                for _ in 0..EVALUATION_CHECKS {
+                    let x = F::random(&mut rng);
+                    assert_eq!(
+                        product.eval(&x),
+                        a.eval(&x) * b.eval(&x),
+                        "the transform's product disagrees at a random point, n = {n}"
+                    );
+                }
+            }
             Ok((elapsed, bytes))
         },
-    ));
+    );
+    fftmul.verified = Some(fftmul_verification(fftmul.reached()));
+    curves.push(fftmul);
 
     curves.push(sweep(
         "div: degree 2n-2 by degree n-1, as pow_mod reduces",
@@ -493,6 +552,14 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
             curve.stop.summary()
         );
     }
+    // Beside the reached sizes, because that is the column a table built from this run quotes and
+    // a size set by a stage's own check is not the same figure as one set by the stage.
+    for curve in &curves {
+        if let Some(verified) = &curve.verified {
+            println!("\n{} — verified {}", curve.name, verified);
+        }
+    }
+
     let first_to_fail = curves
         .iter()
         .min_by_key(|curve| curve.reached())
