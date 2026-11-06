@@ -335,6 +335,17 @@ position that aggregates work across batches, or a single instance large enough 
 substantial, would change the arithmetic. Anyone revisiting this should start from a measurement of
 per-batch phase size, not from the block structure, which misled this milestone three times.
 
+**That escape was taken, outside F4.** #166 parallelized the differential sweep's independent
+*systems* — `SweepOptions::jobs`, one `SingularOracle` per worker, the report assembled in index
+order — where the unit is a whole Gröbner basis plus an FGLM conversion plus a blocking Singular
+subprocess rather than one of F4's batch phases. That is the "aggregates work across batches"
+case: milliseconds to seconds against the 0.52 ms the three won't-dos above could not clear, so
+the overhead argument does not reach it. It leaves #50, #51 and #52 closed on exactly the
+measurements in §6.1 to §6.3: nothing was parallelized *inside* a Gröbner basis, and no figure in
+this document was remeasured. The sweep's product is an agreement verdict and not a timing, which
+is why concurrency is admissible there and why `tools/scoreboard.sh` — whose product *is* the
+timing — was left sequential.
+
 ## 7. Acceptance criteria, closed out
 
 | Criterion | State |

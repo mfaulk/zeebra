@@ -185,6 +185,35 @@ impl SingularOracle {
         })
     }
 
+    /// One oracle per job, each with its own scratch subdirectory `worker-<i>` under `work_dir`.
+    ///
+    /// **The subdirectory is what makes concurrency safe.** A run's scratch files are named from
+    /// this oracle's own `runs` counter, so two oracles in one directory would hand the same
+    /// `run-<pid>-<n>` stem to two concurrent Singular processes — each overwriting the other's
+    /// script and parsing the other's output. Used at one job too, so that the layout does not
+    /// depend on the degree of concurrency.
+    pub fn fleet(
+        binary: impl Into<String>,
+        work_dir: impl AsRef<Path>,
+        timeout: Duration,
+        keep_files: bool,
+        jobs: usize,
+    ) -> Result<Vec<Self>, OracleError> {
+        assert!(jobs >= 1, "a fleet needs at least one oracle");
+        let binary = binary.into();
+        let work_dir = work_dir.as_ref();
+        (0..jobs)
+            .map(|worker| {
+                Self::new(
+                    binary.clone(),
+                    work_dir.join(format!("worker-{}", worker)),
+                    timeout,
+                    keep_files,
+                )
+            })
+            .collect()
+    }
+
     /// Singular's build number, which also proves the binary runs.
     ///
     /// Worth calling before a sweep: the alternative is discovering that Singular is absent once
@@ -525,7 +554,54 @@ fn sorted(basis: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{collect, error_line, marker, markers, sorted, OracleError};
+    use super::{collect, error_line, marker, markers, sorted, OracleError, SingularOracle};
+    use std::{collections::BTreeSet, path::PathBuf, time::Duration};
+
+    /// A fleet gives every worker its own existing scratch directory, under the one asked for.
+    ///
+    /// Scratch names are a per-oracle counter, so two workers in one directory would collide.
+    /// Needs no Singular: the directories are the whole claim.
+    #[test]
+    fn test_a_fleet_gives_every_worker_its_own_scratch_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "zeebra-fleet-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let oracles = SingularOracle::fleet("Singular", &root, Duration::from_secs(1), false, 6)
+            .expect("a writable scratch directory");
+        assert_eq!(oracles.len(), 6);
+
+        let directories: BTreeSet<PathBuf> = oracles
+            .iter()
+            .map(|oracle| oracle.work_dir().to_path_buf())
+            .collect();
+        assert_eq!(directories.len(), 6, "two workers share a directory");
+        for directory in &directories {
+            assert!(
+                directory.is_dir(),
+                "{} was not created",
+                directory.display()
+            );
+            assert!(directory.starts_with(&root));
+        }
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A fleet of one still gets its own subdirectory, so the layout does not depend on `--jobs`.
+    #[test]
+    fn test_a_fleet_of_one_is_still_a_subdirectory() {
+        let root = std::env::temp_dir().join(format!(
+            "zeebra-fleet-one-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let oracles = SingularOracle::fleet("Singular", &root, Duration::from_secs(1), false, 1)
+            .expect("a writable scratch directory");
+        assert_eq!(oracles[0].work_dir(), root.join("worker-0"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// An error line is found wherever Singular put it, with the marker stripped.
     #[test]

@@ -1172,10 +1172,23 @@ one, and compares **every intermediate result** — not only the lex basis:
 ```sh
 cargo run --release --bin zeebra-differential -- --help
 cargo run --release --bin zeebra-differential -- --systems 500
+cargo run --release --bin zeebra-differential -- --systems 500 --jobs 8   # eight at a time
 cargo run --release --bin zeebra-differential -- --seed 777 --systems 240 \
     --max-degree 4 --max-terms 5 \
     --fixtures src/grobner/differential/fixtures.rs   # regenerate the committed cases
 ```
+
+**`--jobs` does not change the answer.** Each system is a Gröbner basis, an FGLM conversion and a
+blocking Singular subprocess, and `system(index)` is a pure function of `(seed, index)` — nothing
+in a system's check reads another's result, so the sweep fans out over whole systems. Each worker
+gets its own `SingularOracle` with its own `worker-<i>` scratch subdirectory, because a run's
+scratch files are named from a per-oracle counter and two workers in one directory would overwrite
+each other's script. The report is assembled **in index order and not in completion order**, and
+the progress callback is held back to index order too: a seeded sweep whose failure list depended
+on which worker finished first could not be reproduced. `--jobs 1` is the sequential sweep, which
+is the default, and the report is pinned equal across one, four and eight jobs by
+`test_a_concurrent_sweep_reproduces_the_sequential_report`. `--jobs` is deliberately *not* recorded
+in a generated fixture module's regeneration command, since it cannot change a recorded answer.
 
 The comparison runs outwards from the source basis and stops at the first disagreement, so what it
 reports is the earliest thing that differs rather than everything downstream of it:

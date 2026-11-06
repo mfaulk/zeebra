@@ -66,8 +66,9 @@ mod tests {
         comparison::{verify_case, Check, DifferentialCase},
         fixtures::FIXTURES,
         generator::{GeneratedSystem, SystemShape},
+        run_sweep,
         singular::{Oracle, OracleError, OracleQuery},
-        SystemOutcome,
+        SweepReport, SystemOutcome,
     };
     use crate::{
         fields::{Zp13, Zp7},
@@ -95,6 +96,61 @@ mod tests {
                 .find(|case| case.name == query.name)
                 .cloned()
                 .ok_or(OracleError::Incomplete)
+        }
+    }
+
+    /// The options the committed fixture table was swept at, which a `RecordedOracle` over that
+    /// table can therefore answer every query of.
+    fn corpus_options(jobs: usize) -> super::SweepOptions {
+        super::SweepOptions {
+            seed: 777,
+            systems: 240,
+            variables: SUPPORTED_VARIABLES.to_vec(),
+            characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+            max_degree: DEFAULT_MAX_DEGREE,
+            max_terms: DEFAULT_MAX_TERMS,
+            minimize_attempts: 0,
+            minimize_budget: std::time::Duration::from_secs(0),
+            jobs,
+            fglm: FglmOptions::unbounded(),
+            f4: F4Options::default(),
+        }
+    }
+
+    /// The committed corpus, swept in process at one job and at several, gives one report.
+    ///
+    /// Seed 777 over 240 systems is exactly the sweep the fixture table was recorded from, so a
+    /// `RecordedOracle` over that table answers every query — a 240-system *agreeing* sweep with
+    /// no Singular installed, which is the one shape of corpus the fan-out has to get right and
+    /// which CI can run. The tallies are the ones the sequential sweep produced before `jobs`
+    /// existed; the full rendering is what pins the order of the 240 recorded cases.
+    #[test]
+    fn test_a_concurrent_sweep_reproduces_the_sequential_report() {
+        let sweep = |jobs: usize| -> SweepReport {
+            let mut oracles: Vec<RecordedOracle> = (0..jobs)
+                .map(|_| RecordedOracle {
+                    cases: FIXTURES.iter().map(|fixture| fixture.to_case()).collect(),
+                })
+                .collect();
+            run_sweep(&corpus_options(jobs), &mut oracles, &mut |_, _, _| {})
+        };
+
+        let sequential = sweep(1);
+        assert_eq!(sequential.attempted, 240);
+        assert_eq!(sequential.agreed, 240);
+        assert_eq!(sequential.zero_dimensional, 120);
+        assert_eq!(sequential.unit_ideals, 55);
+        assert_eq!(sequential.positive_dimensional, 65);
+        assert!(sequential.clean());
+
+        let rendered = format!("{:#?}", sequential);
+        for jobs in [4, 8] {
+            assert_eq!(
+                format!("{:#?}", sweep(jobs)),
+                rendered,
+                "the 240-system corpus at {} jobs is not the sequential report",
+                jobs
+            );
         }
     }
 
@@ -407,16 +463,17 @@ mod tests {
     #[test]
     #[ignore = "needs a local Singular installation"]
     fn test_m22_strategies_agree_with_singular() {
-        use super::{run_sweep, SingularOracle, SweepOptions};
+        use super::{SingularOracle, SweepOptions};
         use crate::grobner::{HilbertSelection, PairSchedule};
         use std::collections::BTreeSet;
         use std::time::Duration;
 
         let work_dir =
             std::env::temp_dir().join(format!("zeebra-m22-differential-{}", std::process::id()));
-        let mut oracle = SingularOracle::new("Singular", &work_dir, Duration::from_secs(60), false)
-            .expect("a writable scratch directory");
-        let version = oracle.version().expect("Singular runs");
+        let mut oracles =
+            SingularOracle::fleet("Singular", &work_dir, Duration::from_secs(60), false, 1)
+                .expect("a writable scratch directory");
+        let version = oracles[0].version().expect("Singular runs");
 
         let configurations: Vec<(&str, F4Options)> = vec![
             ("baseline", F4Options::default()),
@@ -483,10 +540,11 @@ mod tests {
                 max_terms: 4,
                 minimize_attempts: 0,
                 minimize_budget: Duration::from_secs(0),
+                jobs: 1,
                 fglm: FglmOptions::unbounded(),
                 f4,
             };
-            let report = run_sweep(&options, &mut oracle, &mut |_, _, _| {});
+            let report = run_sweep(&options, &mut oracles, &mut |_, _, _| {});
 
             assert!(
                 report.clean(),
@@ -877,14 +935,15 @@ mod tests {
     #[test]
     #[ignore = "needs a local Singular installation"]
     fn test_a_live_sweep_against_singular_agrees() {
-        use super::{run_sweep, SingularOracle, SweepOptions};
+        use super::{SingularOracle, SweepOptions};
         use std::time::Duration;
 
         let work_dir =
             std::env::temp_dir().join(format!("zeebra-differential-test-{}", std::process::id()));
-        let mut oracle = SingularOracle::new("Singular", &work_dir, Duration::from_secs(60), false)
-            .expect("a writable scratch directory");
-        let version = oracle.version().expect("Singular runs");
+        let mut oracles =
+            SingularOracle::fleet("Singular", &work_dir, Duration::from_secs(60), false, 1)
+                .expect("a writable scratch directory");
+        let version = oracles[0].version().expect("Singular runs");
 
         let options = SweepOptions {
             seed: 90_000,
@@ -895,10 +954,11 @@ mod tests {
             max_terms: 4,
             minimize_attempts: 0,
             minimize_budget: Duration::from_secs(0),
+            jobs: 1,
             fglm: FglmOptions::unbounded(),
             f4: F4Options::default(),
         };
-        let report = run_sweep(&options, &mut oracle, &mut |_, _, _| {});
+        let report = run_sweep(&options, &mut oracles, &mut |_, _, _| {});
 
         assert!(
             report.clean(),
@@ -915,6 +975,110 @@ mod tests {
             report.zero_dimensional > 0,
             "the sweep found no zero-dimensional ideal, so it checked no operator column"
         );
+        let _ = std::fs::remove_dir_all(&work_dir);
+    }
+
+    /// Eight live Singulars at once agree with the one, and never share a scratch file.
+    ///
+    /// `#[ignore]`d for the same reason as the sweep above: there is no Singular in CI, and the
+    /// offline half of this claim is pinned by
+    /// `test_a_concurrent_sweep_reproduces_the_sequential_report`. What this adds is the half that
+    /// needs real subprocesses — `keep_files` is on, so every run's script and output survive, and
+    /// a fleet that shared a directory would have overwritten some of them. One script and one
+    /// output per system is the assertion, since `check_system` interrogates exactly once.
+    ///
+    /// ```text
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::differential::tests::test_a_concurrent_live_sweep_agrees_without_collision
+    /// ```
+    #[test]
+    #[ignore = "needs a local Singular installation"]
+    fn test_a_concurrent_live_sweep_agrees_without_collision() {
+        use super::{SingularOracle, SweepOptions};
+        use std::collections::BTreeSet;
+        use std::time::Duration;
+
+        const JOBS: usize = 8;
+        const SYSTEMS: usize = 48;
+
+        let work_dir =
+            std::env::temp_dir().join(format!("zeebra-differential-fleet-{}", std::process::id()));
+        let mut oracles =
+            SingularOracle::fleet("Singular", &work_dir, Duration::from_secs(60), true, JOBS)
+                .expect("a writable scratch directory");
+        assert_eq!(oracles.len(), JOBS);
+
+        let directories: BTreeSet<std::path::PathBuf> = oracles
+            .iter()
+            .map(|oracle| oracle.work_dir().to_path_buf())
+            .collect();
+        assert_eq!(
+            directories.len(),
+            JOBS,
+            "two workers were given the same scratch directory: {:?}",
+            directories
+        );
+
+        let options = SweepOptions {
+            seed: 91_000,
+            systems: SYSTEMS,
+            variables: SUPPORTED_VARIABLES.to_vec(),
+            characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+            max_degree: 3,
+            max_terms: 4,
+            minimize_attempts: 0,
+            minimize_budget: Duration::from_secs(0),
+            jobs: JOBS,
+            fglm: FglmOptions::unbounded(),
+            f4: F4Options::default(),
+        };
+        let mut observed: Vec<(usize, u64)> = Vec::new();
+        let report = run_sweep(&options, &mut oracles, &mut |index, system, _| {
+            observed.push((index, system.seed))
+        });
+
+        assert!(
+            report.clean(),
+            "{} disagreements, {} oracle failures {:?}, {} Zeebra failures {:?}",
+            report.failures.len(),
+            report.oracle_failures.len(),
+            report.oracle_failures,
+            report.zeebra_failures.len(),
+            report.zeebra_failures,
+        );
+        assert_eq!(report.agreed, SYSTEMS);
+        assert_eq!(
+            observed,
+            (0..SYSTEMS)
+                .map(|index| (index, options.seed + index as u64))
+                .collect::<Vec<(usize, u64)>>()
+        );
+
+        let extension_count = |extension: &str| -> usize {
+            directories
+                .iter()
+                .map(|directory| {
+                    std::fs::read_dir(directory)
+                        .expect("a scratch directory")
+                        .filter_map(Result::ok)
+                        .filter(|entry| {
+                            entry.path().extension().and_then(|e| e.to_str()) == Some(extension)
+                        })
+                        .count()
+                })
+                .sum()
+        };
+        assert_eq!(
+            extension_count("sing"),
+            SYSTEMS,
+            "a script was overwritten, so two workers shared a scratch name"
+        );
+        assert_eq!(
+            extension_count("out"),
+            SYSTEMS,
+            "an output was overwritten, so two workers shared a scratch name"
+        );
+
         let _ = std::fs::remove_dir_all(&work_dir);
     }
 
