@@ -354,6 +354,8 @@ cargo run --release --example f4_selection         # reducer selection and the r
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
+cargo run --release --example certification_criteria  # what they discard from a certification pass
+cargo run --release --example certification_criteria -- list
 cargo run --release --example f4_ablation          # every configuration, one table
 cargo run --release --example f4_milestone         # both engines, at matched and default criteria
 cargo run --release --example fglm_baseline        # which systems are zero-dimensional, and what
@@ -2765,10 +2767,37 @@ checks yields `checks_passed()` and a `first_failure()` naming the containment t
 established. The gap and the provenance's effect are each recorded as their own test rather than
 left to be discovered.
 
-Certification is `|G|²/2` normal forms, so it is quadratic in the basis and not cheap.
-`F4Statistics::certification` reports its own cost separately from the total **because that is the
-comparison that decides anything**: a strategy that skips work has to be judged on its cost
-including the check that establishes the result, and a saving the check erases is not a saving.
+Buchberger's criterion names `|G|(|G|−1)/2` pairs, and certification **prunes them with the
+criteria that transfer to a static basis** — the product criterion and Gebauer–Möller's
+lcm-divisibility criteria, both functions of the leading monomials alone. The chain criterion does
+not transfer: it justifies a discard by a pair that has already been *processed*, and a verification
+pass has processed nothing. The strict, history-free form that would be sound is measurably empty on
+this corpus, so it is deferred; `cargo run --release --example certification_criteria` is the
+measurement, and the module documentation of `grobner::f4::certify` has the argument. A criterion
+wrongly applied here is a silent false pass rather than an incomplete basis, so the pruned check is
+asserted to reach the same verdict as the all-pairs check on planted defects as well as on correct
+bases.
+
+| instance | basis | pairs | pruned | all pairs ms | pruned ms | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| katsura-5 | 13 | 78 | 66.7% | 4.3 | 1.2 | 3.6x |
+| katsura-6 | 22 | 231 | 72.3% | 62.6 | 9.9 | 6.3x |
+| cyclic-5 | 20 | 190 | 76.3% | 9.0 | 2.2 | 4.1x |
+| Poseidon `t=2 R_F=2 R_P=2` | 70 | 2 415 | 88.1% | 7 796.3 | 251.6 | **31.0x** |
+| Poseidon `t=2 R_F=4 R_P=0` | 102 | 5 151 | **89.0%** | 27 993.7 | 831.2 | **33.7x** |
+
+The time falls further than the pair count because the pruned pairs are the expensive ones: a
+relatively prime pair's lcm is the product of the two leading monomials, so its S-polynomial is the
+largest the basis has, and Gebauer–Möller's are the pairs with non-minimal lcms. Certifying the
+larger Poseidon instance drops from 28.0 s to 0.83 s, which is the same order as its solve rather
+than dozens of times it.
+
+`CertificationReport::s_polynomials_checked` and `s_polynomials_discarded` report the two counts, so
+the saving is visible rather than inferred; together they cover every pair on a completed check.
+What remains is still quadratic in the basis, so `F4Statistics::certification` still reports its own
+cost separately from the total **because that is the comparison that decides anything**: a strategy
+that skips work has to be judged on its cost including the check that establishes the result, and a
+saving the check erases is not a saving.
 
 With `default()`, **F4 is faster than `buchberger()` on every system and order measured** — 1.2x
 to 236x — and katsura-6 under grevlex, F4's worst case at 0.47x one milestone ago, is 3.8x.
