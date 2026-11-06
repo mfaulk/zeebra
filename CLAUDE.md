@@ -1,0 +1,184 @@
+# CLAUDE.md
+
+Repo-specific guidance for coding agents working on Zeebra. The user-global
+policies (Red-Green TDD, Conventional Commits, README upkeep, sparse source-file
+doc comments, rust-analyzer/LSP for semantic Rust work) apply here unchanged;
+this file adds only what is specific to this repository.
+
+## Multi-agent coordination (claiming work)
+
+Several agents share this repo and the single board
+([Zeebra, project #7](https://github.com/users/mfaulk/projects/7)). GitHub issues
+are the **coordination substrate**: an agent claims an issue before working it,
+keeps the claim alive while active, and releases it when done or abandoning.
+This is what stops two agents doing the same work, and it makes the project
+state self-describing for whoever — human or agent — looks next.
+
+Everything below is implemented by `scripts/agent/zb-claim.sh`. Prefer the
+script over hand-rolled `gh` calls; its reads distinguish failure from emptiness
+(see §0) and hand-rolled ones usually do not.
+
+### 0. Three outcomes, never two
+
+Every read in the claim tooling exits **0 = data, 1 = genuinely empty, 2 = the
+read FAILED**. This matters more than it looks: a rate-limited or
+unauthenticated `gh` prints nothing and exits 0, and through a `| jq` pipeline
+that empty output is indistinguishable from "nothing is claimed" — which would
+hand the same issue to every agent at once.
+
+**Branch on the status, never on whether stdout was empty.**
+
+```bash
+rc=0; queue="$(./scripts/agent/zb-claim.sh orient)" || rc=$?
+case $rc in
+  0) echo "$queue" ;;
+  1) echo "nothing open and unclaimed" ;;
+  *) echo "BOARD READ FAILED — this is not an empty queue" >&2; exit 2 ;;
+esac
+```
+
+### 1. Never run file-mutating agents on a shared checkout
+
+`Agent(..., isolation: "worktree")` is not a reliable guarantee of file
+isolation for concurrent writers. Rules:
+
+- **One writer per checkout.** If you fan out, give each agent its own real
+  `git worktree` on its own branch (`git worktree add ../zb-<slug> -b <branch>
+  origin/main`) and have it operate only there.
+- Prefer **sequential** implementation where the work touches overlapping files.
+  In this repo the contention magnets are `src/grobner/f4/`, `src/linalg/`, and
+  `src/fields/` — several open issues touch each.
+- Read-only fan-out (search, audit) parallelizes safely; **writes do not**.
+- After any parallel run, `git status` the orchestrator checkout and confirm no
+  agent touched files outside its scope.
+
+All agents commit as the same git user, so the assignee cannot tell them apart.
+The distinguishing identity is **worktree + branch**:
+
+```bash
+./scripts/agent/zb-claim.sh id      # e.g. zb-two-adicity@feat/two-adicity
+```
+
+### 2. Orient before picking up work (every session start)
+
+```bash
+git fetch --prune
+./scripts/agent/zb-claim.sh orient
+```
+
+`orient` lists open issues that are **unclaimed** and **unblocked**, ranked
+`High → Medium → Low → unset`. Priority is a board field rather than a label, so
+the read joins each issue to its board row.
+
+Selection rule: take the highest-priority unclaimed, unblocked issue. Skip
+anything labeled `agent:claimed` unless its lease is stale (§5), anything
+labeled `blocked`, and anything a human has assigned to someone else. Respect
+stated dependencies — several issues name a prerequisite in their body (for
+instance #124 depends on #119, which depends on #122).
+
+### 3. Claim it, before writing any code
+
+A claim is a **structured comment + the `agent:claimed` label + self-assign +
+board Status = In Progress**. The comment carries the identity and a **4-hour
+lease**; the label alone cannot expire, because a label does not record when it
+was applied.
+
+```bash
+./scripts/agent/zb-claim.sh claim 119 "implement two-adicity and the two-adic root of unity"
+```
+
+That writes a marker other agents parse — keep the shape exactly:
+
+```
+<!-- zb-claim agent="<id>" at="<iso8601>" until="<iso8601>" -->
+```
+
+`claim` re-reads the issue afterwards and tells you whether you actually hold
+it. **Among claims inside the current lease window, the earliest `at=` wins** —
+two agents claiming in the same second both see their own comment land, so the
+tiebreak has to be a property of the data, not of who looked last. If `verify`
+exits 1 you lost: release and pick something else.
+
+```bash
+./scripts/agent/zb-claim.sh verify 119      # rc 0 = yours, rc 1 = back off
+```
+
+### 4. Keep the claim alive
+
+The lease is 4 hours. A claim is **live** if **any** of these hold, else
+**stale** and reclaimable:
+
+- an open linked PR exists (`Closes #NNN` / `Fixes #NNN`) — always live; or
+- the newest marker's `until=` is still in the future; or
+- a commit landed on the claim branch inside the lease window.
+
+The cleanest heartbeat is to **open a draft PR early** with `Closes #NNN` in the
+body: it pins the issue to In Progress and signals liveness with no timer to
+babysit. Working long without a PR, refresh before the lease expires:
+
+```bash
+./scripts/agent/zb-claim.sh heartbeat 119
+./scripts/agent/zb-claim.sh state 119       # live | stale
+```
+
+A marker with an unparseable `until=` counts as **stale** by design — a corrupt
+claim must not strand an issue behind something no one can disprove.
+
+### 5. Reclaiming a stale claim
+
+```bash
+./scripts/agent/zb-claim.sh reap                 # every claimed issue whose lease expired
+./scripts/agent/zb-claim.sh reclaim 119 "<intent>"
+```
+
+`reclaim` refuses if the lease is live, and announces the takeover in a comment
+so the trail stays honest. Before reusing or discarding the previous agent's
+branch, look at what is there (`git fetch && git log origin/<their-branch>`) and
+salvage usable commits rather than silently dropping them.
+
+### 6. Release
+
+- **Finished** → open the PR with `Closes #NNN`. Merging closes the issue and
+  moves the board to Done. Drop the working label:
+  `./scripts/agent/zb-claim.sh release 119`. Leave the issue open until the PR
+  merges; the PR keeps it In Progress.
+- **Abandoning or handing off** → never leave a silent dangling claim. Comment
+  what was and was not done and why, then:
+  `./scripts/agent/zb-claim.sh release 119 --abandon`, which also removes the
+  assignee and returns the board row to Todo.
+
+### 7. Keep board state truthful
+
+The next agent's orientation is only as good as the state you leave behind. File
+issues for follow-ups, bugs, and scope creep you discover, add them to the board
+explicitly, set Priority, and link parent ↔ sub-issue both ways.
+
+## Board reference
+
+| Thing | Value |
+|---|---|
+| Project | [#7 Zeebra](https://github.com/users/mfaulk/projects/7) (private) |
+| Views | Open, Bugs, Polynomial System Solving, Blocked, Owner Actions, Opportunities |
+| Status | `Todo` / `In Progress` / `Done` |
+| Priority | `High` / `Medium` / `Low` — a board field, not a label |
+| Coordination labels | `agent:claimed`, `blocked`, `owner-action`, `opportunity` |
+
+Every view is grouped by Priority and carries Priority, Milestone, Linked pull
+requests, Status, and Labels. Note that **group-by is not settable through the
+GitHub API** — it is a UI-only setting, so a view created by script needs its
+grouping set by hand (View → Group by → Priority → Save view, then confirm in
+the modal).
+
+## Tests for the agent tooling
+
+`scripts/agent/zb-claim.sh` has unit tests over its pure half — marker parsing,
+race resolution, and the lease arithmetic:
+
+```bash
+bash scripts/agent/test/zb-claim-test.sh
+shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh
+```
+
+Both run in CI (the `agent-scripts` job). The subcommands that call `gh` are
+deliberately not unit-tested: they are thin wrappers whose failure modes are the
+API's, and a test that mocked `gh` would pin the mock rather than the behaviour.

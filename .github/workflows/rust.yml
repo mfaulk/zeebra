@@ -192,3 +192,21 @@ jobs:
       - name: Lint
         if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # The agent claim tooling is shell, so it is invisible to every job above. Its pure half —
+  # marker parsing, race resolution, lease arithmetic — is what stops two agents working the
+  # same issue, and a regression there is silent at the point of use.
+  agent-scripts:
+    name: Agent coordination scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shellcheck
+        run: shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh
+
+      # `!cancelled()` for the same reason as the lint job: a shellcheck finding should not hide
+      # a behavioural failure behind a second round trip.
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: bash scripts/agent/test/zb-claim-test.sh
