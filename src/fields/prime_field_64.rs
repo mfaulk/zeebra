@@ -397,8 +397,8 @@ mod tests {
 
     use crate::{
         fields::{
-            PrimeFieldElement64, Zp1091, Zp13, Zp18446744069414584321, Zp18446744073709551557,
-            Zp2147483647, Zp541, Zp65537, Zp7,
+            finite_field::fermat_inverse_via_recursive_pow, PrimeFieldElement64, Zp1091, Zp13,
+            Zp18446744069414584321, Zp18446744073709551557, Zp2147483647, Zp541, Zp65537, Zp7,
         },
         identities::{One, Zero},
         FiniteField, KnownOrder, ParseFieldElementError,
@@ -688,12 +688,55 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
     // Zero does not have a multiplicative inverse.
     fn test_inverse_of_zero() {
         type Zp = PrimeFieldElement64<7>;
         let element = Zp::new(0);
         let _inverse = element.inverse();
+    }
+
+    /// Every nonzero element of a small field inverts to exactly what the recursive-pow reference
+    /// gives, over the internal representation and not merely up to the field axioms.
+    #[test]
+    fn test_inverse_is_bit_identical_to_the_reference_exhaustively() {
+        fn check<const P: u64>() {
+            for value in 1..P {
+                let a = PrimeFieldElement64::<P>::new(value);
+                assert_eq!(
+                    a.inverse(),
+                    fermat_inverse_via_recursive_pow(&a),
+                    "P = {P}: {value}"
+                );
+            }
+        }
+
+        check::<7>();
+        check::<541>();
+        check::<65537>();
+    }
+
+    proptest! {
+        /// Inversion is bit-identical to the recursive-pow reference at each declared modulus,
+        /// including the largest 64-bit prime, where the exponent fills a whole limb.
+        #[test]
+        fn test_inverse_is_bit_identical_to_the_reference(seed in any::<u64>()) {
+            fn check<const P: u64>(seed: u64) {
+                let a = PrimeFieldElement64::<P>::new(seed);
+                if a.is_zero() {
+                    return;
+                }
+                assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a), "P = {P}: {seed}");
+            }
+
+            check::<7>(seed);
+            check::<541>(seed);
+            check::<65537>(seed);
+            check::<2147483647>(seed);
+            check::<4611624995532046337>(seed);
+            check::<18446744069414584321>(seed);
+            check::<18446744073709551557>(seed);
+        }
     }
 
     fn addition_is_commutative<F: FiniteField>(a: F, b: F) {

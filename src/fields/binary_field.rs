@@ -442,6 +442,7 @@ mod tests {
                 modulus_degree, multiply_polynomials, multiply_polynomials_scalar,
                 BinaryFieldElement,
             },
+            finite_field::fermat_inverse_via_recursive_pow,
             irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X_1},
         },
         FiniteField, KnownOrder,
@@ -826,6 +827,45 @@ mod tests {
             let a = BinaryFieldElement::<X8_X4_X3_X_1>::new(x);
             let a_inv = a.inverse();
             assert_eq!(a * a_inv, BinaryFieldElement::new(1));
+        }
+    }
+
+    /// Zero does not have a multiplicative inverse.
+    #[test]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
+    fn test_inverse_of_zero() {
+        let _inverse = Gf256::zero().inverse();
+    }
+
+    /// Every nonzero element of two small binary fields inverts to exactly what the recursive-pow
+    /// reference gives, over the bit pattern and not merely up to the field axioms.
+    #[test]
+    fn test_inverse_is_bit_identical_to_the_reference_exhaustively() {
+        fn check<const P: u64>() {
+            let order = 1u64 << modulus_degree(P);
+            for pattern in 1..order {
+                let a = BinaryFieldElement::<P>::new(pattern);
+                assert_eq!(
+                    a.inverse(),
+                    fermat_inverse_via_recursive_pow(&a),
+                    "GF(2^{}): {pattern:b}",
+                    modulus_degree(P)
+                );
+            }
+        }
+
+        check::<X5_X2_1>();
+        check::<X8_X4_X3_X_1>();
+    }
+
+    proptest! {
+        /// Inversion is bit-identical to the recursive-pow reference over GF(2^63), where the
+        /// exponent fills most of a limb.
+        #[test]
+        fn test_inverse_is_bit_identical_to_the_reference(a in Gf2Pow63::arbitrary()) {
+            if !a.is_zero() {
+                assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a));
+            }
         }
     }
 

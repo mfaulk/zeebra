@@ -449,6 +449,47 @@ pub trait KnownOrder: FiniteField {
     }
 }
 
+/// The recursive square-and-multiply that every `inverse` reached through before #160.
+///
+/// Frozen here rather than delegating to [`FiniteField::pow`], so that the differential tests
+/// keep comparing against the historical behaviour even if `pow`'s default body changes.
+#[cfg(test)]
+pub(crate) fn recursive_pow<F: FiniteField>(a: &F, b: u128) -> F {
+    if a.is_zero() {
+        if b == 0 {
+            // 0^0 = 1.
+            return F::one();
+        }
+        return F::zero();
+    }
+
+    if b == 0 {
+        return F::one();
+    }
+
+    if b == 1 {
+        *a
+    } else if b.is_multiple_of(2) {
+        let y = recursive_pow(a, b / 2);
+        y * y
+    } else {
+        *a * recursive_pow(a, b - 1)
+    }
+}
+
+/// `a^(q - 2)` by the pre-#160 route: [`recursive_pow`] over an exponent taken in a `u128`.
+///
+/// The reference every field's `inverse` is differentially tested against.
+///
+/// # Panics
+/// Panics if the order does not fit in a `u128`, which excludes the fields that never used this
+/// route in the first place.
+#[cfg(test)]
+pub(crate) fn fermat_inverse_via_recursive_pow<F: KnownOrder>(a: &F) -> F {
+    let order = F::order_u128().expect("the reference inverse needs the order as an integer");
+    recursive_pow(a, order - 2)
+}
+
 /// `limbs` as a `u128`, or `None` if it is wider than that.
 fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
     if limbs.len() > 2 {

@@ -457,8 +457,8 @@ mod tests {
 
     use crate::{
         fields::{
-            BabyBear, KoalaBear, Mersenne31, PrimeFieldElement32, PrimeFieldElement64, Zp31,
-            Zp65537_32,
+            finite_field::fermat_inverse_via_recursive_pow, BabyBear, KoalaBear, Mersenne31,
+            PrimeFieldElement32, PrimeFieldElement64, Zp31, Zp65537_32,
         },
         identities::{One, Zero},
         FiniteField, KnownOrder, ParseFieldElementError,
@@ -890,9 +890,63 @@ mod tests {
 
     /// Zero does not have a multiplicative inverse.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
     fn test_inverse_of_zero() {
         let _inverse = Zp31::new(0).inverse();
+    }
+
+    /// Every nonzero element of a small field inverts to exactly what the recursive-pow reference
+    /// gives, over the internal representation and not merely up to the field axioms.
+    #[test]
+    fn test_inverse_is_bit_identical_to_the_reference_exhaustively() {
+        fn check<const P: u32>() {
+            for value in 1..P {
+                let a = PrimeFieldElement32::<P>::new(value as u64);
+                assert_eq!(
+                    a.inverse(),
+                    fermat_inverse_via_recursive_pow(&a),
+                    "P = {P}: {value}"
+                );
+            }
+        }
+
+        check::<31>();
+        check::<65537>();
+    }
+
+    proptest! {
+        /// Inversion is bit-identical to the recursive-pow reference at each declared modulus.
+        #[test]
+        fn test_inverse_is_bit_identical_to_the_reference(seed in any::<u32>()) {
+            fn check<const P: u32>(seed: u32) {
+                let a = PrimeFieldElement32::<P>::new(seed as u64);
+                if a.is_zero() {
+                    return;
+                }
+                assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a), "P = {P}: {seed}");
+            }
+
+            check::<31>(seed);
+            check::<65537>(seed);
+            check::<2147483647>(seed);
+            check::<2013265921>(seed);
+            check::<2130706433>(seed);
+            check::<BIG>(seed);
+        }
+
+        /// The 31-bit Mersenne field inverts the same whether it is backed by a `u32` or a `u64`.
+        ///
+        /// Two separate implementations of one field: a disagreement here is a defect in whichever
+        /// of them changed, and neither type can be the oracle for the other by construction.
+        #[test]
+        fn test_inversion_agrees_across_the_two_mersenne31_backings(seed in any::<u32>()) {
+            const P: u32 = 2147483647;
+            let narrow = Mersenne31::new(seed as u64);
+            if !narrow.is_zero() {
+                let wide = PrimeFieldElement64::<{ P as u64 }>::new(seed as u64);
+                prop_assert_eq!(narrow.inverse().value() as u64, wide.inverse().value());
+            }
+        }
     }
 
     proptest! {

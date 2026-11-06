@@ -518,6 +518,7 @@ mod tests {
         fields::{
             binary_field::BinaryFieldElement,
             extension_field::{ExtensionFieldElement, IrreduciblePolynomial},
+            finite_field::fermat_inverse_via_recursive_pow,
             irreducible_polynomials::{
                 Modulus13Pow4, Modulus251Pow4, Modulus2Pow8, Modulus3Pow2, Modulus5Pow3,
                 X8_X4_X3_X_1,
@@ -783,13 +784,80 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
     // Zero does not have a multiplicative inverse.
     fn test_inverse_of_zero() {
         type F = F251x4;
         let mut rng = thread_rng();
         let element = F::random(&mut rng);
         let _result = element / F::zero();
+    }
+
+    /// `inverse` on zero panics with the stated message, rather than through division.
+    #[test]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
+    fn test_inverse_of_zero_panics_directly() {
+        let _inverse = F13x4::zero().inverse();
+    }
+
+    /// Every element of a field of order p^N, by reading an index off in base p.
+    fn enumerate<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>>(
+    ) -> Vec<ExtensionFieldElement<P, N, M>> {
+        let order = P.pow(N as u32);
+        (0..order)
+            .map(|index| {
+                let mut coefficients = [0u64; N];
+                let mut rest = index;
+                for c in coefficients.iter_mut() {
+                    *c = rest % P;
+                    rest /= P;
+                }
+                ExtensionFieldElement::new(coefficients)
+            })
+            .collect()
+    }
+
+    /// Every nonzero element of three small extensions inverts to exactly what the recursive-pow
+    /// reference gives, over the coefficient representation and not merely up to the field axioms.
+    #[test]
+    fn test_inverse_is_bit_identical_to_the_reference_exhaustively() {
+        fn check<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>>() {
+            for a in enumerate::<P, N, M>() {
+                if a.is_zero() {
+                    continue;
+                }
+                assert_eq!(
+                    a.inverse(),
+                    fermat_inverse_via_recursive_pow(&a),
+                    "GF({P}^{N}): {a}"
+                );
+            }
+        }
+
+        check::<3, 2, Modulus3Pow2>();
+        check::<5, 3, Modulus5Pow3>();
+        check::<2, 8, Modulus2Pow8>();
+    }
+
+    proptest! {
+        /// Inversion is bit-identical to the recursive-pow reference over the larger extensions,
+        /// including one whose order needs two limbs.
+        #[test]
+        fn test_inverse_is_bit_identical_to_the_reference(
+            a in F13x4::arbitrary(),
+            b in F251x4::arbitrary(),
+            c in FM31x2::arbitrary(),
+        ) {
+            if !a.is_zero() {
+                prop_assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a));
+            }
+            if !b.is_zero() {
+                prop_assert_eq!(b.inverse(), fermat_inverse_via_recursive_pow(&b));
+            }
+            if !c.is_zero() {
+                prop_assert_eq!(c.inverse(), fermat_inverse_via_recursive_pow(&c));
+            }
+        }
     }
 
     #[test]
