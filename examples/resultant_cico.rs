@@ -8,7 +8,18 @@
 //! cargo run --release --example resultant_cico            # the rows this construction reaches
 //! cargo run --release --example resultant_cico -- --all   # attempt the rest; see §4 of the doc
 //! cargo run --release --example resultant_cico -- --write # record the results on the scoreboard
+//! cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the scaling study
 //! ```
+//!
+//! # Concurrency
+//!
+//! `--concurrency` takes a comma-separated list and **defaults to `1`**, so the figures recorded
+//! before it existed reproduce unchanged. Each row runs the whole elimination-and-solve once per
+//! entry, and the resultant's coefficients and the witness set are asserted **equal across the
+//! list** — the determinants are independent and indexed, so a difference would be a bug and not a
+//! race worth tolerating. With more than one entry a scaling table is printed, and each level is
+//! recorded as its own scoreboard row carrying its own `concurrency`: `Comparison::of` refuses to
+//! divide one by another, because that ratio is a core count rather than a solver speedup.
 //!
 //! # The structure the resultant exploits
 //!
@@ -49,10 +60,10 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::research::{
-        bivariate_resultant_ntt, bivariate_resultant_reference, challenge, cico_bivariate,
-        registry, sylvester_determinant_at, ChallengeManifest, CicoInstance, Environment, Json,
-        ResultantRoute, RunOutcome, RunRecord, Scoreboard, Specialization, Stage, StageCost,
-        KOALABEAR_PRIME,
+        bivariate_resultant_ntt_with, bivariate_resultant_reference_with, challenge,
+        cico_bivariate, registry, sylvester_determinant_at, ChallengeManifest, CicoInstance,
+        Environment, Json, ResultantOptions, ResultantRoute, ResultantStages, RunOutcome,
+        RunRecord, Scoreboard, Specialization, Stage, StageCost, KOALABEAR_PRIME,
     },
     roots,
     util::peak_resident_bytes,
@@ -94,8 +105,39 @@ fn evaluate_symbolically(instance: &CicoInstance<K>, fixed: &[K]) -> Bivariate {
     }
 }
 
+/// The `--concurrency` list, defaulting to a single uncontended run.
+///
+/// Parsed strictly: a malformed or zero entry stops the run rather than quietly becoming 1, since
+/// the number is recorded on the scoreboard and a mis-parse would label a single-threaded figure as
+/// a parallel one.
+fn concurrencies() -> Vec<usize> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        let list = match arg.strip_prefix("--concurrency=") {
+            Some(rest) => rest.to_string(),
+            None if arg == "--concurrency" => args.next().unwrap_or_else(|| {
+                panic!("--concurrency needs a comma-separated list, e.g. --concurrency 1,8,32")
+            }),
+            None => continue,
+        };
+        return list
+            .split(',')
+            .map(|entry| {
+                let n: usize = entry
+                    .trim()
+                    .parse()
+                    .unwrap_or_else(|_| panic!("{} is not a worker count", entry));
+                assert!(n >= 1, "a worker count is at least 1");
+                n
+            })
+            .collect();
+    }
+    vec![1]
+}
+
 fn main() {
     let write = std::env::args().any(|a| a == "--write");
+    let concurrencies = concurrencies();
     let mut board = Scoreboard::new();
     println!("# M23-E: a resultant against F4 on the registered t = 16 slices\n");
     println!(
@@ -146,7 +188,7 @@ fn main() {
             println!("- `--all` attempts it anyway\n");
             continue;
         }
-        if let Some(record) = row(&manifest, 1) {
+        for record in row(&manifest, 1, &concurrencies) {
             board
                 .add(record, &registry())
                 .expect("a registered problem");
@@ -163,10 +205,17 @@ fn main() {
                 .iter()
                 .find(|c| c.id == run.challenge)
                 .expect("checked on add");
+            // The concurrency is part of the file name only when it is not 1, so a single-threaded
+            // row keeps the name its history is already filed under while a parallel row of the
+            // same problem, formulation and commit lands beside it instead of on top of it.
             let name = format!(
-                "{}--{}--{}.json",
+                "{}--{}{}--{}.json",
                 run.challenge,
                 run.formulation.replace([' ', '(', ')', ','], "-"),
+                match run.environment.concurrency {
+                    1 => String::new(),
+                    n => format!("--c{}", n),
+                },
                 run.environment.commit
             );
             std::fs::write(
@@ -220,8 +269,14 @@ fn main() {
     );
 }
 
-/// One registered row: evaluate, eliminate, solve, verify.
-fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
+/// One registered row: evaluate once, then eliminate and solve at each degree of parallelism.
+///
+/// The symbolic evaluation is shared across the concurrency list — it is not the stage being
+/// measured and is single-threaded at every level. The elimination-and-solve runs once per entry,
+/// each a full pass down to running the permutation, and every pass's resultant and witness set is
+/// asserted equal to the first's. The determinants are independent and written into their own
+/// index, so the only thing a difference there could mean is a bug.
+fn row(manifest: &ChallengeManifest, seed: u64, concurrencies: &[usize]) -> Vec<RunRecord> {
     let parameters = manifest.poseidon_parameters().expect("a CICO row");
     let rounds = parameters.rounds();
     let instance = manifest.cico_instance::<K>().expect("a registered problem");
@@ -263,7 +318,106 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     let f = built.outputs[0].clone();
     let g = built.outputs[1].clone();
 
-    let (resultant, stages) = match bivariate_resultant_ntt(&f, &g, 1) {
+    let mut records: Vec<RunRecord> = Vec::new();
+    let mut passes: Vec<Pass> = Vec::new();
+    for &concurrency in concurrencies {
+        if concurrencies.len() > 1 {
+            println!("\n### {} worker{}\n", concurrency, plural(concurrency));
+        }
+        let Some(pass) = solve(
+            &instance,
+            &f,
+            &g,
+            &fixed,
+            rounds,
+            built.elapsed,
+            concurrency,
+        ) else {
+            return records;
+        };
+        if let Some(first) = passes.first() {
+            assert_eq!(
+                pass.resultant, first.resultant,
+                "the resultant at {} workers differs from the one at {}",
+                concurrency, first.concurrency
+            );
+            assert_eq!(
+                pass.witnesses, first.witnesses,
+                "the witness set at {} workers differs from the one at {}",
+                concurrency, first.concurrency
+            );
+            println!(
+                "- byte-identical resultant coefficients and the identical witness set as at {} \
+                 worker{}",
+                first.concurrency,
+                plural(first.concurrency)
+            );
+        }
+        records.push(record(manifest, seed, free, &built, &pass, rounds));
+        passes.push(pass);
+    }
+
+    if passes.len() > 1 {
+        scaling(&passes);
+    }
+    println!();
+    records
+}
+
+/// What one elimination-and-solve pass produced, at one degree of parallelism.
+struct Pass {
+    /// Workers the determinants were spread over.
+    concurrency: usize,
+    /// The eliminated polynomial. Compared across passes, so it is kept.
+    resultant: UnivariatePolynomial<K>,
+    /// The subgroup route's stage costs.
+    stages: ResultantStages,
+    /// The reference route's, when the A/B control ran.
+    reference_stages: Option<ResultantStages>,
+    /// Points off the interpolation domain that agreed with a direct determinant, and the cost.
+    off_domain: (usize, Duration),
+    /// Roots of the resultant, and the cost of finding them.
+    candidates: (usize, Duration),
+    /// Candidate pairs lifted from those roots, and the cost.
+    pairs: (usize, Duration),
+    /// The verified witnesses, in root order, and the cost of running the permutation on every
+    /// candidate. Compared across passes.
+    witnesses: Vec<(K, K)>,
+    /// Time spent in `is_solution`.
+    verification: Duration,
+}
+
+impl Pass {
+    /// The elimination's wall clock: determinants plus recovery.
+    fn elimination(&self) -> Duration {
+        self.stages.sampling + self.stages.interpolation
+    }
+}
+
+/// `s` unless `n` is 1, for the worker counts in the narrative.
+fn plural(n: usize) -> &'static str {
+    if n == 1 {
+        ""
+    } else {
+        "s"
+    }
+}
+
+/// Eliminate the second unknown at `concurrency` workers, then solve and verify.
+///
+/// `None` when the resultant is refused, which is a fact about the two polynomials and therefore
+/// does not depend on the concurrency.
+fn solve(
+    instance: &CicoInstance<K>,
+    f: &MultivariatePolynomial<2, K>,
+    g: &MultivariatePolynomial<2, K>,
+    fixed: &[K],
+    rounds: usize,
+    build: Duration,
+    concurrency: usize,
+) -> Option<Pass> {
+    let options = ResultantOptions::with_concurrency(concurrency);
+    let (resultant, stages) = match bivariate_resultant_ntt_with(f, g, 1, options) {
         Ok(pair) => pair,
         Err(error) => {
             println!("- the resultant was refused: {}\n", error);
@@ -286,9 +440,11 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
         ),
     }
     println!(
-        "- {} Sylvester determinants of order {} in {:.1} ms; interpolation {:.1} ms",
+        "- {} Sylvester determinants of order {} on {} worker{} in {:.1} ms; interpolation {:.1} ms",
         stages.samples,
         stages.matrix_order,
+        stages.concurrency,
+        plural(stages.concurrency),
         stages.sampling.as_secs_f64() * 1e3,
         stages.interpolation.as_secs_f64() * 1e3
     );
@@ -305,7 +461,7 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     // short of both figures distinguishes those.
     let reference_stages = if stages.degree_bound <= AB_CONTROL_BOUND {
         let (reference, rstages) =
-            bivariate_resultant_reference(&f, &g, 1).expect("both involve the second");
+            bivariate_resultant_reference_with(f, g, 1, options).expect("both involve the second");
         assert_eq!(
             reference, resultant,
             "the subgroup route and the reference disagree"
@@ -336,7 +492,7 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     // never saw. `degree_bound + 1` samples already determine it, so agreement at a point outside
     // the sample set is evidence about the construction rather than a restatement of it.
     let at = Instant::now();
-    let fresh = off_domain_check(&f, &g, &resultant, &stages.route, 8);
+    let fresh = off_domain_check(f, g, &resultant, &stages.route, 8);
     let independent = at.elapsed();
     println!(
         "- {} points outside the interpolation domain agree with a direct Sylvester determinant, \
@@ -361,7 +517,7 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     let pairs: Vec<(K, K)> = candidates
         .iter()
         .flat_map(|first| {
-            extend(&f, &g, *first)
+            extend(f, g, *first)
                 .into_iter()
                 .map(move |second| (*first, second))
         })
@@ -375,40 +531,108 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
     );
 
     let at = Instant::now();
-    let mut witnesses = 0usize;
+    let mut witnesses: Vec<(K, K)> = Vec::new();
     for (first, second) in &pairs {
         let mut inputs = vec![*first, *second];
-        inputs.extend_from_slice(&fixed);
+        inputs.extend_from_slice(fixed);
         if instance.is_solution(&inputs).unwrap_or(false) {
-            witnesses += 1;
+            witnesses.push((*first, *second));
             println!("  - witness: x = {}, y = {}", first, second);
         }
     }
     let verification = at.elapsed();
     println!(
         "- {} verified witnesses, checked through `permutation_plus_linear` in {:.1} ms",
-        witnesses,
+        witnesses.len(),
         verification.as_secs_f64() * 1e3
     );
-    let total = built.elapsed + elimination + independent + root_finding + lifting + verification;
+    let pass = Pass {
+        concurrency,
+        resultant,
+        stages,
+        reference_stages,
+        off_domain: (fresh, independent),
+        candidates: (candidates.len(), root_finding),
+        pairs: (pairs.len(), lifting),
+        witnesses,
+        verification,
+    };
+    let total = build + pass.elimination() + independent + root_finding + lifting + verification;
     println!("- **total {:.1} ms**", total.as_secs_f64() * 1e3);
     // The estimate is the live dense arrays: the sample vector, the domain and its inverse, and
     // the recovered coefficients, each of `samples` field elements.
-    let estimated = 4 * stages.samples * std::mem::size_of::<K>();
+    let estimated = 4 * pass.stages.samples * std::mem::size_of::<K>();
     match peak_resident_bytes() {
         Some(bytes) => println!(
             "- peak resident {:.1} MB measured process-wide; {:.1} MB estimated for the \
-             interpolation's live arrays\n",
+             interpolation's live arrays",
             bytes as f64 / 1e6,
             estimated as f64 / 1e6
         ),
         None => println!(
             "- {:.1} MB estimated for the interpolation's live arrays; no process measurement on \
-             this platform\n",
+             this platform",
             estimated as f64 / 1e6
         ),
     }
+    Some(pass)
+}
 
+/// The scaling table across a concurrency list, with the parallel efficiency spelled out.
+///
+/// Efficiency is the measured determinant speedup divided by the worker ratio. It is the figure
+/// that says whether the limit is core count or something else: near 1 means cores, well below it
+/// means the sample loop is bounded by something the extra workers do not supply.
+fn scaling(passes: &[Pass]) {
+    let base = &passes[0];
+    println!("\n### Scaling of the determinant stage\n");
+    println!(
+        "| workers | subgroup determinants | speedup | efficiency | reference determinants | \
+         speedup | efficiency |"
+    );
+    println!("|---:|---:|---:|---:|---:|---:|---:|");
+    for pass in passes {
+        let ratio = pass.concurrency as f64 / base.concurrency as f64;
+        let subgroup = base.stages.sampling.as_secs_f64() / pass.stages.sampling.as_secs_f64();
+        let (reference, reference_efficiency) =
+            match (&base.reference_stages, &pass.reference_stages) {
+                (Some(b), Some(p)) => {
+                    let speedup = b.sampling.as_secs_f64() / p.sampling.as_secs_f64();
+                    (
+                        format!("{:.1} ms | {:.2}x", p.sampling.as_secs_f64() * 1e3, speedup),
+                        format!("{:.0}%", 100.0 * speedup / ratio),
+                    )
+                }
+                _ => ("— | —".to_string(), "—".to_string()),
+            };
+        println!(
+            "| {} | {:.1} ms | {:.2}x | {:.0}% | {} | {} |",
+            pass.concurrency,
+            pass.stages.sampling.as_secs_f64() * 1e3,
+            subgroup,
+            100.0 * subgroup / ratio,
+            reference,
+            reference_efficiency
+        );
+    }
+    println!(
+        "\nSpeedup and efficiency are against {} worker{}. Every row above recovered the same \
+         resultant and the same witnesses.",
+        base.concurrency,
+        plural(base.concurrency)
+    );
+}
+
+/// The scoreboard record for one pass.
+fn record(
+    manifest: &ChallengeManifest,
+    seed: u64,
+    free: usize,
+    built: &Bivariate,
+    pass: &Pass,
+    rounds: usize,
+) -> RunRecord {
+    let bezout = 3u64.pow(rounds as u32) * 3u64.pow(rounds as u32);
     let mut record = RunRecord::new(
         manifest,
         format!("resultant, slice(12 fixed, seed {})", seed),
@@ -422,28 +646,32 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
         ),
         "eliminate the second unknown by a Sylvester resultant".to_string(),
     ];
-    record.outcome = if witnesses > 0 {
-        RunOutcome::VerifiedWitness
-    } else {
+    record.outcome = if pass.witnesses.is_empty() {
         RunOutcome::SliceEstablishedNothing
+    } else {
+        RunOutcome::VerifiedWitness
     };
     record.verification = format!(
         "{} candidate pairs checked by running permutation_plus_linear ({} verified); the \
          resultant itself checked against a direct Sylvester determinant at {} points outside \
          the interpolation domain",
-        pairs.len(),
-        witnesses,
-        fresh
+        pass.pairs.0,
+        pass.witnesses.len(),
+        pass.off_domain.0
     );
-    let mut eliminated = StageCost::new(Stage::Elimination, elimination)
-        .with("resultant_degree", resultant.degree() as i64)
+    let mut eliminated = StageCost::new(Stage::Elimination, pass.elimination())
+        .with("resultant_degree", pass.resultant.degree() as i64)
         .with("bezout_bound", bezout as i64)
-        .with("degree_bound", stages.degree_bound as i64)
-        .with("samples", stages.samples as i64)
-        .with("matrix_order", stages.matrix_order as i64)
-        .with("sampling_us", stages.sampling.as_micros() as i64)
-        .with("interpolation_us", stages.interpolation.as_micros() as i64);
-    if let Some(rstages) = reference_stages {
+        .with("degree_bound", pass.stages.degree_bound as i64)
+        .with("samples", pass.stages.samples as i64)
+        .with("matrix_order", pass.stages.matrix_order as i64)
+        .with("concurrency", pass.stages.concurrency as i64)
+        .with("sampling_us", pass.stages.sampling.as_micros() as i64)
+        .with(
+            "interpolation_us",
+            pass.stages.interpolation.as_micros() as i64,
+        );
+    if let Some(rstages) = &pass.reference_stages {
         eliminated = eliminated
             .with("reference_samples", rstages.samples as i64)
             .with("reference_sampling_us", rstages.sampling.as_micros() as i64)
@@ -457,13 +685,13 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
             .with("bivariate_degree", built.degrees[0] as i64)
             .with("terms", built.terms[0] as i64),
         eliminated,
-        StageCost::new(Stage::Univariate, root_finding + lifting)
-            .with("roots", candidates.len() as i64)
-            .with("lifted_pairs", pairs.len() as i64)
-            .with("lifting_us", lifting.as_micros() as i64),
-        StageCost::new(Stage::Verification, verification + independent)
-            .with("witnesses", witnesses as i64)
-            .with("off_domain_checks", fresh as i64),
+        StageCost::new(Stage::Univariate, pass.candidates.1 + pass.pairs.1)
+            .with("roots", pass.candidates.0 as i64)
+            .with("lifted_pairs", pass.pairs.0 as i64)
+            .with("lifting_us", pass.pairs.1.as_micros() as i64),
+        StageCost::new(Stage::Verification, pass.verification + pass.off_domain.1)
+            .with("witnesses", pass.witnesses.len() as i64)
+            .with("off_domain_checks", pass.off_domain.0 as i64),
     ];
     record.environment = Environment {
         commit: commit(),
@@ -475,12 +703,20 @@ fn row(manifest: &ChallengeManifest, seed: u64) -> Option<RunRecord> {
                 .unwrap_or(0),
             std::env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unpinned".to_string())
         ),
+        concurrency: pass.concurrency,
         build: "release, RUSTFLAGS from .cargo/config.toml".to_string(),
-        policy: "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
-            .to_string(),
+        policy: format!(
+            "straight-line evaluation, one Sylvester resultant by interpolation, {} determinant \
+             worker{}, no budget",
+            pass.concurrency,
+            plural(pass.concurrency)
+        ),
     };
-    record.reproduce = "cargo run --release --example resultant_cico -- --write".to_string();
-    Some(record)
+    record.reproduce = format!(
+        "cargo run --release --example resultant_cico -- --concurrency {} --write",
+        pass.concurrency
+    );
+    record
 }
 
 /// How many fresh points agree with a direct Sylvester determinant.

@@ -115,7 +115,9 @@ is `O(n²)` apiece and `O(n³)` in total. Extrapolating 12.9 s at 2 000 points t
 four-round row needs gives **about an hour for the interpolation alone** — against roughly
 `3 × 10^10` field multiplications, or a few minutes, for all 13 123 determinants together.
 
-So the ranked list of what to fix is not what §3 guessed:
+So the ranked list of what to fix is not what §3 guessed. **The ranking below is the pre-#162 one
+and is superseded**: it is kept because it is the measurement that chose what to fix, and each entry
+carries what later measurement did to it. The current ranking is §6.6's.
 
 1. **The interpolation.** `O(n³)` where Newton's divided differences are `O(n²)` and a product-tree
    or NTT evaluation is `O(n log² n)`. KoalaBear has the two-adic roots of unity for the NTT route —
@@ -124,13 +126,19 @@ So the ranked list of what to fix is not what §3 guessed:
    interpolation above now takes 1.37 s measured rather than the extrapolated hour. The table in
    this section is the pre-#162 measurement and is kept as such; see
    [`fast-univariate.md`](fast-univariate.md) §4.3.2 for the same point counts after.**
-   **Fixed again, and this is where it ends: the NTT subgroup route of §6 recovers 16 384 points
-   in 2.1 ms. §6.4 is why that turns out not to matter.**
+   **Fixed again: the NTT subgroup route of §6 recovers 16 384 points in 2.1 ms. §6.4 argued that
+   ended the direction; §6.6 measures it back in contention once the determinants are parallel —
+   at 32 workers the reference route is 55% Lagrange solve.**
 2. **The sample count**, 2x loose: the degree bound is `2d²` and the observed degree is `d²`.
-   **Now the largest remaining win, and larger than 2x — §6.3 measures a resultant whose degree is
-   9x below the bound, not 2x.**
-3. **The determinant**, which is a few minutes of the hour and therefore last. **Now first.** With
-   the interpolation at milliseconds it is 99% of the four-round row. §6.4.
+   **Now the largest remaining *algorithmic* win, and larger than 2x — §6.3 measures a resultant
+   whose degree is 9x below the bound, not 2x. Not implemented.**
+3. **The determinant**, which is a few minutes of the hour and therefore last. **Now first, and
+   done in part.** With the interpolation at milliseconds it was 99% of the four-round row (§6.4);
+   #180 spread the independent determinants over workers and measured **29–31x at 32 of this box's
+   128 cores**, at 92–95% parallel efficiency, taking the four-round row from 49.7 s to 2.16 s with
+   byte-identical coefficients. §6.6. What remains unexploited is the Sylvester *structure* — the
+   path is still a generic dense LU per sample — which is an asymptotic improvement rather than a
+   constant factor and composes with the parallelism.
 
 That reordering is the useful output of attempting a row that does not finish. `bivariate_resultant`
 is a reference implementation and the module says so; what the spike establishes is which of its
@@ -152,22 +160,25 @@ columns are the record of what one measurement supported and what the next one c
 | Does structure-aware elimination beat general F4 here? | **Yes, by 578x** on the one row both can do, and it returns every witness rather than the first. | unchanged, and the factor is larger: the two-round total is now 7.0 ms, so **4 306x**. |
 | Is the univariate polynomial manageable? | Yes at two rounds — degree 81, 17 ms to find its roots over KoalaBear. | Yes at four — degree 729 in 60 ms, degree 6 561 in 4.2 s. |
 | Does Poseidon's structure reduce the degree below Bézout? | **No.** The bivariate degree is exactly `3^rounds` and the resultant's is exactly `d²`. | **Sometimes yes.** Four rounds with `R_P = 2` gives **729 against 6 561**; with `R_P = 0` it gives 6 561 exactly. The bivariate degree is still exactly `3^rounds`. §6.3. |
-| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in two hours with this implementation, six rounds `3.3 × 10^15` operations. | Four rounds in **40 s** by the reference route, 49 s by the subgroup one. The exponent is unchanged, so six rounds is still `3.3 × 10^15`: the reach moved one step up the ladder, not an order of growth. |
-| Which cost should an implementation attack first? | **The interpolation**, measured at `O(n³)` — not the determinant, which is a few minutes of the hour. §4.1. | Settled, by #162 and then by §6: the interpolation is **3.9%** of the four-round row and provably cannot dominate again. **Now the sample count, then the determinant.** §6.4. |
+| Does it scale? | No. The cost is `16 · 3^{5·rounds}`: two rounds in 52 ms, four rounds not in two hours with this implementation, six rounds `3.3 × 10^15` operations. | Four rounds in **40 s** by the reference route, 49 s by the subgroup one, and **2.16 s on 32 cores** (§6.6). The exponent is unchanged, so six rounds is `3.3 × 10^15` serially and `10^14` on 32 cores: the reach moved one step up the ladder and the constant moved 30x, neither of which is an order of growth. |
+| Which cost should an implementation attack first? | **The interpolation**, measured at `O(n³)` — not the determinant, which is a few minutes of the hour. §4.1. | Revised twice. §6.4: the interpolation is **3.9%** of the four-round row and, *serially*, provably cannot dominate again — so the sample count, then the determinant. §6.6 then measured the determinant: **the determinant, and it was 29–31x of parallelism at 92–95% efficiency**, 49.7 s to 2.16 s. That also undoes §6.4's "provably": with the determinants parallel the recovery is 55% of the reference route at 32 workers, so the ranking is now **the sample count, then the Sylvester structure, with the interpolation back in contention at high worker counts**. |
 | Did it extend the frontier? | **No** — both routes reach two rounds. What it changed is the cost there, by 578x. | **Yes** — verified CICO witnesses at **four rounds** on two registered reductions, where F4 stops at two. Credit goes to #162's quadratic `lagrange_interpolate` and the formulation of §1, **not** to the subgroup route, which §6.5 measures as slower. §6.1. |
-| Should a resultant implementation be scoped? | Yes, and narrowly: early-terminating interpolation plus a structured determinant, aimed at the slice shape, not at a general solver. | Narrower still. The interpolation half is finished and was the wrong half; what remains is a **predicted** sample count from §6.3's degree formula, guarded by an off-domain check, and a structured or parallel determinant. §6.4. |
+| Should a resultant implementation be scoped? | Yes, and narrowly: early-terminating interpolation plus a structured determinant, aimed at the slice shape, not at a general solver. | Narrower still. The interpolation half is finished and was the wrong half; the **parallel** determinant is done and measured (§6.6). What remains is a **predicted** sample count from §6.3's degree formula, guarded by an off-domain check, and a **structured** determinant exploiting the Sylvester form — the one piece that is asymptotic rather than a constant. |
 
 ## 6. The four-round row completing, and a subgroup interpolation that does not help
 
-Reference for #82 and #85. Three results, in order of what they are worth:
+Reference for #82, #85 and #180. Four results, in order of what they are worth:
 
 1. **The four-round rows complete with verified witnesses**, where M23-E reached two rounds. §6.1.
    The enabling change is #162's quadratic `lagrange_interpolate`, not anything in this milestone.
 2. **The published `d^{2R_F+R_P}` resultant degree is confirmed** on three registered slices, one
    of which discriminates it from both the Bézout bound and the other form the source gives. §6.3.
-3. **The NTT-subgroup interpolation is slower than the reference**, by 1.23x–1.40x, and §6.4 argues
-   structurally that no interpolation improvement can help this route again. §6.5. A negative
-   result, and the reason to stop looking at that stage.
+3. **The determinants parallelize at 92–95% efficiency** out to 32 of this box's 128 cores, taking
+   the four-round row from 49.7 s to 2.16 s with byte-identical coefficients — and in doing so
+   **falsify §6.4's claim** that no interpolation improvement could help this route again. §6.6.
+4. **The NTT-subgroup interpolation is slower than the reference** single-threaded, by 1.23x–1.40x.
+   §6.5. A negative result at the time; §6.6 measures the sign flipping at eight workers and the
+   subgroup route winning by 1.7–1.8x at 32, which is why both routes were worth retaining.
 
 `bivariate_resultant_ntt` is `bivariate_resultant` with the samples moved: the *same* Sylvester
 determinant of the *same* two polynomials, eliminating the *same* variable, evaluated on a
@@ -318,8 +329,15 @@ interpolation at `n = 2d²` points is `O(n²) = O(d^4)` after #162. So:
 > of this route at any round count.** An `O(n log n)` recovery removes a term that is already
 > asymptotically negligible.
 
-That closes off the direction, which is more useful than a speedup would have been. The ranked list
-is now:
+> **Superseded by §6.6, and this is the interesting correction.** The argument above holds for a
+> **serial** route and silently assumes one. Spread the determinants over `p` workers and they cost
+> `d^5/p` against the recovery's `d^4`, so the recovery returns to contention once `p` reaches the
+> order of `d` — measured, at `d = 81` and `p = 32`, as the reference route spending 55% of its
+> elimination inside `lagrange_interpolate`. The claim as stated above is wrong; the narrower one
+> that survives is in §6.6.
+
+That looked like it closed off the direction, which would have been more useful than a speedup. The
+ranked list as of this section — see §6.6 for the current one — was:
 
 1. **The sample count** — the largest remaining win, and larger than §3's 2x. §6.3's confirmation of
    `d^{2R_F+R_P}` makes the needed count **predictable a priori**, not merely adaptively
@@ -330,8 +348,10 @@ is now:
 2. **The determinant** — 99% of the row today. A Sylvester matrix is structured and the generic
    dense LU path exploits none of it; the 16 384 determinants are also embarrassingly parallel, and
    this run used one core of 128. Either is a large constant factor and neither is algorithmically
-   deep.
-3. **The interpolation** — done, twice, and provably not where the cost is.
+   deep. **The parallel half is done and measured in §6.6: 29–31x at 32 cores. The structured half
+   is not.**
+3. **The interpolation** — done, twice, and provably not where the cost is. **The "provably" is
+   retracted: see the note above and §6.6.**
 
 The exponent is unchanged, which bounds every claim above. The route still costs about
 `16 · 3^{5·rounds}` field operations: `3.3 × 10^15` at six rounds and `1.9 × 10^20` at eight, before
@@ -339,7 +359,11 @@ the bivariate evaluation has to cube a polynomial with 265 720 terms. **Four rou
 rounds not with any constant factor this list can supply.** What moved is the reach by one step of
 the ladder, not the growth.
 
-### 6.5 The A/B: the subgroup route loses, at every size measured
+### 6.5 The A/B: the subgroup route loses, at every size measured — single-threaded
+
+> **Scoped by §6.6.** Everything in this section is at one worker, and the sign of the result
+> depends on that: §6.6 measures the subgroup route winning by 1.7–1.8x at 32 workers, because its
+> extra determinants parallelize and the reference route's Lagrange solve does not.
 
 Every row runs **both** routes on the same two polynomials in the same process and asserts the two
 answers are equal, so the comparison is free of build, machine and contention differences:
@@ -373,6 +397,129 @@ Two notes on comparability:
   for the same point count. The difference is the element type — these rows use the 64-bit-backed
   `PrimeFieldElement64<KOALABEAR_PRIME>` and #162's sweep used the 32-bit-backed `KoalaBear` — and
   is reported rather than reconciled.
+
+### 6.6 The determinants in parallel, and the recovery stage mattering again
+
+Reference for #180. §6.4 ranked the determinant second and called it "a large constant factor,
+neither algorithmically deep". That is now measured, and it also **falsifies §6.4's own asymptotic
+claim about the interpolation** — which is the more interesting half.
+
+`ResultantOptions::concurrency` spreads the independent determinants over worker threads. It
+defaults to 1, so every figure above reproduces unchanged. The samples are written into their own
+index rather than collected as they finish, so the recovered polynomial is a function of the
+abscissa sequence alone: the resultant's coefficients and the witness set are **byte-identical at
+1, 8 and 32 workers**, asserted by the run itself and pinned by
+`test_the_registered_slice_gives_the_same_witnesses_at_every_concurrency` and
+`test_the_resultant_does_not_depend_on_the_concurrency`.
+
+Measured with
+
+```sh
+ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=0-31 \
+  flock /tmp/zeebra-bench.lock \
+  taskset -c 0-31 \
+  cargo run --release --example resultant_cico -- --concurrency 1,8,32
+```
+
+on the development workstation (128 logical cores, 256 MB L3, 500 GB; `-C target-cpu=x86-64-v3`
+from `.cargo/config.toml`, `profile.release` with fat LTO and one codegen unit), seed 1, under an
+exclusive benchmark lock, with the worker set **pinned to a 32-core subset** rather than left to
+contend with the eight-core set the rest of the scoreboard uses. Two independent runs of the same
+binary:
+
+| row | workers | subgroup determinants | speedup | efficiency | reference determinants | speedup | efficiency |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `t16 R_F=2 R_P=2` | 1 | 49 261 ms | — | — | 39 632 ms | — | — |
+| | 8 | 6 428 ms | 7.66x | 96% | 5 143 ms | 7.71x | 96% |
+| | 32 | 1 674 ms | 29.4x | 92% | 1 301 ms | 30.5x | 95% |
+| `t16 R_F=4 R_P=0` | 1 | 49 821 ms | — | — | 41 091 ms | — | — |
+| | 8 | 6 482 ms | 7.69x | 96% | 5 189 ms | 7.92x | 99% |
+| | 32 | 1 632 ms | 30.5x | 95% | 1 351 ms | 30.4x | 95% |
+
+End to end on the subgroup route, including the shared 0.4 s bivariate build and the single-threaded
+tail: `R_F=2 R_P=2` goes from **49.7 s to 2.16 s** and `R_F=4 R_P=0` from **54.5 s to 6.12 s**. The
+second row's larger residual is its own degree-6 561 root finding — 4.0 s of it, untouched here and
+tracked separately.
+
+**Repeated.** The first run gave 7.40x/29.2x and 7.91x/30.6x against the 7.66x/29.4x and
+7.69x/30.5x tabulated; the two agree on every sample count, every resultant degree and every
+witness.
+
+#### What the 5–8% shortfall at 32 workers is, by evidence
+
+Not the core count: 32 workers on a 32-core pinned set returned 29.4–30.5x, and the box has 128.
+The limit is the **all-core clock**, and the discriminating measurement is core-time per
+determinant — wall clock times workers, divided by 16 384:
+
+| workers | `R_F=2 R_P=2` | `R_F=4 R_P=0` |
+|---:|---:|---:|
+| 1 | 3.007 ms | 3.041 ms |
+| 8 | 3.139 ms | 3.165 ms |
+| 32 | 3.270 ms | 3.188 ms |
+
+Per-determinant cost steps up 4% as soon as eight cores are busy and then moves 1–4% more out to
+32. **A memory-bandwidth limit would widen monotonically with the number of concurrent streams, and
+this does not** — it saturates at the point where the clock does. Two independent bounds agree:
+
+- **Working set.** One determinant holds an order-162 matrix of eight-byte elements, 210 KB, and
+  `crout_lu_pivoting` returns `L`, `U` and `P` beside it: about 840 KB live per worker. At 32
+  workers that is 27 MB against this box's 256 MB L3, and measured peak RSS tracks it — 16.2 MB at
+  one worker, 24.5 MB at eight, 54.9 MB at 32. Bandwidth has no way to bind here.
+  `MILESTONE-SIMD-PARALLELISM.md` §8.2 is about misreading a working set on exactly this L3, and the
+  point of quoting the figure is that it is small, not that it is fast.
+- **The matrix build.** Building the Sylvester matrix is 26 244 element writes and 326 polynomial
+  evaluations against the LU's roughly `162³/3 ≈ 1.4 × 10⁶` multiply-and-subtract steps — under 2%
+  by operation count, and *per worker*, so it is not a serial bottleneck at any width.
+
+#### Where the granularity argument stops
+
+The two-round row is the counter-example that bounds the claim. Its 256 determinants are order 18,
+about 8.6 µs each, and it gets 2.2–2.5x at eight workers and **gets slower** at 32 — 1.2–1.3 ms
+against 2.2 ms serial. Dividing out the work gives about 35 µs of spawn and join per thread, which
+is four times a whole determinant. `MILESTONE-SIMD-PARALLELISM.md` §6.4's aggregating-granularity
+rule is what this is: the four-round rows clear it by a factor of 350, the two-round row does not
+clear it at all, and the default of 1 worker is what keeps the small row honest.
+
+#### §6.4's asymptotic claim does not survive concurrency
+
+§6.4 argued that because determinant work grows as `d^5` and quadratic Lagrange interpolation as
+`d^4`, no further interpolation improvement could ever change this route's cost. That argument
+assumed **both stages serial**. Spread the determinants over `p` workers and they cost `d^5/p`
+while the Lagrange solve stays `d^4`, so the recovery is back in contention as soon as `p` reaches
+the order of `d` — and at `d = 81`, `p = 32` is already close enough to see it:
+
+| row | workers | subgroup elimination | reference elimination | of which `lagrange_interpolate` | subgroup / reference |
+|---|---:|---:|---:|---:|---:|
+| `t16 R_F=2 R_P=2` | 1 | 49 262 ms | 41 272 ms | 1 640 ms (4%) | **1.19x** |
+| | 8 | 6 429 ms | 6 773 ms | 1 630 ms (24%) | **0.95x** |
+| | 32 | 1 675 ms | 2 884 ms | 1 583 ms (55%) | **0.58x** |
+| `t16 R_F=4 R_P=0` | 1 | 49 822 ms | 42 736 ms | 1 645 ms (4%) | **1.17x** |
+| | 8 | 6 482 ms | 6 832 ms | 1 643 ms (24%) | **0.95x** |
+| | 32 | 1 633 ms | 2 957 ms | 1 606 ms (54%) | **0.55x** |
+
+**§6.5's negative result inverts.** The subgroup route loses by 1.17–1.19x single-threaded and wins
+by 1.7–1.8x at 32 workers, and the arithmetic is plain: its extra 3 261 determinants parallelize and
+the reference route's 1.6 s Lagrange solve does not. At 32 workers the reference route is *more than
+half* serial interpolation.
+
+So the two routes are not redundant after all, and retaining the one §6.5 measured as a loss turns
+out to have been the right call for a reason §6.5 could not see. The honest form of §6.4's claim is
+narrower: **a serial route cannot be helped by a faster interpolation; a parallel one can, and the
+NTT recovery is the one that keeps up.** Nothing here changes the exponent — the route still costs
+about `16 · 3^{5·rounds}` operations and six rounds is still `3.3 × 10^15`, which 32 cores move to
+`10^14` and not to reach.
+
+#### The scoreboard, and what is not recorded here
+
+The figures above are **not** on the cryptanalysis scoreboard as a speedup, and the machinery now
+refuses to make them one. `Environment::concurrency` is recorded on every run and defaults to 1 for
+every record written before it existed; `Comparison::of` returns
+`ScoreboardError::DifferentConcurrency` rather than a ratio when two runs disagree on it; and
+`Scoreboard::best` — the headline the rendered table quotes — considers uncontended runs only, so a
+30x core count cannot displace the single-core figure it is not comparable with.
+`Scoreboard::best_at` reaches the parallel rows deliberately. This differs from #166, which
+parallelized a differential sweep whose product was an agreement verdict and therefore needed none
+of this.
 
 ## 7. The deeper consequence
 

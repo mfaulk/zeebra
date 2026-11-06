@@ -33,6 +33,9 @@ As the saying goes, you can either make software so simple that it obviously has
       reduced-round instance
 - [x] Graeffe-transform root finding: one root at degree `3^13` over KoalaBear in 3.1 s, against an
       extrapolated 57 hours for the quadratic finder
+- [x] The resultant route's Sylvester determinants in parallel: 92–95% efficiency out to 32 cores,
+      the four-round CICO row from 49.7 s to 2.16 s, with the concurrency recorded on the
+      scoreboard and a cross-concurrency comparison refused rather than quoted
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -317,6 +320,7 @@ tools/scoreboard.sh stable --write                 # the same, pinned, updating 
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (~2 min: two four-round rows now complete)
+cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the determinant scaling study
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -2007,11 +2011,32 @@ six rounds remains `3.3 × 10^15` and out of reach.
 `bivariate_resultant_ntt` moves where the samples are taken: the *same* Sylvester determinants on a
 power-of-two multiplicative subgroup, recovered with one `fft::interpolate`, with
 `interpolation_route` falling back to `bivariate_resultant_reference` on a field whose two-adicity
-admits no domain — Mersenne-31's is 1. **It is measured slower than the reference, by 1.23x–1.40x**,
-and the reason generalizes: the sample count goes as `2d²` and each sample is an order-`2d`
-determinant, so determinant work grows as `d^5` against a quadratic interpolation's `d^4`. Padding
-13 123 samples up to 16 384 costs 10.4 s of determinants to remove 1.5 s of interpolation. Both
-routes are retained and `examples/resultant_cico.rs` runs them side by side in one process.
+admits no domain — Mersenne-31's is 1. **Single-threaded it is measured slower than the reference,
+by 1.23x–1.40x**: the sample count goes as `2d²` and each sample is an order-`2d` determinant, so
+determinant work grows as `d^5` against a quadratic interpolation's `d^4`, and padding 13 123
+samples up to 16 384 costs 10.4 s of determinants to remove 1.5 s of interpolation. Both routes are
+retained and `examples/resultant_cico.rs` runs them side by side in one process.
+
+**That sign flips under concurrency, and retaining both routes is why it could be seen.**
+`ResultantOptions::concurrency` spreads the independent determinants over worker threads and
+defaults to 1, so every figure above reproduces unchanged. The samples are written into their own
+index rather than collected as they finish, so the recovered polynomial does not depend on the
+worker count — asserted byte-identical, with the identical witness set, at 1, 8 and 32. Measured on
+a 32-core pinned set under the benchmark lock, the four-round determinant stage runs at **92–95%
+parallel efficiency out to 32 of this box's 128 cores**, taking `rf2-rp2` end to end from 49.7 s to
+**2.16 s**. The shortfall is the all-core clock and not bandwidth: per-determinant core time steps
+up 4% once eight cores are busy and is then flat to 32, and the live working set is 27 MB against a
+256 MB L3. The subgroup route then *wins* by 1.7–1.8x, because its extra determinants parallelize
+and the reference route's 1.6 s Lagrange solve does not — at 32 workers the reference route is more
+than half serial interpolation.
+
+Timings carry the concurrency onto the scoreboard rather than hiding it. `Environment::concurrency`
+is recorded on every run and reads back as 1 for records written before it existed;
+`Comparison::of` **refuses** two runs that disagree on it, with `DifferentConcurrency`, since the
+ratio would be a core count rather than a speedup; and `Scoreboard::best` — the headline the
+rendered table quotes — considers uncontended runs only, so a 30x of cores cannot displace the
+single-core figure it is not comparable with. `Scoreboard::best_at` reaches the parallel rows on
+purpose.
 
 Two other results from the same run: the resultant's degree matches the **published, unproven**
 `d^{2R_F+R_P}` on all three rows measured — 729 against a Bézout bound of 6 561 on the row with
