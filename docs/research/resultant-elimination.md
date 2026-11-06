@@ -1,10 +1,13 @@
 # Elimination that is not a Gröbner basis: a resultant on the registered CICO slices
 
-Reference for M23-E (#141), which consumes #82 and #85. **§1–§5 are M23-E, with the figures it
-took; §6 supersedes §4 and amends §2 and §5, and says so inline. Nothing is overwritten.**
+Reference for M23-E (#141), which consumes #82 and #85, continued by M24-B (#179, #211). **§1–§5
+are M23-E, with the figures it took; §6 supersedes §4 and amends §2 and §5; §6.7 supersedes §6.4's
+ranked list. Each says so inline. Nothing is overwritten.**
 
 ```sh
-cargo run --release --example resultant_cico          # ~2 min: the four-round rows now complete
+cargo run --release --example resultant_cico          # the rows the budget admits
+cargo run --release --example resultant_cico -- --concurrency 1,8,32          # §6.6's scaling
+cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
 cargo test --lib grobner::research::resultant
 cargo test --release --lib grobner::research::resultant -- --ignored   # the four-round row, ~1 min
 ```
@@ -520,6 +523,157 @@ every record written before it existed; `Comparison::of` returns
 `Scoreboard::best_at` reaches the parallel rows deliberately. This differs from #166, which
 parallelized a differential sweep whose product was an agreement verdict and therefore needed none
 of this.
+
+### 6.7 The predicted sample count, measured — and §6.4's ranked list closed out
+
+§6.3 confirmed [JAZ] slide 22's experimental degree `d^{2R_F+R_P}` on three registered rows and
+§6.4 ranked acting on it first. #179 does, and this is what it measures. **§6.4's ranked list is
+superseded by the one at the end of this section**; it is kept where it is, because it chose the
+order the work was done in and was right about it.
+
+#### Three sample counts, and which denominator a factor is quoted against
+
+| count | where it comes from | `rf2-rp2` | `rf4-rp0` |
+|---|---|---:|---:|
+| NTT domain | the proven bound padded to a power of two — §6.2 | 16 384 | 16 384 |
+| proven `2d²` | `n·deg_x(f) + m·deg_x(g)` + 1, the reference route — §6.5 | 13 123 | 13 123 |
+| **predicted** | `3^{2R_F+R_P}` + 1, from the row's own `alpha`, `R_F` and `R_P` | **730** | **6 562** |
+
+So the sample-count reduction is **22.44x** and **2.50x** against what the route did by default
+before #179, and **17.98x** and **2.00x** against the proven reference route. The second pair is
+the one the measurements below use, because the reference is what runs beside the prediction in the
+same process at the same concurrency. Both pairs are exact — they are ratios of integer sample
+counts, not timings.
+
+#### The four cells
+
+`poseidon31-cico-t16-rf2-rp2` and `-rf4-rp0`, KoalaBear, seed 1. One binary from one tree, so the
+only difference between cells is a flag; each invocation measures the predicted and the proven
+counts in one process on the same two polynomials at one concurrency, which isolates #179, and the
+two concurrencies give #227's effect at both counts. `taskset --cpu-list 40-47` in **every** cell
+so affinity is not a variable, under `tools/benchlock.sh`, interleaved `1, 8, 1, 8`. Determinant
+stage only, mean of two passes:
+
+| row | | proven 13 123 | predicted 730 / 6 562 | **#179** |
+|---|---|---:|---:|---:|
+| `rf2-rp2` | 1 worker | 39 764 ms | **2 214 ms** | **17.96x** |
+| | 8 workers | 5 239 ms | **333 ms** | **15.7x** |
+| | **#227** | **7.59x** (95%) | **6.65x** (83%) | **119x both** |
+| `rf4-rp0` | 1 worker | 39 175 ms | **19 714 ms** | **1.99x** |
+| | 8 workers | 5 087 ms | **2 547 ms** | **2.00x** |
+| | **#227** | **7.70x** (96%) | **7.74x** (97%) | **15.4x both** |
+
+**The two reductions multiply, and #179 delivers its sample-count ratio exactly.** 17.96x against
+17.98x fewer determinants on `rf2-rp2` and 1.99x against 2.00x on `rf4-rp0`: the per-determinant
+cost is unchanged by the sample count, 3 033 µs against 3 030 µs on the one row and 3 004 against
+2 985 on the other, which is what it should be and is worth checking rather than assuming.
+
+Row wall clock, build through verification: `rf2-rp2` **0.88 s** at 8 workers (2.74 s at 1), and
+`rf4-rp0` **7.58 s** at 8 workers (24.66 s at 1). Both still return the witnesses §6 recorded, the
+same coordinates through `permutation_plus_linear`, and on both rows **the prediction held** — eight
+points outside the sample set agreed with a direct Sylvester determinant, for 22–25 ms.
+
+**One cell is not resolved and is not claimed.** `rf2-rp2`'s predicted count at 8 workers measured
+379.0 ms and 286.7 ms on the two passes, a 32% spread, which is outside the ±20% this workstation's
+noise makes readable. The honest form is that 730 determinants over 8 workers is 91 apiece and the
+fixed costs — thread setup, and the sequential layout of the abscissae — are then a visible share,
+so parallel efficiency falls off at that size: **6.0–7.7x, 75–96%**. `rf4-rp0` at 6 562 samples has
+no such problem at 97%, and neither does either row at the proven count. The 119x combined figure
+inherits that uncertainty; 15.4x on `rf4-rp0` does not.
+
+#### #179 closes §6.6's reopening of the interpolation question
+
+§6.6 found that a *parallel* route can be helped by a faster recovery, since the determinants
+shrink with the core count and the interpolation does not: at the proven count on 8 workers the
+Lagrange solve is **23.5%** of `rf2-rp2`'s elimination. With the predicted count it is **1.7%**.
+
+The reason is the exponents, and it is general rather than a fact about this row: determinant work
+is **linear** in the sample count and the Lagrange recovery is **quadratic** in it, so cutting
+samples 18x cuts the determinants 18x and the recovery 323x. Fewer samples therefore makes the
+recovery a *smaller* share — the opposite direction to adding cores. It shows up in the totals: the
+elimination-stage speedup from #179 is **18.5x** against the determinant stage's 17.96x, because
+the proven path also pays 1.6 s of interpolation that the predicted path reduces to 5.1 ms.
+
+730 is also not a power of two, so an NTT domain would round it to 1 024 and hand back a third of
+the saving to buy the stage that just became negligible twice over. **The right pairing is the
+predicted count with arbitrary-point Lagrange**, and §6.6's finding stands for the proven count
+without reaching this one.
+
+#### The ranked list, superseding §6.4's
+
+1. **The determinant's per-sample cost.** Still the row, and now the only axis left with an
+   asymptotic improvement in it: 3.0 ms at order 162 through a generic dense LU, against a
+   Sylvester matrix that is block-banded with each block a shifted copy of one coefficient vector,
+   and matrices that differ across samples only in the evaluation point. Measured against an
+   already-parallel baseline, which is why #227 came first.
+2. **The symbolic build, on memory rather than time** — §6.8. It has been under 1% of every row
+   measured and is not that at six rounds.
+3. **The sample count** — done, predicted from the row's parameters and validated per row.
+4. **Concurrency** — done, 95–97% efficient to 8 workers at the counts where a worker gets enough
+   determinants to amortize its setup.
+5. **The interpolation** — done twice, and now negligible on both axes at once.
+
+The exponent is unchanged, which bounds all of it: the route still costs about `16 · 3^{5·rounds}`
+field operations before the build. What has moved is the constant, by about 119x on the row where
+both reductions apply.
+
+### 6.8 The six-round build, measured — and it is memory, not time
+
+The six-round attempt (#211) is costed in `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §7.4, which
+flags the symbolic build as the one stage whose cost law nothing had checked: it has been under 1%
+of every row measured here, and at six rounds the outputs grow from ~3 400 terms to ~266 000. §7.5
+of that plan therefore asks for `cico_bivariate` to be timed **alone** on
+`poseidon31-cico-t16-rf2-rp4` before any determinants are authorized. It was, single-threaded on
+one pinned core under `tools/benchlock.sh`:
+
+| | §7.4's estimate | **measured** | |
+|---|---:|---:|---|
+| elapsed | ~36 min | **48.37 min** | 1.34x — the same order, so the time estimate holds |
+| peak RSS | ~68 MB | **57.0 GB** | **838x** |
+
+The outputs are two bivariate polynomials of degree 729 with **266 815 terms** each, which is
+exactly `(729+1)(729+2)/2`: the dense bivariate triangle, with no cancellation anywhere in six
+rounds. So the term-count extrapolation was right and the memory estimate was not.
+
+**The mechanism, read rather than guessed.** `SparseMultiPoly`'s multiply materialises every
+pairwise term-product in one `Vec` and collects like terms afterwards, so its transient is
+`O(|a|·|b|)` entries however few distinct monomials the product has. `cico_bivariate` cubes sixteen
+degree-243 words as `p * p` then `(p²) * p`:
+
+| step | term-products | at 16 bytes an entry |
+|---|---:|---:|
+| `p * p` | 29 768² = 8.86 × 10⁸ | 14.2 GB |
+| `(p²) * p` | 118 827 × 29 768 = 3.54 × 10⁹ | **56.6 GB** |
+| the product's actual size | 266 815 terms | 4.3 MB |
+
+56.6 GB predicted against 57.0 GB measured, and the RSS trace is a **sawtooth** with one peak per
+state word rather than a monotonic climb — each word's transient is freed before the next
+allocates. It is a transient four orders of magnitude larger than the result it builds, not a leak.
+
+Two consequences:
+
+1. **The build is now a binding stage, and binds on memory first.** 48.4 minutes is about half of
+   §7.4's whole ~1–1.5 h estimate for the row, where the build has been 0.8% of every row before
+   it. A collecting or chunked multiply would bound the live set by the output size instead of the
+   product count — tracked in #243, with the caveat that a map insert per product may cost more
+   time than `push` plus one sort, so it is a memory win that has to be measured for time.
+2. **§7.4's "peak memory is not a concern" is wrong by 838x**, in the direction that matters: 57 GB
+   is 11% of this workstation's RAM for one single-threaded build, and two concurrent six-round
+   builds would be noticed by every other process on the box.
+
+Measured with `--row poseidon31-cico-t16-rf2-rp4 --build-only`, which runs before the budget check
+on purpose: the budget is on the determinants and the build runs none of them, so the build of a
+row whose determinants are unaffordable is still a bounded, interruptible measurement. Peak RSS
+from `VmHWM`, polled externally and cross-checked against `util::peak_resident_bytes`, which reads
+the same field. Reported as an upper bound on the elapsed: this agent's own `cargo build` and
+`cargo test` ran on eight unrelated cores during part of the window, which the lock does not
+serialize and which inflates a memory-bandwidth-bound figure rather than deflating it.
+
+**No determinants were run on this row.** At six rounds the proven `2d²` fallback is 1 062 882
+order-1 458 determinants — 25.7 single-core days — so a falsified prediction there would be
+reported as *prediction falsified, generic bound unaffordable* rather than retried, and
+`examples/resultant_cico` now prints that consequence before it starts a row instead of discovering
+it mid-run.
 
 ## 7. The deeper consequence
 
