@@ -8,6 +8,69 @@ paper is recorded here without having been read in the PDF.* Every paper figure 
 section or table reference to a PDF that was obtained and read. Figures that could not be verified
 are marked `UNVERIFIED`.
 
+> ## Retraction, 2026-11-05 — §7.2's no-go was wrong on two of its three reasons
+>
+> This document was written against ePrint 2025/950, 2025/937 and 2025/1916 ("[PC]"). It did not
+> have **2026/1254** (Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on Poseidon*) or
+> **2026/1905** (Bak–Hostettler), both of which were read for
+> [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md) and landed in `ce76647`, one
+> merge after this document. Those two sources describe the **actual disclosed solutions** to two of
+> the three registered 2026 targets, and they overturn the conclusion here.
+>
+> **What stands.** §2.1's reading of [PC] is accurate: [PC] really does restrict its own security
+> analysis to CICO-1 and really does say that for the CICO-2 Poseidon-31 challenge "the best known
+> attack would be the Gröbner basis computation together with the FGLM algorithm, or the mutant XL
+> algorithm". The quote is verbatim and correctly placed. §2.3's degree derivation stands and is
+> independently confirmed — see below. §5's rejection of the `4/3` model stands. §6's measurement
+> that the pre-#161 kernel is allocation-bound stands.
+>
+> **What is retracted.** The inference from [PC]'s exclusion to "no-go on every registered
+> instance". [PC] declining to analyse CICO-2 is a statement about *that paper's* scope, not about
+> what is possible — and 2026/1254 §4.2 records that the `R_P = 8` CICO-2 instance **was solved**,
+> by a route this document mis-identified. Specifically:
+>
+> - **§7.2 reason 2 is false.** This document asserted that "the univariate object for CICO-2 is the
+>   resultant", of degree `3^16`–`3^20`, needing `2^26`–`2^32`. It is not. 2026/1254 §4.2
+>   interpolates `P_1`, the **first constrained output coordinate**, at degree `3^13`, applies
+>   Graeffe root finding to it, and then evaluates the full permutation on each root to test the
+>   *second* constraint — "instead of computing a resultant", explicitly "to avoid the memory cost of
+>   resultant computations while exploiting the FFT-friendly structure of the KoalaBear field". The
+>   working degree is `3^13`, not `3^18`, and the required transform is `2^21`–`2^22`, **inside**
+>   KoalaBear's `2^24`.
+> - **§7.2 reason 3 is irrelevant, not false.** The `≈16·3^{5·rounds}` resultant-construction cost
+>   is correct for the *resultant* route and simply does not apply to the route that was used.
+> - **§2.4's table** is therefore right about `δ` and wrong about which column matters: its
+>   "resultant degree" and "`n` for the resultant" columns describe a route the disclosed attack did
+>   not take.
+>
+> **The degree is not in dispute.** This document derived `δ = α^{R_F+R_P−1}` from [PC] §2.3's
+> Poseidon2 one-round-skip rule; `elimination-beyond-grobner.md` §2.1 derives `δ = 3^{R_P+5}` from
+> 2026/1254's `(1,[1])` skip. At `R_F = 6` the two exponents coincide identically, and both give
+> `3^11`, `3^13`, `3^15` for `R_P = 6, 8, 10`. Two independent readings of two different papers
+> agreeing on all three registered targets is the strongest evidence in either document.
+>
+> **What is now open, and it is the number that decides the gate.** §9.3 estimates ≈`p` ≈ `2^31`
+> families for a CICO-2 witness, from ~1 expected `F_p`-root per family times a `1/p` chance that a
+> root satisfies the second constraint. That cannot be reconciled with 2026/1254 Table 1, which
+> reports the `R_P = 8` CICO-2 instance solved in **7 hours on 96 GPUs** — `2^31` families at §9.2's
+> ~2 min each is ~8 100 core-years, and no amount of GPU parallelism closes that. One of the two is
+> wrong and this document cannot say which without reading 2026/1254 directly. Candidates: `P_1` is
+> not root-count-generic the way §9.3 assumes; the `(1,[1])` parametrization supplies more usable
+> freedom per family than one variable; or "common-root strategy" (2026/1254 §4.2's own phrase for
+> it) does more than independent `1/p` filtering. **Treat §9.2 and §9.3's family arithmetic as
+> superseded-pending-verification, and do not quote `2^31` as settled.**
+>
+> **Consequence for the gate.** D3's implementation half is *more* valuable than §7.2 concluded, not
+> less: the univariate route's degree fits the existing power-of-two NTT ceiling at two of three
+> registered targets, and NTT-based multiplication (#124) is the only missing foundational
+> primitive. §10's PR decomposition is unaffected in content and rises in priority.
+> `elimination-beyond-grobner.md` §0 and §3 are the current authority; read them first.
+>
+> Retained rather than edited away, per this repository's practice of keeping superseded reasoning
+> visible — and because the shape of the error is instructive. It came from treating one paper's
+> declared scope as a bound on what is achievable, which is exactly the inference #84 warns against
+> when it says not to infer a complete algorithm from a partial reading.
+
 ## 1. The papers, and how they were obtained
 
 `eprint.iacr.org/*.pdf` is behind a Cloudflare interstitial that returns HTTP 403 from this
@@ -123,6 +186,12 @@ Marked **reconstructed**: the paper states the rule for Poseidon and for Poseido
 hybrid, and no source read here states the hybrid case.
 
 ### 2.4 Degrees and required transform sizes, for every registered instance
+
+> **PARTLY SUPERSEDED.** The `δ`, "`n` for Graeffe/interp." and "`n` for a product" columns stand and
+> are confirmed independently by `elimination-beyond-grobner.md` §2.1. The **"resultant degree" and
+> "`n` for the resultant" columns describe a route the disclosed `R_P = 8` attack did not take** —
+> it interpolated the first constrained output coordinate at `δ = 3^13` and filtered candidates
+> against the second constraint. See the retraction at the head of this document.
 
 `δ` is the degree from §2.3. For CICO-2 the univariate object whose roots are wanted is not `δ` but
 the **resultant**, whose degree [JAZ] slide 19 gives as `d^{2(R_F−1)+R_P}` and calls an
@@ -759,6 +828,12 @@ Against §2.4's required sizes:
 
 ### 7.2 The go/no-go
 
+> **RETRACTED IN PART — see the retraction at the head of this document.** Reason 2 below is false
+> (the disclosed `R_P = 8` attack interpolates `P_1` at degree `3^13`, not a resultant at `3^18`)
+> and reason 3 applies only to the resultant route. Reason 1's *quotation* of [PC] is accurate but
+> does not support the conclusion drawn from it. The **GO** half below stands unchanged.
+> `elimination-beyond-grobner.md` §3.1 is the current authority.
+
 **GO on the root finder as a component; NO-GO on any registered challenge.** The two have to be
 stated separately because they answer differently, and conflating them is the specific error §9.4
 warns about.
@@ -896,6 +971,12 @@ must measure rather than assume**, and it is not stated for KoalaBear in any sou
 
 ### 9.3 Families needed — the number that makes §9.2 irrelevant
 
+> **SUPERSEDED PENDING VERIFICATION.** The `≈2^31` families derived below cannot be reconciled with
+> 2026/1254 Table 1, which reports this instance solved in 7 hours on 96 GPUs. The *separation*
+> between per-family cost and family count is the right discipline and is retained; the **number is
+> not to be quoted**. See the retraction at the head of this document for the three candidate
+> explanations.
+
 This is the separation the issue insists on, and it is where the single-family figure stops meaning
 anything.
 
@@ -1000,6 +1081,16 @@ Rows 2 and 10 are the ones that must wait for #161. Row 1 is this PR.
   expansion of Algorithm B line 16; the Bluestein sizing schedule.
 - **Open**: the `(r, s)` split for KoalaBear (§9.2); whether a `k = 3` family or a hybrid beats both
   ends of §9.3's trade; whether #161's kernel exposes the blocked phase boundary §8 point 3 needs.
+- `UNVERIFIED — not read here` **2026/1254** (Sanso–Vitto, *Top Gun: Degree Annihilation Attacks on
+  Poseidon*) and **2026/1905** (Bak–Hostettler, *A Better Bivariate Resultant Attack on
+  Round-Reduced Poseidon*). Both were obtained and read for
+  [`elimination-beyond-grobner.md`](elimination-beyond-grobner.md) and are quoted there; they were
+  not available to this document and they are what retracts §7.2. Any figure attributed to them here
+  is at second hand from that sibling document, which is the authority for them.
+- **Open, and it decides the gate**: the family count for the `R_P = 8` CICO-2 instance. §9.3's
+  `≈2^31` against 2026/1254 Table 1's 7 hours on 96 GPUs. Resolving this needs 2026/1254 §4.2 read
+  directly, with attention to the expected `F_p`-root count of `P_1`, how much freedom the `(1,[1])`
+  parametrization supplies per family, and what "common-root strategy" denotes operationally.
 - §6.1's figures are from **one uncommitted throwaway binary on one machine against the pre-#161
   recursive kernel**, taken under `benchlock.sh` with six other agents active. They are labelled a
   baseline for exactly that reason and PR 10 above re-takes them.
