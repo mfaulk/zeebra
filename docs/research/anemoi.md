@@ -19,8 +19,9 @@ specification.
 
 Both reference repositories are MIT, so their data *may* be redistributed — which the Fukuoka files
 cannot be, see [`fukuoka-mq.md`](fukuoka-mq.md) §3. Nothing is copied here that is not cited: the
-only committed reference numbers are the four CICO witnesses in `src/grobner/research/anemoi.rs`,
-each traceable to the `results/` file named above.
+only committed reference numbers are the four CICO witnesses in `src/grobner/research/anemoi.rs`
+and the per-step figures in the registry's `ReferencePoint` rows, each traceable to the `results/`
+file named above.
 
 ## 2. What was taken from the reference unchanged
 
@@ -91,10 +92,16 @@ and they are what `test_the_permutation_matches_the_reference_witnesses` asserts
 | 1 | 16536366872043122313 | `(0, 10906135472056154455)` |
 | 2 | 1761853426583392112 | `(0, 503324230923223481)` |
 | 4 | 8251407552160637060 | `(0, 17265183214956306941)` |
+| 5 | 8393487001060711113 | `(0, 15310351087790638079)` |
 
-The **count** is checked too, not only the values: the log's own `nsols` line reports 2, 1, 0 and 1
-solutions at `N = 1, 2, 3, 4`, and the root-finding agrees at every rung including the empty one.
+The **count** is checked too, not only the values: the log's own `nsols` line reports 2, 1, 0, 1 and
+1 solutions at `N = 1 … 5`, and the root-finding agrees at every rung including the empty one.
 `N = 3` contributes no witness because the reference found none either.
+
+And the loop closes without the reference: `examples/anemoi_ladder row anemoi64-cico-n1-fcico`
+takes Zeebra's own F4, FGLM and root finding and lands on `8431162935045355170`, the first witness
+in the table. That is Zeebra recovering a point the reference's own output determined, through a
+completely different pipeline.
 
 **A trap worth recording.** The variable labels in the Six Worlds logs are *positionally permuted*
 relative to the model's own names. `models.sage` re-interprets each specialized polynomial into a
@@ -103,22 +110,96 @@ the log prints as `X0100` is the model's `Y0000` — the CICO input. The two ord
 and diverge from `N = 2` on, which is exactly the shape of bug that passes the easiest case. Reading
 the logs by label without accounting for this yields points that satisfy no equation.
 
-## 5. The machine-independent invariant, as the reference reports it
+## 5. The machine-independent invariant — checked, and it agrees
 
-`dim F_p[x]/I` does not depend on the machine, the library or the wall clock. The committed logs
-report, for `α = 3` and both models:
+`dim F_p[x]/I` does not depend on the machine, the library or the wall clock, so this is the one
+number Zeebra can be right or wrong about without any reference to a clock. A disagreement is a
+**defect in Zeebra or in the model, not a performance difference**, and it stops the workstream
+rather than becoming a table entry. It is therefore read **first**.
+
+The committed logs report, for `α = 3` and both models, a quotient dimension of `(α + 2)^N` exactly.
+Zeebra's own figure, from the leading-term ideal of its degrevlex basis, agrees at every registered
+rung in both models:
 
 | `N` | 1 | 2 | 3 | 4 | 5 |
-|---|---|---|---|---|---|
-| quotient dimension | 5 | 25 | 125 | 625 | 3125 |
+|---|---:|---:|---:|---:|---:|
+| `(α + 2)^N` | 5 | 25 | 125 | 625 | 3125 |
+| Zeebra, `FCICO` | 5 | 25 | 125 | 625 | 3125 |
+| Zeebra, `PCICO` | 5 | 25 | 125 | 625 | 3125 |
 
-which is `(α + 2)^N` exactly. This is tagged `Claim::Observed` and **not** `Claim::Proved`: it is a
-measurement from one implementation, and the designers' corresponding statement is a conjecture.
+**Ten rows out of ten.** Reproduce it with `cargo run --release --example anemoi_ladder dimensions`,
+which pins no environment because it needs none. `N = 1 … 4` in both models is also a unit test,
+`test_the_quotient_dimension_is_the_published_power`, so a regression fails CI rather than appearing
+as a row; `N = 5` is left to the runner to keep the test cheap.
 
-A disagreement between this and Zeebra's own `D` is a **defect in Zeebra or in the model, not a
-performance difference**, and it stops the workstream rather than becoming a table entry.
+The computation is combinatorial once F4 has finished — the number of standard monomials of the
+leading-term ideal — so it costs nothing beyond the basis, which is why it is affordable as the
+first check rather than the last.
 
-## 6. The field
+The published value is tagged `Claim::Observed` and **not** `Claim::Proved`: it is a measurement
+from one implementation, and the designers' corresponding statement is a conjecture. Zeebra agreeing
+with it does not promote either one to a theorem; it means two independent implementations measured
+the same thing.
+
+## 6. The two models, and what the registry had to change
+
+`FCICO` and `PCICO` are from Six Worlds' own `models.sage`, emitted in its `o1` variable ordering —
+the ordering every committed `..._o1.txt` log was produced under, and the one that paper reports as
+the good one. Zeebra's degrevlex order is induced by the variable *indices*, so the index assignment
+**is** the ordering, and matching it is what makes the published per-row figures comparable at all.
+
+| `N` | `FCICO` variables = generators | generator degrees | `PCICO` variables = generators | generator degrees |
+|---:|---:|---|---:|---|
+| 1 | 2 | `3, 3` | 2 | `3, 2` |
+| 2 | 4 | `3, 3, 3, 3` | 3 | `3, 4, 3` |
+| 3 | 6 | `3`×6 | 4 | `3, 4, 6, 4` |
+| 4 | 8 | `3`×8 | 5 | `3, 4, 6, 8, 5` |
+| 5 | 10 | `3`×10 | 6 | `3, 4, 6, 8, 10, 6` |
+
+Both columns agree with the `n_v`, `n_e` and `degs` lines the committed logs print per round count,
+which is what `test_the_sizes_match_the_published_logs` and
+`test_the_generator_degrees_are_the_published_shapes` assert.
+
+Two things had to change in the registry, and the second is a genuine gap rather than a
+convenience.
+
+**The model is inside the identity.** `ChallengeParameters::AnemoiCico` carries it as a field, so it
+appears in `canonical_lines` as a `model fcico` / `model pcico` line. Without it, `N = 5` `FCICO` —
+ten generators of degree three — and `N = 5` `PCICO` — six of degrees up to ten — would share a
+digest, and a comparison tool keyed on the digest would compare them and report nothing wrong.
+`test_the_two_anemoi_models_are_different_problems` asserts the separation at every rung.
+
+**`ReferencePoint` is new, and it is where a published competitor figure lives.** `ExternalStatus`
+records whether and when a problem was solved elsewhere and carries no time, no memory and no
+hardware, so the Six Worlds figures had nowhere to go. A reference point carries source, parameters,
+step, reported time, reported memory, hardware and software. Three decisions worth recording:
+
+- **It sits outside `canonical()`**, for the reason programme metadata does: a corrected
+  extrapolation must not change which mathematical problem a row is.
+  `test_a_reference_point_does_not_change_identity` asserts it.
+- **The basis step and the conversion step are separate points, never one combined figure.** The
+  whole reason this family was chosen is that they are 2 400× apart at `N = 5`; a single number
+  would hide the finding.
+- **`reported_memory` is `None` on every Anemoi row, and that is a real answer.** The logs report
+  peak resident set size once per sweep — 227 MB for the whole `FCICO` run over `N = 1…8`, 225 MB
+  for `PCICO` over `N = 1…7` — so attributing either to one row would be inventing a measurement.
+
+**The class is `Official`, not `FaithfulReduction`.** The combination — reduced round counts of a
+real primitive, registered as official — has no precedent in this registry, so: `FaithfulReduction`
+means *this registry reduced an official problem*, and its `of` field has to name that problem.
+There is none. Nobody posed full-round Anemoi as a challenge and it is not registered, so an `of`
+would be a dangling reference. What is published is the ladder itself — Six Worlds ran `N = 1…8` and
+reported those rows as its own experiment — so the registered object is the published object.
+`ExternalStatus::PublishedWithAnswer` then makes `significance(true)` a `Reproduction`, the
+strongest honest claim on a solved reduced instance. The caveat `FaithfulReduction` would have
+carried structurally is carried in each row's `notes`: a result at `N = 5` says nothing about
+full-round Anemoi, which is 21 rounds at 128-bit security.
+
+`Objective::CicoExact` fits as written and no new objective was added. Anemoi CICO constrains the
+**leading** word of a `2ℓ`-word state at each end — `x_in = 0` and `x_out = 0` — which is what that
+tag means.
+
+## 7. The field
 
 `p = 2^64 − 353 = 18446744073709551263`. Odd, so `PrimeFieldElement64<P>` holds it in Montgomery
 form with no new arithmetic — `montgomery::uses_montgomery` requires only `p % 2 == 1`, and
@@ -126,7 +207,35 @@ Goldilocks is already covered at the same width. `Zp18446744073709551263` is the
 `test_multiplication_matches_wide_reduction` now covers this modulus at the boundary values. Nothing
 else in `fields` changed.
 
-## 7. Open
+## 8. The runner, and what has deliberately not been measured
+
+`examples/anemoi_ladder` has three subcommands, and the split between them is the point.
+
+```sh
+cargo run --release --example anemoi_ladder list        # the ten rows and their published figures
+cargo run --release --example anemoi_ladder dimensions  # the machine-independent gate, §5
+ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
+    cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
+```
+
+`row` runs F4, then FGLM, then root finding, each timed separately — separately because the
+published finding is that the conversion costs 2 400× the basis at `N = 5`, and a combined figure
+would hide it — and verifies any recovered point **through the permutation** rather than through the
+system that produced it.
+
+**`row` refuses to print a single number unless `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` are set**, and
+says so with exit code 2. A wall-clock figure from an unpinned environment is not a measurement, and
+a figure produced by accident is a figure that gets quoted later. Measurements must additionally be
+serialized under `tools/benchlock.sh`, because this box runs several agents at once and a
+contended core is a silently wrong figure.
+
+**No timings are reported in this document or in any commit so far**, and the timed ladder is a
+follow-up. What has been established is the part that does not need a clock: the quotient dimension
+at all ten rows, the generator shapes against the logs, the witnesses, and that the whole pipeline
+runs end to end. When the ladder is run, §5's order is binding: dimension first, then which stage is
+the wall, then wall times last and with both machines named — or the stage split and no ratio at all.
+
+## 9. Open
 
 - **`ℓ > 1` and the named hash instances.** `AnemoiSponge-BN-254` and `AnemoiSponge-BLS12-381` use
   `ℓ ∈ {1, 2}` over 255-bit fields. `Bn254Fr` and `Bls12_381Fr` exist, and `from_decimal` already

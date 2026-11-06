@@ -7,6 +7,7 @@
 //! them says anything about the system you started with.
 
 pub mod anemoi;
+pub mod anemoi_cico;
 pub mod challenge;
 pub mod linear;
 pub mod manifest;
@@ -21,10 +22,13 @@ pub mod specialization;
 pub mod univariate_cico;
 
 pub use anemoi::{smallest_primitive_root, Anemoi, AnemoiError, AnemoiParameters, ANEMOI_64_PRIME};
+pub use anemoi_cico::{
+    dispatch_anemoi_cico, verify_against_anemoi_trace, AnemoiCico, AnemoiCicoVisitor, AnemoiModel,
+};
 pub use challenge::{
-    challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeManifest,
-    ChallengeParameters, ChallengeProgram, CicoTarget, CicoVisitor, DisclosedMethod,
-    ExternalStatus, Objective, Significance,
+    challenge, dispatch_cico, published_quotient_dimension, registry, BenchmarkClass,
+    ChallengeError, ChallengeManifest, ChallengeParameters, ChallengeProgram, CicoTarget,
+    CicoVisitor, DisclosedMethod, ExternalStatus, Objective, ReferencePoint, Significance,
 };
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};

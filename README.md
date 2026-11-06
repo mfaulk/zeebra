@@ -2265,6 +2265,56 @@ solution. [`docs/research/anemoi.md`](docs/research/anemoi.md) records every sou
 ideal-membership check that needs no roots, and one trap: the logs' variable labels are positionally
 permuted relative to the model's own names, and the two orders coincide at `N = 1`.
 
+Ten rows are registered — `N = 1 … 5` in both published models — and frozen by
+`test_the_registry_is_frozen` **before** anything is run. Two registry changes were needed:
+
+- **`ChallengeParameters::AnemoiCico` carries the algebraic model, so the model is inside the
+  identity digest.** `FCICO` at `N = 5` is ten generators of degree three; `PCICO` is six of degrees
+  up to ten. Same primitive, same solutions, two systems a solver meets completely differently — so
+  without the model in `canonical_lines` the two digests would collide and a comparison tool keyed
+  on the digest would compare them.
+- **`ReferencePoint` is where a published competitor figure lives.** `ExternalStatus` records
+  *whether and when* a problem was solved elsewhere and carries no time, no memory and no hardware,
+  so "22 057 s of FGLM at `N = 5` on an Intel Xeon E5-2630 v3 under Magma V2.26-2" had nowhere to
+  go. It sits **outside** `canonical()`, for the same reason a bounty does: a corrected
+  extrapolation must not change what a problem *is*. The basis step and the conversion step are
+  separate points — the finding is that they are 2 400x apart — and `reported_memory` is `None` on
+  every row, because the logs report peak resident once per sweep and not per row.
+
+The class is `Official` rather than `FaithfulReduction`: the registered object *is* the published
+object — Six Worlds ran those round counts and reported them as its own experiment — and there is no
+registered full-round Anemoi for a reduction to name. `ExternalStatus::PublishedWithAnswer` then
+makes a verified witness a `Reproduction`, which is the strongest honest claim on a solved reduced
+instance. The caveat a reduction would have carried structurally is in each row's notes: a result at
+`N = 5` says nothing about full-round Anemoi, which is 21 rounds.
+
+##### The machine-independent check, which is read first
+
+`dim F_p[x]/I` does not depend on the machine, the library or the wall clock, so it is the one
+number zeebra can be right or wrong about with no reference to a clock — and a disagreement is a
+**defect in zeebra or in the model, not a performance difference**. The published value is
+`(α+2)^N`, and zeebra's own figure agrees at **all ten registered rows**, both models, `N = 1 … 5`:
+5, 25, 125, 625, 3125.
+
+```sh
+cargo run --release --example anemoi_ladder list        # the ten rows and their published figures
+cargo run --release --example anemoi_ladder dimensions  # the gate; pins no environment, needs none
+ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
+    cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
+```
+
+`row` runs F4, then FGLM, then root finding, each timed separately — separately because the
+published finding is that the conversion costs 2 400x the basis at `N = 5`, and a combined figure
+would hide it — and checks any recovered point **through the permutation** rather than through the
+system that produced it. At `N = 1` it lands on `8431162935045355170`, which is the witness the
+reference's own lex basis determines: zeebra reaches a reference point through a different pipeline.
+
+**`row` refuses to print a single number unless `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` are set**, and
+exits 2 if they are not. An unpinned wall-clock figure is not a measurement, and one produced by
+accident is one that gets quoted later; measurements must also be serialized under
+`tools/benchlock.sh`. The timed ladder is a follow-up, and `(α+2)^N` is checked at `N = 1 … 4` by a
+unit test so a regression fails CI rather than appearing as a table row.
+
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
 on a 14-variable system with 16384 solutions that is 1.9 ms against 1.6 s, a factor of **830**.
