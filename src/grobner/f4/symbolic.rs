@@ -941,7 +941,7 @@ mod tests {
         let mut basis = MonicBasis::new(&fixture(), MonomialOrder::GradedReverseLexicographic);
         let last = basis.elements[0].terms.len() - 1;
         assert!(last > 0, "the fixture needs a tail term to zero");
-        basis.elements[0].terms[last].1 = <F as Zero>::ZERO;
+        basis.elements[0].terms[last].1 = F::new(0);
         basis.check();
     }
 
@@ -950,7 +950,7 @@ mod tests {
         grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
         poly::MonomialOrder,
         util::contains_duplicates,
-        FiniteField, {Monomial, MultivariatePolynomial, One, Zero},
+        FiniteField, {Monomial, MultivariatePolynomial, One},
     };
     type F = Zp13;
     const VARS: [&str; 3] = ["x", "y", "z"];
