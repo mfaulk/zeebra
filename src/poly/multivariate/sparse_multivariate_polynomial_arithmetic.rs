@@ -341,7 +341,26 @@ mod tests {
         poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
         FiniteField, Monomial, MultivariatePolynomial,
     };
-    use proptest::prelude::*;
+    use proptest::{collection::vec, prelude::*, test_runner::TestRunner};
+
+    /// A strategy for a polynomial of at most `num_terms` distinct monomials over any field.
+    ///
+    /// Written out rather than reached through `any::<SparseMultiPoly<N, F>>()`, whose `Arbitrary`
+    /// impl boxes its strategy and so requires `F: 'static` — a bound the generic body
+    /// `for_each_field!` writes cannot state.
+    fn poly_strategy<const N: usize, F: FiniteField>(
+        num_terms: usize,
+    ) -> impl Strategy<Value = SparseMultiPoly<N, F>> {
+        (
+            vec(any::<Monomial<N>>(), num_terms),
+            vec(F::arbitrary(), num_terms),
+        )
+            .prop_map(|(monomials, coefficients)| {
+                let terms: Vec<(Monomial<N>, F)> =
+                    monomials.into_iter().zip(coefficients).collect();
+                SparseMultiPoly::new(&terms)
+            })
+    }
 
     // TODO: Proptest that Zero is the additive identity.
 
@@ -493,7 +512,74 @@ mod tests {
             b in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
             prop_assert_eq!(&a * &b, &b * &a);
         }
+
+        /// (a * b) * c = a * (b * c)
+        #[test]
+        fn test_mul_is_associative(
+            a in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>(),
+            b in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>(),
+            c in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
+            prop_assert_eq!(&(&a * &b) * &c, &a * &(&b * &c));
+        }
+
+        /// a * (b + c) = a * b + a * c
+        #[test]
+        fn test_mul_distributes_over_add(
+            a in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>(),
+            b in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>(),
+            c in any::<SparseMultiPoly<2, PrimeFieldElement64<541>>>()) {
+            prop_assert_eq!(&a * &(&b + &c), &(&a * &b) + &(&a * &c));
+        }
     }
+
+    /// `(a * b) * c = a * (b * c)` over `F` in `N` variables.
+    ///
+    /// A proptest driven through [`TestRunner`] rather than written with `proptest!`, because the
+    /// macro expands to a `#[test]` item and so cannot sit inside `for_each_field!`'s generic body.
+    fn assert_mul_associates<const N: usize, F: FiniteField>() {
+        let strategy = (
+            poly_strategy::<N, F>(4),
+            poly_strategy::<N, F>(4),
+            poly_strategy::<N, F>(4),
+        );
+        TestRunner::deterministic()
+            .run(&strategy, |(a, b, c)| {
+                prop_assert_eq!(&(&a * &b) * &c, &a * &(&b * &c));
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    /// `a * (b + c) = a * b + a * c` over `F` in `N` variables.
+    fn assert_mul_distributes<const N: usize, F: FiniteField>() {
+        let strategy = (
+            poly_strategy::<N, F>(4),
+            poly_strategy::<N, F>(4),
+            poly_strategy::<N, F>(4),
+        );
+        TestRunner::deterministic()
+            .run(&strategy, |(a, b, c)| {
+                prop_assert_eq!(&a * &(&b + &c), &(&a * &b) + &(&a * &c));
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    // Multiplication associates, over every field and at two arities.
+    for_each_field!(
+        fn multiplication_associates<F>() {
+            assert_mul_associates::<2, F>();
+            assert_mul_associates::<3, F>();
+        }
+    );
+
+    // Multiplication distributes over addition, over every field and at two arities.
+    for_each_field!(
+        fn multiplication_distributes<F>() {
+            assert_mul_distributes::<2, F>();
+            assert_mul_distributes::<3, F>();
+        }
+    );
 
     #[test]
     fn test_div_rem() {
