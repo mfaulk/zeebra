@@ -513,12 +513,12 @@ after #189, against 1.95–2.01 for schoolbook in the same run.
 > the dispatcher uses**; they are kept because they are what §4.1.1's and §3.3's figures were taken
 > against. §4.1.2 has the thresholds that replaced them and the measurement that produced them.
 
-`Mul` itself stays schoolbook, and cannot do otherwise *through the transform*: choosing a domain
-needs a primitive `2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness,
-neither of which `Mul`'s signature can carry — and `KnownOrder` is exactly what the Gröbner core
-refuses to require of a coefficient type (`test_the_grobner_stack_needs_no_field_cardinality`).
-Karatsuba carries no such obstacle, so whether `Mul` dispatches to *that* is a separate question;
-§4.1.2 measures it and answers it. Mersenne-31, whose two-adicity of 1 rules the transform out
+`Mul` cannot reach the transform, and that part has not changed: choosing a domain needs a
+primitive `2^k`-th root of unity, so it needs `KnownOrder` and a source of randomness, neither of
+which `Mul`'s signature can carry — and `KnownOrder` is exactly what the Gröbner core refuses to
+require of a coefficient type (`test_the_grobner_stack_needs_no_field_cardinality`). Karatsuba
+carries no such obstacle, and **since #231 the operator dispatches to it**; §4.1.2 has the
+measurement and the two things that had to be fixed first. Mersenne-31, whose two-adicity of 1 rules the transform out
 entirely, needs no CRT or Kronecker fallback for correctness: `multiply` falls back on precisely
 that failure.
 
@@ -794,67 +794,89 @@ So on the field every F4 benchmark in this crate runs over, where the transform 
 every degree, the dispatcher's whole gain is this column: **1.80x at operand length 16 rising to
 11.19x at 16384**, from a route that was previously unreachable.
 
-##### `DensePolynomial::Mul`: the decision, and the measurement behind it
+##### `DensePolynomial::Mul`: dispatched, and what it cost to get there (#231)
 
-#185 left this open deliberately, since wiring Karatsuba into the operator changes the cost of every
-polynomial product in the crate rather than of one dispatcher's fallbacks. Measured as the memory in
-`zeebra-perf-ab-method` prescribes: two binaries from one tree differing only in `Mul`'s body,
-built into private target directories, `md5sum`-checked distinct, run interleaved under
-`taskset --cpu-list 4` and the benchmark lock, minimum of three rounds.
+#185 left this as a separate decision and asked for one with measurement behind it. #231 took it,
+in the two steps the issue sequenced, and the second step turned up a regression that had to be
+fixed in shared code before the operator could land.
 
-`univariate_scaling` **cannot serve as the harness** — its `fftmul` stage verifies its product
-against `&a * &b`, so the verification is quadratic in the operand degree and the sweep does not
-terminate at any budget that reaches interesting sizes. That is #189, and it was hit before it was
-avoided. The instrument instead times `roots` directly, which is the binding univariate stage per
-§5 and is `O(log q)` products at the working degree, with `div_with_remainder` as a **control**:
-long division contains no polynomial `Mul`, so a change there is not the effect.
+**Step one: an oracle that is not the thing under test.** `&a * &b` was the comparand for *every*
+test in `fft::multiply` and for five in `karatsuba`. Dispatching `Mul` to `multiply_dense` would
+have made the Karatsuba tests compare Karatsuba against itself and the transform tests compare the
+transform against Karatsuba — all still green. `test_support::schoolbook_product` is the definition
+written out, sharing code with neither route, and it is itself pinned against products computed by
+hand. That commit changed no behaviour: the same tests pass before and after.
+
+**Step two, and the thing that was nearly missed.** #185 named the risk precisely — "small products
+dominate by *count* in F4 and FGLM even though large ones dominate by time. A change that adds
+overhead to the smallest products can lose overall while winning every individual large product."
+It does, and the first A/B found it: `from_zeros`, which folds one linear factor at a time and so
+multiplies `len x 2` throughout, measured **0.74x** over KoalaBear.
+
+The cause was not the dispatch. `schoolbook_into` iterated the *longer* operand outside and the
+shorter inside, so a `512 x 2` product paid the `out[i..].iter_mut().zip(..)` setup 512 times for
+two multiplies each. In-process, both routes in one binary so there is no cross-binary variance:
+
+| shape | inline double loop | `multiply_dense`, long outer | after the swap |
+|---|---:|---:|---:|
+| KoalaBear 8 x 2 | 36.5 ns | 37.8 ns (0.97x) | 19.9 ns (**1.96x**) |
+| KoalaBear 32 x 2 | 99.4 ns | 125.6 ns (0.79x) | 45.4 ns (**2.34x**) |
+| KoalaBear 128 x 2 | 356.8 ns | 481.7 ns (0.74x) | 147.7 ns (**2.56x**) |
+| KoalaBear 512 x 2 | 1406.4 ns | 1902.7 ns (0.74x) | 589.8 ns (**2.54x**) |
+| BN254 512 x 2 | 22236 ns | 22433 ns (0.99x) | 21044 ns (1.08x) |
+
+**BN254 does not move in either direction**, and that is the evidence that the cost was the loop
+shape and not the arithmetic: a 254-bit multiply is ~19 ns against ~1 ns of setup, so there is
+nothing there for the setup to be a fraction of. On a 4-byte field the multiply is ~1.3 ns and the
+setup is the larger half.
+
+The swap is in shared code, so Karatsuba's own leaves get it too, and the old inline `Mul` had the
+bad order as well — which is why the fixed dispatched path is 2.5x the operator it replaced on that
+shape rather than merely even with it.
+
+**The A/B, re-run against the final tree.** Two binaries from one tree differing only in `Mul`'s
+body, built into private target directories, `md5sum`-checked distinct, interleaved under
+`taskset --cpu-list 4` and the benchmark lock, minimum of three rounds. `examples/univariate_scaling.rs`
+cannot serve as the harness until #189 is fixed — its `fftmul` stage verifies against `&a * &b`, so
+the verification is quadratic in the operand degree and the sweep does not terminate at any budget
+reaching interesting sizes.
 
 | field | stage | size | `Mul` schoolbook | `Mul` dispatching | ratio |
 |---|---|---:|---:|---:|---:|
-| KoalaBear | **roots** | 256 | 1.386 ms | 1.082 ms | **1.28x** |
-| KoalaBear | **roots** | 1024 | 17.147 ms | 11.369 ms | **1.51x** |
-| KoalaBear | **roots** | 2048 | 61.447 ms | 38.456 ms | **1.60x** |
-| KoalaBear | mul | 1024 | 0.254 ms | 0.082 ms | 3.10x |
-| KoalaBear | mul | 4096 | 3.998 ms | 0.737 ms | 5.42x |
-| KoalaBear | div *(control)* | 1024 | 0.292 ms | 0.328 ms | 0.89x |
-| KoalaBear | div *(control)* | 4096 | 4.560 ms | 5.025 ms | 0.91x |
-| BN254 `Fr` | **roots** | 64 | 68.823 ms | 51.132 ms | **1.35x** |
-| BN254 `Fr` | **roots** | 128 | 264.135 ms | 173.047 ms | **1.53x** |
-| BN254 `Fr` | **roots** | 256 | 1052.214 ms | 655.326 ms | **1.61x** |
-| BN254 `Fr` | mul | 1024 | 23.234 ms | 3.223 ms | 7.21x |
-| BN254 `Fr` | div *(control)* | 256 | 1.417 ms | 1.425 ms | 0.99x |
-| BN254 `Fr` | div *(control)* | 1024 | 21.996 ms | 22.561 ms | 0.97x |
+| KoalaBear | **roots** | 256 | 2.035 ms | 1.538 ms | **1.32x** |
+| KoalaBear | **roots** | 1024 | 27.418 ms | 17.359 ms | **1.58x** |
+| KoalaBear | **roots** | 2048 | 103.901 ms | 62.154 ms | **1.67x** |
+| KoalaBear | mul | 1024 | 0.528 ms | 0.143 ms | 3.70x |
+| KoalaBear | mul | 4096 | 8.392 ms | 1.292 ms | 6.49x |
+| KoalaBear | lcm | 4096 | 17.696 ms | 10.702 ms | 1.65x |
+| KoalaBear | from_zeros | 512 | 0.440 ms | 0.155 ms | **2.83x** |
+| KoalaBear | div *(control)* | 4096 | 7.644 ms | 7.751 ms | 0.99x |
+| BN254 `Fr` | **roots** | 128 | 269.120 ms | 175.231 ms | **1.54x** |
+| BN254 `Fr` | **roots** | 256 | 1084.052 ms | 652.755 ms | **1.66x** |
+| BN254 `Fr` | mul | 1024 | 25.665 ms | 3.512 ms | 7.31x |
+| BN254 `Fr` | lcm | 1024 | 56.007 ms | 33.768 ms | 1.66x |
+| BN254 `Fr` | from_zeros | 512 | 5.856 ms | 5.646 ms | 1.04x |
+| BN254 `Fr` | div *(control)* | 1024 | 24.483 ms | 24.380 ms | 1.00x |
 
-**The control is not quite flat, and that is reported rather than smoothed.** BN254's `div` moves
-0.97x–1.00x, inside the harness's noise. KoalaBear's moves **0.89x–0.91x at all three sizes and in
-all three rounds** — reproducible, and unexplained. `div_with_remainder` contains no polynomial
-multiplication, only field-element products, so this is a code-layout or inlining effect of
-removing the schoolbook loop from `Mul` under fat LTO, not a semantic one. It bounds the claim
-without overturning it: the regression is *already inside* the `roots` figures, since `pow_mod`
-reduces after every squaring, and `roots` still comes out 1.28x–1.61x ahead.
+`roots` is the binding univariate stage per §5, and it is `O(log q)` products at the working degree
+through `pow_mod_limbs`. `lcm` and `from_zeros` are the other two `Mul` callers worth naming;
+`Polynomial::pow`, `compose` and `shift` are built on the same operator.
 
-One consistency check, because a 1.6x on a composite stage from a 5.4x on one of its two halves
-wants verifying. At KoalaBear degree 2048 one squaring is one `mul` at product degree 4096 plus one
-`div`: 3.998 + 4.560 = 8.56 ms schoolbook against 0.737 + 5.025 = 5.76 ms dispatching, a ratio of
-1.49x against the 1.60x measured for `roots`. The residue is the right sign and the right size —
-`roots`'s internal degrees run below the operand degree, and its gcd and equal-degree splitter
-contain further products — so the stage figure is consistent with its parts rather than with a
-harness artifact.
+**#185's control anomaly was environmental, and this run says so.** That run reported KoalaBear
+`div` at 0.89x–0.91x, reproducible across its three rounds and unexplained. Two things settle it
+here. `div_with_remainder`'s machine code is **identical in both binaries** — same instruction count,
+1609, and zero `vpmuludq` in both — so there is nothing in the compiled artifact for a 10% effect
+to live in. And re-measured with an isolated arm as well as the post-`mul` one, the control is flat
+to within 1% in **12 of 12 cells** across two fields and three sizes. The original reading was the
+preceding `mul` leaving a different cache and allocator state, in a run whose sign happened to go
+one way; it went the other way on the next attempt, which a code effect would not do.
 
-**Decision: yes, and not in #185's change.** The measurement is unambiguous — 1.28x to 1.61x on the
-binding univariate stage, for every caller, with no API change — but it cannot land alongside the
-dispatcher, for a reason that is about test coverage rather than about performance:
-
-**`Mul` is the oracle.** `karatsuba.rs`'s `test_it_agrees_with_the_mul_operator_over_every_field_width`
-and both of its proptests compare the kernel against `&f * &g`, and the whole of `fft::multiply`'s
-test module asserts `multiply(...) == &a * &b`. If `Mul` becomes Karatsuba, every one of those
-compares an implementation against itself and passes vacuously — the same failure mode as a doctest
-that is configured off. The module does carry an independent `naive()` oracle, so the work is
-tractable: re-base both modules' agreement tests onto an implementation-independent comparand
-*first*, then change the operator. Doing both in one commit would change the agreement tests in the
-same change as the code they are the agreement for.
-
-That sequencing is #231.
+**The blast radius does not reach the Gröbner core.** F4, Buchberger and FGLM are `SparseMultiPoly`
+throughout; the only `Mul` sites under `grobner::` are `Monomial * Monomial` in `f4::symbolic` and
+multivariate products in tests, and `research::resultant`'s `&result * p` is multivariate too.
+Checked by grep rather than assumed, which is what #231 asked for. So #185's worry about small
+products dominating by count in F4 does not apply to this operator — though it did apply, in a
+different place, and §4.1.2's step two is where it showed up.
 
 ### 4.2 Modular composition: absent
 
