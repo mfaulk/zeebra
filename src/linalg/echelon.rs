@@ -14,8 +14,6 @@
 //! `linalg` does not depend on `grobner`, and does not learn to. [`Backend`] is this module's own
 //! type; F4 holds one in its options.
 
-use std::collections::HashMap;
-
 use crate::{
     linalg::{
         dense::{
@@ -23,6 +21,7 @@ use crate::{
             dense_reduce_rows_against_pivots, dense_row_echelon,
         },
         sparse::{row_echelon_within, EliminationStatistics, SparseMatrix, SparseRow},
+        PivotIndex,
     },
     FiniteField,
 };
@@ -171,8 +170,8 @@ fn upper_block_pivots<F: FiniteField>(
     matrix: &SparseMatrix<F>,
     split: usize,
     statistics: &mut EliminationStatistics,
-) -> HashMap<usize, usize> {
-    let mut pivot_of_column: HashMap<usize, usize> = HashMap::with_capacity(split);
+) -> PivotIndex {
+    let mut pivot_of_column = PivotIndex::new(matrix.num_columns(), matrix.num_rows());
     for index in 0..split {
         let Some(column) = matrix.row(index).leading_column() else {
             statistics.zero_rows += 1;
@@ -199,7 +198,7 @@ fn upper_block_pivots<F: FiniteField>(
 fn sparse_reduce_rows_against_pivots<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
-    pivot_of_column: &mut HashMap<usize, usize>,
+    pivot_of_column: &mut PivotIndex,
     statistics: &mut EliminationStatistics,
     max_nonzeros: usize,
 ) -> Result<(), usize> {
@@ -212,8 +211,8 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
         resident -= row.nonzeros();
 
         while let Some(column) = row.leading_column() {
-            match pivot_of_column.get(&column) {
-                Some(&pivot_index) => {
+            match pivot_of_column.pivot_of(column) {
+                Some(pivot_index) => {
                     // Every pivot's leading coefficient is one, so the factor that clears this
                     // column is this row's own leading coefficient.
                     let factor = row
@@ -256,7 +255,9 @@ mod tests {
     use super::{reduce_rows_against_pivots_with, row_echelon_with, Backend};
     use crate::{
         fields::{Zp13, Zp18446744073709551557, Zp2147483647, Zp541, Zp7},
-        linalg::sparse::{row_echelon, SparseMatrix, SparseRow},
+        linalg::sparse::{
+            reduced_row_echelon, row_echelon, EliminationStatistics, SparseMatrix, SparseRow,
+        },
         FiniteField, One,
     };
     use rand::{prelude::StdRng, Rng, SeedableRng};
@@ -556,6 +557,17 @@ mod tests {
         cases.push(("no columns".to_string(), SparseMatrix::zero(5, 0)));
         cases.push(("all zero".to_string(), SparseMatrix::zero(4, 6)));
 
+        // One column: every row competes for the single pivot, so all but one reduce to zero.
+        cases.push((
+            "single column".to_string(),
+            SparseMatrix::new(
+                1,
+                (1..=5)
+                    .map(|k| SparseRow::new(&[(0, G::new(k))]))
+                    .collect::<Vec<_>>(),
+            ),
+        ));
+
         cases
     }
 
@@ -829,6 +841,126 @@ mod tests {
                 backend
             );
         }
+    }
+
+    /// FNV-1a over a matrix and the statistics its elimination reported.
+    ///
+    /// Hand-rolled rather than `DefaultHasher`, and over `Display` rather than a field's bytes, so
+    /// that a digest recorded today still means the same thing under a later toolchain and a
+    /// different internal representation. That is the whole point of the oracle: the recorded
+    /// constants have to survive the refactors they exist to police.
+    fn absorb(state: &mut u64, bytes: &[u8]) {
+        for byte in bytes {
+            *state ^= u64::from(*byte);
+            *state = state.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+
+    fn absorb_usize(state: &mut u64, value: usize) {
+        absorb(state, &(value as u64).to_le_bytes());
+    }
+
+    fn absorb_result<G: FiniteField>(
+        state: &mut u64,
+        matrix: &SparseMatrix<G>,
+        statistics: &EliminationStatistics,
+    ) {
+        absorb_usize(state, matrix.num_rows());
+        absorb_usize(state, matrix.num_columns());
+        for row in matrix.rows() {
+            absorb_usize(state, row.nonzeros());
+            for (column, coefficient) in row.entries() {
+                absorb_usize(state, *column);
+                absorb(state, format!("{}", coefficient).as_bytes());
+            }
+        }
+        for field in [
+            statistics.rank,
+            statistics.zero_rows,
+            statistics.initial_nonzeros,
+            statistics.final_nonzeros,
+            statistics.peak_nonzeros,
+            statistics.row_operations,
+            statistics.pivot_inversions,
+        ] {
+            absorb_usize(state, field);
+        }
+    }
+
+    /// Every elimination path over the whole corpus, folded into one digest per path.
+    ///
+    /// Order: the corpus in `comparison_cases` order, over five fields, then for each case a full
+    /// echelon, then the split path at a third and at two thirds of an echelon arrangement.
+    fn path_digests() -> [u64; 5] {
+        // [sparse, dense, adaptive, row_echelon, reduced_row_echelon]
+        let mut digests = [0xcbf2_9ce4_8422_2325u64; 5];
+
+        fn check<G: FiniteField>(digests: &mut [u64; 5]) {
+            for (_, original) in comparison_cases::<G>() {
+                for (slot, backend) in BACKENDS.iter().enumerate() {
+                    let mut matrix = original.clone();
+                    let statistics = row_echelon_with(*backend, &mut matrix, usize::MAX)
+                        .expect("unbounded cannot fail");
+                    absorb_result(&mut digests[slot], &matrix, &statistics);
+                }
+
+                let mut reference = original.clone();
+                let statistics = row_echelon(&mut reference);
+                absorb_result(&mut digests[3], &reference, &statistics);
+
+                let mut reduced = original.clone();
+                let statistics = reduced_row_echelon(&mut reduced);
+                absorb_result(&mut digests[4], &reduced, &statistics);
+
+                // An echelon arrangement, so that any prefix is a valid upper block.
+                let mut prepared = original.clone();
+                let _ = row_echelon(&mut prepared);
+                prepared.sort_rows_by_leading_column();
+                for divisor in [3, 2] {
+                    let split = prepared.num_rows() / divisor;
+                    for (slot, backend) in BACKENDS.iter().enumerate() {
+                        let mut matrix = prepared.clone();
+                        let statistics = reduce_rows_against_pivots_with(
+                            *backend,
+                            &mut matrix,
+                            split,
+                            usize::MAX,
+                        )
+                        .expect("unbounded cannot fail");
+                        absorb_result(&mut digests[slot], &matrix, &statistics);
+                    }
+                }
+            }
+        }
+
+        check::<Zp7>(&mut digests);
+        check::<Zp13>(&mut digests);
+        check::<Zp541>(&mut digests);
+        check::<Zp2147483647>(&mut digests);
+        check::<Zp18446744073709551557>(&mut digests);
+        digests
+    }
+
+    /// Every elimination path reproduces the results and statistics recorded before #159.
+    ///
+    /// The cross-backend tests above compare the backends to each other, so a change that moved
+    /// all of them together would pass every one of them. These constants were taken from the
+    /// `HashMap<usize, usize>` implementation and are the only check that the indexed pivot store
+    /// did not perturb a matrix, a rank, a row-operation count, or an inversion count anywhere in
+    /// the corpus — degenerate shapes and five fields included.
+    #[test]
+    fn test_every_path_reproduces_the_pre_indexed_pivot_oracle() {
+        assert_eq!(
+            path_digests(),
+            [
+                0x9e6b_81f2_7b05_3b21,
+                0x9e6b_81f2_7b05_3b21,
+                0x9e6b_81f2_7b05_3b21,
+                0x30c3_cba3_4ed1_1175,
+                0x54bd_4ffb_bc2e_6995,
+            ],
+            "an elimination path no longer reproduces the pre-#159 results"
+        );
     }
 
     /// Every backend rejects an upper block whose rows do not satisfy the precondition.

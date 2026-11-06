@@ -2,7 +2,8 @@
 
 **Status:** complete — M19-0 through M19-D landed; M19-E, M19-F and M19-G closed won't-do on
 measurements recorded in §6; #62 landed afterwards and is recorded in §8, which corrects §5.3's
-bandwidth reading and reopens the SIMD question at eight lanes
+bandwidth reading and reopens the SIMD question at eight lanes; #159 landed after that and is
+recorded in §9, which acts on the `HashMap` §4.4 named
 **Prerequisite:** M16 for the stage attribution this milestone targets; independent of M18, which
 runs in parallel on the quotient-algebra side and touches none of the same files
 **Objective:** remove the software division under every field multiplication, then vectorize and
@@ -39,6 +40,7 @@ division, nothing could be vectorized until that was gone.
 | [#51](https://github.com/mfaulk/zeebra/issues/51) M19-F | Parallel Macaulay matrix construction | **won't do** — §6.3 |
 | [#52](https://github.com/mfaulk/zeebra/issues/52) M19-G | Parallel critical-pair criteria | **won't do** — §6.2 |
 | [#62](https://github.com/mfaulk/zeebra/issues/62) | A 32-bit prime field, which §5.3 identifies as the remaining lever | done — §8, and it reopens #49 |
+| [#159](https://github.com/mfaulk/zeebra/issues/159) | The pivot-of-column `HashMap` §4.4 names, indexed by column instead | done — §9, 28% of the default's elimination stage |
 
 ## 3. What landed
 
@@ -164,6 +166,10 @@ on p64 and quoted as an F4 speedup would have been wrong by a wide margin.
 **Multiplication is a fraction of the elimination loop.** `subtract_scaled` also loads and stores,
 subtracts, tests for zero twice per entry to maintain the nonzero counts, and on the sparse path
 chases pointers and consults a `HashMap` for the pivot of a column.
+
+> The `HashMap` named in the sentence above was replaced by a direct-indexed store in #159. §9
+> measures what that was worth, per backend. The paragraph is left as it was written: it was the
+> state of the code when the 23.1% was taken, and §4.2's figures were measured against it.
 
 A 16 MB out-of-cache axpy runs at 0.59 ns/entry after the change, roughly 40 GB/s on one core,
 already near single-core DRAM bandwidth. katsura-7 grevlex peaks at 1 390 812 live nonzeros, about
@@ -459,3 +465,169 @@ cost halves. Pinned by a test, with the stale comment that said three corrected.
 | No software division reachable from multiplication, verified on the artifact | met — `__umodti3` 0, `__umoddi3` 0, and no `div` instruction in any zeebra symbol of the `field_arithmetic` binary; the one `__udivti3` is §4.1's `PrimeFieldElement128` |
 | Dense elimination at both widths on the same matrices, bytes-moved stated | met — §8.2, §8.4 |
 | The SIMD question revisited at 8 lanes | met — §8.3, and the answer flips |
+
+## 9. The pivot lookup, indexed (#159)
+
+§4.4 named a `HashMap<usize, usize>` consulted once per row operation as part of why the Montgomery
+win did not carry into F4. The keys are dense column indices in `0..num_columns`, so the table was
+keyed by an integer that is already its own slot number. `PivotIndex` replaces it with a `Vec<u32>`
+and `u32::MAX` as the vacant marker, in all four elimination paths.
+
+§4.2's figures are **not** superseded: they were taken on the code §4.4 describes, and this section
+measures the difference between that code and the code that replaces it. Both stand.
+
+Machine and protocol: as §4. `rustc 1.97.0`, release profile, `taskset --cpu-list 0-7`, the two
+binaries built from one tree with only `src/` swapped, runs interleaved, and an exclusive lock
+held for the whole suite so nothing else on the workstation was running.
+
+### 9.1 Elimination per backend, with the per-operation cost
+
+`cargo run --release --example elimination_density -- katsura-6/grevlex` and `katsura-7/grevlex`.
+Milliseconds over every matrix the instance builds; the mean of three runs on katsura-6 and two on
+katsura-7, which agreed to within 1.4%. The dense rows exclude the conversions the backend pays
+around the algorithm, in the milliseconds and in the per-operation figure alike; the harness reports
+the conversion-inclusive figure, and `examples/elimination_density.rs` says so where it prints it.
+
+| instance | backend | row operations | before | after | before ns/op | after ns/op | change |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| katsura-6 grevlex | `Sparse` | 44 023 | 17.42 | 15.71 | 395.7 | 356.8 | **−9.8%** |
+| katsura-6 grevlex | `Adaptive` | 44 023 | 10.31 | 9.43 | 234.3 | 214.2 | **−8.6%** |
+| katsura-6 grevlex | `Dense` | 44 023 | 44.41 | 43.84 | 1008.8 | 995.8 | −1.3% |
+| katsura-7 grevlex | `Sparse` | 608 356 | 658.58 | 594.00 | 1082.6 | 976.4 | **−9.8%** |
+| katsura-7 grevlex | `Adaptive` | 608 356 | 295.40 | 280.11 | 485.6 | 460.4 | **−5.2%** |
+| katsura-7 grevlex | `Dense` | 608 356 | 1346.72 | 1327.05 | 2213.3 | 2181.9 | −1.5% |
+
+`row_operations` is **identical on both sides and across all three backends**, which is what makes
+the nanoseconds-per-operation column a statement about the cost of an operation rather than about
+how many there were. That the three backends agree on it at all is the pre-existing contract; that
+the two sides agree on it is the acceptance criterion, and it is pinned by
+`test_every_path_reproduces_the_pre_indexed_pivot_oracle` rather than left to this table.
+
+### 9.2 Storage
+
+The index is one allocation per elimination, freed with it, so its peak is the widest matrix of the
+instance.
+
+| instance | widest matrix | indexed, `4 * num_columns` | the hash table it replaces |
+| --- | ---: | ---: | ---: |
+| katsura-6 grevlex | 1412 columns | 5.5 KiB | ~34 KiB at 1388 pivots |
+| katsura-7 grevlex | 6862 columns | 26.8 KiB | ~136 KiB at 6810 pivots |
+
+The second column is measured; the third is hashbrown's floor at that occupancy — 2048 and 8192
+buckets of `(usize, usize)` plus a control byte each — not a measurement. **Both indexed figures
+fit in a 32 KiB L1d; neither hashed figure does.** That is the mechanism §9.4 argues for.
+
+### 9.3 Whole computations
+
+`cargo run --release --example f4_profile -- baseline`, which selects `Backend::Sparse`. The
+elimination stage and the whole computation, milliseconds, mean of four runs. Every instance whose
+elimination stage exceeds a millisecond.
+
+| instance | elim before | elim after | elim | total before | total after | total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| katsura-7 grevlex | 623.41 | 603.07 | −3.3% | 726.42 | 704.07 | −3.1% |
+| katsura-7 grlex | 390.27 | 377.24 | −3.3% | 482.82 | 469.56 | −2.7% |
+| katsura-6 lex | 335.86 | 315.95 | −5.9% | 451.04 | 431.80 | −4.3% |
+| katsura-6 grevlex | 16.38 | 15.34 | −6.3% | 24.74 | 23.72 | −4.1% |
+| cyclic-5 grevlex | 15.39 | 13.71 | **−10.9%** | 21.13 | 19.42 | −8.1% |
+| cyclic-5 grlex | 13.30 | 11.46 | **−13.9%** | 20.02 | 18.03 | −10.0% |
+| katsura-6 grlex | 12.87 | 11.95 | −7.1% | 21.85 | 21.07 | −3.6% |
+| cyclic-5 lex | 12.86 | 11.26 | **−12.4%** | 21.68 | 19.91 | −8.2% |
+| katsura-5 lex | 5.63 | 4.96 | −11.9% | 11.83 | 11.09 | −6.3% |
+| random-4 lex | 3.65 | 3.17 | **−13.2%** | 7.38 | 6.85 | −7.2% |
+
+The two katsura-7 rows gain least, and they are the rows where the stage is largest. §9.4 reads
+that as the elimination's own working set having pushed past the level the pivot store competes in,
+not as the change being worth less there.
+
+`cargo run --release --example f4_profile -- recommended` is the configuration
+`F4Options::default()` selects: `Backend::Adaptive`, structured elimination, preprocessing. Mean of
+three runs; the reps agreed to within 1.5%. Every instance whose elimination stage exceeds a
+millisecond — the configuration is fast enough that most are below it.
+
+| instance | elim before | elim after | elim | total before | total after | total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| katsura-7 grlex | 7.05 | 5.69 | **−19.2%** | 45.66 | 44.53 | −2.5% |
+| katsura-7 grevlex | 6.62 | 4.76 | **−28.1%** | 34.22 | 32.36 | −5.4% |
+| katsura-6 lex | 1.14 | 0.96 | −15.7% | 21.14 | 20.63 | −2.4% |
+
+This is the largest proportional gain in the milestone, and it is on the default. Two things make
+the totals move much less. First, the elimination stage is no longer where the time is under this
+configuration: katsura-7 grevlex spends 18.28 ms of its 34.17 in the final interreduction, which is
+untouched. Second, the structured path's own `interreduce_prefix` still keeps a local
+`HashMap<usize, usize>` of the same shape — it is in `src/grobner/f4/structured.rs`, outside the
+elimination layer, and outside #159. The 28.1% is therefore a lower bound on what the change is
+worth to that stage.
+
+`cargo run --release --example scoreboard -- stable`, whole solves, and
+`scoreboard row poseidon31-cico-t16-rf2-rp0 --slice 0`, a registered full-width Poseidon reduction
+at a precommitted specialization seed. **Three runs each side, and every run is listed**, because
+these rows are whole solves and run-to-run variation is several percent — on a single pair the
+Fukuoka row read −13.5%, which three runs do not support.
+
+| row | before, ms | after, ms | mean | outcome |
+| --- | --- | --- | ---: | --- |
+| `poseidon31-cico-t16-rf2-rp0`, slice(12 fixed, seed 0) | 31 144, 30 512, 29 697 | 29 023, 28 904, 27 632 | **−6.3%** | the slice is empty — mathematically complete, not resource-limited, on all six runs |
+| `poseidon-t3-rf2-rp1-planted` | 18 964, 19 021, 18 931 | 18 514, 19 315, 17 853 | −2.2% | **resource-limited**: `max_matrix_columns` at degree 11, the same bound at the same degree on all six runs. The spread is wider than the effect; this row says nothing. |
+| `fukuoka-mq-III-n15-seed0` | 9912, 9577, 8864 | 8579, 8930, 8111 | **−9.6%** | verified witness, all six runs |
+| `poseidon-t2-rf4-rp0-planted` | 388.1, 381.2, 398.8 | 374.1, 389.6, 373.8 | −2.6% | verified witness; the ranges overlap |
+| `poseidon-t2-rf2-rp2-planted` | 151.4, 151.9, 156.9 | 148.1, 148.7, 146.1 | −3.8% | verified witness, all six runs |
+| `fukuoka-mq-III-n10-seed0` | 124.2, 127.6, 123.3 | 110.4, 120.3, 110.0 | **−9.2%** | verified witness, all six runs |
+| `poseidon-t2-rf2-rp0-planted` | 0.9, 1.0, 0.9 | 1.2, 0.9, 0.9 | — | verified witness; under a millisecond, so the sign is not meaningful |
+
+The two Fukuoka rows are the largest whole-solve gains, at −9.2% and −9.6%, and they are over
+GF(31) with 30 quadratic equations in 15 variables — the shortest pivot support of anything here.
+The issue predicted the share the lookup takes is largest where pivots are short, and that is where
+it is largest.
+
+The full-width Poseidon reduction's slice gains 6.3% and reaches the same verdict on both sides. It
+is the only row here with no overlap between the two triples.
+
+### 9.4 The bound: memory, not ALU
+
+**Memory-bound, and specifically a cache-footprint effect rather than a removed instruction.**
+
+A `SipHash-1-3` over eight bytes plus one probe is on the order of 15 to 25 cycles, so removing a
+fixed per-lookup cost would subtract a **constant** number of nanoseconds per row operation. It
+does not. On `Backend::Sparse` the saving is **−9.8% on both instances**, at per-operation costs
+that differ by 2.7x — 38.9 ns on katsura-6 and 106.2 ns on katsura-7. A constant would have read
+−9.8% and −3.6%. The saving is proportional to the operation's own cost, which a removed
+instruction cannot produce and a removed competitor for cache can: the hash table's 34 KiB and
+136 KiB displaced row data, and the 5.5 KiB and 26.8 KiB arrays that replace them do not.
+
+Three further readings line up with that and not with the ALU account:
+
+- **`Backend::Dense` is the null result**, −1.3% and −1.5%. Its per-operation cost is 2.2 µs, a
+  scan of a full dense row, so the pivot store is a vanishing share of both its time and its cache
+  footprint. This is the bound the issue warned about, and it is where it predicted it.
+- **`Adaptive` gains less on katsura-7 (−5.2%) than on katsura-6 (−8.6%)**, the reverse of the
+  sizes. §4.4 measured katsura-7's live working set at 11 MB, out of L2; once the row data itself
+  is out of L2, what the pivot store displaces matters less.
+- **The whole-computation gains are largest on the smallest instances** — cyclic-5 and katsura-5 at
+  11% to 15% of the elimination stage, katsura-7 at 3% — which is the same ordering.
+
+One reading looks like a counterexample and is not. §9.3's default configuration gains **28.1%** of
+its elimination stage on katsura-7 grevlex, far more than the 5.2% §9.1 measures for `Adaptive` on
+the same instance. The two are not the same work: the default takes the reducer rows as established
+pivots, so its loop performs a lookup for every column it visits while doing arithmetic for only
+the few that are not already pivots. The issue put the share the lookup takes at
+`lookup / (support * cost-per-entry)`, and the structured path shrinks the denominator without
+shrinking the numerator. That is the ratio behaving as predicted, not a second mechanism.
+
+Two instance sizes is two points, so the proportionality is an inference rather than a fit. What it
+does rule out is the reading that the lookup's cost was the hash: the hash is a constant and the
+measurement is not.
+
+### 9.5 What this does not change
+
+`EliminationStatistics` is identical in every counter, which is the acceptance criterion and is
+pinned rather than asserted in prose. No `pub` signature moved: `PivotIndex` is `pub(crate)` and
+every signature it appears in was already `pub(crate)` or private. `src/grobner/f4/structured.rs`
+keeps a local map of the same shape — it is outside the elimination layer and outside this issue.
+
+Two shapes fall back to hashing rather than indexing, and both are tested at the boundary:
+`u32::MAX` rows or more, because a row index there would alias the vacant marker, and more than
+`1 << 26` columns, because the sparse backend has no existing per-column buffer against which
+`4 * num_columns` would be free. Nothing measured comes within four orders of magnitude of either.
+`Vec<Option<u32>>` was checked rather than assumed: a `u32` has no invalid bit pattern for a
+discriminant to occupy, so `Option<u32>` is eight bytes and the sentinel is what shipped.

@@ -10,10 +10,11 @@
 //! The invariant that makes the gather cheap: every cell outside `[lead, tail)` is zero. `lead` is
 //! a lower bound on the first nonzero column, `tail` an upper bound on one past the last.
 
-use std::collections::HashMap;
-
 use crate::{
-    linalg::sparse::{EliminationStatistics, SparseMatrix, SparseRow},
+    linalg::{
+        sparse::{EliminationStatistics, SparseMatrix, SparseRow},
+        PivotIndex,
+    },
     FiniteField,
 };
 
@@ -166,7 +167,7 @@ pub(crate) fn accumulated_row_echelon<F: FiniteField>(
         return Err(initial_nonzeros);
     }
 
-    let mut pivot_of_column: HashMap<usize, usize> = HashMap::new();
+    let mut pivot_of_column = PivotIndex::new(matrix.num_columns(), matrix.num_rows());
     let mut resident = initial_nonzeros;
     let mut accumulator = DenseAccumulator::new(matrix.num_columns());
     eliminate_from(
@@ -190,7 +191,7 @@ pub(crate) fn accumulated_row_echelon<F: FiniteField>(
 pub(crate) fn accumulated_reduce_rows_against_pivots<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     split: usize,
-    pivot_of_column: &mut HashMap<usize, usize>,
+    pivot_of_column: &mut PivotIndex,
     statistics: &mut EliminationStatistics,
     max_nonzeros: usize,
 ) -> Result<(), usize> {
@@ -213,7 +214,7 @@ pub(crate) fn accumulated_reduce_rows_against_pivots<F: FiniteField>(
 fn eliminate_from<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     first: usize,
-    pivot_of_column: &mut HashMap<usize, usize>,
+    pivot_of_column: &mut PivotIndex,
     statistics: &mut EliminationStatistics,
     resident: &mut usize,
     accumulator: &mut DenseAccumulator<F>,
@@ -227,8 +228,8 @@ fn eliminate_from<F: FiniteField>(
         accumulator.load(&row);
 
         while let Some(column) = accumulator.leading_column() {
-            match pivot_of_column.get(&column) {
-                Some(&pivot_index) => {
+            match pivot_of_column.pivot_of(column) {
+                Some(pivot_index) => {
                     // Every pivot's leading coefficient is one, so the factor that clears this
                     // column is this row's own leading coefficient.
                     let factor = accumulator

@@ -8,10 +8,11 @@
 //! See Sec 2.10 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea for the role this
 //! plays in F4, and Faugère (1999) for the algorithm that calls it.
 
-use std::collections::HashMap;
-
 use crate::{
-    linalg::sparse::{matrix::SparseMatrix, row::SparseRow},
+    linalg::{
+        sparse::{matrix::SparseMatrix, row::SparseRow},
+        PivotIndex,
+    },
     FiniteField,
 };
 
@@ -91,9 +92,9 @@ pub fn row_echelon_within<F: FiniteField>(
     // the matrix, so its own entries are added back in when the peak is sampled.
     let mut resident = statistics.initial_nonzeros;
 
-    // Which row is the pivot for a given column. Only looked up by key, never iterated, so the
-    // hash order cannot reach the result.
-    let mut pivot_of_column: HashMap<usize, usize> = HashMap::new();
+    // Which row is the pivot for a given column, indexed by the column. Never iterated, so no
+    // storage order can reach the result.
+    let mut pivot_of_column = PivotIndex::new(matrix.num_columns(), matrix.num_rows());
     let mut scratch: Vec<(usize, F)> = Vec::new();
 
     for index in 0..matrix.num_rows() {
@@ -103,8 +104,8 @@ pub fn row_echelon_within<F: FiniteField>(
         resident -= row.nonzeros();
 
         while let Some(column) = row.leading_column() {
-            match pivot_of_column.get(&column) {
-                Some(&pivot_index) => {
+            match pivot_of_column.pivot_of(column) {
+                Some(pivot_index) => {
                     // The pivot's leading coefficient is one, so the factor that clears this
                     // column is this row's leading coefficient itself.
                     let factor = row
@@ -159,8 +160,10 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
     let mut scratch: Vec<(usize, F)> = Vec::new();
     let mut resident = statistics.final_nonzeros;
 
-    // Pivot columns, right to left. Collected from the rows rather than carried out of the first
-    // pass, and sorted, so the traversal does not depend on a hash order.
+    // Pivot columns, right to left. The sort stays: the rows are visited in row order, and what
+    // the pass needs is column order, so the sort is what converts the one into the other rather
+    // than a guard against the pivot index's storage order. Collecting from the rows rather than
+    // from the index keeps the two facts independent.
     let mut pivots: Vec<(usize, usize)> = (0..matrix.num_rows())
         .filter_map(|index| matrix.row(index).leading_column().map(|c| (c, index)))
         .collect();
