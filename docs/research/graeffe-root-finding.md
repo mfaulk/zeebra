@@ -1,0 +1,1005 @@
+# Graeffe root finding: the published algorithm, the degree it consumes, and whether Zeebra's NTT is access-bound
+
+Reference for D3 (#84), a child of the #68 epic. This is the **reading and scoping half**; the
+implementation half is blocked on #124 (polynomial multiplication through the transform).
+
+The issue imposes one evidentiary rule, and this document honours it strictly: *no figure from a
+paper is recorded here without having been read in the PDF.* Every paper figure below carries a
+section or table reference to a PDF that was obtained and read. Figures that could not be verified
+are marked `UNVERIFIED`.
+
+## 1. The papers, and how they were obtained
+
+`eprint.iacr.org/*.pdf` is behind a Cloudflare interstitial that returns HTTP 403 from this
+environment — confirmed again on 2026-11-05 with `curl`, a browser `User-Agent` and a `Referer`.
+The working route is the Wayback Machine's **raw-content** form,
+`https://web.archive.org/web/<ts>id_/https://eprint.iacr.org/<year>/<id>.pdf`; the `id_` suffix is
+essential, since without it the rewritten viewer HTML is returned instead of the original bytes.
+Wayback rate-limits aggressively and `curl --retry 12 --retry-delay 25 --retry-all-errors` cleared
+every 429. This supersedes the "PDF not obtained" note the issue was opened with: **Wayback raw
+content is the first thing to try for an ePrint PDF from this environment**, ahead of the HAL and
+institutional-page routes that `docs/research/additional-benchmarks.md` §8 records for other papers.
+
+| # | paper | authors | pages | obtained |
+|---|---|---|---:|---|
+| **[P950]** | *Breaking Poseidon Challenges with Graeffe Transforms and Complexity Analysis by FFT Lower Bounds* (ePrint 2025/950) | Ziyu Zhao (Tsinghua), Jintai Ding (XJTLU / BCAM Bilbao) | 24 | yes, Wayback raw |
+| **[P937]** | *Attacking Poseidon via Graeffe-Based Root-Finding over NTT-Friendly Fields* (ePrint 2025/937) | Antonio Sanso (Ethereum Foundation), Giuseppe Vitto (Zircuit) | 14 | yes, Wayback raw |
+| **[PC]** | *Graeffe-Based Attacks on Poseidon and NTT Lower Bounds* (ePrint 2025/1916) | Zhao, Sanso, Vitto, Ding | 26 | yes, Wayback raw |
+| **[JAZ]** | *Solving CICO-2 bounty instances of Poseidon* (slides, 2025-03-15) | Bak, Bariant, Boeuf, Hostettler, Jazeron (INRIA/DGA/Télécom SudParis) | 24 | yes, direct from `gjazeron.github.io` |
+
+**The Springer DOI in the issue resolves differently than the issue assumed.**
+`10.1007/978-3-032-35412-9_16` is *Advances in Cryptology — CRYPTO 2026*, LNCS, pp. 471–498, titled
+*Graeffe-Based Attacks on Poseidon and NTT Lower Bounds* — the **merger of [P950] and [P937]**, by
+all four authors. Springer's copy is paywalled (Unpaywall reports `is_oa: false`, no OA locations),
+so **[PC]** (ePrint 2025/1916) is the usable version of the conference paper and is what is cited
+below when the two source papers agree. Where they differ, the source paper is cited.
+
+[JAZ] is not named in #84 but is the **primary source for the attack [PC] improves on** — it is
+reference `[7]` in [PC], the "previous record". It is also already cited in #88 for its hardware
+line. It was read in full and is the source for the CICO-2 resultant degrees in §2.
+
+The authors' implementation is at `https://github.com/zhaoziyu0008/Goldilocks_solver` ([PC] §1,
+C++/CUDA, "about 4,000 to 5,000 lines"). Not read; not needed for this document.
+
+## 2. The problem instance, and its degree
+
+### 2.1 The precise algebraic problem
+
+**Not** CICO in general. [PC] Definition 1 states the CICO problem for `F: F_p^t -> F_p^t` and
+`u < t` as finding `X_0..X_{t-1-u}, Y_0..Y_{t-1-u}` with
+`F(X_0,…,X_{t-1-u},0,…,0) = (Y_0,…,Y_{t-1-u},0,…,0)`. The attack [PC] accelerates solves the
+**univariate** case `u = 1` — CICO-1. [PC] §1 and §4.2 both say so without qualification:
+
+> "It is important to emphasize that the above security analysis only applies when the CICO problem
+> requires just the last coordinate to be fixed. For example, the Poseidon-31 challenge in Table 1
+> requires `Perm(X_0,…,X_13,0,0) = (Y_0,…,Y_13,0,0)`. Then the best known attack would be the
+> Gröbner basis computation together with the FGLM algorithm, or the mutant XL algorithm, where the
+> main bottleneck is linear algebra, which is no longer memory-bound." — [PC] §1
+
+That single paragraph decides most of §7's go/no-go and is the most important thing in the paper for
+this repository. **Zeebra's three registered 2026 KoalaBear challenges are CICO-2** (`k = 2` in
+`src/grobner/research/challenge.rs`), which is the case [PC] explicitly excludes from its own
+analysis.
+
+### 2.2 The polynomial representation required
+
+Dense coefficient vectors, padded to the transform size — not sparse, not multivariate, not a
+straight-line program. [P937] §5.3 is explicit about the layout: "the interpolated polynomials are
+represented as vectors of size `2^28` and `2^31` for instances 6_8 and 6_9, respectively, each entry
+occupying 32 bytes", and "we pad polynomials with zeros to the nearest power-of-two length before
+applying the NTT". [P937] §5.3 adds that "all implemented polynomial arithmetic primitives are
+optimized to use NTTs whose sizes are at most twice the size of their input polynomials."
+
+This is exactly `UnivariatePolynomial<F>`'s representation, so nothing in Zeebra's `poly::univariate`
+layer needs a new data structure.
+
+### 2.3 Round skipping, and the degree — derived
+
+[PC] §2.3 gives the rule in two halves, and the halves differ by one round:
+
+- **Poseidon** (no initial linear layer): two rounds can be skipped. "Under these choices, the
+  permutation becomes a univariate polynomial in `y_0` of degree `α^{R_F + R_P − 2}`" — [PC] §2.3,
+  *The 2-Round Attack for Poseidon*, with the construction given explicitly: let
+  `(λ_0,…,λ_{t-1})` be the last row of `M_E^{-1}`, take
+  `y_{t-1} = (Σ λ_i/λ_{t-1} · RC_{t+i} + RC^α_{t-1}/λ_{t-1})^α`, set `y_2 = … = y_{t-2} = 0` and
+  `y_1 = (λ_0/λ_1)^α · y_0`.
+- **Poseidon2** (initial linear layer present): only one round can be skipped, giving degree
+  `α^{R_F + R_P − 1}` — [PC] §2.3, *The 1-Round Attack for Poseidon2*. [PC] adds that "the impact
+  is less significant for Poseidon2, owing to the presence of the initial linear
+  transformation — this is precisely why [21] introduced the initial linear transform in the first
+  place."
+
+[PC] attributes the trick to [JAZ]/[7] and [JAZ] slide 17 ("Round skipping trick") describes the
+same construction independently. [JAZ] slide 18 gives `δ = d^{R_F − 1 + R_P}` for its CICO-1 attack,
+which is the same exponent as [PC]'s Poseidon2 rule.
+
+**The coordinator's figure `3^13`, derived.** The registered `poseidon31-cico-rf6-rp8` has
+`alpha = 3`, `t = 16`, `R_F = 6`, `R_P = 8` over `KOALABEAR_PRIME`, and its verifier runs
+`permutation_plus_linear` — the variant **with** an initial linear layer
+(`src/grobner/research/poseidon.rs:381`). That is the Poseidon2 side of [PC] §2.3's rule, so one
+round is skipped and
+
+```
+δ = α^(R_F + R_P − 1) = 3^(6 + 8 − 1) = 3^13 = 1 594 323        (log2 δ = 20.60)
+```
+
+**`3^13` reproduces.** Two independent cross-checks that the formula and the padding rule are right:
+
+- [JAZ] slide 5 lists the Poseidon2-31k family as `t = 16, d = 3`, matching the registry's
+  `alpha = 3`. ([PC] Table 1 lumps "M31 / KoalaBear" under a single `x ↦ x^5` entry; for KoalaBear
+  that contradicts both the registry and [JAZ], and is treated here as a Table-1 simplification.
+  Flagged as a **discrepancy between sources**, resolved in favour of the registry.)
+- [P937] §5.3 states the interpolated vectors for the BLS12-381 `6_8` and `6_9` instances are of
+  size `2^28` and `2^31`. Independently: Poseidon, `α = 5`, skip 2, so `δ = 5^12 = 2^27.86` and
+  `5^13 = 2^30.19`, whose next powers of two are **`2^28` and `2^31`**. The formula and the
+  "pad to the next power of two" rule both reproduce the paper's own vector sizes exactly.
+
+**A caveat on `permutation_plus_linear`.** Zeebra's generator is a hybrid: it has Poseidon2's
+initial linear layer but Poseidon's same-MDS-every-round and all-state round constants in the
+partial rounds ([PC] §2.2 lists exactly those three differences; `src/grobner/research/poseidon.rs`
+applies `self.mds` throughout). The skip count depends only on whether the **initial** linear layer
+is present, which it is — so `α^{R_F+R_P−1}` is the right rule and `3^13` the right degree.
+Marked **reconstructed**: the paper states the rule for Poseidon and for Poseidon2, not for this
+hybrid, and no source read here states the hybrid case.
+
+### 2.4 Degrees and required transform sizes, for every registered instance
+
+`δ` is the degree from §2.3. For CICO-2 the univariate object whose roots are wanted is not `δ` but
+the **resultant**, whose degree [JAZ] slide 19 gives as `d^{2(R_F−1)+R_P}` and calls an
+*experimental result* — [JAZ] slide 22 expands on it: the expected degree is `d^{2R_F+2R_P}`,
+"however, we experimentally noticed that the degree of the resultant is `d^{2R_F+R_P}`", saving a
+factor `d^{R_P}`, and "it also corresponds to the degree of the polynomial ideal: why is that?"
+**Unproven in the source and recorded as such.** This repository has an independent corroboration at
+tiny size: `docs/research/resultant-elimination.md` §2 measures the resultant degree on the
+2-round slice as exactly the Bézout bound `d²`, with no collapse — consistent with the loose bound,
+not with the tighter experimental one, at a round count too small to separate them.
+
+Required radix-2 transform size is `2^ceil(log2(δ+1))` for interpolating or Graeffe-transforming a
+degree-`δ` polynomial (an order-2 Graeffe step needs only `n ≥ δ+1`, not `2δ+1` — see §3.2), and
+`2^ceil(log2(2δ+1))` for an ordinary product of two degree-`δ` polynomials.
+
+| registered instance | objective | field | α | R_F | R_P | `δ` | `n` for Graeffe/interp. | `n` for a product | resultant degree | `n` for the resultant |
+|---|---|---|---:|---:|---:|---|---:|---:|---|---:|
+| `poseidon31-cico-rf6-rp6` | CICO-2 | KoalaBear | 3 | 6 | 6 | `3^11` = 177 147 | `2^18` | `2^19` | `3^16` = 4.30e7 | **`2^26`** |
+| `poseidon31-cico-rf6-rp8` | CICO-2 | KoalaBear | 3 | 6 | 8 | **`3^13`** = 1 594 323 | **`2^21`** | **`2^22`** | `3^18` = 3.87e8 | **`2^29`** |
+| `poseidon31-cico-rf6-rp10` | CICO-2 | KoalaBear | 3 | 6 | 10 | `3^15` = 1.43e7 | `2^24` | `2^25` | `3^20` = 3.49e9 | **`2^32`** |
+| `poseidon256-cico-2025-rf6-rp11` | CICO-1 | BLS12-381 `Fr` | 5 | 6 | 11 | `5^15` = 3.05e10 | **`2^35`** | `2^36` | — | — |
+| `poseidon256-cico-2025-rf6-rp16` | CICO-1 | BLS12-381 `Fr` | 5 | 6 | 16 | `5^20` = 9.54e13 | `2^47` | `2^48` | — | — |
+| `poseidon64-cico-2025-rf6-rp13` | CICO-1 | Goldilocks | 7 | 6 | 13 | `7^18` = 1.63e15 | `2^51` | `2^52` | — | — |
+
+The 2025 rows are CICO-1 (`k: 1` in `challenge.rs`) and are therefore **exactly the shape [PC]
+attacks**. They are also the only three registry rows with no public solution recorded. The
+Goldilocks row is the **40-bit tier that [PC] did not solve**: [PC] Table 3 reports the 24-, 28- and
+32-bit tiers (`R_P = 7, 8, 10`) solved, and [PC] §1 says "none of the Poseidon-64 instances were
+solved until our work". `R_P = 13` is the tier above those, at `δ = 7^18 = 2^50.5`.
+
+For context, the instances [PC] actually solved, by the same formulas:
+
+| [PC] instance | field | α | R_F | R_P | skip | `δ` | required `n` | paper's stated size |
+|---|---|---:|---:|---:|---:|---|---:|---|
+| `P_6_8` | BLS12-381 | 5 | 6 | 8 | 2 | `5^12` | `2^28` | `2^28` ([P937] §5.3) |
+| `P_6_9` | BLS12-381 | 5 | 6 | 9 | 2 | `5^13` | `2^31` | `2^31` ([P937] §5.3) |
+| `P2_6_7` | Goldilocks | 7 | 6 | 7 | 1 | `7^12` | `2^34` | mixed radix, `q·2^32` with `q = 15` ([P937] §5.3) |
+| `P2_6_8` | Goldilocks | 7 | 6 | 8 | 1 | `7^13` | `2^37` | mixed radix ([PC] §4.2) |
+| `P2_6_10` | Goldilocks | 7 | 6 | 10 | 1 | `7^15` | `2^43` | `2^32 · 5 · 257` ([PC] §4.2) |
+
+### 2.5 KoalaBear's two-adicity, and the hard ceiling
+
+`docs/research/fast-univariate.md` §1.1 records **24** for KoalaBear and states that the figure was
+*derived rather than quoted*: `two_adicity()` reads `s` off the compiled-in modulus, and three
+independent checks pin it — a `BigUInt` recomputation of `2^s · m` against `q − 1`, an oracle check
+against `ark_ff::FftField::TWO_ADICITY` for the wide fields, and the cyclotomic identity
+`1 + w + … + w^{n−1} = 0` with distinctness of the `n` powers. The throwaway run in §6.1 printed
+`s = 24` again from the shipped `two_adic_decomposition`.
+
+So, with `p = 2^31 − 2^24 + 1 = 2 130 706 433` and `p − 1 = 2^24 · 127`:
+
+| | KoalaBear | Goldilocks | BN254 `Fr` | BLS12-381 `Fr` |
+|---|---:|---:|---:|---:|
+| two-adicity `s` | **24** | 32 | 28 | 32 |
+| max radix-2 transform | `2^24` | `2^32` | `2^28` | `2^32` |
+| odd part of `p − 1` | **127** | `3·5·17·257·65537` | 226 bits | 223 bits |
+| max **mixed-radix** transform | `2^24 · 127` ≈ `2^31.0` | `2^64` (`p−1` itself) | — | — |
+
+KoalaBear's odd part is a single prime, 127, so its mixed-radix headroom above `2^24` is a factor of
+127 and no more. [PC] §4.1 notes "all prime numbers appearing in the Poseidon Challenge have quite
+smooth multiplicative group sizes" and gives the Goldilocks and BLS12-381 factorizations; KoalaBear's
+is not given there, and `2^24 · 127` is **smooth but shallow** — it supports the Graeffe iteration
+(which wants a large `r = 2^k`, and `k = 24` is available) far better than it supports large
+transforms.
+
+## 3. The algorithm, as pseudocode
+
+The issue is emphatic that the transform is not the algorithm, and it is right: the transform is two
+half-degree squarings, and the root finder built on it is where all the content is. Everything in
+this section was read in [PC] §3–§4 or [P937] §4–§5. Steps marked **(reconstructed)** were not
+stated in those sections and are inferred.
+
+### 3.1 Definition and the two lemmas the algorithm rests on
+
+[PC] Definition 2: for `ℓ` coprime to `p`, `GT_ℓ(f)` is the unique `g` with
+
+```
+g(x^ℓ) = f(x) · f(x·ω_ℓ) · … · f(x·ω_ℓ^(ℓ−1)),       ω_ℓ a primitive ℓ-th root of unity
+```
+
+- **[PC] Lemma 1** — `GT_ℓ(f) ∈ F_p[x]` and `deg GT_ℓ(f) = deg f`. Proof read: the product is
+  invariant under `x ↦ ω_ℓ x`, so only exponents divisible by `ℓ` survive; the coefficients are
+  fixed by every Galois conjugation, hence lie in `F_p`.
+- **[PC] Lemma 2** — `GT_{ℓ_0}(GT_{ℓ_1}(f)) = GT_{ℓ_0 ℓ_1}(f)`. This is what makes the whole
+  method work: a transform of smooth order factors into cheap prime-order steps.
+- **[PC] §3.2, after Lemma 2** — with `ℓ | p − 1`: if `µ ∈ F_p` is a root of `f` then `µ^ℓ` is a
+  root of `GT_ℓ(f)`; **conversely**, if `ν` is a root of `GT_ℓ(f)` and has one (hence all) of its
+  `ℓ`-th roots in `F_p`, then at least one of them is a root of `f`. The converse is the direction
+  the un-squaring step in §3.3 relies on.
+- **[P937] §4.2** gives the same statement as a divisibility: `∏_{i=0}^{r−1}(x − ω_r^{r−i}α) =
+  x^r − α^r` divides `G_r(P)(x^r)`.
+
+### 3.2 The order-2 transform, and its cost in NTTs
+
+[PC] §3.2: writing `f(x) = f_0(x²) + x·f_1(x²)`,
+
+```
+f(x)·f(−x) = f_0(x²)² − x²·f_1(x²)²    ⇒    GT_2(f)(x) = f_0(x)² − x·f_1(x)²
+```
+
+and "this can be computed using two NTTs and one invNTT with any NTT group size larger than `d`."
+[P937] §5.3 states the sign convention the issue flagged as open:
+
+```
+G_2(P) = (−1)^d · ( P_e(x)² − x·P_o(x)² )          where P(x) = P_e(x²) + x·P_o(x²)
+```
+
+and records the cost correction explicitly: their first implementation "followed the original
+definition: computing the product of two polynomials of degree `d`, thereby requiring three NTTs of
+size `2d`", and the identity above "reduce[s] the computational cost by performing only three NTTs
+of size `d` instead. As a result, we expect the total runtime of the attack to be reduced by
+approximately half." — [P937] §5.3. **So an order-2 Graeffe step costs three transforms of size
+`≥ d+1`, not `≥ 2d+1`.** That is a factor of two in transform size against an ordinary product and
+is why §2.4's "`n` for Graeffe" column is one power of two below its "`n` for a product" column.
+
+For `ℓ ≥ 3`, [PC] §3.2 follows [24] (van der Hoeven–Monagan) with a recursive product tree on
+`P_h(x) = f(x)f(xω_ℓ)…f(xω_ℓ^{h−1})`:
+
+```
+P_h(x) = f(x)                                        if h = 1
+       = P_{h/2}(x) · P_{h/2}(x·ω_ℓ^{h/2})           if h even
+       = f(x) · P_{(h−1)/2}(x·ω_ℓ^{(h−1)/2}) · P_{(h−1)/2}(x·ω_ℓ^{(h+1)/2})   otherwise
+```
+
+[PC] notes this computes `GT_ℓ(f)(x^ℓ)` rather than `GT_ℓ(f)(x)`, which makes it simpler to
+implement but costs "roughly `2ℓ` times more memory than the output polynomial size" — acceptable
+only because orders above 2 are applied to small-degree polynomials in the final steps.
+[P937] §4.1 adds the complexity argument: computing `GT_{r^k}` directly as an `r^k`-fold product
+costs `O(r^k d log(r^k d))` against `O(k·r·d·log(rd))` for `k` iterated order-`r` steps.
+
+### 3.3 Algorithm A — the general root finder
+
+[PC] Algorithm 2, transcribed verbatim in structure:
+
+```
+ALGORITHM A  (root finding by Graeffe transform)             [PC] Algorithm 2
+input   f ∈ F_p[x] of degree d; the factorization p − 1 = q_1 q_2 … q_k
+output  a root of f in F_p, if one exists
+
+ 1  β ← p − 1 ;  g_0 ← f
+ 2  for i ← 1 to k:
+ 3      β ← β / q_i
+ 4      g_i ← GT_{q_i}(g_{i−1})  mod (x^β − 1)
+ 5  if g_k has no roots in F_p: return ⊥
+ 6  µ_k ← a root of g_k
+ 7  for i ← k down to 1:
+ 8      µ_{i−1} ← a common root of g_{i−1} and (x^{q_i} − µ_i)
+ 9  return µ_0
+```
+
+Four things the text adds, all read in [PC] §3.2 immediately after the algorithm:
+
+- **The reduction in line 4 is what keeps it cheap.** `GT_{q_i}(g_{i−1})` has the same degree as
+  `g_{i−1}` (Lemma 1), but every root that descends from an `F_p`-root of `f` lies in the subgroup
+  of order `β`, hence is a root of `x^β − 1`; so reducing modulo `x^β − 1` loses no wanted root and
+  caps the degree at `β − 1`. "As soon as `β` drops below the degree of `f`, the subsequent
+  computations rapidly become trivial, since the polynomials involved are then of much smaller
+  degree."
+- **The un-squaring in line 8 is where the sign/root ambiguity is resolved, and it is resolved by a
+  gcd, not by a choice.** `µ_i` has `q_i` distinct `q_i`-th roots; the one that is a root of
+  `g_{i−1}` is picked out by the common root of `g_{i−1}` and `x^{q_i} − µ_i`. [PC]: "In the
+  computation of common roots in line 8, one can first reduce `g_{i−1}` modulo `(x^{q_i} − µ_i)`,
+  so that the resulting polynomials have low degree. When `p − 1` is smooth, the cost of these steps
+  becomes negligible." There is no ambiguity to resolve by guessing and no sign convention to track
+  through the descent — the ambiguity is *decided by the polynomial*.
+- **Termination** is by exhaustion of the factor list: `k` forward steps, `k` backward steps. The
+  `⊥` branch at line 5 is the only failure mode, and it is exact rather than heuristic: if the
+  fully-transformed `g_k` has no `F_p`-root then `f` has none, because the forward direction of the
+  §3.1 correspondence maps every `F_p`-root of `f` to an `F_p`-root of every `g_i`.
+- **Multiplicity** is not handled and does not need to be in this algorithm: it returns *one* root,
+  and line 8's gcd is unaffected by `µ_i` being a multiple root. Multiplicity matters only for the
+  *all-roots* variant of §3.6, where [P937] §4.3's tangent method requires `α_i^r` to be a **simple**
+  root of `G_r(P)` and the input to split with distinct roots; [P937] §4.4 handles the shortfall by
+  randomizing — "the polynomial `P(x)` is first replaced by `P(x + τ)`" for random `τ ∈ F_p` — to
+  "ensure a sufficient number of such roots".
+
+### 3.4 Algorithm B — the Goldilocks instantiation
+
+[PC] Algorithm 3, "designed to reduce memory usage and clarify the main idea of Algorithm 2", with
+`p_64 − 1 = 2^32 · 3 · 5 · 17 · 257 · 65537`:
+
+```
+ALGORITHM B  (root finding over Goldilocks)                  [PC] Algorithm 3
+input   f ∈ F_{p64}[x] of degree d           output  a root in F_{p64}, if one exists
+
+ 1  β ← p64 − 1 ;  µ ← 1 ;  g ← f
+ 2  while β is even:                       # 32 order-2 steps
+ 3      β ← β/2 ;  g ← GT_2(g) mod (x^β − µ)
+ 5  β ← β/3    ;  g_3   ← GT_3(g)     mod (x^β − µ)
+ 6  β ← β/5    ;  g_5   ← GT_5(g_3)   mod (x^β − µ)
+ 7  β ← β/17   ;  g_17  ← GT_17(g_5)  mod (x^β − µ)
+ 8  β ← β/257  ;  g_257 ← GT_257(g_17) mod (x^β − µ)
+ 9  if g_257 has no roots in F_{p64}: return ⊥
+10  µ ← a common root of g_257 and (x^65537 − µ)
+11  µ ← a common root of g_17  and (x^257   − µ)
+12  µ ← a common root of g_5   and (x^17    − µ)
+13  µ ← a common root of g_3   and (x^5     − µ)
+14  µ ← a common root of g     and (x^3     − µ)
+15  β ← 2^32 ;  h ← f mod (x^β − µ)
+16  return a common root of h and (x^(2^32) − µ)
+```
+
+Three details read in [PC] §4.1:
+
+- The residue `µ` tracked through the modulus `x^β − µ` rather than `x^β − 1` is the generalisation
+  that lets the descent restart: by line 9 the algorithm holds `λ^{(p64−1)/65537} = λ^{2^32·65535}`,
+  and lines 11–14 successively recover `λ^{2^32·255}`, `λ^{2^32·15}`, `λ^{2^32·3}`, `λ^{2^32}`.
+- Line 16 recovers `λ` itself from `λ^{2^32}` by "a process similar to that in lines 5 to 14" —
+  i.e. the 32 square roots are themselves done by the same gcd descent, not by a square-root
+  formula. **(reconstructed detail:** [PC] says "similar to" and does not expand the 32 steps.)
+- "The computation is dominated by the first `log2(p64) − log2(d) + 1` order-2 Graeffe transforms",
+  and "there is no need to store all intermediate polynomials. We do not even store `f`, but use
+  interpolation to recover it each time it is needed."
+
+### 3.5 Algorithm C — the single-root variant that was actually implemented
+
+[P937] Algorithm 2, which is what [P937]'s Poseidon2-64 attack ran. Written for `p − 1 = r·s` with
+`r = 2^k`:
+
+```
+ALGORITHM C  (single root finding)                           [P937] Algorithm 2
+input   P ∈ F_p[x] of degree d; r = 2^k and s with p = r·s + 1;
+        ω_r, ω_s primitive r-th and s-th roots of unity in F_p
+output  α ∈ F_p with P(α) = 0, if one exists
+
+ 1  if d = 0: return ∅
+ 3  if P(0) = 0: return 0
+ 5  G ← P ;  for i ← 0 .. k−1:  G ← G_2(G)                    # O(M(d) log r)
+ 6  P̃ ← G mod (x^s − 1)                                      # coefficient folding, max(d−s,0) adds
+ 7  V ← NTT_s(P̃) using ω_s                                   # O(s log s)
+ 8  find i with V[i] = 0 ;  if none: return ∅
+10  β ← ω_s^i                                                 # β = α^r
+14  for i ← 0 .. k−1:  β ← sqrt(β)                            # k square roots in F_p
+15  for i ← 0 .. r−1:                                         # O(r)
+16      α ← ω_r^i · β
+17      if P(α) = 0: return α
+19  return ∅
+```
+
+Why each step is the way it is, read in [P937] §5.2:
+
+- Line 6's fold is `O(max(d−s,0))` additions, not a division: "this step can be computed in
+  `max(d − s, 0)` operations by folding the coefficients of `G(x)` according to the relation
+  `x^s = 1 (mod x^s − 1)`."
+- Line 7 is the subgroup search: `NTT_s` evaluates `P̃` at every power of `ω_s`, so "a zero entry at
+  index `i` indicates that `ω_s^i` is a root" — [P937] §4.2. **The whole point of iterating the
+  transform is to push the root into a subgroup small enough to enumerate.** That is the answer to
+  the issue's question of how iterating the transform separates roots over a finite field: it does
+  not separate them by magnitude, as the real-number original does — it drives every `F_p`-root into
+  the order-`s` subgroup, where one NTT finds it.
+- Lines 14–18 replace Algorithm A's gcd descent with `k` square roots followed by an `r`-way scan,
+  because "the values `ω_r^i · β` represent all roots of the polynomial `x^r − α^r`". [P937] notes
+  the scan is nominally `O(dr)` but in an attack "the last loop is then performed by evaluating the
+  permutation `P2` over an input state evaluated at `α`, thus costing `O(r)` operations overall" —
+  the candidate test is a permutation call, not a polynomial evaluation. **That is the step that
+  makes the attack's verification stage free, and it is why §9's component list has the permutation
+  evaluator as a load-bearing piece rather than an afterthought.**
+- Total cost, [P937] §5.2: `O(M(d) log r + s log s + r)`.
+- [P937] §5.2 states the standing assumption plainly: "for the sake of exposition we will assume
+  that it has at most one root and that this is non-zero."
+
+### 3.6 Progressive degree reduction — the memory lever
+
+[P937] §5.3, *Large Input Polynomials*. Since `α^{2^i}` lies in the subgroup of order `(p−1)/2^i`,
+it is a root of `x^{(p−1)/2^i} − 1`, hence of
+
+```
+G̃_{2^i}(x) = G_{2^i}(x) mod (x^{(p−1)/2^i} − 1),    deg G̃_{2^i} = min( deg G_{2^i}, (p−1)/2^i − 1 )
+```
+
+so reduction can begin at iteration `i = ceil(log2((p−1)/d))` and the working degree then **halves
+every step** down to `s`. This is the single most important engineering point for Zeebra: it means
+the sum of transform sizes over the whole Graeffe iteration is a small constant times the largest
+one, not `k` times it.
+
+### 3.7 The all-roots variant, for completeness
+
+Not needed for CICO (one root suffices) but recorded because it is what the literature the papers
+build on actually does. [P937] §4.3–§4.4 reviews the **tangent Graeffe** method of Grenet–van der
+Hoeven–Lecerf [8], implemented in [9],[10] where "for the prime `p = 5·2^55 + 1`, it was used to
+compute the roots of polynomials of degree up to `10^9`":
+
+- Work over `F_p[ε]/(ε²)`. With `P̃(x) = P(x+ε) = P(x) + P'(x)ε`, one gets
+  `G_r(P̃)(x) = ∏(x − (α_i − ε)^r)` with `(α_i − ε)^r = α_i^r − r·α_i^{r−1}ε`.
+- Write `G_r(P̃) = A + Bε` with `A = G_r(P)`. For a **simple** root `α_i^r` of `A`,
+  `r·α_i^{r−1} = B(α_i^r)/A'(α_i^r)`, so `α_i = r·α_i^r · A'(α_i^r) / (r · B(α_i^r))` —
+  [P937] §4.3, with the derivation read.
+- [P937] Algorithm 1 (from [8]) takes `r` the largest power of two with `r ≤ (p−1)/4d`, sets
+  `s = (p−1)/r` so `s = O(d)`, randomizes by `P(x+τ)`, evaluates `A, A', B` on the order-`s`
+  subgroup, divides out the roots found and **recurses on the quotient** to catch the ones missed.
+
+**This is the answer to "how are multiplicities resolved".** The order-2 descent of Algorithms A–C
+does not resolve them, because it does not need to; the tangent method resolves them by requiring
+simplicity and recovering the shortfall through the shift `τ` and the recursion.
+
+### 3.8 What is reconstructed, listed
+
+| step | status |
+|---|---|
+| `GT_2` by three same-size NTTs, with sign `(−1)^d` | read — [P937] §5.3 |
+| Algorithm A, all lines | read — [PC] Algorithm 2 |
+| Algorithm B, all lines | read — [PC] Algorithm 3 |
+| Algorithm C, all lines | read — [P937] Algorithm 2 |
+| the gcd un-squaring resolves the root ambiguity | read — [PC] §3.2 commentary on line 8 |
+| progressive reduction thresholds | read — [P937] §5.3 |
+| tangent Graeffe root recovery formula | read — [P937] §4.3 |
+| the 32 square roots of Algorithm B line 16, expanded | **reconstructed** — [PC] says "similar to lines 5 to 14" |
+| skip count for Zeebra's hybrid `permutation_plus_linear` | **reconstructed** — §2.3 |
+| the Bluestein sizing for a non-dividing `s` | **partially read** — [P937] §5.3 names Bluestein and `q = 15`; the padding rule "sizes exceeding `2s`" is stated, the full schedule is not |
+
+## 4. The reported measurements, with hardware
+
+### 4.1 Goldilocks, Graeffe-based — [PC] Table 3
+
+Hardware, [PC] §4.2: "a dual-socket Intel Xeon Platinum 8474C server equipped with several Nvidia
+RTX 4090 graphics cards. Each card is connected to the system's 2TB RAM via a PCIe 4.0 interface,
+providing a unidirectional bandwidth of roughly 200 GiB/s in total under real-world conditions."
+
+| instance | field | κ | R_F | R_P | degree | time | memory | time [JAZ-method] | memory [JAZ-method] |
+|---|---|---:|---:|---:|---|---:|---:|---:|---:|
+| `P2_6_7` | Goldilocks | 24 | 6 | 7 | `7^12` | `2^8.56` s | 0.32 TB | `2^21.81` s | 6.1 TB |
+| `P2_6_8` | Goldilocks | 28 | 6 | 8 | `7^13` | `2^11.38` s | 1.8 TB | `2^24.83` s | 41 TB |
+| `P2_6_10` | Goldilocks | 32 | 6 | 10 | `7^15` | `2^18.35` s † | 90 TB | `2^30.88` s | 1.9 PB |
+
+† "Data swapped to disk" — [PC] Table 3 footnote.
+
+**The `2^13` and `2^4.5` claims, checked against this table.** `2^24.83 − 2^11.38 = 2^13.45` and
+`2^21.81 − 2^8.56 = 2^13.25`; `41/1.8 = 22.8 ≈ 2^4.51` and `6.1/0.32 = 19.1 ≈ 2^4.25`. **Both
+headline claims reproduce from the table, and both are against an *estimate* rather than a
+measurement of the comparand.** [PC] §4.2 is explicit: "For the GCD-based method, direct computation
+is infeasible even for the degree `7^12` case. Therefore, we use the fitting curve from Figure 12 of
+[7] to estimate the wall time and memory usage… This estimate optimistically assumes that the speed
+is not further reduced by accessing petabytes of memory." The right reading is therefore
+"`2^13` against an extrapolation of the prior method, which the authors call optimistic", not
+"`2^13` measured against a run". Recorded as such.
+
+### 4.2 BLS12-381, GCD-based — [P937] Table 1 and [PC] Table 2
+
+Hardware, [P937] §5.3: "AMD EPYC 9374F 32-core processor, 1.1 TB of RAM, and 8 NVIDIA L4 GPUs, each
+with 23 GiB of memory. The AWS cloud instance closest to this hardware configuration is the
+g6.48xlarge, featuring 192 vCPUs, 768 GiB of memory, and 8 NVIDIA L4 GPUs, priced at $13.35/h
+on-demand."
+
+| instance | κ | R_F | R_P | GPU | interpolation | root finding | other steps ([PC] Table 2) |
+|---|---:|---:|---:|---|---:|---:|---:|
+| `P_6_8` | 24 | 6 | 8 | no | 1 m 20 s | 3 d 7 h 17 m | `2^18.12` s |
+| `P_6_8_GPU` | 24 | 6 | 8 | yes | 45 s | 9 h 17 m | `2^15.03` s |
+| `P_6_9` | 28 | 6 | 9 | yes | 6 m 10 s | 2 d 18 h 10 m | `2^17.86` s |
+
+**Interpolation is 0.03%–0.2% of root finding on these rows.** That is the strongest available
+evidence for #68's premise that root finding and not elimination is the binding stage, and it is
+measured rather than modelled. [P937] §5.3 adds polynomial memory: "approximately 7.3 GiB and
+36.4 GiB" for the two instances, and notes the BLS rows used **the classical GCD method, not
+Graeffe** — "without employing the potential optimizations afforded by the Graeffe transform…
+Investigating the potential improvements achievable through the use of Graeffe-based methods is left
+as future work." The GCD step itself: "a few hours of computation on a single CPU core for the 6_8
+instance and around 3 days for 6_9", with exact timings "no longer available" ([PC] §4.2).
+
+Dollar cost, [P937] §5.3: `P_6_8` $185 against a $4 000 prize; `P_6_9` $1 101 against $6 000;
+`P2_6_8` $133 against $4 000.
+
+### 4.3 Where the time went, per the authors
+
+- [PC] §4.2: "in all the challenges we solved, memory access was the main bottleneck, and GPUs
+  played only a minor role in our speedup. For example, in the large degree cases, our toy CPU
+  implementation with almost no optimization for field operations (no SIMD, etc.), was only about
+  four times slower than the GPU version. During the Radix-2 NTT or invNTT, the typical GPU
+  utilization was less than 20%."
+- [PC] §4.2, Table 4, measured Goldilocks throughput on their GPU: `float32` FMA 41.3 TOPS,
+  `F_p64` addition 3.41, subtraction 2.95, **multiplication 0.76**.
+- [PC] §4.2: "the Radix-2 part of our NTT implementation executes roughly 25 field multiplications
+  and 25 field additions (or subtractions) each time a field element (8 bytes) is transferred to the
+  device. Assuming a ~16GB/s host-to-device bandwidth, this requires only a multiplication
+  throughput of 50 GOPS, which is less than 10% of the architecture's capability."
+- [PC] §4.2 on the alternative to large radix-2: "we need to compute NTT and invNTT with group sizes
+  of at least `7^12`, `7^13`, and `7^15`, all of which are larger than the even part of
+  `p64 − 1 = 2^32·3·5·17·257·65537`… Possible approaches include the Schönhage-Strassen algorithm and
+  the Elliptic Curve FFT, but we choose to use mixed-radix NTT for simplicity."
+- [PC] §4.2 on external memory: "large system RAM is not necessary for running our code. When
+  available memory is limited, users can configure the maximum RAM usage, and our implementation
+  will automatically swap polynomial coefficients and NTT data to and from disk as needed… overall
+  speed will be limited by disk I/O, but still acceptable — in our case it is about 2 ∼ 3 times
+  slower than running entirely in RAM." **This is the figure §8 hands to E3.**
+- [PC] §4.2's security estimate: `d_c` "well below `7^15`"; "it is possible to execute about `2^59`
+  SHA-256 permutations in the same running time as a degree `7^15` root finding over `F_{p255}`";
+  128-bit parameters give `R_F = 8, R_P = 56` hence degree `5^63`, and
+  `(5^63 / 7^15)^{4/3} × 2^59 ≈ 2^198` SHA-256 permutations. ([PC] §1 quotes the same estimate as
+  "about `2^200`"; the arithmetic in §4.2 gives `2^198`. **Discrepancy within the paper**, recorded.)
+
+## 5. The memory-access model, its assumptions, and whether it applies here
+
+### 5.1 The theorem
+
+[PC] §5, Theorem 1: "The arithmetic circuit of NTT over a finite field with input size `n = 2^{e_2}`,
+regardless of how it is realized in our three-dimensional world, will incur a data movement cost of
+at least `Õ(n^{4/3})`."
+
+The proof, read in full:
+
+- **Fact 1** — "The cost of data movement is proportional to the physical distance over which it is
+  transferred (and, of course, the amount of data moved)."
+- **Definition 3** — "For two positions `x` and `y` in `R^3`, we define the cost of moving a field
+  element from position `x` to position `y` as the Euclidean distance `‖x − y‖`."
+- **Fact 2** — "Each bit of data must be stored in a physical volume bounded below by a positive
+  constant (i.e. information density is finite)." Used as: there exists `C_0` with at most `C_0 R^3`
+  field elements in any ball of radius `R`.
+- **Lemma 3** — fixing the radix-2 NTT DAG with nodes `v_{i,s}`, `0 ≤ s ≤ e_2`, and edges
+  `v_{i,s} → v_{i,s+1}` and `v_{i,s} → v_{i ⊕ 2^{e_2−1−s}, s+1}`, the movement cost is at least
+  `Σ_{i < i⊕2^r} ‖p(i) − p(i ⊕ 2^r)‖` for **any** single `r`, via `n/2` pairwise-disjoint subgraphs
+  and the triangle inequality.
+- **Lemma 4** — `Σ_{i,j} ‖p(i) − p(j)‖` is `Ω(n^{7/3})`, from Fact 2.
+- **Lemma 5** — some `r` achieves at least a `1/(n e_2)` share of that sum.
+- Theorem 1 follows: `n^{7/3} / (n log n) = n^{4/3}/log n`.
+
+**A reading note on the statement of Lemma 4 and Theorem 1.** Lemma 4 is *stated* as
+`Σ ‖p(i) − p(j)‖ = O(n^{7/3})` and Theorem 1 as "at least `Õ(n^{4/3})`", but both proofs establish
+**lower** bounds — `≥ (16C_0)^{−1/3} n^{4/3}` per `i` in Lemma 4, summing to `Ω(n^{7/3})`.
+`O` should be `Ω` in both. This is a typographical slip, not a gap in the argument; the proof body is
+correct as written. Recorded because the issue asked for the model to be stated precisely.
+
+### 5.2 The assumptions, stated explicitly
+
+1. Cost is **total distance travelled by data**, in units of element·metre. It is not time, not
+   energy, not DRAM traffic, not cache misses, and not bandwidth.
+2. The computation is laid out in **`R^3` with finite information density**. The asymptotic in `n`
+   therefore presumes the machine *grows* with the problem: a fixed physical machine has a bounded
+   diameter, and the `n^{1/3}` distance factor is a constant for it.
+3. The circuit is the **radix-2 NTT DAG specifically**, with that butterfly edge structure. Lemma 3
+   is a statement about that graph and does not transfer to other transforms unchanged.
+4. The bound is on **one transform of size `n`**, with an unstated constant depending on `C_0`.
+5. [PC] §4.2 is deliberate about what this buys and what it does not: "Some literature uses a
+   simplified two-level hierarchical memory model (corresponding to most real-world settings) to
+   derive lower bounds of memory access cost. But we are aiming for a lower bound that holds for any
+   physically realizable architecture." And the extension from the theorem to the attack cost is
+   flagged by the authors themselves: "we also (with some boldness) model the root finding cost as
+   scaling with the 4/3-power of the polynomial degree".
+
+### 5.3 The practical claim and the theoretical claim rest on different models
+
+This is the key judgement the issue asked for, and it is the paper's own structure that forces it.
+§4.3's *practical* bottleneck argument is a **two-level bandwidth argument**: 25 multiplications per
+8-byte element transferred over a ~16 GB/s PCIe link, therefore 50 GOPS suffices, therefore the
+arithmetic unit idles. That is precisely the "idealized hierarchical memory model" §5.2 declines to
+rely on. The `4/3` theorem does not predict the GPU utilisation figure, and the GPU utilisation
+figure does not evidence the `4/3` theorem. **Two separate claims, each supported, neither
+supporting the other.**
+
+### 5.4 Does the `4/3` model apply to Zeebra's access patterns?
+
+**No, at the sizes Zeebra operates at — and the reason is assumption 2.**
+
+- Zeebra runs on **one fixed machine**: 64 cores, 300 GB RAM, **256 MB of L3**. Its physical
+  diameter does not grow with `n`. The `n^{1/3}` factor is therefore a constant over the whole range
+  of transform sizes any registered instance needs, and the model predicts `Θ(n)` movement cost with
+  a machine-dependent constant — i.e. it degenerates to the pseudo-linear model it is meant to
+  replace.
+- The regime in which the model bites is the one [PC] actually hit: **90 TB swapped to disk**
+  ([PC] Table 3), where the storage hierarchy genuinely extends physically. Zeebra reaches no such
+  working set at any size in §2.4's table over KoalaBear: the largest radix-2 transform the field
+  admits is `2^24`, whose coefficient array is `2^24 × 8 B = 134 MB` — **smaller than this box's
+  L3**.
+- Assumption 3 ties the bound to the radix-2 DAG. #161 replaces Zeebra's recursive split with an
+  iterative in-place kernel; both are radix-2, so the bound's premise survives #161, but a
+  mixed-radix kernel (which §2.4 shows is required for every open challenge) is outside the
+  theorem's scope as proved.
+- Separately, the model is a **lower bound**, so no measurement on this machine can confirm or refute
+  it. It can only be tested for *relevance*, which is what §6 does.
+
+The honest summary: the `4/3` result is a statement about asymptotically large physically-realized
+computations, it is correctly proved under its stated facts, [PC] applies it to a 90 TB
+disk-swapping run where the premise is plausible, and it has **no bearing on any transform Zeebra
+can perform over KoalaBear**.
+
+## 6. The access-bound question for Zeebra, measured
+
+The issue requires this answered by measurement "regardless of the paper's model". It is.
+
+### 6.1 Pre-#161 baseline, measured
+
+Agent C is replacing `src/fft/evaluate.rs`'s recursive split with an iterative in-place kernel on
+`perf/161-iterative-ntt`, so the curve below is **explicitly a pre-#161 baseline** and was taken from
+an uncommitted throwaway binary rather than a committed benchmark, for exactly that reason. Single
+core, `taskset -c 8`, under `benchlock.sh`, KoalaBear in a `u64` (`size_of::<F>() = 8`).
+
+The *arithmetic* comparand was measured in the same run and the same binary, as an independent
+`acc = acc + a[i]*b[i]` loop over a 4 KB window resident in L1: **1.560–1.572 ns per
+multiply-accumulate, i.e. 636–641 M mul/s**. That loop serialises the additions, so 641 M mul/s is a
+*lower bound* on the field-multiplication throughput; for comparison `MILESTONE-SIMD-PARALLELISM.md`
+§8.1 reports 1.809 ns for an isolated `mul` over the Mersenne-31 modulus at the same storage width.
+
+A radix-2 transform of size `n` performs `(n/2)·log2 n` butterflies, each one multiply plus one add
+and one subtract, so one butterfly is charged one field multiplication below.
+
+| `log2 n` | input array | impl. peak at `7nB` | s / transform | ns / element | **ns / butterfly** | M butterfly/s | achieved / arithmetic rate |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 10 | 8 KB | 57 KB | 0.000105 | 102.9 | **20.59** | 48.6 | 7.6% |
+| 12 | 33 KB | 229 KB | 0.000452 | 110.2 | **18.37** | 54.4 | 8.5% |
+| 14 | 131 KB | 918 KB | 0.002128 | 129.9 | **18.55** | 53.9 | 8.4% |
+| 16 | 524 KB | 3.7 MB | 0.009289 | 141.7 | **17.72** | 56.4 | 8.8% |
+| 18 | 2.1 MB | 14.7 MB | 0.040281 | 153.7 | **17.07** | 58.6 | 9.1% |
+| 20 | 8.4 MB | 58.7 MB | 0.173903 | 165.8 | **16.59** | 60.3 | 9.4% |
+| 21 | 16.8 MB | 117 MB | 0.361491 | 172.4 | **16.42** | 60.9 | 9.5% |
+| **22** | **33.6 MB** | **235 MB** | **0.749915** | **178.8** | **16.25** | **61.5** | **9.6%** |
+| 23 | 67.1 MB | 470 MB | 1.612120 | 192.2 | **16.71** | 59.8 | 9.3% |
+| **24** | **134 MB** | **940 MB** | **3.641236** | **217.0** | **18.09** | **55.3** | **8.7%** |
+
+**The answer, for the stage as it stands: Zeebra's NTT runs at 8.7%–9.6% of its own
+field-multiplication rate, and the shortfall is flat in working-set size.** `ns/butterfly` varies by
+`±13%` over a 16 384-fold range of `n`, and it is *worst at the smallest size*, where the entire
+working set is in L1. A stage that were access-bound would show `ns/butterfly` rising as the working
+set crossed L2 and then L3; this one falls and then rises by 11% at the very last point, where the
+implementation's `7nB` footprint (940 MB) finally exceeds the 256 MB L3.
+
+So the 90%+ deficit against the arithmetic rate is **not** a cache effect. It is the recursive
+formulation: `evaluate` calls `evens_and_odds` (two fresh `Vec`s), `UnivariatePolynomial::new` (a
+copy), `domain.split()` (another `Vec`) and allocates a fresh output `Vec` at every one of the
+`log2 n` levels — which is also the arithmetic behind `fast-univariate.md` §3.2's measured `7nB`
+peak. **That is exactly what #161 removes**, and it is why no curve against this kernel should be
+committed.
+
+### 6.2 Why KoalaBear cannot answer the access-bound question on this box at all
+
+`MILESTONE-SIMD-PARALLELISM.md` §8.2 warns that this machine's **256 MB L3** makes a "32 MB, out of
+cache" working set a misreading — it is out of L2 and still in L3. The same trap is sharper here and
+in a way the issue did not anticipate:
+
+| field | `size_of::<F>()` | two-adic ceiling | coefficient array at the ceiling | past 256 MB L3? |
+|---|---:|---:|---:|---|
+| **KoalaBear** (`u64`) | 8 B | `2^24` | **134 MB** | **never** |
+| KoalaBear (`u32`, `fields::KoalaBear`) | 4 B | `2^24` | 67 MB | never |
+| Goldilocks | 8 B | `2^32` | 34 GB | from `2^25` (268 MB) |
+| BN254 `Fr` | 32 B | `2^28` | 8.6 GB | from `2^23` (268 MB) |
+| BLS12-381 `Fr` | 32 B | `2^32` | 137 GB | from `2^23` |
+
+**Over KoalaBear, the coefficient array of a radix-2 NTT can never leave this machine's L3**, because
+the field's two-adicity caps `n` at `2^24` and `2^24 · 8 B < 256 MB`. The only reason row `log2 n =
+24` above shows anything is the recursive kernel's `7nB` multiplier, and an iterative in-place kernel
+(#161) will remove even that. Any sweep that claims to cross the cache hierarchy over KoalaBear is
+measuring the implementation's temporaries, not the transform's working set.
+
+**Consequence for the experiment design: the access-bound question must be asked over Goldilocks and
+BN254, not over KoalaBear.** Goldilocks keeps the arithmetic comparable to KoalaBear's (8 bytes,
+one-word Montgomery) and reaches `2^25`–`2^28` within reasonable time; BN254 reaches 268 MB at
+`2^23`, which `fast-univariate.md` §3.1 already shows is one doubling past the `2^21` it reaches in
+one second. KoalaBear remains in the sweep as the *field of the registered challenge*, with its
+ceiling stated as a result rather than as a limitation of the sweep.
+
+### 6.3 Specification for the committed `examples/` binary
+
+The issue asks for "an NTT size sweep reporting effective field operations per second against
+transform size, with peak bytes, from a committed `examples/` binary". This is the specification,
+**not** the code — #84's experimental half is blocked on #124 and the kernel is being rewritten under
+#161, so committing the binary now would commit a table that #161 invalidates on merge.
+
+**File** `examples/ntt_access.rs`. **Invocation**
+`cargo run --release --example ntt_access [field…] [budget=S] [list]`, following
+`examples/univariate_scaling.rs`'s argument convention exactly.
+
+**Fields**, in this order: `KoalaBear` (`PrimeFieldElement64<2_130_706_433>`, the registered
+challenge's field, swept to its `2^24` ceiling), `Goldilocks`, `Bn254Fr`. Mersenne-31 is excluded and
+the exclusion printed: two-adicity 1, no power-of-two transform above size 2
+(`fast-univariate.md` §1.1).
+
+**Columns per row**, all with units in the header:
+
+| column | definition |
+|---|---|
+| `log2 n`, `n` | transform size |
+| `coeff bytes` | `n · size_of::<F>()` — **the working set that matters**, printed separately from peak |
+| `peak bytes` | peak live heap bytes from a counting global allocator, as `univariate_scaling.rs` does; **not** process RSS |
+| `peak / coeff` | the implementation's multiplier. Pre-#161 this is ≈7; post-#161 it should approach 1–2, and the column is how a reader sees that |
+| `s / transform` | median of `reps` repetitions, `reps` chosen for ≥0.3 s total |
+| `ns / butterfly` | `t · 1e9 / ((n/2)·log2 n)` — **the headline curve** |
+| `eff. Mmul/s` | `(n/2)·log2 n / t`, one butterfly charged one multiplication |
+| `arith Mmul/s` | measured in the same binary, same field, from an isolated-multiply loop in L1 |
+| `achieved %` | `eff. Mmul/s / arith Mmul/s` — the access-bound verdict, per row |
+| `cache level` | which of L1 / L2 / L3 / DRAM the **`coeff bytes`** figure falls in, from constants named in the source with this box's 256 MB L3 written down and cited to `MILESTONE-SIMD-PARALLELISM.md` §8.2 |
+
+**Sweep bounds.** From `2^10` (below that the timing is noise) by doubling, stopping at the field's
+two-adicity or when one measurement exceeds `budget` (default 1.0 s), whichever comes first — and
+printing *which* of the two stopped it, as `univariate_scaling.rs`'s `Stop` enum does. Cap at `2^26`
+unconditionally so a default run cannot starve a concurrent agent: at 217 ns/element that is ~15 s
+per field, and the whole binary is under a minute.
+
+**The arithmetic comparand must be in the same binary and the same run.** `benches/field_arithmetic.rs`
+has arms for `p31` (the Mersenne-31 modulus in `u64`), `p31_u32`, `p64`, `p68`, `p254_bn254` and
+`p255_bls12_381` — **there is no KoalaBear arm and no Goldilocks arm at the Goldilocks modulus**. So
+the bench cannot supply the comparand for two of the three fields swept. Two things follow, and both
+are recommendations rather than part of this document's scope:
+
+- add `bench_field::<KoalaBear…>` and a Goldilocks arm to `benches/field_arithmetic.rs`, so the
+  example's in-run figure has a criterion-measured check against it;
+- have the example print both its own figure and the committed bench figure it should match, so a
+  divergence is visible rather than silent — `MILESTONE-SIMD-PARALLELISM.md` §8.2's note that
+  "that harness was not committed, so the two are not the same program" is the failure this avoids.
+
+**What must not be asserted.** No wall-clock assertion, no pinned absolute `ns/butterfly`. The
+correctness assertion is the round trip (`interpolate(evaluate(p)) == p`) at two sizes, which is
+cheap and invariant to the kernel.
+
+**Correctness part of #84, also specification only.** The issue asks for a Graeffe step on a
+degree-16 polynomial over `PrimeFieldElement64` checked against directly squared roots. The test
+belongs in `src/poly/univariate/` next to `roots.rs` once #124 lands, and its oracle is: build
+`f = ∏(x − r_i)` from 16 known roots, compute `GT_2(f) = (−1)^d (f_e² − x f_o²)` ([P937] §5.3), and
+assert it equals `∏(x − r_i²)` up to a unit. Two further checks that cost nothing and catch the
+errors this is actually prone to: `GT_2(GT_2(f)) == GT_4(f)` ([PC] Lemma 2) and
+`deg GT_ℓ(f) == deg f` ([PC] Lemma 1).
+
+## 7. Required size against reachable size, and the go/no-go
+
+### 7.1 The comparison the acceptance criteria require
+
+Reachable, from `fast-univariate.md` §3.1 and §4.1, with the §6.1 figures beside them:
+
+| | KoalaBear | Goldilocks | BN254 `Fr` | BLS12-381 `Fr` |
+|---|---:|---:|---:|---:|
+| `ntt` reached in 1 s per measurement (§3.1) | `2^23` | `2^23` | `2^21` | — |
+| `intt` reached, post-#118 (§3.1 note) | `2^23` | `2^23` | `2^20` | — |
+| two-adic ceiling (§4.1) | **`2^24`** | `2^32` | `2^28` | `2^32` |
+| what binds at the ceiling (§4.1) | two-adicity | memory, at ≈`2^30` | two-adicity | memory, at ≈`2^30` |
+| §6.1 measured wall time at `2^22` / `2^24` | 0.75 s / 3.64 s | — | — | — |
+
+Against §2.4's required sizes:
+
+| target | required `n` | reachable | ratio | verdict |
+|---|---:|---:|---:|---|
+| **the degree-`3^13` univariate itself** (`rf6-rp8`, the coordinator's figure) | `2^21` interp., `2^22` product, `2^21` per Graeffe step | `2^24` ceiling, `2^23` in 1 s | **under the ceiling by 4–8x** | **within a small factor — GO** |
+| `rf6-rp6` **resultant** (CICO-2) | `2^26` | `2^24` ceiling | **4x over** | over the field's radix-2 ceiling |
+| `rf6-rp8` **resultant** (CICO-2) | `2^29` | `2^24` ceiling; `2^31.0` mixed-radix | **32x over radix-2** | mixed radix mandatory |
+| `rf6-rp10` **resultant** (CICO-2) | `2^32` | `2^31.0` mixed-radix max | **over even mixed-radix** | unreachable over KoalaBear |
+| `poseidon256-cico-2025-rf6-rp11` (CICO-1, open) | `2^35` | `2^32` ceiling; 1.1 TB per array at 32 B | **8x over radix-2, 3.7x over RAM** | unreachable on this box |
+| `poseidon256-cico-2025-rf6-rp16` (CICO-1, open) | `2^47` | `2^32` | `2^15` over | hopeless |
+| `poseidon64-cico-2025-rf6-rp13` (CICO-1, open) | `2^51` | `2^32` | `2^19` over | hopeless |
+
+### 7.2 The go/no-go
+
+**GO on the root finder as a component; NO-GO on any registered challenge.** The two have to be
+stated separately because they answer differently, and conflating them is the specific error §9.4
+warns about.
+
+**GO** — the Graeffe root finder at the degree the issue's own figure names. A degree-`3^13`
+polynomial over KoalaBear needs transforms of size `2^21`; the field admits `2^24` and this box
+reached `2^22` in 0.75 s and `2^24` in 3.6 s with the *pre-#161* recursive kernel (§6.1).
+Algorithm C with `r = 2^24`, `s = 127` costs `k = 24` order-2 steps; by §3.6's reduction rule, with
+`(p−1)/δ = 1337`, the degree is full for `i ≤ 10` and halves thereafter, so the total is ≈13
+full-size steps ≈ 39 transforms of size `2^21` ≈ **14 s single-threaded, pre-#161**. Against
+`fast-univariate.md` §5's extrapolation of the *existing* `roots` to `d = 2^20` over KoalaBear —
+**~31 hours** — that is a ~4 orders-of-magnitude reduction at a comparable degree, from a stage
+that is already measured rather than hoped for. This is the clearest "within a small factor of the
+measured ceiling" the issue's criterion could ask for.
+
+**NO-GO** — the published attack on any registered instance. Three independent reasons, any one
+sufficient:
+
+1. **The 2026 KoalaBear challenges are CICO-2, which [PC] excludes from its own method** ([PC] §1
+   and §4.2, quoted in §2.1). The paper's recommendation is the opposite direction: for CICO-2 "the
+   best known attack would be the Gröbner basis computation together with the FGLM algorithm, or the
+   mutant XL algorithm, where the main bottleneck is linear algebra". That is the pipeline this
+   repository already has.
+2. **The univariate object for CICO-2 is the resultant**, of degree `3^16`–`3^20`, needing `2^26` to
+   `2^32` against KoalaBear's `2^24` radix-2 and `2^31.0` mixed-radix ceilings. `rf6-rp10` is
+   unreachable over the field at all.
+3. **The resultant construction is unreachable independent of the transform.**
+   `resultant-elimination.md` §3 puts the construction at `≈ 16·3^{5·rounds}` field operations —
+   `5.6×10^10` at four rounds and `10^18` at six — and measures four rounds as *not finishing in two
+   hours*. The 2026 rows are **fourteen rounds**. Even granting the §4.1 fixes that document ranks
+   (early-terminating interpolation, a structured determinant, an `O(n log² n)` interpolation), the
+   gap is not a constant factor.
+
+The three open 2025 CICO-1 rows *are* the right shape for the Graeffe method and are a cleaner
+no-go: `2^35`, `2^47` and `2^51` required against a `2^32` radix-2 ceiling, and 1 TB for a single
+coefficient array on the smallest of them against 300 GB of RAM.
+
+**Per the issue's instruction, the gap is recorded and handed to E3/E4 as an external-memory and
+hardware problem rather than an algorithmic one** — §8.
+
+## 8. Handoff note to E3 (#88): conditions for proceeding in external memory
+
+Scope discipline: #84 forbids designing the external-memory algorithm here, and this section does
+not. It states the conditions, with their sources.
+
+1. **The authors did it, and said what it cost.** [PC] §4.2: "When available memory is limited, users
+   can configure the maximum RAM usage, and our implementation will automatically swap polynomial
+   coefficients and NTT data to and from disk as needed. All other data, aside from polynomial
+   coefficients and NTT values, require only a few gigabytes and should fit comfortably in RAM on
+   most systems. In this scenario, overall speed will be limited by disk I/O, but still
+   acceptable — in our case it is about **2 ∼ 3 times slower** than running entirely in RAM." The
+   `P2_6_10` row of [PC] Table 3 is a 90 TB working set marked "data swapped to disk". **That is a
+   measured external-memory slowdown factor for exactly this computation, from a primary source, and
+   it is the single most useful number #88 can start from.** It also sharpens #88's own distinction:
+   [PC] describes a *configured* budget with the algorithm deciding what to spill, not OS swap with
+   the kernel deciding — the difference #88 exists to preserve.
+2. **What has to be spillable, and what does not.** Only the coefficient arrays and NTT working
+   buffers — [PC] §4.2, above. Algorithm C's other state is `ω_r`, `ω_s`, the length-`s` NTT output
+   and a few scalars; for KoalaBear `s = 127`, so "a few gigabytes" is generous. **A single
+   spill-aware array abstraction over `Vec<F>` would cover the whole algorithm.**
+3. **The structure that makes it spillable.** A radix-2 NTT at size `n` decomposes into a
+   four-step/six-step form: view the array as `n_1 × n_2`, transform the columns, twiddle, transform
+   the rows. Each phase touches a contiguous block at a time, so the I/O schedule is a sequence of
+   full passes over the array rather than random access, and the pass count is `O(log n / log(M/B))`.
+   **The practical gate is therefore whether #161's kernel exposes a blocked phase boundary**, not
+   whether an external-memory NTT exists. #161 should be asked for that boundary before it merges.
+4. **The conditions, stated as a checklist for #88.**
+   - A transform size whose coefficient array exceeds RAM. **On this box, over KoalaBear, this never
+     happens** (§6.2): `2^24 · 8 B = 134 MB`. It happens over Goldilocks from `2^32` (34 GB array,
+     within RAM) and only genuinely binds over BLS12-381 at `2^32` (137 GB array, 962 GB at `7nB` —
+     `fast-univariate.md` §4.1 already identifies `2^30` as where memory binds there).
+   - A kernel with an explicit blocked phase boundary (point 3).
+   - A declared RAM budget with the algorithm, not the kernel, choosing evictions.
+   - An I/O complexity stated in `(M, B)` and a measured bytes-to-disk figure, against which [PC]'s
+     2–3x is the comparand to beat or match.
+5. **What E3 should not inherit from this document.** The `4/3` lower bound of §5 is **not** an
+   argument for external memory and must not be quoted as one. It is a lower bound on total data
+   movement for an asymptotically large physical realization; it says nothing about whether a 90 TB
+   array should live on NVMe, and §5.4 finds it inapplicable at Zeebra's sizes.
+
+## 9. Scoping the full attack honestly
+
+**A fast root finder is not the published attack.** A one-family reproduction of the Poseidon1
+CICO-2 univariate attack shape — and `R_F = 6, R_P = 8` in particular — needs every component below,
+not just the Graeffe step.
+
+### 9.1 The components, and what Zeebra has today
+
+| # | component | in Zeebra today? | file | gap |
+|---|---|---|---|---|
+| 1 | the reduced-round permutation, and the verifier's `Perm+` variant | **yes** | `src/grobner/research/poseidon.rs:381` | none |
+| 2 | the registered challenge, with its identity digest and target | **yes** | `src/grobner/research/challenge.rs:1002` | none |
+| 3 | the **round-skipping parametrization** (`A_1…A_k, B` of [JAZ] slide 16; [PC] §2.3's explicit `y_i`) | **no** | — | needs `M_E^{-1}`'s last row and the affine construction; nothing in `src/` inverts the MDS for this purpose |
+| 4 | symbolic evaluation of the permutation on an affine family — **bivariate** | **yes** | `cico_bivariate`, `src/grobner/research/resultant.rs:53` | `k = 2` only, and dense multivariate; a `cico_univariate` is the one-line analogue |
+| 5 | construction of the univariate output polynomial of degree `δ` | **partially** — via 4 at `k = 1` | — | at `δ = 3^13` the straight-line evaluation must be done in the *evaluation* domain, not symbolically; see §9.2 |
+| 6 | interpolation over a power-of-two evaluation domain | **yes** | `src/fft/interpolate.rs` | sound to `2^23` KoalaBear (`fast-univariate.md` §3.1) |
+| 7 | interpolation at **arbitrary** points | yes but **cubic** | `lagrange_interpolate` | `O(n³)`, measured; stops at `n = 1 024` (`fast-univariate.md` §4.3). Only needed by the resultant route |
+| 8 | **NTT-based polynomial multiplication** | **no** | — | **#124**, the blocker. `fast-univariate.md` §4.1: "nothing in the crate uses the NTT for multiplication" |
+| 9 | the **Graeffe transform** `GT_2`, `GT_ℓ` | **no** | — | trivial given 8; §6.3 has the oracle |
+| 10 | Algorithm C's subgroup search (`mod x^s − 1`, then `NTT_s`) | **no** | — | the fold is `max(d−s,0)` adds; `NTT_s` at `s = 127` is not a power of two, so Bluestein or a direct `O(s²)` evaluation (16 129 multiplications — negligible) |
+| 11 | `k` square roots in `F_p` | **no** | — | Tonelli–Shanks; `src/fields/two_adic.rs` already has the 2-Sylow machinery it needs |
+| 12 | candidate reconstruction and verification **through the permutation** | **yes** | `CicoInstance::is_solution`, which "rebuilds the state and runs `permutation_plus_linear`" (`poseidon.md` §2.1) | none — and this is the step [P937] §5.2 relies on to make the `O(r)` scan cheap |
+| 13 | mixed-radix NTT | **no** | — | required by every row of §7.1's no-go table; out of scope for #84 |
+| 14 | existing generic root finder, for comparison | yes, **quadratic** | `src/poly/univariate/roots.rs` | `O(log q · d²)`; the comparand the Graeffe path must beat |
+
+Seven of fourteen exist. The three that matter and do not are **8 (#124)**, **3**, and **9**.
+
+### 9.2 Single-family cost, for `R_F = 6, R_P = 8` over KoalaBear
+
+One family = one choice of the 12 fixed free inputs plus the affine parametrization of §9.1's
+component 3. Estimates, each labelled by where its rate comes from:
+
+| stage | size | cost | basis |
+|---|---|---:|---|
+| build the degree-`3^13` univariate by evaluation at `2^21` points | `2^21` permutation calls | **tens of seconds** | 14 rounds × ~16 S-boxes ≈ 250 field ops per call ⇒ `5×10^8` ops at ~640 M/s ≈ 0.8 s, plus MDS: `t² = 256` multiplications per round ⇒ `3.6×10^3` ops/call ⇒ `7.5×10^9` ops ≈ **12 s** |
+| interpolate `2^21` evaluations | `2^21` | **~0.4 s** | §6.1, `intt ≈ ntt` post-#118 (`fast-univariate.md` §3.1 note) |
+| Graeffe iteration, Algorithm C | ≈39 transforms of `2^21` | **~14 s** | §6.1's 0.361 s at `2^21`, with §3.6's reduction schedule |
+| `NTT_s` at `s = 127` + subgroup scan | 127 | **negligible** | `O(s²) = 16 129` multiplications |
+| 24 square roots | — | **negligible** | 24 × `O(log p)` |
+| candidate scan, `r = 2^24` permutation calls | `2^24` | **~100 s** | `2^24 × 3.6×10^3` ops at 640 M/s ≈ 94 s; [P937] §5.2's `O(r)` observation |
+| verification through the permutation | 1 | **µs** | component 12 |
+| **one family, total** | | **≈2 minutes single-threaded** | |
+
+Peak memory: at `7nB`, `2^21 × 8 × 7 = 117 MB` pre-#161; post-#161 and with §3.6's reduction, a few
+tens of MB. **Memory is not the constraint at single-family scale**, consistent with
+`fast-univariate.md` §5's finding for the whole layer.
+
+The candidate scan dominates, which is a pleasant surprise and a real one: it is `O(r)` with
+`r = 2^24` because KoalaBear's two-adicity is 24. Choosing a smaller `r` (and correspondingly larger
+`s = (p−1)/r`) trades the scan against the `NTT_s`, which is [P937] §5.3's "important
+consideration … the choice of parameters `r = 2^k` and `s` such that `r·s = p − 1`". With `r = 2^12`,
+`s = 2^12 · 127 = 520 192`: 12 Graeffe steps instead of 24, an `NTT_s` of ~`2^19` (Bluestein, since
+`s` is not a power of two), and a 4 096-call scan. **That is the parameter choice an implementation
+must measure rather than assume**, and it is not stated for KoalaBear in any source read here.
+
+### 9.3 Families needed — the number that makes §9.2 irrelevant
+
+This is the separation the issue insists on, and it is where the single-family figure stops meaning
+anything.
+
+**CICO-2 needs two conditions satisfied, and a one-parameter family gives one variable.** Fix 13 of
+the 14 free inputs and parametrize the last by `x`; the first constrained output word is a
+univariate polynomial `P_1(x)` of degree `3^13`, and §2.3's construction forces it to zero at its
+roots. `P_1` "behave[s] like random polynomials in practice" ([PC] §2.3), so its expected number of
+`F_p`-roots is ≈1. Each such root leaves the **second** constrained word unconstrained, zero with
+probability ≈`1/p`. So
+
+```
+expected families for a CICO-2 witness by the univariate route  ≈  p  =  2.13 × 10^9  ≈  2^31
+```
+
+At §9.2's ~2 minutes per family that is **about 8 100 years single-threaded**, or ~130 years across
+all 64 cores. **The one-family cost is irrelevant to the attack by a factor of `2^31`.**
+
+**That factor is precisely why the resultant route exists.** A *two*-parameter family gives two
+variables for two conditions: a zero-dimensional system whose expected number of `F_p`-points is
+`O(1)`, so `O(1)` families suffice — `resultant-elimination.md` §2 found **three** base-field
+witnesses on its single 2-round slice, which is that `O(1)` observed. The cost moves entirely into
+the elimination: a resultant of degree `3^18` built at `≈16·3^{5·rounds}` field operations
+(`resultant-elimination.md` §3), which §7.2 point 3 rules out.
+
+So the two routes trade the same `2^31` in opposite directions, and **neither end of the trade is
+affordable**:
+
+| route | families needed | per-family cost | univariate degree | verdict |
+|---|---:|---|---|---|
+| univariate, `k = 1` parametrization | ≈`2^31` | ~2 min | `3^13`, `n = 2^21` — **reachable** | degree fine, family count fatal |
+| bivariate + resultant, `k = 2` | `O(1)` | `≈16·3^70` field ops | `3^18`, `n = 2^29` — over the ceiling | family count fine, construction fatal |
+
+The intermediate options — fixing fewer inputs to get a `k = 3`-variable family, or a hybrid that
+guesses part of the second condition — are not analysed in any source read here and are **open**.
+
+### 9.4 A Graeffe benchmark is not an attack
+
+Stated in the terms the coordinator asked for, because the §9.2 table is exactly the kind of number
+that gets misquoted:
+
+- **A working `GT_2` validated against squared roots is a unit test.** It establishes correctness of
+  one transform, nothing about a challenge.
+- **A degree-`3^13` root-finding run completing in 14 s is a benchmark of one stage of one family.**
+  It is a real and useful measurement — it would be ~4 orders of magnitude faster than
+  `src/poly/univariate/roots.rs` at a comparable degree — and it is **not** evidence about
+  `poseidon31-cico-rf6-rp8`, because §9.3 shows the univariate route needs `2^31` such runs and the
+  resultant route needs a polynomial Zeebra's field cannot transform.
+- **A successful Graeffe benchmark is not a successful attack.** No figure in this document may be
+  quoted as progress on a registered challenge, and nothing here changes
+  `MILESTONE-CRYPTANALYSIS-SCOREBOARD.md` §1's position: the three 2026 CICO targets are solved
+  externally, the best available outcome there is a reproduction, and the three open 2025 rows are
+  `2^35`–`2^51` in required transform size against a `2^32` ceiling.
+- Per the scoreboard's own class discipline (§3), a Graeffe benchmark is
+  `BenchmarkClass::Engineering { why }` — evidence about the implementation — and could not be
+  anything else until it produces a witness verified through the permutation.
+
+## 10. Proposed PR decomposition
+
+Each row is independently reviewable, has its own oracle, and does not depend on any cryptanalytic
+claim. Rows 1–4 are unblocked by #124 only in the sense that they are *useless* without it; row 2
+onward requires it merged.
+
+| PR | content | depends on | oracle |
+|---:|---|---|---|
+| 1 | **this document** | — | the PDFs, read |
+| 2 | `examples/ntt_access.rs` to §6.3's specification, plus KoalaBear and Goldilocks arms in `benches/field_arithmetic.rs` | **#161 merged** | the `evaluate`/`interpolate` round trip; the in-run arithmetic figure against the criterion arm |
+| 3 | `graeffe_2` — the order-2 transform, `(−1)^d(f_e² − x f_o²)` | **#124** | §6.3's three checks: squared roots at degree 16; `GT_2∘GT_2 == GT_4`; `deg` preserved |
+| 4 | `graeffe_l` for odd prime `ℓ`, by [PC] §3.2's product recursion | 3 | `GT_ℓ` against `∏(x − r_i^ℓ)`; `GT_{ℓ₀}∘GT_{ℓ₁} == GT_{ℓ₀ℓ₁}` |
+| 5 | `sqrt` in `F_p` (Tonelli–Shanks) on `KnownOrder`, reusing `src/fields/two_adic.rs` | — | `x² == y` for the returned root; `None` for non-residues, cross-checked by the Euler criterion |
+| 6 | `graeffe_root` — Algorithm C of §3.5, with §3.6's progressive reduction | 3, 5 | planted roots at degrees `2^8`…`2^16` over KoalaBear and Goldilocks, cross-checked against `src/poly/univariate/roots.rs` on every size the quadratic one reaches |
+| 7 | `(r, s)` parameter selection, measured — §9.2's open question | 6 | a sweep over `k` reporting Graeffe steps against `NTT_s` size and scan length; no assertion |
+| 8 | the round-skipping parametrization (§9.1 component 3) and `cico_univariate` | 4 (`cico_bivariate`'s pattern) | the parametrized family's last coordinate is zero at every point, asserted against `permutation_plus_linear` |
+| 9 | an `examples/graeffe_cico.rs` ladder: one family end-to-end on *reduced* rows, reporting §9.2's per-stage costs and `BenchmarkClass::Engineering` | 6, 8 | every witness verified through `CicoInstance::is_solution` |
+| 10 | extend `docs/research/graeffe-root-finding.md` with §9.2's figures as **measured** rather than estimated; re-take §6.1 as a post-#161 curve | 2, 9 | — |
+
+Rows 2 and 10 are the ones that must wait for #161. Row 1 is this PR.
+
+## 11. Marked unverified, and open
+
+- `UNVERIFIED — not read` the Springer conference version at `10.1007/978-3-032-35412-9_16` itself.
+  Paywalled; Unpaywall reports no OA location. [PC] (ePrint 2025/1916) is its preprint by the same
+  four authors with the same title, and is what is cited. Any figure that appears only in the
+  Springer typesetting is not recorded here.
+- `UNVERIFIED — not read` references `[7]` (Bak–Bariant–Boeuf–Hostettler–Jazeron, as a *paper*),
+  `[8]`/`[9]`/`[10]` (Grenet–van der Hoeven–Lecerf; van der Hoeven–Monagan), `[24]`, `[32]`, `[34]`
+  and `[35]` as cited by [PC] and [P937]. [JAZ]'s **slides** by the `[7]` authors were read and are
+  cited as [JAZ]; the paper was not obtained. In particular **Figure 12 of [7]**, the fitting curve
+  from which [PC] Table 3's comparand columns are *estimated*, was not read, so the "`2^13` faster"
+  claim is recorded in §4.1 as reproducing from [PC]'s own table against an unread extrapolation.
+- `UNVERIFIED — not read` the authors' CUDA implementation.
+- **Discrepancy between sources**, recorded in §2.3: [PC] Table 1 gives `x ↦ x^5` for
+  "M31 / KoalaBear"; [JAZ] slide 5 and `challenge.rs` give `α = 3` for KoalaBear and `α = 5` for
+  Mersenne-31. Resolved in favour of the registry.
+- **Discrepancy within [PC]**, recorded in §4.3: the 128-bit security estimate is "about `2^200`"
+  in §1 and `2^198` in §4.2.
+- **Typographical, recorded in §5.1**: [PC] Lemma 4 and Theorem 1 state `O` where their proofs
+  establish `Ω`.
+- **Unproven in its source**, recorded in §2.4: the CICO-2 resultant degree `d^{2(R_F−1)+R_P}` is
+  called an *experimental result* in [JAZ] slides 19 and 22, with the coincidence with the ideal's
+  degree left as an open question by its authors.
+- **Reconstructed**, per §3.8: the skip count for Zeebra's hybrid `permutation_plus_linear`; the
+  expansion of Algorithm B line 16; the Bluestein sizing schedule.
+- **Open**: the `(r, s)` split for KoalaBear (§9.2); whether a `k = 3` family or a hybrid beats both
+  ends of §9.3's trade; whether #161's kernel exposes the blocked phase boundary §8 point 3 needs.
+- §6.1's figures are from **one uncommitted throwaway binary on one machine against the pre-#161
+  recursive kernel**, taken under `benchlock.sh` with six other agents active. They are labelled a
+  baseline for exactly that reason and PR 10 above re-takes them.
