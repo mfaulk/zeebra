@@ -3,8 +3,10 @@
 //! Three subcommands, and the split between them is the point.
 //!
 //! - `list` prints the registered rows with their published per-step figures.
-//! - `dimensions` computes `dim F_p[x]/I` and checks it against `(α + 2)^N`. **Machine-independent**,
-//!   so it needs no pinned environment and a disagreement is a defect rather than a timing.
+//! - `dimensions [id-substring]` computes `dim F_p[x]/I` and checks it against `(α + 2)^N`.
+//!   **Machine-independent**, so it needs no pinned environment and a disagreement is a defect
+//!   rather than a timing. The optional filter exists because the `N = 6` rows cost minutes of F4
+//!   each and the gate is worth running on them alone.
 //! - `row <id>` runs one row through F4, FGLM and root finding, each timed separately, and
 //!   **refuses to print a single number** unless `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` are set.
 //!
@@ -16,6 +18,7 @@
 //! ```sh
 //! cargo run --release --example anemoi_ladder list
 //! cargo run --release --example anemoi_ladder dimensions
+//! cargo run --release --example anemoi_ladder dimensions n6
 //! ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
 //!     cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
 //! ```
@@ -27,7 +30,10 @@ use zeebra::{
     fields::{PrimeFieldElement64, Zp18446744073709551263},
     grobner::{
         f4_reported,
-        fglm::{fglm_to_lex_with_options, FglmOptions},
+        fglm::{
+            fglm_to_lex_with_options, FglmMemory, FglmOptions, FglmStatistics,
+            OperatorConstruction, OperatorStorage,
+        },
         research::{
             anemoi::{ANEMOI_17_PRIME, ANEMOI_32_PRIME, ANEMOI_64_PRIME},
             anemoi_cico::{dispatch_anemoi_cico, AnemoiCico, AnemoiCicoVisitor},
@@ -35,6 +41,7 @@ use zeebra::{
         },
         solve_from_lex_basis, F4Options, HilbertSeries, SolveOptions, SolveOutcome,
     },
+    util::peak_resident_bytes,
     KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
 
@@ -70,16 +77,23 @@ fn main() {
     let command = arguments.first().map(String::as_str).unwrap_or("list");
     match command {
         "list" => list(),
-        "dimensions" => dimensions(),
+        "dimensions" => dimensions(arguments.get(1).map(String::as_str)),
+        "msolve" => {
+            let id = arguments
+                .get(1)
+                .expect("usage: anemoi_ladder msolve <challenge-id>");
+            emit_msolve(id);
+        }
         "row" => {
             let id = arguments
                 .get(1)
                 .expect("usage: anemoi_ladder row <challenge-id>");
             row(id);
         }
-        other => {
-            panic!("usage: anemoi_ladder [list | dimensions | row <challenge-id>]; got {other}")
-        }
+        other => panic!(
+            "usage: anemoi_ladder [list | dimensions [id-substring] | msolve <challenge-id> | \
+             row <challenge-id>]; got {other}"
+        ),
     }
 }
 
@@ -122,15 +136,23 @@ fn list() {
 /// Exits nonzero on a disagreement rather than printing a table entry: `dim F_p[x]/I` does not
 /// depend on the machine, the library or the wall clock, so a mismatch is a defect in Zeebra or in
 /// the model.
-fn dimensions() {
+fn dimensions(filter: Option<&str>) {
     println!("# quotient dimension against (alpha + 2)^N\n");
     println!("| row | variables | observed D | published D | agrees |");
     println!("|---|---:|---:|---:|---|");
     let mut disagreements = 0;
+    let mut checked = 0;
     for manifest in anemoi_rows() {
+        if let Some(filter) = filter {
+            if !manifest.id.contains(filter) {
+                continue;
+            }
+        }
         let prime = manifest.anemoi_parameters().expect("an Anemoi row").prime;
         disagreements += with_field!(prime, one_dimension(&manifest));
+        checked += 1;
     }
+    assert!(checked > 0, "no registered Anemoi row matched the filter");
     println!(
         "\nMachine-independent: no environment is pinned for this check and none is needed. The \
          published value is Claim::Observed, not Claim::Proved -- it is a measurement from one \
@@ -342,15 +364,21 @@ impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
             ),
         ));
 
+        let options = conversion_options::<N, F>(&basis, order);
         let start = Instant::now();
-        let conversion = fglm_to_lex_with_options(&basis, order, &FglmOptions::default());
+        let conversion = fglm_to_lex_with_options(&basis, order, &options);
         let elapsed = start.elapsed();
-        let Ok((lex, fglm)) = conversion else {
-            steps.push(("conversion", elapsed, "did not complete".to_string()));
-            return Stages {
-                steps,
-                witness: None,
-            };
+        let (lex, fglm) = match conversion {
+            Ok(pair) => pair,
+            Err(e) => {
+                // Printed rather than swallowed: a budget refusal is the result at N = 6, and
+                // "did not complete" alone would not say which budget.
+                steps.push(("conversion", elapsed, format!("did not complete: {e}")));
+                return Stages {
+                    steps,
+                    witness: None,
+                };
+            }
         };
         steps.push((
             "conversion",
@@ -360,6 +388,7 @@ impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
                 fglm.quotient_dimension, fglm.target_basis_elements, fglm.operator_entries
             ),
         ));
+        report_conversion_footprint::<F>(&fglm);
 
         let start = Instant::now();
         let mut rng = rand::rngs::StdRng::from_seed([7; 32]);
@@ -386,4 +415,180 @@ impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
 
         Stages { steps, witness }
     }
+}
+
+/// The conversion options for a basis of this quotient dimension, and the pre-flight that chose
+/// them, printed before the conversion runs.
+///
+/// `FglmOptions::recommended` caps `D` at 4 096 and the dense blocks at 20 M cells, which `N = 5`
+/// fits with 465 625 cells to spare and `N = 6` exceeds on all four budgets before allocating
+/// anything. So at `D > 4 096` this lifts the budgets — and says so, with the figure it computed
+/// from `D` alone, so that a run which then dies in the allocator is a predicted outcome rather
+/// than a surprise. `unbounded()` resets the strategies to the reference ones, so the two the
+/// M18-5 ablation chose are set back explicitly.
+fn conversion_options<const N: usize, F: KnownOrder>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> FglmOptions {
+    let recommended = FglmOptions {
+        measure_stages: true,
+        ..FglmOptions::recommended()
+    };
+    let Some(dimension) = quotient_dimension(basis, order) else {
+        return recommended;
+    };
+    let dimension = usize::try_from(dimension).unwrap_or(usize::MAX);
+    let blocks = FglmMemory::dense_blocks_for::<F>(dimension);
+    println!(
+        "- preflight: D = {dimension}, dense blocks {}",
+        match blocks {
+            Some((span, accepted, bytes)) => format!(
+                "{span} span + {accepted} accepted cells = {:.2} GiB",
+                bytes as f64 / (1 << 30) as f64
+            ),
+            None => "overflow".to_string(),
+        }
+    );
+    if dimension <= recommended.max_quotient_dimension {
+        println!("- budgets:   recommended, unchanged");
+        return recommended;
+    }
+    println!(
+        "- budgets:   LIFTED -- D = {dimension} exceeds max_quotient_dimension {}, and the dense \
+         blocks exceed max_span_entries {}. The strategies stay BatchedBorder + Adaptive; only the \
+         limits move, and the figure above is what this run is betting it can hold.",
+        recommended.max_quotient_dimension, recommended.max_span_entries
+    );
+    FglmOptions {
+        measure_stages: true,
+        ..FglmOptions::unbounded()
+            .with_operator_construction(OperatorConstruction::BatchedBorder)
+            .with_operator_storage(OperatorStorage::Adaptive)
+    }
+}
+
+/// `dim F_p[x]/I` from a degrevlex basis, or `None` if it is not zero-dimensional.
+fn quotient_dimension<const N: usize, F: KnownOrder>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> Option<u128> {
+    let leads: Vec<_> = basis.iter().map(|p| p.leading_monomial(order)).collect();
+    let series = HilbertSeries::of_basis(basis, order).ok()?;
+    u128::try_from(series.quotient_dimension(&leads).ok()??).ok()
+}
+
+/// What the conversion actually held, three ways, beside what the process held.
+///
+/// Entries, cells and bytes are three different numbers and the extrapolation to `N = 6` depends on
+/// not confusing them; `FglmMemory`'s own docs make the distinction and this prints all three. The
+/// `peak` line is the process and is **not** attributable to the conversion — it covers F4's peak
+/// too, and this binary does one row per invocation so that it means something at all.
+fn report_conversion_footprint<F: KnownOrder>(fglm: &FglmStatistics) {
+    let m = &fglm.memory;
+    let gib = |bytes: usize| bytes as f64 / (1 << 30) as f64;
+    println!("\n| conversion footprint | value |");
+    println!("|---|---:|");
+    println!("| quotient dimension `D` | {} |", fglm.quotient_dimension);
+    println!("| operator entries | {} |", m.operator_entries);
+    println!("| operator cells | {} |", m.operator_cells);
+    println!("| operator bytes | {:.3} GiB |", gib(m.operator_bytes));
+    println!("| dense columns of `N*D` | {} |", m.dense_columns);
+    println!("| span cells | {} |", m.span_cells);
+    println!("| accepted-vector cells | {} |", m.accepted_vector_cells);
+    println!(
+        "| dense-block bytes | {:.3} GiB |",
+        gib(m.dense_block_bytes)
+    );
+    println!("| estimated total | {:.3} GiB |", gib(m.estimated_bytes()));
+    println!("| span row operations | {} |", fglm.span_row_operations);
+    match peak_resident_bytes() {
+        Some(peak) => println!(
+            "| process peak RSS | {:.3} GiB |",
+            peak as f64 / (1u64 << 30) as f64
+        ),
+        None => println!("| process peak RSS | unavailable |"),
+    }
+
+    let t = &fglm.timings;
+    println!("\n| conversion stage | elapsed | share |");
+    println!("|---|---:|---:|");
+    let sum = t.sum().as_secs_f64();
+    let share = |d: Duration| {
+        if sum > 0.0 {
+            format!("{:.1}%", 100.0 * d.as_secs_f64() / sum)
+        } else {
+            "-".to_string()
+        }
+    };
+    for (name, elapsed) in [
+        ("quotient basis", t.quotient_basis),
+        ("border classification", t.border_classification),
+        ("normal forms (scalar)", t.normal_forms),
+        ("border symbolic (batched)", t.border_symbolic),
+        ("column assembly", t.column_assembly),
+        ("lex walk / dependence", t.dependence),
+    ] {
+        println!("| {name} | {elapsed:?} | {} |", share(elapsed));
+    }
+    println!("| **measured sum** | {:?} | |", t.sum());
+}
+
+/// The row's generators in msolve's input format, on stdout.
+///
+/// Exists so that the #283 verdict can rest on a **same-machine** comparand rather than only on a
+/// cross-machine ratio against 2015-era Magma. msolve's modular path wants a prime under `2^31`, so
+/// this is usable at `p = 65537` and `p = 2^32 - 209` and not at `p = 2^64 - 353` — which is why
+/// #283's control characteristic is the one that can carry the comparison.
+///
+/// Three lines of header then one polynomial per line, comma-separated with no trailing comma, as
+/// `msolve -h` specifies. The variable order is the generator's own, so `x0` is this crate's
+/// variable 0 and the orderings are the same degrevlex.
+fn emit_msolve(id: &str) {
+    let manifest = challenge(id).unwrap_or_else(|| panic!("{id} is not registered"));
+    let prime = manifest.anemoi_parameters().expect("an Anemoi row").prime;
+    with_field!(prime, write_msolve(&manifest));
+}
+
+/// [`emit_msolve`] over the field the row names.
+fn write_msolve<F: KnownOrder>(manifest: &ChallengeManifest) {
+    struct Emit;
+    impl<F: KnownOrder> AnemoiCicoVisitor<F> for Emit {
+        type Output = ();
+        fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) {
+            let names: Vec<String> = (0..N).map(|i| format!("x{i}")).collect();
+            println!("{}", names.join(","));
+            println!("{}", F::order_limbs()[0]);
+            let lines: Vec<String> = system
+                .iter()
+                .map(|p| {
+                    let mut terms: Vec<String> = p
+                        .terms()
+                        .iter()
+                        .map(|(monomial, c)| {
+                            let mut factors = vec![format!("{c}")];
+                            for (i, e) in monomial.exponents().iter().enumerate() {
+                                if *e > 0 {
+                                    factors.push(format!("{}^{}", names[i], e));
+                                }
+                            }
+                            factors.join("*")
+                        })
+                        .collect();
+                    // Sorted so the emitted file is byte-stable across runs; `terms()` is a
+                    // HashMap and its iteration order is not.
+                    terms.sort();
+                    if terms.is_empty() {
+                        "0".to_string()
+                    } else {
+                        terms.join("+")
+                    }
+                })
+                .collect();
+            println!("{}", lines.join(",\n"));
+        }
+    }
+    let instance = manifest
+        .anemoi_cico_instance::<F>()
+        .expect("the registered field");
+    dispatch_anemoi_cico::<F, _>(&instance, Emit).expect("a compiled dimension");
 }

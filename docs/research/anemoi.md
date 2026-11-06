@@ -255,7 +255,14 @@ Worlds logs' own `nsols` line is 0 at that rung, and an implementation subtly wr
 constants is far likelier to invent a witness than to agree on an empty set. Both models agree on
 `D = 125` there, so the system is zero-dimensional and the absence is about the base field.
 
-### 8a.1 The comparison that survives the hardware gap
+### 8a.1 The comparison that survives the hardware gap — and what it is actually measuring
+
+> **Superseded in part by §8a.3.** The ratio-of-ratios below is arithmetically correct and the
+> framing is still the right one, but §8a.3 measures the same ladder at two further
+> characteristics and shows that most of the gap belongs to the *reference's* field arithmetic
+> rather than to this crate's conversion. Two specific claims in this subsection reverse there;
+> they are flagged inline. Kept rather than rewritten so that what was concluded from one
+> characteristic, and why it was wrong to stop there, both stay readable.
 
 The published figures are Magma on a 2015 Xeon and these are Zeebra on a 2026 workstation, so no
 wall-clock ratio between them means anything. **A ratio between two stages of the same run on the
@@ -284,8 +291,13 @@ The growth rates say where the difference comes from, and it is not all in the c
 
 So Zeebra's basis step grows *faster* per rung than Magma's (41.6x against 16.5x) and its conversion
 grows *far slower* (70.3x against 341x). The ratio moves by 1.7x per rung here and by 20.7x per rung
-there. This is the first externally calibrated evidence about `fglm`'s scaling, and it is favourable
-— which is why it needs the careful framing rather than less of it.
+there.
+
+> **This conclusion does not survive §8a.3.** Magma's conversion growth of 341x per rung is measured
+> at `p = 2^64 − 353`. At `p = 65537` the same Magma, the same machine and the same system give
+> 83.7x per rung against Zeebra's 101.8x — so at the small characteristic **Zeebra's conversion
+> grows faster than Magma's**, and the sign of this finding is a property of the reference's
+> arithmetic path rather than of either conversion algorithm.
 
 **What this does not say.** It does not say Zeebra's FGLM is faster than Magma's; that would be a
 cross-machine claim and the stage ratios are deliberately chosen to avoid making one. It does not
@@ -335,6 +347,132 @@ the published conversion costs 2 400x the published basis, calling that "the sin
 in this issue" for a crate whose FGLM scalability has its own milestone document. That wall is real
 in Magma and does not exist here.
 
+### 8a.3 Three characteristics, and the attribution (#283)
+
+§8a.1 declined to apportion the gap between "the algorithm, the implementation and the field
+arithmetic", on the correct ground that two columns measured at one prime cannot do it. The Six
+Worlds sweep publishes **the same system at three primes**, so the experiment that can is to hold
+`α = 3`, `ℓ = 1`, the model and `N` fixed and vary only the characteristic.
+
+The design rests on one asymmetry. Zeebra's `PrimeFieldElement64<P>` is **one Montgomery path at
+all three primes** — `p = 65537` and `p = 2^32 − 209` are const-generic instantiations of the same
+code as `p = 2^64 − 353`, which is why #283 needed no new field arithmetic. Magma's is not: its own
+log headers say `Matrix kind: Modular FP` at `65537` and `Matrix kind: Generic finite field` at both
+larger primes. So a within-implementation ratio is comparable down the column for this crate and is
+**not** comparable down the column for the reference — and that non-comparability is the finding.
+
+All figures Zeebra-side are from **one benchlock acquisition** on 2026-11-06,
+`ZEEBRA_MACHINE=fedora ZEEBRA_AFFINITY=0-7`, `taskset --cpu-list 0-7`, `-C target-cpu=x86-64-v3`
+verified present in the build. Taking all eighteen rows in one session is deliberate: the `N = 5`
+figures in §8a.2 were taken weeks earlier and this session's `n5-fcico` basis is 16.97 s against
+that section's 26.91 s, so cross-session basis figures are not safe to mix into a three-way
+comparison even though the conversions agree to 5%.
+
+#### The quotient-dimension gate, first
+
+Thirty rows, three characteristics, `D` against `(α + 2)^N`: **30 of 30 agree**, at 5, 25, 125, 625
+and 3 125. Machine-independent, so this is the check that had to pass before any timing meant
+anything.
+
+#### `N = 4`: the one rung where all three primes publish both steps
+
+| `p` | Zeebra basis | Zeebra conv | **Zeebra conv/basis** | Magma basis | Magma conv | **Magma conv/basis** | ratio-of-ratios |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `65537` `FCICO` | 0.2966 s | 0.4667 s | **1.57** | 0.049 s | 1.620 s | **33.1** | **21x** |
+| `2^32 − 209` `FCICO` | 0.2986 s | 0.4255 s | **1.43** | 0.439 s | 63.229 s | **144.0** | **101x** |
+| `2^64 − 353` `FCICO` | 0.2968 s | 0.4161 s | **1.40** | 0.280 s | 67.760 s | **242.0** | **173x** |
+| `65537` `PCICO` | 0.0262 s | 0.3315 s | **12.65** | 0.020 s | 1.420 s | **71.0** | **5.6x** |
+| `2^32 − 209` `PCICO` | 0.0247 s | 0.3145 s | **12.74** | 0.159 s | 50.279 s | **316.2** | **25x** |
+| `2^64 − 353` `PCICO` | 0.0245 s | 0.2950 s | **12.05** | 0.199 s | 56.439 s | **283.6** | **24x** |
+
+Read the two ratio columns against each other:
+
+> **Zeebra's conversion/basis ratio is flat in the characteristic — 1.57 / 1.43 / 1.40 for `FCICO`
+> and 12.65 / 12.74 / 12.05 for `PCICO`, a spread of 12% across a 47-bit range of primes. Magma's
+> moves by 7.3x and 4.5x over the same three primes. The ratio-of-ratios therefore collapses from
+> 173x to 21x, and every bit of that collapse is the reference's column moving while this crate's
+> stands still.**
+
+#### `N = 5`, and the wall gap that was the headline
+
+| `p` | Zeebra conv | Magma conv | Zeebra c/b | Magma c/b | ratio-of-ratios | raw conversion gap |
+|---|---:|---:|---:|---:|---:|---:|
+| `65537` `FCICO` | 47.53 s | 135.64 s | 2.96 | 124.6 | **42x** | **2.85x** |
+| `2^64 − 353` `FCICO` | 43.53 s | 22 057.08 s | 2.57 | 2 366.6 | **922x** | **507x** |
+| `65537` `PCICO` | 38.19 s | 75.75 s | 58.5 | 587.2 | **10x** | **1.98x** |
+| `2^64 − 353` `PCICO` | 34.96 s | 15 569.55 s | 54.6 | 2 731.5 | **50x** | **445x** |
+
+`2^32 − 209` is absent from the conversion column because the sweep ran the `N = 5` basis step
+there and stopped; the registry records that as `NOT_REPORTED` rather than as a missing figure.
+
+> **The headline number does not survive the control. The `FCICO` conversion wall gap is 507x at
+> `p = 2^64 − 353` and 2.85x at `p = 65537` — same system, same round count, same Magma binary,
+> same reference machine. Zeebra's own conversion moved 9% across the two primes (43.53 s → 47.53 s,
+> and the *larger* prime is the faster one). At 2.85x, against a 2014 Xeon E5-2630 v3 @ 2.40 GHz
+> from a 2022 Threadripper, the measured difference is inside what a decade of hardware explains on
+> its own.**
+
+This is the result that favours the crate least, and it is stated first for that reason.
+
+#### The verdict on the three candidates
+
+**(1) Faster arithmetic on the 64-bit prime — supported, and it is the dominant term.** But the
+sharper form is the reference-side one: it is not that Zeebra is unusually fast at 64 bits, it is
+that **Magma is unusually slow there**. Magma's `FCICO` `N = 5` conversion is 163x cheaper at
+17 bits than at 64 bits (135.64 s against 22 057.08 s) while its basis step is only 8.6x cheaper;
+Zeebra's conversion is flat to within 9%. And the mechanism is named in the reference's own log
+header rather than inferred — `Modular FP` at `65537`, `Generic finite field` at `2^32 − 209` and
+`2^64 − 353`. The cost cliff sits at the `65537`→`2^32 − 209` boundary and not at 64 bits: the
+`N = 4` conversion is 1.62 s, 63.23 s and 67.76 s down that column, a 39x step and then 7%. A
+`Modular FP` path whose products must stay exact in a double's 53-bit mantissa cannot be entered
+above about 26 bits per operand, which is consistent with where the step appears.
+
+**(2) FGLM genuinely scaling better — ruled out at the strength §8a.1 implied, and the growth
+comparison reverses.** At `p = 65537` Magma's `FCICO` conversion grows 83.7x from `N = 4` to
+`N = 5` and Zeebra's grows 101.8x. §8a.1's "Zeebra's conversion grows far slower — 70.3x against
+341x" is an artefact of reading growth at the one prime where Magma's arithmetic path inflates it.
+A residual advantage at the control characteristic is not excluded — 2.85x and 1.98x are in
+Zeebra's favour — but it is the size of the hardware gap, so **these data do not establish an
+algorithmic advantage, and the earlier text that read as though they did has been marked.**
+
+**(3) Magma's `Variety` computing more than a lex basis — ruled out, and the logs say what it does
+instead.** The published figures are of Magma's order-change step alone: the logs delimit
+`FGLM ORDER CHANGE` and report `Total FGLM time`, with the univariate solve timed separately under
+`UNIV SOLVING` (2.36 s at `N = 5`, `FCICO`, `2^64 − 353`). So nothing extra is folded in. What the
+step *is* comes out of the `65537` `N = 6` breakdown, which is the only rung verbose enough to
+show it:
+
+| Magma FGLM sub-step, `p = 65537`, `N = 6`, `FCICO` | elapsed | share |
+|---|---:|---:|
+| `Get rep mat (dim: 15625)` | 13 208.46 s | 56.6% |
+| Keller-Gehrig matrix (the spin) | 9 339.52 s | 40.0% |
+| kernel for the minimal polynomial | 364.99 s | 1.6% |
+| relations for all variables | 427.11 s | 1.8% |
+| **total** | **23 340.22 s** | |
+
+Magma spends 97% of its conversion building a `D × D` representation matrix and running a dense
+Keller-Gehrig matrix-power spin. Zeebra spends 82.8% (`FCICO`) and 92.3% (`PCICO`) of its
+conversion in the **lex walk**, with `measure_stages` on. Those are two different algorithms for one specification, which is a more useful finding
+than either being "faster": it says the two implementations are not on the same cost curve at all,
+and that a ratio between them is not a measurement of FGLM.
+
+#### What would actually settle it
+
+A same-machine, same-field comparison. Two are now reachable and neither was when §8a.1 was
+written:
+
+- **msolve 0.11.0**, provisioned at `/home/mfaulk/.local/opt/zeebra-ext/bin`. Its modular path wants
+  a prime under `2^31`, so it runs at `65537` and `2^32 − 209` and cannot run at `2^64 − 353` —
+  which is precisely why #283's control characteristic is the one that can carry a head-to-head.
+  `anemoi_ladder msolve <id>` emits the row in msolve's input format for exactly this.
+- **A currently maintained Magma on this machine.** None is installed, and until one is, no
+  statement in this document is a claim about Magma-as-shipped-today. Magma V2.26-2 is from 2021.
+
+Until one of those is measured, the honest summary is the one in the verdict above: **the published
+2 400x conversion/basis ratio is mostly an artefact of the reference's generic finite-field
+arithmetic at `p ≥ 2^32`, this crate's conversion is characteristic-flat where the reference's is
+not, and no algorithmic advantage over a modern implementation has been demonstrated.**
+
 ## 9. Open
 
 - **`ℓ > 1` and the named hash instances.** `AnemoiSponge-BN-254` and `AnemoiSponge-BLS12-381` use
@@ -343,17 +481,12 @@ in Magma and does not exist here.
   implemented. Out of scope for M24-C.
 - **`GF(2^n)`.** The Six Worlds results cover `n ∈ {15, …, 257}`, where `QUAD = 3` rather than 2.
   Blocked on `binary_field`/`extension_field` being exported, the same wall as the LowMC candidate.
-- **`α ∈ {5, 7, 11}` and `p ∈ {65537, 2^32 − 209}`.** Reference data exists for all of them in the
-  same logs. The registry records `α = 3` at `p = 2^64 − 353` only, because that is the row where
-  the published FGLM cost is 2 400× the F4 that preceded it.
-- **`N = 6`, where the reference has no conversion figure at all.** The Six Worlds logs report a
-  basis at `N = 6` (132.5 s `FCICO`, 372.2 s `PCICO`) and a dash for the conversion — they stop
-  reporting it after `N = 5`. Zeebra converts at `D = 3 125` in 46 s, and the validated `D³` model
-  puts `D = 15 625` at roughly 1.6 h. So `N = 6` is reachable here and would produce a figure the
-  reference does not have, which is a different kind of contribution from reproducing one. It needs
-  a deliberate registry addition — the ladder is frozen at `N = 1 … 5` — and a memory estimate
-  first: operator entries go 12.6 M at `D = 3 125`, and 25x that is not obviously affordable. Filed
-  rather than attempted.
+- **`α ∈ {5, 7, 11}`.** Reference data exists for all of them in the same logs, at every prime.
+  The registry records `α = 3` only. `p ∈ {65537, 2^32 − 209}` **is** now registered — see §8a.3,
+  which is what #283 used them for.
+- **`N = 6`.** The reference has no conversion figure at `p = 2^64 − 353`, and — contrary to what
+  this section said before #283 read the other two logs — it **does** have one at `p = 65537`, in
+  both models, at the quotient dimension `5^6 = 15 625` the logs also print. Still open; #286.
 - **`ACICO`.** A third model of the same primitive (`additional-benchmarks.md` §3.4). Cheap once the
   permutation exists, and a separate issue.
 - **The reference's own `check_polynomial_verification` has not been executed.** It needs Sage. §4
