@@ -408,8 +408,15 @@ mod tests {
     use super::{verify_against_anemoi_trace, AnemoiCico, AnemoiModel};
     use crate::{
         fields::Zp18446744073709551263,
-        grobner::research::anemoi::{Anemoi, AnemoiError, AnemoiParameters},
-        FiniteField,
+        grobner::{
+            f4_reported,
+            research::{
+                anemoi::{Anemoi, AnemoiError, AnemoiParameters},
+                published_quotient_dimension,
+            },
+            F4Options, HilbertSeries,
+        },
+        FiniteField, MonomialOrder,
     };
 
     type A = Zp18446744073709551263;
@@ -533,6 +540,67 @@ mod tests {
             })
         );
         assert!(f.assignment::<7>(A::new(1)).is_none());
+    }
+
+    /// Zeebra's own quotient dimension is the published `(α + 2)^N`, in both models.
+    ///
+    /// **The gate on the whole workstream.** `dim F_p[x]/I` does not depend on the machine, the
+    /// library or the wall clock, so a disagreement here is a defect in Zeebra or in the model and
+    /// not a performance difference. Computed from the leading-term ideal of the grevlex basis,
+    /// which is combinatorial and needs no linear algebra past F4 — the published Magma F4 times
+    /// for these rows are 0.017 s and 0.28 s, so this is cheap and single-threaded on purpose.
+    #[test]
+    fn test_the_quotient_dimension_is_the_published_power() {
+        macro_rules! check {
+            ($($rounds:literal => $fcico:literal, $pcico:literal;)+) => {$(
+                for (model, variables) in
+                    [(AnemoiModel::Fcico, $fcico), (AnemoiModel::Pcico, $pcico)]
+                {
+                    let system = match model {
+                        AnemoiModel::Fcico => dimension_of(
+                            &instance($rounds, model).system::<$fcico>().expect("the right N"),
+                        ),
+                        AnemoiModel::Pcico => dimension_of(
+                            &instance($rounds, model).system::<$pcico>().expect("the right N"),
+                        ),
+                    };
+                    assert_eq!(
+                        i128::from(system),
+                        *published_quotient_dimension(3, $rounds).value() as i128,
+                        "N = {}, {} in {} variables: the quotient dimension disagrees with \
+                         (alpha + 2)^N, which is a defect and not a timing",
+                        $rounds, model.tag(), variables
+                    );
+                }
+            )+};
+        }
+        check! {
+            1 => 2, 2;
+            2 => 4, 3;
+            3 => 6, 4;
+            4 => 8, 5;
+        }
+    }
+
+    /// `dim F_p[x]/I` from the leading-term ideal of the degrevlex basis.
+    fn dimension_of<const N: usize>(system: &[crate::MultivariatePolynomial<N, A>]) -> i64 {
+        let (basis, _) = f4_reported(
+            system,
+            MonomialOrder::GradedReverseLexicographic,
+            &F4Options::default(),
+        );
+        let basis = basis.expect("the basis completes at these round counts");
+        let series = HilbertSeries::of_basis(&basis, MonomialOrder::GradedReverseLexicographic)
+            .expect("a monomial ideal");
+        series
+            .quotient_dimension(
+                &basis
+                    .iter()
+                    .map(|p| p.leading_monomial(MonomialOrder::GradedReverseLexicographic))
+                    .collect::<Vec<_>>(),
+            )
+            .expect("within budget")
+            .expect("zero-dimensional") as i64
     }
 
     /// The two models at one round count are different systems in different numbers of variables.

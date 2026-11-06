@@ -459,7 +459,7 @@ pub struct ChallengeProgram {
 ///
 /// Every field that carries a figure carries its conditions beside it. A time without its hardware
 /// and its software is not comparable to anything, and a type that let one be recorded without the
-/// other would invite exactly the head-to-head `docs/research/anemoi.md` §5 declines to make.
+/// other would invite exactly the head-to-head `docs/research/anemoi.md` §8 declines to make.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReferencePoint {
     /// The publication, precisely enough to find the figure in it.

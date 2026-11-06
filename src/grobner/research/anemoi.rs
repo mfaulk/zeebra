@@ -450,11 +450,12 @@ mod tests {
     /// basis into the permutation's own input coordinates. The counts match the logs' own `nsols`
     /// line — two at `N = 1`, one at `N = 2`, none at `N = 3`, one at `N = 4` — so the extraction
     /// is checked against the reference as well as derived from it. See `docs/research/anemoi.md`.
-    const REFERENCE_WITNESSES: [(usize, u64, u64); 4] = [
+    const REFERENCE_WITNESSES: [(usize, u64, u64); 5] = [
         (1, 8_431_162_935_045_355_170, 8_504_299_942_464_173_430),
         (1, 16_536_366_872_043_122_313, 10_906_135_472_056_154_455),
         (2, 1_761_853_426_583_392_112, 503_324_230_923_223_481),
         (4, 8_251_407_552_160_637_060, 17_265_183_214_956_306_941),
+        (5, 8_393_487_001_060_711_113, 15_310_351_087_790_638_079),
     ];
 
     /// The permutation reproduces the CICO witnesses the committed reference data determines.

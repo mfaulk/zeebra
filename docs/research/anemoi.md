@@ -92,10 +92,16 @@ and they are what `test_the_permutation_matches_the_reference_witnesses` asserts
 | 1 | 16536366872043122313 | `(0, 10906135472056154455)` |
 | 2 | 1761853426583392112 | `(0, 503324230923223481)` |
 | 4 | 8251407552160637060 | `(0, 17265183214956306941)` |
+| 5 | 8393487001060711113 | `(0, 15310351087790638079)` |
 
-The **count** is checked too, not only the values: the log's own `nsols` line reports 2, 1, 0 and 1
-solutions at `N = 1, 2, 3, 4`, and the root-finding agrees at every rung including the empty one.
+The **count** is checked too, not only the values: the log's own `nsols` line reports 2, 1, 0, 1 and
+1 solutions at `N = 1 … 5`, and the root-finding agrees at every rung including the empty one.
 `N = 3` contributes no witness because the reference found none either.
+
+And the loop closes without the reference: `examples/anemoi_ladder row anemoi64-cico-n1-fcico`
+takes Zeebra's own F4, FGLM and root finding and lands on `8431162935045355170`, the first witness
+in the table. That is Zeebra recovering a point the reference's own output determined, through a
+completely different pipeline.
 
 **A trap worth recording.** The variable labels in the Six Worlds logs are *positionally permuted*
 relative to the model's own names. `models.sage` re-interprets each specialized polynomial into a
@@ -104,20 +110,36 @@ the log prints as `X0100` is the model's `Y0000` — the CICO input. The two ord
 and diverge from `N = 2` on, which is exactly the shape of bug that passes the easiest case. Reading
 the logs by label without accounting for this yields points that satisfy no equation.
 
-## 5. The machine-independent invariant, as the reference reports it
+## 5. The machine-independent invariant — checked, and it agrees
 
-`dim F_p[x]/I` does not depend on the machine, the library or the wall clock. The committed logs
-report, for `α = 3` and both models:
+`dim F_p[x]/I` does not depend on the machine, the library or the wall clock, so this is the one
+number Zeebra can be right or wrong about without any reference to a clock. A disagreement is a
+**defect in Zeebra or in the model, not a performance difference**, and it stops the workstream
+rather than becoming a table entry. It is therefore read **first**.
+
+The committed logs report, for `α = 3` and both models, a quotient dimension of `(α + 2)^N` exactly.
+Zeebra's own figure, from the leading-term ideal of its degrevlex basis, agrees at every registered
+rung in both models:
 
 | `N` | 1 | 2 | 3 | 4 | 5 |
-|---|---|---|---|---|---|
-| quotient dimension | 5 | 25 | 125 | 625 | 3125 |
+|---|---:|---:|---:|---:|---:|
+| `(α + 2)^N` | 5 | 25 | 125 | 625 | 3125 |
+| Zeebra, `FCICO` | 5 | 25 | 125 | 625 | 3125 |
+| Zeebra, `PCICO` | 5 | 25 | 125 | 625 | 3125 |
 
-which is `(α + 2)^N` exactly. This is tagged `Claim::Observed` and **not** `Claim::Proved`: it is a
-measurement from one implementation, and the designers' corresponding statement is a conjecture.
+**Ten rows out of ten.** Reproduce it with `cargo run --release --example anemoi_ladder dimensions`,
+which pins no environment because it needs none. `N = 1 … 4` in both models is also a unit test,
+`test_the_quotient_dimension_is_the_published_power`, so a regression fails CI rather than appearing
+as a row; `N = 5` is left to the runner to keep the test cheap.
 
-A disagreement between this and Zeebra's own `D` is a **defect in Zeebra or in the model, not a
-performance difference**, and it stops the workstream rather than becoming a table entry.
+The computation is combinatorial once F4 has finished — the number of standard monomials of the
+leading-term ideal — so it costs nothing beyond the basis, which is why it is affordable as the
+first check rather than the last.
+
+The published value is tagged `Claim::Observed` and **not** `Claim::Proved`: it is a measurement
+from one implementation, and the designers' corresponding statement is a conjecture. Zeebra agreeing
+with it does not promote either one to a theorem; it means two independent implementations measured
+the same thing.
 
 ## 6. The two models, and what the registry had to change
 
@@ -185,7 +207,35 @@ Goldilocks is already covered at the same width. `Zp18446744073709551263` is the
 `test_multiplication_matches_wide_reduction` now covers this modulus at the boundary values. Nothing
 else in `fields` changed.
 
-## 8. Open
+## 8. The runner, and what has deliberately not been measured
+
+`examples/anemoi_ladder` has three subcommands, and the split between them is the point.
+
+```sh
+cargo run --release --example anemoi_ladder list        # the ten rows and their published figures
+cargo run --release --example anemoi_ladder dimensions  # the machine-independent gate, §5
+ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
+    cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
+```
+
+`row` runs F4, then FGLM, then root finding, each timed separately — separately because the
+published finding is that the conversion costs 2 400× the basis at `N = 5`, and a combined figure
+would hide it — and verifies any recovered point **through the permutation** rather than through the
+system that produced it.
+
+**`row` refuses to print a single number unless `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` are set**, and
+says so with exit code 2. A wall-clock figure from an unpinned environment is not a measurement, and
+a figure produced by accident is a figure that gets quoted later. Measurements must additionally be
+serialized under `tools/benchlock.sh`, because this box runs several agents at once and a
+contended core is a silently wrong figure.
+
+**No timings are reported in this document or in any commit so far**, and the timed ladder is a
+follow-up. What has been established is the part that does not need a clock: the quotient dimension
+at all ten rows, the generator shapes against the logs, the witnesses, and that the whole pipeline
+runs end to end. When the ladder is run, §5's order is binding: dimension first, then which stage is
+the wall, then wall times last and with both machines named — or the stage split and no ratio at all.
+
+## 9. Open
 
 - **`ℓ > 1` and the named hash instances.** `AnemoiSponge-BN-254` and `AnemoiSponge-BLS12-381` use
   `ℓ ∈ {1, 2}` over 255-bit fields. `Bn254Fr` and `Bls12_381Fr` exist, and `from_decimal` already
