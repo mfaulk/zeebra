@@ -1,24 +1,42 @@
 //! Root finding by the Graeffe transform.
 //!
-//! The oracles below come from `docs/research/graeffe-root-finding.md` §6.3 and §10: the order-2
-//! transform against directly squared roots at degree 16, [PC] Lemma 2's `GT_2 . GT_2 = GT_4`,
-//! [PC] Lemma 1's degree preservation, and planted roots cross-checked against
-//! `src/poly/univariate/roots.rs` at every degree it reaches.
+//! `GT_l(f)` is the polynomial whose roots are the `l`-th powers of `f`'s. Iterating it over
+//! `F_p` does **not** separate roots by magnitude, which is what the real-number original is for:
+//! `p - 1 = 2^k * s` means `alpha^(2^k)` lands in the subgroup of order `s` for every
+//! `alpha` in `F_p^*`, so `k` transforms drive every base-field root into a subgroup small enough
+//! to search outright. That is the whole idea, and it is why the method wants a field whose
+//! `p - 1` has a large power of two and a small odd part.
+//!
+//! # References
+//! * `docs/research/graeffe-root-finding.md` — the transcription this follows, with the papers.
+//! * [P937] Sanso-Vitto, ePrint 2025/937, §4-§5 (Algorithm 2, the single-root variant).
+//! * [PC] Zhao-Sanso-Vitto-Ding, ePrint 2025/1916, §3 (Definition 2, Lemmas 1 and 2,
+//!   Algorithms 2 and 3).
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    fields::RootOfUnityError, poly::univariate::UnivariatePolynomial, FFTDomain, FiniteField,
-    KnownOrder,
+    evaluate,
+    fft::multiply_over_domain,
+    fields::{two_adic::two_adic_decomposition, RootOfUnityError},
+    interpolate,
+    poly::univariate::{roots::roots, Polynomial, UnivariatePolynomial},
+    FFTDomain, FiniteField, KnownOrder,
 };
 
 /// Why a Graeffe root find could not run.
+///
+/// One variant, deliberately: everything else about the method degrades in cost rather than in
+/// availability, and a cost is reported through [`GraeffeStats`] rather than refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GraeffeError {
     /// An order-2 step at degree `degree` needs a power-of-two domain of `2^log_n >= degree + 1`
     /// points, and this field has no primitive `2^log_n`-th root of unity.
+    ///
+    /// A fact about the field, so a value rather than a panic. Mersenne-31, whose two-adicity is
+    /// 1, is where it bites: no polynomial of degree above one can be transformed over it at all.
     DomainTooLarge {
         degree: u32,
         log_n: u32,
@@ -28,7 +46,17 @@ pub enum GraeffeError {
 
 impl std::fmt::Display for GraeffeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+        match self {
+            Self::DomainTooLarge {
+                degree,
+                log_n,
+                two_adicity,
+            } => write!(
+                f,
+                "an order-2 Graeffe step at degree {degree} needs a domain of 2^{log_n} points, \
+                 and this field's two-adicity is {two_adicity}"
+            ),
+        }
     }
 }
 
@@ -37,66 +65,512 @@ impl std::error::Error for GraeffeError {}
 /// How the roots in the final subgroup were found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubgroupRoute {
+    /// The order-`s` subgroup was enumerated and the polynomial evaluated at every point.
+    ///
+    /// `O(s * d)`, and the route the method is designed around: it is cheap exactly when the odd
+    /// part of `p - 1` is small, which is what makes KoalaBear (`s = 127`) the good case.
     Enumerated { points: u64 },
+    /// [`roots`] was called on the reduced polynomial and its output filtered to the subgroup.
+    ///
+    /// The fallback for a field whose odd part is too large to enumerate — Goldilocks, where
+    /// `s = 2^32 - 1`. Exact, but quadratic in the degree, so the Graeffe iteration buys nothing
+    /// there: see [`graeffe_root`]'s note on which fields the method actually helps.
     GcdRootFinder { degree: u32 },
 }
 
-/// What one [`graeffe_root`] call cost.
+/// What one [`graeffe_root`] call cost, for a benchmark to report rather than estimate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraeffeStats {
+    /// Order-2 Graeffe steps run, which is the field's two-adicity.
     pub graeffe_steps: u32,
+    /// Forward and inverse transforms performed: three per order-2 step.
     pub transforms: usize,
+    /// The largest transform size used.
     pub max_transform_size: usize,
+    /// The sum of every transform's size, which is what progressive reduction bounds.
     pub total_transform_elements: usize,
+    /// Coefficients held live across the whole run: the sum over the retained `G_{2^i}`.
     pub stored_coefficients: usize,
+    /// The degree of the fully transformed polynomial, after reduction.
     pub final_degree: u32,
+    /// The order of the subgroup the forward phase left the roots in.
     pub subgroup_order: u128,
     pub subgroup_route: SubgroupRoute,
+    /// Candidates the subgroup search produced, each of which the descent then un-squares.
     pub candidates: usize,
+    /// Wall time in the order-2 iteration, which is where every transform is.
     pub forward_time: Duration,
+    /// Wall time in the subgroup search.
     pub subgroup_time: Duration,
+    /// Wall time in the un-squaring descent.
     pub descent_time: Duration,
 }
 
 /// The order-2 Graeffe transform of `f`, over a domain the caller supplies.
+///
+/// With `f(x) = f_e(x^2) + x f_o(x^2)`,
+///
+/// ```text
+/// f(x) f(-x) = f_e(x^2)^2 - x^2 f_o(x^2)^2        so        GT_2(f)(y) = f_e(y)^2 - y f_o(y)^2
+/// ```
+///
+/// which is **three transforms of size `>= deg f + 1`, not of size `2 deg f + 1`**: `f_e` and
+/// `f_o` have half the degree, so their squares and the whole result fit in a domain one power of
+/// two below what an ordinary product of two degree-`d` polynomials would need. [P937] §5.3
+/// records this as a correction the authors make to their own first implementation, which followed
+/// Definition 2 literally and paid double.
+///
+/// The leading `(-1)^d` is [P937] §5.3's normalization and is not cosmetic: `f(x) f(-x)` carries
+/// `(-1)^d` from the `d` sign flips, so without it a monic `f` transforms to a polynomial with
+/// leading coefficient `-1` at odd degree, and [PC] Lemma 2's `GT_2 . GT_2 = GT_4` holds only up
+/// to a unit. With it, `f = prod (x - r_i)` transforms to exactly `prod (x - r_i^2)`.
+///
+/// # Panics
+/// Panics if the domain holds `deg f` points or fewer, which is a choice the caller made.
 pub fn graeffe_2_over_domain<F: FiniteField>(
-    _f: &UnivariatePolynomial<F>,
-    _domain: &FFTDomain<F>,
+    f: &UnivariatePolynomial<F>,
+    domain: &FFTDomain<F>,
 ) -> UnivariatePolynomial<F> {
-    todo!("(-1)^d (f_e^2 - x f_o^2), by three transforms of size deg f + 1")
+    let degree = f.degree() as usize;
+    assert!(
+        domain.size() > degree,
+        "an order-2 Graeffe step at degree {degree} needs at least {} points, not {}",
+        degree + 1,
+        domain.size()
+    );
+
+    let coefficients = f.coefficients();
+    let even: Vec<F> = coefficients.iter().step_by(2).copied().collect();
+    let odd: Vec<F> = coefficients.iter().skip(1).step_by(2).copied().collect();
+    let even_values = evaluate(&UnivariatePolynomial::new(&even), domain);
+    let odd_values = evaluate(&UnivariatePolynomial::new(&odd), domain);
+
+    let values: Vec<F> = (0..domain.size())
+        .map(|j| even_values[j] * even_values[j] - domain[j] * (odd_values[j] * odd_values[j]))
+        .collect();
+    let transformed = interpolate(&values, domain);
+
+    if degree % 2 == 1 {
+        transformed.scale(&-F::one())
+    } else {
+        transformed
+    }
 }
 
 /// The order-2 Graeffe transform of `f`, over a domain built for the occasion.
+///
+/// Fails if the field's two-adicity cannot host a domain of `deg f + 1` points.
 pub fn graeffe_2<F: KnownOrder, R: RngCore + CryptoRng>(
-    _f: &UnivariatePolynomial<F>,
-    _rng: &mut R,
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
 ) -> Result<UnivariatePolynomial<F>, GraeffeError> {
-    todo!("a domain of deg f + 1 points, then graeffe_2_over_domain")
+    if f.is_zero() {
+        return Ok(UnivariatePolynomial::zero());
+    }
+
+    let degree = f.degree();
+    let points = (degree as usize + 1).next_power_of_two().max(2);
+    let log_n = points.trailing_zeros();
+    let generator =
+        F::try_two_adic_root_of_unity(log_n, rng).map_err(|_| GraeffeError::DomainTooLarge {
+            degree,
+            log_n,
+            two_adicity: F::two_adicity(),
+        })?;
+    let domain = FFTDomain::from_generator(generator, points);
+    Ok(graeffe_2_over_domain(f, &domain))
 }
 
-/// The order-`l` Graeffe transform of `f`.
+/// The order-`l` Graeffe transform of `f`, by [PC] §3.2's product of scaled copies.
+///
+/// [PC] Definition 2 directly: `GT_l(f)(x^l) = prod_t f(x w_l^t)`, so the `l` scaled copies are
+/// multiplied together and every `l`-th coefficient of the degree-`l d` product is read off. The
+/// intermediate product is `l` times the size of the output, which is why [PC] applies orders
+/// above 2 only to small-degree polynomials in the final steps.
+///
+/// `l` need not be prime. The normalization matches [`graeffe_2`]'s: `prod_t (x w_l^t - r)` is
+/// `w_l^(l(l-1)/2) (x^l - r^l)`, and `w_l^(l(l-1)/2)` is 1 for odd `l` and `-1` for even `l`, so
+/// only an even `l` needs the `(-1)^d`. Hence `graeffe_l(f, 2)` agrees with [`graeffe_2`] and
+/// odd-order steps need no sign at all.
+///
+/// Fails if `l` does not divide `q - 1` — no primitive `l`-th root of unity exists then — or if
+/// the field cannot host a domain for the degree-`l d` product.
+///
+/// # Panics
+/// Panics if `l < 2`.
 pub fn graeffe_l<F: KnownOrder, R: RngCore + CryptoRng>(
-    _f: &UnivariatePolynomial<F>,
-    _l: u64,
-    _rng: &mut R,
+    f: &UnivariatePolynomial<F>,
+    l: u64,
+    rng: &mut R,
 ) -> Result<UnivariatePolynomial<F>, RootOfUnityError> {
-    todo!("the product of the l scaled copies, by a product tree")
+    assert!(l >= 2, "a Graeffe transform needs an order of at least 2");
+    if f.is_zero() {
+        return Ok(UnivariatePolynomial::zero());
+    }
+
+    let degree = f.degree() as usize;
+    let omega = F::try_root_of_unity(l, rng)?;
+
+    let mut power = F::one();
+    let mut factors: Vec<UnivariatePolynomial<F>> = Vec::with_capacity(l as usize);
+    for _ in 0..l {
+        factors.push(scale_variable(f, &power));
+        power *= omega;
+    }
+
+    // A product tree, one domain per level: all the operands of a level have the same degree, so
+    // one domain serves the whole level and the sizes rise with the partial products rather than
+    // every product paying for the final one.
+    while factors.len() > 1 {
+        let operand_degree = factors
+            .iter()
+            .map(|factor| factor.degree() as usize)
+            .max()
+            .unwrap_or(0);
+        let points = (2 * operand_degree + 1).next_power_of_two().max(2);
+        let generator = F::try_two_adic_root_of_unity(points.trailing_zeros(), rng)?;
+        let domain = FFTDomain::from_generator(generator, points);
+
+        let mut level = Vec::with_capacity(factors.len().div_ceil(2));
+        let mut remaining = factors.into_iter();
+        while let Some(left) = remaining.next() {
+            match remaining.next() {
+                Some(right) => level.push(multiply_over_domain(&left, &right, &domain)),
+                None => level.push(left),
+            }
+        }
+        factors = level;
+    }
+
+    // Only exponents divisible by l survive the product, which is Lemma 1's proof: the product is
+    // invariant under `x -> w_l x`.
+    let product = factors
+        .pop()
+        .expect("the product tree leaves one polynomial");
+    let coefficients = product.coefficients();
+    let mut transformed: Vec<F> = (0..=degree)
+        .map(|i| {
+            coefficients
+                .get(i * l as usize)
+                .copied()
+                .unwrap_or_else(F::zero)
+        })
+        .collect();
+    if l.is_multiple_of(2) && !degree.is_multiple_of(2) {
+        for coefficient in transformed.iter_mut() {
+            *coefficient = -*coefficient;
+        }
+    }
+    Ok(UnivariatePolynomial::new(&transformed))
 }
 
 /// A root of `f` in F, or `None` if it has none.
+///
+/// [P937] Algorithm 2 — the single-root variant the authors implemented — with [P937] §5.3's
+/// progressive degree reduction and [PC] Algorithm 2's gcd-based descent in place of Algorithm 2's
+/// `k` square roots and `r`-way scan. Why the descent rather than the scan: the scan is `O(r)`
+/// candidate tests with `r = 2^two_adicity`, which is `2^24` over KoalaBear and `2^32` over
+/// Goldilocks, and is only cheap in the setting [P937] §5.2 assumes — where the test is one
+/// permutation call. For a standalone root finder the gcd descent costs `k` folds instead, each
+/// linear in the degree it folds.
+///
+/// The three phases, and what each costs:
+///
+/// 1. **Forward.** `k = two_adicity` order-2 steps, each three transforms of size
+///    `>= deg + 1`. After step `i` the polynomial is reduced modulo `x^beta_i - 1` with
+///    `beta_i = (q - 1) / 2^i`: every root descended from a base-field root of `f` lies in the
+///    order-`beta_i` subgroup, so the reduction loses none of them and caps the degree at
+///    `beta_i - 1`. Once `beta_i` falls below the degree it **halves every step**, so the sum of
+///    transform sizes is `ceil(log2((q - 1) / d)) + 2` times the largest rather than `k` times it
+///    — a real saving, but one that is only large when `(q - 1) / d` is small. [P937] §5.3.
+/// 2. **Subgroup search.** The roots are now in the subgroup of order `s`, the odd part of
+///    `q - 1`. Found by enumeration when `s` is small and by [`roots`] on the reduced polynomial
+///    when it is not — see [`SubgroupRoute`]. **The method only pays over a field whose odd part
+///    is small**: over Goldilocks `s = 2^32 - 1` exceeds any degree of interest, the progressive
+///    reduction never bites, and this reduces to the quadratic route it was meant to replace.
+///    That is why [PC] Algorithm 3 reaches for odd-order steps over Goldilocks and why
+///    [`graeffe_l`] exists.
+/// 3. **Descent.** `mu_k = alpha^(2^k)` is known; `mu_{i-1}` is the common root of `G_{2^(i-1)}`
+///    and `x^2 - mu_i`, which is [PC] Algorithm 2 line 8 at `q_i = 2`. **The un-squaring
+///    ambiguity is decided by the polynomial, not guessed**: reducing `G_{2^(i-1)}` modulo
+///    `x^2 - mu_i` leaves `a x + b`, and `-b/a` is the one of the two square roots of `mu_i` that
+///    `G_{2^(i-1)}` vanishes at. Both square roots lie in the right subgroup, so either, when both
+///    are roots, descends to a genuine root of `f`.
+///
+/// # Panics
+/// Panics if `f` is the zero polynomial, every element of which is a root.
 pub fn graeffe_root<F: KnownOrder, R: RngCore + CryptoRng>(
-    _f: &UnivariatePolynomial<F>,
-    _rng: &mut R,
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
 ) -> Result<Option<F>, GraeffeError> {
-    todo!("Algorithm C's forward phase, the subgroup search, and the gcd descent")
+    graeffe_root_with_stats(f, rng).map(|(root, _stats)| root)
 }
 
 /// [`graeffe_root`], with what the run cost.
+///
+/// # Panics
+/// Panics if `f` is the zero polynomial.
 pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
-    _f: &UnivariatePolynomial<F>,
-    _rng: &mut R,
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
 ) -> Result<(Option<F>, GraeffeStats), GraeffeError> {
-    todo!("Algorithm C's forward phase, the subgroup search, and the gcd descent")
+    assert!(
+        !f.is_zero(),
+        "every element is a root of the zero polynomial"
+    );
+
+    let (two_adicity, odd_part) = two_adic_decomposition(F::order_limbs());
+    let subgroup_order = limbs_to_u128(&odd_part).unwrap_or(u128::MAX);
+    let mut stats = GraeffeStats {
+        graeffe_steps: 0,
+        transforms: 0,
+        max_transform_size: 0,
+        total_transform_elements: 0,
+        stored_coefficients: 0,
+        final_degree: f.degree(),
+        subgroup_order,
+        subgroup_route: SubgroupRoute::GcdRootFinder { degree: 0 },
+        candidates: 0,
+        forward_time: Duration::ZERO,
+        subgroup_time: Duration::ZERO,
+        descent_time: Duration::ZERO,
+    };
+
+    // A nonzero constant has no roots, and zero is a root exactly when the constant term is.
+    if f.degree() == 0 {
+        return Ok((None, stats));
+    }
+    if f.coefficients()[0].is_zero() {
+        return Ok((Some(F::zero()), stats));
+    }
+
+    // === forward: k order-2 steps, each followed by the reduction that caps the degree ===
+
+    // `beta_0 = q - 1`. The fold is a no-op at every degree this is called at, and is here so the
+    // induction the descent relies on starts where [PC] Algorithm 2 line 1 puts it.
+    let mut retained: Vec<UnivariatePolynomial<F>> = Vec::with_capacity(two_adicity as usize + 1);
+    let mut current = fold_cyclic(f, cyclic_modulus(&odd_part, two_adicity, 0));
+    retained.push(current.clone());
+
+    let forward_start = Instant::now();
+    let mut domain: Option<FFTDomain<F>> = None;
+    for step in 1..=two_adicity {
+        let degree = current.degree();
+        let points = (degree as usize + 1).next_power_of_two().max(2);
+        let log_n = points.trailing_zeros();
+        if log_n > two_adicity {
+            return Err(GraeffeError::DomainTooLarge {
+                degree,
+                log_n,
+                two_adicity,
+            });
+        }
+        if domain.as_ref().map(FFTDomain::size) != Some(points) {
+            let generator = F::try_two_adic_root_of_unity(log_n, rng).map_err(|_| {
+                GraeffeError::DomainTooLarge {
+                    degree,
+                    log_n,
+                    two_adicity,
+                }
+            })?;
+            domain = Some(FFTDomain::from_generator(generator, points));
+        }
+
+        current = graeffe_2_over_domain(&current, domain.as_ref().expect("built above"));
+        current = fold_cyclic(&current, cyclic_modulus(&odd_part, two_adicity, step));
+        retained.push(current.clone());
+
+        stats.graeffe_steps += 1;
+        stats.transforms += 3;
+        stats.max_transform_size = stats.max_transform_size.max(points);
+        stats.total_transform_elements += 3 * points;
+    }
+    stats.forward_time = forward_start.elapsed();
+    stats.final_degree = current.degree();
+    stats.stored_coefficients = retained
+        .iter()
+        .map(|polynomial| polynomial.coefficients().len())
+        .sum();
+
+    // === the subgroup search ===
+
+    let subgroup_start = Instant::now();
+    let candidates = subgroup_roots(&current, &odd_part, subgroup_order, &mut stats, rng);
+    stats.subgroup_time = subgroup_start.elapsed();
+    stats.candidates = candidates.len();
+
+    // === the descent, [PC] Algorithm 2 lines 7-9 ===
+
+    let descent_start = Instant::now();
+    for candidate in candidates {
+        if let Some(root) = descend(&retained, candidate, rng) {
+            if f.eval(&root).is_zero() {
+                stats.descent_time = descent_start.elapsed();
+                return Ok((Some(root), stats));
+            }
+        }
+    }
+    stats.descent_time = descent_start.elapsed();
+    Ok((None, stats))
+}
+
+/// `f(c x)`: the coefficients scaled by the powers of `c`.
+fn scale_variable<F: FiniteField>(f: &UnivariatePolynomial<F>, c: &F) -> UnivariatePolynomial<F> {
+    let mut power = F::one();
+    let scaled: Vec<F> = f
+        .coefficients()
+        .iter()
+        .map(|coefficient| {
+            let value = *coefficient * power;
+            power *= *c;
+            value
+        })
+        .collect();
+    UnivariatePolynomial::new(&scaled)
+}
+
+/// `f mod (x^beta - 1)`, by folding coefficient `i` onto `i mod beta`.
+///
+/// `max(deg f + 1 - beta, 0)` additions and no division, which is [P937] §5.2's point about
+/// Algorithm 2 line 6. `None` leaves `f` alone, for a modulus too wide to index with.
+fn fold_cyclic<F: FiniteField>(
+    f: &UnivariatePolynomial<F>,
+    beta: Option<usize>,
+) -> UnivariatePolynomial<F> {
+    let coefficients = f.coefficients();
+    let beta = match beta {
+        Some(beta) if beta >= 1 && coefficients.len() > beta => beta,
+        _ => return f.clone(),
+    };
+
+    let mut folded = vec![F::zero(); beta];
+    for (index, coefficient) in coefficients.iter().enumerate() {
+        folded[index % beta] += *coefficient;
+    }
+    UnivariatePolynomial::new(&folded)
+}
+
+/// `beta_i = (q - 1) / 2^i = 2^(two_adicity - i) * odd_part`, as a `usize` if it fits.
+///
+/// `None` means the modulus exceeds any degree that could be reduced by it, so the fold is a
+/// no-op — which is the only thing the caller does with it.
+fn cyclic_modulus(odd_part: &[u64], two_adicity: u32, step: u32) -> Option<usize> {
+    let odd = limbs_to_u128(odd_part)?;
+    odd.checked_shl(two_adicity - step)
+        .and_then(|beta| usize::try_from(beta).ok())
+}
+
+/// The roots of `g` that lie in the subgroup of order `s`, by whichever route is cheaper.
+///
+/// Both routes are exact. Enumeration evaluates `g` at all `s` points by Horner, `O(s * deg g)`;
+/// the fallback asks [`roots`] for every base-field root and keeps those of order dividing `s`,
+/// which is `O(log q * (deg g)^2)`. The estimate decides, and the choice is recorded.
+fn subgroup_roots<F: KnownOrder, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    odd_part: &[u64],
+    subgroup_order: u128,
+    stats: &mut GraeffeStats,
+    rng: &mut R,
+) -> Vec<F> {
+    let degree = g.degree();
+    let terms = degree as f64 + 1.0;
+    let enumeration_cost = subgroup_order as f64 * terms;
+    let order_bits = 64.0 * F::order_limbs().len() as f64;
+    let gcd_cost = order_bits * terms * terms;
+
+    let generator = u64::try_from(subgroup_order)
+        .ok()
+        .and_then(|s| F::try_root_of_unity(s, rng).ok());
+
+    if let (true, Some(generator)) = (enumeration_cost <= gcd_cost, generator) {
+        stats.subgroup_route = SubgroupRoute::Enumerated {
+            points: subgroup_order as u64,
+        };
+        let mut found = Vec::new();
+        let mut point = F::one();
+        for _ in 0..subgroup_order {
+            if g.eval(&point).is_zero() {
+                found.push(point);
+            }
+            point *= generator;
+        }
+        return found;
+    }
+
+    stats.subgroup_route = SubgroupRoute::GcdRootFinder { degree };
+    if g.degree() == 0 {
+        // A nonzero constant has no roots; `roots` would return an empty vector anyway, but a
+        // folded polynomial can reach degree zero and this says so without the modular
+        // exponentiation.
+        return Vec::new();
+    }
+    roots(g, rng)
+        .into_iter()
+        .filter(|candidate| candidate.pow_limbs(odd_part).is_one())
+        .collect()
+}
+
+/// `alpha` from `alpha^(2^k)`, by un-squaring against each retained `G_{2^i}` in turn.
+///
+/// `retained[i]` is `G_{2^i}` reduced, so `retained[0]` is `f` itself and the loop runs from the
+/// top down. [PC] Algorithm 2 line 8 at `q_i = 2`.
+fn descend<F: KnownOrder, R: RngCore + CryptoRng>(
+    retained: &[UnivariatePolynomial<F>],
+    mut mu: F,
+    rng: &mut R,
+) -> Option<F> {
+    for level in (0..retained.len() - 1).rev() {
+        mu = un_square(&retained[level], &mu, rng)?;
+    }
+    Some(mu)
+}
+
+/// The common root of `g` and `x^2 - mu`, or `None` if they share none.
+///
+/// `gcd(g, x^2 - mu)` without running a gcd, which is [PC]'s own advice on Algorithm 2 line 8:
+/// reduce `g` modulo `x^2 - mu` — one pass over the coefficients, since `x^2 = mu` — to get
+/// `a x + b`, whose root `-b / a` is the one of `mu`'s two square roots that `g` vanishes at. So
+/// **the sign is decided by the polynomial**; there is nothing to guess and no convention to carry
+/// through the descent.
+///
+/// Two degenerate cases. `a = b = 0` means `x^2 - mu` divides `g`, so both square roots are roots
+/// of `g`; both also lie in the subgroup one level down, so either continues a valid descent and
+/// Tonelli-Shanks picks one. It is not a rare case — it is what `f = x^2 - a^2` produces at the
+/// first level. `a = 0` with `b` nonzero means the two share no root.
+fn un_square<F: KnownOrder, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    mu: &F,
+    rng: &mut R,
+) -> Option<F> {
+    let mut even = F::zero();
+    let mut odd = F::zero();
+    let mut power = F::one();
+    for pair in g.coefficients().chunks(2) {
+        even += pair[0] * power;
+        if let Some(upper) = pair.get(1) {
+            odd += *upper * power;
+        }
+        power *= *mu;
+    }
+
+    if !odd.is_zero() {
+        let root = -even / odd;
+        return (root * root == *mu).then_some(root);
+    }
+    if !even.is_zero() {
+        return None;
+    }
+    mu.sqrt(rng)
+}
+
+/// `limbs` as a `u128`, or `None` if it is wider than that.
+fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
+    if limbs.len() > 2 {
+        return None;
+    }
+    let low = *limbs.first().unwrap_or(&0) as u128;
+    let high = *limbs.get(1).unwrap_or(&0) as u128;
+    Some(low | (high << 64))
 }
 
 #[cfg(test)]
@@ -181,7 +655,10 @@ mod tests {
         let transformed = graeffe_2(&f, &mut rng).expect("KoalaBear has two-adicity 24");
         assert_eq!(transformed, planted(&planted_roots, 2));
         // Without the normalization the result would be the negation, so this is not vacuous.
-        assert_ne!(transformed.scale(&-Koala::one()), planted(&planted_roots, 2));
+        assert_ne!(
+            transformed.scale(&-Koala::one()),
+            planted(&planted_roots, 2)
+        );
     }
 
     /// Two order-2 steps are one order-4 step, which is [PC] Lemma 2.
@@ -211,7 +688,9 @@ mod tests {
                 "GT_2 changed the degree at {degree}"
             );
             assert_eq!(
-                graeffe_l(&f, 2, &mut rng).expect("2 divides 65536").degree() as usize,
+                graeffe_l(&f, 2, &mut rng)
+                    .expect("2 divides 65536")
+                    .degree() as usize,
                 degree
             );
         }
