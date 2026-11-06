@@ -63,15 +63,26 @@ stage, and the identical entry count **20 001 424** — which is what makes the 
 comparison rather than a new experiment. Its runtime, 70.9 s against M23's 67.5 s, is inside this
 machine's noise and is not read.
 
-**Every row stops the same way.** The entries-needed figure sits a few thousand above whatever cap
-it was given — 1 424 above 2M, 178 above 10M, 2 185 above 100M. That is not a budget being
-approached and exceeded; it is a requirement far above the budget, detected the moment the counter
-crosses it. The degree-5 matrix on this instance wants **vastly more than 100 000 000** entries, and
-raising the cap fivefold moves nothing but the number in the error message.
+**Every row stops the same way, and the pattern is weaker evidence than it looks.** The
+entries-needed figure sits a few thousand above whatever cap it was given — 1 424 above 2M, 178
+above 10M, 2 185 above 100M.
 
-## 4. Peak RSS is set by the degree reached, not by the budget
+A first reading of that is "the requirement is far above the budget, detected the moment the counter
+crosses it". **That reading is not supported by these rows**, and it was in an earlier draft of this
+document. Live entry counts grow monotonically as a batch accumulates, so a cap placed anywhere
+along that growth is crossed at `cap + ε` whatever the eventual requirement is. The pattern is
+equally consistent with a requirement of 20M, of 100M, or of 10^10 — it distinguishes none of them,
+and what it actually measures is that the counter is checked densely.
 
-This is the finding, and it was not what the ladder was built to look for.
+Separating those needs a cap the computation does **not** cross, and §6a is that experiment. What
+the rows above do establish, without interpretation, is that **no cap from 2M to 100M changes the
+outcome's shape**: the same limiting resource, the same stage, and only two distinct peak-RSS
+values.
+
+## 4. Peak RSS does not move with the budget
+
+This is the finding, and it was not what the ladder was built to look for. Its *cause* is a separate
+question that §6a reopens and does not close.
 
 ```
 caps  2 000 000 and  10 000 000              ->  degree 4  ->   617 MB  (631 888 / 632 172 kB)
@@ -82,10 +93,16 @@ Two groups. Inside the degree-4 group the cap differs by 5x and the peaks agree 
 the degree-5 group the cap differs by **5x** — a 20M-to-100M span — and the three peaks agree to
 **0.01%**. Across the groups the cap differs by only 2x and the peak differs by **22.8x**.
 
-So peak memory is a step function of the highest degree the computation enters, and is independent
-of the entry budget within a degree. Five caps, two values.
+Five caps, two values, and within each group the budget moves the peak by nothing measurable.
 
-Entering degree 5 on this instance costs about **13.5 GB** that the entry counter never sees.
+> **Read §6a before drawing a mechanism from this.** Two further rungs with the cap effectively
+> removed plateau at a **third** value, 4 978 MB, *below* the degree-5 group while doing strictly
+> more work. So the description above is accurate for these five rows and the obvious causal
+> reading of it — that this is what entering degree 5 costs — is **false**.
+
+Whatever the mechanism, the magnitude is not in doubt: across every row in this document the entry
+counter accounts for at most 1.3% of peak RSS, and the gap is between **0.6 GB and 14 GB** of
+memory the budget does not see.
 
 ## 5. What the byte accounting bounds, and what it does not
 
@@ -115,10 +132,11 @@ shape of the omission**, neither of which the caveat carries:
 
 - **75x.** A documented caveat at 1.2x is a rounding note. The same caveat at 75x changes how the
   limit can be used, and nothing in the repository had attached a number to it.
-- **The omitted part steps with degree and is flat in the cap** (§4). That is not implied by "does
-  not account for the monomial-to-column map", and it is what stops the entry budget from working
-  even as a rough proxy: it cannot be scaled, because the quantity it omits moves in steps the
-  budget does not control.
+- **The omitted part does not move with the cap at all, and takes a different value depending on
+  which stop the run is heading for** (§4, corrected by §6a). That is not implied by "does not
+  account for the monomial-to-column map", and it is what stops the entry budget from working even
+  as a rough proxy: the quantity it omits is not a function of the budget, and the largest value it
+  takes is reached on the path that *refuses* rather than the path that proceeds.
 
 **The cost of the unquantified caveat, recorded because it was paid.**
 `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §9.1 sized this very ladder as "0.32 / 1.6 / 6.4 /
@@ -156,11 +174,55 @@ then a 2x increment bought a degree, then 5x more bought nothing again. **The ru
 fires in a way that says the quantity being bought is not continuous in the budget: a degree either
 fits or it does not, and degree 5 does not fit at any budget this ladder reached.
 
-So the answer to §1's question, for this instance: **out of reach, not out of budget** — with the
-caveat that "out of reach" is a statement about the S-box-per-variable grevlex formulation under F4
-and about nothing else. M23's own §5b.4 reached the same conclusion from the other direction, where
-changing the *formulation* of a Poseidon slice was worth three orders of magnitude and every
-scheduling strategy was worth 7%–14.5%.
+## 6a. The cap removed: the binding resource changes, and that is the real answer
+
+§3 could not distinguish "the requirement is far above the cap" from "the cap is crossed wherever it
+is placed". Two rungs with the cap effectively removed settle it, and they settle §1's question
+better than the stop rule does.
+
+| live-entry cap | outcome | elapsed | peak RSS |
+|---:|---|---:|---:|
+| 400 000 000 | **no entry stop** — stopped deliberately at 8 min 38 s to free the benchmark lock | > 8 min | 4 978 MB |
+| 1 000 000 000 | **`wall_clock`, 4 batches started** | 2 400 s | **4 978 MB** |
+
+> At a billion live entries the run is **time-bound, not entry-bound**: it got **four batches
+> started in forty minutes** and the entry cap never fired. The 2M–100M rows stopped in 1.3–81 s
+> because the cap cut them off inside a batch, not because they had reached a wall.
+
+Three things follow, and the first supersedes §3's framing.
+
+**The entry cap was never measuring the requirement.** Remove it and nothing completes anyway. So
+"out of reach, not out of budget" is the right answer to §1 — but the evidence is this rung, not the
+`cap + ε` pattern, which §3 now says distinguishes nothing.
+
+**The peak-RSS step is about the cap, not about the degree.** This is a correction to §4. Both
+uncapped rungs plateau at **4 978 MB** — 4 977 776 kB and 4 977 796 kB, **20 kB apart** — which is
+*below* the 14 072 MB that every capped degree-5 row reached. A run doing strictly more work peaks
+at a third of the memory. So 14.07 GB is **not what degree 5 costs**; it is reached on the path that
+ends in a refusal and not on the path that proceeds. §4's "step function of the degree entered"
+holds as a description of the five capped rows and **fails as a causal claim**, and the honest
+statement is narrower:
+
+> Peak RSS took exactly two values across five capped rows and a third value across two uncapped
+> ones. It tracks **which stop the run is heading for**, which is not a quantity a caller can
+> choose.
+
+What produces the 14.07 GB on the refusal path specifically is **not established**, and the
+candidates are now different from §5's: the limit check fires during a batch, and `f4_observed_reported`
+retains a clone of the system for the report, so an allocation on the error path is as plausible as
+one in degree-5 preprocessing. #237's profile should compare a capped run against an uncapped one at
+the same point, which is a sharper experiment than profiling either alone.
+
+**A run killed by the wall clock reports no matrix statistics at all** — "F4 has no cooperative time
+check, so no matrix statistics exist for a run killed this way". So the group-B metrics M23 §4.3
+defines are available only for runs that stop at a *resource* bound, and a time-bound run is
+diagnostically poorer than an entry-bound one. That is an argument for keeping the entry cap as the
+primary budget even though it does not bound memory: it is the bound that yields a report.
+
+So, for this instance: **out of reach, not out of budget** — and "out of reach" is a statement about
+the S-box-per-variable grevlex formulation under F4 and nothing else. M23's §5b.4 reached the same
+conclusion from the other direction, where changing the *formulation* of a Poseidon slice was worth
+three orders of magnitude and every scheduling strategy was worth 7%–14.5%.
 
 ## 7. What this does not say
 

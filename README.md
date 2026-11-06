@@ -2501,12 +2501,12 @@ overhead; for the process figure use `util::peak_resident_bytes`.
 
 **How much that omits, measured.** On Fukuoka MQ type III `n = 20` at the default 20,000,000-entry
 budget, the accounted figure is 195 MB and the process peaks at **14.75 GB — 75x more**. The
-omission is also *step-quantized by the highest degree the computation enters* and flat in the
-budget: two caps 5x apart that stop in degree 4 both peak at 617 MB, and two caps 2.5x apart that
-stop in degree 5 both peak at 14.07 GB. So the entry budget cannot be scaled as a proxy for memory
-even roughly — raise it and what grows is a quantity it does not count.
-[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) has the ladder, and
-#237 is the attribution work.
+omission also does not move with the budget: three caps spanning 5x all peak within 0.01% of each
+other, and two caps large enough that the entry bound never fires plateau at a *lower* figure than
+the capped runs while doing strictly more work. So the entry budget cannot be scaled as a proxy for
+memory even roughly — what it omits is not a function of what it bounds.
+[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) has the ladder and
+the one causal reading it rules out; #237 is the attribution work.
 
 #### What the computation did before it ran out of room
 
