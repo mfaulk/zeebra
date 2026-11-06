@@ -464,6 +464,54 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         best
     }
 
+    /// The element with the fewest terms whose leading monomial divides `monomial`, with the
+    /// quotient.
+    ///
+    /// The reference scan for [`ReducerSelection::FewestTerms`]. Ties go to the smaller basis
+    /// index, which is what makes "fewest" a total order on the basis.
+    pub fn find_sparsest_divisor(&self, monomial: &Monomial<N>) -> Option<(usize, Monomial<N>)> {
+        self.best_divisor_by_length(monomial, Ordering::Less)
+    }
+
+    /// The element with the most terms whose leading monomial divides `monomial`, with the
+    /// quotient.
+    ///
+    /// The reference scan for [`ReducerSelection::MostTerms`], the control.
+    pub fn find_densest_divisor(&self, monomial: &Monomial<N>) -> Option<(usize, Monomial<N>)> {
+        self.best_divisor_by_length(monomial, Ordering::Greater)
+    }
+
+    /// The divisor whose term count compares `wanted` against the incumbent's, index order
+    /// breaking ties.
+    ///
+    /// One scan for both directions, so the control cannot drift from the policy it controls.
+    fn best_divisor_by_length(
+        &self,
+        monomial: &Monomial<N>,
+        wanted: Ordering,
+    ) -> Option<(usize, Monomial<N>)> {
+        let mut best: Option<(usize, Monomial<N>)> = None;
+        for (index, element) in self.elements.iter().enumerate() {
+            let Some(quotient) = monomial.checked_div(&element.leading_monomial) else {
+                continue;
+            };
+            let beats_the_best = match best {
+                None => true,
+                Some((incumbent, _)) => {
+                    element
+                        .terms
+                        .len()
+                        .cmp(&self.elements[incumbent].terms.len())
+                        == wanted
+                }
+            };
+            if beats_the_best {
+                best = Some((index, quotient));
+            }
+        }
+        best
+    }
+
     /// As [`MonicBasis::find_divisor`], under the given policy, counting the work.
     ///
     /// The frozen entry point for divisor lookup: an index or a filter goes behind this signature,
@@ -492,6 +540,14 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             ReducerSelection::LargestLeadingMonomial => {
                 counts.divisor_scan_steps += self.elements.len();
                 self.find_largest_divisor(monomial)
+            }
+            ReducerSelection::FewestTerms => {
+                counts.divisor_scan_steps += self.elements.len();
+                self.find_sparsest_divisor(monomial)
+            }
+            ReducerSelection::MostTerms => {
+                counts.divisor_scan_steps += self.elements.len();
+                self.find_densest_divisor(monomial)
             }
         }
     }
@@ -875,7 +931,67 @@ mod tests {
             ),
             basis.find_largest_divisor(&monomial)
         );
-        assert_eq!(counts.divisor_queries, 2);
+        assert_eq!(
+            basis.find_divisor_with(&monomial, ReducerSelection::FewestTerms, &mut counts),
+            basis.find_sparsest_divisor(&monomial)
+        );
+        assert_eq!(
+            basis.find_divisor_with(&monomial, ReducerSelection::MostTerms, &mut counts),
+            basis.find_densest_divisor(&monomial)
+        );
+        assert_eq!(counts.divisor_queries, 4);
+    }
+
+    /// The term-count policies pick the sparsest and the densest divisor respectively.
+    #[test]
+    fn test_find_divisor_by_term_count() {
+        let order = MonomialOrder::Lexicographic;
+        // Both lead with x under lex, and x^2*y is divisible by both. The first has two terms, the
+        // second four, so the two policies part company — and neither is index order, since
+        // `FewestTerms` has to reach past element 1 for element 2.
+        let basis = MonicBasis::new(
+            &system(&["x + y + z", "x*y + x*z + y*z + 1", "x + 1"]),
+            order,
+        );
+        let monomial = Monomial::new(&[2, 1, 0]);
+
+        assert_eq!(
+            basis.find_sparsest_divisor(&monomial),
+            Some((2, Monomial::new(&[1, 1, 0])))
+        );
+        assert_eq!(
+            basis.find_densest_divisor(&monomial),
+            Some((1, Monomial::new(&[1, 0, 0])))
+        );
+        // Nothing divides z^3, under either policy.
+        assert_eq!(
+            basis.find_sparsest_divisor(&Monomial::new(&[0, 0, 3])),
+            None
+        );
+        assert_eq!(basis.find_densest_divisor(&Monomial::new(&[0, 0, 3])), None);
+    }
+
+    /// Equal term counts are broken by the smaller basis index, under both directions.
+    #[test]
+    fn test_find_divisor_by_term_count_tiebreak() {
+        for order in ALL_ORDERS {
+            // Both elements lead with x^2 and have two terms, so only the index is left.
+            let basis = MonicBasis::new(&system(&["x^2 + y", "x^2 + z"]), order);
+            let monomial = Monomial::new(&[2, 1, 0]);
+            let expected = Some((0, Monomial::new(&[0, 1, 0])));
+            assert_eq!(
+                basis.find_sparsest_divisor(&monomial),
+                expected,
+                "{}",
+                order.name()
+            );
+            assert_eq!(
+                basis.find_densest_divisor(&monomial),
+                expected,
+                "{}",
+                order.name()
+            );
+        }
     }
 
     /// Divisor lookup returns the first applicable element and the quotient.
@@ -1151,10 +1267,7 @@ mod tests {
                 let basis = MonicBasis::new(&polynomials, order);
                 let pairs = every_pair(&polynomials, order);
 
-                for selection in [
-                    ReducerSelection::FirstApplicable,
-                    ReducerSelection::LargestLeadingMonomial,
-                ] {
+                for selection in ReducerSelection::ALL {
                     for mode in [CacheMode::Off, CacheMode::Count] {
                         let mut cache = ReducerCache::new(mode);
                         let context = format!(
@@ -1231,10 +1344,7 @@ mod tests {
             let basis = MonicBasis::new(&polynomials, order);
             let pairs = every_pair(&polynomials, order);
 
-            for selection in [
-                ReducerSelection::FirstApplicable,
-                ReducerSelection::LargestLeadingMonomial,
-            ] {
+            for selection in ReducerSelection::ALL {
                 let mut warm = ReducerCache::new(CacheMode::Count);
                 let expected =
                     symbolic_preprocessing_with(&basis, &pairs, usize::MAX, selection, &mut warm)

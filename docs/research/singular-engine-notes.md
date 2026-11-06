@@ -257,6 +257,13 @@ classical systems under Buchberger, not F4, and `docs/research/pair-scheduling.m
 that schedule changes on these systems mostly measure noise. The claim here is that the *axis* is
 untried, not that it wins.
 
+**Measured, in #253, and the two halves came out differently.** The pair ranking is a null result:
+`short-pair` raises peak live entries on all seven instances and `long-pair` is inverted against it
+on two, which is the noise signature. The reducer policy is not: `FewestTerms` takes peak live
+entries down 27.4% and 31.7% on katsura-5 and katsura-6 grevlex with a control 1.09x–3.82x away —
+and *up* 25%–30% on the same systems under grlex, so it stays selectable rather than becoming the
+default. Both tables are in `docs/research/pair-scheduling.md` §2 and §6.
+
 ## 5. Certification: apply the criteria, and fork
 
 `kernel/GBEngine/kverify.cc:24`, `kVerify1`, is a standalone Buchberger-criterion check of a

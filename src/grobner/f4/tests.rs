@@ -962,10 +962,7 @@ fn test_every_configuration_agrees_with_the_baseline() {
                     ReductionStrategy::Unstructured,
                     ReductionStrategy::Structured,
                 ] {
-                    for reducer_selection in [
-                        ReducerSelection::FirstApplicable,
-                        ReducerSelection::LargestLeadingMonomial,
-                    ] {
+                    for reducer_selection in ReducerSelection::ALL {
                         for reducer_cache in [CacheMode::Off, CacheMode::Count] {
                             for criteria in [
                                 PairCriteria::NONE,
@@ -1327,10 +1324,7 @@ fn test_reducer_selection_does_not_change_the_basis() {
             let f = system(&strings);
             let expected = buchberger(&f, order);
 
-            for reducer_selection in [
-                ReducerSelection::FirstApplicable,
-                ReducerSelection::LargestLeadingMonomial,
-            ] {
+            for reducer_selection in ReducerSelection::ALL {
                 let options = F4Options {
                     reducer_selection,
                     ..F4Options::baseline()
@@ -1383,10 +1377,7 @@ fn test_reducer_selection_under_permuted_and_redundant_generators() {
             ],
         ];
 
-        for reducer_selection in [
-            ReducerSelection::FirstApplicable,
-            ReducerSelection::LargestLeadingMonomial,
-        ] {
+        for reducer_selection in ReducerSelection::ALL {
             for (which, variant) in variants.iter().enumerate() {
                 let options = F4Options {
                     reducer_selection,
@@ -1413,10 +1404,7 @@ fn test_reducer_selection_is_deterministic() {
     type G = Zp2147483647;
 
     for order in ALL_ORDERS {
-        for reducer_selection in [
-            ReducerSelection::FirstApplicable,
-            ReducerSelection::LargestLeadingMonomial,
-        ] {
+        for reducer_selection in ReducerSelection::ALL {
             for reducer_cache in [CacheMode::Off, CacheMode::Count] {
                 let options = F4Options {
                     reducer_selection,
