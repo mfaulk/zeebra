@@ -1712,6 +1712,25 @@ cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_a_published_instance_is_reproduced
 ```
 
+### Other external engines, for comparison
+
+Singular is the oracle above because it is the one this repository has always had installed.
+Three more comparands — **msolve**, **Groebner.jl** and **Sagebrush** — are provisioned into a
+user prefix by one script, with pinned versions and no root:
+
+```sh
+tools/external/provision.sh          # idempotent; builds GMP, MPFR, FLINT, msolve; installs Julia
+. tools/external/env.sh              # PATH, LD_LIBRARY_PATH, JULIA_DEPOT_PATH
+tools/external/smoke/smoke.sh        # all four on one system; non-zero exit on disagreement
+```
+
+Nothing is linked and nothing is vendored: every one of them is run as a **separate process**,
+which is what makes a GPL engine usable from an MIT crate at all. The rules are
+`docs/research/external-provenance-policy.md`; what got installed, how to invoke each tool for a
+basis, for an eliminant and for solutions, what each one means by "degrevlex", the prime-field
+ceilings (msolve and Singular both stop at 2^31 − 1), and the smoke-test agreement are in
+`docs/research/external-comparands.md`.
+
 ### Solving zero-dimensional systems
 
 `grobner::solve_one` finds one solution and stops; `grobner::solve_zero_dimensional` finds every
