@@ -5,7 +5,12 @@ use std::{cmp::Ordering, ops, ops::Neg};
 use crate::{impl_add_variants, impl_mul_variants, impl_sub_variants};
 
 use crate::{
-    poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
+    poly::{
+        multivariate::{
+            sparse_multivariate_multiply, sparse_multivariate_polynomial::SparseMultiPoly,
+        },
+        MonomialOrder,
+    },
     FiniteField, Monomial,
 };
 
@@ -46,15 +51,16 @@ impl_add_variants!([const N: usize, F: FiniteField], SparseMultiPoly<N, F>);
 impl<const N: usize, F: FiniteField> ops::Mul<&SparseMultiPoly<N, F>> for &SparseMultiPoly<N, F> {
     type Output = SparseMultiPoly<N, F>;
 
+    /// Collected as the products are formed, by the route `sparse_multivariate_multiply::route`
+    /// selects: see that module for the three routes and the dispatch between them.
+    ///
+    /// On the operator rather than behind an opt-in, because every form of multiplication in the
+    /// crate funnels through here — `impl_mul_variants!`, `MulAssign`, `div_rem`'s `&q * divisor`,
+    /// and the repeated-multiplication S-box in `grobner::research::resultant` — so a caller that
+    /// had to opt in would be a caller that did not. Bit-identical to the materialising loop it
+    /// replaces at every size; below the dispatch threshold it *is* that loop.
     fn mul(self, other: &SparseMultiPoly<N, F>) -> Self::Output {
-        let mut terms: Vec<(Monomial<N>, F)> = Default::default();
-        for (monomial_a, coefficient_a) in self.terms.iter() {
-            for (monomial_b, coefficient_b) in &other.terms {
-                terms.push((monomial_a * monomial_b, *coefficient_a * *coefficient_b));
-            }
-        }
-
-        SparseMultiPoly::new(&terms)
+        sparse_multivariate_multiply::multiply(self, other)
     }
 }
 

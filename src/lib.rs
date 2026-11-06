@@ -46,7 +46,10 @@ pub use poly::{
     PolynomialParams, PowerPermutation, SubgroupRoute, UnivariatePolynomial,
 };
 #[doc(hidden)]
-pub use poly::{karatsuba_base_case_unstable, karatsuba_unstable};
+pub use poly::{
+    karatsuba_base_case_unstable, karatsuba_unstable, multiply_multivariate_unstable,
+    multivariate_multiply_route_unstable, MultiplyRoute,
+};
 pub use rings::Ring;
 
 /// The README's code examples, compiled and run.

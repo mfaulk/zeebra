@@ -3,6 +3,10 @@
 mod multivariate;
 mod univariate;
 
+#[doc(hidden)]
+pub use multivariate::{
+    multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
+};
 pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial};
 pub(crate) use univariate::multiply_dense;
 pub use univariate::{
