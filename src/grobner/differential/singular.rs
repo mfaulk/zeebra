@@ -27,14 +27,15 @@
 
 use std::{
     fmt::{Display, Formatter},
-    fs::File,
     io,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use super::comparison::DifferentialCase;
+use crate::grobner::external::process::{
+    read_output, Invocation, ProcessMeasurement, SpawnError, Supervisor,
+};
 
 /// The largest characteristic Singular's prime fields accept.
 ///
@@ -115,6 +116,15 @@ impl From<io::Error> for OracleError {
     fn from(e: io::Error) -> Self {
         Self::Io {
             reason: e.to_string(),
+        }
+    }
+}
+
+impl From<SpawnError> for OracleError {
+    fn from(e: SpawnError) -> Self {
+        match e {
+            SpawnError::Unavailable { binary, reason } => Self::Unavailable { binary, reason },
+            SpawnError::Io { reason } => Self::Io { reason },
         }
     }
 }
@@ -381,58 +391,49 @@ impl SingularOracle {
     }
 
     /// Run a script and return its combined output.
+    fn run(&mut self, script: &str) -> Result<String, OracleError> {
+        self.run_measured(script).map(|(output, _)| output)
+    }
+
+    /// Run a script, returning its combined output and what the run cost.
+    ///
+    /// The one place a Singular process is started, shared with
+    /// [`SingularSolver`](crate::grobner::external::SingularSolver) so that the competitive
+    /// harness and the differential harness cannot drift into two different invocations of the
+    /// same tool.
     ///
     /// Output goes to a file rather than a pipe, and the wait is a poll rather than a read: a
     /// child whose pipe fills while the parent is not reading blocks forever, which is exactly the
-    /// case a timeout exists for and exactly the case a pipe would deadlock in.
-    fn run(&mut self, script: &str) -> Result<String, OracleError> {
+    /// case a timeout exists for and exactly the case a pipe would deadlock in. Both properties
+    /// now come from [`Supervisor`], along with the measurement.
+    pub(crate) fn run_measured(
+        &mut self,
+        script: &str,
+    ) -> Result<(String, ProcessMeasurement), OracleError> {
         self.runs += 1;
         let stem = format!("run-{}-{}", std::process::id(), self.runs);
         let script_path = self.work_dir.join(format!("{}.sing", stem));
         let output_path = self.work_dir.join(format!("{}.out", stem));
 
         std::fs::write(&script_path, script)?;
-        let output_file = File::create(&output_path)?;
-        let error_file = output_file.try_clone()?;
 
-        let child = Command::new(&self.binary)
+        let invocation = Invocation::new(&self.binary, &self.work_dir, &output_path)
             .arg("-q")
             .arg("--no-warn")
-            .arg(&script_path)
-            .current_dir(&self.work_dir)
-            .stdin(Stdio::null())
-            .stdout(Stdio::from(output_file))
-            .stderr(Stdio::from(error_file))
-            .spawn();
-
-        let mut child = match child {
-            Ok(child) => child,
+            .arg(&script_path);
+        let measurement = match Supervisor::new(self.timeout)
+            .with_poll_interval(Duration::from_millis(5))
+            .run(&invocation)
+        {
+            Ok(measurement) => measurement,
             Err(e) => {
                 self.discard(&script_path, &output_path);
-                return Err(OracleError::Unavailable {
-                    binary: self.binary.clone(),
-                    reason: e.to_string(),
-                });
+                return Err(OracleError::from(e));
             }
         };
 
-        let deadline = Instant::now() + self.timeout;
-        let timed_out = loop {
-            match child.try_wait()? {
-                Some(_) => break false,
-                None if Instant::now() >= deadline => {
-                    // Killed and reaped: leaving it would accumulate one zombie per timeout over
-                    // a sweep of hundreds of systems.
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break true;
-                }
-                None => std::thread::sleep(Duration::from_millis(5)),
-            }
-        };
-
-        let output = std::fs::read_to_string(&output_path).unwrap_or_default();
-        if timed_out {
+        let output = read_output(&output_path);
+        if measurement.timed_out {
             // Kept regardless of `keep_files`: a timeout is the one outcome where the script is
             // the whole evidence and there is no parsed answer to report instead.
             return Err(OracleError::Timeout {
@@ -447,7 +448,7 @@ impl SingularOracle {
         if marker(&output, "@done").is_none() && !output.contains("@done") {
             return Err(OracleError::Incomplete);
         }
-        Ok(output)
+        Ok((output, measurement))
     }
 
     /// Remove a run's files unless they were asked to be kept.
@@ -463,6 +464,16 @@ impl SingularOracle {
     pub fn work_dir(&self) -> &Path {
         &self.work_dir
     }
+
+    /// The binary this oracle runs, for an error message that names it.
+    pub fn binary(&self) -> &str {
+        &self.binary
+    }
+
+    /// The time limit this oracle enforces per run.
+    pub fn timeout(&self) -> Duration {
+        self.timeout
+    }
 }
 
 impl Oracle for SingularOracle {
@@ -475,7 +486,7 @@ impl Oracle for SingularOracle {
 ///
 /// Singular exits 0 after a script error, so this and not the status is what says a run failed.
 /// The lines look like `   ? \`x3\` is not defined`.
-fn error_line(output: &str) -> Option<String> {
+pub(crate) fn error_line(output: &str) -> Option<String> {
     output
         .lines()
         .map(str::trim_start)
@@ -484,12 +495,12 @@ fn error_line(output: &str) -> Option<String> {
 }
 
 /// The value of the first line beginning with `marker `.
-fn marker<'a>(output: &'a str, name: &str) -> Option<&'a str> {
+pub(crate) fn marker<'a>(output: &'a str, name: &str) -> Option<&'a str> {
     markers(output, name).into_iter().next()
 }
 
 /// The values of every line beginning with `marker `, in the order printed.
-fn markers<'a>(output: &'a str, name: &str) -> Vec<&'a str> {
+pub(crate) fn markers<'a>(output: &'a str, name: &str) -> Vec<&'a str> {
     let prefix = format!("{} ", name);
     output
         .lines()
@@ -512,7 +523,7 @@ fn markers<'a>(output: &'a str, name: &str) -> Vec<&'a str> {
 /// 55915 over GF(2). Iterating the slots keeps the count meaningful; dropping the zeros afterwards
 /// is right because none of these lists — a generating set, a reduced basis, a monomial basis — has
 /// a zero as a meaningful element.
-fn collect(
+pub(crate) fn collect(
     output: &str,
     name: &str,
     expected: i64,
