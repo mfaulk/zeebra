@@ -607,6 +607,47 @@ every degree the quadratic finder reaches, and **not peer-reviewed**. If it is w
 mode is a returned `None` where a root exists — never a wrong root, since `graeffe_root` verifies
 `f(α) = 0` before returning.
 
+#### 3.9.2 The dual failure mode, found and fixed: a reduction that lands on zero
+
+§3.9.1 is a *soundness* claim — the reduction introduces no false candidate. Completeness is the
+other half, and it has a degenerate case that neither paper mentions and that the first
+implementation here got wrong.
+
+Reduction modulo `x^(β_i) − 1` loses no root **in the subgroup**, but it can lose the polynomial.
+If `x^(β_i) − 1` divides `G_{2^i}` then the fold lands on the zero polynomial, and zero is the one
+value that cannot carry the information the reduction exists to produce: it means *every* element
+of the order-`β_i` subgroup is a root, and it is stored identically to a polynomial with none. Worse,
+`DensePolynomial::degree` reports `0` for it (the zero polynomial's degree is undefined, and the type
+picks zero), so the `degree() == 0` short-circuit in `subgroup_roots` — correct for a nonzero
+constant, which genuinely has no roots — read it as "no candidates" and `graeffe_root` returned
+`None`.
+
+The smallest witness is as small as it gets. Over KoalaBear `q − 1 = 2^24 · 127`, so take
+
+```text
+f(x) = x^127 − 1
+```
+
+which splits into 127 distinct base-field roots, is fixed by the degree-normalized order-two
+transform (`GT_2(f)(x^2) = −f(x)f(−x) = x^254 − 1`), and meets `β_k = 127` exactly at the last
+step — where the fold sends it to zero. `graeffe_root` reported no root for a polynomial with 127
+of them, `x = 1` among them.
+
+**The fix is at the fold, not at the search.** `fold_if_needed` refuses a fold onto zero and returns
+`None`, which it already uses for "keep what you have", so the unreduced transform is retained and
+the ordinary subgroup routes find the roots. Doing it there rather than in `subgroup_roots` makes it
+unconditional: the alternative — reporting all `β_i` subgroup elements as candidates — needs a
+generator of that subgroup, and `try_root_of_unity` can fail (`OrderTooWide`) on fields whose order
+exceeds a `u128`. The cost is that the degenerate step carries its full degree into the subgroup
+search instead of dropping to `β_i`; that is strictly more work than the fold would have been, and
+it is confined to inputs divisible by `x^(β_i) − 1`.
+
+Regression tests in `graeffe.rs`: `test_a_subgroup_vanishing_polynomial_still_yields_a_root`
+(the bare `x^127 − 1`, through the full descent), `test_a_vanishing_factor_in_a_larger_polynomial_still_descends`
+(the same factor inside a degree-131 product, so the retained polynomial sits above the subgroup),
+and `test_a_fold_onto_the_zero_polynomial_is_refused` (the fold in isolation, including that a
+nonzero remainder is still folded).
+
 
 ## 4. The reported measurements, with hardware
 

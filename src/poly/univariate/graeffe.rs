@@ -477,12 +477,22 @@ fn scale_variable<F: FiniteField>(f: &UnivariatePolynomial<F>, c: &F) -> Univari
     UnivariatePolynomial::new(&scaled)
 }
 
-/// `f mod (x^beta - 1)`, by folding coefficient `i` onto `i mod beta`, or `None` if `f` already
-/// has degree below `beta` and the reduction would do nothing.
+/// `f mod (x^beta - 1)`, by folding coefficient `i` onto `i mod beta`, or `None` if the caller
+/// should keep `f` as it stands.
 ///
 /// `max(deg f + 1 - beta, 0)` additions and no division, which is [P937] §5.2's point about
 /// Algorithm 2 line 6. A `beta` of `None` is a modulus too wide to index with, where the fold is
 /// likewise a no-op.
+///
+/// Three cases return `None`, and the third is a correctness condition rather than a saving. `f`
+/// of degree below `beta` needs no reduction, and a `beta` too wide to index cannot be applied —
+/// but **a fold that lands on the zero polynomial is refused**, because it is the one outcome the
+/// reduction must not be allowed to report. `fold = 0` means `x^beta - 1` divides `f`, so every
+/// `beta`-th root of unity is a root of `f`: the roots the reduction exists to expose are *all*
+/// of them, and the zero polynomial records that as indistinguishable from none. `x^127 - 1` over
+/// KoalaBear is the smallest instance — fixed by the order-two transform, 127 roots, and `beta_k`
+/// is exactly 127. Keeping `f` unreduced carries its degree into the subgroup search, which costs
+/// more than the fold would have but reports the roots.
 fn fold_if_needed<F: FiniteField>(
     f: &UnivariatePolynomial<F>,
     beta: Option<usize>,
@@ -499,7 +509,11 @@ fn fold_if_needed<F: FiniteField>(
     for (index, coefficient) in coefficients.iter().enumerate() {
         folded[index % beta] += *coefficient;
     }
-    Some(UnivariatePolynomial::new(&folded))
+    let folded = UnivariatePolynomial::new(&folded);
+    if folded.is_zero() {
+        return None;
+    }
+    Some(folded)
 }
 
 /// `beta_i = (q - 1) / 2^i = 2^(two_adicity - i) * odd_part`, as a `usize` if it fits.
@@ -554,6 +568,10 @@ fn subgroup_roots<F: KnownOrder, R: RngCore + CryptoRng>(
         // A nonzero constant has no roots; `roots` would return an empty vector anyway, but a
         // folded polynomial can reach degree zero and this says so without the modular
         // exponentiation.
+        //
+        // `degree() == 0` is also what the *zero* polynomial reports, for which the opposite
+        // holds — every element is a root. [`fold_if_needed`] is what keeps it from arriving
+        // here, so the two cannot be confused at this point.
         return Vec::new();
     }
     roots(g, rng)
@@ -639,8 +657,8 @@ mod tests {
     use rand::{prelude::StdRng, Rng, SeedableRng};
 
     use super::{
-        graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root, graeffe_root_with_stats,
-        GraeffeError, SubgroupRoute,
+        fold_if_needed, graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root,
+        graeffe_root_with_stats, GraeffeError, SubgroupRoute,
     };
     use crate::{
         fields::{KoalaBear, Mersenne31, Zp18446744069414584321, Zp2147483647, Zp65537},
@@ -963,6 +981,70 @@ mod tests {
         let (root, stats) = graeffe_root_with_stats(&f, &mut rng).expect("no transform needed");
         assert_eq!(root, Some(Koala::zero()));
         assert_eq!(stats.graeffe_steps, 0);
+    }
+
+    /// `x^s - 1`, whose fold to zero must not be read as "no roots in the subgroup".
+    ///
+    /// The odd part of KoalaBear's `q - 1` is 127, so `x^127 - 1` splits into 127 distinct base
+    /// field roots and is also fixed by the degree-normalized order-two transform. Every element
+    /// of the order-127 subgroup is therefore a root of the fully transformed polynomial, and the
+    /// final reduction modulo `x^127 - 1` sends it to zero — the one case where a zero reduced
+    /// polynomial means *every* candidate rather than none.
+    #[test]
+    fn test_a_subgroup_vanishing_polynomial_still_yields_a_root() {
+        let mut rng = StdRng::seed_from_u64(97);
+        let subgroup_order = 127u128;
+        let mut coefficients = vec![Koala::zero(); subgroup_order as usize + 1];
+        coefficients[0] = -Koala::one();
+        coefficients[subgroup_order as usize] = Koala::one();
+        let f = UnivariatePolynomial::<Koala>::new(&coefficients);
+
+        let (root, stats) = graeffe_root_with_stats(&f, &mut rng).expect("KoalaBear carries 128");
+        let root = root.expect("x^127 - 1 has 127 roots in the base field");
+        assert!(f.eval(&root).is_zero());
+        assert!(root.pow(subgroup_order).is_one());
+        assert_eq!(stats.subgroup_order, subgroup_order);
+    }
+
+    /// The same vanishing factor inside a larger polynomial still descends to a root.
+    ///
+    /// `(x^127 - 1) * cofactor` folds to zero just as the bare factor does, but at a degree above
+    /// the subgroup, so the retained polynomial the descent un-squares against is the unreduced
+    /// transform rather than something of degree below 127.
+    #[test]
+    fn test_a_vanishing_factor_in_a_larger_polynomial_still_descends() {
+        let mut rng = StdRng::seed_from_u64(101);
+        let mut vanishing = vec![Koala::zero(); 128];
+        vanishing[0] = -Koala::one();
+        vanishing[127] = Koala::one();
+        let cofactor = distinct_nonzero::<Koala, _>(4, &mut rng);
+        let f = &UnivariatePolynomial::<Koala>::new(&vanishing)
+            * &UnivariatePolynomial::from_zeros(&cofactor);
+        assert_eq!(f.degree(), 131);
+
+        let root = graeffe_root(&f, &mut rng)
+            .expect("KoalaBear carries 256")
+            .expect("131 roots, all of them in the base field");
+        assert!(f.eval(&root).is_zero());
+    }
+
+    /// A fold that lands on zero is refused, so the caller keeps the polynomial it had.
+    #[test]
+    fn test_a_fold_onto_the_zero_polynomial_is_refused() {
+        let mut coefficients = vec![Koala::zero(); 128];
+        coefficients[0] = -Koala::one();
+        coefficients[127] = Koala::one();
+        let f = UnivariatePolynomial::<Koala>::new(&coefficients);
+
+        // `f mod (x^127 - 1)` is zero, which would lose all 127 of its roots.
+        assert_eq!(fold_if_needed(&f, Some(127)), None);
+        // A fold onto a nonzero remainder is still performed: 127 mod 126 is 1, so the leading
+        // term lands on the linear one and `f mod (x^126 - 1)` is `x - 1`.
+        let folded = fold_if_needed(&f, Some(126)).expect("x - 1 is nonzero");
+        assert_eq!(
+            folded,
+            UnivariatePolynomial::new(&[-Koala::one(), Koala::one()])
+        );
     }
 
     /// A nonzero constant has no root.
