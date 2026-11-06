@@ -9,15 +9,18 @@
 //! the three were joined, and its finding is that the threshold has to be measured against
 //! Karatsuba rather than inherited from the schoolbook-versus-transform figure.
 //!
-//! `Mul` itself stays schoolbook, and not by oversight — see `karatsuba::multiply_dense` for why
-//! the operator is a separate decision from this dispatcher, and §4.1.2 of
-//! `docs/research/fast-univariate.md` for the measurement behind leaving it alone. Finding a domain
-//! needs a primitive `2^k`-th root of unity, which needs [`KnownOrder`] and a source of randomness
-//! — neither of which `Mul`'s signature can carry, and the first of which the Gröbner core
-//! deliberately does not require of a coefficient type
-//! (`test_the_grobner_stack_needs_no_field_cardinality` fails to compile if it starts to). So the
-//! transform is reached through the functions here, of which [`multiply`] is the one to call when
-//! the degree is not known in advance.
+//! **`Mul` covers the first two routes and cannot cover the third.** Since #231 the operator
+//! dispatches to [`multiply_dense`] itself, so a caller who only writes `a * b` already gets
+//! Karatsuba. The transform it cannot reach: finding a domain needs a primitive `2^k`-th root of
+//! unity, which needs [`KnownOrder`] and a source of randomness — neither of which `Mul`'s
+//! signature can carry, and the first of which the Gröbner core deliberately does not require of a
+//! coefficient type (`test_the_grobner_stack_needs_no_field_cardinality` fails to compile if it
+//! starts to). So the transform is reached through the functions here, of which [`multiply`] is
+//! the one to call when the degree is not known in advance.
+//!
+//! One consequence for the tests below: they compare against
+//! `test_support::schoolbook_product` rather than against `a * b`, because the operator is now one
+//! of the routes under test.
 
 use rand::{CryptoRng, RngCore};
 

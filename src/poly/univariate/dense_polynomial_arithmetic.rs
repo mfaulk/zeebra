@@ -2,7 +2,10 @@
 
 use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_rem_variants};
 use crate::{impl_sub_variants, poly::univariate::div_with_remainder::div_with_remainder};
-use crate::{poly::univariate::dense_polynomial::DensePolynomial, FiniteField, Polynomial};
+use crate::{
+    poly::univariate::{dense_polynomial::DensePolynomial, karatsuba::multiply_dense},
+    FiniteField, Polynomial,
+};
 use std::{cmp::max, ops};
 
 // Borrowed + Borrowed
@@ -73,17 +76,22 @@ impl<F: FiniteField> ops::Neg for DensePolynomial<F> {
 impl<F: FiniteField> ops::Mul<&DensePolynomial<F>> for &DensePolynomial<F> {
     type Output = DensePolynomial<F>;
 
+    /// Schoolbook below `karatsuba_base_case` and Karatsuba above it.
+    ///
+    /// The operator rather than only `fft::multiply`'s fallbacks, because the whole univariate
+    /// layer is built out of it: `pow_mod`'s two products per bit of the exponent, `lcm`'s `a * b`,
+    /// `from_zeros`, `Polynomial::pow` and the `compose` and `shift` built on it. #231 measured
+    /// `roots` — the binding univariate stage — 1.28x to 1.61x faster for this one line.
+    ///
+    /// Bit-identical to the schoolbook loop it replaces at every size, and below the base case it
+    /// *is* that loop, reached through [`multiply_dense`]: the recursion takes its schoolbook
+    /// branch. So this is not a different answer anywhere, and no caller has to opt in.
+    ///
+    /// Needs nothing of the field but a ring, which is why it can live on the operator where the
+    /// transform cannot — a domain needs `KnownOrder` and randomness, and the Gröbner core refuses
+    /// to require the first of a coefficient type.
     fn mul(self, rhs: &DensePolynomial<F>) -> Self::Output {
-        let prod_degree = self.degree() + rhs.degree();
-        let mut product = vec![F::zero(); (prod_degree + 1) as usize];
-        for (i, a) in self.coefficients.iter().enumerate() {
-            for (j, b) in rhs.coefficients.iter().enumerate() {
-                // ax^i * bx^j = abx^{i+j}
-                let degree = i + j;
-                product[degree] += *a * *b;
-            }
-        }
-        DensePolynomial::<F>::new(&product)
+        multiply_dense(self, rhs)
     }
 }
 
@@ -152,11 +160,72 @@ impl<F: FiniteField> ops::Mul<F> for DensePolynomial<F> {
 mod tests {
     use crate::poly::univariate::PolynomialParams;
     use crate::{
-        fields::{PrimeFieldElement64, Zp7},
+        fields::{Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64, Zp7},
         poly::univariate::dense_polynomial::DensePolynomial,
+        test_support::schoolbook_product,
         FiniteField, Polynomial,
     };
     use proptest::prelude::*;
+    use rand::{prelude::StdRng, SeedableRng};
+
+    /// Goldilocks, the 64-bit width in the field-coverage set.
+    type Goldilocks = crate::fields::Zp18446744069414584321;
+
+    /// `Mul` is bit-identical to the definition at every operand length from zero to past twice the
+    /// largest Karatsuba base case, over a 4-byte, an 8-byte and a 32-byte element.
+    ///
+    /// The acceptance criterion of #231: the operator now dispatches, so what has to be shown is
+    /// that it dispatches to the same answer and not merely to a faster route. Every length rather
+    /// than a sample, because the interesting boundary is the base case — 48 at 4 bytes, so the
+    /// range below covers it and the 16 and 4 of the other two widths — and sampling around a
+    /// boundary is how an off-by-one there survives.
+    #[test]
+    fn test_the_operator_agrees_with_the_definition_at_every_small_length() {
+        fn check<F: FiniteField>(label: &str, seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for len_a in 0..=100usize {
+                // A few lengths for the right operand rather than the full square: the recursion
+                // splits on the longer operand, so unequal lengths and both parities are what
+                // matter, and the full grid is already covered in `karatsuba`'s own tests.
+                for len_b in [0usize, 1, 2, 47, 48, 49, len_a] {
+                    let a = DensePolynomial::<F>::new(
+                        &(0..len_a).map(|_| F::random(&mut rng)).collect::<Vec<_>>(),
+                    );
+                    let b = DensePolynomial::<F>::new(
+                        &(0..len_b).map(|_| F::random(&mut rng)).collect::<Vec<_>>(),
+                    );
+                    let product = &a * &b;
+                    let expected = schoolbook_product(&a, &b);
+                    assert_eq!(product, expected, "{label}: lengths {len_a} and {len_b}");
+                    assert_eq!(
+                        product.degree(),
+                        expected.degree(),
+                        "{label}: degree at lengths {len_a} and {len_b}"
+                    );
+                }
+            }
+        }
+        check::<Mersenne31>("Mersenne-31", 1);
+        check::<KoalaBear>("KoalaBear", 2);
+        check::<Goldilocks>("Goldilocks", 3);
+        check::<Bn254Fr>("BN254 Fr", 4);
+    }
+
+    proptest! {
+        /// The same, at degrees past the base case where the recursion is several levels deep,
+        /// with both degrees drawn independently.
+        #[test]
+        fn proptest_the_operator_agrees_with_the_definition(
+            seed: u64,
+            degree_a in 0u64..400,
+            degree_b in 0u64..400,
+        ) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let a = DensePolynomial::<KoalaBear>::rand(degree_a, &mut rng);
+            let b = DensePolynomial::<KoalaBear>::rand(degree_b, &mut rng);
+            prop_assert_eq!(&a * &b, schoolbook_product(&a, &b));
+        }
+    }
 
     fn get_elements(values: Vec<u64>) -> Vec<PrimeFieldElement64<13>> {
         values

@@ -4,8 +4,8 @@
 //! user: [`multiply_karatsuba`] takes both operands' coefficients in ascending degree order and
 //! returns exactly `a.len() + b.len() - 1` of them, or an empty `Vec` when either input is empty.
 //! It does **not** trim high-order zeros — it cannot know the caller's canonical form — so a
-//! dispatcher reproduces the schoolbook `Mul`'s degree by handing the `Vec` to
-//! `DensePolynomial::new`, which trims. Nothing in the recursion constructs a `DensePolynomial`,
+//! dispatcher recovers the canonical degree by handing the `Vec` to `DensePolynomial::new` or
+//! `from_coefficients`, which trim. Nothing in the recursion constructs a `DensePolynomial`,
 //! and the whole recursion runs on two allocations: the output and one scratch arena carved by
 //! slicing.
 //!
@@ -14,8 +14,13 @@
 //! coefficients at 4 bytes an element, 16 at 8, and 4 above that. A 4-byte multiply is cheap and
 //! its schoolbook inner loop vectorizes, so Karatsuba's extra additions have to be amortized over
 //! a much larger leaf than they do over a 254-bit field. Below the base case the output is
-//! bit-identical to the schoolbook `Mul`'s because it *is* schoolbook. See
+//! bit-identical to the schoolbook product because it *is* schoolbook. See
 //! `docs/research/fast-univariate.md` §4.1 and `examples/karatsuba_crossover.rs`.
+//!
+//! Since #231 this is what `DensePolynomial`'s `Mul` runs, through [`multiply_dense`], so it is no
+//! longer reachable only from `fft::multiply`'s dispatcher. The comparand for its tests is
+//! `test_support::schoolbook_product` rather than the operator, which would otherwise be checking
+//! itself.
 
 use crate::{poly::univariate::UnivariatePolynomial, FiniteField, Polynomial};
 
@@ -56,7 +61,7 @@ pub(crate) fn multiply_karatsuba<F: FiniteField>(a: &[F], b: &[F]) -> Vec<F> {
 ///
 /// Schoolbook below [`karatsuba_base_case`] and Karatsuba above it. The selection is
 /// [`multiply_karatsuba`]'s own internal one, not a second test here, so the base case is stated in
-/// one place; below it the output is bit-identical to the schoolbook `Mul`'s because it *is*
+/// one place; below it the output is bit-identical to a schoolbook product because it *is*
 /// schoolbook.
 ///
 /// Why this exists beside `fft::multiply`: the transform needs a primitive `2^k`-th root of unity,
@@ -64,10 +69,11 @@ pub(crate) fn multiply_karatsuba<F: FiniteField>(a: &[F], b: &[F]) -> Vec<F> {
 /// available over every field — including Mersenne-31, whose two-adicity of 1 rules a domain out at
 /// every degree above two.
 ///
-/// **One allocation where the schoolbook `Mul` makes two.** `Mul` fills a `Vec` and then hands it
-/// to `DensePolynomial::new`, which copies; the kernel's `Vec` goes to `from_coefficients`, which
-/// truncates in place. So the dispatched path is not merely no worse than `Mul` below the base
-/// case — it is one `n`-element copy cheaper.
+/// **One allocation where the schoolbook loop this replaced made two.** That loop filled a `Vec`
+/// and handed it to `DensePolynomial::new`, which copies; the kernel's `Vec` goes to
+/// `from_coefficients`, which truncates in place. So the dispatched path is not merely no worse
+/// than the loop below the base case — it is one `n`-element copy cheaper, which is part of why
+/// #231 measured no regression on small products.
 ///
 /// Total, including a zero operand: `coefficients()` is never empty, so a zero polynomial's `[0]`
 /// multiplies to a run of zeros that `from_coefficients` trims back to the zero polynomial.
@@ -227,13 +233,10 @@ fn karatsuba_into<F: FiniteField>(
 /// **The shorter operand drives the outer loop**, so the inner one is as long as the inputs allow.
 /// That is not cosmetic: the iterator setup for `out[i..].iter_mut().zip(..)` is paid once per
 /// outer iteration, so a `512 x 2` product with the long operand outside pays it 512 times for two
-/// multiplies each. Measured over KoalaBear at the shape `DensePolynomial::from_zeros` produces —
-/// one linear factor folded at a time — this swap is **2.5x** at an accumulator of 128 and above,
-/// and it is what makes the smallest products no slower here than in an inline double loop.
-///
-/// Over BN254 `Fr` it does not move either way: a 254-bit multiply is ~19 ns against ~1 ns of
-/// setup, so there is nothing for the setup to be a fraction of. That contrast is the evidence
-/// that the cost was the loop shape and not the arithmetic.
+/// multiplies each. #231 measured that shape — the one `DensePolynomial::from_zeros` produces,
+/// folding one linear factor at a time — at **0.74x** over KoalaBear before this swap and 1.00x
+/// after. Over BN254 it did not move either way, because a 254-bit multiply is ~19 ns and the
+/// setup is ~1 ns, which is the same reason the regression was invisible on the wide field.
 ///
 /// The product is symmetric, so which operand is outer is free to choose; `out` must be
 /// `a.len() + b.len() - 1` long either way.
