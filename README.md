@@ -2092,6 +2092,40 @@ published witnesses decide the ambiguity — one reading reproduces 5 of 5 and t
 the instance is reconstructed rather than guessed. That is the argument the document makes for
 preferring candidates that publish a witness.
 
+#### Anemoi, the first candidate actually imported
+
+`grobner::research::anemoi` is the permutation half of candidate 1: Anemoi at `ℓ = 1` over
+`p = 2^64 − 353`, `α = 3`, transcribed from the designers' reference implementation (MIT,
+`3e86ff0c`) and the CRYPTO 2023 paper. The round constants are **derived, not tabulated** — they
+come out of the first two hundred digits of π — and the modulus is odd, so
+`Zp18446744073709551263` holds it in Montgomery form with no new field arithmetic.
+
+```rust
+use zeebra::{
+    fields::Zp18446744073709551263,
+    grobner::research::{Anemoi, AnemoiParameters},
+    FiniteField,
+};
+
+let anemoi = Anemoi::<Zp18446744073709551263>::new(AnemoiParameters::six_worlds(4)).unwrap();
+assert!(anemoi.is_cico_solution(Zp18446744073709551263::new(8251407552160637060)));
+```
+
+The one choice the paper leaves open is `g`, "a generator of the multiplicative subgroup"; the
+reference takes Sage's smallest primitive root, which is `g = 5` here. That is a **convention rather
+than a specification**, so `smallest_primitive_root` reproduces the convention and
+`Anemoi::derived_digest` pins what it produced — a parameter checksum covers `p`, `α`, `ℓ` and `N`
+and would not notice a changed generator moving every constant.
+
+Verification does not rely on the transcription being read correctly. The Six Worlds logs
+(<https://github.com/IAIK/six-worlds-anemoi>, MIT `fa056e6f`) print complete lexicographic Gröbner
+bases, and four CICO witnesses were extracted from them by rooting the lex univariate and reading
+each root back into the permutation's own input coordinates. The witness **count** matches the logs'
+own `nsols` line at every rung — 2, 1, 0 and 1 at `N = 1, 2, 3, 4` — including the rung with no
+solution. [`docs/research/anemoi.md`](docs/research/anemoi.md) records every source URL, the
+ideal-membership check that needs no roots, and one trap: the logs' variable labels are positionally
+permuted relative to the model's own names, and the two orders coincide at `N = 1`.
+
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —
 on a 14-variable system with 16384 solutions that is 1.9 ms against 1.6 s, a factor of **830**.
