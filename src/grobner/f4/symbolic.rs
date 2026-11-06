@@ -380,6 +380,94 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         self.order
     }
 
+    /// Recompute every derived field and compare it to what is stored.
+    ///
+    /// The invariants this type's constructors establish are stated in prose on [`MonicElement`]
+    /// and on [`MonicBasis::new`], and until this existed nothing checked that they still held
+    /// partway through a computation. A wrong cached leading monomial does not fail where it is
+    /// written: it selects a different reducer, which produces a different row and a different
+    /// matrix, so it surfaces as a wrong answer hundreds of batches later, if at all.
+    ///
+    /// Modelled on Singular's `kTest` family (`kernel/GBEngine/kutil.cc`, read in
+    /// `docs/research/singular-engine-notes.md` §6): recompute rather than trust, and name the
+    /// field and the index on failure, because "assertion failed" at a line number in a
+    /// four-hundred-batch run is most of the problem.
+    ///
+    /// # What is deliberately not checked
+    ///
+    /// That no leading monomial divides another's, and in particular that leads are distinct. Both
+    /// are **false** for a basis under construction, and the counterexample was measured rather
+    /// than assumed: asserting it fires on `certify`'s own fixtures, where element 0's lead `x_0^2`
+    /// is divisible by element 4's lead `x_0` — an input generator divided by a basis element F4
+    /// discovered *later*. Nothing removes such an element until the final minimization, and
+    /// `docs/research/singular-engine-notes.md` §0.3 measures two of them surviving to the end on
+    /// every katsura instance under a graded order, and 200 of 206 under lex. Asserting it here
+    /// would fire on correct computations.
+    ///
+    /// Debug-only, and the call site in [`super::f4_with_options`] is gated the same way, so this
+    /// does not exist in a release build. `cargo test --profile ci-release` therefore does **not**
+    /// run it — `ci-release` inherits `release`, where `debug-assertions` is off. The default
+    /// `cargo test` job does.
+    ///
+    /// # Panics
+    /// If any stored field disagrees with its recomputation.
+    #[cfg(debug_assertions)]
+    pub(crate) fn check(&self) {
+        for (index, element) in self.elements.iter().enumerate() {
+            assert!(
+                !element.terms.is_empty(),
+                "MonicBasis element {index}: terms is empty, so it has no leading monomial"
+            );
+
+            // Both halves are checked: equal-to-terms[0] alone would pass on a list sorted the
+            // wrong way, and largest-term alone would pass on a list that is merely unsorted.
+            assert_eq!(
+                element.leading_monomial, element.terms[0].0,
+                "MonicBasis element {index}: leading_monomial {} disagrees with terms[0] {}",
+                element.leading_monomial, element.terms[0].0
+            );
+            let largest = element
+                .terms
+                .iter()
+                .map(|(monomial, _)| *monomial)
+                .reduce(|a, b| if self.order.cmp(&a, &b).is_ge() { a } else { b })
+                .expect("the terms are not empty");
+            assert_eq!(
+                element.leading_monomial,
+                largest,
+                "MonicBasis element {index}: leading_monomial {} is not the largest term under \
+                 {}, which is {}",
+                element.leading_monomial,
+                self.order.name(),
+                largest
+            );
+
+            assert!(
+                element.terms[0].1.is_one(),
+                "MonicBasis element {index}: leading coefficient is not one, so the element is \
+                 not monic and a pair multiple is not a bare shift of its terms"
+            );
+
+            for (position, (monomial, coefficient)) in element.terms.iter().enumerate() {
+                assert!(
+                    !coefficient.is_zero(),
+                    "MonicBasis element {index}: terms[{position}] has a zero coefficient at \
+                     {monomial}"
+                );
+                if position > 0 {
+                    let previous = element.terms[position - 1].0;
+                    assert!(
+                        self.order.cmp(&previous, monomial).is_gt(),
+                        "MonicBasis element {index}: terms[{}] {previous} does not strictly \
+                         precede terms[{position}] {monomial} under {}",
+                        position - 1,
+                        self.order.name()
+                    );
+                }
+            }
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.elements.len()
     }
@@ -787,12 +875,82 @@ mod tests {
         BuildMonomialHasher, CacheMode, MonicBasis, MonomialSet, Preprocessed, PreprocessedRow,
         ReducerCache, RowBudgetExceeded, RowKind, SymbolicCounts,
     };
+
+    /// Three polynomials with tails and distinct leads, for the corruption tests below.
+    #[cfg(debug_assertions)]
+    fn fixture() -> Vec<MultivariatePolynomial<3, F>> {
+        system(&["3*x^2 + y + 3", "x*y + 5*z", "2*y^2 + 11"])
+    }
+
+    /// The checker accepts a basis its own constructor built.
+    ///
+    /// The control for the corruption tests below: without it they would pass against a checker
+    /// that rejected everything.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_the_checker_accepts_a_well_formed_basis() {
+        let basis = MonicBasis::new(&fixture(), MonomialOrder::GradedReverseLexicographic);
+        basis.check();
+    }
+
+    /// A leading monomial that disagrees with the term list is caught, and named.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "leading_monomial")]
+    fn test_a_stale_leading_monomial_is_caught() {
+        let mut basis = MonicBasis::new(&fixture(), MonomialOrder::GradedReverseLexicographic);
+        basis.elements[1].leading_monomial = Monomial::<3>::new(&[9, 0, 0]);
+        basis.check();
+    }
+
+    /// Two tail terms out of order are caught, with the lead left correct.
+    ///
+    /// Swapping inside the tail is the case the lead checks cannot see: `terms[0]` is still the
+    /// largest and still equals `leading_monomial`, so only the pairwise descent catches it. A
+    /// coarser corruption — reversing the whole list — is caught one assertion earlier, by the
+    /// largest-term check, and so would not exercise this one.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "does not strictly precede")]
+    fn test_terms_out_of_order_are_caught() {
+        let mut basis = MonicBasis::new(&fixture(), MonomialOrder::GradedReverseLexicographic);
+        let element = &mut basis.elements[0];
+        assert!(
+            element.terms.len() > 2,
+            "the fixture needs two tail terms to swap"
+        );
+        element.terms.swap(1, 2);
+        basis.check();
+    }
+
+    /// An element that is not monic is caught.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "not monic")]
+    fn test_a_non_monic_element_is_caught() {
+        let mut basis = MonicBasis::new(&fixture(), MonomialOrder::GradedReverseLexicographic);
+        basis.elements[0].terms[0].1 = F::new(7);
+        basis.check();
+    }
+
+    /// A surviving zero coefficient is caught.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "zero coefficient")]
+    fn test_a_zero_coefficient_is_caught() {
+        let mut basis = MonicBasis::new(&fixture(), MonomialOrder::GradedReverseLexicographic);
+        let last = basis.elements[0].terms.len() - 1;
+        assert!(last > 0, "the fixture needs a tail term to zero");
+        basis.elements[0].terms[last].1 = <F as Zero>::ZERO;
+        basis.check();
+    }
+
     use crate::{
         fields::Zp13,
         grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
         poly::MonomialOrder,
         util::contains_duplicates,
-        FiniteField, {Monomial, MultivariatePolynomial, One},
+        FiniteField, {Monomial, MultivariatePolynomial, One, Zero},
     };
     type F = Zp13;
     const VARS: [&str; 3] = ["x", "y", "z"];

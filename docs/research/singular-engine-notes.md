@@ -47,7 +47,7 @@ fraction of that. The large numbers below are all *off* the solve path.
 | 3 | `clearS` | redundant basis elements | **2 of 43 in grevlex; 200 of 206 in lex** (§0.3, new) | Worthless in grevlex, large in lex. Zeebra computes in grevlex. |
 | 1 | exact Hilbert series | the semiregular prediction's 39% and **27x** errors | removes the slack parameter; but costs ~a full extra GB | **Probably a net loss as stated** — see §0.4. |
 | 4 | term-count selection axis | matrix size | best schedule ever measured here: **7%–14.5%** structural, runtime in noise, under the 20% threshold | Cheap to try, low prior. |
-| 6 | whole-state `kTest` | defect-detection latency | no runtime effect at all | Worth having, not a speedup. |
+| 6 | whole-state `kTest` | defect-detection latency | no runtime effect at all | Worth having, not a speedup. **Done** — #252. |
 | 2 | short exponent vectors | divisor lookup | **≈0** — "*eliminating divisor lookup entirely would save about 1% of the symbolic stage's share of 1.4%*" | Already rejected twice. §2.3. |
 
 ### 0.3 New measurement: redundant basis elements, by order
@@ -294,6 +294,13 @@ route, so the machinery and the habit are both there.
 
 ## 6. One whole-state checker, not scattered assertions
 
+> **Implemented, #252.** `MonicBasis::check` and `PairQueue::check`, both `cfg(debug_assertions)`,
+> called once per batch from F4's main loop. Eleven tests, each corrupting one field and asserting
+> the checker names it, plus a control per checker so they cannot pass against a checker that
+> rejects everything. Cost at suite scale: 41.08 s to 41.41 s on the debug library suite, inside
+> noise. One invariant this section proposed turned out to be **false** and is documented as such
+> rather than asserted — see the end of the section.
+
 Singular carries `kTest`, `kTest_TS`, `kTest_T`, `kTest_L`, `kTest_S` (`kernel/GBEngine/kutil.h:636`
 ff., bodies at `kutil.cc:789` and `:1004`), compiled to `TRUE` without `KDEBUG`, and calls them once
 per main-loop iteration. What they check is the discipline worth copying: **every cached or derived
@@ -358,3 +365,19 @@ own `Tst/SBA` suite), which makes it a fine oracle for anyone implementing one �
 implementation is not an argument about headroom. `docs/research/signature-based.md` measured that
 headroom at ~2x on this corpus and, as of its 2026-11-06 revision, rests the won't-do on three
 independent legs. Nothing read here touches any of them.
+
+---
+
+## 9. What §6 got wrong, found by implementing it
+
+§6 listed "no duplicate leads" among the invariants a whole-state checker should assert. It is
+**false**, and so is the stronger property that no leading monomial divides another's. Asserting
+either fires on `certify`'s own fixtures, where element 0's lead `x_0^2` is divisible by element 4's
+lead `x_0` — an input generator divided by a basis element F4 discovered *later*.
+
+That is the same fact §0.3 measured from the other direction, and it is worth stating as an
+invariant of the engine rather than an accident: **F4's basis is not minimal at any point before the
+final interreduction**, because nothing removes an element once a later one subsumes it. §3 is the
+mechanism that would, and §0.3 is the measurement saying it is not worth adding for a grevlex
+pipeline. The checker documents the non-invariant in place, so the next reader does not re-derive it
+by watching a correct computation fail an assertion.
