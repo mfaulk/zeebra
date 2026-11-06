@@ -594,6 +594,14 @@ Three further readings line up with that and not with the ALU account:
 - **The whole-computation gains are largest on the smallest instances** — cyclic-5 and katsura-5 at
   11% to 15% of the elimination stage, katsura-7 at 3% — which is the same ordering.
 
+One reading looks like a counterexample and is not. §9.3's default configuration gains **28.1%** of
+its elimination stage on katsura-7 grevlex, far more than the 5.2% §9.1 measures for `Adaptive` on
+the same instance. The two are not the same work: the default takes the reducer rows as established
+pivots, so its loop performs a lookup for every column it visits while doing arithmetic for only
+the few that are not already pivots. The issue put the share the lookup takes at
+`lookup / (support * cost-per-entry)`, and the structured path shrinks the denominator without
+shrinking the numerator. That is the ratio behaving as predicted, not a second mechanism.
+
 Two instance sizes is two points, so the proportionality is an inference rather than a fit. What it
 does rule out is the reading that the lookup's cost was the hash: the hash is a constant and the
 measurement is not.
