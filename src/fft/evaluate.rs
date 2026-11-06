@@ -188,7 +188,7 @@ mod tests {
     ///
     /// Over BN254's scalar field, where there was no transform at all until `root_of_unity`
     /// stopped being `unimplemented!()`. Direct Horner evaluation shares no code with the
-    /// recursive split, so this pins the wide-field NTT against an independent computation
+    /// transform kernel, so this pins the wide-field NTT against an independent computation
     /// rather than against itself.
     #[test]
     fn test_evaluate_agrees_with_direct_evaluation_over_bn254_fr() {
