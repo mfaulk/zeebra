@@ -6,6 +6,7 @@
 //! is why [`SliceOutcome`] has three variants where a solver has `Option`, and why only one of
 //! them says anything about the system you started with.
 
+pub mod anemoi;
 pub mod challenge;
 pub mod linear;
 pub mod manifest;
@@ -19,6 +20,7 @@ pub mod slices;
 pub mod specialization;
 pub mod univariate_cico;
 
+pub use anemoi::{smallest_primitive_root, Anemoi, AnemoiError, AnemoiParameters, ANEMOI_64_PRIME};
 pub use challenge::{
     challenge, dispatch_cico, registry, BenchmarkClass, ChallengeError, ChallengeManifest,
     ChallengeParameters, ChallengeProgram, CicoTarget, CicoVisitor, DisclosedMethod,

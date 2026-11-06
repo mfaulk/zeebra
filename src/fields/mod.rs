@@ -94,6 +94,9 @@ pub type Zp18446744069414584321 = PrimeFieldElement64<18446744069414584321>;
 /// 2^64 - 59 = 18446744073709551557 is the largest 64-bit prime.
 pub type Zp18446744073709551557 = PrimeFieldElement64<18446744073709551557>;
 
+/// 2^64 - 353 = 18446744073709551263, the 64-bit prime the Anemoi reference data is over.
+pub type Zp18446744073709551263 = PrimeFieldElement64<18446744073709551263>;
+
 // === 128-bit prime fields ===
 
 /// Z mod 221360928884514619393, Proth prime 3*2^66 + 1
