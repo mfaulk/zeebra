@@ -11,7 +11,10 @@
 //! Three arms per size, all reached through the shipped public API so that what is measured is the
 //! dispatched path and not a kernel in isolation:
 //!
-//! 1. **schoolbook** — `&a * &b`, `DensePolynomial`'s `Mul`
+//! 1. **schoolbook** — `karatsuba_unstable(.., usize::MAX)`, a base case the recursion never
+//!    passes, so the plain double loop. **Not `&a * &b`**: since #231 the operator dispatches to
+//!    `multiply_dense`, so using it here would make arms 1 and 2 the same code and the
+//!    `school/dense` column would read 1.00x throughout — which it did, until this was fixed.
 //! 2. **dense** — `multiply_above(a, b, u32::MAX, rng)`, which can never reach the transform, so
 //!    it is exactly `multiply_dense`: schoolbook below `karatsuba_base_case` and Karatsuba above
 //! 3. **ntt** — `multiply_above(a, b, 0, rng)`, which always attempts the transform
@@ -35,8 +38,8 @@ use std::time::{Duration, Instant};
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::{Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64},
-    karatsuba_base_case_unstable, multiply_above, FiniteField, KnownOrder, Polynomial,
-    UnivariatePolynomial,
+    karatsuba_base_case_unstable, karatsuba_unstable, multiply_above, FiniteField, KnownOrder,
+    Polynomial, UnivariatePolynomial,
 };
 
 /// Goldilocks, `2^64 - 2^32 + 1`.
@@ -89,6 +92,22 @@ struct Row {
     transform_available: bool,
 }
 
+/// The plain double loop, reached through the base case the recursion never passes.
+///
+/// `&a * &b` cannot serve: since #231 the operator *is* arm 2. Keeping a real schoolbook arm is
+/// what makes the `school/dense` column mean anything, and it is the quadratic baseline
+/// `docs/research/fast-univariate.md` quotes every crossover against.
+fn schoolbook<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    UnivariatePolynomial::new(&karatsuba_unstable(
+        a.coefficients(),
+        b.coefficients(),
+        usize::MAX,
+    ))
+}
+
 fn polynomial<F: FiniteField>(len: usize, seed: u64) -> UnivariatePolynomial<F> {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut coefficients: Vec<F> = (0..len).map(|_| F::random(&mut rng)).collect();
@@ -116,7 +135,7 @@ fn measure<F: KnownOrder>(len: usize, with_schoolbook: bool, transform_available
     assert_eq!(dense, ntt, "dense and ntt disagree at length {len}");
     if with_schoolbook {
         assert_eq!(
-            &a * &b,
+            schoolbook(&a, &b),
             dense,
             "schoolbook and dense disagree at length {len}"
         );
@@ -135,7 +154,7 @@ fn measure<F: KnownOrder>(len: usize, with_schoolbook: bool, transform_available
             }
             let start = Instant::now();
             match index {
-                0 => drop(&a * &b),
+                0 => drop(schoolbook(&a, &b)),
                 1 => drop(multiply_above(&a, &b, u32::MAX, &mut rng)),
                 _ => drop(multiply_above(&a, &b, 0, &mut rng)),
             }
@@ -289,6 +308,7 @@ fn main() {
     let wanted = |field: &str| named.is_empty() || named.contains(&"all") || named.contains(&field);
 
     println!("# Multiplication dispatch: schoolbook, Karatsuba, transform (#185)");
+    println!("\nISA: {}", zeebra::util::isa_floor());
     println!(
         "\nOperand lengths `2^{FIRST_LOG}..=2^{max_log}`; schoolbook skipped above length {}. \
          Minimum of up to {MAX_REPETITIONS} interleaved repetitions.",
