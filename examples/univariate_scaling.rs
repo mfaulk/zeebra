@@ -31,7 +31,12 @@
 //! cargo run --release --example univariate_scaling -- list
 //! cargo run --release --example univariate_scaling -- bn254
 //! cargo run --release --example univariate_scaling -- all budget=0.5
+//! cargo run --release --example univariate_scaling -- points=250,500,1000,2000
 //! ```
+//!
+//! `points=` replaces the sweep with the **lagrange** stage alone at exactly those point counts,
+//! for comparison against `docs/research/resultant-elimination.md` §4.1, whose table is not in
+//! powers of two.
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -42,7 +47,7 @@ use std::{
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     evaluate,
-    fields::{two_adic::two_adic_decomposition, Bn254Fr, PrimeFieldElement64},
+    fields::{two_adic::two_adic_decomposition, Bn254Fr, KoalaBear, PrimeFieldElement64},
     integers::highest_set_bit,
     interpolate, lagrange_interpolate, roots, FFTDomain, FiniteField, KnownOrder, Polynomial,
     UnivariatePolynomial,
@@ -472,15 +477,75 @@ fn measure_field<F: KnownOrder>(name: &str, budget: Duration, seed: u64) -> Vec<
     curves
 }
 
+/// Time `lagrange_interpolate` at exact point counts rather than at powers of two.
+///
+/// For comparison against a table that is not in powers of two:
+/// `docs/research/resultant-elimination.md` §4.1 measures 250 / 500 / 1 000 / 2 000 points, and
+/// the four-round resultant row it is about needs 13 123.
+fn measure_lagrange_at_counts<F: FiniteField>(name: &str, counts: &[usize], seed: u64) {
+    println!("\n\n## {} — lagrange at exact point counts", name);
+    println!("- an element is {} bytes", std::mem::size_of::<F>());
+    println!();
+    println!(
+        "| {:>8} | {:>10} | {:>12} | {:>13} | {:>9} | {:>24} |",
+        "points", "seconds", "ns/point", "peak bytes", "bytes/pt", "factor against previous"
+    );
+    println!("{}", rule(&[10, 12, 14, 15, 11, 26]));
+
+    let mut previous: Option<(usize, f64)> = None;
+    for &n in counts {
+        let mut rng = StdRng::seed_from_u64(seed ^ 0xa176);
+        // `x_i = i`, as in the sweep above, so the abscissae are distinct by construction.
+        let points: Vec<(F, F)> = (0..n)
+            .map(|i| (<F as FiniteField>::new(i as u64), F::random(&mut rng)))
+            .collect();
+        let (p, elapsed, bytes) = measure(|| lagrange_interpolate(points.clone()));
+        // Four of the n constraints, spot-checked, as in the sweep.
+        for index in [0, n / 3, n / 2, n - 1] {
+            let (x, y) = points[index];
+            assert_eq!(p.eval(&x), y, "the interpolant misses point {index}");
+        }
+        let seconds = elapsed.as_secs_f64();
+        let factor = match previous {
+            Some((previous_n, previous_seconds)) if previous_seconds > 0.0 => format!(
+                "{:.2}x for {:.2}x points",
+                seconds / previous_seconds,
+                n as f64 / previous_n as f64
+            ),
+            _ => "-".to_string(),
+        };
+        println!(
+            "| {:>8} | {:>10.4} | {:>12.1} | {:>13} | {:>9.1} | {:>24} |",
+            n,
+            seconds,
+            seconds * 1e9 / n as f64,
+            bytes,
+            bytes as f64 / n as f64,
+            factor
+        );
+        previous = Some((n, seconds));
+    }
+}
+
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
 
     let mut selector = "all".to_string();
     let mut budget = Duration::from_secs_f64(2.0);
+    let mut counts: Vec<usize> = Vec::new();
     for argument in &arguments {
         if let Some(seconds) = argument.strip_prefix("budget=") {
             budget =
                 Duration::from_secs_f64(seconds.parse().expect("budget=SECONDS takes a number"));
+        } else if let Some(list) = argument.strip_prefix("points=") {
+            counts = list
+                .split(',')
+                .map(|n| {
+                    n.trim()
+                        .parse()
+                        .expect("points= takes a comma-separated list")
+                })
+                .collect();
         } else {
             selector = argument.clone();
         }
@@ -489,6 +554,54 @@ fn main() {
     if selector == "list" {
         println!("fields: all, mersenne31, koalabear, goldilocks, bn254");
         println!("options: budget=SECONDS (default 2.0), the wall clock allowed per measurement");
+        println!(
+            "         points=N,N,... measures only the lagrange stage, at exactly those point \
+             counts"
+        );
+        return;
+    }
+
+    // `points=` replaces the doubling sweep rather than adding to it: the point of those counts is
+    // to line up with a table that is not in powers of two, and the sweep's budget would truncate
+    // the list.
+    if !counts.is_empty() {
+        println!("# lagrange cost at exact point counts");
+        println!();
+        println!(
+            "`lagrange_interpolate` over n points at arbitrary abscissae. Memory is peak live heap \
+             bytes from a counting allocator, attributed to the measured call alone."
+        );
+        let run_all = selector == "all";
+        if run_all || selector == "mersenne31" {
+            measure_lagrange_at_counts::<Mersenne31In64>("Mersenne-31, 2^31 - 1", &counts, 0x4d31);
+        }
+        if run_all || selector == "koalabear" {
+            measure_lagrange_at_counts::<KoalaBearIn64>(
+                "KoalaBear, 2^31 - 2^24 + 1, in a u64",
+                &counts,
+                0x4b0a,
+            );
+            // The u32-backed KoalaBear is the field the resultant spike runs over, so this is the
+            // row that is directly comparable with `resultant-elimination.md` §4.1.
+            measure_lagrange_at_counts::<KoalaBear>(
+                "KoalaBear, 2^31 - 2^24 + 1, in a u32",
+                &counts,
+                0x4b0a,
+            );
+        }
+        if run_all || selector == "goldilocks" {
+            measure_lagrange_at_counts::<Goldilocks>(
+                "Goldilocks, 2^64 - 2^32 + 1",
+                &counts,
+                0x601d,
+            );
+        }
+        if run_all || selector == "bn254" {
+            measure_lagrange_at_counts::<Bn254Fr>("BN254 Fr, 254 bits", &counts, 0xb254);
+        }
+        if let Some(peak) = zeebra::util::peak_resident_bytes() {
+            println!("\n\nprocess peak resident bytes: {}", peak);
+        }
         return;
     }
 

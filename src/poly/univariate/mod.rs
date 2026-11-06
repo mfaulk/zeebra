@@ -26,6 +26,12 @@ pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
 pub use gcd::gcd;
 pub use lagrange_interpolation::interpolate as lagrange_interpolate;
+// The cubic textbook form, for differential testing against the quadratic one. Not public: it was
+// not public before, and it is strictly slower. Re-exported here, unused for now, so that #162's
+// subproduct tree can diff against it from its own module rather than reintroducing it.
+#[cfg(test)]
+#[allow(unused_imports)]
+pub(crate) use lagrange_interpolation::interpolate_reference as lagrange_interpolate_reference;
 pub use polynomial_trait::Polynomial;
 pub use pow_mod::pow_mod;
 pub use power_permutation::{

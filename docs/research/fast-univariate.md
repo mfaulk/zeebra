@@ -10,10 +10,20 @@ Every number below comes from
 
 ```text
 cargo run --release --example univariate_scaling
+cargo run --release --example univariate_scaling -- koalabear points=250,500,1000,2000,4000,8192,13123
 ```
 
 on the development workstation (64 cores, 300 GB RAM; the measurements are single-threaded). The
-sweeps shown used `budget=1.0`, one second of wall clock per measurement.
+sweeps shown used `budget=1.0`, one second of wall clock per measurement. The release profile is
+the one in `Cargo.toml` — `lto = "fat"`, `codegen-units = 1` — with `-C target-cpu=x86-64-v3` from
+`.cargo/config.toml`. Figures added by #162 stage 1 were taken on the same workstation, pinned to
+cores 0–7 with `taskset` per `tools/scoreboard.sh`, with the before and after binaries built from
+one tree and run interleaved.
+
+**Figures marked superseded are kept rather than overwritten.** Where a later issue re-measures a
+stage, the earlier number stays with a pointer to the newer one, because the rest of the table it
+sits in was taken in the same run. §3's `lagrange` row, §3.1, §3.2 and §5 all carry such a marker,
+all from #162 stage 1.
 
 ## 1. The blocker, cleared
 
@@ -118,8 +128,13 @@ source.
 | div | 1.63 – 2.12 → **2** | in-place long division, after §2 |
 | ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive |
 | intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed |
-| lagrange | 2.68 – 2.98 → **3** | `lagrange_interpolate` at arbitrary abscissae |
+| lagrange | 2.68 – 2.98 → **3** | arbitrary abscissae — **superseded, see §4.3** |
 | roots | 1.64 – 2.01 → **2** | `roots`, dominated by `x^q mod f` |
+
+**The `lagrange` row is superseded.** #162 stage 1 rewrote `lagrange_interpolate` around one
+numerator product and synthetic division; the exponent is now **1.86 – 2.12 → 2** and the figure
+above is the pre-#162 measurement, kept because every other row in this table was taken in the same
+run. §4.3 has the new curves.
 
 ### 3.1 Largest size reached in one second per measurement
 
@@ -132,6 +147,16 @@ source.
 | lagrange | 1 024 | 1 024 | 1 024 | 512 |
 | roots | 4 096 | 4 096 | 2 048 | **256** |
 
+**The `lagrange` row is superseded by #162 stage 1**, re-measured in the same way and on the same
+workstation. The figures above are the pre-#162 ones; they are kept rather than overwritten because
+the rest of the table was taken in the same run:
+
+| stage | Mersenne-31 | KoalaBear | Goldilocks | BN254 `Fr` |
+|---|---|---|---|---|
+| lagrange, before #162 | 1 024 | 1 024 | 1 024 | 512 |
+| lagrange, after #162 | **16 384** | **16 384** | **16 384** | **4 096** |
+| factor | 16x | 16x | 16x | 8x |
+
 Absolute cost at the largest size reached, and the peak bytes there:
 
 | field | stage | size | seconds | ns/element | peak bytes |
@@ -141,12 +166,14 @@ Absolute cost at the largest size reached, and the peak bytes there:
 | KoalaBear | ntt | 2^23 | 1.94 | **232** | 469 762 016 |
 | KoalaBear | intt | 2^22 | 2.03 | 485 | 301 989 856 |
 | KoalaBear | lagrange | 2^10 | 2.74 | 2 677 318 | 65 544 |
+| KoalaBear | lagrange, after #162 | 2^14 | 2.39 | 146 044 | 655 368 |
 | KoalaBear | roots | 2^12 | 1.72 | 418 695 | 393 176 |
 | BN254 `Fr` | mul | 2^13 | 1.59 | 193 550 | 1 048 512 |
 | BN254 `Fr` | div | 2^13 | 1.64 | 199 615 | 1 572 800 |
 | BN254 `Fr` | ntt | 2^21 | 2.16 | **1 032** | 469 761 920 |
 | BN254 `Fr` | intt | 2^18 | 1.89 | 7 209 | 75 497 344 |
 | BN254 `Fr` | lagrange | 2^9 | 3.16 | 6 167 733 | 131 104 |
+| BN254 `Fr` | lagrange, after #162 | 2^12 | 1.34 | 327 072 | 655 392 |
 | BN254 `Fr` | roots | 2^8 | 1.04 | 4 074 934 | 98 144 |
 
 The NTT is the stage in good shape: 232 ns per element over a 31-bit field at size 2^23, 1 032 ns
@@ -180,6 +207,13 @@ constant:
 | intt | `9 n B` | 72 n | 288 n |
 | lagrange | `8 n B` | 64 n | 256 n |
 | roots | `12 n B` | 96 n | 384 n |
+
+The `lagrange` row is **superseded by #162 stage 1 at `5 n B`** — 40 n over a 64-bit field and
+160 n over BN254 — and the constant is still exactly integral. It falls rather than rises because
+the cubic form held a growing numerator polynomial and its quotient per basis polynomial, where the
+quadratic form holds the one numerator product `M` of degree n, the n denominators, the result, and
+a copy of the input points. Memory was not the constraint before and is not now; the row is updated
+only so that the constant is not quoted stale.
 
 `B = size_of::<F>()`, which is **8 bytes for a 64-bit field and 32 for a 254-bit one — 4x**. That
 is deliberately not the **2.5x** `MILESTONE-LARGE-PRIME-FIELDS.md` §5.2 records for the sparse
@@ -221,23 +255,94 @@ baby-step/giant-step structure, and no modular composition of any kind. Brent–
 BN254 is 34 GB against the 0.4 GB a multiplication at that degree needs. The issue's note that
 composition's memory profile is worse than multiplication's is borne out by that arithmetic.
 
-### 4.3 Multipoint evaluation and interpolation: present but cubic
+### 4.3 Multipoint evaluation and interpolation: quadratic, no longer cubic
 
 Two things exist and neither is quasi-linear:
 
 - `fft::evaluate` / `fft::interpolate` are `O(n log n)` but only over a **geometric power-of-two
   domain** `1, w, w^2, ...`. They cannot evaluate at an arbitrary point set, which is what an
   evaluation–interpolation resultant needs.
-- `lagrange_interpolate` handles arbitrary abscissae and is **cubic**, measured at 2.97. It builds
-  each of the n Lagrange basis polynomials by multiplying up `n - 1` linear factors, which is
-  `O(n^2)` per basis polynomial.
+- `lagrange_interpolate` handles arbitrary abscissae and is **quadratic**, measured at 1.86 – 2.12
+  across the four fields. It was cubic at 2.97 when this section was first written; #162 stage 1
+  changed that and §4.3.1 is the measurement.
 
-So arbitrary-point interpolation is the **first stage to stop** on all three narrow fields, at
-n = 1 024, and the second on BN254 at n = 512. There is no subproduct tree: no routine builds
-`prod (x - x_i)` as a balanced binary tree, no simultaneous remaindering down such a tree, and no
-fast transposed form for interpolation. That machinery — a subproduct tree plus fast division by
-Newton iteration — is what D1's evaluation–interpolation route would need, and it does not exist in
-any partial form.
+There is still **no subproduct tree**: no routine builds `prod (x - x_i)` as a balanced binary
+tree, no simultaneous remaindering down such a tree, and no fast transposed form for interpolation.
+That machinery — a subproduct tree plus fast division by Newton iteration — is what would make this
+`O(n log^2 n)`, it is what D1's evaluation–interpolation route wants for the degrees §5 is about,
+and it does not exist in any partial form. #162 remains open for it. Nor is there multipoint
+*evaluation* at arbitrary points in any form better than `n` separate Horner passes.
+
+#### 4.3.1 What #162 stage 1 changed, measured
+
+The cubic form built each of the n Lagrange basis polynomials by multiplying up `n - 1` linear
+factors against a product that grows to degree `n - 1` — `O(n^2)` apiece, `O(n^3)` for the n of
+them. The quadratic form builds `M(x) = prod_i (x - x_i)` **once** and recovers each basis
+polynomial as `M(x) / (x - x_j)` by synthetic division by the linear factor, which is `O(n)` each.
+The denominator is `M'(x_j)`, taken as the equivalent product `prod_{k != j} (x_j - x_k)` so that
+all n of them are in hand before the divisions and can go through `batch_invert` — one field
+inversion rather than n, which is worth most over BN254, where the ratio of inversion to
+multiplication is largest.
+
+Same command, `budget=1.0`, the two binaries built from the same tree and interleaved:
+
+| field | before | after | exp. before | exp. after | bytes before | bytes after |
+|---|---|---|---|---|---|---|
+| Mersenne-31 | 2.67 at 1 024 | 2.38 at 16 384 | 2.96 | 1.90 | 65 544 | 655 368 |
+| KoalaBear | 2.54 at 1 024 | 2.39 at 16 384 | 2.89 | 2.00 | 65 544 | 655 368 |
+| Goldilocks | 2.71 at 1 024 | 2.75 at 16 384 | 2.93 | 2.12 | 65 544 | 655 368 |
+| BN254 `Fr` | 2.80 at 512 | 1.34 at 4 096 | 3.03 | 2.00 | 131 104 | 655 392 |
+
+The exponent column is the last row's, `log2(t_i / t_{i-1})` at a doubling size, and the peak-bytes
+columns are at each side's own largest n — a 16x larger n at `5 n B` against `8 n B`, so ten times
+the bytes for sixteen times the degree. At **matched** n the memory falls: `8 n B` to `5 n B`,
+§3.2.
+
+The exponent is the figure that matters, not the speedup: a measured 2.97 moving to a measured
+2.00 is what distinguishes this from a constant-factor win that would wash out at larger n. At
+n = 1 024 over KoalaBear the speedup is **270x** (2.541 s to 0.0094 s) and it grows with n, which
+is what an exponent that moved by one means.
+
+Two things pin correctness. Duplicate abscissae were previously rejected only incidentally, by an
+`assert_eq!(remainder, zero)` after dividing by the scalar denominator; the quadratic form divides
+by the *product* of the differences and `batch_invert` leaves a zero alone, so the check is now an
+explicit pass over the abscissae before any arithmetic, and two tests pin it. And the cubic form is
+kept as `interpolate_reference`, `#[cfg(test)]`, which the new tests diff against over all four
+fields and exhaustively over GF(7) — and which the subproduct tree of stage 2 can use the same way.
+
+#### 4.3.2 At the point counts the resultant actually needs
+
+`resultant-elimination.md` §4.1 measures this function at 250 / 500 / 1 000 / 2 000 points over
+KoalaBear and finds the four-round CICO row needs **13 123**. Those counts are not powers of two,
+so they are measured directly:
+
+```text
+cargo run --release --example univariate_scaling -- koalabear points=250,500,1000,2000,4000,8192,13123
+```
+
+Over the `u32`-backed `KoalaBear` the resultant runs on, two interleaved passes, mean of the two:
+
+| points | §4.1, as recorded | before, here | after | after / before |
+|---:|---:|---:|---:|---:|
+| 250 | 28.6 ms | 20.7 ms | 0.52 ms | 40x |
+| 500 | 219.4 ms | 169.8 ms | 2.05 ms | 83x |
+| 1 000 | 1 632 ms | 1 296 ms | 8.30 ms | 156x |
+| 2 000 | 12 880 ms | 10 540 ms | 32.1 ms | 328x |
+| 13 123 | ~1 hour, extrapolated | 2 978 s, extrapolated | **1.37 s, measured** | **2 170x** |
+
+The `before` column is 20–30% under §4.1's, which was taken on the same workstation at a different
+time; the per-doubling factor is the same 7.3x – 8.5x, so the shape agrees and only the constant
+differs. The `after` column's per-doubling factor is **3.7x – 4.4x**, i.e. 4x, i.e. an exponent of
+2.
+
+The 13 123 row is the useful one, and on the new side it is **measured rather than extrapolated**:
+1.37 s. Extrapolating the quadratic growth from 2 000 points predicts 1.38 s, so the extrapolation
+and the measurement agree to 1%, which is the check that the curve really is the curve. Over BN254
+`Fr` the same count takes **13.2 s** measured, against 48 140 s — 13.4 hours — extrapolated from
+the cubic form.
+
+So the hour §4.1 attributes to the interpolation in the four-round row is now **1.4 seconds**, and
+its ranked fix-list reorders: the interpolation is no longer first.
 
 ### 4.4 Root finding: quadratic, and it is the binding stage
 
@@ -255,10 +360,18 @@ relatively dearer over the wide field than multiplication is.
 
 ## 5. Largest reachable degree, and the first stage to fail
 
-The first stage to stop is **arbitrary-point interpolation** (n = 1 024) on the narrow fields and
-**root finding** (d = 256) on BN254, at one second per measurement. Both are stages that are
-quasi-linear in the literature and quadratic-or-worse here. The NTT, the one stage with a
-quasi-linear implementation, reaches `2^23` in the same second.
+**The first stage to stop is now `roots` on every field** — 4 096 on KoalaBear, 2 048 on
+Goldilocks, 256 on BN254 `Fr` — at one second per measurement. Arbitrary-point interpolation was
+the first stage to stop on the three narrow fields when this section was written, at n = 1 024;
+#162 stage 1 took it to 16 384 (§4.3.1) and it is no longer the binding stage anywhere. The
+pre-#162 conclusion is kept here as the record of what the sweep said then:
+
+> The first stage to stop is **arbitrary-point interpolation** (n = 1 024) on the narrow fields and
+> **root finding** (d = 256) on BN254, at one second per measurement.
+
+Both the old and the new binding stage are quasi-linear in the literature and
+quadratic-or-worse here, so what changed is which one binds, not the character of the finding. The
+NTT, the one stage with a quasi-linear implementation, reaches `2^23` in the same second.
 
 Extrapolating the measured quadratic growth of root finding to `d = 2^20`, which is the order of
 degree the resultant route would produce:
@@ -279,6 +392,28 @@ degree `2^20` over BN254 is three transforms of size `2^21`, so about 6.5 s. Roo
 reduction is a few multiplies — so on the order of **1 to 2 hours** against 202 days. A ~3 000x
 gap, from machinery that is one wrapper away for multiplication and a subproduct tree away for the
 rest.
+
+### 5.1 What this means for D1's reachable degrees, after #162 stage 1
+
+The claim this section used to carry — that the degrees D1's evaluation–interpolation resultant
+would produce are out of reach — stands, but **the interpolation is no longer the reason**. The
+sample count a resultant of two degree-d bivariates needs is `O(d^2)`; the four-round `t = 16` CICO
+row needs 13 123 of them, which was an hour of interpolation (`resultant-elimination.md` §4.1) and
+is now **1.37 s** over KoalaBear and **13.2 s** over BN254, measured (§4.3.2). Extrapolating that
+quadratically:
+
+| samples | KoalaBear | BN254 `Fr` | what needs it |
+|---:|---:|---:|---|
+| 13 123 | **1.37 s** | **13.2 s** | four rounds, `t = 16` — measured |
+| 2^20 | ~2.4 hours | ~23 hours | the `d = 2^20` row above |
+| 2^24 | ~26 days | ~8 months | — |
+
+So the quadratic form carries the four-round row outright and runs out near `2^20` samples, which
+is where root finding also runs out — 31 hours on KoalaBear, 202 days on BN254. **The two stages
+now bind at comparable degrees**, where before the interpolation bound the narrow fields four
+doublings earlier than anything else in the layer. That is the useful change, and it is why §6's
+ranked list keeps its order: the subproduct tree stays third because it is now worth what an
+asymptotic improvement is worth, and not what a missing implementation is worth.
 
 ## 6. Go / no-go for #68
 
@@ -306,8 +441,12 @@ Concretely, before D1 or D3 can run at interesting degrees:
    prerequisite now exists; this is the highest-value single piece of work in the layer.
 2. **Fast division by Newton iteration**, which `pow_mod_limbs` would then inherit, taking root
    finding from `log q * d^2` to `log q * d log d`.
-3. **A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points. D1's
-   evaluation–interpolation route depends on this and there is nothing to build on.
+3. **A subproduct tree**, for multipoint evaluation and interpolation at arbitrary points, taking
+   interpolation from `O(n^2)` to `O(n log^2 n)` and giving multipoint *evaluation* its first
+   sub-quadratic path. #162 stage 1 made interpolation quadratic without it, so this is now an
+   asymptotic improvement over a working stage rather than the only route to one; it is still what
+   D1 wants above `2^20` samples, and §4.3's reference implementation is what a tree would be
+   differentially tested against. #162 stays open for it.
 4. **Modular composition** (Brent–Kung) only if D3's Graeffe route needs it; its memory profile is
    the one place where this workstation's 300 GB could genuinely bind.
 
