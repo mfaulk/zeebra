@@ -1,7 +1,7 @@
 //! Inverse Fast Fourier Transform (IFFT).
 
 use crate::{
-    fft::{domain::FFTDomain, evaluate::evaluate},
+    fft::{domain::FFTDomain, transform::transform_in_place},
     FiniteField, UnivariatePolynomial,
 };
 
@@ -12,6 +12,11 @@ use crate::{
 /// * `w` - Evaluation domain 1, w, w^2, ...
 ///
 /// n must be a power of 2.
+///
+/// The same kernel as [`crate::evaluate`], run over the inverse domain and scaled by `1/n`. There
+/// is no separate inverse pass: after batch inversion of the domain (#118) the two directions are
+/// within a few percent of each other, so a second kernel would be a second place for the
+/// butterfly to be wrong.
 pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolynomial<F> {
     assert_eq!(x.len(), w.size());
 
@@ -23,13 +28,17 @@ pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolyn
     // a domain by hand over a field where it is not.
     let size_inverse = F::new(w.size() as u64).inverse();
 
+    // The inverse domain is built before the coefficient buffer, not after: `batch_inverse` holds
+    // a vector of prefix products alongside its result, and that transient is the peak. Taking it
+    // while only one n-element vector is live keeps the whole call at two.
     let w_inv = w.inverse();
-    let unscaled_coefficients = evaluate(&UnivariatePolynomial::new(x), &w_inv);
-    let coefficients: Vec<_> = unscaled_coefficients
-        .into_iter()
-        .map(|c| c * size_inverse)
-        .collect();
-    UnivariatePolynomial::new(&coefficients)
+
+    let mut coefficients = x.to_vec();
+    transform_in_place(&mut coefficients, w_inv.powers());
+    for c in coefficients.iter_mut() {
+        *c *= size_inverse;
+    }
+    UnivariatePolynomial::from_coefficients(coefficients)
 }
 
 #[cfg(test)]
@@ -96,6 +105,51 @@ mod tests {
 
         round_trip::<Bn254Fr>(31);
         round_trip::<Bls12_381Fr>(37);
+    }
+
+    /// Interpolation agrees with Horner on the recovered polynomial, over every measured field.
+    ///
+    /// A round trip alone would pass if the forward and inverse transforms were inverse but both
+    /// wrong, so the recovered coefficients are also checked against the values they came from by
+    /// direct evaluation at each domain point.
+    #[test]
+    fn test_interpolate_agrees_with_direct_evaluation_over_every_field() {
+        use crate::fields::{Bls12_381Fr, Bn254Fr, KoalaBear, Mersenne31, PrimeFieldElement64};
+
+        fn check<F: KnownOrder>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let highest = F::two_adicity().min(9);
+            for log_n in 0..=highest {
+                let n = 1usize << log_n;
+                let w = F::two_adic_root_of_unity(log_n, &mut rng);
+                let domain = FFTDomain::from_generator(w, n);
+                let values: Vec<F> = (0..n).map(|_| F::random(&mut rng)).collect();
+
+                let p = interpolate(&values, &domain);
+                assert!((p.degree() as usize) < n, "n = {n}");
+                for (i, value) in values.iter().enumerate() {
+                    assert_eq!(p.eval(&domain[i]), *value, "n = {n}, point {i}");
+                }
+            }
+        }
+
+        check::<KoalaBear>(0x4b11);
+        check::<Mersenne31>(0x4d11);
+        check::<PrimeFieldElement64<2_130_706_433>>(0x4b12);
+        check::<PrimeFieldElement64<18_446_744_069_414_584_321>>(0x6011);
+        check::<Bn254Fr>(0xb211);
+        check::<Bls12_381Fr>(0xb311);
+    }
+
+    /// A length mismatch between the values and the domain is rejected.
+    #[test]
+    #[should_panic]
+    fn test_interpolate_rejects_a_length_mismatch() {
+        type F = PrimeFieldElement64<97>;
+        let mut rng = StdRng::seed_from_u64(0x9711);
+        let w = F::two_adic_root_of_unity(4, &mut rng);
+        let domain = FFTDomain::from_generator(w, 16);
+        let _p = interpolate(&[F::new(1), F::new(2)], &domain);
     }
 
     #[test]

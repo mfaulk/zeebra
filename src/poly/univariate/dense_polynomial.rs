@@ -38,6 +38,16 @@ impl<F: FiniteField> DensePolynomial<F> {
         Self { coefficients }
     }
 
+    /// A polynomial that takes ownership of an already-built coefficient vector.
+    ///
+    /// [`Self::new`] copies its slice, which is a second `n`-element allocation where the caller
+    /// has just produced the coefficients and has no further use for them — the NTT's
+    /// `interpolate` is the case. Trimming truncates in place, so this allocates nothing.
+    pub(crate) fn from_coefficients(mut coefficients: Vec<F>) -> Self {
+        trim(&mut coefficients);
+        Self { coefficients }
+    }
+
     /// A polynomial with the given zeros.
     pub fn from_zeros(zeros: &[F]) -> Self {
         // \prod (x - x_i)
