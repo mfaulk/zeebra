@@ -15,7 +15,9 @@
 //!
 //! The last table divides that time by `EliminationStatistics::row_operations`, which every backend
 //! reports identically. A change inside a row operation moves nanoseconds per operation and leaves
-//! the count alone; a change to the pivot rule would move the count, and is a different claim.
+//! the count alone; a change to the pivot rule would move the count, and is a different claim. The
+//! dense row there is the backend's whole cost, conversions included, since that is what a caller
+//! pays per operation; the table above it is where conversion is separated out.
 //!
 //! ```text
 //! cargo run --release --example elimination_density            # the default instances

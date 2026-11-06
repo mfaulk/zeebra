@@ -355,8 +355,11 @@ whole-computation effect and the per-elimination effect are different measuremen
 distribution of row densities as built and at each row's own peak during its reduction, the density
 of the densest 64x64 blocks, and the three backends' elimination times with representation
 conversion in its own column. A global density of a fraction of a percent says nothing about
-either. `-- list` names the instances; the largest are excluded by default, because a dense
-representation of katsura-7 grevlex is 374 MB for a matrix holding 112k entries.
+either. A last table divides each backend's time by the `row_operations` it reported, which is the
+per-operation cost a change inside a row operation has to move, and states the pivot index's
+storage at the instance's widest matrix. `-- list` names the instances; the largest are excluded by
+default, because a dense representation of katsura-7 grevlex is 374 MB for a matrix holding 112k
+entries.
 
 `f4_selection` compares the two reducer-selection policies and the three cache modes against one
 common baseline, on one line each: the closure size, the largest matrix, the peak live entries, the
