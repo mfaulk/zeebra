@@ -252,6 +252,7 @@ mod tests {
     use crate::{
         fields::{Bn254Fr, KoalaBear, Mersenne31, Zp18446744069414584321},
         identities::Zero,
+        test_support::schoolbook_product,
         FiniteField, Polynomial, UnivariatePolynomial,
     };
     use proptest::prelude::*;
@@ -428,10 +429,13 @@ mod tests {
         assert_eq!(karatsuba_base_case::<Bn254Fr>(), KARATSUBA_BASE_CASE_WIDE);
     }
 
-    /// Routed through `DensePolynomial::new`, the Karatsuba product equals the schoolbook `Mul`'s
-    /// — same coefficients and same degree — over a narrow, a 64-bit and a wide field.
+    /// Routed through `DensePolynomial::new`, the Karatsuba product equals the definition's — same
+    /// coefficients and same degree — over a narrow, a 64-bit and a wide field.
+    ///
+    /// Against `test_support::schoolbook_product` rather than against `&f * &g`: #231 dispatches
+    /// `Mul` to this very function, so the operator would be the comparand for itself.
     #[test]
-    fn test_it_agrees_with_the_mul_operator_over_every_field_width() {
+    fn test_it_agrees_with_the_definition_over_every_field_width() {
         fn check<F: FiniteField>(degree: u64, seed: u64) {
             let mut rng = StdRng::seed_from_u64(seed);
             let f = UnivariatePolynomial::<F>::rand(degree, &mut rng);
@@ -440,7 +444,7 @@ mod tests {
                 f.coefficients(),
                 g.coefficients(),
             ));
-            let schoolbook = &f * &g;
+            let schoolbook = schoolbook_product(&f, &g);
             assert_eq!(karatsuba, schoolbook);
             assert_eq!(karatsuba.degree(), schoolbook.degree());
         }
@@ -511,8 +515,8 @@ mod tests {
     }
 
     proptest! {
-        /// Differential against the schoolbook `Mul` on randomized narrow-field operands of
-        /// independently chosen degrees.
+        /// Differential against `test_support::schoolbook_product` on randomized narrow-field
+        /// operands of independently chosen degrees.
         #[test]
         fn proptest_matches_schoolbook_over_a_narrow_field(
             seed: u64,
@@ -526,11 +530,11 @@ mod tests {
             let karatsuba = UnivariatePolynomial::<F>::new(
                 &multiply_karatsuba(f.coefficients(), g.coefficients()),
             );
-            prop_assert_eq!(karatsuba, &f * &g);
+            prop_assert_eq!(karatsuba, schoolbook_product(&f, &g));
         }
 
         /// The same differential over a 254-bit field, where the element is 32 bytes and the base
-        /// case differs.
+        /// case differs. Also against the oracle rather than the operator.
         #[test]
         fn proptest_matches_schoolbook_over_a_wide_field(
             seed: u64,
@@ -544,7 +548,7 @@ mod tests {
             let karatsuba = UnivariatePolynomial::<F>::new(
                 &multiply_karatsuba(f.coefficients(), g.coefficients()),
             );
-            prop_assert_eq!(karatsuba, &f * &g);
+            prop_assert_eq!(karatsuba, schoolbook_product(&f, &g));
         }
 
         /// Untrimmed slices of arbitrary, independently chosen lengths — including zero — agree

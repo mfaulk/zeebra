@@ -1,11 +1,13 @@
-//! Shared checks for properties that every type in the crate should satisfy.
+//! Shared checks for properties that every type in the crate should satisfy, and the oracles they
+//! check against.
 //!
-//! These exist because the same two defects kept recurring: a `proptest` strategy that panics or
-//! generates a single degenerate value, and a type with more than one representation of a value
-//! whose equality is derived over that representation. Both are invisible in a green test run —
-//! a degenerate strategy makes every property hold vacuously, and a duplicate representation only
-//! misbehaves once a value reaches a `HashMap`. Each module's tests call these so a regression
-//! shows up as a failure rather than as silently weaker coverage.
+//! These exist because the same defects kept recurring, all of them invisible in a green test run:
+//! a `proptest` strategy that panics or generates a single degenerate value, so every property
+//! holds vacuously; a type with more than one representation of a value whose equality is derived
+//! over that representation, which only misbehaves once a value reaches a `HashMap`; and — the
+//! reason [`schoolbook_product`] is here — an oracle that is the implementation it is supposed to
+//! be checking. Each module's tests call these so a regression shows up as a failure rather than
+//! as silently weaker coverage.
 
 use std::{
     collections::hash_map::DefaultHasher,
@@ -17,6 +19,35 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
+
+use crate::{FiniteField, Polynomial, UnivariatePolynomial};
+
+/// The product of two polynomials, by the definition, as the comparand for every faster route.
+///
+/// Written out here rather than taken from `Mul` because `Mul` stopped being independent of what it
+/// was checking: #231 dispatches it to `multiply_dense`, so `karatsuba`'s agreement tests would
+/// have compared Karatsuba against Karatsuba and `fft::multiply`'s would have compared the
+/// transform against Karatsuba, and all of them would still have passed. This shares code with
+/// neither Karatsuba nor the transform — two loops over the coefficients and nothing else — so
+/// agreement against it is a real check in a way agreement against `Mul` is no longer.
+///
+/// Deliberately not generic over a polynomial trait and deliberately not optimized: `&[F]` in,
+/// coefficients accumulated at `i + j`, trimmed by `new` exactly as `Mul` used to trim. The whole
+/// point is that there is nothing in here to get subtly right.
+pub fn schoolbook_product<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> UnivariatePolynomial<F> {
+    let x = a.coefficients();
+    let y = b.coefficients();
+    let mut product = vec![F::zero(); x.len() + y.len() - 1];
+    for (i, p) in x.iter().enumerate() {
+        for (j, q) in y.iter().enumerate() {
+            product[i + j] += *p * *q;
+        }
+    }
+    UnivariatePolynomial::new(&product)
+}
 
 /// Draw `count` values from `strategy`.
 ///
@@ -103,4 +134,63 @@ fn hash_of<T: Hash>(value: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::schoolbook_product;
+    use crate::{fields::Zp7, FiniteField, Polynomial, UnivariatePolynomial};
+
+    fn poly(coefficients: &[u64]) -> UnivariatePolynomial<Zp7> {
+        UnivariatePolynomial::new(
+            &coefficients
+                .iter()
+                .map(|c| Zp7::new(*c))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// The oracle reproduces products computed by hand, so that the thing two modules now check
+    /// against is itself pinned rather than trusted.
+    #[test]
+    fn test_the_oracle_agrees_with_products_computed_by_hand() {
+        // (1 + x)(1 + x) = 1 + 2x + x^2
+        assert_eq!(
+            schoolbook_product(&poly(&[1, 1]), &poly(&[1, 1])),
+            poly(&[1, 2, 1])
+        );
+        // (2 + 3x)(4 + 5x) = 8 + 22x + 15x^2, which over GF(7) is 1 + x + x^2
+        assert_eq!(
+            schoolbook_product(&poly(&[2, 3]), &poly(&[4, 5])),
+            poly(&[1, 1, 1])
+        );
+        // (1 + x^2)(1 + x) = 1 + x + x^2 + x^3, a gap in one operand
+        assert_eq!(
+            schoolbook_product(&poly(&[1, 0, 1]), &poly(&[1, 1])),
+            poly(&[1, 1, 1, 1])
+        );
+    }
+
+    /// The oracle trims its result, so the degree it reports is the degree `Mul` reported: a
+    /// product whose leading coefficient vanishes modulo the characteristic is shorter than
+    /// `deg a + deg b`.
+    #[test]
+    fn test_the_oracle_trims_a_vanishing_leading_coefficient() {
+        // (7x + 1) is (1) over GF(7), so this is degree 0 and not degree 2.
+        let product = schoolbook_product(&poly(&[1, 7]), &poly(&[1, 7]));
+        assert_eq!(product, poly(&[1]));
+        assert_eq!(product.degree(), 0);
+    }
+
+    /// Multiplying by zero or one behaves, which is what the empty-coefficient edge would break.
+    #[test]
+    fn test_the_oracle_handles_the_zero_and_one_polynomials() {
+        let f = poly(&[3, 1, 4]);
+        let zero = UnivariatePolynomial::<Zp7>::zero();
+        let one = UnivariatePolynomial::<Zp7>::one();
+        assert!(schoolbook_product(&f, &zero).is_zero());
+        assert!(schoolbook_product(&zero, &f).is_zero());
+        assert!(schoolbook_product(&zero, &zero).is_zero());
+        assert_eq!(schoolbook_product(&f, &one), f);
+    }
 }

@@ -230,8 +230,9 @@ mod tests {
             BabyBear, Bn254Fr, KoalaBear, Mersenne31, RootOfUnityError, Zp18446744069414584321,
             Zp65537,
         },
-        karatsuba_base_case_unstable, FFTDomain, FiniteField, KnownOrder, Polynomial,
-        UnivariatePolynomial,
+        karatsuba_base_case_unstable,
+        test_support::schoolbook_product,
+        FFTDomain, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
     };
 
     /// A polynomial of exactly the given degree: the leading coefficient is never zero.
@@ -254,7 +255,7 @@ mod tests {
         for &(da, db) in degrees {
             let a = random_polynomial::<F, _>(da, &mut rng);
             let b = random_polynomial::<F, _>(db, &mut rng);
-            let expected = &a * &b;
+            let expected = schoolbook_product(&a, &b);
             let product = try_multiply_via_fft(&a, &b, &mut rng)
                 .expect("the field has the two-adicity for this degree");
             assert_eq!(product, expected, "degrees {da} and {db}");
@@ -317,7 +318,7 @@ mod tests {
             let a = random_polynomial::<Mersenne31, _>(degree, &mut rng);
             let b = random_polynomial::<Mersenne31, _>(degree, &mut rng);
             let product = multiply(&a, &b, &mut rng);
-            assert_eq!(product, &a * &b, "degree {degree}");
+            assert_eq!(product, schoolbook_product(&a, &b), "degree {degree}");
             assert_eq!(product.degree() as usize, 2 * degree, "degree {degree}");
         }
     }
@@ -336,7 +337,7 @@ mod tests {
             try_multiply_via_fft(&a, &b, &mut rng).is_err(),
             "a two-adicity of 1 cannot host this domain, so the dispatcher's fallback is live"
         );
-        assert_eq!(multiply(&a, &b, &mut rng), &a * &b);
+        assert_eq!(multiply(&a, &b, &mut rng), schoolbook_product(&a, &b));
     }
 
     /// The dispatcher agrees with schoolbook across all three routes' thresholds.
@@ -352,7 +353,11 @@ mod tests {
         for degree in [1, 4, 16, 64, 300, 600, 1100] {
             let a = random_polynomial::<Zp65537, _>(degree, &mut rng);
             let b = random_polynomial::<Zp65537, _>(degree, &mut rng);
-            assert_eq!(multiply(&a, &b, &mut rng), &a * &b, "degree {degree}");
+            assert_eq!(
+                multiply(&a, &b, &mut rng),
+                schoolbook_product(&a, &b),
+                "degree {degree}"
+            );
         }
     }
 
@@ -368,7 +373,7 @@ mod tests {
         for degree in 0..=100 {
             let a = random_polynomial::<KoalaBear, _>(degree, &mut rng);
             let b = random_polynomial::<KoalaBear, _>(degree, &mut rng);
-            let expected = &a * &b;
+            let expected = schoolbook_product(&a, &b);
             let dispatched = multiply(&a, &b, &mut rng);
             assert_eq!(dispatched, expected, "degree {degree}");
             assert_eq!(dispatched.degree(), expected.degree(), "degree {degree}");
@@ -423,7 +428,7 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(29);
         let a = random_polynomial::<Zp65537, _>(8, &mut rng);
         let b = random_polynomial::<Zp65537, _>(8, &mut rng);
-        let expected = &a * &b;
+        let expected = schoolbook_product(&a, &b);
         // Degree 16 is below the default, so force the transform with a crossover of zero.
         assert_eq!(multiply_above(&a, &b, 0, &mut rng), expected);
         assert_eq!(multiply_above(&a, &b, u32::MAX, &mut rng), expected);
@@ -451,7 +456,10 @@ mod tests {
         for _ in 0..5 {
             let a = random_polynomial::<Zp65537, _>(10, &mut rng);
             let b = random_polynomial::<Zp65537, _>(10, &mut rng);
-            assert_eq!(multiply_over_domain(&a, &b, &domain), &a * &b);
+            assert_eq!(
+                multiply_over_domain(&a, &b, &domain),
+                schoolbook_product(&a, &b)
+            );
         }
     }
 
