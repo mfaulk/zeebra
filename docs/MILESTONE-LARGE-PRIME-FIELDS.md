@@ -410,12 +410,12 @@ holds: they read 184–194 here and are unchanged by #160.
 **`pow`'s own default body is left recursive, on measurement.** The obvious follow-on is to make
 the default every field inherits iterative too, since nothing wants the recursion. A third binary
 was built with exactly that — `pow` delegating to `pow_limbs(&[b as u64, (b >> 64) as u64])` — and
-measured in the same interleave. It buys nothing anywhere: p31 125.2 ns against 125.4 (the arm no
-longer reaches `pow`), p68 18.67 µs against 19.11, BN254 4.14 µs against 3.94 — measured in the
-earlier run, whose `after` column those are the comparison against. All inside the noise band the
-control rows establish. p68 is the explanation: a 137 ns multiply means ~137
-multiplies dominate 19 µs completely, and ~128 recursive frames at a few nanoseconds each are
-about 1% of it. The recursion only mattered where the multiply was cheap, and those are exactly the
+measured in the same interleave. It buys nothing anywhere. Against the earlier run's `after`
+column, which is the one it was interleaved with: p31 125.2 ns against 125.4 — that arm no longer
+reaches `pow` at all — p68 18.67 µs against 19.11, and BN254 4.14 µs against 3.94. All inside the
+noise band the control rows establish. p68 is the explanation: a 137 ns multiply means its
+134-operation chain dominates 19 µs completely, and the ~136 recursive frames at a few nanoseconds
+each are about 1% of it. The recursion only mattered where the multiply was cheap, and those are exactly the
 fields #160 already fixed. So the wider change — `pow` is `pub`, and `substitute`, `compose`,
 `Monomial::eval` and `PowerPermutation` all go through it — is deferred to #181 rather than taken
 for a measured nothing. The one call site with a large exponent and a plausible gain is
