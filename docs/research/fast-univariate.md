@@ -693,6 +693,47 @@ stage at the same size) — which together give 91x. The measurement is 1.4x abo
 residue is inversions again: the equal-degree splitter and the gcd both invert, and inversion is
 relatively dearer over the wide field than multiplication is.
 
+### 4.5 Division and GCD: quadratic, and gated on the multiplication they would be built from
+
+**Partly closed by #126, and the rest deliberately not.** `/`, `%`, `/=` and `%=` now exist on
+`UnivariatePolynomial`, and `lcm` with them; `Polynomial::div`, which returns both halves, is
+renamed `div_with_remainder` so that `Div::div` — taking `self` by value — cannot win method
+resolution over it and silently return the quotient alone. That is interface work, not cost work:
+every operator is one call to the §2 long division, so the `div` row of §3.1 governs all of them,
+and `gcd`'s Euclidean loop costs exactly what it did.
+
+The two algorithmic items from the same issue are **not** written — they are #193 (Newton
+inversion) and #194 (half-GCD) — and the arithmetic says they should not be yet:
+
+| route | cost | with the `M` available at the operator |
+|---|---|---|
+| long division (today) | `d^2` | `d^2` |
+| Newton inversion of `rev(g)` | `O(M(d))` | `O(d^2)`, with a worse constant |
+| classical Euclid (today) | `O(d^2)` | `O(d^2)` |
+| half-GCD | `O(M(d) log d)` | `O(d^2 log d)` — **slower** |
+
+`M(d)` at the operator is schoolbook, and §4.1 is why: `Mul` cannot choose a transform domain from
+its signature, so the quasi-linear route is reachable only through `fft::multiply`, which needs
+`KnownOrder` and an RNG. Karatsuba needs neither — but it is still called from nothing outside its
+own tests, so `Mul` is `d^2` there too. Newton inversion over a quadratic `M` is `d^2` with
+several multiplications per iteration instead of one pass of long division, and half-GCD is
+`d^2 log d`: the asymptotically better algorithm is the measurably slower one until the
+multiplication underneath moves. §4.1.1's closing line — "`div` is not Karatsuba and will not
+move" — is the same finding from the multiplication side.
+
+So the gate is a crossover, not a date, and it is #185's — specifically its open
+`DensePolynomial::Mul` dispatch question rather than its recommended first step, since wiring
+Karatsuba into `fft::multiply`'s fallbacks alone leaves `*` and `%` on the schoolbook route.
+Wiring Karatsuba into `Mul` makes `M(d) = d^1.585` for
+every field including Mersenne-31, at which point Newton inversion is `d^1.585` against long
+division's `d^2` and half-GCD is `d^1.585 log d` against Euclid's `d^2`, and both are worth
+measuring. Its base case is already measured per element width (§4.1.1: 48 / 16 / 4 bytes), so the
+dispatch thresholds a fast division would inherit exist; what does not exist is the dispatch.
+
+The stage this would serve is §4.4's. `roots` is `O(log q)` multiplications **and divisions** at
+the working degree, so halving the division exponent moves the binding stage directly — which is
+why the two sit in one issue with root finding rather than being filed as polish.
+
 ## 5. Largest reachable degree, and the first stage to fail
 
 **The first stage to stop is now `roots` on every field** — 4 096 on KoalaBear, 2 048 on

@@ -1,6 +1,7 @@
 //! Arithmetic operations for dense univariate polynomials.
 
-use crate::{impl_add_variants, impl_mul_variants, impl_sub_variants};
+use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_rem_variants};
+use crate::{impl_sub_variants, poly::univariate::div_with_remainder::div_with_remainder};
 use crate::{poly::univariate::dense_polynomial::DensePolynomial, FiniteField, Polynomial};
 use std::{cmp::max, ops};
 
@@ -88,6 +89,29 @@ impl<F: FiniteField> ops::Mul<&DensePolynomial<F>> for &DensePolynomial<F> {
 
 impl_mul_variants!([F: FiniteField], DensePolynomial<F>);
 
+// Borrowed / Borrowed. The quotient half of division with remainder; `%` is the other half, and a
+// caller that wants both should call `div_with_remainder` rather than pay for the division twice.
+impl<F: FiniteField> ops::Div<&DensePolynomial<F>> for &DensePolynomial<F> {
+    type Output = DensePolynomial<F>;
+
+    fn div(self, rhs: &DensePolynomial<F>) -> Self::Output {
+        div_with_remainder(self, rhs).0
+    }
+}
+
+impl_div_variants!([F: FiniteField], DensePolynomial<F>);
+
+// Borrowed % Borrowed
+impl<F: FiniteField> ops::Rem<&DensePolynomial<F>> for &DensePolynomial<F> {
+    type Output = DensePolynomial<F>;
+
+    fn rem(self, rhs: &DensePolynomial<F>) -> Self::Output {
+        div_with_remainder(self, rhs).1
+    }
+}
+
+impl_rem_variants!([F: FiniteField], DensePolynomial<F>);
+
 // &DensePolynomial * &F
 impl<F: FiniteField> ops::Mul<&F> for &DensePolynomial<F> {
     type Output = DensePolynomial<F>;
@@ -132,7 +156,7 @@ mod tests {
         poly::univariate::dense_polynomial::DensePolynomial,
         FiniteField, Polynomial,
     };
-    use proptest::{prelude::any_with, proptest, strategy::Strategy};
+    use proptest::prelude::*;
 
     fn get_elements(values: Vec<u64>) -> Vec<PrimeFieldElement64<13>> {
         values
@@ -283,5 +307,77 @@ mod tests {
         // 8 + 6x + x^2 + 7x^3 + 0x^4 + 6x^5 + 8x^6 + 11x^7 + x^8
         let expected = DensePolynomial::new(&get_elements(vec![8, 6, 1, 7, 0, 6, 8, 11, 1]));
         assert_eq!(a * b, expected);
+    }
+
+    #[test]
+    // `/` returns the quotient and `%` the remainder of `div_with_remainder`.
+    fn test_div_and_rem_agree_with_div_with_remainder() {
+        type F = Zp7;
+        type P = DensePolynomial<F>;
+
+        let f = P::try_from("1 + 2x + 3x^2 + 4x^3").unwrap();
+        let g = P::try_from("2 + x^2").unwrap();
+        let (quotient, remainder) = f.div_with_remainder(&g);
+
+        assert_eq!(&f / &g, quotient);
+        assert_eq!(&f % &g, remainder);
+    }
+
+    #[test]
+    // All four owned/borrowed operand combinations, plus `/=` and `%=`, are available.
+    fn test_div_and_rem_operand_variants() {
+        type F = Zp7;
+        type P = DensePolynomial<F>;
+
+        let f = P::try_from("1 + x + x^3").unwrap();
+        let g = P::try_from("3 + x").unwrap();
+        let quotient = &f / &g;
+        let remainder = &f % &g;
+
+        assert_eq!(f.clone() / &g, quotient);
+        assert_eq!(&f / g.clone(), quotient);
+        assert_eq!(f.clone() / g.clone(), quotient);
+        assert_eq!(f.clone() % &g, remainder);
+        assert_eq!(&f % g.clone(), remainder);
+        assert_eq!(f.clone() % g.clone(), remainder);
+
+        let mut quotient_assign = f.clone();
+        quotient_assign /= g.clone();
+        assert_eq!(quotient_assign, quotient);
+
+        let mut remainder_assign = f.clone();
+        remainder_assign %= g.clone();
+        assert_eq!(remainder_assign, remainder);
+    }
+
+    #[test]
+    // `%` by a zero divisor panics, as `div_with_remainder` does.
+    #[should_panic]
+    fn test_rem_by_zero_should_panic() {
+        type F = Zp7;
+        type P = DensePolynomial<F>;
+        let _ = P::try_from("1 + x").unwrap() % P::zero();
+    }
+
+    #[test]
+    // `/` by a zero divisor panics, as `div_with_remainder` does.
+    #[should_panic]
+    fn test_div_by_zero_should_panic() {
+        type F = Zp7;
+        type P = DensePolynomial<F>;
+        let _ = P::try_from("1 + x").unwrap() / P::zero();
+    }
+
+    proptest! {
+        #[test]
+        // f = (f / g) * g + f % g for every nonzero divisor g.
+        fn test_div_and_rem_recover_the_dividend(
+            f in ((0..=50usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp7>>)),
+            g in ((0..=50usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<DensePolynomial<Zp7>>))) {
+            if g.is_zero() {
+                return Ok(());
+            }
+            prop_assert_eq!(&(&(&f / &g) * &g) + &(&f % &g), f);
+        }
     }
 }

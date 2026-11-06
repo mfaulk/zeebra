@@ -1,5 +1,9 @@
 //! Polynomial division with remainder.
 //!
+//! Both `Div` and `Rem` on `DensePolynomial` are one call to this and a projection, so a caller
+//! that wants the quotient *and* the remainder must come here rather than write `f / g` and
+//! `f % g`, which would run the division twice.
+//!
 //! Long division over a coefficient array. Each step subtracts `c * x^e * divisor` from the
 //! working remainder in place, which is `deg(divisor) + 1` multiplications, so dividing degree
 //! `2d` by degree `d` costs `d^2` of them.
