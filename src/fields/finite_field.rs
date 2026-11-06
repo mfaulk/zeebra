@@ -166,9 +166,10 @@ where
     /// The multiplicative inverse of this element.
     ///
     /// Required rather than provided: the obvious default is `a^(q-2)`, which needs the field's
-    /// order as a machine integer and so cannot exist for a field whose order does not fit in
-    /// one. Implementations over a cardinality that does fit may write exactly that; the rest
-    /// delegate to their own inversion.
+    /// order, and the order lives in [`KnownOrder`] precisely so that `FiniteField` does not
+    /// demand it. An implementation that has an order writes Fermat as
+    /// `self.pow_limbs(&FERMAT_EXPONENT_LIMBS)` — no width limit, since both the exponent and the
+    /// walk are over limbs; the rest delegate to their own inversion.
     ///
     /// # Panics
     /// Panics if `self` is zero. Use [`Self::checked_div`] where zero is possible — pivot
@@ -449,6 +450,47 @@ pub trait KnownOrder: FiniteField {
     }
 }
 
+/// The recursive square-and-multiply that every `inverse` reached through before #160.
+///
+/// Frozen here rather than delegating to [`FiniteField::pow`], so that the differential tests
+/// keep comparing against the historical behaviour even if `pow`'s default body changes.
+#[cfg(test)]
+pub(crate) fn recursive_pow<F: FiniteField>(a: &F, b: u128) -> F {
+    if a.is_zero() {
+        if b == 0 {
+            // 0^0 = 1.
+            return F::one();
+        }
+        return F::zero();
+    }
+
+    if b == 0 {
+        return F::one();
+    }
+
+    if b == 1 {
+        *a
+    } else if b.is_multiple_of(2) {
+        let y = recursive_pow(a, b / 2);
+        y * y
+    } else {
+        *a * recursive_pow(a, b - 1)
+    }
+}
+
+/// `a^(q - 2)` by the pre-#160 route: [`recursive_pow`] over an exponent taken in a `u128`.
+///
+/// The reference every field's `inverse` is differentially tested against.
+///
+/// # Panics
+/// Panics if the order does not fit in a `u128`, which excludes the fields that never used this
+/// route in the first place.
+#[cfg(test)]
+pub(crate) fn fermat_inverse_via_recursive_pow<F: KnownOrder>(a: &F) -> F {
+    let order = F::order_u128().expect("the reference inverse needs the order as an integer");
+    recursive_pow(a, order - 2)
+}
+
 /// `limbs` as a `u128`, or `None` if it is wider than that.
 fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
     if limbs.len() > 2 {
@@ -463,7 +505,7 @@ fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
 mod tests {
     use rand::{prelude::StdRng, SeedableRng};
 
-    use super::{default_primitive_element, RootOfUnityError};
+    use super::{default_primitive_element, fermat_inverse_via_recursive_pow, RootOfUnityError};
     use crate::{
         fields::{
             binary_field::BinaryFieldElement,
@@ -473,6 +515,28 @@ mod tests {
         },
         FiniteField, KnownOrder, One, Zero,
     };
+
+    // Inversion returns exactly what the pre-#160 recursive-pow route returned, over every field.
+    for_each_field!(
+        fn inverse_matches_the_recursive_pow_reference<F>() {
+            // A 254-bit order has no `u128` for the reference to take `q - 2` in, and those
+            // fields invert by extended Euclid rather than by Fermat, so there is no recursive
+            // route to compare against.
+            if F::order_u128().is_some() {
+                let mut rng = StdRng::seed_from_u64(160);
+                for _ in 0..20 {
+                    let a = F::random(&mut rng);
+                    if !a.is_zero() {
+                        assert_eq!(
+                            a.inverse(),
+                            fermat_inverse_via_recursive_pow(&a),
+                            "1/{a} changed"
+                        );
+                    }
+                }
+            }
+        }
+    );
 
     /// An order below 2^64 reports one limb, not a word padded with a zero.
     #[test]

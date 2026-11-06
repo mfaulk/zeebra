@@ -501,12 +501,19 @@ one four times as wide. `cargo bench --bench field_arithmetic`, per operation:
 
 | field | width | mul | add | sub | inverse |
 |---|---:|---:|---:|---:|---:|
-| `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | 227 ns |
-| `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | 246 ns |
-| `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | 509 ns |
+| `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | **100 ns** |
+| `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | **124 ns** |
+| `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | **236 ns** |
 | `PrimeFieldElement128` | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
 | `Bn254Fr` | 254 | 18.71 ns | 3.69 ns | 3.41 ns | 3.77 µs |
 | `Bls12_381Fr` | 255 | 19.34 ns | 3.52 ns | 3.27 ns | 3.97 µs |
+
+The three bold inversion figures are from #160 and replace 227, 246 and 509 ns. Those three fields
+invert by Fermat, and Fermat went through a *recursive* `pow` when the trait already had the
+iterative `pow_limbs` next to it — 2.0x to 2.3x for one line per field, with no change to the
+result. The other three rows do not use that route and are unchanged;
+`docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.1 has the before/after table, the controls, and why
+replacing Fermat with binary extended Euclid measured *slower* at these widths.
 
 Read the last three rows together: a 254-bit multiply is **7.0x faster** than the 68-bit one, and
 10.9x slower than the 64-bit one. A claim about what field width costs has to say which baseline
@@ -768,7 +775,9 @@ Every field type in the crate implements both traits. Two consequences for anyth
 - `F::order()` and `F::characteristic()` are gone. Add `F: KnownOrder` and call `order_limbs()`,
   or `order_u128()` where the old `u128` is what you want.
 - `inverse()` is a required method rather than a provided one. Its only sensible default was
-  `a^(q-2)`, which needs the order; a field whose order does not fit in a `u128` cannot have it.
+  `a^(q-2)`, which needs the order — and the order is in `KnownOrder`, not here. A field that has
+  one writes Fermat as `pow_limbs` over a `q - 2` subtracted on the limbs, so no width caps that
+  route; a field without one, or with a faster inversion, writes its own.
 
 `docs/MILESTONE-LARGE-PRIME-FIELDS.md` records the audit this came out of.
 
@@ -802,9 +811,15 @@ legitimately hold zeros, so panicking would make the routine unusable where it i
 about.
 
 The crossover is **n = 2** in every field; a single-element batch loses by a few percent to the
-copy. The plateau is the ratio between an inversion and three multiplications — 35x over
-Mersenne-31, 38x over the 254-bit fields, up to 90x over Goldilocks, whose inversion is an
-exponentiation by a 64-bit exponent.
+copy. The plateau is the ratio between an inversion and three multiplications, so it tracks
+whatever inversion costs — and #160 halved inversion over the fields that invert by Fermat.
+`field_arithmetic`'s `isolated/inverse` against its `batch/inverse` over the same 256 operands,
+before and after #160: **29.6x to 14.8x** over `Mersenne31`, **54.6x to 27.6x** over the largest
+64-bit prime, against **60.4x to 60.7x** over BN254 `Fr`, which does not use that route and holds
+still. Montgomery's trick still wins by more than an order of magnitude everywhere; it has less to
+beat. `docs/research/batch-inversion.md`'s table predates #160 and is its own instrument, so read
+its Mersenne-31 and Goldilocks columns as roughly halved rather than substituting these figures
+for them.
 
 `FFTDomain::inverse` is where it is wired in, and `fft::interpolate` additionally hoists the one
 `1/n` it used to compute per coefficient. Together those make the inverse transform cost what the

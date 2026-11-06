@@ -57,6 +57,31 @@ pub fn lowest_set_bit(limbs: &[u64]) -> Option<usize> {
         .map(|position| position * 64 + limbs[position].trailing_zeros() as usize)
 }
 
+/// `limbs - 2`, over little-endian 64-bit limbs and at the same width.
+///
+/// The Fermat inversion exponent `q - 2`. Const and allocation-free, so a field can hold it in an
+/// associated const as wide as its order rather than routing it through a `u128` — which is what
+/// keeps the computation correct for an order too wide for any machine integer.
+/// [`multi_word_sub`] is the general case and does neither.
+///
+/// # Panics
+/// Panics if the value is below two. No finite field has an order below two, so a caller
+/// computing a Fermat exponent cannot reach this.
+pub const fn limbs_minus_two<const N: usize>(mut limbs: [u64; N]) -> [u64; N] {
+    let mut borrow = 2u64;
+    let mut index = 0;
+    while index < N {
+        let (difference, borrowed) = limbs[index].overflowing_sub(borrow);
+        limbs[index] = difference;
+        if !borrowed {
+            return limbs;
+        }
+        borrow = 1;
+        index += 1;
+    }
+    panic!("subtracting two underflows this value");
+}
+
 /// Number of digits, omitting higher-order zeros.
 pub fn num_digits(words: &[u64]) -> usize {
     words
@@ -76,7 +101,7 @@ pub fn sample_n_words<R: RngCore + CryptoRng>(n: usize, rng: &mut R) -> Vec<u64>
 
 #[cfg(test)]
 mod tests {
-    use crate::integers::{bit, highest_set_bit, lowest_set_bit, num_digits};
+    use crate::integers::{bit, highest_set_bit, limbs_minus_two, lowest_set_bit, num_digits};
 
     /// A bit is read from the limb that holds it, and positions past the end read as zero.
     #[test]
@@ -111,6 +136,42 @@ mod tests {
         assert_eq!(lowest_set_bit(&[1 << 63]), Some(63));
         assert_eq!(lowest_set_bit(&[0, 1]), Some(64));
         assert_eq!(lowest_set_bit(&[0, 0, 1 << 4]), Some(132));
+    }
+
+    /// Subtracting two borrows across limbs and never widens to a machine integer.
+    #[test]
+    fn test_limbs_minus_two() {
+        assert_eq!(limbs_minus_two([2]), [0]);
+        assert_eq!(limbs_minus_two([3]), [1]);
+        assert_eq!(limbs_minus_two([u64::MAX]), [u64::MAX - 2]);
+
+        // A borrow out of the low limb.
+        assert_eq!(limbs_minus_two([0, 1]), [u64::MAX - 1, 0]);
+        assert_eq!(limbs_minus_two([1, 1]), [u64::MAX, 0]);
+        assert_eq!(limbs_minus_two([2, 1]), [0, 1]);
+
+        // A borrow that propagates the whole way up, which is where a `u128` round trip would
+        // have lost the value entirely.
+        assert_eq!(
+            limbs_minus_two([0, 0, 0, 1]),
+            [u64::MAX - 1, u64::MAX, u64::MAX, 0]
+        );
+        assert_eq!(
+            limbs_minus_two([1, 0, 0, 1]),
+            [u64::MAX, u64::MAX, u64::MAX, 0]
+        );
+
+        // Usable in a const context, which is the point: a field holds its Fermat exponent in an
+        // associated const of the same width as its order.
+        const EXPONENT: [u64; 2] = limbs_minus_two([0, 1]);
+        assert_eq!(EXPONENT, [u64::MAX - 1, 0]);
+    }
+
+    /// Subtracting two from a value below two is rejected rather than wrapping.
+    #[test]
+    #[should_panic(expected = "underflows")]
+    fn test_limbs_minus_two_underflows() {
+        let _ = limbs_minus_two([1, 0]);
     }
 
     #[test]

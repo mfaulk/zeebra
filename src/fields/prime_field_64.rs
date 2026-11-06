@@ -22,7 +22,7 @@ use crate::{
     fields::{trim_limbs, KnownOrder, RootOfUnityError},
     identities::{One, Zero},
     impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_variants,
-    integers::{big_uint::BigUInt, factor, find_generator},
+    integers::{big_uint::BigUInt, factor, find_generator, limbs_minus_two},
     FiniteField, ParseFieldElementError, Ring,
 };
 
@@ -234,13 +234,19 @@ impl<const P: u64> FiniteField for PrimeFieldElement64<P> {
             Self::zero(),
             "The zero element does not have a multiplicative inverse."
         );
-        self.pow(P as u128 - 2)
+        self.pow_limbs(&Self::FERMAT_EXPONENT_LIMBS)
     }
 }
 
 impl<const P: u64> PrimeFieldElement64<P> {
     /// The order q = p of the field, as little-endian limbs. See [`KnownOrder::order_limbs`].
     const ORDER_LIMBS: [u64; 1] = [P];
+
+    /// The Fermat inversion exponent q - 2, as little-endian limbs.
+    ///
+    /// Subtracted on the limbs rather than on a machine integer, and held at the width of
+    /// [`Self::ORDER_LIMBS`], so nothing here caps the order at the width of a `u128`.
+    const FERMAT_EXPONENT_LIMBS: [u64; 1] = limbs_minus_two(Self::ORDER_LIMBS);
 }
 
 impl<const P: u64> KnownOrder for PrimeFieldElement64<P> {
@@ -397,8 +403,8 @@ mod tests {
 
     use crate::{
         fields::{
-            PrimeFieldElement64, Zp1091, Zp13, Zp18446744069414584321, Zp18446744073709551557,
-            Zp2147483647, Zp541, Zp65537, Zp7,
+            finite_field::fermat_inverse_via_recursive_pow, PrimeFieldElement64, Zp1091, Zp13,
+            Zp18446744069414584321, Zp18446744073709551557, Zp2147483647, Zp541, Zp65537, Zp7,
         },
         identities::{One, Zero},
         FiniteField, KnownOrder, ParseFieldElementError,
@@ -688,12 +694,54 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
     // Zero does not have a multiplicative inverse.
     fn test_inverse_of_zero() {
         type Zp = PrimeFieldElement64<7>;
         let element = Zp::new(0);
         let _inverse = element.inverse();
+    }
+
+    /// Every nonzero element of a small field inverts to exactly what the recursive-pow reference
+    /// gives, over the internal representation and not merely up to the field axioms.
+    #[test]
+    fn test_inverse_is_bit_identical_to_the_reference_exhaustively() {
+        fn check<const P: u64>() {
+            for value in 1..P {
+                let a = PrimeFieldElement64::<P>::new(value);
+                assert_eq!(
+                    a.inverse(),
+                    fermat_inverse_via_recursive_pow(&a),
+                    "P = {P}: {value}"
+                );
+            }
+        }
+
+        check::<7>();
+        check::<541>();
+        check::<65537>();
+    }
+
+    proptest! {
+        /// Inversion is bit-identical to the recursive-pow reference at the moduli
+        /// `for_each_field!` does not reach — including the largest 64-bit prime, which is the
+        /// benchmark's `p64` and whose exponent fills a whole limb.
+        #[test]
+        fn test_inverse_is_bit_identical_to_the_reference(seed in any::<u64>()) {
+            fn check<const P: u64>(seed: u64) {
+                let a = PrimeFieldElement64::<P>::new(seed);
+                if a.is_zero() {
+                    return;
+                }
+                assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a), "P = {P}: {seed}");
+            }
+
+            check::<7>(seed);
+            check::<541>(seed);
+            check::<2147483647>(seed);
+            check::<4611624995532046337>(seed);
+            check::<18446744073709551557>(seed);
+        }
     }
 
     fn addition_is_commutative<F: FiniteField>(a: F, b: F) {

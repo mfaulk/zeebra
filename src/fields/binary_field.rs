@@ -33,6 +33,7 @@ use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_sub_va
 use crate::{
     fields::{trim_limbs, KnownOrder},
     identities::{One, Zero},
+    integers::limbs_minus_two,
     FiniteField, ParseFieldElementError, Ring,
 };
 
@@ -140,7 +141,7 @@ impl<const P: u64> FiniteField for BinaryFieldElement<P> {
             Self::zero(),
             "The zero element does not have a multiplicative inverse."
         );
-        self.pow(Self::ORDER - 2)
+        self.pow_limbs(&Self::FERMAT_EXPONENT_LIMBS)
     }
 }
 
@@ -153,6 +154,12 @@ impl<const P: u64> BinaryFieldElement<P> {
 
     /// Characteristic two. See [`KnownOrder::characteristic_limbs`].
     const CHARACTERISTIC_LIMBS: [u64; 1] = [2];
+
+    /// The Fermat inversion exponent q - 2, as little-endian limbs.
+    ///
+    /// Subtracted on the limbs rather than on a machine integer, and held at the width of
+    /// [`Self::ORDER_LIMBS`], so nothing here caps the order at the width of a `u128`.
+    const FERMAT_EXPONENT_LIMBS: [u64; 2] = limbs_minus_two(Self::ORDER_LIMBS);
 }
 
 impl<const P: u64> KnownOrder for BinaryFieldElement<P> {
@@ -442,6 +449,7 @@ mod tests {
                 modulus_degree, multiply_polynomials, multiply_polynomials_scalar,
                 BinaryFieldElement,
             },
+            finite_field::fermat_inverse_via_recursive_pow,
             irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X_1},
         },
         FiniteField, KnownOrder,
@@ -826,6 +834,45 @@ mod tests {
             let a = BinaryFieldElement::<X8_X4_X3_X_1>::new(x);
             let a_inv = a.inverse();
             assert_eq!(a * a_inv, BinaryFieldElement::new(1));
+        }
+    }
+
+    /// Zero does not have a multiplicative inverse.
+    #[test]
+    #[should_panic(expected = "does not have a multiplicative inverse")]
+    fn test_inverse_of_zero() {
+        let _inverse = Gf256::zero().inverse();
+    }
+
+    /// Every nonzero element of two small binary fields inverts to exactly what the recursive-pow
+    /// reference gives, over the bit pattern and not merely up to the field axioms.
+    #[test]
+    fn test_inverse_is_bit_identical_to_the_reference_exhaustively() {
+        fn check<const P: u64>() {
+            let order = 1u64 << modulus_degree(P);
+            for pattern in 1..order {
+                let a = BinaryFieldElement::<P>::new(pattern);
+                assert_eq!(
+                    a.inverse(),
+                    fermat_inverse_via_recursive_pow(&a),
+                    "GF(2^{}): {pattern:b}",
+                    modulus_degree(P)
+                );
+            }
+        }
+
+        check::<X5_X2_1>();
+        check::<X8_X4_X3_X_1>();
+    }
+
+    proptest! {
+        /// Inversion is bit-identical to the recursive-pow reference over GF(2^63), the widest
+        /// binary field and wider than the `Gf256` that `for_each_field!` covers.
+        #[test]
+        fn test_inverse_is_bit_identical_to_the_reference(a in Gf2Pow63::arbitrary()) {
+            if !a.is_zero() {
+                assert_eq!(a.inverse(), fermat_inverse_via_recursive_pow(&a));
+            }
         }
     }
 
