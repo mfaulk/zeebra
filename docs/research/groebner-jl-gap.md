@@ -341,18 +341,21 @@ large:
 | `linalg=:deterministic`, calls 1 / 2 | 529.820 / **424.615 ms** |
 
 **4.89x.** The share screen was applied to the wrong engine's profile: elimination is 13.90% of
-*Zeebra's* run and about 89% of *Groebner.jl's deterministic* run, and the factor a kernel change
-buys is a fact about the engine whose kernel it is. Two consequences, and they pull in opposite
-directions, which is why both are stated:
+*Zeebra's* run and roughly **90%** of *Groebner.jl's deterministic* run — an estimate, not a
+measurement, got by adding the 337.8 ms the deterministic kernel costs to the 54.5 ms
+`f4_reduction!` of §3 and dividing by the 424.6 ms solve; the timer was not re-run under
+`:deterministic`. Either way, the factor a kernel change buys is a fact about the engine whose
+kernel it is. Two consequences, and they pull in opposite directions, which is why both are stated:
 
 * Nothing changes today. At Zeebra's current speed, randomized linear algebra could buy at most
   1.16x, so declining it costs nothing measurable.
 * It is a **permanent floor on the comparison**. The best end-to-end figure Zeebra can reach on this
   row while keeping a deterministic checked answer is Groebner.jl's own deterministic 424.6 ms — a
-  70x improvement over 29 912.76 ms — and it would still read **4.89x behind** the published 83 ms.
-  Any roadmap that treats 348x as the thing to close is committing to a number that is not
-  available. Also worth recording: deterministic Groebner.jl at 424.6 ms is still 16.5x faster than
-  Singular's 7 001 ms on this row, so 424.6 ms is a *deterministic* target and not a concession.
+  70x improvement over 29 912.76 ms — and it would still read **4.89x** behind Groebner.jl's own
+  randomized 86.842 ms, or 5.1x behind the board's 83 ms. Any roadmap that treats 348x as the thing
+  to close is committing to a number that is not available. Also worth recording: deterministic
+  Groebner.jl at 424.6 ms is still **16.5x faster than Singular's 7 001 ms** on this row, so 424.6
+  ms is a *deterministic* target and not a concession.
 
 **§6.7 is refuted twice over.** The share makes it a 1.16x ceiling. And it is not even what the
 comparand does: Groebner.jl ran this instance on `SpecializedArithmeticZp{UInt64, UInt32, true}`,
@@ -372,7 +375,8 @@ quoted. It is now settled, in Groebner.jl's disfavour.
 Three successive `groebner` calls on this instance **in one process, after the adapter's proxy
 warm-up**: 88.745, 87.706, **86.842 ms**. Monotone, total spread **2.2%**. So on this instance the
 residual compilation inside the inner timer is **at most 2.2%**, and its sign *inflates*
-Groebner.jl's reported time rather than flattering it — the adapter's module documentation predicted
+Groebner.jl's reported time, which makes the published ratio smaller rather than larger — the
+adapter's module documentation predicted
 exactly this and predicted the mechanism (`src/grobner/external/groebner_jl.rs:33-35`: "a code path
 the proxy does not reach … compiles inside the timed call, so the figure over-states Groebner.jl's
 time and never under-states it").
@@ -432,8 +436,9 @@ because it is unexplained.** Of the measured 344x, §6 can address factor C and 
 A (4.89x) is a design commitment Zeebra should keep. Factor B (5.03x) is an algorithm substitution
 that §6 never proposed, because §6 was looking for stages to speed up and this stage needs
 replacing. What is reachable, taking items 1 and 2 above and keeping the deterministic kernel, is
-roughly **424 ms against 29 913 ms — a 70x improvement, landing 4.89x behind the published figure
-and ahead of every other deterministic engine measured on this row.** That is a target; it is not a
+roughly **424 ms against 29 913 ms — a 70x improvement, landing 4.89x behind Groebner.jl's own
+randomized figure and ahead of every other deterministic engine measured on this row.** That is a
+target; it is not a
 forecast, because a ceiling bounds the conceivable and not the achievable (§6a), and factor C has no
 measured decomposition yet at all.
 
