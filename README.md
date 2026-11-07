@@ -101,6 +101,7 @@ shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
 bash scripts/agent/test/zb-claim-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/merge-base-age-test.sh
+bash tools/test/benchlock-test.sh
 ```
 
 The Rust examples in this file are **compiled and run** by `cargo test --doc`, through a
@@ -382,6 +383,83 @@ is invoked with this directory as the working directory, and profile settings co
 workspace being built. A downstream build gets whatever that build configures, so a dependent
 crate wanting these settings must set them itself.
 
+#### An out-of-tree measurement harness
+
+That last paragraph is also **a third way to lose the ISA floor, and the only one with no mistake
+to avoid.** A benchmark harness in its own crate outside this worktree, depending on `zeebra` by
+path, inherits neither the `rustflags` nor the profile — cargo resolves config from the invocation
+directory upward, and `[profile.release]` comes from the crate being built. `RUSTFLAGS` need never
+be set. The build succeeds, the tests pass, and the numbers are smooth and self-consistent.
+
+It happened, and because both runs were kept the cost is measured rather than estimated
+(#352, [`docs/research/structured-sylvester.md`](docs/research/structured-sylvester.md) §5.5.1):
+
+| build | order-1 458 LU | order-1 458 Euclid | ratio |
+|---|---:|---:|---:|
+| no `target-cpu`, no LTO | 6.360 s | 3.295 ms | 1 930x |
+| `x86-64-v3`, fat LTO, cgu 1 | **2.272 s** | **1.343 ms** | **1 692x** |
+| what the flags were worth | **2.80x** | **2.45x** | — |
+
+**2.80x on the determinant**, and 12 % on the ratio — small enough to look plausible, which is the
+dangerous size. Nothing in the toolchain objected. What caught it was comparing the baseline column
+against an independently measured figure for the same quantity: #312 puts the order-1 458
+single-worker determinant at 2.404 s, the first harness said 6.360 s, and 2.6x apart is not a noise
+story.
+
+So, for a harness built anywhere but here, in order of what it buys:
+
+1. **State the comparison.** A harness that measures a quantity something else in this repository
+   already measures should print both and name the discrepancy. That is what found this, and it is
+   the only item on this list that also catches the mistakes nobody has thought of yet.
+
+2. **Print the ISA floor from inside the harness.** `zeebra::util::isa_floor()` is compiled as part
+   of *your* build, so it reports your flags and not this repository's — one line in the header and
+   a silent miss becomes a visible one:
+
+   ```rust
+   println!("ISA: {}", zeebra::util::isa_floor());
+   ```
+
+   `zeebra::util::has_isa_floor()` is the predicate, for a harness that would rather refuse to
+   record a figure than label it.
+
+3. **Pass the build configuration explicitly.** Either put the settings on the invocation —
+
+   ```sh
+   cargo build --release \
+     --config 'target."cfg(target_arch = \"x86_64\")".rustflags = ["-C", "target-cpu=x86-64-v3"]' \
+     --config 'profile.release.lto = "fat"' \
+     --config 'profile.release.codegen-units = 1'
+   ```
+
+   — or copy `.cargo/config.toml` into the harness crate **and** restate `[profile.release]` in its
+   `Cargo.toml`. Copying the config file alone is not enough and is the trap inside the fix:
+   profiles live in `Cargo.toml`, and this repository's `.cargo/config.toml` carries no `[profile]`
+   section, so the copy brings the ISA floor and leaves `lto = "fat"` and `codegen-units = 1`
+   behind.
+
+   Verified on a throwaway out-of-tree crate, counting VEX-encoded instructions over SIMD registers
+   in the resulting binary: **0** for a plain `cargo build --release`, **70** with
+   `.cargo/config.toml` copied, **79** with all three settings passed by `--config`. The profile
+   half is visible in `cargo build -v`: the `--config` route shows `-C lto=fat` and
+   `codegen-units=1` on the rustc command line, and the copied-config route shows neither.
+
+   One trap while checking any of this, which cost a figure here before it was noticed: if the
+   environment sets `CARGO_TARGET_DIR` — this workstation's `~/projects/.cargo/config.toml` does,
+   to a shared build cache — then `target/release/<name>` does not exist and `objdump` on it
+   silently reports nothing, which reads as "no AVX2". Pass `--target-dir` explicitly, or resolve
+   the path with `cargo metadata --format-version 1 --no-deps`, and confirm the file exists before
+   believing a census of it.
+
+Note that `tools/vec_census.sh` will not catch this for an arbitrary harness. Its signal is vector
+*multiplies*, which only exist for an artifact exercising a **4-byte** field — a 32-bit Montgomery
+reduction is 64-bit arithmetic LLVM can put in a lane and a 64-bit one is 128-bit arithmetic it
+cannot — so it reports zero for an 8-byte-field harness whether the floor is there or not. A
+general static probe is harder than it looks, and #385 records the measurements that killed one:
+the AVX2 and BMI2 instructions in a baseline-built binary's explicitly dispatched
+`#[target_feature]` kernels are indistinguishable, instruction by instruction, from those a real
+`x86-64-v3` build emits.
+
 #### No compiler cache, and why that is the measured choice
 
 `.cargo/config.toml` sets `[build] rustc-wrapper = ""`, which **disables** any compiler cache
@@ -445,6 +523,78 @@ The lock handles contention and nothing else. Also needed, per invocation:
   against everyone else.
 - A memory ceiling enforced by `tools/rss-guard.sh`, not by a hand-rolled `pgrep -f` loop. See
   below.
+- **`setsid`, so the run survives its launcher.** See *Why a run ended* below.
+- A build whose ISA floor actually survived. `.cargo/config.toml` is not inherited by a harness
+  crate built outside this worktree, which is a third route to losing `-C target-cpu=x86-64-v3`
+  with no `RUSTFLAGS` mistake to avoid (#352); `tools/benchlock.sh` lists it among the hazards the
+  lock does not handle.
+
+#### Why a run ended
+
+An `END` line names its cause, and **`end=exited` rather than `status=0` is what says a measurement
+completed**. The distinction is not decorative. A 1.5-hour Anemoi run was killed at 3 177 s of a
+5 400 s budget when the agent harness stopped the background shell that had launched it — taking
+`benchlock`, `timeout`, `taskset` and the binary with it, since all four were its descendants — and
+the log recorded:
+
+```text
+2026-11-06T20:01:47-05:00  END  zb-m25-anemoi  pid=2761621  status=0  elapsed=3177s  ...
+```
+
+`status=0`, a plausible `elapsed`, and no resource limit anywhere near being crossed. From the
+lock's side the measurement had finished; the only clue otherwise was an output file holding eleven
+header lines and no stage table. That consumed 53 minutes of a serialized mutex with three other
+agents queued behind it *while reporting success*, and it made every historical `END status=0`
+retroactively ambiguous — which matters because the resource policy authorizes bounded runs on the
+grounds that a budget stop is observable and attributable, and it is not, if a budget stop and an
+unrelated kill read the same (#344).
+
+So the cause is now explicit:
+
+| field | meaning |
+|---|---|
+| `end=exited` | the command ran and returned on its own; `status=` is its own status |
+| `end=budget` | status 124, GNU `timeout`'s convention — a resource-attributed stop |
+| `end=signalled-child(NAME)` | the command itself died of a signal; `status=` is 128+n |
+| `end=launcher-signal(NAME)` | **the lock itself was signalled.** `status=` is forced to 128+n however the command exited, and `child=` keeps the command's own status visible |
+| `launcher=gone` | the run outlived the process that launched it |
+| `end=aborted`, `route=trap` | the `END` came from the `EXIT` trap, so the lock never reached its own last line and never observed the command return. Never `end=exited`, and `status=` is 128 rather than 0 |
+
+`end=launcher-signal` is the one that closes the incident, and the override is the point: in that
+run the child reported **0**, because an intermediate `bash run.sh` with no `set -e` exited on its
+own last command after the binary beneath it had died. No exit status reaching the lock could have
+been trusted, so a signal to the lock now outranks whatever the command said.
+
+Two cases leave no `END` at all, both honestly. A signal arriving while a caller is still
+**queued** leaves a `QUEUED` line and nothing else, which is right: no `START` means no window was
+opened, so nothing later can look like it overlapped. And `kill -9` cannot be trapped, so it leaves
+a `START` with no `END` — an unterminated window, unhelpful but not a claim that anything finished,
+and the one case no script can prevent. Verified by process-group kill:
+
+```text
+kill -TERM  ->  status=143 end=launcher-signal(TERM) child=143
+kill -HUP   ->  status=129 end=launcher-signal(HUP)  child=129
+kill -USR1  ->  status=138 end=launcher-signal(USR1) child=138
+kill -KILL  ->  (no END line)
+```
+
+`launcher=gone` is a note and not a failure, deliberately — `setsid` reparents a run to init on
+purpose, so overriding the status on it would fail the very discipline being recommended:
+
+```sh
+setsid nohup bash run.sh > log 2>&1 < /dev/null &
+ps -o pid=,sid= -p "$!"   # a session id that differs from this shell's is the confirmation
+```
+
+The lock does **not** call `setsid` itself. A detached run that nobody can cancel is its own
+hazard, and that trade is worse than the one it would fix; so the lock records what happened rather
+than preventing it.
+
+`tools/test/benchlock-test.sh` covers the classification and reproduces the incident end to end —
+benchlock in its own session, a measured command whose wrapper swallows the kill and exits 0, and a
+signal to the whole process group — asserting that the resulting `END` is not `status=0`. It runs
+in CI's `agent-scripts` job, in a throwaway `ZEEBRA_BENCHLOCK_DIR`, so it never takes the real lock
+or appends to the real log.
 
 #### Enforcing a memory ceiling
 
@@ -914,6 +1064,31 @@ answer is no. Over GF(65521), the Courtois MinRank challenge field, degree 65521
 `field_equations` refuses outright only when `q` exceeds a monomial exponent, which is a
 representation limit rather than a policy.
 
+The *solving* half is covered end to end over both characteristic-two fields by
+`tests/boolean_readiness.rs`. Over GF(2), `fglm_to_lex` converts the field-equation ideal and
+`solve_zero_dimensional` returns **exactly** the point set an exhaustive walk of all 256 assignments
+finds — no dropped solution and none invented over an extension. Over GF(2^8) the degree-256
+equations are usable rather than merely representable, and `roots` works, which exercises the
+characteristic-two trace splitter at `m = 8` where every earlier test had `m = 1`.
+
+Three caveats a caller should know, each asserted rather than described:
+
+- **GF(2) is `Zp2`, not `BinaryFieldElement<0b11>`.** The two are the same field — the full operation
+  tables agree — but `Zp2` is 4 bytes to the other's 8 and needs no carry-less multiply for a field
+  where multiplication is `and`.
+- **No GF(2^8) system can be read from text.** `FiniteField::from_str` is `todo!()` for
+  `BinaryFieldElement`, and `MultivariatePolynomial::parse` unwraps it, so parsing over `Gf256`
+  **panics**. GF(2) parses fine. This is #377, and it is what actually blocks the GF(2^8) importers.
+- **Omitting the field equations is diagnosed on only one route.** `SolveStrategy::GrevlexF4ThenFglm`
+  reports a positive-dimensional ideal immediately; the default `DirectLexF4` exhausts a
+  Macaulay-matrix budget and reports a *resource* failure, which invites raising a limit that cannot
+  help. #376.
+
+[`docs/research/boolean-solving.md`](docs/research/boolean-solving.md) is the readiness write-up:
+what runs in characteristic two, what does not and why, and the Singular oracle's position (it has
+covered GF(2) all along — 40 of the 240 committed differential fixtures are at characteristic 2 —
+and is prime-field only, so there is no GF(2^8) oracle yet: #378).
+
 ### A 32-bit prime field
 
 `PrimeFieldElement32<P>` is the same field as `PrimeFieldElement64<P>` for any modulus both can
@@ -1379,10 +1554,10 @@ dispatched the same way, recursively, and what it costs depends on the factor:
 | an odd prime power (9, 25, 27) | the `O(m^2)` definition | `n * n_i` |
 
 So `2520 = 2^3 * 3^2 * 5 * 7` costs `n log 8` plus `n * (9 + 5 + 7)`, which is why a size whose
-odd factors are small is cheap and **a large prime size is quadratic**. Bluestein is the fix for
-that case — rewriting the DFT as a convolution of length `>= 2n - 1` — and it is deliberately not
-here: it needs a `2n`-th root of unity and the convolution rather than a re-indexing. Filed as
-#357.
+odd factors are small is cheap and **a large prime size is quadratic through this route**.
+[Bluestein](#bluestein-a-large-prime-size-without-the-quadratic-cost) is what removes that case,
+and it is a separate entry point rather than a decomposition the dispatcher reaches on its own —
+see below for why.
 
 Two consequences of allowing any size, both visible in the API:
 
@@ -1393,6 +1568,104 @@ Two consequences of allowing any size, both visible in the API:
   `g^6 != 1` and would otherwise have been accepted.
 - `FFTDomain::split` — the radix-2 even/odd split — panics on an odd size, where the halves would
   not be the same length.
+
+### Bluestein: a large prime size without the quadratic cost
+
+Bluestein's algorithm turns a length-`n` transform into a **convolution**, which the radix-2 kernel
+runs at a padded power-of-two length. It is `O(n log n)` at every size, prime included, so it is
+what the quadratic row of the table above gives way to.
+
+The textbook identity is `jk = (j^2 + k^2 - (k - j)^2) / 2`, whose halved squares need a `2n`-th
+root of unity to write down. This uses the **triangular numbers** `T(m) = m(m - 1) / 2` instead:
+
+```text
+T(j) + T(k) - T(k - j) = jk - j,     so     jk = T(j) + j + T(k) - T(k - j)
+```
+
+giving
+
+```text
+X_k = w^T(k) * sum_j (x_j w^(T(j) + j)) * w^(-T(k - j)).
+```
+
+Every exponent is an integer and every factor is a power of the `n`th root the caller already
+holds, so there is no second root to construct, validate, or fail to find. Nothing is lost by it:
+for odd `n`, `n | q - 1` already implies `2n | q - 1`, and for even `n` the convolution length
+needs two-adicity at least `log2(n) + 1` — because `2n - 1` is odd and above one, so it is not a
+power of two and `L >= 2n` — which is never less than the `2n`-th root's own `v2(n) + 1`. A field
+that can host the convolution always has a `2n`-th root; one that cannot never gets far enough to
+want it.
+
+So the convolution length is the single demand on the field, and `bluestein_convolution_domain`
+is where it is either met or reported:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform,
+    fields::KoalaBear, FFTDomain, FiniteField, KnownOrder, Zero,
+};
+
+// KoalaBear: q - 1 = 2^24 * 127, so 127 is a size this field has a root of unity for — and the
+// one the prime-factor route would spend 127^2 multiplications on.
+type F = KoalaBear;
+let n = 127;
+
+let mut rng = StdRng::seed_from_u64(127);
+let domain = FFTDomain::from_generator(F::root_of_unity(n as u64, &mut rng), n);
+
+// The convolution runs at the least power of two at or above 2n - 1, so that the cyclic
+// convolution does not alias the two ends of the chirp onto each other.
+assert_eq!(bluestein_convolution_length(n), 256);
+let convolution_domain = bluestein_convolution_domain::<F, _>(n, &mut rng).unwrap();
+
+let coefficients: Vec<F> = (0..n).map(|i| F::new(i as u64 + 1)).collect();
+let mut values = coefficients.clone();
+bluestein_transform(&mut values, &domain, &convolution_domain);
+
+// The same thing the Vandermonde definition gives, in n log n rather than n^2.
+for (k, value) in values.iter().enumerate() {
+    let mut expected = F::zero();
+    for (j, c) in coefficients.iter().enumerate() {
+        expected += *c * domain[(j * k) % n];
+    }
+    assert_eq!(*value, expected);
+}
+```
+
+A field too shallow in two-adicity to hold a primitive `L`-th root is a fact about the field, so it
+is a value rather than a panic — the same line #120 drew for `DomainError`, in the existing
+`RootOfUnityError` vocabulary:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    bluestein_convolution_domain,
+    fields::{Mersenne31, RootOfUnityError},
+    FFTDomain, KnownOrder,
+};
+
+// Mersenne-31: q - 1 = 2 * (2^30 - 1), so its two-adicity is 1 and there is no transform here
+// beyond size two. A size-5 Bluestein would want a 16-point convolution.
+assert_eq!(Mersenne31::two_adicity(), 1);
+let mut rng = StdRng::seed_from_u64(2);
+assert_eq!(
+    bluestein_convolution_domain::<Mersenne31, _>(5, &mut rng),
+    Err(RootOfUnityError::TwoAdicityExceeded { log_n: 4, two_adicity: 1 }),
+);
+```
+
+**It is not yet dispatched to automatically.** `evaluate` and `interpolate` at a prime size still
+take the quadratic route, and reaching Bluestein means calling it. Two reasons, both of which want
+their own change:
+
+- The crossover against the quadratic definition is **unmeasured**. `dft` is quadratic but
+  allocation-free and branch-free, while Bluestein pays three `n`-length chirp passes plus a padded
+  convolution of length up to `4n`, so below some size the quadratic route wins. No figure is
+  quoted here because none has been measured.
+- `prime_factor::transform_any` is generic over `FiniteField`, and constructing a primitive `L`-th
+  root needs `KnownOrder` and an rng. Tightening that bound would propagate through `evaluate` and
+  `interpolate` into the polynomial API — a breaking change that is a decision, not a side effect.
 
 ### What the univariate stages cost
 
@@ -2727,8 +3000,13 @@ the 2.868 ms order-162 anchor every earlier projection used does not reproduce.
 `grobner::research::MqInstance` imports instances from the
 [Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
 no new arithmetic — `PrimeFieldElement64<31>` already exists, and `Zp31` is the same field in four
-bytes — and the GF(2) and GF(2^8) families
-are refused by name, because `binary_field` and `extension_field` are not publicly exported.
+bytes — and the GF(2) and GF(2^8) families are refused by name, each for its own reason. **Not for
+want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
+long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
+path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
+*and* #377, because `FiniteField::from_str` is `todo!()` for `BinaryFieldElement`, so a `Gf256`
+system cannot be read from text at all; the challenge's modulus, which is not the AES one, is
+`Gf256Mq`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
@@ -2766,7 +3044,9 @@ of published cryptanalysis instances worth importing next, with the rejections a
 Four candidates are accepted: reduced-round **Anemoi** CICO, whose reference data is raw Magma F4
 and FGLM logs under MIT and whose quotient dimension is a published `(α+2)^N` zeebra can be checked
 against; reduced-round **Griffin**; Anemoi's `ACICO` model as a second formulation of the first; and
-reduced-round **LowMC**, which is blocked on `binary_field` not being exported. UOV, MAYO, Arion and
+reduced-round **LowMC**, recorded there as blocked on `binary_field` not being exported — which it is
+not: the module is public and LowMC is over GF(2), where the whole solve path works
+(`docs/research/boolean-solving.md` §6). UOV, MAYO, Arion and
 XHash8 are rejected, each with a recorded reason. The document also states plainly that the
 [LowMC challenge](https://lowmcchallenge.github.io/) is a **claimed-complexity competition** — its
 results are `log₂ T` and `log₂ M` estimates, several with memory exponents past 65 bits, and there
@@ -2795,6 +3075,27 @@ designers' reference implementation, and the paper's `(δ, µ)` index convention
 published witnesses decide the ambiguity — one reading reproduces 5 of 5 and the other 0 of 5 — so
 the instance is reconstructed rather than guessed. That is the argument the document makes for
 preferring candidates that publish a witness.
+
+#### Courtois MinRank A–F, where the challenge is a parameter set and not a file
+
+[`docs/research/minrank.md`](docs/research/minrank.md) is the provenance record for the six MinRank
+challenges Courtois proposed in 2001, read from the original publication rather than from the
+literature that cites it. The parameters are verified and are committed, machine-readable, in
+`research/minrank/courtois-challenges.tsv`; `tests/minrank_challenges.rs` re-derives the paper's own
+solution-probability column from them, so a transcription slip in any of `q`, `η`, `n`, `m` or `r`
+fails a test instead of propagating.
+
+The finding that matters is negative. The paper proposes "six **sets of parameters** A-F"; it
+publishes no matrices, offers no prize, and the scheme's official page — archived eight times
+between 2001 and 2003 — carries papers and slides only. **No authentic instance of any of A–F was
+ever published**, and the construction that would regenerate one needs a 160-bit seed and a
+generator the paper names neither of. Both published breaks, the 2010 one on C and the 2026 one on
+D, ran on instances their authors generated; the 2026 abstract says so in as many words ("**an**
+instance"). So a same-parameter instance here is not a degraded substitute — it is the same kind of
+object every published result used — but the published costs stay a **difficulty scale and not a
+comparand**, and nothing is in [the registry](#the-challenge-registry) until a generator exists to
+digest. The document also corrects the verifier: the condition is `rank(Σ αᵢ Mᵢ − M₀) ≤ r` over
+`1 + m` matrices, so challenge A is eleven `6 × 6` matrices over `GF(65521)`, not ten.
 
 #### Anemoi, the first candidate actually imported
 

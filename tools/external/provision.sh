@@ -231,6 +231,21 @@ provision_sagebrush() {
   log "building the Sagebrush Groebner driver"
   # RUSTC_WRAPPER="" defeats a globally configured sccache, which keys on CARGO_TARGET_DIR and
   # would otherwise produce a stale rlib here.
+  #
+  # This build is **outside Zeebra's worktree**, which is #352's third route to a lost ISA floor:
+  # cargo resolves config from the invocation directory upward, so `cd "$PREFIX/sagebrush-driver"`
+  # inherits none of `/.cargo/config.toml`, and `[profile.release]` comes from the driver's own
+  # `Cargo.toml` — which sets `opt-level = 3` and nothing else. So the comparand is built at
+  # baseline `x86-64` with no LTO, while Zeebra's own side of every comparison is built at
+  # `x86-64-v3` under fat LTO at one codegen unit. Confirmed on the installed binary: its only
+  # AVX2/BMI2 instructions are inside Sagebrush's and dashu's explicitly dispatched
+  # `dense_axpy_avx2` and `*_bmi2` kernels, which a baseline build contains too.
+  #
+  # Deliberately **not** changed here. `docs/research/external-comparison-protocol.md` wants each
+  # side's ISA floor recorded, and raising the comparand's would be the fairer configuration — but
+  # it would also change every recorded Sagebrush timing, so it needs a serialized re-measurement
+  # rather than a quiet flag. Tracked in #385; the README section "An out-of-tree measurement
+  # harness" has the recipe for when that decision is made.
   (
     cd "$PREFIX/sagebrush-driver"
     RUSTC_WRAPPER="" \
@@ -239,6 +254,8 @@ provision_sagebrush() {
       cargo build --release
   ) > "$BUILD/sagebrush-driver.log" 2>&1
   ln -sf "$PREFIX/cargo-target/release/sagebrush-gb-driver" "$PREFIX/bin/sagebrush-gb-driver"
+  log "the driver is built at baseline x86-64 with opt-level=3: it is outside the worktree, so it"
+  log "inherits neither target-cpu=x86-64-v3 nor the release profile (#352)"
   note "sagebrush-gb-driver"
 }
 

@@ -233,6 +233,7 @@ jobs:
           bash scripts/agent/test/zb-claim-test.sh
           bash tools/test/rss-guard-test.sh
           bash tools/test/merge-base-age-test.sh
+          bash tools/test/benchlock-test.sh
 
   # How stale the base of this run's merge is, and whether the gap touches the same files the pull
   # request does (#339).

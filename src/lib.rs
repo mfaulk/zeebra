@@ -33,8 +33,9 @@ pub mod util;
 pub(crate) mod test_support;
 
 pub use fft::{
-    evaluate, fft_multiplication_crossover, interpolate, multiply, multiply_above,
-    multiply_over_domain, powers_of, try_multiply_via_fft, DomainError, FFTDomain,
+    bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform, evaluate,
+    fft_multiplication_crossover, interpolate, multiply, multiply_above, multiply_over_domain,
+    powers_of, try_multiply_via_fft, DomainError, FFTDomain,
 };
 pub use fields::{FiniteField, KnownOrder, ParseFieldElementError};
 pub use identities::{One, Zero};
