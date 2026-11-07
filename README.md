@@ -355,7 +355,14 @@ cargo bench --bench f4_stages
 cargo bench --bench fglm                 # order conversion: stages, pipeline, strategies,
                                          # dependence, the shipped configuration, verification
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
+cargo bench --bench sparse_polynomial    # multivariate arithmetic, four arities
 ```
+
+`sparse_polynomial`'s `mul_dense` arm is separate from `mul` because they are different shapes, not
+just different sizes. `mul` draws monomials independently, which is sparse in the total-degree sense
+at every size; `mul_dense` builds the dense total-degree simplex, which is what the symbolic
+resultant build actually produces and what selects the specialised bivariate multiplication route.
+An arm of only the first kind cannot catch a wrong dispatch predicate.
 
 `sparse_linear_algebra` has two groups, and the difference between them matters. `sparse_linalg`
 times sparse row echelon beside dense *reduced* row echelon, which performs a back-substitution
