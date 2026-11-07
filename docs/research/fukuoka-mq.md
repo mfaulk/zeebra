@@ -281,9 +281,12 @@ here:
    whose digits happen to all be decimal — `08`, `13`, `99` — would parse as a *different* element
    and pass the range check silently. Making `MqField::parse` accept the real header without also
    switching to base 16 would turn a loud failure into a wrong system. Filed as #414.
-3. `MqInstance::parse_answer` splits on `!c.is_ascii_digit()`, so the published GF(2^8) answer
-   `[a3, 67, 64, 5c, ab, 81, 4f, e6, f5, b8]` yields nine values rather than ten, each of them
-   wrong, with no error. Filed as #415.
+3. `MqInstance::parse_answer` split on `!c.is_ascii_digit()`, so the published GF(2^8) answer
+   `[a3, 67, 64, 5c, ab, 81, 4f, e6, f5, b8]` yielded nine values rather than ten, each of them
+   wrong, with no error. Filed as #415 and **fixed**: the parser is a method on the instance, takes
+   its base from `MqField::answer_radix`, and returns `Result` — so a coordinate count that is not
+   the instance's `n` is `MqError::WrongAnswerCount` and an unreadable or out-of-range token is
+   `MqError::BadAnswerValue`, instead of either being dropped.
 
 Since `from_str` for `BinaryFieldElement` reads a **decimal** integer as a bit pattern (#377), it is
 not the route for these tokens either: the importer needs its own base-16 decode.
@@ -425,7 +428,8 @@ also what every published type V and type VI solve did.
 
 - **GF(2^8) import** is three specific defects, not one gap: the header is unparsed (#414), the
   coefficients need base 16 and silently mis-read as decimal if the header check is relaxed without
-  it (#414), and `parse_answer` mis-parses a hex answer without erroring (#415). The modulus
+  it (#414). The third, `parse_answer` mis-parsing a hex answer without erroring, is closed (#415):
+  it reads base 16 over GF(2^8) and refuses a short or unreadable file by name. The modulus
   question is settled: `Gf256Mq` (`0x11D`), verified against a published answer in §2.4. #197 owns
   the import path.
 - **The exported-module story is finished and is no longer a reason for anything.** The previous

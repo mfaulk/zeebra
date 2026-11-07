@@ -41,16 +41,27 @@ fn directory() -> PathBuf {
 fn load(stem: &str) -> Option<(MqInstance, Vec<u64>)> {
     let path = directory().join(stem);
     let text = std::fs::read_to_string(&path).ok()?;
-    let answer = std::fs::read_to_string(directory().join(format!("{}-answer", stem)))
-        .map(|t| MqInstance::parse_answer(&t))
-        .unwrap_or_default();
-    match MqInstance::parse(&text) {
-        Ok(instance) => Some((instance, answer)),
+    let instance = match MqInstance::parse(&text) {
+        Ok(instance) => instance,
         Err(e) => {
             println!("{}: {}", path.display(), e);
-            None
+            return None;
         }
-    }
+    };
+    // A missing answer file is ordinary: not every instance publishes one. A present one that does
+    // not parse is not ordinary at all — it is the check the import is verified against, so it is
+    // reported rather than turned into an empty vector (#415).
+    let answer = match std::fs::read_to_string(directory().join(format!("{}-answer", stem))) {
+        Ok(text) => match instance.parse_answer(&text) {
+            Ok(answer) => answer,
+            Err(e) => {
+                println!("{}-answer: {}", path.display(), e);
+                return None;
+            }
+        },
+        Err(_) => Vec::new(),
+    };
+    Some((instance, answer))
 }
 
 /// The manifest for an instance, with everything a reproducible result needs.
