@@ -882,12 +882,26 @@ cross-rung basis comparison. The conversion figures are unaffected — #305 is a
 yet crossed it. **Three of F4's four relevant budgets were discovered by separate refusals rather
 than by reading the struct**, which is #322's complaint with a third instance.
 
-The comparison this produced is worth more than the fix. The published Magma run on **this exact
-row** peaks at **173 808 × 189 401** — *inside* the 200 000 default it refused on. So this crate's
-symbolic preprocessing enumerates more rows than Magma's for the same system at the same rung, and
-the default is not obviously the wrong size for a library. That is an **F4** observation, and it
-lands on the structure #305 has just bounded, which is why the re-attempt is on a post-#305 build
-rather than the one that produced the refusal.
+**The comparison this produced is a competitive result, and must not be fixed away by raising a
+constant.** The published Magma run on **this exact row** peaks at **173 808 × 189 401** — *inside*
+the 200 000 default that Zeebra refused on. Same system, same model, same round count, same
+characteristic. So:
+
+> **For a problem Magma reduces within a 173 808-row matrix, this crate's symbolic preprocessing
+> enumerates more than 200 000 rows. That is a measured difference in preprocessing selectivity
+> between two F4 implementations, not a budget-tuning problem.** The 200 000 default is not
+> obviously the wrong size for a library — Magma fits under it on this row — so raising it is a
+> workaround that lets the measurement proceed and leaves the difference in place.
+
+It belongs in #263's gap map on that basis, beside the conversion deficit in §8a.7, and the two are
+independent: §8a.7 is an FGLM result and this is an **F4** one. Neither follows from the other.
+
+Two caveats on how far it generalizes. The row counts are not strictly like for like — Magma's
+figure is the peak *reduced matrix* it reports, and Zeebra's is the row set symbolic preprocessing
+enumerated before reduction, so part of the gap may be a counting convention rather than selectivity
+and the honest claim is a one-row observation rather than a ratio. And it lands on exactly the
+structure #305 has just bounded, which is why the re-attempt is on a post-#305 build: the figure may
+well move, and if it does, that is #305 earning its keep rather than this finding evaporating.
 
 #### Attempt 1, `PCICO`: lost to infrastructure at 3 177 s of 5 400 s — **not** a result
 
