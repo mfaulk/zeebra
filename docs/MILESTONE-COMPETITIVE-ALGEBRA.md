@@ -676,12 +676,42 @@ Four engines are provisioned on this machine, pinned, and reachable through one 
 | Sagebrush | `86d9f1c7` | `p < 2^62` (`lib.rs:1552`) | via `SB_FGLM` | **timings not authoritative** — §13.6 |
 | Singular | 4.4.1 (44105) | `p < 2^31` | `fglm` | pre-existing |
 
-**Where Zeebra loses, and it is the cleanest comparable measurement the milestone produced.** On
+**Zeebra loses in two places, and they are different places.** That matters more than either
+figure: one explanation is unlikely to cover both, and the report does not offer one.
+
+**Loss 1 — order conversion, ~30x against msolve.** On
 Anemoi `N = 5` FGLM at `p = 65537`, same machine, byte-identical generators: **~21–35x end to end**
 and **~30x on the conversion stage** against msolve. The ~280x per-core figure is defensible **for
 the conversion stage only** — that stage is single-threaded at ~1 CPU-second per wall second
 observed, while the basis stage had eight cores. Quoting per-core for the whole solve would
 overstate it.
+
+**Loss 2 — the basis stage, 4.11x against Singular**, on `mq-random-10`: 29 963 ms against 7 291 ms,
+with conversion 3.57x behind as well. Zeebra against Singular 4.4.1 on all 19 corpus rungs × both
+tasks, one machine, `taskset -c 0-7`, one worker, under `benchlock`. Every completed row agreed on
+the quotient dimension — 9, 25, 57, 64, 81, 156, 354, 1024, 16 384 — which is what licenses the
+timings at all.
+
+Two things make it more consequential than its size:
+
+- **It is in F4, not conversion.** On Anemoi the conversion was 75% of the solve; here conversion is
+  nearly free (30.6 s against a 30.0 s basis) and the **whole** gap is in the basis. §6's gap map had
+  the basis stage as "not yet measured"; it now has rank 2 at ~22.7 s absolute.
+- **Random MQ is the corpus family closest in shape to a cryptanalytic system** — dense, square,
+  quadratic, no exploitable structure. Loss 1 was on a structured CICO row at a 17-bit prime; this is
+  a deficit on **the problems Zeebra exists for**.
+
+**A measurement-method result that disqualifies four of Zeebra's apparent wins, and it is the most
+reusable thing in this section. Singular's startup floor is 36.0 ms, measured.** Five rows cluster at
+36.01, 36.04, 36.05, 36.07 and 36.08 ms across instances whose quotient dimensions differ by a factor
+of **2 000**. A figure that constant across that range is not a computation. The rule:
+
+> Where a comparand's wall is within ~2x of its own floor, the row is **not an engine comparison in
+> either direction**.
+
+That disqualifies apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x**. The 450x is the sharpest
+warning this milestone produced about reading a ratio without checking its denominator's floor — and
+it would have been a very attractive number to publish.
 
 **Where Zeebra cannot be compared, which is three results rather than three gaps.**
 
@@ -853,7 +883,8 @@ memory", and a budget that bounds one structure cannot bound the other.
 |---|---|---|
 | **#202 Griffin/FreeLunch** | **no-go for M25**; capability costed as #306, deferred | Fails on *worth*, not expressibility. All five published witnesses lie on **one affine line** whose `(a,b)` the paper does not publish — recovered from two `r=5` witnesses, confirmed **3/3 out of sample** at `r=6,7`. `D_I` reproduces `(6α+3)(α(2α+1))^(r−3)` at 21/441/9261. The blocker is **not** a polynomial-matrix determinant (`D_H ≤ 81`, which the existing parallel sweep already covers) but **weighted monomial orders plus normal form against a given basis** — #306. |
 | **#289 determinant law** | **adopt, conservatively** | Cubic to within measurement above L2: **2.9953 ± 0.0285**, worst residual 3.7%, over orders 486 / 1 458 / 4 374. **No cache cliff** — order 4 374's 153 MB matrix exceeds L3 and still gives a local exponent of 3.045, because Crout LU is ~180 ops/byte. `RowCost::of` takes the **larger** of fitted and cubic, since 2.9953 < 3 and a model that under-predicts authorizes a run nobody costed. |
-| **#58 Wiedemann/Krylov for FGLM** | **reopen the FGLM half** | The one measured cross-library gap is order conversion, ~30x. #58 is the candidate and **is not in the H-series**. Its deferral was conditional on a named trigger, and a measured gap against a maintained implementation is new evidence. Reopen as *"the measured conversion gap is worth a Krylov route"* — **not** as "sparse-FGLM would be 30x faster", which does not follow. |
+| **#268 compact representations** | **partly rehabilitated — hold for one profile** | The only H-series item that could explain an F4 gap, and loss 2 is **4.11x in F4**. Its two target stages' ceilings are 2.59x and 1.92x, the right order to span it. **First external evidence any H-series item has had** — but the ceilings come from katsura and cyclic and the losing instance is unprofiled, so it is a hypothesis with a named, cheap test. |
+| **#58 Wiedemann/Krylov for FGLM** | **reopen the FGLM half** | The larger measured cross-library gap is order conversion, ~30x. #58 is the candidate and **is not in the H-series**. Its deferral was conditional on a named trigger, and a measured gap against a maintained implementation is new evidence. Reopen as *"the measured conversion gap is worth a Krylov route"* — **not** as "sparse-FGLM would be 30x faster", which does not follow. |
 | **#269 F4 elimination kernels** | **deprioritize** | Elimination is **7–22%**, not M16's obsolete 65–88%. Amdahl ceiling **1.07x–1.29x**, at or inside the 20% noise band, so no kernel work there can produce a readable end-to-end result before any implementation question arises. |
 | **#270 field-width specialization** | **deprioritize or re-scope** | msolve's delayed reduction is active only below `2^18`, so it is **inactive at the compared fields**; all three of its kernels use `int64_t`, so narrow kernels buy lanes rather than accumulator headroom. The gap #270 reasons from does not exist at the corpus's fields. |
 | **#271 modular composition** | **settled** | Extraction's ceiling is **1.013x–1.053x** — an *infinitely fast* stage is unmeasurable on every profiled instance. Its univariate-factoring half is a separate claim this screen does not reach. |
@@ -1004,12 +1035,26 @@ files), #205–#207 (MinRank analysis), #199 (classical-collection provenance).
 
 ### 13.9 M26 recommendation
 
-**Primary: order conversion — reopen #58's FGLM half and build a Krylov route.**
+**Run one cheap measurement first, because two deficits are now measured and it decides between
+them. Then: order conversion — reopen #58's FGLM half and build a Krylov route.**
 
-The evidence, in the order it was produced:
+**The measurement, and it should happen before anything is committed: profile `mq-random-10`'s stage
+split.** Loss 2 is 4.11x in **F4** on the corpus family closest in shape to a cryptanalytic system,
+and **#268 is the only H-series item that could plausibly explain an F4 gap** — its two target stages
+have Amdahl ceilings of 2.59x and 1.92x, the right order to span 4.11x if both contribute. That would
+be the **first external evidence any H-series item has had.** But those ceilings come from katsura
+and cyclic, and the losing instance's split is **unprofiled**, so it is a hypothesis. One profile
+either points #268 at a measured external gap or rules it out, and it costs a single run.
 
-1. It is **the only measured cross-library gap**: ~30x on the conversion stage against msolve, same
-   machine, byte-identical generators.
+This is a change from the first draft of this section, which called conversion "the only measured
+cross-library gap". It was, until the lock freed.
+
+**Why conversion is still primary if the profile does not rescue #268**, in the order the evidence
+was produced:
+
+1. It is **the larger measured gap** — ~30x on conversion against msolve versus 4.11x on the basis
+   against Singular, same machine, byte-identical generators — and conversion was **75% of the
+   Anemoi solve** where the basis deficit's instance has a conversion that is nearly free.
 2. It is **outside the series that was supposed to contain the next optimization.** #263's structural
    finding is that H12–H17 were scoped before any measurement existed, and the measurement says the
    largest lever is not among them. #269 and #270 are falsified on arithmetic; #271 is settled; #272
@@ -1024,11 +1069,23 @@ The evidence, in the order it was produced:
    linear form can reuse the existing `O(N·D)` verification **unchanged**, so it could ship certified
    rather than conjectural.
 
+6. The published literature agrees on where the bottleneck is: eprint 2026/1905 names the
+   change-of-ordering step, performed by FGLM, as the bottleneck for the Gröbner-basis attack. That
+   is external corroboration of the stage, independent of Zeebra's own profile.
+
 Stated carefully, because the inference is easy to overdraw: the three engines reach a lex basis by
 **three different algorithms** — lex walk, Keller-Gehrig spin, Wiedemann scalar sequence — so the 30x
 is Zeebra's conversion against msolve's on one family at one prime. It is evidence that a Krylov
 route is worth building. It is **not** evidence that sparse-FGLM would be 30x faster, and
 `MILESTONE-FGLM-SCALABILITY.md` §8.5's three measurements against that claim still stand unrefuted.
+
+**And stated as contested, which it was not before.** Loss 2 is in a different subsystem, on a
+different family, against a different engine, and it is the family that matters most for the
+long-term objective. If the profile implicates #268's two stages, the cheaper and better-targeted
+investment is **compact monomial and polynomial representations**, not a Krylov route — and #268
+would then be the rare case of an H-series item surviving the screen on *external* evidence rather
+than being closed by it. The honest position is that M25 measured two deficits and funded neither
+blind.
 
 **Ranked alternatives.** *Structure-exploiting algorithms* (#306 → #202) — the Griffin instance is
 now pinned including the attack's input parametrization, and the capability is costed; the obstacle
