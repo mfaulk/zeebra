@@ -249,19 +249,50 @@ pub enum Equivalence {
     /// that still licenses a timing.
     LiveOracle { tool: &'static str },
 
-    /// No comparand can represent the field, so no cross-library check is possible at all.
+    /// Exactly **one** external engine can represent the field, so nothing corroborates it.
     ///
-    /// **Not a gap in the work.** Anemoi's published parameters are over `2^64 - 353`, and msolve
-    /// and Singular both stop below `2^31`; the family is in the corpus as the concrete case that
-    /// makes the ceiling visible. No timing is publishable, and the reason is permanent until a
-    /// 64-bit-capable comparand is validated against something.
+    /// **The limit is corroboration, not representability**, and the distinction decides what to
+    /// do about it: representability needs a *new* tool, corroboration needs a *second* tool at
+    /// the same field. Agreement here is two-way, Zeebra against the one engine, and cannot be
+    /// triangulated — so a disagreement says one of the two is wrong without saying which, where a
+    /// three-way disagreement usually names the odd one out.
+    ///
+    /// A timing **is** publishable: the ratio is taken on one machine at one task under one limit,
+    /// and the invariants can still be checked between the two engines. What is unavailable is
+    /// independent confirmation that both are not wrong the same way. [`Self::is_corroborated`]
+    /// is the check a renderer should mark the row on.
+    SoleComparand {
+        tool: &'static str,
+        reason: &'static str,
+    },
+
+    /// No external engine can represent the field, so no cross-library check is possible at all.
+    ///
+    /// **Not a gap in the work**, and now a narrower claim than it was: it applies to Zeebra's
+    /// 254/255-bit fields, where no surveyed engine reaches. No timing is publishable.
     NoComparand { reason: &'static str },
 }
 
 impl Equivalence {
     /// Whether a cross-library timing may be published for a family with this evidence.
+    ///
+    /// True for [`Self::SoleComparand`]: one engine at one field on one machine still gives a
+    /// valid ratio and a checkable invariant. What it does not give is corroboration, which is
+    /// [`Self::is_corroborated`]'s question and a separate one.
     pub fn licenses_timing(&self) -> bool {
         !matches!(self, Self::NoComparand { .. })
+    }
+
+    /// Whether a **third** opinion exists, so that a disagreement could name the odd one out.
+    ///
+    /// False for [`Self::SoleComparand`] and [`Self::NoComparand`]. A row that licenses a timing
+    /// but is not corroborated is publishable **with the fact stated** — this is the method a
+    /// renderer marks it on.
+    pub fn is_corroborated(&self) -> bool {
+        matches!(
+            self,
+            Self::ComparandFile { .. } | Self::KnownSolution | Self::LiveOracle { .. }
+        )
     }
 
     /// The stable tag used in the manifest.
@@ -270,9 +301,149 @@ impl Equivalence {
             Self::ComparandFile { .. } => "comparand-file",
             Self::KnownSolution => "known-solution",
             Self::LiveOracle { .. } => "live-oracle",
+            Self::SoleComparand { .. } => "sole-comparand",
             Self::NoComparand { .. } => "no-comparand",
         }
     }
+}
+
+/// The highest characteristic each surveyed engine accepts, each from the engine's own gate.
+///
+/// Named constants rather than prose because the **capability boundary is a general fact** and
+/// every per-family statement about it should be a consequence of these four numbers rather than
+/// an independent claim. [`corroboration`] is that consequence.
+pub mod ceilings {
+    /// msolve's prime-field bound for a basis, `iofiles.c:564`.
+    pub use crate::grobner::external::msolve::MAX_CHARACTERISTIC as MSOLVE;
+
+    /// msolve's **much lower** bound on the univariate eliminant, `linalg-fglm.c:38`. Above it the
+    /// sparse-FGLM failure is laundered into a retry loop with no exit.
+    pub use crate::grobner::external::msolve::MAX_CHARACTERISTIC_ELIMINANT as MSOLVE_ELIMINANT;
+
+    /// Singular's prime-field bound, which is also its `fglm` bound.
+    pub use crate::grobner::differential::MAX_CHARACTERISTIC as SINGULAR;
+
+    /// Sagebrush's own gate at `lib.rs:1552`. Its *basis* bound — `fglm.rs:329` caps the FGLM
+    /// route an eighth lower, which is moot while the driver exposes no FGLM at all.
+    pub use crate::grobner::external::sagebrush::MAX_CHARACTERISTIC as SAGEBRUSH;
+
+    /// Groebner.jl accepts `< typemax(UInt64)`, measured computing correctly at `2^31 - 1`,
+    /// `2^32 - 5`, Goldilocks, `2^64 - 353` and `2^64 - 59`, with **no** task-specific ceiling.
+    pub use crate::grobner::external::groebner_jl::MAX_CHARACTERISTIC as GROEBNER_JL;
+}
+
+/// How many **external** engines can check a result at `characteristic`.
+///
+/// The capability boundary, as a function rather than a table in a document. Derived entirely from
+/// [`ceilings`], so a corrected ceiling corrects every statement that depends on it.
+///
+/// This is the fact that makes Anemoi's row a consequence rather than a special case: its field is
+/// `2^64 - 353`, which only Groebner.jl reaches, so it has one engine and no corroborator — while
+/// the band below `2^62` has two and the band below `2^31` has four.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Corroboration {
+    /// Four engines. Only the basis task below `2^31` reaches this.
+    FourWay,
+
+    /// Three engines.
+    ThreeWay,
+
+    /// Two engines, **neither checkable against a third**.
+    TwoWay,
+
+    /// One engine. A timing is publishable; nothing corroborates it.
+    SoleEngine,
+
+    /// No surveyed engine performs this task at this field.
+    None,
+}
+
+impl Corroboration {
+    /// The band for a count of engines.
+    pub fn from_engines(engines: usize) -> Self {
+        match engines {
+            0 => Self::None,
+            1 => Self::SoleEngine,
+            2 => Self::TwoWay,
+            3 => Self::ThreeWay,
+            _ => Self::FourWay,
+        }
+    }
+
+    /// How many external engines perform the task at the field.
+    pub fn engines(&self) -> usize {
+        match self {
+            Self::FourWay => 4,
+            Self::ThreeWay => 3,
+            Self::TwoWay => 2,
+            Self::SoleEngine => 1,
+            Self::None => 0,
+        }
+    }
+
+    /// Whether a third opinion exists, so a disagreement could name the odd engine out.
+    ///
+    /// Two engines plus Zeebra is three implementations, but **two of them are the comparison**:
+    /// a Zeebra-against-Groebner.jl disagreement at `2^40` can be adjudicated by Sagebrush, where
+    /// at `2^63` it cannot be adjudicated at all.
+    pub fn can_triangulate(&self) -> bool {
+        self.engines() >= 2
+    }
+}
+
+/// The highest characteristic at which `engine` performs `task`, or `None` if it has no route.
+///
+/// **Ceilings are task-specific, and the differences are large.** msolve's eliminant bound is
+/// below a tenth of its basis bound; Sagebrush exposes no conversion route at all. Declaring only
+/// a basis bound is what lets a sweep run a worker into its wall limit and record a limit stop
+/// where the truth is a capability gap.
+fn ceiling_for(engine: &str, task: super::Task) -> Option<u64> {
+    use super::Task::*;
+    match (engine, task) {
+        // Basis routes: each engine's own prime-field bound.
+        ("msolve", ReducedGrobnerBasis | LexBasis) => Some(ceilings::MSOLVE),
+        ("singular", ReducedGrobnerBasis | LexBasis) => Some(ceilings::SINGULAR),
+        ("sagebrush", ReducedGrobnerBasis | LexBasis) => Some(ceilings::SAGEBRUSH),
+        ("groebner.jl", ReducedGrobnerBasis | LexBasis) => Some(ceilings::GROEBNER_JL),
+
+        // Conversion. **Sagebrush is absent, not merely limited** — its driver exposes no FGLM,
+        // so this is a missing task rather than a field ceiling.
+        ("msolve", LexBasisByConversion) => Some(ceilings::MSOLVE),
+        ("singular", LexBasisByConversion) => Some(ceilings::SINGULAR),
+        ("groebner.jl", LexBasisByConversion) => Some(ceilings::GROEBNER_JL),
+
+        // Eliminant: msolve's own far-lower bound.
+        ("msolve", UnivariateEliminant) => Some(ceilings::MSOLVE_ELIMINANT),
+        ("singular", UnivariateEliminant) => Some(ceilings::SINGULAR),
+        ("groebner.jl", UnivariateEliminant) => Some(ceilings::GROEBNER_JL),
+
+        // Nothing offers the solution tasks or the witness task at any field.
+        _ => None,
+    }
+}
+
+/// Every engine the corpus compares against.
+pub const ENGINES: [&str; 4] = ["msolve", "singular", "sagebrush", "groebner.jl"];
+
+/// The corroboration available for `task` at `characteristic`.
+///
+/// Task-aware, because the ceilings are. The case that matters most for #263: the **conversion**
+/// task, where Zeebra's only measured cross-library deficit lies, has Sagebrush missing entirely
+/// — so above `2^31` it has **one** corroborator where the basis task has two.
+pub fn corroboration_for(task: super::Task, characteristic: u64) -> Corroboration {
+    let engines = ENGINES
+        .iter()
+        .filter(|engine| ceiling_for(engine, task).is_some_and(|ceiling| characteristic < ceiling))
+        .count();
+    Corroboration::from_engines(engines)
+}
+
+/// The corroboration available at `characteristic` for a **basis**, the task every engine offers.
+///
+/// Shorthand for [`corroboration_for`] at [`Task::ReducedGrobnerBasis`](super::Task). Use the
+/// task-aware form for anything else: a basis band over-states what is available for conversion.
+pub fn corroboration(characteristic: u64) -> Corroboration {
+    corroboration_for(super::Task::ReducedGrobnerBasis, characteristic)
 }
 
 /// The seeded point the planted family plants, and the planted Poseidon rows echo.
@@ -413,9 +584,14 @@ pub fn poseidon_instance(id: &str, order: MonomialOrder) -> Option<Instance> {
 
 /// A registered Anemoi CICO instance, as a corpus instance.
 ///
-/// Over `2^64 - 353`, which **no comparand accepts**: msolve and Singular both stop below `2^31`.
-/// The family is in the corpus so that the ceiling is visible as a row rather than as an absence,
-/// and [`Equivalence::NoComparand`] records that no timing is publishable for it.
+/// Over `2^64 - 353`. **Groebner.jl reaches this field** — its ceiling is `typemax(UInt64)` and it
+/// was measured computing correctly at this prime — so the family is representable, and the limit
+/// is **corroboration**: Sagebrush stops at `2^62` and msolve and Singular at `2^31`, leaving one
+/// external engine and nothing to check it against. [`Equivalence::SoleComparand`] records that,
+/// and [`corroboration`] derives it from the engine ceilings rather than asserting it here.
+///
+/// A timing is therefore publishable **with the fact stated**, which is a different disposition
+/// from the 254/255-bit fields, where no engine reaches at all.
 ///
 /// # Errors
 /// `None` if `id` is not a registered Anemoi CICO row, or is at a dimension the dispatcher does
@@ -615,10 +791,14 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "anemoi",
             rung: Rung::Easy,
             zero_dimensional: true,
-            // Over 2^64 - 353, which no comparand accepts. In the corpus so the ceiling is a row
-            // rather than an absence; no timing is publishable.
-            equivalence: Equivalence::NoComparand {
-                reason: "2^64 - 353 exceeds msolve's and Singular's 2^31 prime-field ceiling",
+            // Over 2^64 - 353. **Groebner.jl can represent and compute this ring** — its
+            // ceiling is typemax(UInt64) and it was measured correct at this very prime. What is
+            // missing is a *second* external engine: Sagebrush stops at 2^62 and msolve and
+            // Singular at 2^31, so there is one comparand and nothing to triangulate against.
+            equivalence: Equivalence::SoleComparand {
+                tool: "Groebner.jl",
+                reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
+                         2^31, so Groebner.jl is the only external engine that reaches it",
             },
             digest: "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
         },
@@ -627,8 +807,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "anemoi",
             rung: Rung::Intermediate,
             zero_dimensional: true,
-            equivalence: Equivalence::NoComparand {
-                reason: "2^64 - 353 exceeds msolve's and Singular's 2^31 prime-field ceiling",
+            equivalence: Equivalence::SoleComparand {
+                tool: "Groebner.jl",
+                reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
+                         2^31, so Groebner.jl is the only external engine that reaches it",
             },
             digest: "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
         },
@@ -682,7 +864,10 @@ pub fn manifest() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{instance, ladder, manifest, Rung, REFERENCE_CHARACTERISTIC};
+    use super::{
+        ceilings, corroboration, corroboration_for, instance, ladder, manifest, CorpusEntry,
+        Corroboration, Equivalence, Rung, REFERENCE_CHARACTERISTIC,
+    };
     use crate::{
         fields::Zp2147483647,
         grobner::{
@@ -1052,22 +1237,31 @@ mod tests {
         );
     }
 
-    /// Every family's recorded equivalence licenses a timing exactly when a comparand exists.
+    /// Every family licenses a timing, and only the corroborated ones claim corroboration.
     ///
-    /// The gate itself. `Anemoi` is over `2^64 - 353`, above msolve's and Singular's `2^31`
-    /// ceiling, so it is in the corpus **and** barred from any published cross-library figure —
-    /// which is a result about the state of the tools, not a gap in the corpus.
+    /// The gate, and the distinction it now draws. Anemoi is over `2^64 - 353`, which
+    /// **Groebner.jl does reach** — so the family is representable and its timing is publishable.
+    /// What it lacks is a *second* external engine, so its agreement cannot be triangulated. Those
+    /// two limits have different fixes, which is why they are different variants.
     #[test]
-    fn test_only_families_with_a_comparand_license_a_timing() {
+    fn test_every_family_licenses_a_timing_and_only_some_are_corroborated() {
         for entry in ladder() {
-            let licensed = entry.equivalence.licenses_timing();
+            assert!(
+                entry.equivalence.licenses_timing(),
+                "{} should license a timing",
+                entry.name
+            );
             match entry.family {
                 "anemoi" => assert!(
-                    !licensed,
-                    "{} has no comparand at its field size and must not license a timing",
+                    !entry.equivalence.is_corroborated(),
+                    "{} has one external engine, so nothing can triangulate it",
                     entry.name
                 ),
-                _ => assert!(licensed, "{} should license a timing", entry.name),
+                _ => assert!(
+                    entry.equivalence.is_corroborated(),
+                    "{} should be corroborated",
+                    entry.name
+                ),
             }
         }
 
@@ -1084,9 +1278,157 @@ mod tests {
         const {
             assert!(
                 ANEMOI_64_PRIME > REFERENCE_CHARACTERISTIC,
-                "the Anemoi rows' exclusion rests on their prime being above the ceiling"
+                "the Anemoi rows' weaker corroboration rests on their prime being above the \
+                 four-way band"
             )
         };
+    }
+
+    /// The corroboration bands follow from the engine ceilings, not from prose.
+    ///
+    /// The capability boundary as arithmetic, checked at each real field Zeebra uses. A corrected
+    /// ceiling then corrects every statement depending on it, which is the point of deriving this
+    /// rather than writing it down. The error being guarded is the one that reached a draft of the
+    /// report: asserting that *no* engine reaches `2^64 - 353` when Groebner.jl does, which
+    /// confuses representability with corroboration.
+    #[test]
+    fn test_the_corroboration_bands_follow_from_the_engine_ceilings() {
+        // Four-way: every engine reaches it.
+        assert_eq!(corroboration(KOALABEAR_PRIME), Corroboration::FourWay);
+        assert_eq!(
+            corroboration(REFERENCE_CHARACTERISTIC),
+            Corroboration::FourWay
+        );
+        assert_eq!(corroboration(ceilings::MSOLVE - 1), Corroboration::FourWay);
+
+        // Two-way: Groebner.jl and Sagebrush, neither checkable against a third.
+        assert_eq!(corroboration(ceilings::MSOLVE), Corroboration::TwoWay);
+        assert_eq!(corroboration(1 << 40), Corroboration::TwoWay);
+        assert_eq!(
+            corroboration(ceilings::SAGEBRUSH - 1),
+            Corroboration::TwoWay
+        );
+
+        // Sole engine: Groebner.jl alone. Goldilocks and Anemoi's 2^64 - 353 are both here.
+        assert_eq!(
+            corroboration(ceilings::SAGEBRUSH),
+            Corroboration::SoleEngine
+        );
+        assert_eq!(corroboration(ANEMOI_64_PRIME), Corroboration::SoleEngine);
+        assert_eq!(
+            corroboration(0xFFFF_FFFF_0000_0001),
+            Corroboration::SoleEngine,
+            "Goldilocks"
+        );
+
+        // Triangulable only where at least two external engines reach the field.
+        assert!(corroboration(REFERENCE_CHARACTERISTIC).can_triangulate());
+        assert!(corroboration(1 << 40).can_triangulate());
+        assert!(!corroboration(ANEMOI_64_PRIME).can_triangulate());
+
+        assert_eq!(corroboration(REFERENCE_CHARACTERISTIC).engines(), 4);
+        assert_eq!(corroboration(ANEMOI_64_PRIME).engines(), 1);
+    }
+
+    /// Corroboration is **task-specific**, and the conversion task is the narrowest.
+    ///
+    /// The case that matters most for #263: the conversion stage is where Zeebra's only measured
+    /// cross-library deficit lies, and **Sagebrush exposes no FGLM route at all** — a missing task
+    /// rather than a field ceiling. So above `2^31` conversion has one corroborator where a basis
+    /// has two, and reading a basis band as a conversion band would overstate what can check a
+    /// future Anemoi conversion row.
+    #[test]
+    fn test_corroboration_is_task_specific_and_conversion_is_narrowest() {
+        // Below 2^31 every engine does a basis; only three do a conversion.
+        assert_eq!(
+            corroboration_for(Task::ReducedGrobnerBasis, REFERENCE_CHARACTERISTIC),
+            Corroboration::FourWay
+        );
+        assert_eq!(
+            corroboration_for(Task::LexBasisByConversion, REFERENCE_CHARACTERISTIC),
+            Corroboration::ThreeWay,
+            "Sagebrush exposes no FGLM route"
+        );
+
+        // Above 2^31 a basis keeps two engines; a conversion drops to one.
+        assert_eq!(
+            corroboration_for(Task::ReducedGrobnerBasis, 1 << 40),
+            Corroboration::TwoWay
+        );
+        assert_eq!(
+            corroboration_for(Task::LexBasisByConversion, 1 << 40),
+            Corroboration::SoleEngine,
+            "only Groebner.jl converts above msolve's and Singular's 2^31"
+        );
+        assert!(!corroboration_for(Task::LexBasisByConversion, 1 << 40).can_triangulate());
+
+        // At Anemoi's field both tasks are sole-engine, for two different reasons.
+        assert_eq!(
+            corroboration_for(Task::ReducedGrobnerBasis, ANEMOI_64_PRIME),
+            Corroboration::SoleEngine
+        );
+        assert_eq!(
+            corroboration_for(Task::LexBasisByConversion, ANEMOI_64_PRIME),
+            Corroboration::SoleEngine
+        );
+
+        // The eliminant collapses earlier still: msolve's bound is below a tenth of its basis one,
+        // and the corpus reference prime is already above it.
+        const {
+            assert!(
+                ceilings::MSOLVE_ELIMINANT < ceilings::MSOLVE,
+                "the eliminant collapse rests on msolve's two bounds differing"
+            )
+        };
+        assert_eq!(
+            corroboration_for(Task::UnivariateEliminant, REFERENCE_CHARACTERISTIC),
+            Corroboration::TwoWay,
+            "msolve is out at 2^31 - 1; Singular and Groebner.jl remain"
+        );
+
+        // Nothing offers the solution tasks at any field — the unanimous gap #263 reports.
+        for task in [
+            Task::OneFiniteFieldSolution,
+            Task::AllFiniteFieldSolutions,
+            Task::CryptanalyticWitness,
+        ] {
+            assert_eq!(
+                corroboration_for(task, REFERENCE_CHARACTERISTIC),
+                Corroboration::None,
+                "{} should have no comparand at any field",
+                task.tag()
+            );
+        }
+    }
+
+    /// Anemoi's recorded reason names **corroboration**, not representability.
+    ///
+    /// A wording correction with teeth: the two limits have different fixes. Representability
+    /// needs a new tool; corroboration needs a second tool at the same field. A reader deciding
+    /// whether to trust an Anemoi row has to be told which one applies.
+    #[test]
+    fn test_anemois_reason_names_corroboration_and_not_representability() {
+        let anemoi: Vec<CorpusEntry> = ladder()
+            .into_iter()
+            .filter(|entry| entry.family == "anemoi")
+            .collect();
+        assert!(!anemoi.is_empty());
+        for entry in anemoi {
+            match entry.equivalence {
+                Equivalence::SoleComparand { tool, reason } => {
+                    assert_eq!(tool, "Groebner.jl", "the one engine that reaches the field");
+                    assert!(
+                        reason.contains("only external engine"),
+                        "the reason must say one engine reaches it, not that none does: {}",
+                        reason
+                    );
+                }
+                other => panic!(
+                    "{} should be SoleComparand, not {:?} — Groebner.jl reaches 2^64 - 353",
+                    entry.name, other
+                ),
+            }
+        }
     }
 
     /// Six families, which is the milestone's minimum, each with its evidence recorded.
@@ -1108,10 +1450,16 @@ mod tests {
             "comparand-file",
             "known-solution",
             "live-oracle",
-            "no-comparand",
+            "sole-comparand",
         ] {
             assert!(kinds.contains(expected), "no family uses {}", expected);
         }
+        // `no-comparand` is deliberately unused by the ladder: it is for Zeebra's 254/255-bit
+        // fields, where no surveyed engine reaches, and no rung sits at one of those.
+        assert!(
+            !kinds.contains("no-comparand"),
+            "a ladder rung claims no comparand; check it is not really a sole-comparand row"
+        );
     }
 
     /// A Poseidon rung is built from the registry at the registry's own field, not the corpus's.

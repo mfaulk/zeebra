@@ -24,9 +24,18 @@ what this decided.
   `docs/research/external-comparison-protocol.md`, and
   `CompetitiveBoard::speedups` is the only place a ratio is computed.
 - Zeebra runs in-process and gets **no process-startup charge**, where msolve's and Julia's wall
-  times include theirs. That favours Zeebra. It is immaterial at the sizes where the gaps are
-  interesting and material on the millisecond rungs, so no conclusion below rests on a
-  sub-100 ms row.
+  times include theirs. That favours Zeebra, and it is now **measured rather than estimated**:
+
+  > **Singular's process-startup floor on this machine is 36.0 ms.** Five sweep rows cluster at
+  > 36.01, 36.04, 36.05, 36.07 and 36.08 ms across instances whose quotient dimensions differ by a
+  > factor of 2 000 (9 to 16 384). A figure that constant across that range is not a computation.
+
+  **The rule this gives, and it is used throughout §4a: where a comparand's wall time is within
+  about 2x of its own startup floor, the row is not an engine comparison in either direction.**
+  Such rows are recorded — they are what it costs to *ask* that engine, which is a real quantity —
+  but no speedup is drawn from them. Four apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x**
+  turn out to be Singular starting up, and the 450x is the clearest warning in the whole report
+  about reading a ratio without its denominator's floor.
 
 ### Pinned versions
 
@@ -161,22 +170,44 @@ the row is never produced. The adapter declares the documented-safe `1515531529`
 msolve's own guard, because the 2 968 684-wide window between them runs with no accumulation
 guarantee.
 
-### 3.3 The field-width ladder
+### 3.3 The corroboration bands — and the limit is usually corroboration, not representability
 
-| Zeebra field width | engines that can accept it |
-|---|---|
-| ≤ `2^31 − 1` | msolve, Singular, Groebner.jl, Sagebrush |
-| 32–64 bit (Goldilocks, KoalaBear-derived) | Groebner.jl and Sagebrush only — **and they cannot corroborate each other against a third** |
-| 254/255-bit (BN254, BLS12-381 scalar fields) | **none, at any size** |
+The capability boundary, derived from four engine ceilings rather than stated per family.
+`corpus::corroboration` is the function and `corpus::ceilings` the constants, so a corrected
+ceiling corrects every statement that depends on it.
 
-The second row is the uncomfortable one. The differential harness's whole argument for Singular as
-an oracle is that its `std` is Buchberger/slimgb lineage and therefore *algorithmically*
-independent. **Two engines that agree prove less than two engines that agree for different
-reasons.** Where only Groebner.jl and Sagebrush are available, the rows say so.
+| band | engines that reach it | corroboration |
+|---|---|---|
+| `p < 2^31` | msolve, Singular, Groebner.jl, Sagebrush | **four-way** |
+| `2^31 ≤ p < 2^62` | Groebner.jl, Sagebrush | **two-way**, neither checkable against a third |
+| `2^62 ≤ p < 2^64` | Groebner.jl only | **none** |
+| 254/255-bit (BN254, BLS12-381 scalar) | none | none |
 
-The third row means Zeebra's widest fields are validated by its own cross-field agreement and by
-`ark-ff` on the arithmetic — **not by any Gröbner comparand**. That is a fact about the state of
-the tools, and this report states it rather than omitting those rows.
+The ceilings: msolve `2^31` (`iofiles.c:564`), Singular `2^31`, Sagebrush `2^62` (its own gate,
+`lib.rs:1552`), Groebner.jl `typemax(UInt64)` — measured computing correctly at `2^31 − 1`,
+`2^32 − 5`, Goldilocks, `2^64 − 353` and `2^64 − 59`.
+
+**Row 2 is the uncomfortable one, and for a sharper reason than "only two".** The differential
+harness's whole argument for Singular as an oracle is that its `std` is Buchberger/slimgb lineage
+and therefore *algorithmically* independent. **Two engines that agree prove less than two engines
+that agree for different reasons** — and with exactly two, a disagreement says one of them is wrong
+without saying which.
+
+**Row 3 is where Anemoi's field sits**, at `2^64 − 353`. One engine reaches it, so a timing is
+publishable and its invariants are checkable against that one engine — but nothing can
+triangulate. Goldilocks is in the same band.
+
+**Row 4 means Zeebra's widest fields are validated by its own cross-field agreement and by
+`ark-ff` on the arithmetic, not by any Gröbner comparand.**
+
+> **The distinction rows 3 and 4 draw is the one to take away, because the two have different
+> fixes.** Row 4 is a *representability* limit and needs a **new** tool. Row 3 is a
+> *corroboration* limit and needs a **second** tool at the same field — Sagebrush is the obvious
+> candidate and its `2^62` gate is exactly what excludes it from Anemoi's prime.
+>
+> An earlier draft of this report collapsed both into "no comparand can represent this", which was
+> wrong for row 3 and wrong in the expensive direction: it would have told a reader to wait for a
+> new engine when what is needed is a second one at a field two engines nearly share.
 
 ### 3.4 Characteristic two is not yet comparable
 
@@ -221,6 +252,72 @@ The msolve prefix check works because distinct degree-2 monomials are pairwise n
 Gröbner basis *is* the generating set — which is why a set round-trip is a sound test there.
 
 ---
+
+## 4a. Measured cross-library rows on the corpus — including a basis-stage loss
+
+Zeebra against Singular 4.4.1, one machine, `taskset -c 0-7`, one worker, under `benchlock`, 60 s
+wall limit, every row from `corpus::instance` so the generators are digest-identical. Singular's
+startup floor is subtracted from no figure; the `startup share` column is what says whether a row
+means anything about the engines (§0).
+
+| row | task | Zeebra | Singular | wall ratio | startup share | verdict |
+|---|---|---:|---:|---:|---:|---|
+| **mq-random-10** | **basis** | **29 963 ms** | **7 291 ms** | **0.24x** | 0% | **Zeebra 4.11x slower** |
+| **mq-random-10** | **conversion** | **30 605 ms** | **8 580 ms** | **0.28x** | 0% | **Zeebra 3.57x slower** |
+| mq-planted-10 | conversion | 19.6 ms | 163.7 ms | 8.37x | 22% | Zeebra faster, startup-sensitive |
+| poseidon-t2-rf4-rp0 | basis | 291 ms | 209 ms | 0.72x | 17% | Zeebra 1.39x slower |
+| poseidon-t2-rf4-rp0 | conversion | 316 ms | 215 ms | 0.68x | 17% | Zeebra 1.47x slower |
+| poseidon-t2-rf2-rp2 | basis | 118 ms | 87 ms | 0.74x | 41% | 1.35x, **startup-dominated** |
+| mq-random-6 | basis | 25.3 ms | 56.4 ms | 2.23x | 64% | **not an engine comparison** |
+| cyclic-6 | conversion | 15.3 ms | 51.3 ms | 3.35x | 70% | **not an engine comparison** |
+| mq-planted-6 | basis | 0.08 ms | 36.0 ms | 450x | 100% | **not an engine comparison** |
+| mq-random-14 | both | entry cap | 60 s wall | — | — | **different limits; no ratio** |
+
+All quotient dimensions agreed on every completed row — 9, 25, 57, 64, 81, 156, 354, 1024, 16 384 —
+which is the invariant check that licenses the timings at all (§5 of the protocol).
+
+### The new result: a basis-stage loss on random MQ
+
+**§6 previously recorded the basis stage as "not yet measured" cross-library. It is measured now,
+and Zeebra loses: 4.11x to Singular on `mq-random-10`.** Singular's wall is 200x its startup floor
+there, so startup is irrelevant and the ratio is clean.
+
+This matters more than its size suggests, for two reasons:
+
+- **Random MQ is the corpus family closest in shape to a cryptanalytic system** — dense, square,
+  quadratic, no exploitable structure. A deficit here is a deficit on the problems Zeebra exists
+  for, where the Anemoi loss in §1 was on a conversion-dominated row.
+- **Zeebra loses on the basis and on the conversion by similar factors** (4.11x and 3.57x), and the
+  conversion row is only 2% slower than the basis row in absolute terms — so on this instance the
+  conversion is nearly free and the whole gap is in F4. That is a *different* gap from §1's, where
+  the conversion was 75% of the solve.
+
+So there are now **two** measured cross-library deficits with different locations, and §6's gap map
+is revised accordingly.
+
+### The capability finding: a stale FGLM default, revealed by the wider corpus
+
+`mq-planted-14` has a **16 384-dimensional** quotient. `FglmOptions::default()` caps
+`max_quotient_dimension` at **4 096**, and its documented rationale is that 4 096 is "26x the
+largest quotient dimension in the benchmark corpus, which is cyclic-6's 156". The corpus has since
+grown a rung 105x over that cap, so **the default is now mis-set relative to the corpus it
+guards.**
+
+Singular converts the same instance in 45.8 s using 10.4 GB, so the problem is solvable and
+Zeebra's refusal is a self-imposed bound rather than an inability. The refusal itself is **correct
+behaviour** — a refused budget is not a wrong answer — and raising the cap to 32 768 lets the rung
+through (`test_raising_the_budget_lets_the_same_rung_through`, `#[ignore]`d for cost).
+
+Two separate actions fall out, and only the first is a defect:
+
+1. **The row was being recorded as `Failed`.** A declared budget is a **limit stop**, and putting
+   it in the bucket reserved for an engine that broke is the exact confusion this contract exists
+   to prevent — it also makes the row eligible for a ratio, which a limit stop never is. Fixed;
+   every `FglmError` resource variant now maps to `StoppedByLimit`, `PositiveDimensional` to
+   `Unsupported`, and only the genuine errors to `Failed`.
+2. **The default should be revisited** against the corpus it now has to cover. That is a decision
+   for whoever owns `FglmOptions`, not a defect — the figure was correct for the corpus it was
+   chosen against.
 
 ## 5. Zeebra's own stage split, and the correction #269 was built on
 
@@ -280,16 +377,19 @@ gap with no comparand is a hypothesis.
 | rank | stage | absolute time lost | measured against | is the comparand on the same cost curve? |
 |---:|---|---:|---|---|
 | **1** | **Order conversion / FGLM** | **~46 s** on one row (47.53 s against ~1.6 s) | msolve 0.11.0, same machine, `p = 65537` | **No** — lex walk against Wiedemann. §2. |
-| **2** | Interreduction | 28.71 ms of 46.72 (katsura-7 grlex) | Zeebra's own past only | n/a — internal |
-| **3** | Matrix construction | 9.33 ms of 19.53 (katsura-6 lex) | Zeebra's own past only | n/a — internal |
-| **4** | Elimination | 8.00 ms of 46.72 | Zeebra's own past only | n/a — internal |
-| — | Basis stage, cross-library | **not yet measured** on the corpus | corpus sweep pending adapter merge (#259, #260) | — |
+| **2** | **Basis (F4), cross-library** | **~22.7 s** on one row (29.96 s against 7.29 s) | **Singular 4.4.1, same machine, `p = 2^31 − 1`** | **Partly** — both compute a reduced grevlex basis, but Singular's `std` is Buchberger/slimgb lineage, not F4. §4a. |
+| **3** | Interreduction | 28.71 ms of 46.72 (katsura-7 grlex) | Zeebra's own past only | n/a — internal |
+| **4** | Matrix construction | 9.33 ms of 19.53 (katsura-6 lex) | Zeebra's own past only | n/a — internal |
+| **5** | Elimination | 8.00 ms of 46.72 | Zeebra's own past only | n/a — internal |
 
-**The honest shape of this table is that rank 1 dwarfs everything below it by three orders of
-magnitude, and rank 1 is the one whose comparand is a different algorithm.** Ranks 2–4 are
-internal profile shares with no external comparand at all yet.
+**The honest shape of this table is that ranks 1 and 2 dwarf everything below them by three orders
+of magnitude, and neither has a comparand on the same cost curve.** Ranks 3–5 are internal profile
+shares with no external comparand at all.
 
-That is the single most important structural fact in this report, and §9 is built on it.
+Rank 2 is new since the first draft, and it moves the conclusion: there are now **two** measured
+cross-library deficits, in **different stages**, on **different families**. §1's is conversion on a
+structured CICO row; §4a's is the basis on dense random MQ, where the conversion is nearly free.
+A single explanation is unlikely to cover both, and §9 says so.
 
 ---
 
@@ -367,17 +467,17 @@ compared:
 
 | criterion | status |
 |---|---|
-| ≥3 external tools | **Partially met, with reasons.** msolve measured (§1). Singular integrated through the contract and sweeping. Groebner.jl and Sagebrush **provisioned but their adapters are unmerged** (#259, #260) — the sweep harness takes them in three lines when they land. |
-| ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** established on seven rungs of two of them (§4), cross-library **timing** on `anemoi` only (§1). |
+| ≥3 external tools | **Partially met, with reasons.** msolve measured (§1); **Singular measured on 19 corpus rungs across both tasks (§4a)**. Groebner.jl and Sagebrush are now adapted and wired into the sweep, but their four-engine run is **queued behind a 90-minute reproduction on `benchlock`** — the serialization protocol working, not failing. |
+| ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** on seven rungs of two of them against Zeebra's F4 (§4) **plus quotient-dimension agreement on every completed Singular row across all six** (§4a); cross-library **timing** on `anemoi` (§1) and on `mq-random`, `mq-planted` and `poseidon` (§4a). |
 | every row verified or classified unverified, method named | **Met.** §4 names the method (invariant agreement against Zeebra's F4, dimensions against published values). §1's rows are verified at `N = 4, 5, 6`. |
 | failure stages and limits recorded for incomplete runs | **Met** by construction: `StoppedByLimit` carries the limit and `Unsupported` the missing capability, and neither is timing evidence. |
 | no cross-machine or cross-concurrency ratio | **Met.** §1 states 8-core against 1-core and quotes **no** per-core ratio for the end-to-end rows; the per-core figure is restricted to the single-threaded conversion stage. |
 | recommendation for each H12–H17, issue updated | §9, and the issues updated. |
 
-**What is missing and why.** A cross-library basis-stage number on the corpus is the one deliverable
-not yet taken, and it is blocked on #259/#260 merging rather than on anything in this report. The
-harness exists, is runnable, and is queued behind four other agents on `benchlock` — which is the
-protocol working, not a failure.
+**What is missing and why.** The **four-engine** sweep. The basis-stage number §8 previously listed
+as missing has been taken against Singular (§4a) and produced the report's second measured deficit;
+what remains is msolve, Groebner.jl and Sagebrush on the same rungs, which is a lock-queue wait
+rather than an engineering gap. The harness runs all four.
 
 ---
 
@@ -385,29 +485,39 @@ protocol working, not a failure.
 
 | question | answer |
 |---|---|
-| Where does Zeebra lag by more than the noise band? | **Order conversion, by ~30x against msolve** on Anemoi `N = 5` at `p = 65537`. That is the only measured cross-library gap, and it is three orders of magnitude larger in absolute terms than every internal stage share. |
-| Is that gap in elimination, symbolic preprocessing, conversion, or extraction? | **Conversion**, unambiguously — 82.8% of Zeebra's conversion is the lex walk and dependence test. |
+| Where does Zeebra lag by more than the noise band? | **Two places, measured.** Order conversion, ~30x against msolve on Anemoi `N = 5` at `p = 65537` (§1). And the **basis stage, 4.11x against Singular** on `mq-random-10` at `p = 2^31 − 1` (§4a) — new, and on the family closest in shape to a cryptanalytic system. |
+| Is that gap in elimination, symbolic preprocessing, conversion, or extraction? | **It depends on the family, which is itself the finding.** On Anemoi it is conversion — 82.8% of Zeebra's conversion is the lex walk and dependence test. On `mq-random-10` the conversion is nearly free (30.6 s against a 30.0 s basis) and **the whole gap is in F4**. One explanation is unlikely to cover both. |
 | Is it a tuning gap or an algorithm gap? | **Algorithm.** Zeebra walks and tests dependence in `O(D³)`; msolve runs a Wiedemann scalar sequence; Magma spins a representation matrix. **A conversion ratio between any two of the three is not a measurement of FGLM.** |
 | Does Zeebra's measured 65–88% elimination share hold? | **No, and it no longer holds for Zeebra either.** It is **7%–22%** (§5). The figure in #269's title is from M16-0 and was superseded by M16's own success. |
 | Does the per-field-width hypothesis survive? | **No.** msolve's delayed reduction is active only below `2^18`, so it is inactive at the compared fields, and all three of its kernels use `int64_t` — narrow kernels buy lanes, not headroom. |
-| Which instances does Zeebra solve that no comparand does, and is that capability or performance? | **Capability, in three distinct ways**: the solution tasks (no comparand at any size), 32–64-bit fields (two comparands, neither independent of the other), and 254/255-bit fields (none). None of these is a speedup and none is reported as one. |
+| Which instances does Zeebra solve that no comparand does, and is that capability or performance? | **Capability, in four distinct ways** (§3.3): the solution tasks (no comparand at any size); `2^31`–`2^62` (two engines, neither checkable against a third); `2^62`–`2^64`, where Anemoi and Goldilocks sit (**one** engine — publishable but uncorroborated); and 254/255-bit (none at all). None is a speedup and none is reported as one. **Only the last is a representability limit; the middle two are corroboration limits, and they have a different fix.** |
 | Do the external anchors agree in rank order? | **Not assessed.** #199's Magma page and Sagebrush's `bench/magma-scoreboard/` are cross-machine, and §0 forbids a cross-machine ratio. Deliberately left open rather than answered weakly. |
-| **Should H12–H17 proceed as scoped?** | **No. The measurement points at a lever the H-series does not contain.** |
+| Does Zeebra have a capability limit a comparand does not? | **Yes, one, and it is self-imposed.** `FglmOptions`'s default caps the quotient dimension at 4 096, chosen when the corpus's largest was 156; the corpus now has a 16 384-dimensional rung that Singular converts in 45.8 s and 10.4 GB. The refusal is correct behaviour and the default is simply stale (§4a). |
+| **Should H12–H17 proceed as scoped?** | **No. The measurement points at a lever the H-series does not contain — and now at a second one it partly does.** |
 
 ### The conclusion that matters
 
 **H12–H17 were scoped before the measurement, and the measurement says the largest lever is not
-among them.** The one measured cross-library gap is in order conversion, and the candidate that
+among them.** The largest measured cross-library gap is in order conversion, and the candidate that
 addresses it is **#58** — Wiedemann/Krylov — which is currently *deferred*. Meanwhile the two
 H-series items with the strongest a-priori stories, #269 and #270, both rest on premises this
 report falsifies.
+
+**The second measured gap partly rehabilitates the H-series, and #268 specifically.** The 4.11x
+basis loss on `mq-random-10` is in F4 itself, and #268's two target stages — interreduction and
+matrix construction — are F4 stages with ceilings of 2.59x and 1.92x. That is the right order of
+magnitude to explain a 4.11x if both contribute, which is the first external evidence any H-series
+item has had. It is **not** confirmation: the stage split for `mq-random-10` has not been profiled,
+and §6a's ceilings come from katsura and cyclic. **Profiling `mq-random-10`'s stage split is now the
+single highest-value cheap measurement available**, because it would either point #268 at a
+measured external gap or rule it out.
 
 ### Recommendations, per issue
 
 | issue | recommendation | reason |
 |---|---|---|
 | **#58** (Krylov/Wiedemann) | **Reopen the FGLM half for measurement**, as "the measured conversion gap is worth a Krylov route" and **not** as "sparse-FGLM would be 30x faster". Highest-value candidate in the set. | It is the algorithm msolve uses for the stage where Zeebra's only measured cross-library deficit lies (~46 s on one row, ~30x). #58 deferred it on a named trigger rather than a judgement that the idea was bad, and a measured gap against a maintained implementation is the trigger. **But see §9a: the 30x does not transfer to a prediction, and `MILESTONE-FGLM-SCALABILITY.md` §8.5's three measurements still stand.** |
-| **#268 H12** compact representations | **Raise to the top of the H-series.** | Addresses interreduction (61%) and matrix construction (48%) — the two largest *internal* stages, with ceilings of 2.59x and 1.92x. |
+| **#268 H12** compact representations | **Raise to the top of the H-series**, and profile `mq-random-10` first. | Addresses interreduction (61%) and matrix construction (48%) — the two largest *internal* stages, ceilings 2.59x and 1.92x. §4a's 4.11x basis loss is the first **external** gap any H-series item could plausibly explain, and 2.59x × 1.92x spans it — but the stage split of the losing instance is unprofiled, so that is a hypothesis and the profile is what tests it. |
 | **#273 H17** adaptive strategy | **Keep, at low cost.** | Extends the existing planner. §6a: its benefit is bounded by **route spread, 70x measured** on planted-8, not by any stage share — against a best stage ceiling of 2.59x. `fglm::shape` already ships a tested detector that is deliberately unwired, so this is connecting two existing pieces. |
 | **#271 H15** modular composition | **Defer** — the F4 half is **settled**. | Extraction's ceiling is **1.013x–1.053x** (§6a): an infinitely fast stage is unmeasurable on every profiled instance. The univariate-factoring half is a separate claim the screen does not reach, and the large univariate win was already taken — `graeffe-root-finding.md` has one root at degree `3^13` in 3.1 s against an extrapolated 57 hours. |
 | **#269 H13** elimination kernels | **Deprioritize, and correct the title.** | The 65–88% premise is false; the stage is 7–22%, giving an Amdahl ceiling of 1.07x–1.29x, at or inside the noise band. The cited `la_ff_small_prime.c` does not exist. |
@@ -451,12 +561,28 @@ of #58 more than anything else in it.
 
 **#58's won't-do for F4 is untouched** and rests on reasoning nothing here disturbs.
 
-### Two follow-ups this report generates
+### Four follow-ups this report generates
+
+- **Profile `mq-random-10`'s stage split.** The highest-value cheap measurement in the report:
+  Zeebra loses 4.11x there and §6a's stage ceilings are all from katsura and cyclic, so nobody
+  knows whether #268's targets are where that particular loss lives.
 
 - **Verify the `x1`/`x10` prefix handling in Groebner.jl and the Sagebrush driver**, as #311 did for
   msolve. Both are unverified, and the failure is invisible from the engine's side.
 - **Settle the `GF(2^k)` defining-polynomial convention per engine**, which is what blocks both a
   char-2 corpus rung and any decision on #272.
+- **Find a second engine above `2^62`.** That band currently has one, so every figure Zeebra takes
+  at Goldilocks or at Anemoi's `2^64 − 353` is uncorroborated by construction. This is the cheapest
+  available improvement to the *trustworthiness* of the widest rows, as distinct from their speed,
+  and it is a different task from finding an engine for the 254/255-bit fields.
+
+### A note on Sagebrush's maturity, which is separate from its ceiling
+
+Sagebrush **disagreed with nothing** — term-for-term on every family tried, including at a 62-bit
+prime. But it is five weeks old, nothing is versioned, it has six F4 tests, and no oracle run in
+its own repository exercises the elimination. So it is reportable **with its SHA** and **never as a
+speedup denominator**. That is a maturity judgement, not a correctness one, and it is independent
+of the `2^62` ceiling that keeps it out of Anemoi's band.
 
 ---
 

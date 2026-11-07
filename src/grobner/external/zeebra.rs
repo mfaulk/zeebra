@@ -283,13 +283,45 @@ fn solve<const N: usize, F: FiniteField>(
                         stages,
                     }
                 }
-                Err(error) => Solved {
-                    status: RunStatus::Failed(RunFailure::Reported {
-                        message: error.to_string(),
-                    }),
-                    wall: started.elapsed(),
-                    stages,
-                },
+                // **A declared budget is a limit stop, not a failure.** Recording
+                // `QuotientDimensionExceeded` as `Failed` put a resource cap in the bucket
+                // reserved for an engine that broke — the exact confusion this contract exists
+                // to prevent, and it showed up on the first corpus sweep that reached a rung
+                // over the cap. The two genuine failures are kept apart: a positive-dimensional
+                // ideal is a fact about the ideal, and a source that was not a Gröbner basis is
+                // a caller error.
+                Err(error) => {
+                    use crate::grobner::FglmError::*;
+                    let status = match error {
+                        OperatorStorageExceeded { .. }
+                        | OperatorBytesExceeded { .. }
+                        | SpanStorageExceeded { .. }
+                        | SpanBytesExceeded { .. }
+                        | BorderBatchExceeded { .. }
+                        | QuotientDimensionExceeded { .. } => {
+                            RunStatus::StoppedByLimit(LimitStop::ToolCap {
+                                detail: error.to_string(),
+                            })
+                        }
+                        // Not a budget: no limit would make this possible, so it is a statement
+                        // about the input rather than about the resources.
+                        PositiveDimensional => {
+                            RunStatus::Unsupported(Unsupported::Representation {
+                                detail: "order conversion needs a finite quotient algebra, and \
+                                         this ideal is positive-dimensional"
+                                    .to_string(),
+                            })
+                        }
+                        other => RunStatus::Failed(RunFailure::Reported {
+                            message: other.to_string(),
+                        }),
+                    };
+                    Solved {
+                        status,
+                        wall: started.elapsed(),
+                        stages,
+                    }
+                }
             }
         }
         // `statistics` is read here only so that a reader can see the basis stage was genuinely
@@ -604,6 +636,57 @@ mod tests {
                 .any(|n| n.starts_with("conversion: dependence")),
             "the lex walk is the stage the report attributes the gap to: {:?}",
             names
+        );
+    }
+
+    /// An FGLM budget is a **limit stop**, not a failure, so no ratio can use its time.
+    ///
+    /// Found on the first corpus sweep that reached a rung over the default cap:
+    /// `mq-planted-14` has a 16 384-dimensional quotient against `FglmOptions`'s default of 4 096,
+    /// and the row was being recorded as `Failed` — putting a declared budget in the bucket
+    /// reserved for an engine that broke. `StoppedByLimit` is the honest outcome and, unlike
+    /// `Failed`, it is also what keeps the row out of a speedup.
+    #[test]
+    fn test_an_fglm_budget_is_a_limit_stop_and_not_a_failure() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let mut solver = ZeebraSolver::new();
+        let report = solver.run(&built, Task::LexBasisByConversion, &limits());
+
+        match &report.status {
+            RunStatus::StoppedByLimit(stop) => {
+                let detail = stop.to_string();
+                assert!(detail.contains("dimension"), "{}", detail);
+            }
+            other => panic!(
+                "a declared quotient-dimension budget must be a limit stop, got {:?}",
+                other
+            ),
+        }
+        assert!(
+            !report.status.is_timing_evidence(),
+            "a limit stop is a lower bound, never a measurement"
+        );
+    }
+
+    /// Raising the budget past the quotient dimension lets the same rung through.
+    ///
+    /// Evidence that the stop above is the **cap** and not the instance: the default of 4 096 was
+    /// chosen when the corpus's largest quotient dimension was cyclic-6's 156, and the corpus has
+    /// since grown a 16 384-dimensional rung. The refusal is correct behaviour; the default is
+    /// now mis-set relative to the corpus it guards.
+    #[test]
+    #[ignore = "a 16384-dimensional conversion needs minutes and gigabytes"]
+    fn test_raising_the_budget_lets_the_same_rung_through() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let mut solver = ZeebraSolver::new().with_fglm_options(crate::grobner::FglmOptions {
+            max_quotient_dimension: 32_768,
+            ..crate::grobner::FglmOptions::default()
+        });
+        let report = solver.run(&built, Task::LexBasisByConversion, &limits());
+        assert!(
+            matches!(report.status, RunStatus::Complete(_)),
+            "{:?}",
+            report.status
         );
     }
 
