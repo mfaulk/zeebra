@@ -344,6 +344,30 @@ declare `[lints] workspace = true`. Toolchain: `engine/rust-toolchain.toml` pins
 is what `stable` already is here, so the driver builds on `stable` and no extra toolchain is
 downloaded.
 
+Its command line, as of #315:
+
+```text
+sagebrush-gb-driver <file.ms> [--order lex|deglex|degrevlex|invlex] [--route f4|fglm]
+```
+
+Both flags default to the original behaviour — `--order degrevlex --route f4` — so a bare
+invocation is what it always was, which is how `tools/external/smoke/smoke.sh` still calls it.
+`--route f4` is `f4::groebner_p` in the requested order, the lex case going through the engine's own
+homogenize → DegLex → dehomogenize route; `--route fglm` is `fglm::groebner_fglm`, an order
+conversion from a degrevlex basis, and it accepts only a lex or invlex target and only `p < 2^31`
+(§5.1.1 of `sagebrush-implementation.md`). Unknown flags and unknown values are refused rather
+than ignored.
+
+Every run echoes what it actually did — `#engine:`, `#field characteristic:`, `#variable order:`,
+`#monomial order:`, `#route:`, `#quotient dimension:`, `#length of basis:`, `#seconds:` — and the
+adapter checks the characteristic, the variable order, the order and the route against the request,
+reporting a mismatch as `RunFailure::SelfInconsistent`. The route line matters more than it looks:
+the two lex routes return the **same basis**, so nothing else in the output distinguishes a direct
+lex F4 from an FGLM conversion, and a column that mixed them would compare two complexities under
+one heading. `#quotient dimension:` is the driver's own count of the monomials no leading monomial
+divides — `-1` for a positive-dimensional ideal, following Singular's `vdim` convention — because
+Sagebrush computes the same number at `fglm.rs:97` and exposes only a boolean.
+
 ### 5.2 Exponent packing and the lex-storage trap
 
 `engine/mpoly/src/order.rs:1-9` states the layout: `bits` bits per variable in one 64-bit word,
