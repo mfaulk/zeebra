@@ -93,11 +93,36 @@ impl Outcome {
     /// The protocol's requirement that a failure record "the resource limit or the missing
     /// capability instead of a ratio", made concrete.
     pub fn instead_of_a_time(&self) -> Option<String> {
+        // `prefixed` is idempotent: a detail that already begins with its tag is left alone, so a
+        // row stored by an older writer — which saved the *rendered* form — does not acquire a
+        // second prefix on the way out. `Outcome::detail` is what new rows store, and it is bare.
+        let prefixed = |tag: &str, text: String| {
+            if text.starts_with(tag) {
+                text
+            } else {
+                format!("{}: {}", tag, text)
+            }
+        };
         match self {
             Self::Complete | Self::Verified => None,
             Self::StoppedByLimit(stop) => Some(stop.to_string()),
-            Self::Unsupported(reason) => Some(format!("unsupported: {}", reason)),
-            Self::Failed(failure) => Some(format!("failed: {}", failure)),
+            Self::Unsupported(reason) => Some(prefixed("unsupported", reason.to_string())),
+            Self::Failed(failure) => Some(prefixed("failed", failure.to_string())),
+        }
+    }
+
+    /// The **bare** reason, with no `unsupported:`/`failed:` prefix.
+    ///
+    /// What gets stored. [`Self::instead_of_a_time`] adds the prefix for display, so storing its
+    /// output and reading it back into a variant's detail field double-prefixed it on the next
+    /// render — `unsupported: unsupported: characteristic ...`, visible in the first 72 rows the
+    /// board ever held. The stored form has to be the datum, not the rendering of it.
+    pub fn detail(&self) -> Option<String> {
+        match self {
+            Self::Complete | Self::Verified => None,
+            Self::StoppedByLimit(stop) => Some(stop.to_string()),
+            Self::Unsupported(reason) => Some(reason.to_string()),
+            Self::Failed(failure) => Some(failure.to_string()),
         }
     }
 
@@ -340,9 +365,10 @@ impl CompetitiveRecord {
             ]),
         ));
         fields.push(("outcome", Json::string(self.outcome.tag())));
-        if let Some(detail) = self.outcome.instead_of_a_time() {
+        if let Some(detail) = self.outcome.detail() {
             // The cell that stands where a number would be. Emitted under a name that cannot be
-            // mistaken for one.
+            // mistaken for one, and **bare** — see `Outcome::detail`, because storing the
+            // prefixed rendering double-prefixes it on the next read.
             fields.push(("outcome_detail", Json::string(detail)));
         }
         fields.push(("invariants", invariants_to_json(&self.invariants)));
@@ -486,11 +512,22 @@ impl CompetitiveRecord {
                 .unwrap_or_default(),
         };
 
-        let detail = value
-            .get("outcome_detail")
-            .and_then(Json::as_str)
-            .unwrap_or_default()
-            .to_string();
+        // Stripped on the way in, which is what makes `load` -> `to_json` a **fixed point**.
+        //
+        // An older writer stored `instead_of_a_time`'s rendered form rather than the bare datum,
+        // so reading it into a variant's detail field and writing it back added a prefix — and
+        // because this board is *regenerated* rather than hand-edited, each regeneration added
+        // another. Six stored rows reached `unsupported: unsupported: ...` that way. A lossy
+        // round trip in a regenerable artifact does not stay the same size; it grows.
+        //
+        // Stripping here heals those rows on the next regeneration and makes the property
+        // testable: `test_loading_and_rewriting_is_a_fixed_point`.
+        let detail = strip_outcome_tags(
+            value
+                .get("outcome_detail")
+                .and_then(Json::as_str)
+                .unwrap_or_default(),
+        );
         // The reason text is not re-parsed into its variant: it was rendered for a human, and a
         // round trip through prose would invent a structure the file does not have. `Representation`
         // and `ToolCap` carry it verbatim, which is honest about what was stored.
@@ -580,6 +617,40 @@ impl CompetitiveRecord {
                 .to_string(),
             outcome,
         })
+    }
+}
+
+/// Remove any leading `unsupported:` / `failed:` tags, however many an older writer accumulated.
+///
+/// The stored datum is the bare reason; the tags belong to the rendering. See
+/// [`CompetitiveRecord::from_json`] on why they accumulated at all.
+fn strip_outcome_tags(detail: &str) -> String {
+    // Two families, and both have to go.
+    //
+    // The outcome **tags** are what `instead_of_a_time` prepends. The **wrappers** are the
+    // `Display` prefixes of the three variants `from_json` reconstructs into — `Reported` renders
+    // "the tool reported an error: {message}" and `ToolCap` renders "stopped at the tool's own
+    // cap: {detail}" — so reading a rendered string into one of them and writing it back wraps it
+    // again. Stripping both is what cancels the wrapping and makes `load` -> `to_json` a fixed
+    // point; `Unsupported::Representation` needs no wrapper stripped because its `Display` is
+    // already the identity on its payload, which is why it was chosen for the round trip.
+    const PREFIXES: [&str; 5] = [
+        "unsupported:",
+        "failed:",
+        "stopped-by-limit:",
+        "the tool reported an error:",
+        "stopped at the tool's own cap:",
+    ];
+    let mut text = detail.trim();
+    loop {
+        let stripped = PREFIXES
+            .iter()
+            .find_map(|prefix| text.strip_prefix(prefix))
+            .map(str::trim_start);
+        match stripped {
+            Some(rest) => text = rest,
+            None => return text.to_string(),
+        }
     }
 }
 
@@ -701,18 +772,23 @@ pub struct Speedup {
     /// publishing. Carried rather than filtered so that a renderer can say so.
     pub shared_invariants: usize,
 
-    /// The baseline's wall time as a multiple of that library's observed startup floor.
+    /// The **smaller** of the two operands' wall times measured against its own library's floor.
     ///
     /// **Below about 2.0 the ratio is not an engine comparison in either direction** — it is
     /// dominated by the cost of *starting* the comparand. Measured on this board: Singular's floor
     /// is 36.0 ms, and four apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x** are entirely
     /// that floor. The 450x is the one that would have been published.
     ///
-    /// `None` when the library has too few rows to observe a floor. Carried rather than filtered,
-    /// for the same reason as `shared_invariants`: a dropped row is a gap a reader cannot see, and
-    /// the board is the artifact that has to stop somebody recomputing the 450x from the raw
-    /// numbers later.
-    pub baseline_floor_multiple: Option<f64>,
+    /// **Both operands, not just the baseline.** Measuring only the baseline against its own floor
+    /// checked the wrong thing: Zeebra runs in-process and has no startup, so its floor is
+    /// microseconds and every ratio passed. The concern is a *comparand* sitting at its own
+    /// startup, so the minimum over the two is what decides.
+    ///
+    /// `None` when neither library has enough rows to observe a floor. Carried rather than
+    /// filtered, for the same reason as `shared_invariants`: a dropped row is a gap a reader
+    /// cannot see, and the board is the artifact that has to stop somebody recomputing the 501x
+    /// from the raw numbers later.
+    pub floor_multiple: Option<f64>,
 }
 
 impl Speedup {
@@ -724,11 +800,11 @@ impl Speedup {
 
     /// Whether this ratio says anything about the **engines** rather than about process startup.
     ///
-    /// `false` when the baseline's wall is within [`Self::FLOOR_MULTIPLE_REQUIRED`] of its
-    /// library's observed startup floor. An unknown floor is treated as acceptable: refusing on
-    /// absent evidence would silently drop every row of a library with few measurements.
+    /// `false` when **either** operand's wall is within [`Self::FLOOR_MULTIPLE_REQUIRED`] of its
+    /// own library's observed startup floor. An unknown floor is treated as acceptable: refusing
+    /// on absent evidence would silently drop every row of a library with few measurements.
     pub fn is_engine_comparison(&self) -> bool {
-        self.baseline_floor_multiple
+        self.floor_multiple
             .is_none_or(|multiple| multiple >= Self::FLOOR_MULTIPLE_REQUIRED)
     }
 
@@ -808,7 +884,7 @@ impl CompetitiveBoard {
     /// unchecked instead of silently dropping it — a dropped row is a gap a reader cannot see.
     pub fn speedups(&self, baseline: &str) -> Vec<Speedup> {
         let mut found = Vec::new();
-        let floor = self.startup_floor(baseline);
+        let baseline_floor = self.startup_floor(baseline);
         for reference in self.rows.iter().filter(|row| row.library == baseline) {
             if !reference.is_timing_evidence() {
                 continue;
@@ -833,9 +909,20 @@ impl CompetitiveBoard {
                     subject: subject.library.clone(),
                     ratio: theirs.as_secs_f64() / ours.as_secs_f64(),
                     shared_invariants: reference.invariants.overlap(&subject.invariants),
-                    baseline_floor_multiple: floor
-                        .filter(|floor| !floor.is_zero())
-                        .map(|floor| theirs.as_secs_f64() / floor.as_secs_f64()),
+                    // The minimum over both operands: a ratio is startup-dominated if *either*
+                    // side is sitting at its own floor, and in practice it is the subprocess
+                    // comparand rather than the in-process baseline.
+                    floor_multiple: [
+                        (theirs, baseline_floor),
+                        (ours, self.startup_floor(&subject.library)),
+                    ]
+                    .into_iter()
+                    .filter_map(|(wall, floor)| {
+                        floor
+                            .filter(|floor| !floor.is_zero())
+                            .map(|floor| wall.as_secs_f64() / floor.as_secs_f64())
+                    })
+                    .min_by(|a, b| a.total_cmp(b)),
                 });
             }
         }
@@ -957,8 +1044,8 @@ impl CompetitiveBoard {
                     speedup.ratio,
                     if !speedup.is_engine_comparison() {
                         format!(
-                            "**NOT AN ENGINE COMPARISON: baseline is {:.1}x its startup floor**",
-                            speedup.baseline_floor_multiple.unwrap_or_default()
+                            "**NOT AN ENGINE COMPARISON: an operand is {:.1}x its startup floor**",
+                            speedup.floor_multiple.unwrap_or_default()
                         )
                     } else if speedup.shared_invariants == 0 {
                         "**NOT PUBLISHABLE: no invariant was checked**".to_string()
@@ -1352,6 +1439,110 @@ mod tests {
         );
     }
 
+    /// Loading the board and writing it back is a **fixed point**, even on damaged input.
+    ///
+    /// The property a regenerable artifact needs and did not have. An older writer stored the
+    /// *rendered* outcome detail, so each `competitive --write` read it into a variant and wrote
+    /// it back one prefix longer — six stored rows reached `unsupported: unsupported: ...` that
+    /// way, and the damage grew on every regeneration rather than staying put.
+    ///
+    /// Asserted from deliberately damaged input, because healing is the behaviour that matters:
+    /// the rows already on disk have to come out clean.
+    #[test]
+    fn test_loading_and_rewriting_is_a_fixed_point() {
+        let damaged = row(
+            "msolve",
+            RunStatus::Unsupported(Unsupported::Characteristic {
+                characteristic: 1 << 61,
+                supported_below: 1 << 31,
+            }),
+            0,
+        );
+        let mut json = damaged.to_json();
+        // Damage it exactly the way the old writer did, twice over.
+        if let Json::Object(fields) = &mut json {
+            for (key, value) in fields.iter_mut() {
+                if key == "outcome_detail" {
+                    let inner = value.as_str().unwrap_or_default().to_string();
+                    *value = Json::string(format!("unsupported: unsupported: {}", inner));
+                }
+            }
+        }
+
+        let once = CompetitiveRecord::from_json(&json).expect("reads damaged input");
+        let healed = once.to_json().to_json();
+        assert!(
+            !healed.contains("unsupported: "),
+            "the first rewrite must heal the prefix, not carry it: {}",
+            healed
+        );
+
+        // And it is stable: a second pass changes nothing.
+        let twice = CompetitiveRecord::from_json(&Json::parse(&healed).expect("valid"))
+            .expect("round trips");
+        assert_eq!(
+            twice.to_json().to_json(),
+            healed,
+            "load -> write must be a fixed point"
+        );
+
+        // The same must hold for the other two reconstruction variants, whose `Display` wraps
+        // their payload where `Unsupported::Representation`'s does not.
+        for status in [
+            RunStatus::Failed(RunFailure::Reported {
+                message: "no @gbsize marker was printed".to_string(),
+            }),
+            RunStatus::StoppedByLimit(LimitStop::ToolCap {
+                detail: "20006072 live nonzero entries".to_string(),
+            }),
+        ] {
+            let first = row("singular", status, 0).to_json().to_json();
+            let reloaded = CompetitiveRecord::from_json(&Json::parse(&first).expect("valid"))
+                .expect("round trips")
+                .to_json()
+                .to_json();
+            assert_eq!(reloaded, first, "a rewrite must not re-wrap the detail");
+        }
+
+        // The rendering still carries exactly one prefix.
+        let rendered = twice.outcome.instead_of_a_time().expect("no time");
+        assert_eq!(rendered.matches("unsupported").count(), 1, "{}", rendered);
+    }
+
+    /// A stored outcome detail is **bare**, so a round trip does not double-prefix it.
+    ///
+    /// The first 72 rows the board ever held read `unsupported: unsupported: characteristic ...`,
+    /// because `to_json` stored `instead_of_a_time`'s prefixed rendering and `from_json` read it
+    /// back into the variant's detail field, where the next render prefixed it again. The stored
+    /// form has to be the datum, not a rendering of it.
+    #[test]
+    fn test_a_stored_outcome_detail_does_not_double_prefix_on_a_round_trip() {
+        let row = row(
+            "msolve",
+            RunStatus::Unsupported(Unsupported::Characteristic {
+                characteristic: 1 << 61,
+                supported_below: 1 << 31,
+            }),
+            0,
+        );
+        let text = row.to_json().to_json();
+        assert!(
+            !text.contains("unsupported: "),
+            "the stored detail must be bare: {}",
+            text
+        );
+
+        let back =
+            CompetitiveRecord::from_json(&Json::parse(&text).expect("valid")).expect("round trips");
+        let rendered = back.outcome.instead_of_a_time().expect("there is no time");
+        assert_eq!(
+            rendered.matches("unsupported").count(),
+            1,
+            "re-rendering a read-back row must prefix exactly once: {}",
+            rendered
+        );
+    }
+
     /// A startup floor is observed from the board, and a ratio against it is disqualified.
     ///
     /// The measured case, reproduced: Singular's floor on the real sweep was 36.0 ms, and
@@ -1383,7 +1574,10 @@ mod tests {
             floor
         );
 
-        let speedups = board.speedups("singular");
+        // Asked from **Zeebra**'s side, which is how the report reads it, and the direction that
+        // exposed the original bug: Zeebra runs in-process so its own floor is microseconds, and
+        // measuring only the baseline against its own floor passed every ratio.
+        let speedups = board.speedups("zeebra");
         let disqualified: Vec<&super::Speedup> = speedups
             .iter()
             .filter(|s| !s.is_engine_comparison())
@@ -1391,11 +1585,11 @@ mod tests {
         assert_eq!(
             disqualified.len(),
             4,
-            "the four rows at Singular's floor must all be disqualified"
+            "the four rows where Singular sits at its own floor must all be disqualified"
         );
         for speedup in &disqualified {
             assert!(!speedup.is_publishable());
-            assert!(speedup.baseline_floor_multiple.unwrap() < 2.0);
+            assert!(speedup.floor_multiple.unwrap() < 2.0);
         }
 
         // The one real row survives: Singular's wall there is 200x its floor.
@@ -1407,11 +1601,11 @@ mod tests {
         assert_eq!(real[0].problem, "e");
         assert!(real[0].is_publishable());
         assert!(
-            (real[0].ratio - 7290.0 / 29963.0).abs() < 1e-6,
-            "Zeebra is slower here, so the ratio is below one: {}",
+            (real[0].ratio - 29963.0 / 7290.0).abs() < 1e-6,
+            "from Zeebra's side the ratio is Zeebra's wall over Singular's: {}",
             real[0].ratio
         );
-        assert!(real[0].baseline_floor_multiple.unwrap() > 100.0);
+        assert!(real[0].floor_multiple.unwrap() > 100.0);
 
         // And the rows are still on the board, all ten of them.
         assert_eq!(board.rows().len(), 10);
@@ -1434,9 +1628,9 @@ mod tests {
         board.add(named_row("a", "singular", answered(8), 36.0));
         assert_eq!(board.startup_floor("singular"), None);
 
-        let speedups = board.speedups("singular");
+        let speedups = board.speedups("zeebra");
         assert_eq!(speedups.len(), 1);
-        assert_eq!(speedups[0].baseline_floor_multiple, None);
+        assert_eq!(speedups[0].floor_multiple, None);
         assert!(
             speedups[0].is_engine_comparison(),
             "an unknown floor must not be read as a disqualification"
