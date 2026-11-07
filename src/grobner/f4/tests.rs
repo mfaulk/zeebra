@@ -3153,3 +3153,40 @@ fn test_the_unbudgeted_structures_are_reported() {
     assert!(statistics.peak_basis_elements >= basis.len());
     assert!(statistics.peak_basis_terms >= statistics.peak_basis_elements);
 }
+
+/// The pending monomial queue never holds more monomials than the matrix has columns.
+///
+/// A batch's columns are the distinct monomials across its rows, which is exactly the set of
+/// monomials symbolic preprocessing ever offers to the queue. So a queue that holds only
+/// *distinct* monomials is bounded by the column count, and therefore by
+/// `F4Options::max_matrix_columns`; a queue that holds every term of every row is bounded by
+/// nothing a caller sets. This is the bound #305 is about, checked against the per-batch maxima
+/// — `max_pending_monomials <= columns(b) <= max_matrix_columns` for every batch `b`, so the
+/// maximum over batches obeys the same bound.
+#[test]
+fn test_the_monomial_queue_is_bounded_by_the_column_count() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    for (name, statistics) in [
+        (
+            "katsura-5",
+            f4_with_options(&katsura::<5, Zp2147483647>(), order, &F4Options::default())
+                .expect("katsura-5 completes under the default")
+                .1,
+        ),
+        (
+            "cyclic-5",
+            f4_with_options(&cyclic::<5, Zp2147483647>(), order, &F4Options::default())
+                .expect("cyclic-5 completes under the default")
+                .1,
+        ),
+    ] {
+        assert!(statistics.max_pending_monomials > 0, "{name}: no queue");
+        assert!(
+            statistics.max_pending_monomials <= statistics.max_matrix_columns,
+            "{name}: the queue held {} monomials against {} columns — it is holding duplicates, \
+             so no column budget bounds it",
+            statistics.max_pending_monomials,
+            statistics.max_matrix_columns
+        );
+    }
+}
