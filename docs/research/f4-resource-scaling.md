@@ -542,6 +542,27 @@ The `VecDeque` doubling slack of §9.2 goes with the payload. At 40 929 elements
 `2^16 = 65 536` slots, 5.2 MB, so the allocator-against-resident gap that explained the 21 674 MB
 against 13 996 MB is now a few megabytes and not worth separating.
 
+**The benchmark systems, where the win is real and immaterial.** `examples/f4_memory` with no
+arguments, same binaries:
+
+| system | queue high-water before | after | factor | monomials offered | peak live heap before / after |
+|---|---:|---:|---:|---:|---:|
+| katsura-6 | 2 908 | **206** | 14.1x | 17 550 | 0.3 MB / 0.3 MB |
+| katsura-7 | 16 334 | **693** | 23.6x | 92 669 | 1.2 MB / 1.2 MB |
+| cyclic-6 | 5 684 | **293** | 19.4x | 62 216 | 0.7 MB / 0.7 MB |
+
+The factor is larger here than one might guess from the MQ rungs and the peak does not move at all,
+because at six and seven variables the whole computation fits in a megabyte and the queue was never
+what bound it. The queue's cost scales with rows times terms per row, which is what makes it a
+twenty-variable problem and not a general one. Reported because the issue asked for the benchmark
+systems, and a figure that shows a change mattering nowhere is worth as much as one that shows it
+mattering somewhere.
+
+The column that matters for equivalence is **monomials offered**, which is byte-identical before and
+after on all three — 17 550, 92 669, 62 216 — as are the batch counts, the stop lines and the peak
+basis sizes. Only the high-water moved, which is the whole intent: `monomials_enqueued` still counts
+offers rather than admissions precisely so that this comparison is possible.
+
 ### 10.3 The new binding site, and that it is not the same one at both rungs
 
 Removing 88% of a peak promotes something else to the top, which is the whole reason to recompute
