@@ -591,11 +591,19 @@ directly, under `--route fglm`.
    against Zeebra from two to three; that number is the driver's own count of the standard
    monomials rather than Sagebrush's internal `stair.len()`, which stays unexposed, and being an
    independent computation it is a real third invariant rather than a restatement.
-2. **#316 — add a `RunFailure` variant for a hostile environment.** `src/grobner/external/sagebrush.rs`
-   must refuse to run when an `SB_*` switch is inherited, because `Invocation` can set a child's
-   variable but not clear one, and those switches are truthy-if-set. The closest existing variant is
-   `Reported`, which `contract.rs` explicitly asks an adapter not to overload — so this is the
-   "say so rather than overloading" case, said.
+2. **#316 — add a `RunFailure` variant for a hostile environment. Done.**
+   `src/grobner/external/sagebrush.rs` refuses to run when an `SB_*` switch is inherited, because
+   `Invocation` can set a child's variable but not clear one, and those switches are truthy-if-set.
+   The closest existing variant was `Reported`, which `contract.rs` explicitly asks an adapter not
+   to overload — so this was the "say so rather than overloading" case, said, and the answer was
+   `RunFailure::Environment { variable, detail }`.
+
+   Three details worth recording. `RunReport::was_skipped()` counts it, alongside `Unavailable` and
+   `Unsupported`, because all three mean the tool did not run — the issue left that open and the
+   answer is yes. Its `Display` begins `not run:`, so the board cell a reader actually sees says
+   so rather than implying a tool error. And `PINNED_SWITCHES` now carries each switch's *effect*
+   next to its name, so `detail` is specific: a refusal that named only the variable would tell an
+   operator to unset it without letting them judge whether it should have been set.
 3. **#269 — correct its premise.** Its title cites M16's obsolete 65–88% elimination figure;
    `MILESTONE-F4-OPTIMIZATION.md` §8.5 measures 7–22%, with interreduction at 61% and matrix
    construction at 48%. Whatever #269 becomes, it should be aimed at those.

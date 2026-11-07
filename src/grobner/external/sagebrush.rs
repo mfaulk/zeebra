@@ -259,14 +259,41 @@ pub const MAX_VARIABLES_LEX: usize = 31;
 ///
 /// The last two are a parsing hazard as much as a measurement one: the supervisor sends both of
 /// the child's streams to one file, so a trace interleaves with the basis the adapter parses.
-pub const PINNED_SWITCHES: &[&str] = &[
-    "SB_SIGF4",
-    "SB_SIG_NOSYZ",
-    "SB_SIG_NOREW",
-    "SB_SIG_NOZERO",
-    "SB_F4_FL",
-    "SB_F4_DEBUG",
-    "SB_F4_SHAPE",
+///
+/// Each entry carries its effect as well as its name, because that text becomes
+/// [`RunFailure::Environment`]'s `detail` — and a refusal that says only *which* variable is set
+/// tells an operator to unset it without letting them judge whether it should have been.
+pub const PINNED_SWITCHES: &[(&str, &str)] = &[
+    (
+        "SB_SIGF4",
+        "tries the experimental signature-based F4 first (engine/mpoly/src/f4.rs:484)",
+    ),
+    (
+        "SB_SIG_NOSYZ",
+        "disables syzygy-signature pruning (engine/mpoly/src/sigf4.rs:170)",
+    ),
+    (
+        "SB_SIG_NOREW",
+        "disables the rewrite criterion (engine/mpoly/src/sigf4.rs:171)",
+    ),
+    (
+        "SB_SIG_NOZERO",
+        "stops recording zero reductions as syzygies (engine/mpoly/src/sigf4.rs:327)",
+    ),
+    (
+        "SB_F4_FL",
+        "overrides the elimination cost model (engine/mpoly/src/f4.rs:325-329)",
+    ),
+    (
+        "SB_F4_DEBUG",
+        "writes a trace into the stream the basis is parsed from \
+         (24 sites from engine/mpoly/src/f4.rs:196)",
+    ),
+    (
+        "SB_F4_SHAPE",
+        "writes matrix shape statistics into the stream the basis is parsed from \
+         (engine/mpoly/src/f4.rs:310)",
+    ),
 ];
 
 /// The variable Sagebrush takes its worker count from.
@@ -453,12 +480,15 @@ impl SagebrushSolver {
             .env(THREADS_VARIABLE, limits.workers.max(1).to_string())
     }
 
-    /// The first [`PINNED_SWITCHES`] entry the harness's own environment sets, if any.
-    fn inherited_switch() -> Option<&'static str> {
+    /// The first [`PINNED_SWITCHES`] entry the harness's own environment sets, with its effect.
+    ///
+    /// Presence and not value: every one of these but `SB_F4_FL` is read with
+    /// `env::var(..).is_ok()`, so `SB_SIGF4=0` *enables* the signature path.
+    fn inherited_switch() -> Option<(&'static str, &'static str)> {
         PINNED_SWITCHES
             .iter()
             .copied()
-            .find(|name| std::env::var_os(name).is_some())
+            .find(|(name, _)| std::env::var_os(name).is_some())
     }
 
     /// Parse the driver's output into an answer, checking its echoed headers against the request.
@@ -865,19 +895,17 @@ impl ExternalSolver for SagebrushSolver {
                 None,
             );
         }
-        if let Some(switch) = Self::inherited_switch() {
+        if let Some((variable, effect)) = Self::inherited_switch() {
             // Refusing beats measuring: an inherited switch selects a different algorithm or
-            // interleaves a trace with the basis, and `Invocation` can set a variable but not
-            // clear one. `Reported` is the closest variant the contract has; `RunFailure` has no
-            // "the environment is wrong" arm, and that gap is worth a follow-up rather than a
-            // silent overload.
+            // interleaves a trace with the basis, and `Invocation` can set a child's variable but
+            // not clear one — so the condition cannot be fixed from inside the run.
+            //
+            // `RunFailure::Environment` and not `Reported`: nothing ran, so the tool printed no
+            // error. `was_skipped()` counts it, so the board shows the row as not attempted.
             return finish(
-                RunStatus::Failed(RunFailure::Reported {
-                    message: format!(
-                        "the environment sets {}, which changes Sagebrush's engine path and \
-                         cannot be cleared from the invocation",
-                        switch
-                    ),
+                RunStatus::Failed(RunFailure::Environment {
+                    variable: variable.to_string(),
+                    detail: format!("{} and cannot be cleared from the invocation", effect),
                 }),
                 Measurement::unmeasured(),
                 None,
@@ -1643,16 +1671,47 @@ mod tests {
     fn test_an_inherited_engine_switch_refuses_the_run() {
         // Serialized against the other tests only by being the sole writer of this variable.
         let name = "SB_SIGF4";
-        assert!(PINNED_SWITCHES.contains(&name));
+        assert!(PINNED_SWITCHES.iter().any(|(switch, _)| *switch == name));
         // SAFETY: a single-threaded section of one test; no other test reads this variable.
         unsafe { std::env::set_var(name, "0") };
         let switch = SagebrushSolver::inherited_switch();
         unsafe { std::env::remove_var(name) };
         assert_eq!(
-            switch,
+            switch.map(|(switch, _)| switch),
             Some(name),
             "a truthy-if-set switch must be detected even at the value 0"
         );
+    }
+
+    /// An inherited switch is reported as `Environment`, naming the variable, and skips the row.
+    ///
+    /// Not [`RunFailure::Reported`], which is documented as "the tool printed an error": nothing
+    /// ran, so there was no tool to print anything. The distinction is the point of #316 — a board
+    /// must show this row as not attempted rather than as a result, and an operator needs to be
+    /// told which variable to unset.
+    #[test]
+    fn test_an_inherited_switch_is_an_environment_failure_naming_the_variable() {
+        let name = "SB_F4_SHAPE";
+        assert!(PINNED_SWITCHES.iter().any(|(switch, _)| *switch == name));
+        let mut solver = solver("sagebrush-gb-driver", "env-refusal");
+        // SAFETY: a single-threaded section of one test; this is the sole writer of this variable.
+        unsafe { std::env::set_var(name, "1") };
+        let report = solver.run(
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(5)),
+        );
+        unsafe { std::env::remove_var(name) };
+
+        match &report.status {
+            RunStatus::Failed(RunFailure::Environment { variable, detail }) => {
+                assert_eq!(variable, name);
+                assert!(!detail.is_empty(), "the effect has to be named");
+            }
+            other => panic!("expected an Environment refusal, got {:?}", other),
+        }
+        assert!(report.was_skipped(), "nothing was attempted");
+        assert!(report.measurement.is_unmeasured());
     }
 
     /// A generator naming an undeclared variable is a capability gap, not a failed run.

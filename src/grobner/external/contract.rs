@@ -810,6 +810,35 @@ pub enum RunFailure {
 
     /// The filesystem or process work the run needs failed.
     Io { reason: String },
+
+    /// The harness's own environment would have changed what was measured.
+    ///
+    /// **Not a property of the instance and not a property of the tool: a run that ends here was
+    /// not attempted.** Something inherited would have selected a different algorithm, a different
+    /// thread count, or polluted the output being parsed — and an adapter can set a child's
+    /// environment but cannot clear it, so the condition cannot be fixed from inside the run.
+    ///
+    /// Distinct from every other variant here, which is why it exists rather than overloading
+    /// [`Self::Reported`]:
+    ///
+    /// * not [`Self::Unavailable`] — the binary is present and would have started;
+    /// * not [`Unsupported`] — nothing about the *instance* is unrepresentable, and `Unsupported`
+    ///   is specifically a statement about the tool's declared capability;
+    /// * not [`Self::Reported`] or [`Self::NonZeroExit`] — the tool never ran, so it printed
+    ///   nothing and exited nothing;
+    /// * not [`Self::Io`] — nothing on the filesystem failed.
+    ///
+    /// Counted by [`RunReport::was_skipped`], because a board must show the row as not attempted
+    /// rather than as a result.
+    ///
+    /// `variable` is the inherited name, so an operator is told what to unset; `detail` is what it
+    /// would have changed, so the refusal can be judged rather than merely obeyed.
+    ///
+    /// The case that motivated it: `engine/mpoly` reads seven `SB_*` switches with
+    /// `env::var(..).is_ok()` — **truthy if set, so `SB_SIGF4=0` enables the experimental
+    /// signature path** — and two of them write a trace into the stream the basis is parsed from.
+    /// Any adapter driving a tool with environment-selected internals has the same problem.
+    Environment { variable: String, detail: String },
 }
 
 impl Display for RunFailure {
@@ -830,6 +859,11 @@ impl Display for RunFailure {
                 None => write!(f, "the tool was killed by a signal"),
             },
             Self::Io { reason } => write!(f, "{}", reason),
+            Self::Environment { variable, detail } => write!(
+                f,
+                "not run: the environment sets {}, which {}",
+                variable, detail
+            ),
         }
     }
 }
@@ -1316,13 +1350,23 @@ impl RunReport {
         self
     }
 
-    /// True if this run was skipped rather than attempted — tool absent or input unrepresentable.
+    /// True if this run was skipped rather than attempted.
     ///
-    /// The two cases a board shows as "not attempted" rather than as a result.
+    /// The three cases a board shows as "not attempted" rather than as a result: the input is
+    /// unrepresentable ([`RunStatus::Unsupported`]), the tool is absent
+    /// ([`RunFailure::Unavailable`]), or the harness's own environment would have invalidated the
+    /// measurement ([`RunFailure::Environment`]).
+    ///
+    /// The common property is that **the tool did not run**, so there is no measurement and nothing
+    /// about any implementation follows. Every other [`RunFailure`] describes a run that was
+    /// attempted and went wrong, which is a different thing for a reader to act on.
     pub fn was_skipped(&self) -> bool {
         matches!(
             &self.status,
-            RunStatus::Unsupported(_) | RunStatus::Failed(RunFailure::Unavailable { .. })
+            RunStatus::Unsupported(_)
+                | RunStatus::Failed(
+                    RunFailure::Unavailable { .. } | RunFailure::Environment { .. }
+                )
         )
     }
 
@@ -1851,6 +1895,50 @@ mod tests {
         );
         assert!(report.was_skipped());
         assert!(!report.status.answered());
+    }
+
+    /// A run refused because of the harness's own environment is a skipped run, not a failed one.
+    ///
+    /// Nothing ran, so there is no measurement and nothing about any implementation follows from
+    /// it. A board that showed it as a result would be reporting a figure for a question nobody
+    /// asked.
+    #[test]
+    fn test_a_hostile_environment_is_a_skipped_run_and_not_a_failed_solve() {
+        let report = RunReport::new(
+            "sagebrush",
+            &instance(),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(600)),
+            RunStatus::Failed(RunFailure::Environment {
+                variable: "SB_SIGF4".to_string(),
+                detail: "selects the experimental signature-based F4".to_string(),
+            }),
+            Measurement::unmeasured(),
+        );
+        assert!(report.was_skipped(), "nothing was attempted");
+        assert!(!report.status.answered());
+        assert!(report.measurement.is_unmeasured());
+    }
+
+    /// `Environment` names the variable and what it would have changed.
+    ///
+    /// The message is the whole value of the variant over `Reported`: an operator reading it has to
+    /// learn which variable to unset.
+    #[test]
+    fn test_the_environment_failure_names_the_variable_and_the_effect() {
+        let failure = RunFailure::Environment {
+            variable: "SB_F4_SHAPE".to_string(),
+            detail: "writes matrix shape statistics into the parsed output".to_string(),
+        };
+        let rendered = failure.to_string();
+        assert!(rendered.contains("SB_F4_SHAPE"), "{}", rendered);
+        assert!(rendered.contains("matrix shape statistics"), "{}", rendered);
+        // Not phrased as the tool's doing: the tool never ran.
+        assert!(
+            !rendered.contains("the tool reported"),
+            "an environment refusal is not a tool error: {}",
+            rendered
+        );
     }
 
     /// Limits are comparable only when every declared resource matches.
