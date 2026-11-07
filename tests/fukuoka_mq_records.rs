@@ -129,7 +129,10 @@ fn test_the_fixture_covers_the_four_types_and_nothing_else() {
 /// The encryption families are overdetermined with exactly `m = 2n`, as their generator fixes.
 #[test]
 fn test_the_encryption_families_have_m_equal_to_twice_n() {
-    for s in load().iter().filter(|s| matches!(s.challenge_type.as_str(), "II" | "III")) {
+    for s in load()
+        .iter()
+        .filter(|s| matches!(s.challenge_type.as_str(), "II" | "III"))
+    {
         assert_eq!(
             s.m,
             2 * s.n,
@@ -144,7 +147,10 @@ fn test_the_encryption_families_have_m_equal_to_twice_n() {
 /// `n = m * 1.5` truncated, not rounded, which is why `m = 17` gives `n = 25` and not 26.
 #[test]
 fn test_the_signature_families_have_n_equal_to_the_truncation_of_one_and_a_half_m() {
-    for s in load().iter().filter(|s| matches!(s.challenge_type.as_str(), "V" | "VI")) {
+    for s in load()
+        .iter()
+        .filter(|s| matches!(s.challenge_type.as_str(), "V" | "VI"))
+    {
         let expected = (s.m * 3) / 2;
         assert_eq!(
             s.n,
@@ -233,7 +239,10 @@ fn test_a_hybrid_attacks_total_follows_from_its_subsystems_and_its_parallelism()
         );
         checked += 1;
     }
-    assert_eq!(checked, 3, "three wall-total rows publish all three ingredients");
+    assert_eq!(
+        checked, 3,
+        "three wall-total rows publish all three ingredients"
+    );
 }
 
 /// The two rows that publish a peak-memory figure name which metric it is.
@@ -312,9 +321,7 @@ fn test_the_rows_obey_the_challenges_own_recording_rules() {
     for s in load() {
         let key = (s.challenge_type.clone(), s.n, s.seed);
         assert!(seen.insert(key.clone()), "{}: recorded twice", s.label());
-        let count = per_size
-            .entry((s.challenge_type.clone(), s.n))
-            .or_default();
+        let count = per_size.entry((s.challenge_type.clone(), s.n)).or_default();
         *count += 1;
         assert!(
             *count <= 5,
@@ -361,7 +368,11 @@ fn test_the_record_per_type_is_the_one_the_write_up_quotes() {
     );
     assert_eq!(
         best("VI", false),
-        (24, "2025-10-16".into(), "Kosuke Sakata, Tsuyoshi Takagi".into())
+        (
+            24,
+            "2025-10-16".into(),
+            "Kosuke Sakata, Tsuyoshi Takagi".into()
+        )
     );
 }
 

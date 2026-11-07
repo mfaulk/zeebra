@@ -51,7 +51,14 @@
 #   subsystems              number of subsystems solved before a solution was
 #                           found, for the hybrid attacks that report it.
 #   avg_subsystem_seconds   average time per subsystem, as reported.
-#   processes               simultaneous processes, where the notes state it.
+#   processes               simultaneous processes, where the notes state it
+#                           AND the three figures reconcile. Deliberately left
+#                           `-` on three rows that state a count and an average
+#                           but whose totals do not follow from them: type VI
+#                           m=21 2023-10-23 (2.6% high, campaign overhead) and
+#                           the two 2025 type VI rows (implying 7.6-way and
+#                           15.8-way parallelism, neither an integer). See
+#                           docs/research/fukuoka-mq.md section 8.4.
 #   answer_published        whether the detail page prints the answer vector.
 #   details                 path under https://www.mqchallenge.org/ .
 #   runtime_printed         the `Running Time` field verbatim, so the conversion
