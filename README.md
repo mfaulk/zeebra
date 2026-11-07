@@ -434,6 +434,9 @@ cargo run --release --example resultant_cico       # a resultant against F4 on t
                                                    #   (two four-round rows, predicted sample count)
 cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the determinant scaling study
 cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
+cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
+                                                   #   five matrix orders, fitted with residuals
+cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -2326,14 +2329,40 @@ interpolation never sampled, the check is part of the route rather than a flag �
 `ResultantOptions::with_off_domain_checks(0)` panics rather than disabling it — and on disagreement
 the proven `2d²` path produces the answer with `DegreeSource::PredictionFalsified` recording that
 the published formula did not hold on that row. A falsification would be a result worth more than
-the samples it saved, so it is recorded rather than silently repaired. The validation runs on the
-parallel determinant path too, which is a test.
+the samples it saved, so it is recorded rather than silently repaired.
+
+The check's own determinants go over the **same** worker pool as the interpolation's samples:
+`off_domain_abscissae` is pure in the sample count and the fixed seed, so the points are drawn
+before anything is evaluated and then partitioned through the one indexed `sample_determinants`
+loop. At order 1 458 eight checks measure 19.97 s serial against 2.82 s at eight workers, which
+takes a six-round row's validation share from 3.1% to 0.5%. Every check is evaluated before any is
+compared, so the verdict cannot depend on which worker finished first, and the draws are distinct
+rather than merely off-domain. It remains a **probabilistic consistency check and not a proof of a
+polynomial identity** — eight agreements bound the failure probability by `(bound/p)^8`, which is
+`4 × 10^-27` at six rounds: overwhelming evidence, and not the certificate that the proven-bound
+routes get from uniqueness of interpolation.
 
 `examples/resultant_cico` selects what it attempts: `--row <challenge-id>` (repeatable),
 `--max-samples` and `--wall-budget`, with a row over either **costed and skipped** and its
 arithmetic printed. `--build-only` times `cico_bivariate` alone, which is the bounded measurement a
 row past the budget still supports. There is no `--all` — it removed the guard entirely, which put
 a 12.9-day row beside a bounded one.
+
+What the guard costs a row with is **measured rather than assumed**. `examples/determinant_sweep`
+times the Sylvester determinant kernel at orders 18, 162, 486, 1 458 and 4 374 on random bivariate
+pairs and fits a power law with per-point residuals, and the answer is piecewise: above the L2
+footprint the exponent is **2.9953 ± 0.0285** with a worst residual of 3.7% — cubic to within the
+measurement, including at order 4 374 whose 153 MB matrix exceeds a CCX's L3, so there is no cache
+cliff to model — and below it 2.79, which is fixed per-determinant overhead the small orders cannot
+amortize. `determinant_core_ms` takes the **larger** of the fitted and cubic laws, because 2.9953 is
+below 3 and a cost model that under-predicts authorizes a run nobody costed, times a measured
+core-time penalty for running wide (2.404 s, 2.821 s and 3.148 s a determinant at order 1 458 on 1,
+8 and 32 workers). The six-round rows come out at 12.0 min (`rf2-rp4`), 1.79 h (`rf4-rp2`) and
+16.15 h (`rf6-rp0`) on 32 workers; the eight-round rows at order 13 122 are 490 and 4 415 days, out
+of reach by three orders of magnitude rather than by a factor the sample count could recover. See
+[`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md) §6.9, which also
+records that the figures on record are about 1.2x faster than the same measurements today, and that
+the 2.868 ms order-162 anchor every earlier projection used does not reproduce.
 
 #### External instances: the Fukuoka MQ Challenge
 
