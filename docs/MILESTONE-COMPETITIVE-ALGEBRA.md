@@ -1049,6 +1049,48 @@ The register in §11 is reconciled against the tracker; the additions are:
 (Boolean importers — and #272 says `GF(2)` can be profiled today), #193/#194 (univariate, independent
 files), #205–#207 (MinRank analysis), #199 (classical-collection provenance).
 
+### 13.8a Scored against §10 and §16, criterion by criterion
+
+Scored against the criteria as written before the work, including where they were not met.
+
+**Minimum — met, 7 of 7.**
+
+| criterion | | evidence |
+|---|---|---|
+| a standardized cross-library protocol | **met** | #257, `external-comparison-protocol.md`; the six-task taxonomy, each field with a stated measurement method, "cannot represent the input" distinguished from "slower" in the type system |
+| working adapters for ≥3 comparators, or documented blockers | **met** | **4** — msolve 0.11.0, Groebner.jl 0.10.11, Sagebrush `86d9f1c7`, Singular 4.4.1, all on one frozen contract |
+| a validated corpus of ≥6 families | **met** | #261 — six families, nineteen rungs, equivalence a **recorded field** with a `licenses_timing()` gate asserted per rung |
+| a first competitive report, identical problems and hardware | **met** | #263, `competitive-baseline.md`; two measured deficits, four-way agreement, three cannot-be-compared results |
+| stage-attributed priorities for subsequent optimization | **met** | the six-axis ranking plus the Amdahl screen, which closed #269/#270/#271, held #272 and vindicated #273 |
+| a machine-readable record of measured RSS, separate from estimated | **met** | #288 — both populated, ratio recoverable from one record, `measured_peak_rows_in_process` labelling attributability, `RssBasis::AllocatorTracked` keeping allocated and resident apart |
+| updated issues and milestone documentation | **met** | 29 issues created, all boarded with Priority; §11's register reconciled both ways |
+
+**Strong — met, 5 of 5, with one of them narrower than the criterion's wording suggests.**
+
+| criterion | | evidence |
+|---|---|---|
+| a demonstrated improvement to an important core operation, end to end | **met** | #243 — the six-round build 175–179x lower peak **and 7.5x faster**; #305 — F4's peak **9.06x** lower and **10% faster**, both under the lock with the before column reproducing the recorded ladder to 0.013% |
+| a completed, resource-attributed Anemoi `N = 6` attempt | **met**, narrowly | FCICO refused in 3.8 s on a **named** budget, with the Magma row-count observation attached; `D = 15 625` witnessed three independent ways; the rung demonstrated reachable at 340.66 s by msolve. **No Zeebra conversion time was obtained**, and PCICO is recorded as *not a result* |
+| an explicit explanation of the published-conversion discrepancy | **met** | #283 — candidate (2) ruled out; the ratio flat to 12% across a 47-bit prime range against Magma's 7.3x, the 507x collapsing to 2.85x, and msolve settling it at 1.81 s against 63.7 s |
+| a validated, updated Poseidon resultant cost model | **met** | #289 — five orders, 2.9953 ± 0.0285, residuals published, no cache cliff, and `RowCost::of` deliberately keeping the **larger** of fitted and cubic |
+| one clear recommendation on the next algorithmic investment, from new measurement | **met**, and **contested** | §13.9 — order conversion, with the contest named and **#349** as the one run that decides it |
+
+**Stretch — not met, 0 of 4**, and the first criterion inverted:
+
+| criterion | | |
+|---|---|---|
+| a same-machine performance lead over a credible established implementation | **not met — the opposite** | Two measured deficits: ~30x on conversion against msolve, 4.11x on the basis against Singular. Four apparent wins were **disqualified by our own startup-floor rule**, including a 450x |
+| a verified cryptanalytic instance beyond M24's measured frontier | **not met** | `rf4-rp2` costed at ≈2.6 h against a ~2 h ceiling and **refused**. §8.4.1 |
+| an improvement to a published attack surviving an equivalent comparison | **not met** | Griffin is a **no-go for M25** on worth; the capability it needs is costed as #306 |
+| an algorithmic change materially raising the maximum reachable problem size | **not met**, and a claim withdrawn | #305 took 9.06x off F4's working set but the stop reason is **unchanged** — `max_live_nonzeros` at degree 5, so M24's "out of reach, not out of budget" stands. And axis 4's round-count claim was **withdrawn** in §13.5 |
+
+**One §16 clause deserves naming because it was the hardest to honour.** "Do not manufacture a stretch
+success by choosing an easier benchmark, changing its mathematical identity, or comparing incompatible
+computational objectives." The 450x row was available, arithmetically correct, and would have read as
+a stretch result. It was disqualified by a rule this milestone wrote against itself — a comparand's
+wall within ~2x of its own 36.0 ms floor is not an engine comparison. That rule cost four wins and
+kept none.
+
 ### 13.9 M26 recommendation
 
 **Run one cheap measurement first, because two deficits are now measured and it decides between
