@@ -57,6 +57,23 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Anemoi CICO at six rounds, `D = 15 625`: a witness verified through the permutation in
       1.180 h, reproducing a published 11 775 s conversion, with the pre-recorded cost model landing
       within 4% on the conversion and 1.5% on the operator count
+- [x] The Sylvester determinant's cost law measured over five matrix orders instead of two: cubic to
+      within the measurement above L2 — `2.9953 ± 0.0285`, worst residual 3.7% — and no cache
+      cliff, since order 4 374's 153 MB matrix exceeds L3 and still fits the law. The budget guard
+      takes the larger of the fitted and cubic laws, because a model that under-predicts authorizes
+      a run nobody costed
+- [x] A cost-and-resource-model register in which prediction error is *derived* from the predicted
+      and measured columns rather than authored, every figure labelled measured / fitted / predicted
+      / extrapolated, and rows append-only — so a re-measurement sits beside the estimate it
+      corrects instead of erasing how wrong it was
+- [x] Two measured same-machine losses in different subsystems, which is what the comparison was
+      for: order conversion ~30x behind msolve, and the basis stage 4.11x behind Singular on random
+      MQ — the corpus family closest in shape to a cryptanalytic system
+- [x] A competitive board that refuses a ratio against a comparand's own startup floor, measured at
+      35.91 ms from the board's own rows. Of 28 answered pairs only 7 clear 2x it; the other 21 all
+      read as wins for this crate, up to 501x, and settle nothing. Of the seven that qualify: four
+      losses, two inside the noise band, one win — on a corpus whose raw numbers show this crate
+      ahead on every pair
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
