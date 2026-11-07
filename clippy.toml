@@ -1,0 +1,9 @@
+# `cargo test` runs the whole suite as threads of one process, so a `setenv` anywhere — including
+# in a test that believes it is the sole writer of its variable — races every concurrent `getenv`
+# and leaks its value into whatever else is reading the environment at that moment (#418). Code
+# that needs to vary an environment-derived value must take it as a parameter instead.
+disallowed-methods = [
+    { path = "std::env::set_var", reason = "mutates the process environment under a parallel test suite; inject the value instead (#418)" },
+    { path = "std::env::remove_var", reason = "mutates the process environment under a parallel test suite; inject the value instead (#418)" },
+    { path = "std::env::set_current_dir", reason = "process-wide state under a parallel test suite; pass the path instead (#418)" },
+]
