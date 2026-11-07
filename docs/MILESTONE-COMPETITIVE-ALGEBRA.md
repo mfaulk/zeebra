@@ -450,16 +450,25 @@ Costed, each line labelled:
 
 | stage | cost | basis |
 |---|---:|---|
-| symbolic build | **48.4 min**, **57 GB** peak RSS | measured, §6.8; identical for every six-round row |
+| symbolic build | **48.4 min**, **310.4 MiB** peak RSS | measured, §6.12 — **was 53.09 GiB before #243**; identical for every six-round row |
 | 59 050 order-1458 determinants, 32 workers | **1.79 h** | model (`RowCost::of`, 10% conservative by construction) |
 | the same, from measured core-times alone | **1.61 h** | 59 050 × 3.148 s / 32, measured per-determinant |
 | off-domain validation, 8 points | **< 1%** of the row | measured, now on the parallel path (#285) |
 | root finding at degree 59 049 | **not estimated** | §6.3 measured 70x for a 9x degree step (729 → 6 561); extrapolating that again is not defensible |
-| **total** | **≈ 2.6 h**, **≈ 57 GB** | build + determinants, root finding unpriced |
+| **total** | **≈ 2.6 h**, **≈ 0.3 GB** | build + determinants, root finding unpriced |
 
-**Against the §9 ceiling of ~2 h wall and ~64 GB peak RSS, this fails on time.** It is close on memory
-too — 57 GB against 64 GB is 89% of the ceiling, with the largest single unpriced term (root finding
-at a degree nine times anything measured) sitting on the wrong side of the estimate.
+**Against the §9 ceiling of ~2 h wall and ~64 GB peak RSS, this fails on time — and on time alone.**
+
+That last clause is a correction to this section's own first draft, which also called the row "close
+on memory, 57 GB against a 64 GB ceiling, 89% of it". **#243 landed between the costing and this
+sentence and made the build's peak 175–179x smaller**, so the memory term is now 0.5% of the ceiling
+rather than 89% of it. The arithmetic that refuses the row did not change; the reason it is refused
+narrowed from two resources to one.
+
+Which makes the point §13.7 draws from this harder to miss: **memory was never what blocked this
+row.** It only looked like a binding constraint while it was the quantity that had been mis-estimated
+by 838x, and the moment it was measured and then fixed, the constraint that remained was the one
+nobody had been arguing about.
 
 So the decision is **no-go pending explicit owner authorization**, and that is a completed research
 decision rather than an unfinished attempt. Three things follow from recording it this way:
@@ -653,7 +662,289 @@ bash scripts/agent/test/zb-claim-test.sh
 
 ## 13. Final measurements and conclusions
 
-To be written by #299 as the workstreams report. Sections reserved: competitive position;
-cryptanalytic position; computational frontier against M24; performance improvements with
-stage-level attribution; research findings as adopt / reject / defer; negative results; cost-model
-accuracy; future work; and the M26 recommendation.
+Two items are still running at the time of writing and are marked as such: Anemoi `N = 6` (§13.2)
+and M25-D's hybrid and structured-Sylvester derivations (§13.5). Everything else is final.
+
+### 13.1 Competitive position
+
+Four engines are provisioned on this machine, pinned, and reachable through one contract:
+
+| engine | version | basis ceiling | eliminant ceiling | notes |
+|---|---|---|---|---|
+| msolve | 0.11.0 | `p < 2^31` (`iofiles.c:564`) | **`p < 1515531529`** (`linalg-fglm.c:38`) | two ceilings, not one |
+| Groebner.jl | 0.10.11 / Julia 1.11.7 | `p < typemax(u64)` | — (no FGLM in 0.10.11) | measured at 2^64−353 |
+| Sagebrush | `86d9f1c7` | `p < 2^62` (`lib.rs:1552`) | via `SB_FGLM` | **timings not authoritative** — §13.6 |
+| Singular | 4.4.1 (44105) | `p < 2^31` | `fglm` | pre-existing |
+
+**Where Zeebra loses, and it is the cleanest comparable measurement the milestone produced.** On
+Anemoi `N = 5` FGLM at `p = 65537`, same machine, byte-identical generators: **~21–35x end to end**
+and **~30x on the conversion stage** against msolve. The ~280x per-core figure is defensible **for
+the conversion stage only** — that stage is single-threaded at ~1 CPU-second per wall second
+observed, while the basis stage had eight cores. Quoting per-core for the whole solve would
+overstate it.
+
+**Where Zeebra cannot be compared, which is three results rather than three gaps.**
+
+1. **Both solution tasks have no comparand at any field size.** `OneFiniteFieldSolution` and
+   `AllFiniteFieldSolutions` are empty columns for **every** engine — msolve produces a rational
+   parametrization rather than finite-field points (verified at `main.c:96-97`), and the other
+   three have no solver. Zeebra's end-to-end solving capability has no external baseline.
+2. **The corroboration boundary has four tiers**, and it is about corroboration rather than
+   representability — a distinction with different fixes:
+
+   | band | engines | corroboration |
+   |---|---|---|
+   | `p < 2^31` | all four | four-way, term-for-term |
+   | `2^31 ≤ p < 2^62` | Groebner.jl, Sagebrush | two-way, no third opinion |
+   | `2^62 ≤ p < 2^64` | Groebner.jl only | **none** |
+   | 254/255-bit | none | **none at any size** |
+
+   Anemoi's field is 2^64−353, so it sits in the one-engine band. The corpus's `NoComparand` reason
+   says so.
+3. **The corpus reference field, `2^31 − 1`, is above msolve's eliminant ceiling.** So msolve is a
+   basis comparand there and not an eliminant one. Asking it anyway does not fail — it **hangs**:
+   the sparse-FGLM `NULL` is laundered into the genericity signal and reaches a `goto restart` loop
+   with no exit (`msolve.c:649`, `:482-484`), measured at **25 353 retries and 1.37 M lines in 8 s,
+   never exiting**. A hang reads as `StoppedByLimit`, which is timing-adjacent and wrong, so
+   `competitive_sweep` **refuses to ask** rather than documenting the hazard.
+
+**Correctness, which is the precondition for any of the above.** Four engines produce a term-for-term
+identical basis — every coefficient, not only leading monomials — on a shared system over
+GF(1073741827), corroborated by `vdim` / `quotient_basis` / parametrization degree all equal to 12.
+Across the corpus, all seven Katsura and Cyclic rungs agree **exactly** with Zeebra's own F4 through
+msolve, with each rung's digest asserted frozen. Sagebrush disagreed with nothing on any family
+tried, including a 62-bit prime.
+
+### 13.2 Cryptanalytic position
+
+**Unchanged from M24 on official problems.** The hardest official problem solved remains Fukuoka MQ
+III `n = 15`. No official challenge was attempted in M25, and nothing here is a prize claim.
+
+**Faithful reductions: unchanged, and refused deliberately.** `rf4-rp2` was costed against the
+calibrated model and **not authorized** — §8.4.1. At ≈2.6 h against a ~2 h ceiling it fails on
+**time**, not memory, which only became visible once #289 measured the per-determinant cost at
+3.148 s rather than the 2.70 s on record. `rf6-rp0` is 16.15 h and every eight-round row is ≥490 d.
+
+**External calibration: extended from ten registered rows to thirty.** The Anemoi ladder now carries
+`N = 1..5` in both models at **three characteristics** — 65537, 2^32−209, 2^64−353 — with the 29
+pre-existing digests byte-identical, so the freeze test reports additions rather than redefinitions.
+
+**Anemoi `N = 6` — running, not yet reported.** PCICO at `p = 65537` was in flight at ≈1 800 s of a
+5 400 s budget at 4.53 GB when this section was written; FCICO is authorized and queued. Both are
+**reproduction** targets rather than produced figures, because the `p = 65537` logs do publish an
+`N = 6` conversion in both models (23 340 s / 11 775 s) — which corrects #286's premise in the
+crate's favour. The authorization is recorded in `anemoi.md` §8a.5 as the **integration agent's**
+under §9's approximate threshold, **not** the repository owner's.
+
+### 13.3 Computational frontier against M24
+
+| | M24 | M25 |
+|---|---|---|
+| hardest **official** problem solved | Fukuoka MQ III `n = 15` | unchanged |
+| **faithful reduction**, resultant route | 6 rounds, `rf2-rp4`, verified | unchanged — `rf4-rp2` costed and **refused** on time |
+| external comparand **on this machine** | none | **four engines**, pinned, one contract |
+| registered Anemoi rows | 10, one prime | **30**, three primes |
+| F4 peak RSS, `fukuoka-mq-III-n20-seed0` deg 5 | 13 996 MB | **1 496.5 MB** — 9.4x |
+| six-round symbolic build transient | 57.0 GB for a 4.3 MB output | **bounded by the output** |
+| determinant cost law | 2 points, cubic asserted | **5 orders**, 2.9953 ± 0.0285 fitted |
+| off-domain validation at six rounds | 19.97 s, 3.12% of the row | **2.82 s, 0.51%** |
+| scoreboards | 1 | **3** |
+
+### 13.4 Performance improvements
+
+**#243 — the multivariate multiply.** On the six-round build's dominant step (`p²·p`, 3 551 768 920
+products, 266 815 output terms), three routes measured against the materialize-all baseline, which
+was **skipped because its 56.6 GB transient is the defect**:
+
+| route | time | live heap |
+|---|---:|---:|
+| monomial-keyed map | 103.39 s | 28.4 MiB |
+| chunked collect | 84.85 s | 6.5 MiB |
+| **dense triangle** | **11.25 s** | **7.5 MiB** |
+
+So this is **not** the memory-win-at-a-time-cost the issue anticipated: the dense triangle is both
+bounded in memory and **7.5x faster than the best alternative**, because the product is the dense
+`(d+1)(d+2)/2` triangle with zero cancellation and hashing it was pure overhead. Dispatch is on the
+**output bound**, not on operand density, with both failure modes recorded.
+
+**#305 — symbolic preprocessing's monomial queue.** Deduplicating on push rather than on pop, which
+is the same number of hash operations one step earlier, bounds the queue by the closure instead of by
+nothing. Peak RSS **13 996 MB → 1 496.5 MB, 9.4x**; the queue from **88.4% of peak to 0.21%**. The
+closure-equivalence risk was discharged by an induction written out, with per-batch row counts,
+column counts and the selection-degree sequence asserted identical — the basis alone being too weak
+a check, since two closures can reach the same reduced basis by different matrices.
+
+**#285 — off-domain validation.** 8 checks at order 1 458: **19.97 s serial → 2.82 s at 8 workers**,
+dropping the six-round row's validation share from 3.12% to **0.51%**. Verdicts and recovered
+resultants asserted identical at concurrency 1, 8 and 32, on both the held and the falsified path.
+
+**Stage-level attribution, and the structural finding underneath it.** Removing 88% of a peak
+promotes something else, so the attribution was recomputed rather than scaled. At degree 5 the new
+peak is **the basis, held twice, at 60.4%** — and that row is a floor by construction, so the true
+figure is 1.0–1.5 GB of a 1 496.5 MB process. At degree 4 the binding site is instead **matrix
+construction at 51.9%**, with the basis at 19.1%. The reason is structural: **the basis grows with
+the whole computation and a batch's matrix grows with that batch**, so which site binds depends on
+how far the computation got before it stopped. There is no single answer to "what dominates F4's
+memory", and a budget that bounds one structure cannot bound the other.
+
+### 13.5 Research findings
+
+| item | verdict | the measurement that decided it |
+|---|---|---|
+| **#202 Griffin/FreeLunch** | **no-go for M25**; capability costed as #306, deferred | Fails on *worth*, not expressibility. All five published witnesses lie on **one affine line** whose `(a,b)` the paper does not publish — recovered from two `r=5` witnesses, confirmed **3/3 out of sample** at `r=6,7`. `D_I` reproduces `(6α+3)(α(2α+1))^(r−3)` at 21/441/9261. The blocker is **not** a polynomial-matrix determinant (`D_H ≤ 81`, which the existing parallel sweep already covers) but **weighted monomial orders plus normal form against a given basis** — #306. |
+| **#289 determinant law** | **adopt, conservatively** | Cubic to within measurement above L2: **2.9953 ± 0.0285**, worst residual 3.7%, over orders 486 / 1 458 / 4 374. **No cache cliff** — order 4 374's 153 MB matrix exceeds L3 and still gives a local exponent of 3.045, because Crout LU is ~180 ops/byte. `RowCost::of` takes the **larger** of fitted and cubic, since 2.9953 < 3 and a model that under-predicts authorizes a run nobody costed. |
+| **#58 Wiedemann/Krylov for FGLM** | **reopen the FGLM half** | The one measured cross-library gap is order conversion, ~30x. #58 is the candidate and **is not in the H-series**. Its deferral was conditional on a named trigger, and a measured gap against a maintained implementation is new evidence. Reopen as *"the measured conversion gap is worth a Krylov route"* — **not** as "sparse-FGLM would be 30x faster", which does not follow. |
+| **#269 F4 elimination kernels** | **deprioritize** | Elimination is **7–22%**, not M16's obsolete 65–88%. Amdahl ceiling **1.07x–1.29x**, at or inside the 20% noise band, so no kernel work there can produce a readable end-to-end result before any implementation question arises. |
+| **#270 field-width specialization** | **deprioritize or re-scope** | msolve's delayed reduction is active only below `2^18`, so it is **inactive at the compared fields**; all three of its kernels use `int64_t`, so narrow kernels buy lanes rather than accumulator headroom. The gap #270 reasons from does not exist at the corpus's fields. |
+| **#271 modular composition** | **settled** | Extraction's ceiling is **1.013x–1.053x** — an *infinitely fast* stage is unmeasurable on every profiled instance. Its univariate-factoring half is a separate claim this screen does not reach. |
+| **#272 characteristic-two linear algebra** | **the screen cannot run, and that is the finding** | A ceiling needs a profile and there is no characteristic-two one; extrapolating from the prime-field split would be #269's error exactly. But **`GF(2)` is a prime field, so it can be profiled today** — only `GF(2^e)` is blocked on the defining-polynomial convention. One profile decides it. |
+| **#273 adaptive strategy selection** | **vindicated, and bounded by the right quantity** | Selection picks a route; it does not speed a stage. Measured route spread is **70x** (planted-8's lex basis: F4 direct 0.04 ms against a 2.8 ms conversion) against the best stage ceiling anywhere of 2.59x. `fglm::shape` already ships a detector validated against Singular on 26 ideals and **deliberately unwired**. |
+| **#287 hybrid / k=3 CICO** | *pending — §13.5a* | |
+| **#297 structured Sylvester** | *pending — §13.5a* | Baseline is now clean: cubic kernel, no cache anomaly, sweep 92–95% efficient to 32 cores. Axis 1 is close to zero-sum; axes 3–5 are the only ones with anywhere to go. |
+
+The Amdahl screen's **asymmetry** is why one table closes two issues and vindicates a third: **a
+ceiling bounds the conceivable, not the achievable.** That is decisive where even the free case is
+unmeasurable (#271), and merely permissive for #268 — whose 2.59x is an upper bound, not a forecast,
+so its acceptance test is a before/after on a corpus rung rather than a number read off the table.
+
+### 13.6 Negative results
+
+1. **Zeebra's apparent 479x Anemoi FGLM advantage is the reference's arithmetic, not Zeebra's
+   algorithm.** Zeebra's conversion/basis ratio is **flat to 12% across a 47-bit range of primes**
+   while Magma's moves **7.3x**; the 507x `N = 5` wall gap collapses to **2.85x** at `p = 65537`;
+   and msolve settles it at **1.81 s on one core against Zeebra's 63.7 s on eight**. Candidate (2),
+   "FGLM genuinely scaling better", is **ruled out**. A negative result favourable to this crate
+   needed more care, not less, and §8a.1's growth finding actually **reverses** at the control prime.
+2. **#289's own premise is not reproduced.** The 3.116 exponent came of dividing a **32-worker**
+   core-time at order 1 458 by a **single-worker** one at order 162. The width was the excess. At one
+   width the same interval gives 2.96. The issue's extrapolation table was also internally
+   inconsistent with its own stated fit.
+3. **`f4-resource-scaling.md` §6a's refusal-path reading is withdrawn.** Capped and uncapped peak at
+   **14 336 724 kB — identical to the kilobyte** across a 50x cap difference and a 3x runtime
+   difference, so §6a's 4 978 MB uncapped figure was a measurement error. The exactness was the
+   evidence: one `VecDeque` reserve reproduces to the kilobyte; scattered allocations would not.
+4. **The pair heap was the top-ranked suspect for F4's memory and is 4.5 MB** — 0.03% of the peak.
+   The prior estimate assumed a basis eight times larger than the 1 318 elements reached.
+5. **#243 was expected to be a memory win at a possible time cost.** It is a **7.5x speedup** as
+   well, because the output is a dense triangle and hashing it was overhead.
+6. **Two determinant figures are unexplained and bound every ratio quoted against the older
+   records.** Measurements taken now are **~1.2x slower** than the same measurements on record —
+   same registered row, same code path, same lock, months apart (#318) — and the width penalty
+   measures **31–44%** at 32 workers where §6.6 recorded **4–9%** (#319). Treated as findings rather
+   than repaired. A factor spanning §6.5 and today carries a ~20% systematic belonging to neither
+   implementation.
+7. **Sagebrush agreed with everything and is still not a baseline.** Term-for-term on every family
+   tried, including a 62-bit prime — but five weeks old, every crate `0.1.0`, nothing on crates.io,
+   six F4 tests, and no oracle run in its own repository exercising the elimination. Reportable with
+   its SHA; **never a speedup denominator**.
+
+### 13.6a Six measurement-integrity defects, and the pattern they share
+
+M25 found six places where a mechanism reported confidently about something other than what the
+caller meant. They are listed together because the pattern is the milestone's methodological result
+and it is more transferable than any single fix.
+
+| # | the defect | why it was invisible |
+|---|---|---|
+| 1 | **31 issues had no board row**, so `zb-claim.sh orient` ranked a queue that omitted them — including #243, M24's own first-named next step | `orient` exited **0** with a plausible 36-row queue. `rc=0` does not distinguish "nothing left" from "not joined". |
+| 2 | **PR #303 auto-merged and closed three issues with no code on `main`** | Its pushed head became an ancestor of `main` while its real commits sat unpushed in one worktree. A green `main` and three closed issues look exactly like success. |
+| 3 | **`max_live_bytes` bounded 1.3% of the peak it was read as bounding** | The budget is a real bound on a real structure. Nothing said *which* structure. |
+| 4 | **F4's two memory knobs are numerically identical at the default**, and the error names the limit the caller **set** rather than the one that **bound** (#322) | `320_000_000 / 16` is exactly `20_000_000`, so raising one does nothing and the message confirms the wrong ceiling. |
+| 5 | **`pgrep -f` matched a heredoc wrapper on its own script text**, returning two matches for a job that had not started and **zero** for the binary that was running (#328) | Anti-correlated, not merely imprecise. The RSS guard built on it was safe only because a 4 MB wrapper cannot cross a 16 GiB ceiling — a guard correct by accident, in the instrument §9's policy depends on. |
+| 6 | **A test that returns early on an absent tool is indistinguishable from one that ran and agreed** (#333, class filed as #339) | `main` was red for ~40 minutes with every check green. #311 and #324 were each green against their own base and red only once combined: **CI tests a PR against its base, not against the merged result.** |
+
+The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the six
+produced well-formed output. Three were caught only because an agent ran something locally for an
+unrelated reason, and that is not a detection strategy. The repository already applies the right
+discipline in two places — `zb-claim.sh`'s three outcomes for a board read, and
+`Outcome::instead_of_a_time` for a row carrying no wall time — and the lesson is that it belongs
+everywhere a mechanism can be silent.
+
+### 13.7 Cost-model accuracy
+
+Now a durable artifact rather than prose: **#294's register**, 20 sourced rows, with prediction error
+**derived** from the predicted and measured columns rather than authored — `history.json` stores no
+error column at all, and a test injects a plausible wrong value and asserts the loaded row still
+reports the arithmetic. `FigureBasis` labels every number `Measured` / `Fitted` / `Predicted` /
+`Extrapolated`; `Fitted` carries its residual **and** its applicability limit, and `Extrapolated` is a
+separate variant because #289's law is a 3.7%-residual fit at order 4 374 and a guess at 13 122,
+where `times_past_the_evidence()` returns 3.0 — the only honest thing it can report in place of a
+residual. Peak allocated and peak resident are **separate columns**, because #237 measured them
+21 674 MB against 13 996 MB on one row.
+
+M25's own predictions, scored:
+
+| predicted | prediction | observed | attribution |
+|---|---|---|---|
+| #243's transient | 56.6 GB | **57.0 GB** | within 1% — the one large memory prediction in this family that held, because it was arithmetic over a measured term count |
+| `rf4-rp2` total | ≈1.4 h (two-point) | **≈2.6 h** (calibrated) | the per-determinant anchor was 1.2x stale and the width penalty 4x understated. §13.6 items 6 |
+| Anemoi `N = 6` footprint | 3.64 GiB dense blocks | **4.53 GB RSS** | #286's memory projection was **correct** and predicted the **wrong blocker** — F4 binds, not FGLM (#323) |
+| #305's new binding site | *not predicted* | basis held twice, 60.4% | removing 88% of a peak promotes something else, and nothing had predicted what |
+
+The sharpest entry is #323: a projection can be numerically right and operationally useless. **FGLM
+checks its budgets from `D` before any allocation, so it fails in milliseconds and is cheap to
+predict; F4 has no pre-flight and discovers the wall at batch 41 — so the stage that is harder to
+budget for is the one that binds first.**
+
+### 13.8 Future work
+
+**23 issues created** (#292–#339, three already closed), all boarded with Priority on project #7.
+The register in §11 is reconciled against the tracker; the additions are:
+
+| issue | topic | readiness | milestone |
+|---|---|---|---|
+| #304 | the basis is held three times at interreduction — now **the** peak | ready | M26 |
+| #306 | weighted monomial orders + normal form against a given basis (Griffin's gap) | research needed | M26 |
+| #315, #329 | extend the Sagebrush driver; echo its generators so the adapter can check them | ready | M26 |
+| #316 | a `RunFailure` variant for an environment that invalidates the measurement | ready | M26 |
+| #317 | packed monomial with a cached total degree, gated on a `cmp` microbenchmark | research needed | M26 |
+| #318, #319 | the ~1.2x systematic and the 31–44% width penalty | **research needed — both bound existing ratios** | M26 |
+| #322, #323 | the `min()` knob trap; F4 binds at Anemoi `N = 6` | ready | M26 |
+| #325, #328, #339 | claim markers orphaned by a rename; `pgrep -f`; CI tests against the base | ready | M26 |
+| #330, #331 | column indices from symbolic preprocessing; a monomial divmask | research needed | M26 |
+| #332, #335 | corrections to the comparand record; no measurement records its commit | ready | M26 |
+| #333, #334 | the corpus-rung coverage gap; cost rows emitted by runs rather than transcribed | ready | M26 |
+
+**Independently parallelizable, not M25 completion dependencies:** #262 (F4 matrix corpus), #218/#219
+(Boolean importers — and #272 says `GF(2)` can be profiled today), #193/#194 (univariate, independent
+files), #205–#207 (MinRank analysis), #199 (classical-collection provenance).
+
+### 13.9 M26 recommendation
+
+**Primary: order conversion — reopen #58's FGLM half and build a Krylov route.**
+
+The evidence, in the order it was produced:
+
+1. It is **the only measured cross-library gap**: ~30x on the conversion stage against msolve, same
+   machine, byte-identical generators.
+2. It is **outside the series that was supposed to contain the next optimization.** #263's structural
+   finding is that H12–H17 were scoped before any measurement existed, and the measurement says the
+   largest lever is not among them. #269 and #270 are falsified on arithmetic; #271 is settled; #272
+   cannot be screened; #273 is real but is a routing change rather than a speedup.
+3. The Amdahl screen puts **every** stage-level candidate at a ceiling of **1.01x–2.59x**, at or near
+   the 20% noise band. A 30x gap is not a stage-share problem and cannot be reached by one.
+4. One measurement gates it cheaply, and it should be taken first: katsura-7's conversion is **96%
+   border reduction** (§8.5) while Anemoi `N = 5` is **82.8% lex walk and dependence test** — the
+   *opposite* split, and the only reason this family is a candidate at all. Confirming it on a second
+   Anemoi rung decides whether the rest of the work has a target.
+5. Its cost is lower than it looks: §8.5's answer 4 means a Wiedemann variant choosing a random
+   linear form can reuse the existing `O(N·D)` verification **unchanged**, so it could ship certified
+   rather than conjectural.
+
+Stated carefully, because the inference is easy to overdraw: the three engines reach a lex basis by
+**three different algorithms** — lex walk, Keller-Gehrig spin, Wiedemann scalar sequence — so the 30x
+is Zeebra's conversion against msolve's on one family at one prime. It is evidence that a Krylov
+route is worth building. It is **not** evidence that sparse-FGLM would be 30x faster, and
+`MILESTONE-FGLM-SCALABILITY.md` §8.5's three measurements against that claim still stand unrefuted.
+
+**Ranked alternatives.** *Structure-exploiting algorithms* (#306 → #202) — the Griffin instance is
+now pinned including the attack's input parametrization, and the capability is costed; the obstacle
+is that it buys one family. *Harder resultants* (#297) — the only remaining asymptotic axis, but the
+baseline is now measurably clean, so there is no implementation slack to recover and `rf4-rp2` needs
+only ~1.3x while eight rounds needs three orders. *Boolean/SAT* (#218–#221) — the first same-machine
+external baseline outside Gröbner, and #272 notes `GF(2)` is profilable today. *Kernel
+specialization* — **not recommended**; that is what the Amdahl screen settled.
+
+**Not recommended for M26:** GPU and out-of-core (#69, #86–#89, #225). Nothing in M25 produced the
+named kernel, workload, predicted benefit and benchmark that §3 requires before that work is
+scheduled, and #305 just removed 9.4x from the memory pressure that was the main argument for it.
