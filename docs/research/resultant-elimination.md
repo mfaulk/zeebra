@@ -1134,9 +1134,21 @@ selected.
 #### The small-operation control
 
 The `mul/{arity}` Criterion arms are the regression control, and they top out at 256 × 256 = 65 536
-term-products — about a megabyte of transient, four orders below the regime this is about. Measured
-through Criterion's baseline mechanism, the `origin/main` bench binary against the branch's, same
-core, same lock: **PLACEHOLDER_CRITERION**
+term-products — about a megabyte of transient, four orders below the regime this is about.
+
+The A/B is a timing measurement, so unlike the peak above it **does** need the lock, and it is
+queued behind several hours of other agents' work. It is set up and will be filed when it lands:
+Criterion's baseline mechanism, the `origin/main` bench binary against the branch's, the same
+pinned core and the same `CRITERION_HOME`, filtered to the arms both binaries have
+(`sparse_poly/mul(_by_term)?/n(3|6|10)`).
+
+What it is expected to show, stated in advance so the measurement can contradict it: **no
+regression anywhere, and a modest improvement throughout.** The claim is not a guess — the
+per-route table above measures the same operation at the same sizes and finds the selected route
+faster than the materialising one at every point, including 36 term-products, and the `n3` arms sit
+between the 100-product and 27 225-product trivariate rows where `Accumulate` measured 0.49x and
+0.59x. A Criterion result slower than `main` on any shared arm would contradict the sweep and would
+be reported as that.
 
 Two arms were missing and are added in `benches/sparse_polynomial.rs`: an **`n2` arity**, which the
 file did not have although N = 2 is the arity the whole resultant route runs at, and a
@@ -1148,9 +1160,44 @@ not have caught a wrong predicate.
 #### End to end: the number that decides the issue
 
 `examples/resultant_cico --row poseidon31-cico-t16-rf2-rp4 --build-only`, single-threaded on one
-pinned core under `tools/benchlock.sh`, against §6.8's recorded before:
+pinned core, against §6.8's recorded before:
 
-**PLACEHOLDER_END_TO_END**
+| | §6.8, recorded | after #243 | |
+|---|---:|---:|---|
+| peak RSS | 57.0 GB | **0.32 GB** | **179x smaller** |
+| elapsed | 48.37 min | 5.6 min | ~8.6x — see the protocol note |
+| output | deg 729 / 729, 266 815 / 266 815 terms | **identical** | the same two polynomials |
+
+**The protocol, because the two rows were not taken under the same one.** `f4-resource-scaling.md`
+§8 states that peak-RSS probes do not need `tools/benchlock.sh` and timings do, so the peak was
+taken **off the lock**, with the binary backgrounded directly and `/proc/<pid>/status` polled for
+`VmHWM` — no `timeout` wrapper, because `taskset` execs and keeps the pid where `timeout` forks and
+does not, a confusion that once reported 2 MB for a 14 GB run in this repository. The external poll
+and `resultant_cico`'s own `util::peak_resident_bytes` agreed exactly at 317 872 kB. **The 5.6 min
+from that same off-lock run is an indicative upper bound, not a result**; the on-lock timing is
+queued behind several hours of other agents' work and will be filed when it lands. Nothing about
+the memory claim depends on it.
+
+Read 57.0 GB → 0.32 GB as the ratio, not the absolute: **179x**, for a build whose output is 4.3 MB.
+§6.8's "wrong by 838x" is now wrong by 4.7x, and in the same direction.
+
+**What the remaining 0.32 GB is, and why it is not a transient.** It is the *output*, three times
+over. At the last round the state is sixteen words of 266 815 terms each — 68 MB of `(Monomial<2>,
+F)` pairs, about 110 MB once a `HashMap`'s load factor is paid — and `cico_bivariate`'s MDS layer
+folds those with `acc + word.scale(m)`, where `Add` still materialises a `Vec` of `|a| + |b|` terms
+and rebuilds a fresh map (`sparse_multivariate_polynomial_arithmetic.rs:32-39`). So two to three
+copies of the whole state are live across the linear layer. That is a constant factor on the
+output, which is the regime #243 set out to reach; collecting `Add` and `scale` the same way the
+multiply now is would take the constant down and is worth its own issue.
+
+**A note on which memory number is which, because this milestone has three.** Per-route **live
+heap** in the tables above is allocator-tracked: the peak of `sum(alloc) - sum(dealloc)` during one
+product. The 0.32 GB here is **`VmHWM`**, resident. They are not interchangeable and the gap is not
+small — #237 measured 21 674 MB allocator-observed against 13 996 MB resident on
+`fukuoka-mq-III-n20-seed0`, a 55% spread, because a `VecDeque<Monomial<20>>` reserving `2^28` slots
+takes 20 480 MiB in one allocation of which ~60% is never written. The competitive board now carries
+`RssBasis::AllocatorTracked` so the two cannot share a column by accident; the same discipline
+applies to reading this section. A figure labelled only "peak memory" tells a reader nothing.
 
 #### #164 is left unmeasured, deliberately
 

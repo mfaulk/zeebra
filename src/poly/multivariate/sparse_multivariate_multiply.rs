@@ -3,8 +3,9 @@
 //! The multiply this replaced pushed every pairwise term-product into one `Vec` and collected like
 //! terms afterwards, so its transient was `O(|a|·|b|)` entries however few distinct monomials the
 //! product had. `docs/research/resultant-elimination.md` §6.8 measured a six-round symbolic build
-//! holding 57.0 GB to produce 4.3 MB of polynomial. The routes here collect *as they go*, so the
-//! live set is bounded by the output instead.
+//! holding 57.0 GB to produce 4.3 MB of polynomial. The routes [`route`] selects collect *as they
+//! go*, so the live set is bounded by the output instead; the materialising one is kept only as the
+//! reference the differential test compares against and as the measurement's baseline arm.
 //!
 //! All of them end in the same drop-on-cancel step as [`SparseMultiPoly::new`]: a monomial whose
 //! coefficients cancel is not a term of the product, and a surviving zero would make a polynomial
