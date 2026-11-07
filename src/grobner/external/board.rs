@@ -306,12 +306,21 @@ impl CompetitiveRecord {
 
     /// True if `other` measured the same thing under the same conditions.
     ///
-    /// Problem, task, limits, machine, build **and policy**. The precondition of a ratio, minus the
-    /// invariant agreement, which is checked separately because it is a property of the *answers*.
+    /// Problem, task, limits, machine, build, **commit and policy**. The precondition of a ratio,
+    /// minus the invariant agreement, which is checked separately because it is a property of the
+    /// *answers*.
     ///
-    /// `Environment::comparable` covers machine, cpu and build and **not** `policy`, which is where
-    /// the measurement discipline lives — `many rows per process (no memory figure)` against `one
-    /// row per process`. Those are different measurements of the same row: one is cold in a fresh
+    /// `Environment::comparable` covers machine, cpu and build and **not** `commit` or `policy`,
+    /// and both omissions let the board compare two different things.
+    ///
+    /// **Commit.** `build` is `release, rustc <version>`, which is identical across every source
+    /// change, so without this a re-measure taken after an engine change pairs against the rows the
+    /// change superseded — a ratio between two versions of this crate, rendered as a ratio against
+    /// a competitor. Caught when a rebase picked up an F4 change and the stale rows were still on
+    /// the board.
+    ///
+    /// **Policy** is where the measurement discipline lives — `many rows per process (no memory
+    /// figure)` against `one row per process`. Two different measurements of the same row: one is cold in a fresh
     /// process, the other inherits the allocator and cache state of every row that ran before it in
     /// the same one. Left to `Environment::comparable` alone the board paired them, which doubled
     /// its own pair count and ratioed a cold row against a warm one. Checked here rather than in
@@ -322,6 +331,7 @@ impl CompetitiveRecord {
             && self.task == other.task
             && self.limits.comparable_with(&other.limits)
             && self.environment.comparable(&other.environment)
+            && self.environment.commit == other.environment.commit
             && self.environment.policy == other.environment.policy
     }
 
@@ -1827,6 +1837,27 @@ mod tests {
         let markdown = CompetitiveBoard::new().to_markdown();
         assert!(markdown.contains("No rows yet"));
         assert!(!markdown.contains("| problem |"));
+    }
+
+    /// Two rows built from different source commits are not comparable, so a re-measure after a
+    /// change to the engine never ratios the new build against the old one.
+    #[test]
+    fn test_a_different_commit_is_not_comparable() {
+        let before = named_row("p1", "zeebra", answered(64), 100.0);
+        let mut after = named_row("p1", "zeebra", answered(64), 50.0);
+        after.environment.commit = "cafef00d".to_string();
+
+        assert!(!before.comparable_with(&after), "different source commits");
+
+        // And the board does not pair across them: with one comparand at each commit, only the
+        // one sharing the baseline's commit produces a ratio.
+        let mut board = CompetitiveBoard::new();
+        board.add(before);
+        board.add(named_row("p1", "singular", answered(64), 400.0));
+        let mut other_commit = named_row("p1", "singular", answered(64), 400.0);
+        other_commit.environment.commit = "cafef00d".to_string();
+        board.add(other_commit);
+        assert_eq!(board.speedups("zeebra").len(), 1);
     }
 
     /// A ratio against a comparand that is recorded but not authoritative says so in the cell and

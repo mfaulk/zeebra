@@ -5280,7 +5280,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5307,18 +5307,18 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 144644,
+      "wall_nanos": 184670,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6402048,
+      "peak_rss_bytes": 6631424,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 144644
+          "elapsed_nanos": 184670
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 4408
+          "elapsed_nanos": 5721
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-4 --task reduced-grobner-basis"
@@ -5340,7 +5340,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5367,10 +5367,10 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 36039713,
+      "wall_nanos": 35980171,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 19832832,
+      "peak_rss_bytes": 19828736,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -5397,7 +5397,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5423,7 +5423,7 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 10350064,
+      "wall_nanos": 10321242,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 20480,
@@ -5462,7 +5462,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1934218-katsura-4/msolve/msolve-1934218-2.ms -o /tmp/zeebra-competitive-1934218-katsura-4/msolve/msolve-1934218-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2041870-katsura-4/msolve/msolve-2041870-2.ms -o /tmp/zeebra-competitive-2041870-katsura-4/msolve/msolve-2041870-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -5481,7 +5481,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5508,25 +5508,25 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 834250,
+      "wall_nanos": 794595,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 732073984,
+      "peak_rss_bytes": 731303936,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 834250
+          "elapsed_nanos": 794595
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5473173342
+          "elapsed_nanos": 5142631279
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6340000000
+          "elapsed_nanos": 5910000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1934218-katsura-4/groebner-jl/katsura-4-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2041870-katsura-4/groebner-jl/katsura-4-2.jl"
     },
     {
       "schema": 1,
@@ -5545,7 +5545,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5572,7 +5572,7 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 10408505,
+      "wall_nanos": 10396123,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 20480,
@@ -5580,10 +5580,10 @@
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 179000
+          "elapsed_nanos": 154000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1934218-katsura-4/sagebrush/katsura-4-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2041870-katsura-4/sagebrush/katsura-4-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -5602,7 +5602,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5626,18 +5626,18 @@
         ],
         "basis_cardinality": 4
       },
-      "wall_nanos": 236298,
+      "wall_nanos": 246087,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6692864,
+      "peak_rss_bytes": 6856704,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 176765
+          "elapsed_nanos": 185572
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 59533
+          "elapsed_nanos": 60515
         },
         {
           "name": "conversion: dependence",
@@ -5667,7 +5667,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5691,10 +5691,10 @@
         ],
         "basis_cardinality": 4
       },
-      "wall_nanos": 36045786,
+      "wall_nanos": 36014306,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 17661952,
+      "peak_rss_bytes": 19869696,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -5725,7 +5725,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5761,7 +5761,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5797,7 +5797,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5821,18 +5821,18 @@
         ],
         "basis_cardinality": 4
       },
-      "wall_nanos": 10425807,
+      "wall_nanos": 10434516,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 28672,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 271000
+          "elapsed_nanos": 231000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1935368-katsura-4/sagebrush/katsura-4-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2042254-katsura-4/sagebrush/katsura-4-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -5851,7 +5851,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5884,18 +5884,18 @@
         ],
         "basis_cardinality": 13
       },
-      "wall_nanos": 842255,
+      "wall_nanos": 806327,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7352320,
+      "peak_rss_bytes": 6979584,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 842255
+          "elapsed_nanos": 806327
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 14428
+          "elapsed_nanos": 11672
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-5 --task reduced-grobner-basis"
@@ -5917,7 +5917,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5950,15 +5950,15 @@
         ],
         "basis_cardinality": 13
       },
-      "wall_nanos": 36059992,
+      "wall_nanos": 35979501,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20361216,
+      "peak_rss_bytes": 20385792,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 0
+          "elapsed_nanos": 1000000
         }
       ],
       "reproduce": ""
@@ -5980,7 +5980,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6012,7 +6012,7 @@
         ],
         "basis_cardinality": 13
       },
-      "wall_nanos": 10353280,
+      "wall_nanos": 10331461,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 16384,
@@ -6051,7 +6051,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1935554-katsura-5/msolve/msolve-1935554-2.ms -o /tmp/zeebra-competitive-1935554-katsura-5/msolve/msolve-1935554-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2042399-katsura-5/msolve/msolve-2042399-2.ms -o /tmp/zeebra-competitive-2042399-katsura-5/msolve/msolve-2042399-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -6070,7 +6070,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6103,25 +6103,25 @@
         ],
         "basis_cardinality": 13
       },
-      "wall_nanos": 870459,
+      "wall_nanos": 842335,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 729964544,
+      "peak_rss_bytes": 728649728,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 870459
+          "elapsed_nanos": 842335
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5230483777
+          "elapsed_nanos": 5172204810
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6270000000
+          "elapsed_nanos": 6600000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1935554-katsura-5/groebner-jl/katsura-5-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2042399-katsura-5/groebner-jl/katsura-5-2.jl"
     },
     {
       "schema": 1,
@@ -6140,7 +6140,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6173,18 +6173,18 @@
         ],
         "basis_cardinality": 13
       },
-      "wall_nanos": 10400910,
+      "wall_nanos": 10412023,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 24576,
+      "peak_rss_bytes": 20480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 292000
+          "elapsed_nanos": 369000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1935554-katsura-5/sagebrush/katsura-5-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2042399-katsura-5/sagebrush/katsura-5-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -6203,7 +6203,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6228,18 +6228,18 @@
         ],
         "basis_cardinality": 5
       },
-      "wall_nanos": 909313,
+      "wall_nanos": 917888,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7102464,
+      "peak_rss_bytes": 7225344,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 753067
+          "elapsed_nanos": 753737
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 156246
+          "elapsed_nanos": 164151
         },
         {
           "name": "conversion: dependence",
@@ -6269,7 +6269,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6294,10 +6294,10 @@
         ],
         "basis_cardinality": 5
       },
-      "wall_nanos": 36044302,
+      "wall_nanos": 36005098,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20254720,
+      "peak_rss_bytes": 20176896,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -6328,7 +6328,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6364,7 +6364,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6400,7 +6400,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6425,18 +6425,18 @@
         ],
         "basis_cardinality": 5
       },
-      "wall_nanos": 10384139,
+      "wall_nanos": 10394750,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 24576,
+      "peak_rss_bytes": 28672,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 622000
+          "elapsed_nanos": 511000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1935804-katsura-5/sagebrush/katsura-5-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2042705-katsura-5/sagebrush/katsura-5-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -6455,7 +6455,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6497,18 +6497,18 @@
         ],
         "basis_cardinality": 22
       },
-      "wall_nanos": 3733211,
+      "wall_nanos": 3864517,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7577600,
+      "peak_rss_bytes": 7405568,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 3733211
+          "elapsed_nanos": 3864517
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 27592
+          "elapsed_nanos": 31079
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-6 --task reduced-grobner-basis"
@@ -6530,7 +6530,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6572,10 +6572,10 @@
         ],
         "basis_cardinality": 22
       },
-      "wall_nanos": 41147779,
-      "cpu_nanos": 10000000,
+      "wall_nanos": 41171791,
+      "cpu_nanos": 20000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20209664,
+      "peak_rss_bytes": 20480000,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -6602,7 +6602,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6643,7 +6643,7 @@
         ],
         "basis_cardinality": 22
       },
-      "wall_nanos": 10324966,
+      "wall_nanos": 10315140,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 20480,
@@ -6682,7 +6682,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1935947-katsura-6/msolve/msolve-1935947-2.ms -o /tmp/zeebra-competitive-1935947-katsura-6/msolve/msolve-1935947-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2042848-katsura-6/msolve/msolve-2042848-2.ms -o /tmp/zeebra-competitive-2042848-katsura-6/msolve/msolve-2042848-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -6701,7 +6701,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6743,25 +6743,25 @@
         ],
         "basis_cardinality": 22
       },
-      "wall_nanos": 1048827,
+      "wall_nanos": 1061069,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 730947584,
+      "peak_rss_bytes": 731062272,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1048827
+          "elapsed_nanos": 1061069
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5181184228
+          "elapsed_nanos": 5161110225
         },
         {
           "name": "process-cpu",
           "elapsed_nanos": 5970000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1935947-katsura-6/groebner-jl/katsura-6-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2042848-katsura-6/groebner-jl/katsura-6-2.jl"
     },
     {
       "schema": 1,
@@ -6780,7 +6780,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6822,18 +6822,18 @@
         ],
         "basis_cardinality": 22
       },
-      "wall_nanos": 10412603,
+      "wall_nanos": 10410891,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 20480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 991000
+          "elapsed_nanos": 1030000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1935947-katsura-6/sagebrush/katsura-6-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2042848-katsura-6/sagebrush/katsura-6-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -6852,7 +6852,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6878,18 +6878,18 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 4073415,
+      "wall_nanos": 3995144,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7802880,
+      "peak_rss_bytes": 7454720,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 3587776
+          "elapsed_nanos": 3520936
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 485639
+          "elapsed_nanos": 474208
         },
         {
           "name": "conversion: dependence",
@@ -6919,7 +6919,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6945,15 +6945,15 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 41070813,
+      "wall_nanos": 36000690,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 19853312,
+      "peak_rss_bytes": 20258816,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 2000000
+          "elapsed_nanos": 1000000
         },
         {
           "name": "solve",
@@ -6979,7 +6979,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7015,7 +7015,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7051,7 +7051,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7077,18 +7077,18 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 10364822,
+      "wall_nanos": 10413165,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 24576,
+      "peak_rss_bytes": 20480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1429000
+          "elapsed_nanos": 1319000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1936201-katsura-6/sagebrush/katsura-6-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2043267-katsura-6/sagebrush/katsura-6-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -7107,7 +7107,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7168,18 +7168,18 @@
         ],
         "basis_cardinality": 41
       },
-      "wall_nanos": 27297955,
+      "wall_nanos": 27194889,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 8581120,
+      "peak_rss_bytes": 8601600,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 27297955
+          "elapsed_nanos": 27194889
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 78449
+          "elapsed_nanos": 88227
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-7 --task reduced-grobner-basis"
@@ -7201,7 +7201,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7262,15 +7262,15 @@
         ],
         "basis_cardinality": 41
       },
-      "wall_nanos": 51347519,
+      "wall_nanos": 51305998,
       "cpu_nanos": 20000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21016576,
+      "peak_rss_bytes": 20484096,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 9000000
+          "elapsed_nanos": 10000000
         }
       ],
       "reproduce": ""
@@ -7292,7 +7292,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7352,10 +7352,10 @@
         ],
         "basis_cardinality": 41
       },
-      "wall_nanos": 10336779,
+      "wall_nanos": 10347111,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 24576,
+      "peak_rss_bytes": 20480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -7391,7 +7391,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1936345-katsura-7/msolve/msolve-1936345-2.ms -o /tmp/zeebra-competitive-1936345-katsura-7/msolve/msolve-1936345-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2043411-katsura-7/msolve/msolve-2043411-2.ms -o /tmp/zeebra-competitive-2043411-katsura-7/msolve/msolve-2043411-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -7410,7 +7410,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7471,25 +7471,25 @@
         ],
         "basis_cardinality": 41
       },
-      "wall_nanos": 1842119,
+      "wall_nanos": 1711710,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 732246016,
+      "peak_rss_bytes": 732303360,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1842119
+          "elapsed_nanos": 1711710
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5301418637
+          "elapsed_nanos": 5207710924
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6150000000
+          "elapsed_nanos": 6030000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1936345-katsura-7/groebner-jl/katsura-7-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2043411-katsura-7/groebner-jl/katsura-7-2.jl"
     },
     {
       "schema": 1,
@@ -7508,7 +7508,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7569,7 +7569,7 @@
         ],
         "basis_cardinality": 41
       },
-      "wall_nanos": 10413454,
+      "wall_nanos": 10418535,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 20480,
@@ -7577,10 +7577,10 @@
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 3558000
+          "elapsed_nanos": 3136000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1936345-katsura-7/sagebrush/katsura-7-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2043411-katsura-7/sagebrush/katsura-7-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -7599,7 +7599,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7626,18 +7626,18 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 29309736,
+      "wall_nanos": 29666678,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 8687616,
+      "peak_rss_bytes": 8724480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 27073931
+          "elapsed_nanos": 27416198
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 2235805
+          "elapsed_nanos": 2250480
         },
         {
           "name": "conversion: dependence",
@@ -7667,7 +7667,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7694,19 +7694,19 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 56430726,
-      "cpu_nanos": 30000000,
+      "wall_nanos": 51364269,
+      "cpu_nanos": 20000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21258240,
+      "peak_rss_bytes": 21061632,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 10000000
+          "elapsed_nanos": 11000000
         },
         {
           "name": "solve",
-          "elapsed_nanos": 8000000
+          "elapsed_nanos": 7000000
         }
       ],
       "reproduce": ""
@@ -7728,7 +7728,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7764,7 +7764,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7800,7 +7800,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7827,7 +7827,7 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 10382757,
+      "wall_nanos": 10397846,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 24576,
@@ -7835,10 +7835,10 @@
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 4673000
+          "elapsed_nanos": 4902000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1936644-katsura-7/sagebrush/katsura-7-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2043737-katsura-7/sagebrush/katsura-7-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -7857,7 +7857,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7883,14 +7883,14 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 118003,
+      "wall_nanos": 151347,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6504448,
+      "peak_rss_bytes": 6426624,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 118003
+          "elapsed_nanos": 151347
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-4 --task reduced-grobner-basis"
@@ -7912,7 +7912,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7938,10 +7938,10 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 35985731,
+      "wall_nanos": 35920168,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 18800640,
+      "peak_rss_bytes": 20045824,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -7968,7 +7968,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7994,10 +7994,10 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 10335076,
+      "wall_nanos": 10314108,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -8033,7 +8033,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1936828-cyclic-4/msolve/msolve-1936828-2.ms -o /tmp/zeebra-competitive-1936828-cyclic-4/msolve/msolve-1936828-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2043881-cyclic-4/msolve/msolve-2043881-2.ms -o /tmp/zeebra-competitive-2043881-cyclic-4/msolve/msolve-2043881-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -8052,7 +8052,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8078,25 +8078,25 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 747306,
+      "wall_nanos": 754007,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 728629248,
+      "peak_rss_bytes": 727728128,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 747306
+          "elapsed_nanos": 754007
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 4908470794
+          "elapsed_nanos": 4885939232
         },
         {
           "name": "process-cpu",
           "elapsed_nanos": 5740000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1936828-cyclic-4/groebner-jl/cyclic-4-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2043881-cyclic-4/groebner-jl/cyclic-4-2.jl"
     },
     {
       "schema": 1,
@@ -8115,7 +8115,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8141,18 +8141,18 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 10358972,
+      "wall_nanos": 10404409,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 8192,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 156000
+          "elapsed_nanos": 163000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1936828-cyclic-4/sagebrush/cyclic-4-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2043881-cyclic-4/sagebrush/cyclic-4-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -8171,7 +8171,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8188,12 +8188,12 @@
       "outcome_detail": "order conversion needs a finite quotient algebra, and this ideal is positive-dimensional",
       "invariants": {},
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6459392,
+      "peak_rss_bytes": 6176768,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 151647
+          "elapsed_nanos": 124716
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-4 --task lex-basis-by-conversion"
@@ -8215,7 +8215,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8251,7 +8251,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8287,7 +8287,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8323,7 +8323,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8341,9 +8341,9 @@
       "invariants": {},
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1937161-cyclic-4/sagebrush/cyclic-4-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2044187-cyclic-4/sagebrush/cyclic-4-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -8362,7 +8362,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8402,18 +8402,18 @@
         ],
         "basis_cardinality": 20
       },
-      "wall_nanos": 1653222,
+      "wall_nanos": 1766103,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7307264,
+      "peak_rss_bytes": 7274496,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 1653222
+          "elapsed_nanos": 1766103
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 41299
+          "elapsed_nanos": 43323
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-5 --task reduced-grobner-basis"
@@ -8435,7 +8435,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8475,15 +8475,15 @@
         ],
         "basis_cardinality": 20
       },
-      "wall_nanos": 41125527,
+      "wall_nanos": 36023974,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 18837504,
+      "peak_rss_bytes": 19853312,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 0
+          "elapsed_nanos": 1000000
         }
       ],
       "reproduce": ""
@@ -8505,7 +8505,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8544,10 +8544,10 @@
         ],
         "basis_cardinality": 20
       },
-      "wall_nanos": 10330998,
+      "wall_nanos": 10345157,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -8583,7 +8583,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1937307-cyclic-5/msolve/msolve-1937307-2.ms -o /tmp/zeebra-competitive-1937307-cyclic-5/msolve/msolve-1937307-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2044381-cyclic-5/msolve/msolve-2044381-2.ms -o /tmp/zeebra-competitive-2044381-cyclic-5/msolve/msolve-2044381-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -8602,7 +8602,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8642,25 +8642,25 @@
         ],
         "basis_cardinality": 20
       },
-      "wall_nanos": 1109852,
+      "wall_nanos": 995494,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 730247168,
+      "peak_rss_bytes": 728145920,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1109852
+          "elapsed_nanos": 995494
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5308896952
+          "elapsed_nanos": 5115739935
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6090000000
+          "elapsed_nanos": 6210000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1937307-cyclic-5/groebner-jl/cyclic-5-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2044381-cyclic-5/groebner-jl/cyclic-5-2.jl"
     },
     {
       "schema": 1,
@@ -8679,7 +8679,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8719,18 +8719,18 @@
         ],
         "basis_cardinality": 20
       },
-      "wall_nanos": 10395020,
+      "wall_nanos": 10402435,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 782000
+          "elapsed_nanos": 718000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1937307-cyclic-5/sagebrush/cyclic-5-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2044381-cyclic-5/sagebrush/cyclic-5-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -8749,7 +8749,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8780,18 +8780,18 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 2280359,
+      "wall_nanos": 2352093,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7581696,
+      "peak_rss_bytes": 7356416,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 1723534
+          "elapsed_nanos": 1775652
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 556825
+          "elapsed_nanos": 576441
         },
         {
           "name": "conversion: dependence",
@@ -8821,7 +8821,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8852,19 +8852,19 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 35976353,
+      "wall_nanos": 35984310,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 19890176,
+      "peak_rss_bytes": 20353024,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 1000000
+          "elapsed_nanos": 0
         },
         {
           "name": "solve",
-          "elapsed_nanos": 1000000
+          "elapsed_nanos": 0
         }
       ],
       "reproduce": ""
@@ -8886,7 +8886,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8922,7 +8922,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8958,7 +8958,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8989,18 +8989,18 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 10434173,
+      "wall_nanos": 10394990,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 16384,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1282000
+          "elapsed_nanos": 1245000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1937612-cyclic-5/sagebrush/cyclic-5-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2044750-cyclic-5/sagebrush/cyclic-5-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -9019,7 +9019,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9084,18 +9084,18 @@
         ],
         "basis_cardinality": 45
       },
-      "wall_nanos": 12943637,
+      "wall_nanos": 13244466,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 8286208,
+      "peak_rss_bytes": 7954432,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 12943637
+          "elapsed_nanos": 13244466
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 110349
+          "elapsed_nanos": 122742
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-6 --task reduced-grobner-basis"
@@ -9117,7 +9117,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9182,15 +9182,15 @@
         ],
         "basis_cardinality": 45
       },
-      "wall_nanos": 51359471,
+      "wall_nanos": 51300307,
       "cpu_nanos": 20000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20840448,
+      "peak_rss_bytes": 20672512,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 8000000
+          "elapsed_nanos": 9000000
         }
       ],
       "reproduce": ""
@@ -9212,7 +9212,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9276,7 +9276,7 @@
         ],
         "basis_cardinality": 45
       },
-      "wall_nanos": 10323494,
+      "wall_nanos": 10329076,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 20480,
@@ -9315,7 +9315,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1937750-cyclic-6/msolve/msolve-1937750-2.ms -o /tmp/zeebra-competitive-1937750-cyclic-6/msolve/msolve-1937750-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2044889-cyclic-6/msolve/msolve-2044889-2.ms -o /tmp/zeebra-competitive-2044889-cyclic-6/msolve/msolve-2044889-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -9334,7 +9334,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9399,25 +9399,25 @@
         ],
         "basis_cardinality": 45
       },
-      "wall_nanos": 1955975,
+      "wall_nanos": 2136014,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 731897856,
+      "peak_rss_bytes": 728637440,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1955975
+          "elapsed_nanos": 2136014
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5249947104
+          "elapsed_nanos": 5097426903
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6650000000
+          "elapsed_nanos": 5950000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1937750-cyclic-6/groebner-jl/cyclic-6-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2044889-cyclic-6/groebner-jl/cyclic-6-2.jl"
     },
     {
       "schema": 1,
@@ -9436,7 +9436,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9501,18 +9501,18 @@
         ],
         "basis_cardinality": 45
       },
-      "wall_nanos": 10421279,
+      "wall_nanos": 10375314,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 20480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 4190000
+          "elapsed_nanos": 3842000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1937750-cyclic-6/sagebrush/cyclic-6-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2044889-cyclic-6/sagebrush/cyclic-6-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -9531,7 +9531,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9568,18 +9568,18 @@
         ],
         "basis_cardinality": 17
       },
-      "wall_nanos": 15954790,
+      "wall_nanos": 15832004,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 8290304,
+      "peak_rss_bytes": 8204288,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 13587867
+          "elapsed_nanos": 13439004
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 2366923
+          "elapsed_nanos": 2393000
         },
         {
           "name": "conversion: dependence",
@@ -9609,7 +9609,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9646,19 +9646,19 @@
         ],
         "basis_cardinality": 17
       },
-      "wall_nanos": 51411420,
+      "wall_nanos": 51320015,
       "cpu_nanos": 20000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21708800,
+      "peak_rss_bytes": 21598208,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 9000000
+          "elapsed_nanos": 8000000
         },
         {
           "name": "solve",
-          "elapsed_nanos": 6000000
+          "elapsed_nanos": 7000000
         }
       ],
       "reproduce": ""
@@ -9680,7 +9680,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9716,7 +9716,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9752,7 +9752,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9789,18 +9789,18 @@
         ],
         "basis_cardinality": 17
       },
-      "wall_nanos": 10396953,
+      "wall_nanos": 10402605,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 24576,
+      "peak_rss_bytes": 16384,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 6348000
+          "elapsed_nanos": 6446000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1938166-cyclic-6/sagebrush/cyclic-6-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2045348-cyclic-6/sagebrush/cyclic-6-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -9819,7 +9819,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9876,18 +9876,18 @@
         ],
         "basis_cardinality": 37
       },
-      "wall_nanos": 25733903,
+      "wall_nanos": 25809124,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 8368128,
+      "peak_rss_bytes": 8290304,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 25733903
+          "elapsed_nanos": 25809124
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 53261
+          "elapsed_nanos": 53711
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-6 --task reduced-grobner-basis"
@@ -9909,7 +9909,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9966,10 +9966,10 @@
         ],
         "basis_cardinality": 37
       },
-      "wall_nanos": 56461766,
+      "wall_nanos": 51277864,
       "cpu_nanos": 20000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20496384,
+      "peak_rss_bytes": 20586496,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -9996,7 +9996,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10052,10 +10052,10 @@
         ],
         "basis_cardinality": 37
       },
-      "wall_nanos": 10293237,
+      "wall_nanos": 10318035,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -10091,7 +10091,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1938319-mq-random-6/msolve/msolve-1938319-2.ms -o /tmp/zeebra-competitive-1938319-mq-random-6/msolve/msolve-1938319-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2045492-mq-random-6/msolve/msolve-2045492-2.ms -o /tmp/zeebra-competitive-2045492-mq-random-6/msolve/msolve-2045492-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -10110,7 +10110,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10167,25 +10167,25 @@
         ],
         "basis_cardinality": 37
       },
-      "wall_nanos": 2350522,
+      "wall_nanos": 2353616,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 728133632,
+      "peak_rss_bytes": 728137728,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 2350522
+          "elapsed_nanos": 2353616
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5307412761
+          "elapsed_nanos": 5154702463
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6180000000
+          "elapsed_nanos": 6270000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1938319-mq-random-6/groebner-jl/mq-random-6-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2045492-mq-random-6/groebner-jl/mq-random-6-2.jl"
     },
     {
       "schema": 1,
@@ -10204,7 +10204,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10261,7 +10261,7 @@
         ],
         "basis_cardinality": 37
       },
-      "wall_nanos": 10466385,
+      "wall_nanos": 10431109,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
       "peak_rss_bytes": 24576,
@@ -10269,10 +10269,10 @@
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 4707000
+          "elapsed_nanos": 4778000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1938319-mq-random-6/sagebrush/mq-random-6-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2045492-mq-random-6/sagebrush/mq-random-6-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -10291,7 +10291,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10317,18 +10317,18 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 28000608,
+      "wall_nanos": 27920822,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 8384512,
+      "peak_rss_bytes": 8200192,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 25854883
+          "elapsed_nanos": 25763167
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 2145725
+          "elapsed_nanos": 2157655
         },
         {
           "name": "conversion: dependence",
@@ -10358,7 +10358,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10384,15 +10384,15 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 56325187,
+      "wall_nanos": 56432945,
       "cpu_nanos": 30000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21147648,
+      "peak_rss_bytes": 21131264,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 15000000
+          "elapsed_nanos": 14000000
         },
         {
           "name": "solve",
@@ -10418,7 +10418,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10454,7 +10454,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10490,7 +10490,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10516,18 +10516,18 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 10382727,
+      "wall_nanos": 10392987,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 28672,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 5382000
+          "elapsed_nanos": 5345000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1939027-mq-random-6/sagebrush/mq-random-6-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2045736-mq-random-6/sagebrush/mq-random-6-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -10546,7 +10546,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10813,18 +10813,18 @@
         ],
         "basis_cardinality": 247
       },
-      "wall_nanos": 29918672187,
+      "wall_nanos": 29011430770,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 172580864,
+      "peak_rss_bytes": 171470848,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 29918672187
+          "elapsed_nanos": 29011430770
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 1848170
+          "elapsed_nanos": 2060511
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-10 --task reduced-grobner-basis"
@@ -10846,7 +10846,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -11113,15 +11113,15 @@
         ],
         "basis_cardinality": 247
       },
-      "wall_nanos": 7198559982,
-      "cpu_nanos": 7130000000,
+      "wall_nanos": 7001083415,
+      "cpu_nanos": 6930000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 24858624,
+      "peak_rss_bytes": 25055232,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 7071000000
+          "elapsed_nanos": 6875000000
         }
       ],
       "reproduce": ""
@@ -11143,7 +11143,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -11409,19 +11409,19 @@
         ],
         "basis_cardinality": 247
       },
-      "wall_nanos": 273676198,
-      "cpu_nanos": 250000000,
+      "wall_nanos": 243143234,
+      "cpu_nanos": 220000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 12816384,
+      "peak_rss_bytes": 12935168,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "f4/overall(elapsed)",
-          "elapsed_nanos": 250000000
+          "elapsed_nanos": 220000000
         },
         {
           "name": "f4/overall(cpu)",
-          "elapsed_nanos": 240000000
+          "elapsed_nanos": 220000000
         },
         {
           "name": "f4/select",
@@ -11441,14 +11441,14 @@
         },
         {
           "name": "f4/linear algebra",
-          "elapsed_nanos": 180000000
+          "elapsed_nanos": 160000000
         },
         {
           "name": "f4/reduce gb",
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1939165-mq-random-10/msolve/msolve-1939165-2.ms -o /tmp/zeebra-competitive-1939165-mq-random-10/msolve/msolve-1939165-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2045880-mq-random-10/msolve/msolve-2045880-2.ms -o /tmp/zeebra-competitive-2045880-mq-random-10/msolve/msolve-2045880-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -11467,7 +11467,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -11734,25 +11734,25 @@
         ],
         "basis_cardinality": 247
       },
-      "wall_nanos": 81650997,
+      "wall_nanos": 83407376,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 758673408,
+      "peak_rss_bytes": 761585664,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 81650997
+          "elapsed_nanos": 83407376
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 7372408083
+          "elapsed_nanos": 7348762397
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 8180000000
+          "elapsed_nanos": 8160000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1939165-mq-random-10/groebner-jl/mq-random-10-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2045880-mq-random-10/groebner-jl/mq-random-10-2.jl"
     },
     {
       "schema": 1,
@@ -11771,7 +11771,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12038,18 +12038,18 @@
         ],
         "basis_cardinality": 247
       },
-      "wall_nanos": 333644675,
+      "wall_nanos": 334882495,
       "cpu_nanos": 310000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 33890304,
+      "peak_rss_bytes": 33525760,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 307793000
+          "elapsed_nanos": 311685000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1939165-mq-random-10/sagebrush/mq-random-10-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2045880-mq-random-10/sagebrush/mq-random-10-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -12068,7 +12068,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12098,18 +12098,18 @@
         ],
         "basis_cardinality": 10
       },
-      "wall_nanos": 29716983714,
+      "wall_nanos": 29448070923,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 171368448,
+      "peak_rss_bytes": 173293568,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 29256149516
+          "elapsed_nanos": 28995932507
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 460834198
+          "elapsed_nanos": 452138416
         },
         {
           "name": "conversion: dependence",
@@ -12139,7 +12139,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12169,19 +12169,19 @@
         ],
         "basis_cardinality": 10
       },
-      "wall_nanos": 8514408737,
-      "cpu_nanos": 8430000000,
+      "wall_nanos": 8309630043,
+      "cpu_nanos": 8230000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 37998592,
+      "peak_rss_bytes": 38039552,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 6970000000
+          "elapsed_nanos": 6795000000
         },
         {
           "name": "solve",
-          "elapsed_nanos": 1456000000
+          "elapsed_nanos": 1422000000
         }
       ],
       "reproduce": ""
@@ -12203,7 +12203,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12239,7 +12239,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12275,7 +12275,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12305,18 +12305,18 @@
         ],
         "basis_cardinality": 10
       },
-      "wall_nanos": 424941964,
-      "cpu_nanos": 400000000,
+      "wall_nanos": 395408569,
+      "cpu_nanos": 380000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 33812480,
+      "peak_rss_bytes": 33271808,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 410878000
+          "elapsed_nanos": 390758000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1944768-mq-random-10/sagebrush/mq-random-10-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2046791-mq-random-10/sagebrush/mq-random-10-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -12335,7 +12335,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12352,12 +12352,12 @@
       "outcome_detail": "stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros)",
       "invariants": {},
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 1185873920,
+      "peak_rss_bytes": 1187848192,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 35203969218
+          "elapsed_nanos": 33878743928
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-14 --task reduced-grobner-basis"
@@ -12379,7 +12379,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12415,7 +12415,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12432,9 +12432,9 @@
       "outcome_detail": "stopped at the tool's own cap: stopped at a 60s wall-clock limit",
       "invariants": {},
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 498733056,
+      "peak_rss_bytes": 498622464,
       "peak_rss_basis": "unavailable",
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1946785-mq-random-14/msolve/msolve-1946785-2.ms -o /tmp/zeebra-competitive-1946785-mq-random-14/msolve/msolve-1946785-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2047380-mq-random-14/msolve/msolve-2047380-2.ms -o /tmp/zeebra-competitive-2047380-mq-random-14/msolve/msolve-2047380-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -12453,7 +12453,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12469,11 +12469,11 @@
       "outcome": "stopped-by-limit",
       "outcome_detail": "stopped at the tool's own cap: stopped at a 60s wall-clock limit",
       "invariants": {},
-      "cpu_nanos": 60330000000,
+      "cpu_nanos": 60410000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 1204805632,
+      "peak_rss_bytes": 1204137984,
       "peak_rss_basis": "unavailable",
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1946785-mq-random-14/groebner-jl/mq-random-14-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2047380-mq-random-14/groebner-jl/mq-random-14-2.jl"
     },
     {
       "schema": 1,
@@ -12492,7 +12492,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12508,11 +12508,11 @@
       "outcome": "stopped-by-limit",
       "outcome_detail": "stopped at the tool's own cap: stopped at a 60s wall-clock limit",
       "invariants": {},
-      "cpu_nanos": 59530000000,
+      "cpu_nanos": 59590000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 4439728128,
+      "peak_rss_bytes": 4671438848,
       "peak_rss_basis": "unavailable",
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1946785-mq-random-14/sagebrush/mq-random-14-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2047380-mq-random-14/sagebrush/mq-random-14-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -12531,7 +12531,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12548,12 +12548,12 @@
       "outcome_detail": "stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros)",
       "invariants": {},
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 1186496512,
+      "peak_rss_bytes": 1186115584,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 36748675356
+          "elapsed_nanos": 33925020514
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-14 --task lex-basis-by-conversion"
@@ -12575,7 +12575,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12611,7 +12611,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12647,7 +12647,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12683,7 +12683,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12699,11 +12699,11 @@
       "outcome": "stopped-by-limit",
       "outcome_detail": "stopped at the tool's own cap: stopped at a 60s wall-clock limit",
       "invariants": {},
-      "cpu_nanos": 59560000000,
+      "cpu_nanos": 59600000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 4558290944,
+      "peak_rss_bytes": 4752953344,
       "peak_rss_basis": "unavailable",
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1963685-mq-random-14/sagebrush/mq-random-14-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2055436-mq-random-14/sagebrush/mq-random-14-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -12722,7 +12722,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12751,18 +12751,18 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 64292,
+      "wall_nanos": 60806,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6934528,
+      "peak_rss_bytes": 6701056,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 64292
+          "elapsed_nanos": 60806
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 54222
+          "elapsed_nanos": 61587
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-6 --task reduced-grobner-basis"
@@ -12784,7 +12784,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12813,15 +12813,15 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 35996322,
+      "wall_nanos": 35987035,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 19349504,
+      "peak_rss_bytes": 19873792,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 1000000
+          "elapsed_nanos": 0
         }
       ],
       "reproduce": ""
@@ -12843,7 +12843,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12871,10 +12871,10 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 10314407,
+      "wall_nanos": 10327243,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -12910,7 +12910,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1976213-mq-planted-6/msolve/msolve-1976213-2.ms -o /tmp/zeebra-competitive-1976213-mq-planted-6/msolve/msolve-1976213-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2058567-mq-planted-6/msolve/msolve-2058567-2.ms -o /tmp/zeebra-competitive-2058567-mq-planted-6/msolve/msolve-2058567-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -12929,7 +12929,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12958,25 +12958,25 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 833819,
+      "wall_nanos": 768435,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 733249536,
+      "peak_rss_bytes": 732733440,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 833819
+          "elapsed_nanos": 768435
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5433617408
+          "elapsed_nanos": 5069082305
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6400000000
+          "elapsed_nanos": 5890000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1976213-mq-planted-6/groebner-jl/mq-planted-6-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2058567-mq-planted-6/groebner-jl/mq-planted-6-2.jl"
     },
     {
       "schema": 1,
@@ -12995,7 +12995,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13024,18 +13024,18 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 10382586,
+      "wall_nanos": 10432583,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 16384,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 158000
+          "elapsed_nanos": 118000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1976213-mq-planted-6/sagebrush/mq-planted-6-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2058567-mq-planted-6/sagebrush/mq-planted-6-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -13054,7 +13054,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13080,18 +13080,18 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 617960,
+      "wall_nanos": 585418,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7094272,
+      "peak_rss_bytes": 6791168,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 63009
+          "elapsed_nanos": 65574
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 554951
+          "elapsed_nanos": 519844
         },
         {
           "name": "conversion: dependence",
@@ -13121,7 +13121,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13147,10 +13147,10 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 36038492,
+      "wall_nanos": 35961045,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20680704,
+      "peak_rss_bytes": 18800640,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -13181,7 +13181,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13217,7 +13217,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13253,7 +13253,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13279,18 +13279,18 @@
         ],
         "basis_cardinality": 6
       },
-      "wall_nanos": 10418634,
+      "wall_nanos": 10476796,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 581000
+          "elapsed_nanos": 599000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1976626-mq-planted-6/sagebrush/mq-planted-6-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2059074-mq-planted-6/sagebrush/mq-planted-6-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -13309,7 +13309,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13344,18 +13344,18 @@
         ],
         "basis_cardinality": 15
       },
-      "wall_nanos": 116861,
+      "wall_nanos": 118675,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7024640,
+      "peak_rss_bytes": 6352896,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 116861
+          "elapsed_nanos": 118675
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 1086828
+          "elapsed_nanos": 1271387
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-10 --task reduced-grobner-basis"
@@ -13377,7 +13377,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13412,10 +13412,10 @@
         ],
         "basis_cardinality": 15
       },
-      "wall_nanos": 36062176,
+      "wall_nanos": 35953041,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 19955712,
+      "peak_rss_bytes": 20533248,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -13442,7 +13442,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13476,10 +13476,10 @@
         ],
         "basis_cardinality": 15
       },
-      "wall_nanos": 10357779,
+      "wall_nanos": 10330639,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -13515,7 +13515,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1976815-mq-planted-10/msolve/msolve-1976815-2.ms -o /tmp/zeebra-competitive-1976815-mq-planted-10/msolve/msolve-1976815-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2059219-mq-planted-10/msolve/msolve-2059219-2.ms -o /tmp/zeebra-competitive-2059219-mq-planted-10/msolve/msolve-2059219-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -13534,7 +13534,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13569,25 +13569,25 @@
         ],
         "basis_cardinality": 15
       },
-      "wall_nanos": 992981,
+      "wall_nanos": 733900,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 760434688,
+      "peak_rss_bytes": 758218752,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 992981
+          "elapsed_nanos": 733900
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 7082563019
+          "elapsed_nanos": 6797006727
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 7880000000
+          "elapsed_nanos": 8870000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1976815-mq-planted-10/groebner-jl/mq-planted-10-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2059219-mq-planted-10/groebner-jl/mq-planted-10-2.jl"
     },
     {
       "schema": 1,
@@ -13606,7 +13606,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13641,18 +13641,18 @@
         ],
         "basis_cardinality": 15
       },
-      "wall_nanos": 10433603,
+      "wall_nanos": 10375474,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 144000
+          "elapsed_nanos": 210000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1976815-mq-planted-10/sagebrush/mq-planted-10-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2059219-mq-planted-10/sagebrush/mq-planted-10-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -13671,7 +13671,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13701,18 +13701,18 @@
         ],
         "basis_cardinality": 10
       },
-      "wall_nanos": 29588324,
+      "wall_nanos": 28415540,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 24080384,
+      "peak_rss_bytes": 23646208,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 118003
+          "elapsed_nanos": 125628
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 29470321
+          "elapsed_nanos": 28289912
         },
         {
           "name": "conversion: dependence",
@@ -13742,7 +13742,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13772,19 +13772,19 @@
         ],
         "basis_cardinality": 10
       },
-      "wall_nanos": 163683608,
-      "cpu_nanos": 140000000,
+      "wall_nanos": 148177278,
+      "cpu_nanos": 120000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 53997568,
+      "peak_rss_bytes": 53977088,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 1000000
+          "elapsed_nanos": 0
         },
         {
           "name": "solve",
-          "elapsed_nanos": 122000000
+          "elapsed_nanos": 112000000
         }
       ],
       "reproduce": ""
@@ -13806,7 +13806,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13842,7 +13842,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13878,7 +13878,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13908,18 +13908,18 @@
         ],
         "basis_cardinality": 10
       },
-      "wall_nanos": 40728234,
-      "cpu_nanos": 20000000,
+      "wall_nanos": 30612890,
+      "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21544960,
+      "peak_rss_bytes": 14827520,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 31282000
+          "elapsed_nanos": 27717000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1977090-mq-planted-10/sagebrush/mq-planted-10-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2059484-mq-planted-10/sagebrush/mq-planted-10-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -13938,7 +13938,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13979,18 +13979,18 @@
         ],
         "basis_cardinality": 21
       },
-      "wall_nanos": 157859,
+      "wall_nanos": 201993,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 27140096,
+      "peak_rss_bytes": 28106752,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 157859
+          "elapsed_nanos": 201993
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 43633758
+          "elapsed_nanos": 40089913
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-14 --task reduced-grobner-basis"
@@ -14012,7 +14012,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14053,10 +14053,10 @@
         ],
         "basis_cardinality": 21
       },
-      "wall_nanos": 41173448,
+      "wall_nanos": 35999649,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 19120128,
+      "peak_rss_bytes": 20672512,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -14083,7 +14083,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14123,10 +14123,10 @@
         ],
         "basis_cardinality": 21
       },
-      "wall_nanos": 10324015,
+      "wall_nanos": 10286847,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 90112,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -14162,7 +14162,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1977300-mq-planted-14/msolve/msolve-1977300-2.ms -o /tmp/zeebra-competitive-1977300-mq-planted-14/msolve/msolve-1977300-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2059628-mq-planted-14/msolve/msolve-2059628-2.ms -o /tmp/zeebra-competitive-2059628-mq-planted-14/msolve/msolve-2059628-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -14181,7 +14181,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14222,25 +14222,25 @@
         ],
         "basis_cardinality": 21
       },
-      "wall_nanos": 800496,
+      "wall_nanos": 749389,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 764248064,
+      "peak_rss_bytes": 765960192,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 800496
+          "elapsed_nanos": 749389
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 26415493986
+          "elapsed_nanos": 24945126598
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 27430000000
+          "elapsed_nanos": 25670000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1977300-mq-planted-14/groebner-jl/mq-planted-14-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2059628-mq-planted-14/groebner-jl/mq-planted-14-2.jl"
     },
     {
       "schema": 1,
@@ -14259,7 +14259,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14300,18 +14300,18 @@
         ],
         "basis_cardinality": 21
       },
-      "wall_nanos": 30601989,
+      "wall_nanos": 30671782,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 6803456,
+      "peak_rss_bytes": 6676480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 220000
+          "elapsed_nanos": 154000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1977300-mq-planted-14/sagebrush/mq-planted-14-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2059628-mq-planted-14/sagebrush/mq-planted-14-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -14330,7 +14330,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14347,16 +14347,16 @@
       "outcome_detail": "stopped at the tool's own cap: the quotient algebra has more than the 4096 dimensions allowed",
       "invariants": {},
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 11243520,
+      "peak_rss_bytes": 11071488,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 201121
+          "elapsed_nanos": 201392
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 9033673
+          "elapsed_nanos": 9034335
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-14 --task lex-basis-by-conversion"
@@ -14378,7 +14378,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14412,19 +14412,19 @@
         ],
         "basis_cardinality": 14
       },
-      "wall_nanos": 46148457000,
-      "cpu_nanos": 45800000000,
+      "wall_nanos": 44270514941,
+      "cpu_nanos": 43940000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 10911731712,
+      "peak_rss_bytes": 10912636928,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 1000000
+          "elapsed_nanos": 0
         },
         {
           "name": "solve",
-          "elapsed_nanos": 44999000000
+          "elapsed_nanos": 43555000000
         }
       ],
       "reproduce": ""
@@ -14446,7 +14446,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14482,7 +14482,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14518,7 +14518,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14552,18 +14552,18 @@
         ],
         "basis_cardinality": 14
       },
-      "wall_nanos": 6665444529,
-      "cpu_nanos": 6600000000,
+      "wall_nanos": 6349366198,
+      "cpu_nanos": 6290000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 3124310016,
+      "peak_rss_bytes": 3124178944,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 6473145000
+          "elapsed_nanos": 6157653000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1978012-mq-planted-14/sagebrush/mq-planted-14-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2060543-mq-planted-14/sagebrush/mq-planted-14-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -14582,7 +14582,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14613,18 +14613,18 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 637126,
+      "wall_nanos": 657545,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7598080,
+      "peak_rss_bytes": 7692288,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 637126
+          "elapsed_nanos": 657545
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 9347
+          "elapsed_nanos": 7745
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf2-rp0-planted --task reduced-grobner-basis"
@@ -14646,7 +14646,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14677,10 +14677,10 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 35966546,
+      "wall_nanos": 35965915,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20271104,
+      "peak_rss_bytes": 20418560,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -14707,7 +14707,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14737,10 +14737,10 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 10336009,
+      "wall_nanos": 10344996,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -14776,7 +14776,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1979887-poseidon-t2-rf2-rp0-planted/msolve/msolve-1979887-2.ms -o /tmp/zeebra-competitive-1979887-poseidon-t2-rf2-rp0-planted/msolve/msolve-1979887-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2061487-poseidon-t2-rf2-rp0-planted/msolve/msolve-2061487-2.ms -o /tmp/zeebra-competitive-2061487-poseidon-t2-rf2-rp0-planted/msolve/msolve-2061487-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -14795,7 +14795,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14826,25 +14826,25 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 939379,
+      "wall_nanos": 847335,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 731021312,
+      "peak_rss_bytes": 730079232,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 939379
+          "elapsed_nanos": 847335
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5381728056
+          "elapsed_nanos": 5105278126
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6170000000
+          "elapsed_nanos": 5970000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1979887-poseidon-t2-rf2-rp0-planted/groebner-jl/poseidon-t2-rf2-rp0-planted-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2061487-poseidon-t2-rf2-rp0-planted/groebner-jl/poseidon-t2-rf2-rp0-planted-2.jl"
     },
     {
       "schema": 1,
@@ -14863,7 +14863,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14894,18 +14894,18 @@
         ],
         "basis_cardinality": 11
       },
-      "wall_nanos": 10407034,
+      "wall_nanos": 10384982,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 20480,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 375000
+          "elapsed_nanos": 416000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1979887-poseidon-t2-rf2-rp0-planted/sagebrush/poseidon-t2-rf2-rp0-planted-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2061487-poseidon-t2-rf2-rp0-planted/sagebrush/poseidon-t2-rf2-rp0-planted-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -14924,7 +14924,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14949,18 +14949,18 @@
         ],
         "basis_cardinality": 5
       },
-      "wall_nanos": 757925,
+      "wall_nanos": 759417,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7516160,
+      "peak_rss_bytes": 7929856,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 664118
+          "elapsed_nanos": 657244
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 93807
+          "elapsed_nanos": 102173
         },
         {
           "name": "conversion: dependence",
@@ -14990,7 +14990,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15015,10 +15015,10 @@
         ],
         "basis_cardinality": 5
       },
-      "wall_nanos": 36016260,
-      "cpu_nanos": 10000000,
+      "wall_nanos": 36057679,
+      "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 18890752,
+      "peak_rss_bytes": 19058688,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -15049,7 +15049,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15085,7 +15085,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15121,7 +15121,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15146,18 +15146,18 @@
         ],
         "basis_cardinality": 5
       },
-      "wall_nanos": 10408646,
+      "wall_nanos": 10500391,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20480,
+      "peak_rss_bytes": 249856,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 424000
+          "elapsed_nanos": 379000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1980140-poseidon-t2-rf2-rp0-planted/sagebrush/poseidon-t2-rf2-rp0-planted-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2061933-poseidon-t2-rf2-rp0-planted/sagebrush/poseidon-t2-rf2-rp0-planted-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -15176,7 +15176,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15266,18 +15266,18 @@
         ],
         "basis_cardinality": 70
       },
-      "wall_nanos": 115610676,
+      "wall_nanos": 113506244,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 11706368,
+      "peak_rss_bytes": 11382784,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 115610676
+          "elapsed_nanos": 113506244
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 137490
+          "elapsed_nanos": 119606
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf2-rp2-planted --task reduced-grobner-basis"
@@ -15299,7 +15299,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15389,15 +15389,15 @@
         ],
         "basis_cardinality": 70
       },
-      "wall_nanos": 97373819,
-      "cpu_nanos": 70000000,
+      "wall_nanos": 81937363,
+      "cpu_nanos": 60000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 20869120,
+      "peak_rss_bytes": 20848640,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 46000000
+          "elapsed_nanos": 41000000
         }
       ],
       "reproduce": ""
@@ -15419,7 +15419,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15508,10 +15508,10 @@
         ],
         "basis_cardinality": 70
       },
-      "wall_nanos": 10378059,
+      "wall_nanos": 10329928,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 16384,
+      "peak_rss_bytes": 24576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -15547,7 +15547,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1980372-poseidon-t2-rf2-rp2-planted/msolve/msolve-1980372-2.ms -o /tmp/zeebra-competitive-1980372-poseidon-t2-rf2-rp2-planted/msolve/msolve-1980372-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2062072-poseidon-t2-rf2-rp2-planted/msolve/msolve-2062072-2.ms -o /tmp/zeebra-competitive-2062072-poseidon-t2-rf2-rp2-planted/msolve/msolve-2062072-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -15566,7 +15566,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15656,25 +15656,25 @@
         ],
         "basis_cardinality": 70
       },
-      "wall_nanos": 3382093,
+      "wall_nanos": 3405628,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 732766208,
+      "peak_rss_bytes": 734498816,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 3382093
+          "elapsed_nanos": 3405628
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 5395926379
+          "elapsed_nanos": 5148209449
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 6270000000
+          "elapsed_nanos": 6320000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1980372-poseidon-t2-rf2-rp2-planted/groebner-jl/poseidon-t2-rf2-rp2-planted-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2062072-poseidon-t2-rf2-rp2-planted/groebner-jl/poseidon-t2-rf2-rp2-planted-2.jl"
     },
     {
       "schema": 1,
@@ -15693,7 +15693,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15783,18 +15783,18 @@
         ],
         "basis_cardinality": 70
       },
-      "wall_nanos": 20557602,
+      "wall_nanos": 20531302,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 4894720,
+      "peak_rss_bytes": 4747264,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 10797000
+          "elapsed_nanos": 9343000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1980372-poseidon-t2-rf2-rp2-planted/sagebrush/poseidon-t2-rf2-rp2-planted-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2062072-poseidon-t2-rf2-rp2-planted/sagebrush/poseidon-t2-rf2-rp2-planted-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -15813,7 +15813,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15840,18 +15840,18 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 117737252,
+      "wall_nanos": 113091319,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 11808768,
+      "peak_rss_bytes": 11821056,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 114960916
+          "elapsed_nanos": 110094104
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 2776336
+          "elapsed_nanos": 2997215
         },
         {
           "name": "conversion: dependence",
@@ -15881,7 +15881,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15908,19 +15908,19 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 97295410,
-      "cpu_nanos": 70000000,
+      "wall_nanos": 92222187,
+      "cpu_nanos": 60000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21536768,
+      "peak_rss_bytes": 21528576,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 45000000
+          "elapsed_nanos": 41000000
         },
         {
           "name": "solve",
-          "elapsed_nanos": 14000000
+          "elapsed_nanos": 15000000
         }
       ],
       "reproduce": ""
@@ -15942,7 +15942,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15978,7 +15978,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16014,7 +16014,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16041,18 +16041,18 @@
         ],
         "basis_cardinality": 7
       },
-      "wall_nanos": 20511295,
+      "wall_nanos": 20480066,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 4833280,
+      "peak_rss_bytes": 4845568,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 11785000
+          "elapsed_nanos": 10260000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1981033-poseidon-t2-rf2-rp2-planted/sagebrush/poseidon-t2-rf2-rp2-planted-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2062337-poseidon-t2-rf2-rp2-planted/sagebrush/poseidon-t2-rf2-rp2-planted-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -16071,7 +16071,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16193,18 +16193,18 @@
         ],
         "basis_cardinality": 102
       },
-      "wall_nanos": 301544487,
+      "wall_nanos": 292800526,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 16117760,
+      "peak_rss_bytes": 16199680,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 301544487
+          "elapsed_nanos": 292800526
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 235576
+          "elapsed_nanos": 209036
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf4-rp0-planted --task reduced-grobner-basis"
@@ -16226,7 +16226,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16348,15 +16348,15 @@
         ],
         "basis_cardinality": 102
       },
-      "wall_nanos": 204397648,
-      "cpu_nanos": 180000000,
+      "wall_nanos": 193980458,
+      "cpu_nanos": 160000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 21643264,
+      "peak_rss_bytes": 21610496,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 154000000
+          "elapsed_nanos": 151000000
         }
       ],
       "reproduce": ""
@@ -16378,7 +16378,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16499,10 +16499,10 @@
         ],
         "basis_cardinality": 102
       },
-      "wall_nanos": 20475176,
+      "wall_nanos": 20444808,
       "cpu_nanos": 0,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 6754304,
+      "peak_rss_bytes": 6778880,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
@@ -16538,7 +16538,7 @@
           "elapsed_nanos": 0
         }
       ],
-      "reproduce": "msolve -f /tmp/zeebra-competitive-1981178-poseidon-t2-rf4-rp0-planted/msolve/msolve-1981178-2.ms -o /tmp/zeebra-competitive-1981178-poseidon-t2-rf4-rp0-planted/msolve/msolve-1981178-2.out -v 1 -t 1 -g 2"
+      "reproduce": "msolve -f /tmp/zeebra-competitive-2062537-poseidon-t2-rf4-rp0-planted/msolve/msolve-2062537-2.ms -o /tmp/zeebra-competitive-2062537-poseidon-t2-rf4-rp0-planted/msolve/msolve-2062537-2.out -v 1 -t 1 -g 2"
     },
     {
       "schema": 1,
@@ -16557,7 +16557,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16679,25 +16679,25 @@
         ],
         "basis_cardinality": 102
       },
-      "wall_nanos": 7765502,
+      "wall_nanos": 7618544,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 763035648,
+      "peak_rss_bytes": 754307072,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 7765502
+          "elapsed_nanos": 7618544
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 7253542871
+          "elapsed_nanos": 6739534593
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 8040000000
+          "elapsed_nanos": 7500000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1981178-poseidon-t2-rf4-rp0-planted/groebner-jl/poseidon-t2-rf4-rp0-planted-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2062537-poseidon-t2-rf4-rp0-planted/groebner-jl/poseidon-t2-rf4-rp0-planted-2.jl"
     },
     {
       "schema": 1,
@@ -16716,7 +16716,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16838,18 +16838,18 @@
         ],
         "basis_cardinality": 102
       },
-      "wall_nanos": 30641253,
+      "wall_nanos": 30620785,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 5443584,
+      "peak_rss_bytes": 5664768,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 22491000
+          "elapsed_nanos": 20357000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1981178-poseidon-t2-rf4-rp0-planted/sagebrush/poseidon-t2-rf4-rp0-planted-2.ms --order degrevlex --route f4"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2062537-poseidon-t2-rf4-rp0-planted/sagebrush/poseidon-t2-rf4-rp0-planted-2.ms --order degrevlex --route f4"
     },
     {
       "schema": 1,
@@ -16868,7 +16868,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16897,18 +16897,18 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 320810313,
+      "wall_nanos": 297563003,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 16515072,
+      "peak_rss_bytes": 16297984,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 315460184
+          "elapsed_nanos": 292883854
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 5350129
+          "elapsed_nanos": 4679149
         },
         {
           "name": "conversion: dependence",
@@ -16938,7 +16938,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16967,19 +16967,19 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 224986529,
-      "cpu_nanos": 200000000,
+      "wall_nanos": 204268476,
+      "cpu_nanos": 180000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 22220800,
+      "peak_rss_bytes": 22265856,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "source-basis",
-          "elapsed_nanos": 166000000
+          "elapsed_nanos": 152000000
         },
         {
           "name": "solve",
-          "elapsed_nanos": 20000000
+          "elapsed_nanos": 18000000
         }
       ],
       "reproduce": ""
@@ -17001,7 +17001,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17037,7 +17037,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17073,7 +17073,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17102,18 +17102,18 @@
         ],
         "basis_cardinality": 9
       },
-      "wall_nanos": 30651784,
+      "wall_nanos": 30669027,
       "cpu_nanos": 10000000,
       "cpu_basis": "proc-stat-ticks",
-      "peak_rss_bytes": 5574656,
+      "peak_rss_bytes": 5591040,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 24059000
+          "elapsed_nanos": 23102000
         }
       ],
-      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-1981661-poseidon-t2-rf4-rp0-planted/sagebrush/poseidon-t2-rf4-rp0-planted-2.ms --order lex --route fglm"
+      "reproduce": "SAGEBRUSH_THREADS=1 sagebrush-gb-driver /tmp/zeebra-competitive-2062812-poseidon-t2-rf4-rp0-planted/sagebrush/poseidon-t2-rf4-rp0-planted-2.ms --order lex --route fglm"
     },
     {
       "schema": 1,
@@ -17132,7 +17132,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17155,18 +17155,18 @@
         ],
         "basis_cardinality": 3
       },
-      "wall_nanos": 50145,
+      "wall_nanos": 52489,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6320128,
+      "peak_rss_bytes": 6066176,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 50145
+          "elapsed_nanos": 52489
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 2274
+          "elapsed_nanos": 2695
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row anemoi64-cico-n1-fcico --task reduced-grobner-basis"
@@ -17188,7 +17188,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17224,7 +17224,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17260,7 +17260,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17283,25 +17283,25 @@
         ],
         "basis_cardinality": 3
       },
-      "wall_nanos": 752174,
+      "wall_nanos": 768575,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 756260864,
+      "peak_rss_bytes": 756662272,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 752174
+          "elapsed_nanos": 768575
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 8023235557
+          "elapsed_nanos": 7431793904
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 8730000000
+          "elapsed_nanos": 8230000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1982021-anemoi64-cico-n1-fcico/groebner-jl/anemoi64-cico-n1-fcico-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2063104-anemoi64-cico-n1-fcico/groebner-jl/anemoi64-cico-n1-fcico-2.jl"
     },
     {
       "schema": 1,
@@ -17320,7 +17320,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17356,7 +17356,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17378,18 +17378,18 @@
         ],
         "basis_cardinality": 2
       },
-      "wall_nanos": 64191,
+      "wall_nanos": 77687,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 6127616,
+      "peak_rss_bytes": 6049792,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 42380
+          "elapsed_nanos": 52149
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 21811
+          "elapsed_nanos": 25538
         },
         {
           "name": "conversion: dependence",
@@ -17419,7 +17419,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17455,7 +17455,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17491,7 +17491,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17527,7 +17527,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17563,7 +17563,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17595,18 +17595,18 @@
         ],
         "basis_cardinality": 12
       },
-      "wall_nanos": 613151,
+      "wall_nanos": 617870,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7479296,
+      "peak_rss_bytes": 7426048,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 613151
+          "elapsed_nanos": 617870
         },
         {
           "name": "quotient-dimension (for the invariant)",
-          "elapsed_nanos": 12814
+          "elapsed_nanos": 16661
         }
       ],
       "reproduce": "cargo run --release --example competitive_sweep -- --row anemoi64-cico-n2-fcico --task reduced-grobner-basis"
@@ -17628,7 +17628,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17664,7 +17664,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17700,7 +17700,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17732,25 +17732,25 @@
         ],
         "basis_cardinality": 12
       },
-      "wall_nanos": 916466,
+      "wall_nanos": 959236,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 757559296,
+      "peak_rss_bytes": 759271424,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "solve",
-          "elapsed_nanos": 916466
+          "elapsed_nanos": 959236
         },
         {
           "name": "process-wall",
-          "elapsed_nanos": 7998228612
+          "elapsed_nanos": 7395052681
         },
         {
           "name": "process-cpu",
-          "elapsed_nanos": 8790000000
+          "elapsed_nanos": 8240000000
         }
       ],
-      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-1982730-anemoi64-cico-n2-fcico/groebner-jl/anemoi64-cico-n2-fcico-2.jl"
+      "reproduce": "JULIA_DEPOT_PATH=/home/mfaulk/.local/opt/zeebra-ext/julia-depot julia --startup-file=no --history-file=no -t1 /tmp/zeebra-competitive-2063654-anemoi64-cico-n2-fcico/groebner-jl/anemoi64-cico-n2-fcico-2.jl"
     },
     {
       "schema": 1,
@@ -17769,7 +17769,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17805,7 +17805,7 @@
       "library": "zeebra",
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17829,18 +17829,18 @@
         ],
         "basis_cardinality": 4
       },
-      "wall_nanos": 922466,
+      "wall_nanos": 891227,
       "cpu_basis": "unavailable",
-      "peak_rss_bytes": 7811072,
+      "peak_rss_bytes": 7569408,
       "peak_rss_basis": "unavailable",
       "stages": [
         {
           "name": "basis",
-          "elapsed_nanos": 692671
+          "elapsed_nanos": 701197
         },
         {
           "name": "conversion",
-          "elapsed_nanos": 229795
+          "elapsed_nanos": 190030
         },
         {
           "name": "conversion: dependence",
@@ -17870,7 +17870,7 @@
       "library": "singular",
       "library_version": "singular build 44105 (44105)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17906,7 +17906,7 @@
       "library": "msolve",
       "library_version": "msolve 0.11.0",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17942,7 +17942,7 @@
       "library": "groebner.jl",
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17978,7 +17978,7 @@
       "library": "sagebrush",
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
-        "commit": "2e1b305",
+        "commit": "7adb29e",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,

@@ -90,13 +90,13 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] The board populated to **five libraries**: 180 measured records over the whole corpus ladder
       x both tasks x Zeebra, Singular 4.4.1, msolve 0.11.0, Groebner.jl 0.10.11 and Sagebrush, one
       row per process under the benchmark lock, all four externals agreeing term-for-term before any
-      timing was taken. Of 116 pairs, 89 are disqualified by a startup floor and 18 are ones a
-      conclusion may rest on: **12 losses, 1 level, 1 win**. On random MQ at 10 variables this crate
-      is the **slowest of the five** — 366x behind Groebner.jl, 109x behind msolve, 90x behind
-      Sagebrush, 4.2x behind Singular, every engine agreeing on the answer. And the classical
-      families turn out to decide something after all: 14.8x behind Groebner.jl on katsura-7 and
-      6.6x on cyclic-6, where against Singular alone they could decide nothing because Singular was
-      starting up through all of it
+      timing was taken. Of 116 pairs, 89 are disqualified by a startup floor and 19 are ones a
+      conclusion may rest on: **13 losses, 1 win**. On random MQ at 10 variables this crate is the
+      **slowest of the five** — 348x behind Groebner.jl, 119x behind msolve, 87x behind Sagebrush,
+      4.1x behind Singular, every engine agreeing on the answer. And the classical families turn out
+      to decide something after all: 15.9x behind Groebner.jl on katsura-7 and 6.2x on cyclic-6,
+      where against Singular alone they could decide nothing because Singular was starting up
+      through all of it
 - [x] Multivariate composition: `x_i -> g_i(x_i)` for univariate `g_i`, and the general form that
       substitutes a polynomial in all `N` variables for each one — so a permutation round can be
       written the way it is defined, with the substituted powers memoized and formed by repeated
