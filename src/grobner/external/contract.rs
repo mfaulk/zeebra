@@ -422,6 +422,126 @@ pub fn order_from_tag(tag: &str) -> Option<MonomialOrder> {
     }
 }
 
+/// A polynomial as a canonical, sorted multiset of `coefficient*factors` terms over `GF(p)`.
+///
+/// # What this is for
+///
+/// Every adapter here echoes the system the tool read back and compares it against the system that
+/// was sent, because of one failure mode **cross-validation cannot catch**: every engine is handed
+/// the same bytes, so an input that is misread is misread identically everywhere, and four engines
+/// then agree with each other while all four answer a different question. Agreement is the
+/// instrument this module relies on, and this is the case it is blind to.
+///
+/// The concrete instance of it: **at ten or more variables `x1` is a prefix of `x10`**, so a greedy
+/// tokenizer reads `x1*x10` as `x1*x1*0` and silently annihilates the term. The corpus has
+/// fourteen-variable rungs, so this is live rather than hypothetical.
+///
+/// # Why a canonical form rather than a string compare
+///
+/// The two sides legitimately spell the same polynomial differently — Zeebra writes `x1*x10-1`,
+/// Groebner.jl echoes `x1*x10 + 1073741826`, the Sagebrush driver `1*x1*x10 + 1073741826` — and
+/// neither term order, factor order within a monomial, nor the choice between `-1` and `p-1` is
+/// meaningful. Reducing every coefficient mod `p` and sorting both levels makes the comparison
+/// about the polynomial.
+///
+/// Tokenizing is on the explicit `*` and `^` separators and variable names are then matched
+/// **whole**, which is the property that makes `x1` and `x10` distinguishable — the same property
+/// both drivers' parsers have, and the one a greedy longest-prefix scan would lack.
+pub fn canonical_generator(text: &str, characteristic: u64) -> String {
+    let p = characteristic.max(2) as i128;
+    let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+
+    // Split into signed chunks without losing a sign, as the drivers' parsers do.
+    let mut chunks: Vec<(i128, String)> = Vec::new();
+    let mut sign: i128 = 1;
+    let mut current = String::new();
+    for character in compact.chars() {
+        match character {
+            '+' | '-' if !current.is_empty() => {
+                chunks.push((sign, std::mem::take(&mut current)));
+                sign = if character == '-' { -1 } else { 1 };
+            }
+            '+' => {}
+            '-' => sign = -sign,
+            _ => current.push(character),
+        }
+    }
+    if !current.is_empty() {
+        chunks.push((sign, current));
+    }
+
+    let mut terms: Vec<String> = Vec::new();
+    for (sign, chunk) in chunks {
+        let mut coefficient: i128 = 1;
+        let mut factors: Vec<String> = Vec::new();
+        for factor in chunk.split('*').filter(|factor| !factor.is_empty()) {
+            let (base, exponent) = match factor.split_once('^') {
+                Some((base, exponent)) => (base, exponent.parse::<u32>().unwrap_or(0)),
+                None => (factor, 1),
+            };
+            match base.parse::<i128>() {
+                // A numeric factor folds into the coefficient.
+                Ok(value) => {
+                    for _ in 0..exponent {
+                        coefficient = coefficient * value % p;
+                    }
+                }
+                // A variable name, matched whole.
+                Err(_) => factors.push(if exponent == 1 {
+                    base.to_string()
+                } else {
+                    format!("{}^{}", base, exponent)
+                }),
+            }
+        }
+        let coefficient = (sign * coefficient).rem_euclid(p);
+        if coefficient == 0 {
+            continue;
+        }
+        factors.sort();
+        let monomial = if factors.is_empty() {
+            "1".to_string()
+        } else {
+            factors.join("*")
+        };
+        terms.push(format!("{}*{}", coefficient, monomial));
+    }
+    terms.sort();
+    terms.join("+")
+}
+
+/// Whether two systems are the same set of polynomials over `GF(characteristic)`.
+///
+/// A **set**, because neither generator order nor term order is meaningful. Returns the first
+/// canonical pair that differs, for a diagnostic: at the variable counts where this matters a full
+/// dump of both systems is unreadable, and the first disagreement is the useful part.
+pub fn generators_agree(
+    sent: &[String],
+    echoed: &[String],
+    characteristic: u64,
+) -> Result<(), (String, String)> {
+    let mut ours: Vec<String> = sent
+        .iter()
+        .map(|generator| canonical_generator(generator, characteristic))
+        .collect();
+    let mut theirs: Vec<String> = echoed
+        .iter()
+        .map(|generator| canonical_generator(generator, characteristic))
+        .collect();
+    ours.sort();
+    theirs.sort();
+    if ours == theirs {
+        return Ok(());
+    }
+    let first = ours
+        .iter()
+        .zip(&theirs)
+        .find(|(a, b)| a != b)
+        .map(|(a, b)| (a.clone(), b.clone()))
+        .unwrap_or_else(|| ("the generator multisets differ".to_string(), String::new()));
+    Err(first)
+}
+
 /// The resources a run is allowed, declared before it starts.
 ///
 /// **Declared, not discovered.** A limit is part of the result: a run that stopped at 600 seconds

@@ -603,15 +603,25 @@ directly, under `--route fglm`.
    `groebner-jl-implementation.md` §6.2–6.3 are the same idea reached from two independent
    codebases; they should be one experiment, and the microbenchmark of `MonomialOrder::cmp` should
    gate it.
-5. **#329 — echo the generators from the driver**, so the adapter can check what it read on every
-   run rather than relying on one behavioural test. The driver already self-documents the
-   characteristic, the variable order and the monomial order, and the adapter already checks all
-   three as `SelfInconsistent`; the generators are the one input fact not covered. This is the
-   `x1`/`x10` class of hazard, which **cross-engine agreement cannot detect** — every engine is
-   handed the same bytes, so a misread is identical everywhere and four engines agree on the same
-   wrong ideal. The driver is verified clean at fourteen variables (it splits on the explicit `*`
-   and `^` separators and matches each name whole), and the corpus's `mq-random-14` and
-   `mq-planted-14` rungs make the hazard live rather than hypothetical.
+5. **#329 — echo the generators from the driver. Done.** The adapter now checks what the driver
+   read on every run rather than relying on one behavioural test. The driver already
+   self-documented the characteristic, the variable order and the monomial order, and the adapter
+   already checked all three as `SelfInconsistent`; the generators were the one input fact not
+   covered. This is the `x1`/`x10` class of hazard, which **cross-engine agreement cannot detect** —
+   every engine is handed the same bytes, so a misread is identical everywhere and four engines
+   agree on the same wrong ideal. The driver is verified clean at fourteen variables (it splits on
+   the explicit `*` and `^` separators and matches each name whole, and its echo reads
+   `1*x1*x10 + 1073741826`), and the corpus's `mq-random-14` and `mq-planted-14` rungs make the
+   hazard live rather than hypothetical.
+
+   Two choices worth recording. The echo is rendered from the **packed** polynomials rather than
+   from the input text, so it is a round trip through the driver's own parser and packer and would
+   also catch a truncated exponent. And the driver carries a `#driver contract:` version the
+   adapter *requires*: the alternative — checking only when `#gen` is present — is a check that
+   silently stops checking against an older installed binary, and silence is the one outcome worse
+   than a loud refusal. `contract::canonical_generator` is now shared with the Groebner.jl adapter,
+   since the normalization reconciling `-1` against `p-1` is the subtle part and two copies of it
+   would drift.
 6. **#337 — the msolve adapter's corpus agreement test panics on a rung it has no instantiation
    for**, and CI cannot see it because the test returns early when msolve is absent. Not this
    study's subject, but found by it: a test whose skip is indistinguishable from its pass will
