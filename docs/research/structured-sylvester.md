@@ -277,13 +277,34 @@ milestone, and §5.3's check should gate integration anyway.
 
 ### 5.5 Measured, at the orders that matter
 
-> **PENDING, queued under `tools/benchlock.sh`** behind five concurrent agents. Euclid against
-> `Matrix::determinant` at Sylvester orders 36 / 162 / 486 / 1 458 / 4 374, single-threaded on one
-> pinned core, agreement checked at every size. §5.2's operation count predicts **3 888×** at order
-> 1 458 and **11 664×** at 4 374; a measured ratio materially below that would mean the remainder
-> sequence pays a constant the count does not show — the per-step inversion is the candidate, at
-> `n` inversions against `n²/2` multiplications — and §8 should be re-scored against the measurement.
-> The **ratio** is what is being measured; no absolute time in §8 depends on it.
+> **PENDING, queued under `tools/benchlock.sh`** behind five concurrent agents and the CI runner.
+> Euclid against `Matrix::determinant` at Sylvester orders 36 / 162 / 486 / 1 458, single-threaded on
+> one pinned core, agreement checked at every size. The **ratio** is what is being measured; no
+> absolute figure in §8 depends on it.
+
+The measurement's purpose is to catch a constant the operation count does not show, and **the one
+candidate can be bounded now, from a measurement already in the repository** — which is why §8 does
+not wait on it.
+
+The candidate is the **per-step inversion**: the remainder sequence does `n` divisions, each
+normalising by a leading coefficient, so `n` inversions against `n²/2` multiplications. From
+`docs/research/batch-inversion.md`, the **measured** plateau over Mersenne-31 — which is
+`Zp2147483647`, the field in question — is that one inversion costs **35× three multiplications**,
+i.e. ~105 multiplications (and that figure *predates* #160, which halved Fermat inversion, so ~53 is
+the current number; 105 is the pessimistic one).
+
+Charging inversions at the pessimistic rate, at `R = 6`:
+
+| | multiplications | inversions | at 105 mult each | total mult-equivalents |
+|---|---:|---:|---:|---:|
+| dense LU | `1.033 × 10^9` | 1 458 (one per pivot) | `1.5 × 10^5` | `1.033 × 10^9` (+0.015%) |
+| classical Euclid | `2.657 × 10^5` | 729 | `7.65 × 10^4` | `3.423 × 10^5` (+28.8%) |
+
+So the ratio is **≥ 3 018×** rather than 3 888× — a 22% haircut that changes no conclusion in §8,
+and the gap still grows 3× per round. Note also that the inversions are **removable**: the
+pseudo-remainder (subresultant) variant of the same recursion divides by nothing, at the cost of
+coefficient growth that over a prime field is free. If the pending measurement comes in below
+~3 000×, that is the first thing to try, and §8's recommendation stands either way.
 
 ## 6. Axis 5 — polynomial-matrix determinant algorithms
 
@@ -482,9 +503,11 @@ blocking half is refuted by #312; axis 2 has no content; axis 3 is axis 4 with m
 
 ## 10. Marked unverified, and open
 
-- **The Euclid-versus-LU timing is queued, not measured** (§5.5). The 3 888× is an exact
-  operation-count ratio, not a measured speedup; they differ by whatever constant the remainder
-  sequence's per-step inversion carries.
+- **The Euclid-versus-LU timing is queued, not measured** (§5.5) — the benchlock queue held five
+  other agents and the CI runner for the duration of this work. The 3 888× is an exact
+  operation-count ratio, not a measured speedup. Its one known hidden constant, the per-step
+  inversion, is **bounded** in §5.5 against 's measured Mersenne-31 plateau and
+  costs at most 22% of the ratio, so §8 does not rest on the pending run.
 - **Whether the specialization trap fires at all on the registered rows is unchecked** (§5.3). It
   needs `lc_y` of `cico_bivariate`'s outputs, in a file another agent owns this milestone.
 - **The root-finding exponent 1.933 is fitted on two points** (§7). Every root-finding figure in §7.1
