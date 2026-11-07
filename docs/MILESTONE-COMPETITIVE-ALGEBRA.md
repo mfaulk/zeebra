@@ -859,8 +859,19 @@ memory", and a budget that bounds one structure cannot bound the other.
 | **#271 modular composition** | **settled** | Extraction's ceiling is **1.013x–1.053x** — an *infinitely fast* stage is unmeasurable on every profiled instance. Its univariate-factoring half is a separate claim this screen does not reach. |
 | **#272 characteristic-two linear algebra** | **the screen cannot run, and that is the finding** | A ceiling needs a profile and there is no characteristic-two one; extrapolating from the prime-field split would be #269's error exactly. But **`GF(2)` is a prime field, so it can be profiled today** — only `GF(2^e)` is blocked on the defining-polynomial convention. One profile decides it. |
 | **#273 adaptive strategy selection** | **vindicated, and bounded by the right quantity** | Selection picks a route; it does not speed a stage. Measured route spread is **70x** (planted-8's lex basis: F4 direct 0.04 ms against a 2.8 ms conversion) against the best stage ceiling anywhere of 2.59x. `fglm::shape` already ships a detector validated against Singular on 26 ideals and **deliberately unwired**. |
-| **#287 hybrid / k=3 CICO** | *pending — §13.5a* | |
-| **#297 structured Sylvester** | *pending — §13.5a* | Baseline is now clean: cubic kernel, no cache anomaly, sweep 92–95% efficient to 32 cores. Axis 1 is close to zero-sum; axes 3–5 are the only ones with anywhere to go. |
+| **#287 hybrid / k=3 CICO** | **negative result**, on counting rather than cost | `⟨f,g⟩ ∩ F_p[x] = (0)` for `k = 3`: with two constraints and three parameters the variety is a **curve**, so there is **no univariate polynomial in the ideal** and every root-finding stage in the crate has **no input** — a structural impossibility, not a bad constant. The hybrid is capped by a verification-to-construction ratio of **7 × 10⁻⁸** (µs against 15.2 s), making its largest conceivable saving one part in 1.4 × 10⁷, so `W(b) = W(0)` for every `b`. And the per-family floor is **12.2 s against 15.2 s measured** — the `k = 1` route's last axis is worth 1.25x against a nine-order gap. The product is **not invariant across `k`; it is minimised at `k = c = 2`, where the resultant route already sits.** |
+| **#297 structured Sylvester** | **build axis 4 only** (Euclidean remainder sequence); axis 5 ruled out | **1 692x measured** at order 1 458 — the Euclidean route 1.343 ms against dense LU's 2.272 s, the latter cross-checking #312's independent 2.404 s single-worker figure to **5.5%** on a different binary and core. The new evidence that reopens a 2023 rejection: scoping moved from order 18 to order 1 458, taking the operation-count gap from **48x to 3 888x** and the stage from milliseconds to 67% of an unrunnable row. Axis 5's crossover sits at **`R > 8.7`** once LU's 2.20 ns multiply-subtract is charged against the remainder sequence's 5.05 ns multiply-add, which rules out the new subsystem. |
+
+**And axis 4 does not raise the reachable round count — that claim is withdrawn.** The "~99% of the
+route is determinants" figure is a **four-round** number, from `rf2-rp2` at order 162 on one core.
+At six rounds the resultant degree grows with the sample count, so root finding grows quadratically
+in `S` while the determinant stage grows linearly: `rf6-rp0` is **67% determinants**, and *after*
+axis 4 it is **78% root finding**. So axis 4 is 1 692x on the stage and **~3x on the row** —
+`rf6-rp0`'s determinants fall from 14.5 h to ~31 s and a **5.63 h root-finding tail** then dominates.
+Reaching `R = 7` needs axis 4 **and** #243 **and** a sub-quadratic root finder **and** a
+sub-quadratic interpolation: four walls, three of them serial quadratic stages with known fast
+algorithms the crate has not wired in. That is a better position than needing new mathematics, and
+it is **not** the position the stage figure alone describes.
 
 The Amdahl screen's **asymmetry** is why one table closes two issues and vindicates a third: **a
 ceiling bounds the conceivable, not the achievable.** That is decisive where even the free case is
@@ -900,7 +911,7 @@ so its acceptance test is a before/after on a corpus rung rather than a number r
 
 ### 13.6a Six measurement-integrity defects, and the pattern they share
 
-M25 found seven places where a mechanism reported confidently about something other than what the
+M25 found eight places where a mechanism reported confidently about something other than what the
 caller meant. They are listed together because the pattern is the milestone's methodological result
 and it is more transferable than any single fix.
 
@@ -912,9 +923,10 @@ and it is more transferable than any single fix.
 | 4 | **F4's two memory knobs are numerically identical at the default**, and the error names the limit the caller **set** rather than the one that **bound** (#322) | `320_000_000 / 16` is exactly `20_000_000`, so raising one does nothing and the message confirms the wrong ceiling. |
 | 5 | **`pgrep -f` matched a heredoc wrapper on its own script text**, returning two matches for a job that had not started and **zero** for the binary that was running (#328) | Anti-correlated, not merely imprecise. The RSS guard built on it was safe only because a 4 MB wrapper cannot cross a 16 GiB ceiling — a guard correct by accident, in the instrument §9's policy depends on. |
 | 6 | **A test that returns early on an absent tool is indistinguishable from one that ran and agreed** (#333, class filed as #339) | `main` was red for ~40 minutes with every check green. #311 and #324 were each green against their own base and red only once combined: **CI tests a PR against its base, not against the merged result.** |
+| 8 | **A measurement crate outside the worktree does not inherit `.cargo/config.toml`**, so it silently loses `-C target-cpu=x86-64-v3` with **nobody setting `RUSTFLAGS` at all** | A third route to the failure that has already cost this repository two sets of figures — and the first with **no trigger to avoid**, since the other two are both "someone set `RUSTFLAGS`". Building a harness outside `src/` is good practice, which is what makes it dangerous. Caught only because the corrected build changed the headline: **1 930x → 1 692x**. Both runs kept. |
 | 7 | **A harness-killed run records a clean `END status=0` in `benchlock.log`**, so the lock cannot distinguish "the budget stopped it" from "something unrelated stopped it" | The Anemoi PCICO run was stopped at 3 177 s of its 5 400 s budget when the background shell that launched it was terminated, taking `benchlock`, `timeout`, `taskset` and the binary with it. The lock recorded success. Worse than the others, because it consumes an hour of a **serialized mutex** while reporting that a measurement completed — and it makes every historical `END status=0` retroactively ambiguous. Fixed with `setsid`, so the run is its own session leader. |
 
-The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the seven
+The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the eight
 produced well-formed output. Three were caught only because an agent ran something locally for an
 unrelated reason, and that is not a detection strategy. The repository already applies the right
 discipline in two places — `zb-claim.sh`'s three outcomes for a board read, and
