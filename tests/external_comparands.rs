@@ -36,13 +36,20 @@ use zeebra::{
             corpus, ExternalSolver, FieldSpec, GroebnerJlSolver, Instance, Invariants, Limits,
             RunFailure, RunStatus, SagebrushSolver, Task,
         },
-        f4,
+        f4, f4_with_options, F4Options,
     },
     Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
 };
 
 /// The prime the provisioning smoke test used: 2^30 + 3, inside every comparand's range.
 const P: u64 = 1_073_741_827;
+
+/// How long Zeebra's own F4 is given per rung when it is acting as the oracle.
+///
+/// Not a measurement and not a claim about Zeebra's speed — it is the budget that keeps the sweep
+/// runnable. A rung that crosses it has **no oracle**, which is printed, and the comparand's own
+/// run is still exercised and still checked for a coherent status.
+const ZEEBRA_ORACLE_BUDGET: Duration = Duration::from_secs(120);
 type F = PrimeFieldElement64<P>;
 
 /// The corpus's reference field, so a corpus row is checked at the characteristic it was frozen at.
@@ -209,6 +216,15 @@ fn canonical_polynomial(element: &str) -> String {
 ///
 /// `None` when Zeebra's own F4 crosses one of its `F4Options` limits. That is a fact about
 /// Zeebra's budget and not a disagreement, so the rung is reported and skipped rather than failed.
+///
+/// **Zeebra's side is explicitly time-bounded**, by [`ZEEBRA_ORACLE_BUDGET`]. The default
+/// `F4Options` limits are *resource* bounds — 20 million live nonzeros, 320 MB — with
+/// `max_wall_time` unset, so a hard rung such as fourteen random quadratics in fourteen variables
+/// can grind for a long time before crossing either. An oracle that takes longer than the engines
+/// it is checking makes the sweep impractical to run at all, which is how a test stops being run
+/// and therefore stops being true. Declaring the budget is also symmetric with how the external
+/// side is bounded: every comparand gets a `Limits::wall`, so Zeebra gets one too, and a crossing
+/// is reported in the same breath rather than inferred from a wall-clock that nobody set.
 fn zeebra_for<const N: usize>(instance: &Instance) -> Option<(Invariants, Vec<String>)> {
     let names: Vec<&str> = instance.variable_refs();
     let fixed: [&str; N] = names.clone().try_into().ok()?;
@@ -224,7 +240,11 @@ fn zeebra_for<const N: usize>(instance: &Instance) -> Option<(Invariants, Vec<St
             })
         })
         .collect();
-    let basis = f4(&system, instance.order).ok()?;
+    let options = F4Options {
+        max_wall_time: Some(ZEEBRA_ORACLE_BUDGET),
+        ..F4Options::default()
+    };
+    let (basis, _statistics) = f4_with_options(&system, instance.order, &options).ok()?;
     let leading = basis
         .iter()
         .map(|f| monomial_to_string(&f.leading_monomial(instance.order), &names))
@@ -598,10 +618,24 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
 
     // Floors rather than exact counts, so the corpus can grow without editing this test — but it
     // cannot grow into covering nothing.
+    // The floor is the seven Katsura and Cyclic rungs across two tools. Deliberately **not** the
+    // 24 this run achieved: whether a rung gets an oracle depends on Zeebra crossing
+    // `ZEEBRA_ORACLE_BUDGET`, which is a property of one machine under one load, so pinning the
+    // observed number would make the test fail for a reason that is not a regression. Those seven
+    // are sub-second benchmarks and are the coverage that is genuinely guaranteed.
     assert!(
-        compared_against_zeebra >= 13,
-        "only {} rung/solver pairs were checked against Zeebra; the thirteen reference-characteristic rungs across two tools are the floor",
+        compared_against_zeebra >= 14,
+        "only {} rung/solver pairs were checked against Zeebra; the seven Katsura and Cyclic rungs across two tools are the floor",
         compared_against_zeebra
+    );
+    // And one rung is named rather than counted, because it is the one carrying the load: at
+    // fourteen variables `x1` is a prefix of `x10`, and this is the rung that turns that check
+    // from "it completed and the echoed generators matched" into a full basis agreement. A count
+    // alone would let it vanish into the budget while staying above the floor.
+    assert!(
+        !no_oracle.contains(&"mq-planted-14"),
+        "mq-planted-14 lost its Zeebra oracle, so the fourteen-variable prefix case is no longer \
+         checked as a basis agreement; raise ZEEBRA_ORACLE_BUDGET rather than dropping the rung"
     );
     assert!(
         ran > 0 && unsupported > 0,
