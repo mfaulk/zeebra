@@ -2142,7 +2142,10 @@ fn duration_text(elapsed: Duration) -> String {
     } else if seconds >= 1.0 {
         format!("{:.3} s", seconds)
     } else {
-        format!("{:.1} ms", seconds * 1e3)
+        // Three decimals, not one: the figures this register divides are millisecond-scale
+        // determinant costs (2.868 ms against 3.439 ms is #318) and rounding them to 2.9 and 3.4
+        // would print a ratio the numbers in the cells cannot produce.
+        format!("{:.3} ms", seconds * 1e3)
     }
 }
 
@@ -3324,7 +3327,7 @@ mod tests {
             "1.30e-3x",
             "a two-decimal ratio would round this to 0.00x and report the opposite finding"
         );
-        assert_eq!(duration_text(Duration::from_millis(12)), "12.0 ms");
+        assert_eq!(duration_text(Duration::from_millis(12)), "12.000 ms");
         assert_eq!(duration_text(Duration::from_secs(90)), "1.50 min");
         assert_eq!(duration_text(Duration::from_secs(7_200)), "2.00 h");
         assert_eq!(duration_text(Duration::from_secs(172_800)), "2.00 d");
