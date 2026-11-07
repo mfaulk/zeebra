@@ -42,11 +42,22 @@
 #   launcher=gone                the process that launched this lock is no longer this process's
 #                                parent, so the run outlived its launcher. A note and not a status
 #                                override, because `setsid` reparents a run to init deliberately
+#   end=aborted                  the END was written from the EXIT trap, so the lock never reached
+#                                its own last line and never observed the command return. Always
+#                                paired with `route=trap`, and never `end=exited`: on this path `$?`
+#                                is 0 for a signal outside the trapped set, and reporting that as a
+#                                completed run would be #344 again by a narrower route. `status=` is
+#                                128 when `$?` was 0 — terminated by a signal of unknown number
 #   route=trap                   the END was written from the EXIT trap rather than from the end of
-#                                the script, so the lock did not reach its own last line
+#                                the script
 #
-# A signal that arrives while a caller is still **queued** leaves a QUEUED line and no END, which
-# is correct: no START means no window was opened, so nothing later can look like it overlapped.
+# Two cases leave no END at all, both of them honestly:
+#
+#   * a signal that arrives while a caller is still **queued**. No START means no window was opened,
+#     so nothing later can look like it overlapped; and
+#   * `kill -9`. SIGKILL cannot be trapped, so nothing runs. The log then shows a START with no END,
+#     which is an unterminated window — unhelpful, but it does not claim that a measurement
+#     completed, and it is the one case no script can prevent.
 #
 # Companion hazards. The lock does not handle any of these, and each has cost a re-run:
 #
@@ -116,6 +127,9 @@ bl_signal_name() { # <signum>
     2) printf 'INT' ;;
     3) printf 'QUIT' ;;
     9) printf 'KILL' ;;
+    10) printf 'USR1' ;;
+    12) printf 'USR2' ;;
+    14) printf 'ALRM' ;;
     15) printf 'TERM' ;;
     *) printf 'signal %s' "$1" ;;
   esac
@@ -125,9 +139,17 @@ bl_signal_name() { # <signum>
 #
 # A signal to the lock outranks everything the command reported: if this process was signalled then
 # the run did not complete, whatever exit status reached it through the wrappers in between.
-bl_end_cause() { # <child-status> <signalled-signum-or-empty> <launcher-state>
+bl_end_cause() { # <child-status> <signalled-signum-or-empty> <launcher-state> [route]
   if [ -n "$2" ]; then
     printf 'launcher-signal(%s)' "$(bl_signal_name "$2")"
+    return 0
+  fi
+  # An END written from the EXIT trap cannot be `exited`, whatever `$?` happened to hold: by
+  # definition the script did not reach its own last line, so it never observed the command return.
+  # A signal outside the trapped set gets here, and reporting `status=0 end=exited` for one would be
+  # #344 again by a narrower route.
+  if [ "${4:-normal}" = trap ]; then
+    printf 'aborted'
     return 0
   fi
   if [ "$1" = 124 ]; then
@@ -148,18 +170,24 @@ bl_end_cause() { # <child-status> <signalled-signum-or-empty> <launcher-state>
 #
 # The whole of #344 in one rule: a run whose lock was signalled is never recorded as 0. 128+n is the
 # conventional encoding, so a reader who knows nothing about this script still sees a kill.
-bl_end_status() { # <child-status> <signalled-signum-or-empty> <launcher-state>
+bl_end_status() { # <child-status> <signalled-signum-or-empty> <launcher-state> [route]
   if [ -n "$2" ]; then
     printf '%s' "$((128 + $2))"
+    return 0
+  fi
+  # Aborted, and `$?` was 0. 128 is "terminated by a signal whose number is not known", which is
+  # what this is; the one status it must not be is 0.
+  if [ "${4:-normal}" = trap ] && [ "$1" = 0 ]; then
+    printf '128'
     return 0
   fi
   printf '%s' "$1"
 }
 
 # The fields an END line carries, in the order a reader greps for them.
-bl_end_fields() { # <child-status> <signalled-signum-or-empty> <launcher-state>
+bl_end_fields() { # <child-status> <signalled-signum-or-empty> <launcher-state> [route]
   printf 'status=%s end=%s' \
-    "$(bl_end_status "$1" "$2" "$3")" "$(bl_end_cause "$1" "$2" "$3")"
+    "$(bl_end_status "$1" "$2" "$3" "${4:-normal}")" "$(bl_end_cause "$1" "$2" "$3" "${4:-normal}")"
   # The command's own status, kept when the override has displaced it so nothing is lost.
   if [ -n "$2" ]; then
     printf ' child=%s' "$1"
@@ -228,7 +256,7 @@ bl_launcher_state() {
 bl_on_exit() {
   local status=$?
   if [ "$BL_ENDED" -eq 0 ] && [ "$BL_STARTED_AT" -ne 0 ]; then
-    bl_note END "$(bl_end_fields "$status" "$BL_SIGNALLED" "$(bl_launcher_state)") route=trap elapsed=$(($(date +%s) - BL_STARTED_AT))s $BL_COMMAND_LINE"
+    bl_note END "$(bl_end_fields "$status" "$BL_SIGNALLED" "$(bl_launcher_state)" trap) route=trap elapsed=$(($(date +%s) - BL_STARTED_AT))s $BL_COMMAND_LINE"
   fi
   return "$status"
 }
@@ -269,6 +297,11 @@ bl_main() {
   trap 'bl_on_signal 2' INT
   trap 'bl_on_signal 3' QUIT
   trap 'bl_on_signal 15' TERM
+  # Named too, so these are attributed rather than falling through to `end=aborted`. `KILL` cannot
+  # be trapped, which is why the header says a `kill -9` leaves no END at all.
+  trap 'bl_on_signal 10' USR1
+  trap 'bl_on_signal 12' USR2
+  trap 'bl_on_signal 14' ALRM
   trap bl_on_exit EXIT
 
   exec 9>"$lock_file" || {

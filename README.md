@@ -413,12 +413,25 @@ So the cause is now explicit:
 | `end=signalled-child(NAME)` | the command itself died of a signal; `status=` is 128+n |
 | `end=launcher-signal(NAME)` | **the lock itself was signalled.** `status=` is forced to 128+n however the command exited, and `child=` keeps the command's own status visible |
 | `launcher=gone` | the run outlived the process that launched it |
-| `route=trap` | the `END` came from the `EXIT` trap, so the lock never reached its own last line |
+| `end=aborted`, `route=trap` | the `END` came from the `EXIT` trap, so the lock never reached its own last line and never observed the command return. Never `end=exited`, and `status=` is 128 rather than 0 |
 
 `end=launcher-signal` is the one that closes the incident, and the override is the point: in that
 run the child reported **0**, because an intermediate `bash run.sh` with no `set -e` exited on its
 own last command after the binary beneath it had died. No exit status reaching the lock could have
 been trusted, so a signal to the lock now outranks whatever the command said.
+
+Two cases leave no `END` at all, both honestly. A signal arriving while a caller is still
+**queued** leaves a `QUEUED` line and nothing else, which is right: no `START` means no window was
+opened, so nothing later can look like it overlapped. And `kill -9` cannot be trapped, so it leaves
+a `START` with no `END` — an unterminated window, unhelpful but not a claim that anything finished,
+and the one case no script can prevent. Verified by process-group kill:
+
+```text
+kill -TERM  ->  status=143 end=launcher-signal(TERM) child=143
+kill -HUP   ->  status=129 end=launcher-signal(HUP)  child=129
+kill -USR1  ->  status=138 end=launcher-signal(USR1) child=138
+kill -KILL  ->  (no END line)
+```
 
 `launcher=gone` is a note and not a failure, deliberately — `setsid` reparents a run to init on
 purpose, so overriding the status on it would fail the very discipline being recommended:

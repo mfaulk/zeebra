@@ -96,6 +96,26 @@ check "status: a clean run is still 0" 0 "$(bl_end_status 0 '' same)"
 check "status: a failing command keeps its status" 2 "$(bl_end_status 2 '' same)"
 check "status: a budget stop keeps 124" 124 "$(bl_end_status 124 '' same)"
 
+# --- the EXIT-trap route ----------------------------------------------------
+
+# An END written from the EXIT trap must never claim the command exited: the script did not reach
+# its own last line, so it never observed the command return. Found by sending the lock a signal
+# outside the trapped set, which reported `status=0 end=exited` — #344 again by a narrower route.
+check "cause: the trap route is aborted, never exited" aborted "$(bl_end_cause 0 '' same trap)"
+check "status: an aborted run with \$?=0 is not 0" 128 "$(bl_end_status 0 '' same trap)"
+check "fields: the trap route" "status=128 end=aborted" "$(bl_end_fields 0 '' same trap)"
+
+# A status the trap did observe is kept — only the uninformative 0 is replaced.
+check "status: an aborted run keeps a nonzero \$?" 2 "$(bl_end_status 2 '' same trap)"
+check "fields: an aborted run with a status" "status=2 end=aborted" "$(bl_end_fields 2 '' same trap)"
+
+# A signal the lock did catch still outranks the route: the cause is known, so name it.
+check "cause: a trapped signal beats the trap route" "launcher-signal(TERM)" \
+  "$(bl_end_cause 0 15 same trap)"
+
+# The default route is the normal one, so every three-argument call above is unaffected.
+check "cause: the route defaults to normal" exited "$(bl_end_cause 0 '' same)"
+
 # --- the launcher going away ------------------------------------------------
 
 # "The wrapper went away" is the other half of #344 and the half no exit status can carry: the
@@ -218,6 +238,34 @@ done
 orphan="$(log_line 'END  *t-orphan')"
 contains "orphan: the vanished launcher is recorded" "launcher=gone" "$orphan"
 contains "orphan: ...and the run is still a completed one" "status=0 end=exited" "$orphan"
+
+# --- an untrapped signal, end to end ---------------------------------------
+
+# USR1 is now in the trapped set; before it was, it reached the EXIT trap with `$?` of 0 and the
+# log read `status=0 end=exited` for a lock that had been killed. Whichever way a later edit moves
+# the trap set, this END must not claim the run completed.
+setsid bash -c \
+  "echo \$\$ >'$DIR/pid2'; exec env ZEEBRA_BENCHLOCK_DIR='$DIR' bash '$BENCHLOCK' t-usr1 sleep 20" \
+  >/dev/null 2>&1 &
+for _ in $(seq 1 100); do
+  [ -s "$DIR/pid2" ] && grep -q '  START  *t-usr1 ' "$DIR/benchlock.log" 2>/dev/null && break
+  sleep 0.1
+done
+USR1_PID="$(cat "$DIR/pid2" 2>/dev/null)"
+if [ -n "$USR1_PID" ]; then
+  kill -USR1 -- "-$USR1_PID" 2>/dev/null
+  for _ in $(seq 1 100); do
+    grep -q '  END  *t-usr1 ' "$DIR/benchlock.log" 2>/dev/null && break
+    sleep 0.1
+  done
+  usr1="$(log_line 'END  *t-usr1')"
+  lacks "usr1: a signalled lock is not recorded as a clean exit" "status=0 end=exited" "$usr1"
+  lacks "usr1: ...and not as status=0 at all" "status=0 " "$usr1"
+  contains "usr1: the END names a cause" "end=" "$usr1"
+else
+  fail=$((fail + 1))
+  printf 'FAIL  usr1: the reproduction never started\n' >&2
+fi
 
 # --- usage -----------------------------------------------------------------
 
