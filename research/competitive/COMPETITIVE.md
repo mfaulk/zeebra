@@ -8,11 +8,11 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 | library | rows | answered |
 |---|---:|---:|
-| groebner.jl | 36 | 17 |
-| msolve | 36 | 15 |
-| sagebrush | 36 | 29 |
-| singular | 72 | 58 |
-| zeebra | 72 | 64 |
+| groebner.jl | 37 | 17 |
+| msolve | 37 | 15 |
+| sagebrush | 37 | 29 |
+| singular | 73 | 58 |
+| zeebra | 73 | 64 |
 
 ## anemoi
 
@@ -65,6 +65,11 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | failed: the tool reported an error: the ideal is not zero-dimensional, so FGLM does not apply | — | 0.0 ms | 24576 B | — | unchecked |
+| `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `a904145` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | 4.7 MB | basis 0.2 ms | unchecked |
+| `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | singular (singular build 44105 (44105)) | `a904145` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | — | — | unchecked |
+| `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `a904145` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `a904145` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `a904145` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | — | — | unchecked |
 | `cyclic-5` `3274d14b2246` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 1.5 ms | — | — | basis 1.5 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `cyclic-5` `3274d14b2246` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 36.1 ms | 10.0 ms | 19.6 MB | solve 1.0 ms | unchecked |
 | `cyclic-5` `3274d14b2246` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 2.3 ms | — | — | basis 1.8 ms; conversion 0.5 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
