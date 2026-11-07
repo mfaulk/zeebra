@@ -15,7 +15,13 @@
 //! cargo run --release --example f4_profile -- baseline     # the same, named
 //! cargo run --release --example f4_profile -- list         # the configurations available
 //! cargo run --release --example f4_profile -- mq           # #349: the competitive MQ split
+//! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
 //! ```
+//!
+//! `mq-instance` emits the digest-pinned instance rather than a measurement, so that an external
+//! engine can be driven on the same ideal and its own counters compared against the columns here
+//! (#447). The text is `Instance::canonical`, which is what the digest is taken over, so a
+//! consumer in another language can re-derive the digest and refuse a mismatch.
 //!
 //! Each configuration is one row of the milestone's ablation table. They are named here rather
 //! than assembled at each call site so that every workstream reports the same thing.
@@ -282,6 +288,43 @@ fn each_system(options: &F4Options, stage_times: bool) {
     );
 }
 
+/// From `research/competitive/results/history.json`: both the zeebra and singular
+/// `reduced-grobner-basis` records for `mq-random-10` carry this digest.
+const RECORDED_DIGEST: &str = "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2";
+
+/// The digest-pinned `mq-random-10` instance, or a panic.
+///
+/// Shared by [`competitive_mq`] and [`print_mq_instance`] so that the stage split and the text
+/// handed to an external engine cannot drift apart: a comparison of counters across two engines is
+/// only a comparison if both ran the same ideal.
+fn mq_instance() -> zeebra::grobner::external::Instance {
+    let built = instance(
+        "mq-random-10",
+        REFERENCE_CHARACTERISTIC,
+        MonomialOrder::GradedReverseLexicographic,
+    )
+    .expect("mq-random-10 is a corpus rung with a compiled dimension");
+
+    assert_eq!(
+        built.digest(),
+        RECORDED_DIGEST,
+        "the generated instance is not the one the 4.11x was measured on"
+    );
+    assert_eq!(built.variables.len(), 10, "ten variables");
+    built
+}
+
+/// The instance as canonical text, for an external engine's own harness — #447.
+///
+/// Prints the digest and then `Instance::canonical` verbatim. Nothing is measured: the point is
+/// that Groebner.jl's pair, matrix and row counters be taken on the ideal `mq` profiles and not on
+/// a same-named rebuild, and the digest is what lets the other side check that.
+fn print_mq_instance() {
+    let built = mq_instance();
+    println!("digest {}", built.digest());
+    print!("{}", built.canonical());
+}
+
 /// The competitive-board MQ instance, profiled per stage — #349.
 ///
 /// `mq-random-10` is the instance M25 measured Zeebra **4.11x slower than Singular** on, and it is
@@ -300,24 +343,7 @@ fn each_system(options: &F4Options, stage_times: bool) {
 /// in the retained record**. A stage split taken on a different instance than the 4.11x was
 /// measured on would answer a different question while looking like an answer to this one.
 fn competitive_mq(options: &F4Options) {
-    // From `research/competitive/results/history.json`: both the zeebra and singular
-    // `reduced-grobner-basis` records for this problem carry this digest.
-    const RECORDED_DIGEST: &str =
-        "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2";
-
-    let built = instance(
-        "mq-random-10",
-        REFERENCE_CHARACTERISTIC,
-        MonomialOrder::GradedReverseLexicographic,
-    )
-    .expect("mq-random-10 is a corpus rung with a compiled dimension");
-
-    assert_eq!(
-        built.digest(),
-        RECORDED_DIGEST,
-        "the generated instance is not the one the 4.11x was measured on"
-    );
-    assert_eq!(built.variables.len(), 10, "ten variables");
+    let built = mq_instance();
 
     let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
     let mut compiled = [""; 10];
@@ -362,9 +388,16 @@ fn competitive_mq(options: &F4Options) {
 fn main() {
     let argument = std::env::args().nth(1).unwrap_or_else(|| "baseline".into());
 
+    if argument == "mq-instance" {
+        print_mq_instance();
+        return;
+    }
+
     if argument == "list" {
         println!("configurations: {}", CONFIGURATIONS.join(", "));
-        println!("modes: mq (the #349 competitive MQ stage split)");
+        println!(
+            "modes: mq (the #349 competitive MQ stage split), mq-instance (its canonical text)"
+        );
         return;
     }
 

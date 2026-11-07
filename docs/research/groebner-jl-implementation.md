@@ -691,3 +691,25 @@ cover, and are where §6's two best hypotheses come from.
 48% of lex), then §6.2's microbenchmark (cached degree, aimed at 61% of grlex), then §6.5's
 cheap transfer test (same-shape traces, aimed at 70% of katsura-6 lex), and **not** §6.4 or §6.6
 until a measurement says otherwise.
+
+> ### That order is superseded — #447 measured the comparand
+> **`docs/research/groebner-jl-gap.md`** re-screened all seven hypotheses against **grevlex shares
+> on `mq-random-10`**, the instance every competitive row is measured on, instead of lex and grlex
+> shares on katsura and cyclic. Five of the seven are bounded at or below **1.16x** there, including
+> **§6.1 at 1.04x** — construction is 3.43% of that run, not 48%. Only §6.2 and §6.3 survive, and
+> they survive because they are not stage hypotheses at all: they attack a per-operation constant
+> measured at **11.6x–25.5x uniformly across every stage**.
+>
+> Two corrections to the sections above, both measured rather than argued:
+> * **§6.6 understates what it declines by about 20x.** Randomized linear algebra is worth **4.89x**
+>   to Groebner.jl on that instance (424.6 ms deterministic against 86.8 ms). The won't-do verdict
+>   is unaffected — the correctness argument is independent — but the factor is a permanent floor on
+>   the comparison, not "at most 22% of elimination".
+> * **§6.7 has no comparand behaviour to imitate at Zeebra's reference prime.** Groebner.jl ran that
+>   instance on `SpecializedArithmeticZp`, not `DelayedArithmeticZp`, because `p = 2^31 − 1` is
+>   outside every window `Zp.jl:363-381` selects delayed arithmetic for.
+>
+> And the item that now ranks first is **not in §6**: Groebner.jl's final interreduction is one
+> Macaulay matrix (`src/f4/f4.jl:106-170`, measured at 250 × 604 and **1.74 ms**) where Zeebra runs
+> 247 sequential polynomial divisions and spends **24.1 s**. §6 looked for stages to speed up; that
+> stage needs replacing.
