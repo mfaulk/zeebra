@@ -915,11 +915,22 @@ above) had to be whole-token for the same reason, or it would have rejected what
 ## 6. Status of the stage-by-stage comparison
 
 §4.0 establishes that the mapping exists and is direct for four of Zeebra's five stages. The
-*numbers* — msolve's stage breakdown beside Zeebra's §8.5 table on the same instances — are not in
-this document: the measurement was queued under `tools/benchlock.sh` behind other agents'
-long-running jobs and had not acquired the lock when this was written. It is cheap (seconds of
-msolve per rung, three repeats) and it is the obvious next step, so it is filed rather than
-estimated.
+*numbers* — msolve's stage breakdown beside Zeebra's §8.5 table on the same instances — are
+deliberately **not** in this document, for two reasons rather than one.
+
+The lesser reason is scheduling: the measurement was queued under `tools/benchlock.sh` behind other
+agents' long-running jobs and had not acquired the lock. The better reason is that it should be
+taken on **#261's corpus** rather than on the hand-rolled Katsura inputs this study's author
+generated to establish msolve's input format. A corpus rung carries a recorded `Equivalence` and a
+`licenses_timing()` gate, so whether a rung may be timed is a field a test asserts rather than a
+judgement made at the keyboard; a figure taken outside it has no such warrant. The queue slot was
+released rather than held.
+
+So the measurement is **filed, not estimated**. It is cheap — seconds of msolve per rung, three
+repeats — and it needs only two things this study already supplies: the adapter captures msolve's
+stages into `Measurement::stages` with msolve's own labels, and §4.0 says which Zeebra field each
+one corresponds to. Note before taking it that msolve's resolution is **10 ms** (`%.2f sec`), so
+the rungs below katsura-7 will quantize every stage to zero.
 
 What can be said without it, because it is structural rather than numerical: msolve times
 `select` and `update` as separate stages and Zeebra does not. Zeebra measured its pair criteria at
