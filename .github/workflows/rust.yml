@@ -212,10 +212,12 @@ jobs:
         run: |
           shellcheck -S warning \
             scripts/agent/*.sh scripts/agent/test/*.sh \
-            tools/*.sh tools/external/*.sh tools/external/smoke/*.sh
+            tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 
       # `!cancelled()` for the same reason as the lint job: a shellcheck finding should not hide
       # a behavioural failure behind a second round trip.
       - name: Unit tests
         if: ${{ !cancelled() }}
-        run: bash scripts/agent/test/zb-claim-test.sh
+        run: |
+          bash scripts/agent/test/zb-claim-test.sh
+          bash tools/test/rss-guard-test.sh

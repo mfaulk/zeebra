@@ -341,7 +341,7 @@ pub fn dispatch_anemoi_cico<F: KnownOrder, V: AnemoiCicoVisitor<F>>(
     let variables = instance.variables();
 
     // Every dimension the registry needs, and no others: a spare `N` monomorphizes the whole
-    // pipeline again. FCICO at N = 1..5 needs 2, 4, 6, 8, 10; PCICO needs 2, 3, 4, 5, 6.
+    // pipeline again. FCICO at N = 1..6 needs 2, 4, 6, 8, 10, 12; PCICO needs 2, 3, 4, 5, 6, 7.
     macro_rules! dispatch {
         ($($n:literal),+ $(,)?) => {
             match variables {
@@ -353,7 +353,7 @@ pub fn dispatch_anemoi_cico<F: KnownOrder, V: AnemoiCicoVisitor<F>>(
             }
         };
     }
-    dispatch!(2, 3, 4, 5, 6, 8, 10)
+    dispatch!(2, 3, 4, 5, 6, 7, 8, 10, 12)
 }
 
 /// `M(x, y) = (2x + y, x + y)`, over polynomials.

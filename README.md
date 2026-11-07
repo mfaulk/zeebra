@@ -50,6 +50,10 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
       `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
       symbolic closure checked unchanged batch by batch rather than inferred from the basis
+- [x] The published 2 400x Anemoi conversion gap attributed by measuring the same system at three
+      characteristics: this crate's conversion/basis ratio is flat to 12% across a 47-bit range of
+      primes where the reference's moves 7.3x, so the gap is the reference's field arithmetic — and
+      msolve on this machine is 35x faster than either
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -347,6 +351,53 @@ The lock handles contention and nothing else. Also needed, per invocation:
 - `timeout --signal=INT --kill-after=60s` on anything long, with a budget-killed run reported as a
   resource-limited result rather than as a measurement. A run left past its budget holds the lock
   against everyone else.
+- A memory ceiling enforced by `tools/rss-guard.sh`, not by a hand-rolled `pgrep -f` loop. See
+  below.
+
+#### Enforcing a memory ceiling
+
+```sh
+tools/rss-guard.sh <comm> <id-substring> <ceiling-kb> [--poll <seconds>] [--once] [--wait <seconds>]
+                   [--signal <name>] [--kill-pid <pid>] [--dry-run]
+
+tools/rss-guard.sh anemoi_ladder anemoi17-cico-n6-fcico $((16 * 1024 * 1024)) --poll 10
+```
+
+`<comm>` is the binary's name as `/proc/<pid>/comm` spells it, truncated to 15 characters by the
+kernel and by the script alike; `<id-substring>` is then confirmed against that pid's command line,
+so a second concurrent run of the same binary on a different row is not watched. The mark read is
+`VmHWM`, the high-water mark, so a peak that has already been released still counts.
+
+**Do not find the process with `pgrep -f`.** A script created and run through a heredoc inside
+`bash -c` — how agent sessions launch benchmark runs — has its entire text in the wrapper's
+`/proc/<pid>/cmdline`, and `pgrep -f` matches the full command line, so it matches the wrapper on
+its own payload. Observed live in #328 while one row was running and the next was still queued:
+`pgrep -f` returned two `comm=bash` pids for the queued job and did not return the running binary
+at all. The consequences were a monitor reporting queued work as running, and an RSS guard reading
+a wrapper's ~4 MB high-water mark — which can never exceed a 16 GiB ceiling, so it silently never
+fired and the run proceeded unsupervised while looking supervised.
+
+Hence the exit statuses, which split three ways rather than two:
+
+| status | meaning |
+|---|---|
+| 0 | watched to completion, the ceiling was never crossed |
+| 3 | the ceiling was crossed and the signal was sent |
+| 1 | **nothing matched — nothing was guarded.** Not a pass |
+| 2 | a read of `/proc` failed |
+| 64 | usage error, including a `<comm>` that names a wrapper (`bash`, `timeout`, `taskset`, …) |
+
+Status 1 is the one worth the separate code: "watched and it was fine" and "watched nothing" are
+the same output otherwise, and only the first is a guarded run. A guard started before its binary
+waits `--wait` seconds (60 by default) for one to appear and then reports `NOT GUARDED` rather than
+polling an empty process table forever.
+
+When the launcher and the guard are in the same script, prefer neither form of matching: capture
+the pid from `$!` and pass it with `--kill-pid`.
+
+`tools/test/rss-guard-test.sh` covers the pure half against a synthetic `/proc` — including a case
+where both wrappers' command lines contain the row id and only the binary is matched — and runs in
+CI's `agent-scripts` job.
 
 ### Benchmarks
 

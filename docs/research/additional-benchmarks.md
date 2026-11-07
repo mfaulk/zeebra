@@ -185,14 +185,45 @@ For `α = 3`, `ℓ = 1`, `p = 2⁶⁴ − 353`, ordering `o1`:
 | 3 | 6 | 0.017 | 0.199 | 4 | 0.010 | 0.320 | 125 |
 | 4 | 8 | 0.280 | 67.8 | 5 | 0.199 | 56.4 | 625 |
 | 5 | 10 | 9.32 | 22057 | 6 | 5.70 | 15570 | 3125 |
-| 6 | 12 | 132.5 | — | 7 | 372.2 | — | — |
+| 6 | 12 | 132.5 | not reported | 7 | 372.2 | not reported | 15625 |
 | 7 | 14 | 1623 | — | 8 | 26402 | — | — |
 | 8 | 16 | 18215 | — | — | — | — | — |
 
-The logs stop reporting FGLM past `N=5`; the Gröbner step alone continues to `N=8`. **The
-conversion, not the basis, is the wall** — at `N=5` FGLM costs 2400× the F4 that preceded it. For a
-crate whose FGLM scalability is the subject of its own milestone document, that is the single most
-useful fact in this issue.
+The logs stop reporting FGLM past `N=5` **at this prime**; the Gröbner step alone continues to
+`N=8`. **The conversion, not the basis, is the wall** — at `N=5` FGLM costs 2400× the F4 that
+preceded it. For a crate whose FGLM scalability is the subject of its own milestone document, that
+is the single most useful fact in this issue.
+
+> **Two corrections from #283, which read the other two primes' logs.**
+>
+> 1. **The `N=6` conversion is published — at `p = 65537`, in both models.** 23 340.22 s for
+>    `FCICO` and 11 775.43 s for `PCICO`, at the quotient dimension `5^6 = 15 625` those logs also
+>    print. Only the `2^64−353` and `2^32−209` sweeps stop after `N=5`. So `N=6` is a reproduction
+>    target rather than a rung with no reference, which is what #286 was filed believing.
+> 2. **The 2400× is mostly Magma's field arithmetic, not a property of the problem.** The same
+>    ratio is 124.6 at `p = 65537` and 33.1 at `N=4` there. Magma's own log headers name the
+>    mechanism — `Matrix kind: Modular FP` at `65537`, `Generic finite field` at both larger primes
+>    — and the published `N=4` conversion goes 1.62 s → 63.23 s → 67.76 s down that column, a 39×
+>    step at the `65537` boundary and 7% between the two larger primes. Quoting the 2400× without
+>    the characteristic overstates what it says about FGLM. `docs/research/anemoi.md` §8a.3 carries
+>    the apportionment.
+
+For `α = 3`, `ℓ = 1`, **`p = 65537`**, ordering `o1` — the row #283 added, and the one with the
+`N=6` conversion:
+
+| rounds `N` | `FCICO`: GB (s) | FGLM (s) | `PCICO`: GB (s) | FGLM (s) | quotient dim |
+|---|---|---|---|---|---|
+| 3 | 0.007 | 0.060 | < 0.001 | 0.050 | 125 |
+| 4 | 0.049 | 1.620 | 0.020 | 1.420 | 625 |
+| 5 | 1.089 | 135.640 | 0.129 | 75.750 | 3125 |
+| 6 | 45.930 | **23340.220** | 1.560 | **11775.430** | **15625** |
+| 7 | 1817.849 | — | 45.979 | — | — |
+| 8 | 25826.659 | — | 1731.209 | — | — |
+
+Extraction rule, since the two are not interchangeable: the Gröbner figure is
+`Total Faugere F4 time` and the conversion figure is `Total FGLM time` where the log prints it, else
+the `Time:` line closing the `FGLM ORDER CHANGE` block. The `65537` logs omit the former; where both
+appear they agree to 0.01 s.
 
 `FCICO` uses `2N` variables with every generator of degree `α`; `PCICO` uses `N+1` variables with
 degrees growing to `2N`. Same primitive, same solutions, two different shapes for a solver to meet —
