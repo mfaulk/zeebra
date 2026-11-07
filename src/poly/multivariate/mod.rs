@@ -1,9 +1,11 @@
 //! Multivariate polynomials over finite fields.
 
+mod dense_index;
 mod monomial;
 mod monomial_arithmetic;
 mod monomial_order;
 mod multi_poly_parser;
+mod sparse_multivariate_compose;
 mod sparse_multivariate_multiply;
 mod sparse_multivariate_polynomial;
 mod sparse_multivariate_polynomial_arithmetic;

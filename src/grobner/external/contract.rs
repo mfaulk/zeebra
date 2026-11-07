@@ -422,6 +422,126 @@ pub fn order_from_tag(tag: &str) -> Option<MonomialOrder> {
     }
 }
 
+/// A polynomial as a canonical, sorted multiset of `coefficient*factors` terms over `GF(p)`.
+///
+/// # What this is for
+///
+/// Every adapter here echoes the system the tool read back and compares it against the system that
+/// was sent, because of one failure mode **cross-validation cannot catch**: every engine is handed
+/// the same bytes, so an input that is misread is misread identically everywhere, and four engines
+/// then agree with each other while all four answer a different question. Agreement is the
+/// instrument this module relies on, and this is the case it is blind to.
+///
+/// The concrete instance of it: **at ten or more variables `x1` is a prefix of `x10`**, so a greedy
+/// tokenizer reads `x1*x10` as `x1*x1*0` and silently annihilates the term. The corpus has
+/// fourteen-variable rungs, so this is live rather than hypothetical.
+///
+/// # Why a canonical form rather than a string compare
+///
+/// The two sides legitimately spell the same polynomial differently — Zeebra writes `x1*x10-1`,
+/// Groebner.jl echoes `x1*x10 + 1073741826`, the Sagebrush driver `1*x1*x10 + 1073741826` — and
+/// neither term order, factor order within a monomial, nor the choice between `-1` and `p-1` is
+/// meaningful. Reducing every coefficient mod `p` and sorting both levels makes the comparison
+/// about the polynomial.
+///
+/// Tokenizing is on the explicit `*` and `^` separators and variable names are then matched
+/// **whole**, which is the property that makes `x1` and `x10` distinguishable — the same property
+/// both drivers' parsers have, and the one a greedy longest-prefix scan would lack.
+pub fn canonical_generator(text: &str, characteristic: u64) -> String {
+    let p = characteristic.max(2) as i128;
+    let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+
+    // Split into signed chunks without losing a sign, as the drivers' parsers do.
+    let mut chunks: Vec<(i128, String)> = Vec::new();
+    let mut sign: i128 = 1;
+    let mut current = String::new();
+    for character in compact.chars() {
+        match character {
+            '+' | '-' if !current.is_empty() => {
+                chunks.push((sign, std::mem::take(&mut current)));
+                sign = if character == '-' { -1 } else { 1 };
+            }
+            '+' => {}
+            '-' => sign = -sign,
+            _ => current.push(character),
+        }
+    }
+    if !current.is_empty() {
+        chunks.push((sign, current));
+    }
+
+    let mut terms: Vec<String> = Vec::new();
+    for (sign, chunk) in chunks {
+        let mut coefficient: i128 = 1;
+        let mut factors: Vec<String> = Vec::new();
+        for factor in chunk.split('*').filter(|factor| !factor.is_empty()) {
+            let (base, exponent) = match factor.split_once('^') {
+                Some((base, exponent)) => (base, exponent.parse::<u32>().unwrap_or(0)),
+                None => (factor, 1),
+            };
+            match base.parse::<i128>() {
+                // A numeric factor folds into the coefficient.
+                Ok(value) => {
+                    for _ in 0..exponent {
+                        coefficient = coefficient * value % p;
+                    }
+                }
+                // A variable name, matched whole.
+                Err(_) => factors.push(if exponent == 1 {
+                    base.to_string()
+                } else {
+                    format!("{}^{}", base, exponent)
+                }),
+            }
+        }
+        let coefficient = (sign * coefficient).rem_euclid(p);
+        if coefficient == 0 {
+            continue;
+        }
+        factors.sort();
+        let monomial = if factors.is_empty() {
+            "1".to_string()
+        } else {
+            factors.join("*")
+        };
+        terms.push(format!("{}*{}", coefficient, monomial));
+    }
+    terms.sort();
+    terms.join("+")
+}
+
+/// Whether two systems are the same set of polynomials over `GF(characteristic)`.
+///
+/// A **set**, because neither generator order nor term order is meaningful. Returns the first
+/// canonical pair that differs, for a diagnostic: at the variable counts where this matters a full
+/// dump of both systems is unreadable, and the first disagreement is the useful part.
+pub fn generators_agree(
+    sent: &[String],
+    echoed: &[String],
+    characteristic: u64,
+) -> Result<(), (String, String)> {
+    let mut ours: Vec<String> = sent
+        .iter()
+        .map(|generator| canonical_generator(generator, characteristic))
+        .collect();
+    let mut theirs: Vec<String> = echoed
+        .iter()
+        .map(|generator| canonical_generator(generator, characteristic))
+        .collect();
+    ours.sort();
+    theirs.sort();
+    if ours == theirs {
+        return Ok(());
+    }
+    let first = ours
+        .iter()
+        .zip(&theirs)
+        .find(|(a, b)| a != b)
+        .map(|(a, b)| (a.clone(), b.clone()))
+        .unwrap_or_else(|| ("the generator multisets differ".to_string(), String::new()));
+    Err(first)
+}
+
 /// The resources a run is allowed, declared before it starts.
 ///
 /// **Declared, not discovered.** A limit is part of the result: a run that stopped at 600 seconds
@@ -690,6 +810,35 @@ pub enum RunFailure {
 
     /// The filesystem or process work the run needs failed.
     Io { reason: String },
+
+    /// The harness's own environment would have changed what was measured.
+    ///
+    /// **Not a property of the instance and not a property of the tool: a run that ends here was
+    /// not attempted.** Something inherited would have selected a different algorithm, a different
+    /// thread count, or polluted the output being parsed — and an adapter can set a child's
+    /// environment but cannot clear it, so the condition cannot be fixed from inside the run.
+    ///
+    /// Distinct from every other variant here, which is why it exists rather than overloading
+    /// [`Self::Reported`]:
+    ///
+    /// * not [`Self::Unavailable`] — the binary is present and would have started;
+    /// * not [`Unsupported`] — nothing about the *instance* is unrepresentable, and `Unsupported`
+    ///   is specifically a statement about the tool's declared capability;
+    /// * not [`Self::Reported`] or [`Self::NonZeroExit`] — the tool never ran, so it printed
+    ///   nothing and exited nothing;
+    /// * not [`Self::Io`] — nothing on the filesystem failed.
+    ///
+    /// Counted by [`RunReport::was_skipped`], because a board must show the row as not attempted
+    /// rather than as a result.
+    ///
+    /// `variable` is the inherited name, so an operator is told what to unset; `detail` is what it
+    /// would have changed, so the refusal can be judged rather than merely obeyed.
+    ///
+    /// The case that motivated it: `engine/mpoly` reads seven `SB_*` switches with
+    /// `env::var(..).is_ok()` — **truthy if set, so `SB_SIGF4=0` enables the experimental
+    /// signature path** — and two of them write a trace into the stream the basis is parsed from.
+    /// Any adapter driving a tool with environment-selected internals has the same problem.
+    Environment { variable: String, detail: String },
 }
 
 impl Display for RunFailure {
@@ -710,6 +859,11 @@ impl Display for RunFailure {
                 None => write!(f, "the tool was killed by a signal"),
             },
             Self::Io { reason } => write!(f, "{}", reason),
+            Self::Environment { variable, detail } => write!(
+                f,
+                "not run: the environment sets {}, which {}",
+                variable, detail
+            ),
         }
     }
 }
@@ -1196,13 +1350,23 @@ impl RunReport {
         self
     }
 
-    /// True if this run was skipped rather than attempted — tool absent or input unrepresentable.
+    /// True if this run was skipped rather than attempted.
     ///
-    /// The two cases a board shows as "not attempted" rather than as a result.
+    /// The three cases a board shows as "not attempted" rather than as a result: the input is
+    /// unrepresentable ([`RunStatus::Unsupported`]), the tool is absent
+    /// ([`RunFailure::Unavailable`]), or the harness's own environment would have invalidated the
+    /// measurement ([`RunFailure::Environment`]).
+    ///
+    /// The common property is that **the tool did not run**, so there is no measurement and nothing
+    /// about any implementation follows. Every other [`RunFailure`] describes a run that was
+    /// attempted and went wrong, which is a different thing for a reader to act on.
     pub fn was_skipped(&self) -> bool {
         matches!(
             &self.status,
-            RunStatus::Unsupported(_) | RunStatus::Failed(RunFailure::Unavailable { .. })
+            RunStatus::Unsupported(_)
+                | RunStatus::Failed(
+                    RunFailure::Unavailable { .. } | RunFailure::Environment { .. }
+                )
         )
     }
 
@@ -1731,6 +1895,50 @@ mod tests {
         );
         assert!(report.was_skipped());
         assert!(!report.status.answered());
+    }
+
+    /// A run refused because of the harness's own environment is a skipped run, not a failed one.
+    ///
+    /// Nothing ran, so there is no measurement and nothing about any implementation follows from
+    /// it. A board that showed it as a result would be reporting a figure for a question nobody
+    /// asked.
+    #[test]
+    fn test_a_hostile_environment_is_a_skipped_run_and_not_a_failed_solve() {
+        let report = RunReport::new(
+            "sagebrush",
+            &instance(),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(600)),
+            RunStatus::Failed(RunFailure::Environment {
+                variable: "SB_SIGF4".to_string(),
+                detail: "selects the experimental signature-based F4".to_string(),
+            }),
+            Measurement::unmeasured(),
+        );
+        assert!(report.was_skipped(), "nothing was attempted");
+        assert!(!report.status.answered());
+        assert!(report.measurement.is_unmeasured());
+    }
+
+    /// `Environment` names the variable and what it would have changed.
+    ///
+    /// The message is the whole value of the variant over `Reported`: an operator reading it has to
+    /// learn which variable to unset.
+    #[test]
+    fn test_the_environment_failure_names_the_variable_and_the_effect() {
+        let failure = RunFailure::Environment {
+            variable: "SB_F4_SHAPE".to_string(),
+            detail: "writes matrix shape statistics into the parsed output".to_string(),
+        };
+        let rendered = failure.to_string();
+        assert!(rendered.contains("SB_F4_SHAPE"), "{}", rendered);
+        assert!(rendered.contains("matrix shape statistics"), "{}", rendered);
+        // Not phrased as the tool's doing: the tool never ran.
+        assert!(
+            !rendered.contains("the tool reported"),
+            "an environment refusal is not a tool error: {}",
+            rendered
+        );
     }
 
     /// Limits are comparable only when every declared resource matches.

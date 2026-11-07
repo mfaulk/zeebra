@@ -119,7 +119,7 @@ measurement method is unstated is a field two runs can disagree on without eithe
 | Outcome | One of `RunStatus`'s five: `Complete`, `Verified`, `StoppedByLimit`, `Unsupported`, `Failed`. §3. |
 | Invariants | The implementation-independent quantities extracted from the answer: quotient dimension, the sorted leading monomials of the reduced basis, basis cardinality, solution count, eliminant degree. `Invariants`. §5. |
 | Verification | What independently agreed, and **how many invariants were actually shared** (`Verification::shared_invariants`). Zero shared invariants is not a verification, and `RunStatus::is_verified` returns false in that case — two empty invariant sets agree vacuously, which is the trap this guards. |
-| Failure or limit | `LimitStop` names the resource and the limit; `RunFailure` names the mode (`Unavailable`, `Reported`, `Incomplete`, `MissingMarker`, `Unparsable`, `SelfInconsistent`, `NonZeroExit`, `Io`); `Unsupported` names the missing capability and the tool's own bound. §3. |
+| Failure or limit | `LimitStop` names the resource and the limit; `RunFailure` names the mode (`Unavailable`, `Reported`, `Incomplete`, `MissingMarker`, `Unparsable`, `SelfInconsistent`, `NonZeroExit`, `Io`, `Environment`); `Unsupported` names the missing capability and the tool's own bound. §3. |
 | Reproduction command | The exact command line, shell-quoted, including the environment variables set for the child. `Invocation::command_line()`. Plus the input file, which is recoverable from the identity digest's canonical text. |
 | Raw log | Kept for every failure. A parse error is not diagnosable without it, and a failure with no log is an assertion rather than a finding. |
 
@@ -135,7 +135,7 @@ The five outcomes, and what each licenses:
 | `Verified(Answer, Verification)` | yes | yes | the time |
 | `StoppedByLimit(LimitStop)` | the time **is the limit** | **no** | `> 600 s (wall limit)` |
 | `Unsupported(Unsupported)` | **no** | **no** | the missing capability, e.g. `field > 2^31` |
-| `Failed(RunFailure)` | the time to fail | **no** | the failure mode |
+| `Failed(RunFailure)` | the time to fail, or none at all when the run was never attempted (`Unavailable`, `Environment`) | **no** | the failure mode |
 
 `RunStatus::is_timing_evidence()` is this table's third column, and `speedup_over` consults it for
 **both** operands. The prohibitions:
@@ -148,8 +148,18 @@ The five outcomes, and what each licenses:
   the tool "failing" — the limit was the harness's choice.
 - An absent tool (`RunFailure::Unavailable`) is a **skipped row**, reported as skipped. `probe_version`
   is called once per sweep precisely so that this is discovered once rather than per instance.
-  `RunReport::was_skipped()` covers this and `Unsupported` together, because both mean "not
-  attempted" rather than "attempted and lost".
+- A run refused because of **the harness's own environment** (`RunFailure::Environment`) is a
+  skipped row for the same reason: nothing ran. This is the case where something inherited would
+  have selected a different algorithm, a different thread count, or polluted the output being
+  parsed — and an adapter can set a child's environment but cannot *clear* it, so the condition
+  cannot be fixed from inside the run. It is deliberately not `Reported`, which means "the tool
+  printed an error": there was no tool execution to print one. The variant names the variable, so
+  an operator is told what to unset, and the effect, so the refusal can be judged rather than
+  merely obeyed. The live instance is Sagebrush's seven `SB_*` switches, every one read with
+  `env::var(..).is_ok()` — truthy if set, so `SB_SIGF4=0` *enables* the experimental signature
+  path — two of which also write a trace into the stream the basis is parsed from.
+- `RunReport::was_skipped()` covers `Unsupported`, `Unavailable` and `Environment` together,
+  because all three mean "not attempted" rather than "attempted and lost".
 - A tool that contradicts itself (`SelfInconsistent`) produces **no finding at all**. Nothing may be
   concluded about any other implementation from a run in which the reference was unsound. This is
   not hypothetical: Singular's `std` under lex is cross-checked against its own `fglm` precisely

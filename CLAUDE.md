@@ -181,6 +181,18 @@ salvage usable commits rather than silently dropping them.
   `./scripts/agent/zb-claim.sh release 119 --abandon`, which also removes the
   assignee and returns the board row to Todo.
 
+**A green check is not a green merge.** CI tests your branch merged into `main`
+*as of when the run was queued*, and nothing re-runs when `main` moves — which is
+how #311 and #324 were each green and the merge of both a panic, with no textual
+conflict for git to refuse. The `merge-staleness` job warns when the gap since
+your run touches files you also changed; that warning is **advisory and does not
+block**, so acting on it is yours to do: rebase onto current `origin/main` and
+let CI run again before merging. Branches are not gated on being current because
+the cost is measured and unaffordable — see the README section "Testing the
+merged result". And if your change touches the external comparands, the corpus or
+the challenge registry, run the coverage assertion from that section before
+merging: CI has no msolve, so those tests pass on the runner without being run.
+
 ### 7. Keep board state truthful
 
 The next agent's orientation is only as good as the state you leave behind. File

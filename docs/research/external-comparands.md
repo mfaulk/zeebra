@@ -344,6 +344,52 @@ declare `[lints] workspace = true`. Toolchain: `engine/rust-toolchain.toml` pins
 is what `stable` already is here, so the driver builds on `stable` and no extra toolchain is
 downloaded.
 
+Its command line, as of #315:
+
+```text
+sagebrush-gb-driver <file.ms> [--order lex|deglex|degrevlex|invlex] [--route f4|fglm]
+```
+
+Both flags default to the original behaviour — `--order degrevlex --route f4` — so a bare
+invocation is what it always was, which is how `tools/external/smoke/smoke.sh` still calls it.
+`--route f4` is `f4::groebner_p` in the requested order, the lex case going through the engine's own
+homogenize → DegLex → dehomogenize route; `--route fglm` is `fglm::groebner_fglm`, an order
+conversion from a degrevlex basis, and it accepts only a lex or invlex target and only `p < 2^31`
+(§5.1.1 of `sagebrush-implementation.md`). Unknown flags and unknown values are refused rather
+than ignored.
+
+Every run echoes what it actually did — `#driver contract:`, `#generators:`, one `#gen` per
+generator, `#engine:`, `#field characteristic:`, `#variable order:`, `#monomial order:`, `#route:`,
+`#quotient dimension:`, `#length of basis:`, `#seconds:` — and the adapter checks the
+characteristic, the variable order, the order, the route **and the generators** against the
+request, reporting a mismatch as `RunFailure::SelfInconsistent`.
+
+The `#gen` echo (#329) is the one input fact the other checks do not cover, and it follows msolve's
+own discipline (§3.2: an adapter should assert on what the tool says it did rather than trusting
+its own request). It is printed **before** the engine is called and rendered from the packed
+polynomials the driver is about to hand over, so it is a round trip through the driver's own parser
+and packer rather than a copy of its input. It exists for the hazard cross-engine agreement
+structurally cannot catch: at ten or more variables `x1` is a prefix of `x10`, so a greedy
+tokenizer reads `x1*x10` as `x1*x1*0` and annihilates the term — identically in every engine,
+because every engine is handed the same bytes. Measured on a fourteen-variable system, the driver
+echoes `1*x1*x10 + 1073741826` and distinguishes `x1^2` from `x10^2`, so the parser is clean; the
+check is what makes that a per-run assertion rather than a belief. Comparison is as a set of
+canonical term multisets (`contract::canonical_generator`, shared with the Groebner.jl adapter),
+because the two sides legitimately spell `-1` and `p-1` differently and neither term nor generator
+order is meaningful.
+
+`#driver contract:` is a format version the adapter **requires** rather than tolerates. The driver
+is installed into the prefix and can therefore be older than the adapter reading it, and "check the
+echo only if it is present" is a check that silently stops checking — the failure mode being one
+that produces a well-formed answer to a different question. A driver below the required contract
+fails with `RunFailure::Incomplete` naming `provision.sh`. Bumping the marker in the driver and
+`sagebrush::DRIVER_CONTRACT` in the adapter is one change, not two. The route line matters more than it looks:
+the two lex routes return the **same basis**, so nothing else in the output distinguishes a direct
+lex F4 from an FGLM conversion, and a column that mixed them would compare two complexities under
+one heading. `#quotient dimension:` is the driver's own count of the monomials no leading monomial
+divides — `-1` for a positive-dimensional ideal, following Singular's `vdim` convention — because
+Sagebrush computes the same number at `fglm.rs:97` and exposes only a boolean.
+
 ### 5.2 Exponent packing and the lex-storage trap
 
 `engine/mpoly/src/order.rs:1-9` states the layout: `bits` bits per variable in one 64-bit word,

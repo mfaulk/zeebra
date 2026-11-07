@@ -304,16 +304,9 @@ fn gf256_solving_works_on_a_system_planted_by_hand() {
     }
 }
 
-/// The enumeration oracle should cover GF(2^8), and cannot: `FiniteField::new` is `todo!()` there.
-///
-/// `#[ignore]`d for **#377**, which owns the gap. `rational_points_by_enumeration` refuses
-/// extension fields as a value today — see
-/// `grobner::field_equations::tests::enumeration_refuses_a_field_it_cannot_index` — because the
-/// alternatives are a panic (`BinaryFieldElement::new` is `todo!()`) or a silently wrong count
-/// (`ExtensionFieldElement::new` embeds the prime subfield, so it would walk 2 of 256 elements).
-/// This test asserts the behaviour #377 should deliver, so it turns green when the gap closes.
+/// The enumeration oracle covers GF(2^8), through `KnownOrder::element_at` rather than
+/// `FiniteField::new` — the latter only reaches the prime subfield of an extension (#377).
 #[test]
-#[ignore = "blocked on #377: FiniteField::new cannot index a characteristic-two extension field"]
 fn the_enumeration_oracle_should_cover_gf256() {
     // x0 + 1: exactly one GF(2^8) point.
     let system: Vec<MultivariatePolynomial<1, Gf256>> = vec![MultivariatePolynomial::new(&[
@@ -324,15 +317,8 @@ fn the_enumeration_oracle_should_cover_gf256() {
     assert_eq!(points, vec![[Gf256::one()]]);
 }
 
-/// A system over GF(2^8) should parse from text, and cannot: `from_str` is `todo!()` there.
-///
-/// `#[ignore]`d for **#377**. `MultivariatePolynomial::parse` calls `F::from_str(..).unwrap()`, so
-/// text input over `Gf256` or any `ExtensionFieldElement` **panics**. Every text-fed path over
-/// GF(2^8) inherits it: the Fukuoka importer of #197, the HFE ladder of #198, and the Singular
-/// oracle, which renders systems as strings. Over GF(2) the same call works, which is why
-/// nothing noticed.
+/// A system over GF(2^8) parses from text, as the same text over GF(2) always did (#377).
 #[test]
-#[ignore = "blocked on #377: FiniteField::from_str is todo!() for characteristic-two extensions"]
 fn a_system_over_gf256_should_parse_from_text() {
     let parsed = MultivariatePolynomial::<2, Gf256>::parse("x0*x1 + x0 + 1", ["x0", "x1"])
         .expect("the text is well formed");

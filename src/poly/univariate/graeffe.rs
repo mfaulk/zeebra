@@ -333,6 +333,71 @@ pub fn graeffe_root<F: KnownOrder, R: RngCore + CryptoRng>(
     graeffe_root_with_stats(f, rng).map(|(root, _stats)| root)
 }
 
+/// `f / (x - root)` by synthetic division, assuming `root` is a root so the remainder vanishes.
+///
+/// `O(d)`, which is what makes deflation affordable to repeat: a `div_with_remainder` against a
+/// linear divisor would do the same work through a general division.
+fn deflate<F: FiniteField>(f: &UnivariatePolynomial<F>, root: F) -> UnivariatePolynomial<F> {
+    let coefficients = f.coefficients();
+    let degree = coefficients.len() - 1;
+    if degree == 0 {
+        return UnivariatePolynomial::new(&[F::zero()]);
+    }
+    // Horner from the top: q[i-1] = c[i] + root * q[i], with q[d-1] = c[d].
+    let mut quotient = vec![F::zero(); degree];
+    let mut carry = coefficients[degree];
+    quotient[degree - 1] = carry;
+    for i in (1..degree).rev() {
+        carry = coefficients[i] + root * carry;
+        quotient[i - 1] = carry;
+    }
+    UnivariatePolynomial::new(&quotient)
+}
+
+/// Every base-field root of `f`, **with multiplicity**, by [`graeffe_root`] and deflation.
+///
+/// [`graeffe_root`] returns *one* root, where an elimination route needs every candidate. This is
+/// the bridge: take a root, divide it out in `O(d)`, repeat until the deflated polynomial has none.
+/// A root of multiplicity `m` survives `m - 1` deflations and is therefore reported `m` times,
+/// which is why this returns a `Vec` rather than a set — the caller that wants distinct values can
+/// collect, and the caller pricing a search wants the iteration count.
+///
+/// **Whether this beats [`roots`](super::roots::roots) is a property of the root count, not of the
+/// degree.** Each iteration costs one `graeffe_root`, so the total is `(roots + 1)` searches: cheap
+/// when the base-field roots are `O(1)`, and worse than a gcd-based finder when they are `O(d)`.
+/// #351 is the measurement.
+///
+/// # Errors
+/// [`GraeffeError`], from the first search that cannot be made to apply — the field's two-adic
+/// structure is a property of `F`, so a failure here fails for every degree alike.
+///
+/// # Panics
+/// Panics if `f` is the zero polynomial, every element of which is a root.
+pub fn graeffe_all_roots<F: KnownOrder, R: RngCore + CryptoRng>(
+    f: &UnivariatePolynomial<F>,
+    rng: &mut R,
+) -> Result<Vec<F>, GraeffeError> {
+    assert!(
+        !f.is_zero(),
+        "every element is a root of the zero polynomial"
+    );
+
+    let mut remaining = f.clone();
+    let mut found = Vec::new();
+    // A linear factor leaves at most `degree` of them, which bounds the loop independently of
+    // whatever the search returns.
+    while remaining.degree() >= 1 {
+        match graeffe_root(&remaining, rng)? {
+            Some(root) => {
+                remaining = deflate(&remaining, root);
+                found.push(root);
+            }
+            None => break,
+        }
+    }
+    Ok(found)
+}
+
 /// [`graeffe_root`], with what the run cost.
 ///
 /// # Panics
@@ -657,8 +722,8 @@ mod tests {
     use rand::{prelude::StdRng, Rng, SeedableRng};
 
     use super::{
-        fold_if_needed, graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root,
-        graeffe_root_with_stats, GraeffeError, SubgroupRoute,
+        fold_if_needed, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l,
+        graeffe_root, graeffe_root_with_stats, GraeffeError, SubgroupRoute,
     };
     use crate::{
         fields::{KoalaBear, Mersenne31, Zp18446744069414584321, Zp2147483647, Zp65537},
@@ -1154,5 +1219,88 @@ mod tests {
             stats.total_transform_elements,
             3 * 32 * stats.max_transform_size
         );
+    }
+
+    /// Every root of a product of distinct known linear factors is recovered by deflation.
+    #[test]
+    fn deflation_recovers_every_distinct_root() {
+        type F = KoalaBear;
+        let mut rng = StdRng::seed_from_u64(0xdef1_a7e0 + 1);
+        let planted: Vec<F> = (1..=6u64).map(F::new).collect();
+        let mut f = UnivariatePolynomial::new(&[F::one()]);
+        for root in &planted {
+            f = &f * &UnivariatePolynomial::new(&[-*root, F::one()]);
+        }
+        let found = graeffe_all_roots(&f, &mut rng).expect("koalabear is two-adic enough");
+        assert_eq!(
+            found.len(),
+            planted.len(),
+            "six distinct roots, six reported"
+        );
+        let found: HashSet<F> = found.into_iter().collect();
+        let expected: HashSet<F> = planted.into_iter().collect();
+        assert_eq!(found, expected);
+    }
+
+    /// Deflation returns a repeated root once per multiplicity, not once per value.
+    #[test]
+    fn deflation_returns_a_repeated_root_with_its_multiplicity() {
+        type F = KoalaBear;
+        let mut rng = StdRng::seed_from_u64(0xdef1_a7e0 + 2);
+        let root = F::new(7);
+        let linear = UnivariatePolynomial::new(&[-root, F::one()]);
+        // (x - 7)^3
+        let f = &(&linear * &linear) * &linear;
+        let found = graeffe_all_roots(&f, &mut rng).expect("two-adic");
+        assert_eq!(found.len(), 3, "a triple root is three roots");
+        assert!(found.iter().all(|r| *r == root));
+    }
+
+    /// A polynomial with no base-field root deflates to nothing rather than looping.
+    #[test]
+    fn deflation_terminates_with_no_base_field_roots() {
+        type F = KoalaBear;
+        let mut rng = StdRng::seed_from_u64(0xdef1_a7e0 + 3);
+        // x^2 - g for a non-square g has no root in the base field.
+        let mut f = UnivariatePolynomial::new(&[F::zero(), F::zero(), F::one()]);
+        for candidate in 2..200u64 {
+            let g = F::new(candidate);
+            if roots(
+                &UnivariatePolynomial::new(&[-g, F::zero(), F::one()]),
+                &mut rng,
+            )
+            .is_empty()
+            {
+                f = UnivariatePolynomial::new(&[-g, F::zero(), F::one()]);
+                break;
+            }
+        }
+        let found = graeffe_all_roots(&f, &mut rng).expect("two-adic");
+        assert!(found.is_empty(), "no base-field roots, so none reported");
+    }
+
+    /// Deflation and the gcd-based finder agree as multisets on random polynomials.
+    #[test]
+    fn deflation_agrees_with_the_gcd_finder_on_random_polynomials() {
+        type F = KoalaBear;
+        let mut rng = StdRng::seed_from_u64(0xdef1_a7e0 + 4);
+        for degree in [4usize, 7, 12, 20] {
+            let coefficients: Vec<F> = (0..=degree)
+                .map(|_| F::new(rng.gen_range(0..1000)))
+                .collect();
+            let f = UnivariatePolynomial::new(&coefficients);
+            if f.is_zero() {
+                continue;
+            }
+            let by_deflation = graeffe_all_roots(&f, &mut rng).expect("two-adic");
+            // `roots` reports distinct roots, so compare the deflation result as a set.
+            let as_set: HashSet<F> = by_deflation.iter().copied().collect();
+            let by_gcd: HashSet<F> = roots(&f, &mut rng).into_iter().collect();
+            assert_eq!(as_set, by_gcd, "degree {degree}");
+            // And every reported root really is one.
+            for root in &as_set {
+                assert!(f.eval(root).is_zero(), "degree {degree}, root {root:?}");
+            }
+        }
     }
 }

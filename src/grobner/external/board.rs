@@ -67,7 +67,10 @@ pub enum Outcome {
     /// The library cannot accept this input or task. **There is no time.**
     Unsupported(Unsupported),
 
-    /// It ran and failed.
+    /// It failed. **There is no time**, and for two variants it did not even run:
+    /// [`RunFailure::Unavailable`] (the tool is absent) and [`RunFailure::Environment`] (the
+    /// harness's own environment would have invalidated the measurement). Both render through
+    /// [`Self::instead_of_a_time`] with text that says so.
     Failed(RunFailure),
 }
 
@@ -1258,6 +1261,25 @@ mod tests {
 
         assert_eq!(Outcome::Complete.instead_of_a_time(), None);
         assert_eq!(Outcome::Verified.instead_of_a_time(), None);
+    }
+
+    /// A row refused for the environment reads as not run, and is never timing evidence.
+    ///
+    /// The cell is what a reader of the board actually sees, so this is where #316's requirement —
+    /// "a board must show the row as not attempted rather than as a result" — is pinned.
+    #[test]
+    fn test_an_environment_refusal_reads_as_not_run_and_is_not_timing_evidence() {
+        let outcome = Outcome::Failed(RunFailure::Environment {
+            variable: "SB_SIGF4".to_string(),
+            detail: "selects the experimental signature-based F4".to_string(),
+        });
+        assert!(
+            !outcome.is_timing_evidence(),
+            "nothing ran, so there is no time to publish"
+        );
+        let cell = outcome.instead_of_a_time().expect("there is no time");
+        assert!(cell.contains("not run"), "{}", cell);
+        assert!(cell.contains("SB_SIGF4"), "{}", cell);
     }
 
     /// A verification that compared nothing does not make the row verified.

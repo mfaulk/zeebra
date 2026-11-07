@@ -38,12 +38,21 @@ As the saying goes, you can either make software so simple that it obviously has
       scoreboard and a cross-concurrency comparison refused rather than quoted
 - [x] The whole solving pipeline in characteristic two, over GF(2) and GF(2^8), and field equations
       `x^q - x` that make a quotient dimension count base-field points
+- [x] Text input and exhaustive enumeration over an extension field, on a settled split between the
+      integer embedding `FiniteField::new` and the element index `KnownOrder::element_at`
 - [x] A contract for driving external Gröbner engines as subprocesses, which separates "this tool
       cannot represent the input" from "this tool was slower", and refuses to quote a ratio against
       a comparand that could not accept the problem
 - [x] Multivariate multiplication that collects as it multiplies, so the live set is bounded by the
       product's size and not by the term-product count: the six-round symbolic build from 57.0 GB
       peak resident to 0.32 GB, 179x, for byte-identical output
+- [x] That dense accumulator generalized past two variables, which turned out to pay: 1.3x–5.4x
+      over the hashing route at three, four and five variables and 8.4x on a trivariate pair dense
+      in two variables and linear in the third, with the box-versus-simplex crossover measured
+      rather than argued — and one shape where generalizing the layout *loses*, found the same way
+- [x] Multivariate `Add`, `Sub` and `scale` collecting into an operand's own map, so a sum that
+      cancels to one term out of 11 476 a side allocates nothing at all where materializing held
+      594 KB, and an owned accumulator grows in place
 - [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
       resolved against msolve's own distributed input files
@@ -74,6 +83,10 @@ As the saying goes, you can either make software so simple that it obviously has
       read as wins for this crate, up to 501x, and settle nothing. Of the seven that qualify: four
       losses, two inside the noise band, one win — on a corpus whose raw numbers show this crate
       ahead on every pair
+- [x] Multivariate composition: `x_i -> g_i(x_i)` for univariate `g_i`, and the general form that
+      substitutes a polynomial in all `N` variables for each one — so a permutation round can be
+      written the way it is defined, with the substituted powers memoized and formed by repeated
+      squaring
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -100,6 +113,7 @@ shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
   tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 bash scripts/agent/test/zb-claim-test.sh
 bash tools/test/rss-guard-test.sh
+bash tools/test/merge-base-age-test.sh
 bash tools/test/benchlock-test.sh
 ```
 
@@ -261,6 +275,73 @@ The suite is not sharded across parallel jobs. Warm the 968 tests take under 3s 
 `#[ignore]`d systems dominate everything else, with all but 0.3s of that being a single test that
 no partitioning can divide; a shard would pay a checkout, a toolchain, a cache restore and a
 release build to split seconds of test execution.
+
+### Testing the merged result
+
+A pull-request run **does** test a merged result, which is worth stating because the obvious
+assumption is that it does not. `actions/checkout` on a `pull_request` event resolves
+`refs/pull/N/merge` and logs `HEAD is now at <sha> Merge <head> into <base>`; the suite runs on that
+merge commit, not on the branch tip. What nothing recomputes is the merge when `<base>` advances. A
+green check therefore means "this change is consistent with `main` **as it was when this run was
+queued**", and with several agents landing work in the same hour the gap between that and "as
+`main` will be" is where a semantic conflict lives.
+
+One landed. #324 took `corpus::ladder()` from 7 rungs to 19; #311 added a test that resolved each
+rung through an exhaustive match over the 7 that existed when it was written. Each was green. The
+merge of both panicked, and git saw no textual conflict because there was none. It then stayed
+unnoticed for about forty minutes with every check green, because the test's comparand — msolve —
+is absent on the runner, so the test returned early and passed. #338 fixed the instance and made
+that early return say `NOT CHECKED` on stderr; #339 is about the class.
+
+GitHub's **"Require branches to be up to date"** closes the gap exactly: it re-runs the suite
+against the new base before each merge. It is not used here, and the cost is the reason rather than
+an assertion. The release job is **806 s mean over the last 25 successful runs**, worst case 983 s,
+and it is the critical path — the debug job is 318 s. A serialized merge queue therefore admits
+**4.5 merges an hour**. Against that, the week to 2026-11-07 merged 155 pull requests, **58 of them
+on 2026-11-06 alone**, peaking at **14 in one hour**; the median gap between consecutive merges was
+686 s, and **59 % of consecutive merges were less than one release job apart**. Re-running before
+each of that day's 58 merges is **13.0 hours of CI inside a 24-hour day**. The setting would not
+have slowed that day down, it would have made it impossible.
+
+What is used instead is two cheaper things, neither of which subsumes the gate:
+
+- **A staleness notice on every pull request.** `tools/merge-base-age.sh` compares the base this
+  run's merge was computed from against the current tip of the base branch, and reports which files
+  the pull request changes *also* changed in that gap. The overlap is the signal; a bare
+  behind-count is nonzero on nearly every pull request here and would be ignored within a day. The
+  `merge-staleness` job takes seconds, needs no toolchain, and is **advisory by construction** — an
+  overlapping result is a workflow warning and the job still passes, because a required check would
+  be the gate again with extra steps. A failed *read* does fail the job: a staleness check that
+  could not read the repository must not be reported as a clean one.
+
+  ```sh
+  tools/merge-base-age.sh <tested-base-sha> <head-sha> origin/main
+  # 0 current   1 behind   3 behind and overlapping   2 a git read failed   64 usage
+  ```
+
+- **A daily run on `main`.** Push runs on `main` already test the merged result within minutes of a
+  merge, so they catch the combination after the fact. What they do not catch is a red `main` that
+  nobody pushes to afterwards, or drift from resolving the toolchain to `stable`, which moves and
+  has delivered a new clippy lint mid-project before. The `schedule` trigger bounds both to a day,
+  for one run of **20.7 to 25.9 job-minutes** — measured across the last six successful push runs
+  on `main`, which have the same job set a scheduled run gets.
+
+Neither covers the second half of the failure, which is that CI skipped the broken test entirely.
+Provisioning the external comparands in ordinary CI is deliberately not done — building GMP, MPFR,
+FLINT and msolve on every run is the cost #308 was told not to add, and the ordinary CI path must
+not come to depend on an external binary being present. Asserting that coverage is therefore a
+**local pre-merge step**, on a machine where `tools/external/provision.sh` has already run:
+
+```sh
+ZEEBRA_REQUIRE_MSOLVE=1 cargo nextest run --profile ci --lib -E 'test(/^grobner::external::/)'
+```
+
+`ZEEBRA_REQUIRE_MSOLVE=1` turns an absent msolve from a silent early return into a failure, so the
+command either exercises the comparand or says it could not. It is 199 tests in 1.4s once built —
+a debug build is enough, because every msolve comparison runs on a corpus rung small enough to be
+instant — so this is cheap to run before merging anything that changes the corpus, the challenge
+registry, or either engine's side of the comparison. The test that #339 is named for lives here:
+`grobner::external::msolve::tests`, driven from `corpus::ladder()`.
 
 ### Build configuration
 
@@ -666,6 +747,7 @@ cargo run --release --example multivariate_mul     # multivariate multiply: time
 cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
 cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
+cargo run --release --example graeffe_root -- deflate   # all roots by deflation, #351
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
 cargo run --release --example graeffe_cico         # the univariate CICO route, and the family economics
@@ -689,6 +771,7 @@ cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
+cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -945,6 +1028,43 @@ the 65025 nonzero operand pairs separate them. An order check cannot tell them a
 order 256 — so the field is named at the type level rather than inferred.
 `docs/research/fukuoka-mq.md` §2.4 has the consequence for importing an instance.
 
+**An integer names an element of an extension field in two different ways, and the API keeps them
+apart.** `FiniteField::new` is the image of an integer under the unique ring homomorphism from the
+integers — `val mod p` — so over an extension it only ever reaches the prime subfield, and walking
+it over `0..q` is not an enumeration. `KnownOrder::element_at` is the bijection from `0..q`, and
+`FiniteField::from_str` reads the text `Display` writes, which is the coefficient bit pattern over
+GF(2^m) and the bracketed coefficient list over GF(p^k):
+
+```rust
+use zeebra::{fields::{Gf13Pow4, Gf256}, FiniteField, KnownOrder, One};
+
+// `new` is the embedding: 5 copies of one, which in characteristic two is one.
+assert_eq!(<Gf256 as FiniteField>::new(5), Gf256::one());
+
+// `from_str` is the representation, and inverts `Display`.
+let x2_plus_1 = <Gf256 as FiniteField>::from_str("5").unwrap();
+assert_eq!(x2_plus_1.to_string(), "5");
+assert_eq!(Gf256::element_at(5), Some(x2_plus_1));
+
+// Out of range is a `Result`, not a panic.
+assert!(<Gf256 as FiniteField>::from_str("256").is_err());
+
+// Over GF(13^4) a bare decimal is the base-13 digits; `Display`'s own form reads back too.
+assert_eq!(
+    <Gf13Pow4 as FiniteField>::from_str("170").unwrap().to_string(),
+    "[1, 0, 1, 0]",
+);
+assert_eq!(
+    <Gf13Pow4 as FiniteField>::from_str("[1, 0, 1, 0]"),
+    <Gf13Pow4 as FiniteField>::from_str("170"),
+);
+```
+
+`element_at`'s default is `new`, which is that bijection exactly when `q = p`, and returns `None`
+for every index over a field whose order and characteristic differ — so a field that has not
+overridden it reports that it cannot be enumerated rather than enumerating its prime subfield and
+returning a count that is wrong rather than failed.
+
 ### Characteristic two in the solver, and field equations
 
 The Gröbner stack is generic over `FiniteField` and had never been run in even characteristic. It
@@ -1009,9 +1129,11 @@ Three caveats a caller should know, each asserted rather than described:
 - **GF(2) is `Zp2`, not `BinaryFieldElement<0b11>`.** The two are the same field — the full operation
   tables agree — but `Zp2` is 4 bytes to the other's 8 and needs no carry-less multiply for a field
   where multiplication is `and`.
-- **No GF(2^8) system can be read from text.** `FiniteField::from_str` is `todo!()` for
-  `BinaryFieldElement`, and `MultivariatePolynomial::parse` unwraps it, so parsing over `Gf256`
-  **panics**. GF(2) parses fine. This is #377, and it is what actually blocks the GF(2^8) importers.
+- **A GF(2^8) coefficient is written as its bit pattern.** `MultivariatePolynomial::parse` works over
+  `Gf256`, reading each decimal `0..255` as the coefficient bit pattern `Display` writes — so
+  `from_str` inverts `Display` over every field, and over an extension it is deliberately not
+  `FiniteField::new`, which only ever reaches the prime subfield. `KnownOrder::element_at` is the
+  route that enumerates all `q` elements. #377.
 - **Omitting the field equations is diagnosed on only one route.** `SolveStrategy::GrevlexF4ThenFglm`
   reports a positive-dimensional ideal immediately; the default `DirectLexF4` exhausts a
   Macaulay-matrix budget and reports a *resource* failure, which invites raising a limit that cannot
@@ -1871,6 +1993,164 @@ small-product regression the issue predicted — which turned out to be `schoolb
 the longer operand outside; swapping that made the same shape **2.5x** instead. The transform still
 cannot live on `Mul`, because choosing a domain needs `KnownOrder` and randomness.
 
+## Multivariate Polynomials
+
+`MultivariatePolynomial<N, F>` is sparse: a monomial-to-coefficient map over `N` variables, held
+canonically. No coefficient is ever zero, so the zero polynomial is the empty set of terms and a
+monomial whose coefficients cancel is dropped rather than kept at zero. Equality and `Hash` are
+over that set, which is why the invariant is not cosmetic — a surviving zero term would make a
+polynomial unequal to its own canonical form.
+
+### Multiplication dispatches over four dense layouts and one hash route
+
+Multiplication collects as the products are formed, so the live set is bounded by the output rather
+than by the term-product count. *How* it collects is chosen per operand pair, because the choice is
+worth 3x–5x and no single answer covers every arity:
+
+| route | index | cells | selected when |
+|---|---|---|---|
+| `Accumulate` | one hash lookup per product | — | the general case |
+| `DenseTriangle` | three integer operations | `(d+1)(d+2)/2` | `N == 2`, dense output |
+| `DenseBox` | one add — the index is separable | `∏(d_i + 1)` | dense output, box within 24x the simplex |
+| `DenseSimplex` | `2(N-1)` table lookups | `C(d + N, N)` | dense output, otherwise |
+
+The dense routes do no hashing at all: `slots[index(a) + index(b)] += ca * cb` needs no monomial
+key. What distinguishes them is that `DenseBox`'s mixed-radix index is **separable** —
+`index(a·b) = index(a) + index(b)`, so the left operand's index hoists out of the inner loop and the
+per-product cost is one add at any arity — while `DenseSimplex` ranks the monomials of total degree
+at most `d` and so allocates the tightest dense array there is, at a non-separable index. The box
+pays up to about `N!` in cells for that separability, which is why the crossover between them sits
+near five variables rather than being an asymptotic argument.
+
+Measured on one pinned core under `tools/benchlock.sh`, dense `p * p` against the hashing route:
+
+| arity | terms | products | `Accumulate` | `DenseSimplex` | `DenseBox` |
+|---:|---:|---:|---:|---:|---:|
+| 3 | 2 925 | 8.56e6 | 127.23 ms | 40.95 ms | **23.58 ms** |
+| 4 | 715 | 5.11e5 | 7.37 ms | 3.56 ms | **2.35 ms** |
+| 5 | 462 | 2.13e5 | 5.66 ms | **1.55 ms** | 1.76 ms |
+| 3, degrees (40, 40, 1) | 3 362 | 1.13e7 | 278.83 ms / 17.0 MiB | 61.48 ms / 3.3 MiB | **33.28 ms / 620.9 KiB** |
+
+So there is no arity in this range where the dense accumulator stops being worth it, and the lopsided
+trivariate row is where it is worth most: its bounding box is 5 043 cells where its total-degree
+simplex is 317 750, so the box is both 8.4x faster and 28x smaller than hashing.
+
+The one shape where generalizing the layout **loses** is one term against many — the Gröbner
+reduction inner step. There the products do not collide at all, so there is nothing for a dense
+accumulator to merge, and at `N = 3` it costs 55.4 µs against the hash route's 48.6 µs. At `N = 2`
+the same shape *wins* (29.1 µs against 44.1 µs) because the triangle's index is three operations, so
+this is not a conclusion that transfers between arities. The predicate therefore requires the
+product count to be at least twice an upper bound on the output's monomial count before taking a
+dense route above `N = 2`, and that threshold is not applied at `N = 2`.
+
+Re-measure any of this with
+
+```sh
+cargo run --release --example multivariate_mul                  # every route, per arity and size
+cargo run --release --example multivariate_mul -- max_degree=90  # stop short of the six-round size
+```
+
+### Add, Sub and scale collect into an operand's own map
+
+`Add`, `Sub`, `Neg` and `scale` **collect into one of their operands' maps** rather than building a
+`Vec` of `|a| + |b|` terms and rehashing it into a third map. Which operand is mutated follows the
+ownership of the spelling you write, and that is the whole of the optimization:
+
+| spelling | what it allocates |
+|---|---|
+| `&a + &b`, `&a - &b` | clones one side; for `+` the *larger*, since addition commutes |
+| `a + &b`, `a - &b`, `a + b`, `a - b` | nothing — the owned operand's map is merged into |
+| `a += &b`, `a -= &b`, `a += b`, `a -= b` | nothing |
+| `a.scale(&c)` | clones `a` |
+| `a.scale_assign(&c)` | nothing |
+
+So an accumulator you own grows in place:
+
+```rust
+use zeebra::{fields::Zp13, FiniteField, MultivariatePolynomial, Zero};
+
+let vars = ["x", "y"];
+let words: Vec<MultivariatePolynomial<2, Zp13>> = ["x^2 + y", "x*y - 1", "y^2 + x"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, vars).unwrap())
+    .collect();
+let row = [Zp13::new(3), Zp13::new(5), Zp13::new(7)];
+
+// The linear layer of a symbolic permutation: no sum is ever built twice.
+let folded = row
+    .iter()
+    .zip(&words)
+    .fold(MultivariatePolynomial::zero(), |acc, (m, word)| acc + word.scale(m));
+
+assert_eq!(
+    folded,
+    MultivariatePolynomial::parse("3*x^2 + 5*x*y + 7*y^2 + 7*x + 3*y + 8", vars).unwrap()
+);
+
+// Scaling by zero is the zero polynomial held as no terms, not as zero coefficients.
+let mut vanishing = words[0].clone();
+vanishing.scale_assign(&Zp13::zero());
+assert!(vanishing.is_zero());
+assert!(vanishing.terms().is_empty());
+```
+
+### Aliasing
+
+The in-place forms mutate the left operand and never the right, and the borrow checker rules out
+the one case that would be ambiguous: `a += &a` does not compile, because `&mut a` and `&a` cannot
+coexist. Self-assignment is therefore spelled through a clone — `a += a.clone()` doubles, and
+`a -= a.clone()` is the empty polynomial, not a map full of zeros.
+
+What this buys is measured in `tests/multivariate_add_memory.rs`, which asserts it rather than
+quoting it. Summing two 11 476-term triangles that cancel to a single term allocates **0 bytes**
+against **594 944** for the form that materialized every term, because every merge lands on a
+monomial already present and the table never grows — the live set is the output. Folding eight
+scaled words into one accumulator peaks at **43 312 bytes** against **84 448**; there the output
+has to be allocated, so the 2x is all there is to win.
+
+### Composition
+
+`compose_univariate` substitutes one univariate polynomial per variable, `x_i -> g_i(x_i)`, and
+`compose` is the general form, replacing each `x_i` by a polynomial in all `N` variables at once.
+Both are simultaneous rather than sequential: a substitution's own variables are not themselves
+substituted. `from_univariate(i, &g)` is the lift the univariate form is built on — the same `g`
+read as a polynomial in variable `i` alone.
+
+A round of a sponge permutation is exactly this shape: an S-box `x -> x^d` per state word followed
+by an affine layer.
+
+```rust
+use zeebra::{fields::Zp13, FiniteField, MultivariatePolynomial, Polynomial, UnivariatePolynomial};
+
+let vars = ["x", "y"];
+let p: MultivariatePolynomial<2, Zp13> =
+    MultivariatePolynomial::parse("x^2*y + 3*x + 2", vars).unwrap();
+
+// x -> x + 1, y -> y^2, written as coefficients in ascending order.
+let shift = UnivariatePolynomial::new(&[Zp13::new(1), Zp13::new(1)]);
+let square = UnivariatePolynomial::new(&[Zp13::new(0), Zp13::new(0), Zp13::new(1)]);
+assert_eq!(
+    p.compose_univariate(&[shift, square]),
+    MultivariatePolynomial::parse("x^2*y^2 + 2*x*y^2 + y^2 + 3*x + 5", vars).unwrap()
+);
+
+// The general form can mix variables: x*y under x -> x + y, y -> x - y is x^2 - y^2.
+let product: MultivariatePolynomial<2, Zp13> = MultivariatePolynomial::parse("x*y", vars).unwrap();
+let sum = MultivariatePolynomial::parse("x + y", vars).unwrap();
+let difference = MultivariatePolynomial::parse("x - y", vars).unwrap();
+assert_eq!(
+    product.compose(&[sum, difference]),
+    MultivariatePolynomial::parse("x^2 - y^2", vars).unwrap()
+);
+```
+
+Degree grows multiplicatively — `deg(p(g_0, ..., g_{N-1}))` is bounded by the largest
+`sum_i e_i * deg(g_i)` over the monomials `x^e` of `p` — so forming the powers `g_i^(e_i)` is where
+the work is. They are memoized per variable and built by repeated squaring, which makes a distinct
+exponent `e` cost `O(log e)` multiplications and a repeated one cost none. Cancellation is handled
+by the same canonical invariant as everything else: a composition that collapses returns the zero
+polynomial as no terms at all.
+
 ## Gröbner Bases
 
 `grobner::buchberger` computes a reduced Gröbner basis under a chosen monomial order. All three
@@ -2213,6 +2493,18 @@ let report = solver.run(&instance, Task::ReducedGrobnerBasis, &Limits::wall(Dura
 assert!(report.status.answered() || report.was_skipped());
 ```
 
+`RunReport::was_skipped()` is true for the three outcomes that mean **the tool did not run**:
+`Unsupported` (the input is unrepresentable), `RunFailure::Unavailable` (the tool is absent) and
+`RunFailure::Environment` (the harness's own environment would have invalidated the measurement).
+The last is why it exists: an adapter can set a child's environment but cannot *clear* it, so an
+inherited switch that selects a different algorithm — or writes a trace into the stream the basis
+is parsed from — cannot be undone from inside the run, and the honest answer is to refuse rather
+than to measure something no user of the tool gets. It is deliberately not `Reported`, which means
+"the tool printed an error"; there was no execution to print one. The variant names the variable so
+an operator knows what to unset and the effect so the refusal can be judged. Sagebrush has seven
+such switches (`sagebrush::PINNED_SWITCHES`), every one read with `env::var(..).is_ok()` — truthy
+if set, so `SB_SIGF4=0` *enables* the experimental signature path.
+
 Two msolve-specific facts the adapter encodes as named constants, because both are capability
 bounds rather than slow paths and both are narrower than they look:
 
@@ -2241,6 +2533,21 @@ same wrong ideal — which is why that check is against the input rather than ag
 All three, the mapping from msolve's F4 stage names onto Zeebra's, and what of its design is worth
 reimplementing are in `docs/research/msolve-implementation.md`.
 
+The msolve adapter's corpus agreement test builds **Zeebra's side by parsing the rung's own text**
+and dispatching on **variable count**, so a corpus family added at a width already present — 4, 5,
+6, 7, 10 or 14 — gets an oracle with no edit. It is also the stronger check: the bytes parsed are
+the bytes every engine is handed, so a round-trip failure in either direction shows up as a
+disagreement rather than as a silently different problem. The rungs with no oracle are only the
+Poseidon and Anemoi ones, which carry their own fields (KoalaBear and `2^64 - 353`) and so need a
+second field *type* rather than a second match arm.
+
+That test is not `#[ignore]`d — it runs whenever msolve is installed — so by default it builds
+oracles only up to seven variables, which is 1.4 s for nine rungs where `mq-random-10` alone did
+not finish in ten minutes. **`ZEEBRA_FULL_CORPUS_ORACLE=1` lifts that ceiling** for a machine that
+wants the ten- and fourteen-variable rungs covered. Rungs left out are printed with the remedy,
+never silently dropped. (`F4Options::max_wall_time` does not substitute for the ceiling: it is
+checked once per batch, so one long matrix reduction overruns it.)
+
 `GroebnerJlSolver` and `SagebrushSolver` are built the same way, and both read what
 `tools/external/env.sh` exports: `GroebnerJlSolver::from_env(work_dir)` and
 `SagebrushSolver::from_env(work_dir)`. Two things about them are worth knowing before reading
@@ -2263,12 +2570,32 @@ the full eighteen-rung ladder it has **disagreed with nothing**. Both halves bel
 quotes it: report its rows with the pinned SHA, and do not make it the denominator of a headline
 speedup. The verdict is `docs/research/sagebrush-implementation.md` §6.3.
 
+**It is also the only comparand that offers both routes to a lex basis.** The driver takes
+`--order lex|deglex|degrevlex` and `--route f4|fglm`, so `SagebrushSolver` covers
+`ReducedGrobnerBasis` under any of Zeebra's three orders, `LexBasis` by the engine's direct lex F4,
+and `LexBasisByConversion` by `fglm::groebner_fglm` — which gives that last task a second comparand
+beside Singular, Groebner.jl 0.10.11 having no FGLM at all. The two routes are deliberately
+separate tasks: they return the same basis by different algorithms, so a column that mixed them
+would compare two complexities under one heading, and the adapter checks the driver's echoed
+`#route:` line on every run for exactly that reason. FGLM carries its **own** field ceiling of
+`2^31`, an eighth of the basis route's `2^62`, and the adapter declares it per task rather than
+letting a sweep discover it as a wall-clock stop.
+
 Neither tool confuses `x1` with `x10`, which matters because the corpus has fourteen-variable
 rungs and **cross-engine agreement cannot catch a tokenizer bug** — every engine is handed the same
-bytes, so all of them would agree on the same wrong ideal. The Groebner.jl adapter checks its
-echoed generators against the sent system on every run, so a `Complete` status on a fourteen-
-variable rung is itself the proof; the Sagebrush driver prints no such echo, so there it is pinned
-by a behavioural test instead.
+bytes, so all of them would agree on the same wrong ideal. **Both adapters now check their echoed
+generators against the sent system on every run**, comparing canonical term multisets so that
+`x1*x10-1` and `1*x1*x10 + 1073741826` count as the same polynomial, and reporting a mismatch as
+`RunFailure::SelfInconsistent`. So a `Complete` status on a fourteen-variable rung is itself the
+proof, for Groebner.jl's `@gen` echo and for the Sagebrush driver's `#gen` echo alike. The
+behavioural test remains, because it checks the *consequence* in the computed basis and would still
+fail if a parser read the system correctly and then packed it wrongly.
+
+Because the Sagebrush driver lives in the provisioning prefix rather than in this repository, it
+prints a `#driver contract:` version that the adapter **requires**: an adapter that checked the echo
+only when it happened to be present would silently stop checking against an older installed binary,
+which is worse than not checking at all. A driver predating the marker fails with
+`RunFailure::Incomplete` naming `tools/external/provision.sh`, so the remedy is in the error.
 
 The agreement checks are live tests, `#[ignore]`d because CI has neither tool installed and a test
 that silently passed when the tool is absent would be worse than no test:
@@ -2815,10 +3142,27 @@ visible.
 the determinant of their Sylvester matrix recovered by interpolating scalar determinants;
 `bivariate_resultant_ntt` computes the same resultant with the samples taken on a power-of-two
 subgroup, so the recovery is an inverse NTT rather than a cubic solve. The
-determinant construction rather than a Euclidean algorithm on purpose: evaluating a matrix and
-taking its determinant commutes with evaluation *always*, so there is no case to analyse — where
-specializing `f` at a point that kills its leading coefficient in `y` drops its degree, and the
-specialized resultant is then not the specialization of the resultant.
+determinant construction needs no case analysis: evaluating a matrix and taking its determinant
+commutes with evaluation *always*, where specializing `f` at a point that kills its leading
+coefficient in `y` drops its degree, and the specialized resultant is then not the specialization of
+the resultant.
+
+**Which per-sample kernel evaluates that scalar is now a choice**, `ResultantOptions::kernel`:
+
+- `DeterminantKernel::Dense` — dense LU on the `(m + n)`-square matrix, `O(n³)`. The **default**, so
+  a figure taken before the alternative existed reproduces unchanged.
+- `DeterminantKernel::Euclidean` — `poly::resultant_from_coefficients`, driving `f mod g` down the
+  polynomial remainder sequence in `O(n²)`.
+
+Both return the same scalar, including at the specialization points, where the fixed Sylvester order
+and the fallen true degrees differ by a correcting power of a leading coefficient — the case analysis
+the dense route avoids, closed in `O(1)` per sample by `poly::resultant_at_formal_degrees` and
+asserted against an explicitly built determinant over all 15 625 degree-drop combinations. Measured
+same-binary on one pinned core, the Euclidean kernel is **137× faster at order 162 and 2 094× at
+order 1 458**, with fitted exponents of **2.94** and **1.85** — the ratio grows with the order
+because the kernels differ by a power of it. It does **not** raise the reachable round count: the
+six-round route becomes 78% root finding, so the row gains ~3×. See
+`docs/research/structured-sylvester.md` §5.6.
 
 It exists to answer one question, and the answer is worth knowing. On a registered `t = 16` CICO
 slice — twelve of the fourteen free inputs fixed, two unknowns left — the S-box variables can be
@@ -2937,9 +3281,9 @@ bytes — and the GF(2) and GF(2^8) families are refused by name, each for its o
 want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
 long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
 path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
-*and* #377, because `FiniteField::from_str` is `todo!()` for `BinaryFieldElement`, so a `Gf256`
-system cannot be read from text at all; the challenge's modulus, which is not the AES one, is
-`Gf256Mq`.
+too, and no longer anything else: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, so
+a `Gf256` system reads from text with each coefficient as its bit pattern. The challenge's modulus,
+which is not the AES one, is `Gf256Mq`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
@@ -3022,9 +3366,10 @@ The finding that matters is negative. The paper proposes "six **sets of paramete
 publishes no matrices, offers no prize, and the scheme's official page — archived eight times
 between 2001 and 2003 — carries papers and slides only. **No authentic instance of any of A–F was
 ever published**, and the construction that would regenerate one needs a 160-bit seed and a
-generator the paper names neither of. Both published breaks, the 2010 one on C and the 2026 one on
-D, ran on instances their authors generated; the 2026 abstract says so in as many words ("**an**
-instance"). So a same-parameter instance here is not a degraded substitute — it is the same kind of
+generator the paper names neither of. Every published break ran on an instance its authors generated — the only
+executed solve of C, Steel's of 23 August 2014, on "a random instance over `GF(65521)`", and the
+2026 one on D, whose abstract says so in as many words ("**an** instance"); the 2010 result on C is
+a method and a projection, not a completed run. So a same-parameter instance here is not a degraded substitute — it is the same kind of
 object every published result used — but the published costs stay a **difficulty scale and not a
 comparand**, and nothing is in [the registry](#the-challenge-registry) until a generator exists to
 digest. The document also corrects the verifier: the condition is `rank(Σ αᵢ Mᵢ − M₀) ≤ r` over

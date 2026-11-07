@@ -206,12 +206,24 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 
     /// Scale the polynomial by a constant factor.
     pub fn scale(&self, scale_factor: &F) -> Self {
-        let terms: Vec<_> = self
-            .terms
-            .iter()
-            .map(|(monomial, c)| (*monomial, *c * scale_factor))
-            .collect();
-        Self::new(&terms)
+        let mut scaled = self.clone();
+        scaled.scale_assign(scale_factor);
+        scaled
+    }
+
+    /// Scale every coefficient by `factor`, in the polynomial's own map.
+    ///
+    /// The form the MDS fold of a symbolic permutation wants: `scale` built a `Vec` of the scaled
+    /// terms and then rehashed every one of them into a fresh map, so scaling a 266 815-term state
+    /// word allocated it twice over to change only its values.
+    ///
+    /// One pass, because `retain` holds each coefficient by mutable reference: scaling and dropping
+    /// the terms that went to zero — every term, when `factor` is zero — happen together.
+    pub fn scale_assign(&mut self, factor: &F) {
+        self.terms.retain(|_monomial, c| {
+            *c *= *factor;
+            !c.is_zero()
+        });
     }
 }
 
