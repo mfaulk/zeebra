@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "contract": "every run ever recorded, APPEND-ONLY and in the order recorded. Array position is the only record of when a run was taken, and results/solved.json's tie-break reads it: among verified witnesses tied on environment.concurrency it keeps the LAST, because the later record is the one later code wrote and so carries at least as many fields. Appending is safe; sorting, deduplicating or regenerating this file is not, and would silently change what solved.json claims. run_count must equal runs.length.",
-  "run_count": 93,
+  "run_count": 94,
   "runs": [
     {
       "schema": 1,
@@ -6851,6 +6851,81 @@
       },
       "experiment": null,
       "reproduce": "cargo run --release --example scoreboard -- smoke  # poseidon-t2-rf4-rp0-planted"
+    },
+    {
+      "schema": 1,
+      "challenge": "poseidon31-cico-t16-rf4-rp2",
+      "challenge_digest": "80957f3ccf46927efb6c6663565e8ed3b225e222d2da511c06dbcd1e6fe6abc3",
+      "class": "faithful-reduction",
+      "formulation": "resultant, slice(12 fixed, seed 1)",
+      "transformations": [
+        "specialize free inputs 2..14 at seed 1",
+        "evaluate the 66 S-box variables away: two bivariate polynomials of degree 729",
+        "eliminate the second unknown by a Sylvester resultant"
+      ],
+      "outcome": "verified_witness",
+      "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+      "verification": "1 candidate pairs checked by running permutation_plus_linear (1 verified); the resultant itself checked against a direct Sylvester determinant at 8 points outside the interpolation domain",
+      "elapsed_nanos": 328219023614,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 289374417035,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "bivariate_degree": 729,
+            "terms": 266815
+          }
+        },
+        {
+          "stage": "elimination",
+          "elapsed_nanos": 38632199667,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "resultant_degree": 59049,
+            "bezout_bound": 531441,
+            "degree_bound": 1062882,
+            "samples": 59050,
+            "matrix_order": 1458,
+            "concurrency": 32,
+            "sampling_us": 6535214,
+            "interpolation_us": 29322589,
+            "validation_us": 2774395
+          }
+        },
+        {
+          "stage": "univariate",
+          "elapsed_nanos": 212399758,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "roots": 1,
+            "lifted_pairs": 1,
+            "lifting_us": 28551
+          }
+        },
+        {
+          "stage": "verification",
+          "elapsed_nanos": 7154,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "witnesses": 1,
+            "off_domain_checks": 8
+          }
+        }
+      ],
+      "grobner_frontier": null,
+      "campaign": null,
+      "measured_peak_resident_bytes": 825307136,
+      "environment": {
+        "commit": "ad7ec4a",
+        "machine": "workstation",
+        "cpu": "32 logical, affinity 0-31",
+        "concurrency": 32,
+        "build": "release, RUSTFLAGS from .cargo/config.toml",
+        "policy": "straight-line evaluation, one Sylvester resultant by interpolation, euclidean kernel, deflation root finder, 32 determinant workers, sample cap 59050, wall budget 3600 s"
+      },
+      "experiment": null,
+      "reproduce": "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf4-rp2 --concurrency 32 --kernel euclidean --root-finder deflation --max-samples 59050 --wall-budget 3600 --write"
     }
   ]
 }
