@@ -15,13 +15,51 @@ specification.
 | Bouvier, Briaud, Chaidos, Perrin, Salen, Velichkov, Willems, *New Design Techniques for Efficient Arithmetization-Oriented Hash Functions: Anemoi Permutations and Jive Compression Mode*, CRYPTO 2023 | <https://hal.science/hal-04276646/document> |
 | The designers' reference implementation (MIT, commit `3e86ff0c`) | `anemoi.sage` and `constants.py` via `raw.githubusercontent.com/anemoi-hash/anemoi-hash` |
 | Koschatko, Lüftenegger, Rechberger, *Exploring the Six Worlds of Gröbner Basis Cryptanalysis: Application to Anemoi*, ToSC 2024 №4, DOI `10.46586/tosc.v2024.i4.138-190` | `tosc.iacr.org` — ToSC is open access |
-| The Six Worlds experimental output (MIT, commit `fa056e6f`) | `models.sage`, `anemoi.sage`, `attack.sage` and `results/anemoi_p18446744073709551263_n1_l1_a3_m{F,P}CICO_o1.txt` via `raw.githubusercontent.com/IAIK/six-worlds-anemoi` |
+| The Six Worlds experimental output (MIT, commit `fa056e6f`) | `models.sage`, `anemoi.sage`, `attack.sage` and `results/anemoi_p{18446744073709551263,4294967087,65537}_n1_l1_a3_m{F,P}CICO_o1.txt` via `raw.githubusercontent.com/IAIK/six-worlds-anemoi` |
 
 Both reference repositories are MIT, so their data *may* be redistributed — which the Fukuoka files
 cannot be, see [`fukuoka-mq.md`](fukuoka-mq.md) §3. Nothing is copied here that is not cited: the
 only committed reference numbers are the four CICO witnesses in `src/grobner/research/anemoi.rs`
 and the per-step figures in the registry's `ReferencePoint` rows, each traceable to the `results/`
 file named above.
+
+### 1.1 The six results files, pinned by content
+
+`docs/research/external-provenance-policy.md` requires a licence verified from the project's own
+files at a pinned commit, and a figure quoted from external data to be traceable to the bytes it
+came from. The files themselves are 3.8 MB of verbose Magma logs and are **not** committed — the
+figures extracted from them are, in `ANEMOI_{17,32,64}_POINTS`. So the bytes are pinned by digest
+instead, all six fetched 2026-11-06 from
+`raw.githubusercontent.com/IAIK/six-worlds-anemoi/fa056e6f/results/`:
+
+| file | SHA-256 | bytes |
+|---|---|---:|
+| `anemoi_p65537_n1_l1_a3_mFCICO_o1.txt` | `4781f28b474e959c6de58b59adab9ce9fd4d8e516982c315dcc949870e92b5d5` | 115 731 |
+| `anemoi_p65537_n1_l1_a3_mPCICO_o1.txt` | `6c75c0ec13682c440664531f695d4d9936c2fe6a04b2ce31185f70624a73afb7` | 231 828 |
+| `anemoi_p4294967087_n1_l1_a3_mFCICO_o1.txt` | `e2be89f2394a263697bb78e97054582f37302d6ec832e550c655fecc6b80d5f2` | 244 693 |
+| `anemoi_p4294967087_n1_l1_a3_mPCICO_o1.txt` | `883397c54eb868d68005a712cf667d350b4445ae6d89b2de70e0f369191b81b2` | 211 731 |
+| `anemoi_p18446744073709551263_n1_l1_a3_mFCICO_o1.txt` | `c8ac4bf4241406eb6564503346fa79778cfe3bf05b47f8c3985b68db495a86d6` | 1 716 521 |
+| `anemoi_p18446744073709551263_n1_l1_a3_mPCICO_o1.txt` | `f25886c1f71d71c292808624085fddffb2a24de6899bc05f94f96c32f57c205b` | 1 274 621 |
+
+The licence was read in full from the repository's own licence file at that commit. It is at
+**`LICENCE`** — British spelling, no `LICENSE`, `LICENSE.md`, `LICENSE.txt` or `COPYING`, each of
+which returns 404 — and the file is seven lines: the verbatim MIT permission and warranty
+paragraphs under `Copyright (c) 2024 Graz University of Technology`, with no title line and no SPDX
+identifier. So the grant is MIT, redistribution of the extracted figures is permitted, and
+attribution is carried in each `ReferencePoint`'s `source` field.
+
+The spelling is worth recording rather than silently working around: a licence classifier keyed on
+`LICENSE*` finds nothing here, which is precisely the failure mode
+`external-provenance-policy.md` §1 was written about. This entry was checked by fetching each
+candidate path and reading the one that existed, not by trusting a reported SPDX id.
+
+**The extraction rule, because the two steps come from different lines.** The Gröbner figure is
+`Total Faugere F4 time`; the conversion figure is `Total FGLM time` where the log prints it, and
+otherwise the `Time:` line closing the `FGLM ORDER CHANGE` block. The `65537` logs omit the former,
+and where both appear they agree to 0.01 s. The quotient dimension is `unideg`, which the logs print
+for every completed rung and which `Get rep mat (dim: …)` repeats. The pre-existing `2^64 − 353`
+figures at `N = 1 … 5` are the **paper's published table** rather than a re-extraction, and are left
+byte-identical; the `N = 6` row and both new primes are read from the logs by the rule above.
 
 ## 2. What was taken from the reference unchanged
 
