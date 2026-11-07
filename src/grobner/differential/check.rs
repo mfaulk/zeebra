@@ -2,11 +2,17 @@
 //!
 //! The variable count is a const generic and the field is a type, so a harness that varies either
 //! at runtime has to dispatch into a fixed set of monomorphizations. [`check_generated`] is that
-//! dispatch, and it is the only place in this module that knows which `(N, p)` pairs exist:
-//! everything above it works in strings and integers, and everything below it is generic.
+//! dispatch, and it is the only place in this module that knows which `(N, F)` pairs exist:
+//! everything above it works in strings and [`CaseField`]s, and everything below it is generic.
+//!
+//! The field arm is keyed on a [`CaseField`] and not on a characteristic, because a characteristic
+//! does not determine a field: GF(2) and GF(2^8) share one, and two degree-8 moduli give two
+//! fields of the same order in which the same byte has two different products. Each arm's type is
+//! then checked against the spec by [`CaseField::matches`] inside the comparison, so a dispatch
+//! table that paired a spec with the wrong type would fail rather than compare.
 
 use crate::{
-    fields::PrimeFieldElement64,
+    fields::{Gf256, PrimeFieldElement64},
     grobner::{
         f4_with_options,
         fglm::{BorderIndex, FglmError, FglmOptions, QuotientBasis},
@@ -17,6 +23,7 @@ use crate::{
 
 use super::{
     comparison::{verify_case_with, Agreement, DifferentialCase, Disagreement, SOURCE_ORDER},
+    field::CaseField,
     generator::GeneratedSystem,
     singular::{Oracle, OracleError, OracleQuery},
     text::monomial_to_string,
@@ -25,12 +32,29 @@ use super::{
 /// Variable counts the harness can check, as const generics.
 pub const SUPPORTED_VARIABLES: &[usize] = &[2, 3, 4, 5];
 
-/// Characteristics the harness can check, as field types.
+/// Fields the harness can check, as field types.
 ///
 /// Two and three are here because they are where an implementation that assumed an odd
-/// characteristic, or that `2` is invertible, goes wrong. The largest is the biggest prime
-/// Singular's prime fields accept.
-pub const SUPPORTED_CHARACTERISTICS: &[u64] = &[2, 3, 7, 13, 65537, 2147483647];
+/// characteristic, or that `2` is invertible, goes wrong. The largest prime is the biggest
+/// Singular's prime fields accept. GF(2^8) modulo the AES polynomial is
+/// [`Gf256`](crate::fields::Gf256), the coefficient field of the GF(2^8) half of the Fukuoka MQ
+/// challenges and of HFE.
+pub const SUPPORTED_FIELDS: &[CaseField] = &[
+    CaseField::prime(2),
+    CaseField::prime(3),
+    CaseField::prime(7),
+    CaseField::prime(13),
+    CaseField::prime(65537),
+    CaseField::prime(2147483647),
+    CaseField::binary(GF256_MODULUS),
+];
+
+/// `x^8 + x^4 + x^3 + x + 1`, which is [`Gf256`](crate::fields::Gf256)'s modulus.
+///
+/// Named rather than inlined so that the dispatch arm and the supported-field list cannot name
+/// two different degree-8 polynomials — which would be a field mismatch the dispatch could not
+/// see, since both are GF(2^8).
+pub const GF256_MODULUS: u64 = 0x11B;
 
 /// What checking one system found.
 #[derive(Clone, Debug)]
@@ -163,7 +187,7 @@ pub fn check_system<const N: usize, F: KnownOrder>(
 
     let query = OracleQuery {
         name: system.name(),
-        characteristic: system.characteristic,
+        field: system.field,
         variables: &names,
         system: &rendered,
         border_monomials: &border,
@@ -183,29 +207,39 @@ pub fn check_system<const N: usize, F: KnownOrder>(
     }
 }
 
-/// Dispatch on the characteristic for a fixed variable count.
-macro_rules! by_characteristic {
+/// Dispatch on the field for a fixed variable count.
+macro_rules! by_field {
     ($n:literal, $body:ident, $system:expr, $oracle:expr, $options:expr, $f4:expr) => {
-        match $system.characteristic {
-            2 => $body::<$n, PrimeFieldElement64<2>>($system, $oracle, $options, $f4),
-            3 => $body::<$n, PrimeFieldElement64<3>>($system, $oracle, $options, $f4),
-            7 => $body::<$n, PrimeFieldElement64<7>>($system, $oracle, $options, $f4),
-            13 => $body::<$n, PrimeFieldElement64<13>>($system, $oracle, $options, $f4),
-            65537 => $body::<$n, PrimeFieldElement64<65537>>($system, $oracle, $options, $f4),
-            2147483647 => {
-                $body::<$n, PrimeFieldElement64<2147483647>>($system, $oracle, $options, $f4)
+        match $system.field {
+            CaseField::Prime { characteristic: 2 } => {
+                $body::<$n, PrimeFieldElement64<2>>($system, $oracle, $options, $f4)
             }
+            CaseField::Prime { characteristic: 3 } => {
+                $body::<$n, PrimeFieldElement64<3>>($system, $oracle, $options, $f4)
+            }
+            CaseField::Prime { characteristic: 7 } => {
+                $body::<$n, PrimeFieldElement64<7>>($system, $oracle, $options, $f4)
+            }
+            CaseField::Prime { characteristic: 13 } => {
+                $body::<$n, PrimeFieldElement64<13>>($system, $oracle, $options, $f4)
+            }
+            CaseField::Prime {
+                characteristic: 65537,
+            } => $body::<$n, PrimeFieldElement64<65537>>($system, $oracle, $options, $f4),
+            CaseField::Prime {
+                characteristic: 2147483647,
+            } => $body::<$n, PrimeFieldElement64<2147483647>>($system, $oracle, $options, $f4),
+            CaseField::Binary {
+                modulus: GF256_MODULUS,
+            } => $body::<$n, Gf256>($system, $oracle, $options, $f4),
             other => SystemOutcome::Unsupported {
-                detail: format!(
-                    "GF({}) is not one of {:?}",
-                    other, SUPPORTED_CHARACTERISTICS
-                ),
+                detail: format!("GF({}) is not one of {:?}", other, SUPPORTED_FIELDS),
             },
         }
     };
 }
 
-/// Check a generated system, dispatching on its variable count and characteristic.
+/// Check a generated system, dispatching on its variable count and field.
 ///
 /// An unsupported combination is [`SystemOutcome::Unsupported`] and never silence: a sweep that
 /// asked for six variables should see that it got none, not that everything agreed.
@@ -216,10 +250,10 @@ pub fn check_generated(
     f4: &F4Options,
 ) -> SystemOutcome {
     match system.variables.len() {
-        2 => by_characteristic!(2, check_system, system, oracle, options, f4),
-        3 => by_characteristic!(3, check_system, system, oracle, options, f4),
-        4 => by_characteristic!(4, check_system, system, oracle, options, f4),
-        5 => by_characteristic!(5, check_system, system, oracle, options, f4),
+        2 => by_field!(2, check_system, system, oracle, options, f4),
+        3 => by_field!(3, check_system, system, oracle, options, f4),
+        4 => by_field!(4, check_system, system, oracle, options, f4),
+        5 => by_field!(5, check_system, system, oracle, options, f4),
         other => SystemOutcome::Unsupported {
             detail: format!(
                 "{} variables is not one of {:?}",
@@ -229,30 +263,40 @@ pub fn check_generated(
     }
 }
 
-/// Dispatch on the characteristic for a fixed variable count, for a recorded case.
-macro_rules! verify_by_characteristic {
+/// Dispatch on the field for a fixed variable count, for a recorded case.
+macro_rules! verify_by_field {
     ($n:literal, $case:expr, $options:expr, $f4:expr) => {
-        match $case.characteristic {
-            2 => verify_case_with::<$n, PrimeFieldElement64<2>>($case, $options, $f4),
-            3 => verify_case_with::<$n, PrimeFieldElement64<3>>($case, $options, $f4),
-            7 => verify_case_with::<$n, PrimeFieldElement64<7>>($case, $options, $f4),
-            13 => verify_case_with::<$n, PrimeFieldElement64<13>>($case, $options, $f4),
-            65537 => verify_case_with::<$n, PrimeFieldElement64<65537>>($case, $options, $f4),
-            2147483647 => {
-                verify_case_with::<$n, PrimeFieldElement64<2147483647>>($case, $options, $f4)
+        match $case.field {
+            CaseField::Prime { characteristic: 2 } => {
+                verify_case_with::<$n, PrimeFieldElement64<2>>($case, $options, $f4)
             }
+            CaseField::Prime { characteristic: 3 } => {
+                verify_case_with::<$n, PrimeFieldElement64<3>>($case, $options, $f4)
+            }
+            CaseField::Prime { characteristic: 7 } => {
+                verify_case_with::<$n, PrimeFieldElement64<7>>($case, $options, $f4)
+            }
+            CaseField::Prime { characteristic: 13 } => {
+                verify_case_with::<$n, PrimeFieldElement64<13>>($case, $options, $f4)
+            }
+            CaseField::Prime {
+                characteristic: 65537,
+            } => verify_case_with::<$n, PrimeFieldElement64<65537>>($case, $options, $f4),
+            CaseField::Prime {
+                characteristic: 2147483647,
+            } => verify_case_with::<$n, PrimeFieldElement64<2147483647>>($case, $options, $f4),
+            CaseField::Binary {
+                modulus: GF256_MODULUS,
+            } => verify_case_with::<$n, Gf256>($case, $options, $f4),
             other => Err(Disagreement {
                 check: super::comparison::Check::Field,
-                detail: format!(
-                    "GF({}) is not one of {:?}",
-                    other, SUPPORTED_CHARACTERISTICS
-                ),
+                detail: format!("GF({}) is not one of {:?}", other, SUPPORTED_FIELDS),
             }),
         }
     };
 }
 
-/// Verify a recorded case, dispatching on its variable count and characteristic.
+/// Verify a recorded case, dispatching on its variable count and field.
 ///
 /// The no-oracle path: a committed fixture already holds the oracle's answers, so this is the whole
 /// comparison with no subprocess involved. It is what CI runs.
@@ -274,10 +318,10 @@ pub fn verify_recorded_with(
     f4: &F4Options,
 ) -> Result<Agreement, Disagreement> {
     match case.variables.len() {
-        2 => verify_by_characteristic!(2, case, options, f4),
-        3 => verify_by_characteristic!(3, case, options, f4),
-        4 => verify_by_characteristic!(4, case, options, f4),
-        5 => verify_by_characteristic!(5, case, options, f4),
+        2 => verify_by_field!(2, case, options, f4),
+        3 => verify_by_field!(3, case, options, f4),
+        4 => verify_by_field!(4, case, options, f4),
+        5 => verify_by_field!(5, case, options, f4),
         other => Err(Disagreement {
             check: super::comparison::Check::Field,
             detail: format!(

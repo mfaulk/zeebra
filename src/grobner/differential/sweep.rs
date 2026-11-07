@@ -1,10 +1,10 @@
 //! A run of many generated systems through the oracle, and the shrinking of whatever fails.
 //!
 //! The sweep's coverage is deliberate rather than random: it walks the cross product of variable
-//! counts and characteristics in a fixed order, so asking for 24 systems over four variable counts
-//! and six primes gives one of each, and asking for 500 gives about 21 of each. A uniformly random
-//! choice would leave the small characteristics — where an implementation that assumed `2` is
-//! invertible goes wrong — to chance.
+//! counts and fields in a fixed order, so asking for 24 systems over four variable counts and six
+//! fields gives one of each, and asking for 500 gives about 21 of each. A uniformly random choice
+//! would leave the small fields — where an implementation that assumed `2` is invertible goes
+//! wrong — to chance.
 
 use std::{
     collections::BTreeMap,
@@ -20,6 +20,7 @@ use crate::grobner::{f4::F4Options, fglm::FglmOptions};
 use super::{
     check::{check_generated, SystemOutcome},
     comparison::{Check, DifferentialCase, Disagreement},
+    field::CaseField,
     generator::{GeneratedSystem, SystemShape},
     singular::Oracle,
 };
@@ -37,8 +38,8 @@ pub struct SweepOptions {
     /// Variable counts to cycle through.
     pub variables: Vec<usize>,
 
-    /// Characteristics to cycle through.
-    pub characteristics: Vec<u64>,
+    /// Fields to cycle through, each naming its modulus where it has one.
+    pub fields: Vec<CaseField>,
 
     /// The largest total degree of a generated term.
     pub max_degree: u32,
@@ -78,11 +79,10 @@ impl SweepOptions {
     /// The shape and field of system `index`.
     ///
     /// Variable count cycles fastest, so a short sweep covers every variable count before
-    /// repeating a characteristic.
+    /// repeating a field.
     fn system(&self, index: usize) -> GeneratedSystem {
         let variables = self.variables[index % self.variables.len()];
-        let characteristic =
-            self.characteristics[(index / self.variables.len()) % self.characteristics.len()];
+        let field = self.fields[(index / self.variables.len()) % self.fields.len()];
         GeneratedSystem::generate(
             self.seed.wrapping_add(index as u64),
             SystemShape {
@@ -90,7 +90,7 @@ impl SweepOptions {
                 max_degree: self.max_degree,
                 max_terms: self.max_terms,
             },
-            characteristic,
+            field,
         )
     }
 }
@@ -187,8 +187,8 @@ pub fn run_sweep<O: Oracle + Send>(
     observe: &mut dyn FnMut(usize, &GeneratedSystem, &SystemOutcome),
 ) -> SweepReport {
     assert!(
-        !options.variables.is_empty() && !options.characteristics.is_empty(),
-        "a sweep needs at least one variable count and one characteristic"
+        !options.variables.is_empty() && !options.fields.is_empty(),
+        "a sweep needs at least one variable count and one field"
     );
     assert!(options.jobs >= 1, "a sweep needs at least one job");
     assert_eq!(
@@ -417,8 +417,8 @@ fn minimize<O: Oracle>(
 
 /// Smaller systems to try, largest reduction first.
 ///
-/// The seed and the characteristic are carried through unchanged: a shrunk system is no longer what
-/// the seed generates, and saying so is the point of [`Failure::original`].
+/// The seed and the field are carried through unchanged: a shrunk system is no longer what the
+/// seed generates, and saying so is the point of [`Failure::original`].
 fn shrinks_of(system: &GeneratedSystem) -> Vec<GeneratedSystem> {
     let mut candidates: Vec<GeneratedSystem> = Vec::new();
 
@@ -480,7 +480,7 @@ pub fn is_finding(check: Check) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{run_sweep, shrinks_of, SweepOptions, SweepReport};
+    use super::{run_sweep, shrinks_of, CaseField, SweepOptions, SweepReport};
     use crate::grobner::f4::F4Options;
     use crate::grobner::{
         differential::{
@@ -504,12 +504,23 @@ mod tests {
         max_terms: 4,
     };
 
+    /// The six primes and one binary extension these tests cycle through.
+    const FIELDS: [CaseField; 7] = [
+        CaseField::prime(2),
+        CaseField::prime(3),
+        CaseField::prime(7),
+        CaseField::prime(13),
+        CaseField::prime(65537),
+        CaseField::prime(2147483647),
+        CaseField::binary(0x11B),
+    ];
+
     fn options() -> SweepOptions {
         SweepOptions {
             seed: 100,
             systems: 24,
             variables: vec![2, 3, 4, 5],
-            characteristics: vec![2, 3, 7, 13, 65537, 2147483647],
+            fields: FIELDS.to_vec(),
             max_degree: 3,
             max_terms: 4,
             minimize_attempts: 0,
@@ -520,23 +531,23 @@ mod tests {
         }
     }
 
-    /// The first `v * c` systems cover every variable count and characteristic exactly once.
+    /// The first `v * f` systems cover every variable count and field exactly once.
     #[test]
     fn test_a_sweep_covers_the_cross_product() {
         let options = options();
-        let combinations: Vec<(usize, u64)> = (0..24)
+        let combinations: Vec<(usize, CaseField)> = (0..28)
             .map(|i| {
                 let system = options.system(i);
-                (system.variables.len(), system.characteristic)
+                (system.variables.len(), system.field)
             })
             .collect();
 
-        let distinct: std::collections::HashSet<(usize, u64)> =
+        let distinct: std::collections::HashSet<(usize, CaseField)> =
             combinations.iter().copied().collect();
         assert_eq!(
             distinct.len(),
-            24,
-            "the first 24 systems do not cover the 4 x 6 cross product: {:?}",
+            28,
+            "the first 28 systems do not cover the 4 x 7 cross product: {:?}",
             combinations
         );
     }
@@ -560,7 +571,7 @@ mod tests {
     /// Every shrink is strictly smaller than what it came from, so the descent terminates.
     #[test]
     fn test_every_shrink_is_strictly_smaller() {
-        let system = GeneratedSystem::generate(5, SHAPE, 13);
+        let system = GeneratedSystem::generate(5, SHAPE, CaseField::prime(13));
         let size = |s: &GeneratedSystem| -> (usize, usize, u64, u32) {
             (
                 s.polynomials.len(),
@@ -593,7 +604,7 @@ mod tests {
     /// Shrinking offers every kind of reduction the minimizer claims to make.
     #[test]
     fn test_shrinking_offers_every_reduction() {
-        let system = GeneratedSystem::generate(5, SHAPE, 65537);
+        let system = GeneratedSystem::generate(5, SHAPE, CaseField::prime(65537));
         let candidates = shrinks_of(&system);
 
         assert!(
@@ -644,7 +655,7 @@ mod tests {
     /// Shrinking a one-generator system does not offer to delete its only generator.
     #[test]
     fn test_shrinking_keeps_at_least_one_generator() {
-        let mut system = GeneratedSystem::generate(5, SHAPE, 13);
+        let mut system = GeneratedSystem::generate(5, SHAPE, CaseField::prime(13));
         system.polynomials.truncate(1);
         for candidate in shrinks_of(&system) {
             assert_eq!(
@@ -655,13 +666,13 @@ mod tests {
         }
     }
 
-    /// A shrink keeps the seed and the characteristic, since the original is reported beside it.
+    /// A shrink keeps the seed and the field, since the original is reported beside it.
     #[test]
     fn test_a_shrink_keeps_its_provenance() {
-        let system = GeneratedSystem::generate(42, SHAPE, 7);
+        let system = GeneratedSystem::generate(42, SHAPE, CaseField::prime(7));
         for candidate in shrinks_of(&system) {
             assert_eq!(candidate.seed, 42);
-            assert_eq!(candidate.characteristic, 7);
+            assert_eq!(candidate.field, CaseField::prime(7));
             assert_eq!(candidate.variables, system.variables);
         }
     }
@@ -692,12 +703,12 @@ mod tests {
             std::thread::sleep(self.dwell);
             live.fetch_sub(1, Ordering::SeqCst);
 
-            if query.characteristic == 3 {
+            if query.field == CaseField::prime(3) {
                 return Err(OracleError::Incomplete);
             }
             Ok(DifferentialCase {
                 name: query.name.clone(),
-                characteristic: query.characteristic,
+                field: query.field,
                 variables: query.variables.iter().map(|v| v.to_string()).collect(),
                 system: query.system.to_vec(),
                 // Echoed exactly, so the oracle-input check passes and the comparison gets as far
@@ -718,8 +729,8 @@ mod tests {
 
     /// The sweep the concurrency tests run, at `jobs` workers.
     ///
-    /// Five variable counts of which one is unsupported, a characteristic the oracle refuses, and
-    /// a quotient-dimension cap low enough that some systems trip it: every list in the report is
+    /// Five variable counts of which one is unsupported, a field the oracle refuses, and a
+    /// quotient-dimension cap low enough that some systems trip it: every list in the report is
     /// populated, which `test_the_synthetic_sweep_populates_every_list` asserts.
     ///
     /// `minimize_budget` is ten minutes on purpose. It is a *wall-clock* bound, so a shrink cut
@@ -730,7 +741,7 @@ mod tests {
             seed: 4_400,
             systems: 40,
             variables: vec![2, 3, 4, 5, 6],
-            characteristics: vec![2, 3, 7, 13, 65537, 2147483647],
+            fields: FIELDS.to_vec(),
             max_degree: 3,
             max_terms: 4,
             minimize_attempts: 3,

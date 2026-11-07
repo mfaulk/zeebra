@@ -24,9 +24,9 @@ use zeebra::grobner::fglm::{FglmOptions, OperatorConstruction, OperatorStorage};
 use zeebra::grobner::F4Options;
 
 use zeebra::grobner::differential::{
-    check::{SUPPORTED_CHARACTERISTICS, SUPPORTED_VARIABLES},
-    emit_failure, emit_fixture_module, run_sweep, Failure, SingularOracle, SweepOptions,
-    SweepReport, SystemOutcome,
+    check::{SUPPORTED_FIELDS, SUPPORTED_VARIABLES},
+    emit_failure, emit_named_fixture_module, run_sweep, CaseField, Failure, SingularOracle,
+    SweepOptions, SweepReport, SystemOutcome,
 };
 
 /// What the command was asked to do.
@@ -37,6 +37,7 @@ struct Arguments {
     work_dir: PathBuf,
     keep_files: bool,
     fixtures: Option<PathBuf>,
+    fixture_table: String,
     failures: PathBuf,
     quiet: bool,
 }
@@ -54,7 +55,10 @@ OPTIONS
     --systems <n>            Systems to check. Default: 48
     --min-variables <n>      Smallest variable count. Default: 2
     --max-variables <n>      Largest variable count. Default: 5
-    --characteristics <csv>  Primes to sweep. Default: every supported one
+    --fields <csv>           Fields to sweep, as `p` or `2^m/modulus` — so `2` is GF(2) and
+                             `2^8/283` is GF(2^8) modulo x^8+x^4+x^3+x+1.
+                             Default: every supported one.
+                             `--characteristics` is accepted as the old name.
     --max-degree <d>         Largest total degree of a generated term. Default: 3
     --max-terms <t>          Largest number of terms in a generated polynomial. Default: 4
     --timeout <seconds>      Per-system Singular time limit. Default: 30
@@ -69,6 +73,7 @@ OPTIONS
                              The report does not depend on this: the systems are independent
                              and it is assembled in index order whatever finishes first.
     --fixtures <path>        Write the agreeing cases as a Rust fixture module.
+    --fixture-table <name>   Constant the fixture module declares. Default: FIXTURES
     --failures <dir>         Where to write failing cases. Default: target/differential-failures
     --work-dir <dir>         Scratch directory for Singular scripts. Default: a temporary one
     --keep-files             Keep every Singular script and its output, not only failures'.
@@ -126,12 +131,15 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
         "# Zeebra against Singular build {}, seed {}, {} systems",
         version, arguments.sweep.seed, arguments.sweep.systems
     );
+    let fields: Vec<String> = arguments
+        .sweep
+        .fields
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
     println!(
-        "# variables {:?}, characteristics {:?}, degree <= {}, terms <= {}",
-        arguments.sweep.variables,
-        arguments.sweep.characteristics,
-        arguments.sweep.max_degree,
-        arguments.sweep.max_terms
+        "# variables {:?}, fields {:?}, degree <= {}, terms <= {}",
+        arguments.sweep.variables, fields, arguments.sweep.max_degree, arguments.sweep.max_terms
     );
     println!(
         "# operator construction: {:?}, storage: {:?}",
@@ -183,7 +191,13 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
         // Sorted so that regenerating with the same arguments gives the same file, byte for byte,
         // rather than a diff that depends on the order the sweep happened to finish in.
         report.agreed_cases.sort_by(|a, b| a.name.cmp(&b.name));
-        let module = emit_fixture_module(&report.agreed_cases, &version, &sweep_flags(&arguments));
+        let module = emit_named_fixture_module(
+            &report.agreed_cases,
+            &version,
+            &sweep_flags(&arguments),
+            &arguments.fixture_table,
+            &path.display().to_string(),
+        );
         std::fs::write(path, module)
             .map_err(|e| format!("cannot write {}: {}", path.display(), e))?;
         println!(
@@ -206,22 +220,22 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
 /// cannot alter a single recorded answer.
 fn sweep_flags(arguments: &Arguments) -> String {
     let sweep = &arguments.sweep;
-    let characteristics: Vec<String> = sweep
-        .characteristics
-        .iter()
-        .map(|p| p.to_string())
-        .collect();
-    format!(
+    let fields: Vec<String> = sweep.fields.iter().map(|f| f.to_string()).collect();
+    let mut flags = format!(
         "--seed {} --systems {} --min-variables {} --max-variables {} --max-degree {} \
-         --max-terms {} --characteristics {}",
+         --max-terms {} --fields {}",
         sweep.seed,
         sweep.systems,
         sweep.variables.iter().min().copied().unwrap_or(0),
         sweep.variables.iter().max().copied().unwrap_or(0),
         sweep.max_degree,
         sweep.max_terms,
-        characteristics.join(","),
-    )
+        fields.join(","),
+    );
+    if arguments.fixture_table != "FIXTURES" {
+        flags.push_str(&format!(" --fixture-table {}", arguments.fixture_table));
+    }
+    flags
 }
 
 fn summarize(report: &SweepReport, elapsed: Duration) {
@@ -299,7 +313,7 @@ fn provenance(failure: &Failure) -> String {
     out.push_str(&format!(
         "seed {}, GF({}), {} variables\n",
         failure.original.seed,
-        failure.original.characteristic,
+        failure.original.field,
         failure.original.variables.len()
     ));
     out.push_str(&format!(
@@ -322,7 +336,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
         seed: 12_345,
         systems: 48,
         variables: SUPPORTED_VARIABLES.to_vec(),
-        characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+        fields: SUPPORTED_FIELDS.to_vec(),
         max_degree: 3,
         max_terms: 4,
         minimize_attempts: 40,
@@ -336,6 +350,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
     let mut work_dir = default_work_dir();
     let mut keep_files = false;
     let mut fixtures: Option<PathBuf> = None;
+    let mut fixture_table = "FIXTURES".to_string();
     let mut failures = PathBuf::from("target/differential-failures");
     let mut quiet = false;
     let mut min_variables = *SUPPORTED_VARIABLES.first().expect("a supported count");
@@ -409,14 +424,18 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
             "--minimize-seconds" => {
                 sweep.minimize_budget = Duration::from_secs(number(&value()?, flag)?)
             }
-            "--characteristics" => {
+            // `--characteristics` is the name the committed fixture headers were written with, so
+            // it stays accepted: a table whose own regeneration command no longer runs is a table
+            // of unknown provenance.
+            "--fields" | "--characteristics" => {
                 let list = value()?;
-                sweep.characteristics = list
+                sweep.fields = list
                     .split(',')
-                    .map(|p| number(p.trim(), "--characteristics"))
-                    .collect::<Result<Vec<u64>, String>>()?;
+                    .map(|f| f.trim().parse::<CaseField>())
+                    .collect::<Result<Vec<CaseField>, String>>()?;
             }
             "--fixtures" => fixtures = Some(PathBuf::from(value()?)),
+            "--fixture-table" => fixture_table = value()?,
             "--failures" => failures = PathBuf::from(value()?),
             "--work-dir" => work_dir = PathBuf::from(value()?),
             other => return Err(format!("{:?} is not an option", other)),
@@ -435,14 +454,14 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
             min_variables, max_variables, SUPPORTED_VARIABLES
         ));
     }
-    if sweep.characteristics.is_empty() {
-        return Err("--characteristics was empty".to_string());
+    if sweep.fields.is_empty() {
+        return Err("--fields was empty".to_string());
     }
-    for characteristic in &sweep.characteristics {
-        if !SUPPORTED_CHARACTERISTICS.contains(characteristic) {
+    for field in &sweep.fields {
+        if !SUPPORTED_FIELDS.contains(field) {
             return Err(format!(
-                "GF({}) is not instantiated; the supported characteristics are {:?}",
-                characteristic, SUPPORTED_CHARACTERISTICS
+                "GF({}) is not instantiated; the supported fields are {:?}",
+                field, SUPPORTED_FIELDS
             ));
         }
     }
@@ -460,6 +479,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
         work_dir,
         keep_files,
         fixtures,
+        fixture_table,
         failures,
         quiet,
     }))

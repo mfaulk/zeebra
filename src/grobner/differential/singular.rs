@@ -24,6 +24,22 @@
 //!   basis, which is what lets a comparison be an equality rather than a containment test.
 //! * Each list element is printed on its own marked line rather than the whole ideal at once, so
 //!   that no answer has to be split on a separator a coefficient might contain.
+//!
+//! # Extension fields
+//! Singular's `(2^8, a)` Galois fields take their minimal polynomial from an internal table that
+//! a script cannot choose, and the choice matters: `Gf256` reduces modulo `x^8+x^4+x^3+x+1` and
+//! `Gf256Mq` modulo `x^8+x^4+x^3+x^2+1`, so the same byte has two different squares. The harness
+//! therefore declares an *algebraic extension* of the prime field — `ring R = (2,a),...` with
+//! `minpoly = a^8+a^4+a^3+a+1` — which is the only form in which the modulus is the harness's to
+//! state. Singular echoes `minpoly` back and the echo is **compared** with what was asked for, so
+//! a ring that silently reduced by something else is an [`OracleError::ModulusMismatch`] and not a
+//! comparison.
+//!
+//! The two sides do not spell an extension element the same way: Zeebra writes the decimal of its
+//! coefficient bit pattern and Singular writes `(a^3+a)`. Every polynomial crossing the boundary
+//! is rewritten by [`CaseField::to_singular`] on the way out and [`CaseField::from_singular`] on
+//! the way back, so a [`DifferentialCase`] is always in Zeebra's syntax and a committed fixture
+//! needs no conversion step to be read.
 
 use std::{
     fmt::{Display, Formatter},
@@ -32,7 +48,10 @@ use std::{
     time::Duration,
 };
 
-use super::comparison::DifferentialCase;
+use super::{
+    comparison::DifferentialCase,
+    field::{CaseField, FieldTextError},
+};
 use crate::grobner::external::process::{
     read_output, Invocation, ProcessMeasurement, SpawnError, Supervisor,
 };
@@ -70,6 +89,16 @@ pub enum OracleError {
     /// The characteristic is outside what Singular's prime fields accept.
     UnsupportedField { characteristic: u64 },
 
+    /// Singular's ring reduces by a different polynomial than the one it was given.
+    ///
+    /// **Not a disagreement about mathematics.** Two fields of the same order and different
+    /// moduli are both right about their own arithmetic, and nothing can be concluded from
+    /// comparing one with the other — so this is an oracle failure, like a timeout.
+    ModulusMismatch { asked: u64, reported: String },
+
+    /// A polynomial could not be rewritten between the two sides' syntaxes.
+    Untranslatable { reason: String },
+
     /// Singular's own `std` under lex and its own `fglm` disagreed.
     ///
     /// The oracle contradicting itself. Nothing can be concluded about Zeebra from such a run, so
@@ -102,6 +131,13 @@ impl Display for OracleError {
                 "Singular's prime fields stop below {}, so GF({}) is out of reach",
                 MAX_CHARACTERISTIC, characteristic
             ),
+            Self::ModulusMismatch { asked, reported } => write!(
+                f,
+                "the ring was given the modulus {} and reports {}, so the two sides are not in \
+                 the same field",
+                asked, reported
+            ),
+            Self::Untranslatable { reason } => write!(f, "{}", reason),
             Self::SelfInconsistent { detail } => {
                 write!(f, "Singular disagrees with itself: {}", detail)
             }
@@ -115,6 +151,14 @@ impl std::error::Error for OracleError {}
 impl From<io::Error> for OracleError {
     fn from(e: io::Error) -> Self {
         Self::Io {
+            reason: e.to_string(),
+        }
+    }
+}
+
+impl From<FieldTextError> for OracleError {
+    fn from(e: FieldTextError) -> Self {
+        Self::Untranslatable {
             reason: e.to_string(),
         }
     }
@@ -135,13 +179,15 @@ pub struct OracleQuery<'a> {
     /// A stable identifier, carried through to the case and to any fixture written from it.
     pub name: String,
 
-    /// The field's characteristic.
-    pub characteristic: u64,
+    /// The field, modulus included.
+    pub field: CaseField,
 
     /// Variable names, declared to Singular in this order.
+    ///
+    /// None of them may be `a`, which the extension ring reserves for its parameter.
     pub variables: &'a [&'a str],
 
-    /// The generators, in a syntax both Zeebra and Singular parse.
+    /// The generators, in **Zeebra's** syntax. The oracle rewrites them for its own.
     pub system: &'a [String],
 
     /// The border monomials whose normal forms to ask for, as text.
@@ -240,20 +286,63 @@ impl SingularOracle {
     ///
     /// # Errors
     /// Any [`OracleError`]. In particular [`OracleError::SelfInconsistent`] if Singular's `std`
-    /// under lex disagrees with its own `fglm`, which makes the whole run unusable rather than
-    /// making Zeebra wrong.
+    /// under lex disagrees with its own `fglm`, and [`OracleError::ModulusMismatch`] if an
+    /// extension ring does not reduce by the modulus it was given — each of which makes the whole
+    /// run unusable rather than making Zeebra wrong.
     pub fn interrogate(
         &mut self,
         query: &OracleQuery<'_>,
     ) -> Result<DifferentialCase, OracleError> {
-        if query.characteristic >= MAX_CHARACTERISTIC {
+        if query.field.characteristic() >= MAX_CHARACTERISTIC {
             return Err(OracleError::UnsupportedField {
-                characteristic: query.characteristic,
+                characteristic: query.field.characteristic(),
+            });
+        }
+        if let Some(offender) = query
+            .variables
+            .iter()
+            .find(|name| **name == super::field::EXTENSION_PARAMETER)
+        {
+            return Err(OracleError::Untranslatable {
+                reason: format!(
+                    "{:?} is the name an extension ring gives its parameter, so a variable cannot \
+                     use it",
+                    offender
+                ),
             });
         }
 
-        let script = self.script(query);
+        let script = self.script(query)?;
         let output = self.run(&script)?;
+
+        // Before anything is read from the ring: a ring reducing by a different polynomial is a
+        // different field, and every answer below would be about that field instead. Asserted
+        // rather than assumed — Singular is entitled to normalize or reject a `minpoly`.
+        if let Some(CaseField::Binary { modulus }) = Some(query.field).filter(|f| f.degree() > 1) {
+            let reported = marker(&output, "@minpoly")
+                .ok_or(OracleError::MissingMarker { marker: "@minpoly" })?;
+            let parsed = CaseField::read_binary_polynomial(reported).map_err(|_| {
+                OracleError::ModulusMismatch {
+                    asked: modulus,
+                    reported: reported.to_string(),
+                }
+            })?;
+            if parsed != modulus {
+                return Err(OracleError::ModulusMismatch {
+                    asked: modulus,
+                    reported: reported.to_string(),
+                });
+            }
+        }
+
+        // Every polynomial Singular printed, back in Zeebra's syntax. The identity over a prime
+        // field, so the recorded prime corpus is byte-for-byte what it was.
+        let translate = |values: Vec<String>| -> Result<Vec<String>, OracleError> {
+            values
+                .iter()
+                .map(|value| query.field.from_singular(value).map_err(OracleError::from))
+                .collect()
+        };
 
         let integer = |marker_name: &'static str| -> Result<i64, OracleError> {
             let value = marker(&output, marker_name).ok_or(OracleError::MissingMarker {
@@ -266,19 +355,26 @@ impl SingularOracle {
         };
 
         let vdim = integer("@vdim")?;
-        let oracle_system = collect(&output, "@gen", integer("@gensize")?, "@gen")?;
-        let grevlex_basis = collect(&output, "@gb", integer("@gbsize")?, "@gb")?;
-        let lex_basis = collect(&output, "@lex", integer("@lexsize")?, "@lex")?;
+        let oracle_system = translate(collect(&output, "@gen", integer("@gensize")?, "@gen")?)?;
+        let grevlex_basis = translate(collect(&output, "@gb", integer("@gbsize")?, "@gb")?)?;
+        let lex_basis = translate(collect(&output, "@lex", integer("@lexsize")?, "@lex")?)?;
 
         let (quotient_dimension, standard_monomials, border_normal_forms) = if vdim < 0 {
             (None, Vec::new(), Vec::new())
         } else {
-            let standard = collect(&output, "@kbase", integer("@kbasesize")?, "@kbase")?;
+            // Monomials, so nothing in them is a coefficient — but translated anyway, because a
+            // list that is supposed to hold monomials and does not is better caught here.
+            let standard = translate(collect(
+                &output,
+                "@kbase",
+                integer("@kbasesize")?,
+                "@kbase",
+            )?)?;
 
             // Singular's own cross-check: `fglm` is a third algorithm, so a disagreement with its
             // `std` under lex means the oracle is unsound on this input and nothing can be
             // concluded from it.
-            let fglm = collect(&output, "@fglm", integer("@fglmsize")?, "@fglm")?;
+            let fglm = translate(collect(&output, "@fglm", integer("@fglmsize")?, "@fglm")?)?;
             if sorted(&fglm) != sorted(&lex_basis) {
                 return Err(OracleError::SelfInconsistent {
                     detail: format!(
@@ -291,9 +387,12 @@ impl SingularOracle {
             let mut normal_forms: Vec<(String, String)> = Vec::new();
             for line in markers(&output, "@nf") {
                 match line.split_once(" ; ") {
-                    Some((monomial, normal_form)) => {
-                        normal_forms.push((monomial.to_string(), normal_form.to_string()))
-                    }
+                    // The monomial is echoed as the script sent it, so it is already Zeebra's
+                    // text; only the normal form came out of the ring.
+                    Some((monomial, normal_form)) => normal_forms.push((
+                        monomial.to_string(),
+                        query.field.from_singular(normal_form)?,
+                    )),
                     None => {
                         return Err(OracleError::Unparsable {
                             marker: "@nf",
@@ -318,7 +417,7 @@ impl SingularOracle {
 
         Ok(DifferentialCase {
             name: query.name.clone(),
-            characteristic: query.characteristic,
+            field: query.field,
             variables: query.variables.iter().map(|v| v.to_string()).collect(),
             system: query.system.to_vec(),
             oracle_system: Some(oracle_system),
@@ -337,16 +436,42 @@ impl SingularOracle {
     /// `int` is ring-independent in Singular, so `vd` declared before any ring is still readable
     /// after `setring` — which is what lets the lex section know whether to call `fglm`. Verified,
     /// not assumed.
-    fn script(&self, query: &OracleQuery<'_>) -> String {
-        let p = query.characteristic;
+    ///
+    /// **`minpoly` is set in every ring and echoed from the first.** It is a property of a ring and
+    /// not of the session, so the lex ring needs its own; and it is printed so that the modulus the
+    /// two sides reduce by can be compared rather than assumed.
+    ///
+    /// # Errors
+    /// [`OracleError::Untranslatable`] if a generator cannot be written in Singular's syntax for
+    /// this field.
+    fn script(&self, query: &OracleQuery<'_>) -> Result<String, OracleError> {
+        let coefficients = query.field.singular_coefficients();
+        let minpoly = query.field.singular_minpoly();
         let vars = query.variables.join(",");
-        let generators = query.system.join(",");
+        let generators = query
+            .system
+            .iter()
+            .map(|generator| query.field.to_singular(generator))
+            .collect::<Result<Vec<String>, FieldTextError>>()?
+            .join(",");
+
+        // `minpoly` must be assigned after the ring exists and before anything is built in it.
+        let declare = |name: &str, order: &str| -> String {
+            let mut out = format!("ring {} = {},({}),{};\n", name, coefficients, vars, order);
+            if let Some(minpoly) = &minpoly {
+                out.push_str(&format!("minpoly = {};\n", minpoly));
+            }
+            out.push_str("short = 0;\n");
+            out
+        };
 
         let mut script = String::new();
         script.push_str("option(redSB);\n");
         script.push_str("int vd;\nint k;\n");
-        script.push_str(&format!("ring Rsrc = {},({}),dp;\n", p, vars));
-        script.push_str("short = 0;\n");
+        script.push_str(&declare("Rsrc", "dp"));
+        if minpoly.is_some() {
+            script.push_str("printf(\"@minpoly %s\", minpoly);\n");
+        }
         script.push_str(&format!("ideal I = {};\n", generators));
         // Echoed before anything is computed from it. An oracle that read the system differently
         // has not disagreed about mathematics, and nothing it says afterwards means anything — so
@@ -374,8 +499,7 @@ impl SingularOracle {
         }
         script.push_str("}\n");
 
-        script.push_str(&format!("ring Rlex = {},({}),lp;\n", p, vars));
-        script.push_str("short = 0;\n");
+        script.push_str(&declare("Rlex", "lp"));
         script.push_str("ideal Glex = std(fetch(Rsrc, I));\n");
         script.push_str("printf(\"@lexsize %s\", ncols(Glex));\n");
         script.push_str("for (k = 1; k <= ncols(Glex); k++) { printf(\"@lex %s\", Glex[k]); }\n");
@@ -387,7 +511,7 @@ impl SingularOracle {
         );
         script.push_str("}\n");
         script.push_str("printf(\"@done\");\nexit;\n");
-        script
+        Ok(script)
     }
 
     /// Run a script and return its combined output.
@@ -565,7 +689,10 @@ fn sorted(basis: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{collect, error_line, marker, markers, sorted, OracleError, SingularOracle};
+    use super::{
+        collect, error_line, marker, markers, sorted, CaseField, OracleError, OracleQuery,
+        SingularOracle,
+    };
     use std::{collections::BTreeSet, path::PathBuf, time::Duration};
 
     /// A fleet gives every worker its own existing scratch directory, under the one asked for.
@@ -612,6 +739,85 @@ mod tests {
             .expect("a writable scratch directory");
         assert_eq!(oracles[0].work_dir(), root.join("worker-0"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// An extension query declares its modulus in every ring and echoes it from the first.
+    ///
+    /// `minpoly` is a property of a ring and not of the session, so the lex ring needs its own;
+    /// and the echo is what lets the modulus be compared instead of assumed. A prime query must
+    /// carry neither, or the recorded prime corpus would have been swept under a different script.
+    #[test]
+    fn test_an_extension_query_declares_and_echoes_its_modulus() {
+        let oracle = SingularOracle::new(
+            "Singular",
+            std::env::temp_dir(),
+            Duration::from_secs(1),
+            false,
+        )
+        .expect("a writable scratch directory");
+        let variables = ["x1", "x2"];
+        let system = ["10*x1^2+x2".to_string()];
+        let query = |field: CaseField| OracleQuery {
+            name: "t".to_string(),
+            field,
+            variables: &variables,
+            system: &system,
+            border_monomials: &[],
+        };
+
+        let extension = oracle
+            .script(&query(CaseField::binary(0x11B)))
+            .expect("the system is translatable");
+        assert_eq!(
+            extension.matches("minpoly = a^8+a^4+a^3+a+1;").count(),
+            2,
+            "every ring needs its own minpoly: {}",
+            extension
+        );
+        assert!(extension.contains("ring Rsrc = (2,a),(x1,x2),dp;"));
+        assert!(extension.contains("ring Rlex = (2,a),(x1,x2),lp;"));
+        assert!(extension.contains("printf(\"@minpoly %s\", minpoly);"));
+        // The coefficient crossed into Singular's syntax: `10` is the bit pattern of a^3 + a.
+        assert!(
+            extension.contains("ideal I = (a^3+a)*x1^2+x2;"),
+            "the generator was not rewritten: {}",
+            extension
+        );
+
+        let prime = oracle
+            .script(&query(CaseField::prime(13)))
+            .expect("a prime field needs no rewriting");
+        assert!(prime.contains("ring Rsrc = 13,(x1,x2),dp;"));
+        assert!(!prime.contains("minpoly"));
+        assert!(prime.contains("ideal I = 10*x1^2+x2;"));
+    }
+
+    /// A variable named after the extension parameter is refused, not silently shadowed.
+    #[test]
+    fn test_a_variable_named_like_the_extension_parameter_is_refused() {
+        let mut oracle = SingularOracle::new(
+            "Singular",
+            std::env::temp_dir(),
+            Duration::from_secs(1),
+            false,
+        )
+        .expect("a writable scratch directory");
+        let variables = ["a", "x2"];
+        let system = ["a+x2".to_string()];
+        let error = oracle
+            .interrogate(&OracleQuery {
+                name: "t".to_string(),
+                field: CaseField::binary(0x11B),
+                variables: &variables,
+                system: &system,
+                border_monomials: &[],
+            })
+            .expect_err("`a` is the extension parameter, so it cannot also be a variable");
+        assert!(
+            matches!(error, OracleError::Untranslatable { .. }),
+            "{:?}",
+            error
+        );
     }
 
     /// An error line is found wherever Singular put it, with the marker stripped.

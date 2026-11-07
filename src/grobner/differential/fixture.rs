@@ -10,7 +10,7 @@
 //! monomial. So a committed fixture exercises the multiplication operators column by column with
 //! no Singular installation present.
 
-use super::comparison::DifferentialCase;
+use super::{comparison::DifferentialCase, field::CaseField};
 
 /// One ideal and every answer an oracle gave about it.
 ///
@@ -22,8 +22,9 @@ pub struct DifferentialFixture {
     /// count, so the name alone reproduces the system.
     pub name: &'static str,
 
-    /// The field's characteristic.
-    pub characteristic: u64,
+    /// The field, modulus included — so a GF(2) case and a GF(2^8) one are distinguishable, and a
+    /// GF(2^8) case records which degree-8 polynomial the oracle reduced by.
+    pub field: CaseField,
 
     /// Variable names, in declaration order.
     pub variables: &'static [&'static str],
@@ -52,7 +53,7 @@ impl DifferentialFixture {
     pub fn to_case(&self) -> DifferentialCase {
         DifferentialCase {
             name: self.name.to_string(),
-            characteristic: self.characteristic,
+            field: self.field,
             variables: self.variables.iter().map(|v| v.to_string()).collect(),
             system: self.system.iter().map(|s| s.to_string()).collect(),
             // A fixture inherits the oracle-input check from the sweep that produced it: a case
@@ -84,13 +85,34 @@ impl DifferentialFixture {
 /// a record of what an independent implementation said, which is the only thing that makes it
 /// worth committing.
 ///
-/// `sweep_flags` goes into the regeneration command in the header. It must be the flags the sweep
-/// actually ran with — the tool's defaults regenerate a *different* table, so a header quoting
-/// them would leave the committed one unreproducible.
+/// `sweep_flags` goes into the regeneration command in the header, and so does `destination`. Both
+/// must be what the sweep actually ran with — the tool's defaults regenerate a *different* table
+/// into a *different* file, so a header quoting them would leave the committed one unreproducible.
 pub fn emit_fixture_module(
     cases: &[DifferentialCase],
     singular_version: &str,
     sweep_flags: &str,
+) -> String {
+    emit_named_fixture_module(
+        cases,
+        singular_version,
+        sweep_flags,
+        "FIXTURES",
+        "src/grobner/differential/fixtures.rs",
+    )
+}
+
+/// [`emit_fixture_module`] with the table's constant name chosen.
+///
+/// One sweep produces one reproducible table, and the header's regeneration command is only true
+/// of the sweep that wrote it — so a second corpus over a second field is a second table with its
+/// own command, rather than an append that leaves neither reproducible.
+pub fn emit_named_fixture_module(
+    cases: &[DifferentialCase],
+    singular_version: &str,
+    sweep_flags: &str,
+    table: &str,
+    destination: &str,
 ) -> String {
     let mut out = String::new();
 
@@ -103,7 +125,7 @@ pub fn emit_fixture_module(
     for line in wrapped_flags(sweep_flags, 84) {
         out.push_str(&format!("//!     {} \\\n", line));
     }
-    out.push_str("//!     --fixtures src/grobner/differential/fixtures.rs\n");
+    out.push_str(&format!("//!     --fixtures {}\n", destination));
     out.push_str("//! ```\n");
     out.push_str("//!\n");
     out.push_str(&format!(
@@ -114,13 +136,17 @@ pub fn emit_fixture_module(
     out.push_str("//! basis — so verifying one exercises the multiplication operators column by\n");
     out.push_str("//! column without Singular being installed.\n");
     out.push('\n');
+    out.push_str("use super::field::CaseField;\n");
     out.push_str("use super::fixture::DifferentialFixture;\n");
     out.push('\n');
     out.push_str(&format!(
         "/// {} ideals, with every answer Singular gave about them.\n",
         cases.len()
     ));
-    out.push_str("pub(super) const FIXTURES: &[DifferentialFixture] = &[\n");
+    out.push_str(&format!(
+        "pub(super) const {}: &[DifferentialFixture] = &[\n",
+        table
+    ));
     for case in cases {
         out.push_str(&emit_fixture(case));
     }
@@ -164,10 +190,7 @@ pub fn emit_fixture(case: &DifferentialCase) -> String {
     let mut out = String::new();
     out.push_str("    DifferentialFixture {\n");
     out.push_str(&format!("        name: {:?},\n", case.name));
-    out.push_str(&format!(
-        "        characteristic: {},\n",
-        case.characteristic
-    ));
+    out.push_str(&format!("        field: {},\n", case.field.rust_literal()));
     out.push_str(&format!(
         "        variables: &[{}],\n",
         quoted(&case.variables)
@@ -238,13 +261,13 @@ fn quoted(items: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{emit_fixture_module, quoted, DifferentialFixture};
+    use super::{emit_fixture_module, quoted, CaseField, DifferentialFixture};
     use crate::grobner::differential::comparison::DifferentialCase;
 
     fn case() -> DifferentialCase {
         DifferentialCase {
             name: "seed-1-p13-n2".to_string(),
-            characteristic: 13,
+            field: CaseField::prime(13),
             variables: vec!["x1".to_string(), "x2".to_string()],
             system: vec!["x1^2-1".to_string(), "x2-x1".to_string()],
             quotient_dimension: Some(2),
@@ -261,7 +284,7 @@ mod tests {
     fn test_a_fixture_converts_to_a_case() {
         let fixture = DifferentialFixture {
             name: "seed-1-p13-n2",
-            characteristic: 13,
+            field: CaseField::prime(13),
             variables: &["x1", "x2"],
             system: &["x1^2-1", "x2-x1"],
             quotient_dimension: Some(2),
@@ -279,7 +302,7 @@ mod tests {
         let emitted = emit_fixture_module(&[case()], "44105", "--systems 48");
         for field in [
             "name:",
-            "characteristic:",
+            "field:",
             "variables:",
             "system:",
             "quotient_dimension:",
