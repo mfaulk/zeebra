@@ -60,7 +60,9 @@ As the saying goes, you can either make software so simple that it obviously has
       594 KB, and an owned accumulator grows in place
 - [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
-      resolved against msolve's own distributed input files
+      resolved against msolve's own distributed input files — now at **two** reference
+      characteristics, `2^31 − 1` and `GF(32003)`, each rung frozen at each, because a rung at
+      another prime is another ideal and not the same one under a parameter
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
       `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
       symbolic closure checked unchanged batch by batch rather than inferred from the basis
@@ -373,7 +375,7 @@ ZEEBRA_REQUIRE_MSOLVE=1 cargo nextest run --profile ci --lib -E 'test(/^grobner:
 ```
 
 `ZEEBRA_REQUIRE_MSOLVE=1` turns an absent msolve from a silent early return into a failure, so the
-command either exercises the comparand or says it could not. It is 199 tests in 1.4s once built —
+command either exercises the comparand or says it could not. It is 241 tests in 1.6s once built —
 a debug build is enough, because every msolve comparison runs on a corpus rung small enough to be
 instant — so this is cheap to run before merging anything that changes the corpus, the challenge
 registry, or either engine's side of the comparison. The test that #339 is named for lives here:
@@ -800,6 +802,10 @@ cargo run --release --example competitive_sweep -- --list   # corpus x engines x
 . tools/external/env.sh                            # REQUIRED FIRST, or the sweep sees one engine
 tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
     --row katsura-6 --task reduced-grobner-basis --measure --write   # one measured row
+tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
+    --characteristic 32003 --row katsura-6 --task reduced-grobner-basis --measure --write
+                                                   # the same rung at the corpus's other identity;
+                                                   #   only a PUBLISHED characteristic is accepted
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
@@ -1214,8 +1220,9 @@ assert_eq!(BabyBear::order_u128(), Some(2013265921));
 ```
 
 Declared: `Zp2` (GF(2) — Fukuoka MQ types I and IV, LowMC, HFE), `Zp31` (Fukuoka MQ types III and
-VI), `Zp65537_32`, `Mersenne31`, `BabyBear` (`2^31 - 2^27 + 1`) and `KoalaBear`
-(`2^31 - 2^24 + 1`, the 2026 Poseidon challenge prime). The two Bear fields are NTT-friendly;
+VI), `Zp32003` (the cross-library corpus's small-prime reference characteristic, and the field every
+published Gröbner timing table uses), `Zp65537_32`, `Mersenne31`, `BabyBear` (`2^31 - 2^27 + 1`) and
+`KoalaBear` (`2^31 - 2^24 + 1`, the 2026 Poseidon challenge prime). The two Bear fields are NTT-friendly;
 `Zp65537_32` and `Zp2147483647` are the same mathematical fields as `Zp65537` and `Mersenne31`'s
 64-bit twin, so a caller picks a width rather than a field. `Zp2` is the one declared modulus that
 is not odd, so it keeps the wide-remainder path rather than reaching Montgomery form.

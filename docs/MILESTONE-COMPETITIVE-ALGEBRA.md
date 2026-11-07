@@ -743,7 +743,7 @@ of **2 000**. A figure that constant across that range is not a computation. The
 > Where a comparand's wall is within ~2x of its own floor, the row is **not an engine comparison in
 > either direction**.
 
-Applied to the populated board — 72 rows, 19 rungs × 2 tasks × 2 engines — the consequence is not a
+Applied to the populated board — 72 rows, 18 rungs × 2 tasks × 2 engines — the consequence is not a
 caveat but the headline:
 
 > **Of the 28 pairs where both engines answered, only 7 clear 2x that floor. The other 21 all read as
@@ -802,15 +802,24 @@ and all ten rows still on the board.
    a valid ratio and a checkable invariant) while `is_corroborated()` is false. `NoComparand` narrows
    to the 254/255-bit fields, and a test asserts no ladder rung uses it.
 
-   **Corroboration is task-specific, and the table above is the _basis_ table.** Conversion is
-   narrower, because Sagebrush exposes **no FGLM route at all** — a missing task, not a field
-   ceiling:
+   **Corroboration is task-specific, and the table above is the _basis_ table.** Conversion and
+   eliminant are both narrower, and for reasons that are **missing tasks rather than field
+   ceilings**: msolve has no lex order, Groebner.jl 0.10.11 has no FGLM and no eliminant, and
+   Sagebrush has no eliminant. Corrected against each adapter's own `supports` while adding the
+   `GF(32003)` identity (#426) — an earlier version of this table said Sagebrush had no FGLM route,
+   which is wrong: it has one, capped at `2^31`, and the board holds fourteen completed Sagebrush
+   conversion rows.
 
-   | task | `p < 2^31` | `p ≥ 2^31` |
-   |---|---|---|
-   | basis | four-way | two-way |
-   | **conversion** | **three-way** | **sole engine** |
-   | eliminant | two-way (msolve out at `2^31 − 1`) | sole engine |
+   | task | engines with the task | `p = 32003` | `p < 2^31` | `p ≥ 2^31` |
+   |---|---|---|---|---|
+   | basis | all four | four-way | four-way | two-way |
+   | **conversion** | Singular, Sagebrush | **two-way** | **two-way** | **none** |
+   | eliminant | msolve, Singular | **two-way** | sole engine above `1515531529` | none |
+
+   The eliminant row is why `GF(32003)` is a second corpus identity rather than a curiosity: msolve
+   stops below `1515531529`, so at the reference prime the eliminant has **one** engine and at
+   `32003` it has two. Note that Zeebra's own adapter refuses `UnivariateEliminant`, so that column
+   has no in-crate operand at any field — tracked separately.
 
    This matters more than a refinement, because **conversion is the one stage where M25 measured a
    cross-library deficit at all.** Reading a basis band as a conversion band would overstate what can
@@ -1210,7 +1219,7 @@ Scored against the criteria as written before the work, including where they wer
 |---|---|---|
 | a standardized cross-library protocol | **met** | #257, `external-comparison-protocol.md`; the six-task taxonomy, each field with a stated measurement method, "cannot represent the input" distinguished from "slower" in the type system |
 | working adapters for ≥3 comparators, or documented blockers | **met** | **4** — msolve 0.11.0, Groebner.jl 0.10.11, Sagebrush `86d9f1c7`, Singular 4.4.1, all on one frozen contract |
-| a validated corpus of ≥6 families | **met** | #261 — six families, nineteen rungs, equivalence a **recorded field** with a `licenses_timing()` gate asserted per rung |
+| a validated corpus of ≥6 families | **met** | #261 — six families, eighteen rungs, equivalence a **recorded field** with a `licenses_timing()` gate asserted per rung |
 | a first competitive report, identical problems and hardware | **met** | #263, `competitive-baseline.md`; two measured deficits, four-way agreement, three cannot-be-compared results |
 | stage-attributed priorities for subsequent optimization | **met** | the six-axis ranking plus the Amdahl screen, which closed #269/#270/#271, held #272 and vindicated #273 |
 | a machine-readable record of measured RSS, separate from estimated | **met** | #288 — both populated, ratio recoverable from one record, `measured_peak_rows_in_process` labelling attributability, `RssBasis::AllocatorTracked` keeping allocated and resident apart |
@@ -1238,7 +1247,7 @@ not, and the first is inverted:
 
 **One deliverable was partially met when this scoring pass found it, and was closed before the
 milestone did.** `research/competitive/results/history.json` held **zero rows** — it now holds
-**72** (36 Zeebra, 36 Singular, 19 rungs × 2 tasks, including 5 `unsupported`, 5 `stopped-by-limit`
+**72** (36 Zeebra, 36 Singular, 18 rungs × 2 tasks, including 5 `unsupported`, 5 `stopped-by-limit`
 and 1 `failed`), §13.1's figures are read out of those records rather than out of a terminal
 scrollback, and `COMPETITIVE.md` is generated from the same source. #293 is **met for Zeebra and
 Singular**; the other three engines' rows are outstanding on lock contention rather than on

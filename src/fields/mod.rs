@@ -70,6 +70,15 @@ pub type Zp2 = PrimeFieldElement32<2>;
 /// Z mod 31. The coefficient field of Fukuoka MQ Challenge types III and VI.
 pub type Zp31 = PrimeFieldElement32<31>;
 
+/// Z mod 32003, the 15-bit prime every published Gröbner timing table uses.
+///
+/// Allan Steel's Magma comparison runs its whole modular column over this field, because the
+/// comparands "handle small primes only up to 16 bits" — so it is the arithmetic regime those
+/// engines were tuned for. It is the corpus's small-prime reference characteristic
+/// ([`SMALL_PRIME_CHARACTERISTIC`](crate::grobner::external::corpus::SMALL_PRIME_CHARACTERISTIC)),
+/// and 32-bit rather than 64-bit so that the regime being measured is the narrow one.
+pub type Zp32003 = PrimeFieldElement32<32003>;
+
 /// Z mod 65537, Proth prime 2^16 + 1. [`Zp65537`] is the same field backed by a `u64`.
 pub type Zp65537_32 = PrimeFieldElement32<65537>;
 

@@ -8,11 +8,11 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 | library | rows | answered |
 |---|---:|---:|
-| groebner.jl | 37 | 17 |
-| msolve | 37 | 15 |
-| sagebrush | 37 | 29 |
-| singular | 73 | 58 |
-| zeebra | 73 | 64 |
+| groebner.jl | 63 | 29 |
+| msolve | 63 | 27 |
+| sagebrush | 63 | 52 |
+| singular | 99 | 81 |
+| zeebra | 99 | 86 |
 
 ## anemoi
 
@@ -70,6 +70,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `a904145` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `a904145` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-4` `e1d8d59448b3` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `a904145` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | — | — | unchecked |
+| `cyclic-4` `e5a49df27c74` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.2 ms | — | 6.8 MB | basis 0.2 ms | unchecked |
+| `cyclic-4` `e5a49df27c74` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 19.2 MB | solve 0.0 ms | unchecked |
+| `cyclic-4` `e5a49df27c74` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 24576 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `cyclic-4` `e5a49df27c74` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 0.9 ms | — | 722.5 MB | solve 0.9 ms; process-wall 7.75 s; process-cpu 8.60 s | unchecked |
+| `cyclic-4` `e5a49df27c74` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 16384 B | solve 0.2 ms | unchecked |
+| `cyclic-4` `e5a49df27c74` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | 6.6 MB | basis 0.1 ms | unchecked |
+| `cyclic-4` `e5a49df27c74` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | — | — | unchecked |
+| `cyclic-4` `e5a49df27c74` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-4` `e5a49df27c74` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-4` `e5a49df27c74` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | unsupported: lex-basis-by-conversion needs a finite quotient algebra, and this ideal is positive-dimensional | — | — | — | — | unchecked |
 | `cyclic-5` `3274d14b2246` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 1.5 ms | — | — | basis 1.5 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `cyclic-5` `3274d14b2246` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 36.1 ms | 10.0 ms | 19.6 MB | solve 1.0 ms | unchecked |
 | `cyclic-5` `3274d14b2246` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 2.3 ms | — | — | basis 1.8 ms; conversion 0.5 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -84,6 +94,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `cyclic-5` `3274d14b2246` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-5` `3274d14b2246` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-5` `3274d14b2246` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 16384 B | solve 1.2 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 1.7 ms | — | 7.8 MB | basis 1.7 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 41.2 ms | 10.0 ms | 18.2 MB | solve 1.0 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 16384 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 1.0 ms | — | 732.5 MB | solve 1.0 ms; process-wall 7.83 s; process-cpu 8.63 s | unchecked |
+| `cyclic-5` `e80b7d8a6432` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 16384 B | solve 0.7 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 2.1 ms | — | 7.4 MB | basis 1.6 ms; conversion 0.5 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 18.6 MB | source-basis 1.0 ms; solve 1.0 ms | unchecked |
+| `cyclic-5` `e80b7d8a6432` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-5` `e80b7d8a6432` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-5` `e80b7d8a6432` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 24576 B | solve 1.2 ms | unchecked |
 | `cyclic-6` `ed89afe173d1` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 13.1 ms | — | — | basis 13.1 ms; quotient-dimension (for the invariant) 0.1 ms | unchecked |
 | `cyclic-6` `ed89afe173d1` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 46.2 ms | 20.0 ms | 19.8 MB | solve 7.0 ms | unchecked |
 | `cyclic-6` `ed89afe173d1` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 15.3 ms | — | — | basis 13.0 ms; conversion 2.3 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -98,6 +118,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `cyclic-6` `ed89afe173d1` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-6` `ed89afe173d1` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `cyclic-6` `ed89afe173d1` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 16384 B | solve 6.4 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 13.0 ms | — | 8.6 MB | basis 13.0 ms; quotient-dimension (for the invariant) 0.1 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 46.3 ms | 20.0 ms | 19.5 MB | solve 7.0 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 2.1 ms | — | 735.1 MB | solve 2.1 ms; process-wall 8.00 s; process-cpu 8.74 s | unchecked |
+| `cyclic-6` `bf3bb57af08f` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 3.9 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 15.1 ms | — | 8.9 MB | basis 13.3 ms; conversion 1.8 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 51.3 ms | 20.0 ms | 20.4 MB | source-basis 7.0 ms; solve 6.0 ms | unchecked |
+| `cyclic-6` `bf3bb57af08f` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-6` `bf3bb57af08f` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `cyclic-6` `bf3bb57af08f` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 16384 B | solve 6.3 ms | unchecked |
 
 ## katsura
 
@@ -117,6 +147,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-4` `825a3aa54e15` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-4` `825a3aa54e15` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-4` `825a3aa54e15` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 28672 B | solve 0.2 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.2 ms | — | 6.8 MB | basis 0.2 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 35.9 ms | 10.0 ms | 17.7 MB | solve 0.0 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 0.9 ms | — | 734.6 MB | solve 0.9 ms; process-wall 8.26 s; process-cpu 9.04 s | unchecked |
+| `katsura-4` `c5fb073f5c9a` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 0.2 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.3 ms | — | 7.2 MB | basis 0.2 ms; conversion 0.1 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 41.1 ms | 10.0 ms | 16.3 MB | source-basis 0.0 ms; solve 0.0 ms | unchecked |
+| `katsura-4` `c5fb073f5c9a` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-4` `c5fb073f5c9a` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-4` `c5fb073f5c9a` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 0.3 ms | unchecked |
 | `katsura-5` `6f305e37b2cc` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 1.0 ms | — | — | basis 1.0 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `katsura-5` `6f305e37b2cc` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 36.0 ms | 10.0 ms | 19.5 MB | solve 0.0 ms | unchecked |
 | `katsura-5` `6f305e37b2cc` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 1.1 ms | — | — | basis 1.0 ms; conversion 0.2 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -131,6 +171,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-5` `6f305e37b2cc` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-5` `6f305e37b2cc` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-5` `6f305e37b2cc` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 28672 B | solve 0.5 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.8 ms | — | 7.4 MB | basis 0.8 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 41.2 ms | 10.0 ms | 19.4 MB | solve 0.0 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 1.0 ms | — | 735.1 MB | solve 1.0 ms; process-wall 8.41 s; process-cpu 9.17 s | unchecked |
+| `katsura-5` `8be0a39d2d8c` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 0.3 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 1.0 ms | — | 7.3 MB | basis 0.8 ms; conversion 0.2 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.1 ms | 10.0 ms | 18.7 MB | source-basis 1.0 ms; solve 0.0 ms | unchecked |
+| `katsura-5` `8be0a39d2d8c` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-5` `8be0a39d2d8c` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-5` `8be0a39d2d8c` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 0.6 ms | unchecked |
 | `katsura-6` `aa992992dfe2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 3.7 ms | — | — | basis 3.7 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `katsura-6` `aa992992dfe2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 35.9 ms | 10.0 ms | 19.5 MB | solve 1.0 ms | unchecked |
 | `katsura-6` `aa992992dfe2` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 3.9 ms | — | — | basis 3.4 ms; conversion 0.5 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -145,6 +195,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-6` `aa992992dfe2` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-6` `aa992992dfe2` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-6` `aa992992dfe2` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 1.3 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 3.6 ms | — | 8.4 MB | basis 3.6 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 19.3 MB | solve 2.0 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 1.1 ms | — | 738.0 MB | solve 1.1 ms; process-wall 8.12 s; process-cpu 8.93 s | unchecked |
+| `katsura-6` `a7bd9edf654a` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 16384 B | solve 1.1 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 4.0 ms | — | 8.1 MB | basis 3.5 ms; conversion 0.4 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 19.2 MB | source-basis 1.0 ms; solve 1.0 ms | unchecked |
+| `katsura-6` `a7bd9edf654a` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-6` `a7bd9edf654a` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-6` `a7bd9edf654a` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 1.5 ms | unchecked |
 | `katsura-7` `545cef6185ed` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 25.8 ms | — | — | basis 25.8 ms; quotient-dimension (for the invariant) 0.1 ms | unchecked |
 | `katsura-7` `545cef6185ed` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 51.4 ms | 20.0 ms | 19.7 MB | solve 10.0 ms | unchecked |
 | `katsura-7` `545cef6185ed` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 28.9 ms | — | — | basis 26.9 ms; conversion 2.1 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -159,6 +219,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `katsura-7` `545cef6185ed` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-7` `545cef6185ed` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `katsura-7` `545cef6185ed` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 24576 B | solve 4.9 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 26.2 ms | — | 8.5 MB | basis 26.2 ms; quotient-dimension (for the invariant) 0.1 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 51.4 ms | 20.0 ms | 19.6 MB | solve 8.0 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 1.8 ms | — | 738.7 MB | solve 1.8 ms; process-wall 7.94 s; process-cpu 8.74 s | unchecked |
+| `katsura-7` `c56bf75048b0` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 24576 B | solve 3.1 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 28.0 ms | — | 8.8 MB | basis 26.3 ms; conversion 1.7 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 51.3 ms | 20.0 ms | 20.1 MB | source-basis 8.0 ms; solve 7.0 ms | unchecked |
+| `katsura-7` `c56bf75048b0` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-7` `c56bf75048b0` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `katsura-7` `c56bf75048b0` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 24576 B | solve 4.6 ms | unchecked |
 
 ## mq-planted
 
@@ -178,6 +248,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-planted-10` `0eef4b55bce6` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-planted-10` `0eef4b55bce6` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-planted-10` `0eef4b55bce6` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 30.6 ms | 10.0 ms | 14.1 MB | solve 27.7 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.1 ms | — | 6.7 MB | basis 0.1 ms; quotient-dimension (for the invariant) 1.2 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 18.6 MB | solve 0.0 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 0.9 ms | — | 755.3 MB | solve 0.9 ms; process-wall 10.32 s; process-cpu 11.07 s | unchecked |
+| `mq-planted-10` `74fc86970c3e` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 24576 B | solve 0.1 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 17.5 ms | — | 15.5 MB | basis 0.1 ms; conversion 17.3 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 158.5 ms | 130.0 ms | 51.0 MB | source-basis 1.0 ms; solve 120.0 ms | unchecked |
+| `mq-planted-10` `74fc86970c3e` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-planted-10` `74fc86970c3e` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-planted-10` `74fc86970c3e` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 40.7 ms | 20.0 ms | 18.1 MB | solve 30.5 ms | unchecked |
 | `mq-planted-14` `063f5b1ddbab` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.2 ms | — | — | basis 0.2 ms; quotient-dimension (for the invariant) 25.4 ms | unchecked |
 | `mq-planted-14` `063f5b1ddbab` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 36.1 ms | 10.0 ms | 19.2 MB | solve 0.0 ms | unchecked |
 | `mq-planted-14` `063f5b1ddbab` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: the quotient algebra has more than the 4096 dimensions allowed | — | — | — | basis 0.2 ms; conversion 5.9 ms | unchecked |
@@ -192,6 +272,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-planted-14` `063f5b1ddbab` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-planted-14` `063f5b1ddbab` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-planted-14` `063f5b1ddbab` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 6.35 s | 6.29 s | 2.91 GB | solve 6.16 s | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.2 ms | — | 28.1 MB | basis 0.2 ms; quotient-dimension (for the invariant) 44.9 ms | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 41.1 ms | 20.0 ms | 18.2 MB | solve 1.0 ms | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 24576 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 0.9 ms | — | 757.7 MB | solve 0.9 ms; process-wall 28.01 s; process-cpu 28.64 s | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 30.7 ms | 10.0 ms | 6.4 MB | solve 0.2 ms | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | stopped at the tool's own cap: the quotient algebra has more than the 4096 dimensions allowed | — | — | 11.6 MB | basis 0.2 ms; conversion 9.7 ms | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 49.87 s | 49.44 s | 10.16 GB | source-basis 0.0 ms; solve 48.59 s | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-planted-14` `132bc0b85ac2` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 6.54 s | 6.48 s | 2.91 GB | solve 6.33 s | unchecked |
 | `mq-planted-6` `55fb9b0622b6` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.1 ms | — | — | basis 0.1 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `mq-planted-6` `55fb9b0622b6` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 36.0 ms | 10.0 ms | 19.5 MB | solve 0.0 ms | unchecked |
 | `mq-planted-6` `55fb9b0622b6` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.7 ms | — | — | basis 0.1 ms; conversion 0.6 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -206,6 +296,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-planted-6` `55fb9b0622b6` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-planted-6` `55fb9b0622b6` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-planted-6` `55fb9b0622b6` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.5 ms | 0.0 ms | 24576 B | solve 0.6 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.1 ms | — | 6.4 MB | basis 0.1 ms; quotient-dimension (for the invariant) 0.1 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 19.1 MB | solve 0.0 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.3 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 0.9 ms | — | 732.7 MB | solve 0.9 ms; process-wall 7.79 s; process-cpu 8.61 s | unchecked |
+| `mq-planted-6` `26932613e8ca` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 0.1 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 0.6 ms | — | 6.8 MB | basis 0.1 ms; conversion 0.5 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 36.0 ms | 10.0 ms | 19.1 MB | source-basis 0.0 ms; solve 1.0 ms | unchecked |
+| `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-planted-6` `26932613e8ca` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 0.6 ms | unchecked |
 
 ## mq-random
 
@@ -225,6 +325,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 395.4 ms | 380.0 ms | 31.7 MB | solve 390.8 ms | unchecked |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 28.69 s | — | 159.3 MB | basis 28.69 s; quotient-dimension (for the invariant) 1.8 ms | unchecked |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 7.07 s | 6.99 s | 23.5 MB | solve 6.94 s | unchecked |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 222.8 ms | 200.0 ms | 12.2 MB | f4/overall(elapsed) 200.0 ms; f4/overall(cpu) 200.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 140.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 84.8 ms | — | 753.5 MB | solve 84.8 ms; process-wall 9.29 s; process-cpu 10.17 s | unchecked |
+| `mq-random-10` `16422dafcdb6` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 323.5 ms | 300.0 ms | 32.0 MB | solve 296.5 ms | unchecked |
+| `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 30.95 s | — | 159.6 MB | basis 30.61 s; conversion 343.0 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 8.01 s | 7.93 s | 36.0 MB | source-basis 6.73 s; solve 1.19 s | unchecked |
+| `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 395.1 ms | 370.0 ms | 31.9 MB | solve 382.1 ms | unchecked |
 | `mq-random-14` `029def705543` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | — | basis 34.44 s | unchecked |
 | `mq-random-14` `029def705543` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | — | — | — | unchecked |
 | `mq-random-14` `029def705543` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | — | basis 34.42 s | unchecked |
@@ -239,6 +349,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-random-14` `029def705543` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-14` `029def705543` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-14` `029def705543` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | 59.60 s | 4.43 GB | — | unchecked |
+| `mq-random-14` `4e440cfac842` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | stopped at the tool's own cap: 20005445 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | 1.06 GB | basis 32.24 s | unchecked |
+| `mq-random-14` `4e440cfac842` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | — | — | — | unchecked |
+| `mq-random-14` `4e440cfac842` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | — | 463.3 MB | — | unchecked |
+| `mq-random-14` `4e440cfac842` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | 60.45 s | 1.16 GB | — | unchecked |
+| `mq-random-14` `4e440cfac842` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | 59.57 s | 4.37 GB | — | unchecked |
+| `mq-random-14` `4e440cfac842` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | stopped at the tool's own cap: 20005445 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | 1.06 GB | basis 32.38 s | unchecked |
+| `mq-random-14` `4e440cfac842` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | — | — | — | unchecked |
+| `mq-random-14` `4e440cfac842` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-14` `4e440cfac842` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-14` `4e440cfac842` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | 59.56 s | 4.35 GB | — | unchecked |
 | `mq-random-6` `d98e5e5bf82b` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 22.9 ms | — | — | basis 22.9 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `mq-random-6` `d98e5e5bf82b` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 51.4 ms | 20.0 ms | 19.7 MB | solve 14.0 ms | unchecked |
 | `mq-random-6` `d98e5e5bf82b` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 27.1 ms | — | — | basis 25.1 ms; conversion 1.9 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -253,6 +373,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-random-6` `d98e5e5bf82b` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-6` `d98e5e5bf82b` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `7adb29e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-6` `d98e5e5bf82b` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `7adb29e` | complete | 10.4 ms | 0.0 ms | 28672 B | solve 5.3 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | reduced-grobner-basis | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 29.4 ms | — | 8.9 MB | basis 29.4 ms; quotient-dimension (for the invariant) 0.1 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | reduced-grobner-basis | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 56.4 ms | 30.0 ms | 19.5 MB | solve 13.0 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | reduced-grobner-basis | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | f4/overall(elapsed) 0.0 ms; f4/overall(cpu) 0.0 ms; f4/select 0.0 ms; f4/symbolic prep. 0.0 ms; f4/update 0.0 ms; f4/convert 0.0 ms; f4/linear algebra 0.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | reduced-grobner-basis | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | complete | 2.6 ms | — | 740.1 MB | solve 2.6 ms; process-wall 7.78 s; process-cpu 8.72 s | unchecked |
+| `mq-random-6` `bbfecd7f5522` | reduced-grobner-basis | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 4.5 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | lex-basis-by-conversion | GF(32003) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `87a807e` | complete | 29.4 ms | — | 9.1 MB | basis 27.7 ms; conversion 1.7 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | lex-basis-by-conversion | GF(32003) | singular (singular build 44105 (44105)) | `87a807e` | complete | 56.5 ms | 30.0 ms | 19.9 MB | source-basis 13.0 ms; solve 7.0 ms | unchecked |
+| `mq-random-6` `bbfecd7f5522` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-6` `bbfecd7f5522` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-6` `bbfecd7f5522` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 10.4 ms | 0.0 ms | 20480 B | solve 5.0 ms | unchecked |
 
 ## poseidon
 
@@ -305,7 +435,7 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 Computed only for rows agreeing on problem digest, task, limits, machine and build, with **both** outcomes answered. A ratio whose two answers share no checked invariant is marked: the protocol does not permit publishing it.
 
-**116 pairs**: 89 disqualified by the startup floor, 0 with no checked invariant, 27 publishable — of which 3 inside the 20% noise band, 6 against a comparand that is not authoritative, and 19 that a conclusion may rest on.
+**184 pairs**: 145 disqualified by the startup floor, 0 with no checked invariant, 39 publishable — of which 3 inside the 20% noise band, 10 against a comparand that is not authoritative, and 27 that a conclusion may rest on.
 
 | problem | task | library | ratio | checked |
 |---|---|---|---:|---|
@@ -425,4 +555,72 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 | `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | sagebrush | 9.70x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `anemoi64-cico-n1-fcico` | reduced-grobner-basis | groebner.jl | 0.07x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `anemoi64-cico-n2-fcico` | reduced-grobner-basis | groebner.jl | 0.64x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.83x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | sagebrush | 0.10x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | singular | 0.10x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | msolve | 0.35x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.21x | **NOT AN ENGINE COMPARISON: an operand is 1.5x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | sagebrush | 0.34x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | singular | 0.51x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | msolve | 2.54x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | groebner.jl | 14.89x | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | sagebrush | 2.52x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | singular | 0.55x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | sagebrush | 2.70x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.18x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | singular | 0.04x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | msolve | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.59x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | sagebrush | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | singular | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.20x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | singular | 0.28x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | msolve | 1.26x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.13x | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | sagebrush | 1.25x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | singular | 0.29x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.45x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | singular | 0.52x | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | msolve | 2.84x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner.jl | 11.42x | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | sagebrush | 2.84x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | singular | 0.52x | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | sagebrush | 2.83x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.06x | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 128.78x | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 338.23x | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 88.68x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 3.86x | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 78.35x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.05x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 0.11x | 3 invariants agreed |
+| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.43x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-14` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.22x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 

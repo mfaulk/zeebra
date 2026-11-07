@@ -201,7 +201,12 @@ the finding in the direction of making the epic look unnecessary, and the epic i
   comparable in kind, and both are still 2004 Athlon figures on a different machine — §4 item 3
   applies regardless. Not worth it for that reason alone.
 - **`GF(32003)` is a one-line `PrimeFieldElement32<32003>`** if the `GF(2)` and `GF(32003)` columns
-  are ever wanted; nothing here needs it.
+  are ever wanted; nothing here needs it. **Done (#426):** `fields::Zp32003` is that line, and the
+  field is now the corpus's *second reference characteristic* rather than a sweep parameter — the
+  identity digest is computed per published characteristic, so a `GF(32003)` row is a row about a
+  different ideal and needs its own frozen digest. `docs/research/cross-library-corpus.md` §4b is
+  the decision and the argument. The engines are re-run here over that field rather than compared
+  against §2.1's figures, which §4 still forbids.
 - **Rationals are out of scope**, stated so the `Q` rows are not mistaken for a gap.
 
 ## 7. Other collections, assessed against #65's bar
@@ -236,3 +241,6 @@ to be quoted; see #198 for why that rule exists.
   and Steel's independent Cyclic-10 figure is consistent, but the primary papers were not read.
 - **Nothing was measured over GF(2) or GF(32003)**, so the GF(2) Cyclic rows of §2.2 have no Zeebra
   comparand yet. #218 has since made characteristic two work, so that is now possible.
+  **`GF(32003)` has since been measured (#426)**: it is a published corpus characteristic, and
+  `research/competitive/` carries Zeebra, Singular, msolve, Groebner.jl and Sagebrush over it on the
+  whole Katsura/Cyclic/MQ ladder. GF(2) remains unmeasured here.
