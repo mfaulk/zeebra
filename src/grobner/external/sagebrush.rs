@@ -75,6 +75,24 @@
 //! [`Invariants::overlap`] against Zeebra from 2 to 3. A positive-dimensional ideal is reported as
 //! `-1`, the convention Singular's `vdim` already uses, and read here as "not reported".
 //!
+//! # The generator echo, checked on every run
+//!
+//! The driver prints one `#gen` line per generator **before** it calls into Sagebrush, rendered
+//! from the packed polynomials it is about to hand over — so the echo is a round trip through the
+//! driver's own parser and packer rather than a copy of its input, and
+//! `check_echoed_generators` compares it against [`Instance::system`] as a set of canonical term
+//! multisets.
+//!
+//! This covers the one failure mode **cross-validation cannot catch**. Every engine is handed the
+//! same bytes, so an input that is misread is misread identically everywhere, and the engines then
+//! agree with each other while all of them answer a different question — and agreement is the
+//! instrument this module relies on. The live instance of it is the `x1` / `x10` prefix collapse at
+//! ten or more variables, which the corpus's fourteen-variable rungs reach. A [`RunStatus::Complete`]
+//! on one of those is therefore *itself* the proof that the two names were read apart; before this
+//! the claim rested on a single behavioural test over a single system.
+//!
+//! [`DRIVER_CONTRACT`] is why the check cannot quietly lapse against an older installed binary.
+//!
 //! # The leading-monomial trap, handled in the driver
 //!
 //! Sagebrush keeps a polynomial's terms in decreasing **lex** order of the packed exponent word
@@ -136,8 +154,8 @@ use std::time::Duration;
 
 use super::{
     contract::{
-        Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
-        RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        generators_agree, Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits,
+        Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
     process::{read_output, Invocation, Supervisor},
 };
@@ -261,6 +279,25 @@ const THREADS_VARIABLE: &str = "SAGEBRUSH_THREADS";
 
 /// The separator the driver prints between the basis and its leading monomials.
 const LEADING_SEPARATOR: &str = "--- leading monomials ---";
+
+/// The driver output format this adapter requires, which the driver prints as
+/// `#driver contract:`.
+///
+/// # Why a version and not a tolerated absence
+///
+/// The driver lives in the provisioning prefix, not in this repository, so an installed binary can
+/// be older than the adapter reading it. The obvious accommodation — check the generator echo only
+/// when `#gen` is present — is **a check that silently stops checking**: against an older binary
+/// every run would pass having verified nothing, and the one failure mode the echo exists to catch
+/// is precisely the one that produces a well-formed answer to a different question. So the marker
+/// is *required*, and a driver that cannot produce it fails loudly with
+/// [`RunFailure::Incomplete`] telling the operator to re-run `tools/external/provision.sh`.
+///
+/// | contract | what it added |
+/// |---|---|
+/// | 1 | the degrevlex basis, its leading monomials, and the echoed characteristic, variable order and monomial order |
+/// | 2 | `--order` / `--route`, `#route:`, `#quotient dimension:`, and the `#gen` generator echo |
+pub const DRIVER_CONTRACT: u32 = 2;
 
 /// Sagebrush's name for one of Zeebra's monomial orders, which is what the driver's `--order`
 /// takes and what its `#monomial order:` header echoes.
@@ -440,6 +477,23 @@ impl SagebrushSolver {
                 })
         };
 
+        // Before anything else: a driver too old to echo its generators cannot be checked, and an
+        // unchecked run is the one this adapter must not report as a result.
+        let contract = header("#driver contract:")?;
+        let contract: u32 = contract.parse().map_err(|_| RunFailure::Unparsable {
+            marker: "#driver contract:".to_string(),
+            value: contract.to_string(),
+        })?;
+        if contract < DRIVER_CONTRACT {
+            return Err(RunFailure::Incomplete {
+                detail: format!(
+                    "the installed driver speaks contract {} and this adapter requires {}; \
+                     re-run tools/external/provision.sh to rebuild sagebrush-gb-driver",
+                    contract, DRIVER_CONTRACT
+                ),
+            });
+        }
+
         let characteristic = header("#field characteristic:")?;
         if characteristic != instance.field.characteristic.to_string() {
             return Err(RunFailure::SelfInconsistent {
@@ -483,6 +537,8 @@ impl SagebrushSolver {
             });
         }
 
+        Self::check_echoed_generators(output, instance)?;
+
         let length = header("#length of basis:")?;
         let size: usize = length
             .split_whitespace()
@@ -504,6 +560,68 @@ impl SagebrushSolver {
             invariants = invariants.with_quotient_dimension(dimension);
         }
         Ok(Answer::from_invariants(invariants).with_basis(basis))
+    }
+
+    /// Check that the system the driver parsed is the one that was sent, **as a set**.
+    ///
+    /// # Why this is a check and not a comment
+    ///
+    /// The driver prints `#gen` for each generator *before* it calls into Sagebrush, rendering the
+    /// packed polynomials it is about to hand over — so the echo is a round trip through the
+    /// driver's own parser and packer, not a copy of its input. It has to be checked on every run
+    /// because of one failure mode **cross-validation cannot catch**: every engine is handed the
+    /// same bytes, so an input that is misread is misread identically everywhere, and the engines
+    /// then agree with each other while all of them answer a different question.
+    ///
+    /// The concrete instance of it is the `x1` / `x10` prefix collapse — see
+    /// [`canonical_generator`](super::contract::canonical_generator) — and the corpus has fourteen-variable rungs, so a `Complete` status
+    /// on one is now *itself* the proof that the two names were read apart. Previously that was
+    /// pinned by a single behavioural test covering one system; this covers every run.
+    ///
+    /// The driver's parser is believed clean (it splits on `*`, then `^`, then matches the base
+    /// against a variable name with an exact whole-string comparison, never a longest-prefix scan).
+    /// This check is what makes that a per-run assertion rather than a belief, and it also catches
+    /// a dropped generator, a packing that truncated an exponent, and a renderer change on
+    /// Zeebra's side.
+    ///
+    /// # Errors
+    /// [`RunFailure::Unparsable`] if the count and the lines disagree — a run killed between two
+    /// `println!`s is a failure and not a shorter system. [`RunFailure::SelfInconsistent`] if the
+    /// systems differ, which is what a tool contradicting its input *is*: nothing can be concluded
+    /// about any other implementation from a run whose input was not the one requested.
+    fn check_echoed_generators(output: &str, instance: &Instance) -> Result<(), RunFailure> {
+        let reported = output
+            .lines()
+            .find_map(|line| line.strip_prefix("#generators:"))
+            .map(str::trim)
+            .ok_or(RunFailure::MissingMarker {
+                marker: "#generators:".to_string(),
+            })?;
+        let count: usize = reported.parse().map_err(|_| RunFailure::Unparsable {
+            marker: "#generators:".to_string(),
+            value: reported.to_string(),
+        })?;
+        let echoed: Vec<String> = output
+            .lines()
+            .filter_map(|line| line.trim_start().strip_prefix("#gen "))
+            .map(|generator| generator.trim().to_string())
+            .collect();
+        if echoed.len() != count || echoed.len() != instance.system.len() {
+            return Err(RunFailure::Unparsable {
+                marker: "#gen".to_string(),
+                value: format!(
+                    "{} echoed lines for a reported {} and a sent system of {}",
+                    echoed.len(),
+                    count,
+                    instance.system.len()
+                ),
+            });
+        }
+        generators_agree(&instance.system, &echoed, instance.field.characteristic).map_err(
+            |(sent, read)| RunFailure::SelfInconsistent {
+                detail: format!("the driver read a different system: sent {sent}, read {read}"),
+            },
+        )
     }
 
     /// The driver's `#quotient dimension:`, or `None` when it reported no finite one.
@@ -841,8 +959,8 @@ impl ExternalSolver for SagebrushSolver {
 #[cfg(test)]
 mod tests {
     use super::{
-        SagebrushSolver, FGLM_MAX_CHARACTERISTIC, MAX_CHARACTERISTIC, MAX_VARIABLES,
-        MAX_VARIABLES_LEX, PINNED_SWITCHES,
+        SagebrushSolver, DRIVER_CONTRACT, FGLM_MAX_CHARACTERISTIC, MAX_CHARACTERISTIC,
+        MAX_VARIABLES, MAX_VARIABLES_LEX, PINNED_SWITCHES,
     };
     use crate::{
         grobner::external::{
@@ -1170,7 +1288,10 @@ mod tests {
     #[test]
     fn test_the_driver_output_parses_into_invariants() {
         let solver = solver("sagebrush-gb-driver", "parse");
-        let output = "#engine:               sagebrush-mpoly f4::groebner_p\n\
+        let output = "#driver contract:      2\n\
+                      #generators:           2\n\
+                      #gen 1*x1^2 + 1*x2\n#gen 1*x2^2 + 65520\n\
+                      #engine:               sagebrush-mpoly f4::groebner_p\n\
                       #field characteristic: 65521\n\
                       #variable order:       x1, x2\n\
                       #monomial order:       degrevlex (Order::DegRevLex)\n\
@@ -1244,6 +1365,155 @@ mod tests {
         ));
     }
 
+    /// A complete output whose echoed generators are the sent system parses.
+    #[test]
+    fn test_echoed_generators_matching_the_sent_system_parse() {
+        let solver = solver("sagebrush-gb-driver", "gen-ok");
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #generators:           2\n\
+                      #gen 1*x1^2 + 1*x2\n#gen 1*x2^2 + 65520\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        assert!(solver
+            .answer(
+                output,
+                &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis
+            )
+            .is_ok());
+    }
+
+    /// Echoed generators that are not the sent system are self-inconsistent.
+    ///
+    /// The whole point of the echo: a run whose input was not the one requested says nothing about
+    /// any other implementation, however well-formed its basis looks.
+    #[test]
+    fn test_an_echoed_generator_mismatch_is_self_inconsistent() {
+        let solver = solver("sagebrush-gb-driver", "gen-mismatch");
+        // The instance sends `x1^2+x2` and `x2^2-1`; the driver echoes a different constant.
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #generators:           2\n\
+                      #gen 1*x1^2 + 1*x2\n#gen 1*x2^2 + 65519\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+        ) {
+            Err(RunFailure::SelfInconsistent { detail }) => {
+                assert!(detail.contains("different system"), "{}", detail)
+            }
+            other => panic!("expected SelfInconsistent, got {:?}", other),
+        }
+    }
+
+    /// The `x1` / `x10` prefix collapse is caught by the echo check, on every run.
+    ///
+    /// The hazard cross-engine agreement structurally cannot catch: every engine is handed the same
+    /// bytes, so a greedy tokenizer reading `x1*x10` as `x1*x1*0` annihilates the term identically
+    /// everywhere and four engines then agree while all four answer a different question. This test
+    /// is the one that must be able to fail, so it feeds the *collapsed* echo a greedy parser would
+    /// produce and requires the adapter to reject it.
+    #[test]
+    fn test_the_prefix_collapse_is_caught_by_the_echoed_generators() {
+        let solver = solver("sagebrush-gb-driver", "gen-prefix");
+        let mut wide = instance(1_073_741_827, MonomialOrder::GradedReverseLexicographic);
+        wide.variables = (1..=10).map(|i| format!("x{}", i)).collect();
+        wide.system = vec!["x1*x10-1".to_string()];
+        let header = "#driver contract:      2\n\
+                      #field characteristic: 1073741827\n\
+                      #variable order:       x1, x2, x3, x4, x5, x6, x7, x8, x9, x10\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #generators:           1\n";
+        let tail = "#length of basis:      1 elements\n1*x1\n--- leading monomials ---\nx1\n";
+
+        // What a greedy longest-prefix tokenizer produces: `x1*x10` read as `x1*x1*0`, so the
+        // whole term vanishes and the generator collapses to the constant.
+        let collapsed = format!("{}#gen 1073741826\n{}", header, tail);
+        match solver.answer(&collapsed, &wide, Task::ReducedGrobnerBasis) {
+            Err(RunFailure::SelfInconsistent { .. }) => {}
+            other => panic!("a collapsed `x1*x10` must be rejected, got {:?}", other),
+        }
+        // And the honest echo of the same generator is accepted, so the check is not merely strict.
+        let faithful = format!("{}#gen 1*x1*x10 + 1073741826\n{}", header, tail);
+        assert!(
+            solver
+                .answer(&faithful, &wide, Task::ReducedGrobnerBasis)
+                .is_ok(),
+            "`x1*x10` read whole must be accepted"
+        );
+    }
+
+    /// A driver too old to echo its generators fails loudly rather than skipping the check.
+    ///
+    /// "Check only if the marker is present" is a check that silently stops checking, which is the
+    /// one outcome worse than not having it — so the contract marker is **required**.
+    #[test]
+    fn test_a_driver_that_cannot_echo_its_generators_is_refused() {
+        let solver = solver("sagebrush-gb-driver", "gen-old");
+        let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+        ) {
+            Err(RunFailure::MissingMarker { marker }) => {
+                assert_eq!(marker, "#driver contract:")
+            }
+            other => panic!("expected a missing contract marker, got {:?}", other),
+        }
+    }
+
+    /// A driver whose contract is older than the adapter requires is refused, naming both.
+    #[test]
+    fn test_an_older_driver_contract_is_refused_and_names_the_requirement() {
+        let solver = solver("sagebrush-gb-driver", "gen-older");
+        let output = "#driver contract:      1\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+        ) {
+            Err(RunFailure::Incomplete { detail }) => {
+                assert!(detail.contains("provision"), "{}", detail);
+                assert!(detail.contains(&DRIVER_CONTRACT.to_string()), "{}", detail);
+            }
+            other => panic!("expected an Incomplete contract refusal, got {:?}", other),
+        }
+    }
+
+    /// An echoed generator count that disagrees with the lines printed is a truncated run.
+    #[test]
+    fn test_an_echoed_generator_count_mismatch_is_unparsable() {
+        let solver = solver("sagebrush-gb-driver", "gen-count");
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #generators:           2\n#gen 1*x1^2 + 1*x2\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+        ) {
+            Err(RunFailure::Unparsable { marker, .. }) => assert_eq!(marker, "#gen"),
+            other => panic!("expected Unparsable, got {:?}", other),
+        }
+    }
+
     /// A driver that took the direct F4 route is not an answer to the conversion task.
     ///
     /// The two routes return the *same* lex basis, so this header is the only thing in the output
@@ -1252,7 +1522,8 @@ mod tests {
     #[test]
     fn test_an_echoed_route_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo-route");
-        let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       lex\n#route:                f4 (direct)\n\
                       #length of basis:      1 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
@@ -1272,7 +1543,8 @@ mod tests {
     #[test]
     fn test_an_echoed_order_mismatch_names_the_requested_order() {
         let solver = solver("sagebrush-gb-driver", "echo-order");
-        let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #length of basis:      1 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
@@ -1295,7 +1567,8 @@ mod tests {
     #[test]
     fn test_an_echoed_variable_order_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo");
-        let output = "#field characteristic: 65521\n\
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n\
                       #variable order:       x2, x1\n\
                       #monomial order:       degrevlex\n\
                       #route:                f4\n\
@@ -1317,7 +1590,8 @@ mod tests {
     #[test]
     fn test_an_echoed_characteristic_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo-char");
-        let output = "#field characteristic: 65519\n#variable order:       x1, x2\n\
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65519\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #length of basis:      1 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
@@ -1335,8 +1609,11 @@ mod tests {
     #[test]
     fn test_a_truncated_basis_is_unparsable_rather_than_short() {
         let solver = solver("sagebrush-gb-driver", "truncated");
-        let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
+        let output = "#driver contract:      2\n\
+                      #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
+                      #generators:           2\n\
+                      #gen 1*x1^2 + 1*x2\n#gen 1*x2^2 + 65520\n\
                       #length of basis:      2 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
         match solver.answer(

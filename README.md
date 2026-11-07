@@ -2465,10 +2465,19 @@ letting a sweep discover it as a wall-clock stop.
 
 Neither tool confuses `x1` with `x10`, which matters because the corpus has fourteen-variable
 rungs and **cross-engine agreement cannot catch a tokenizer bug** — every engine is handed the same
-bytes, so all of them would agree on the same wrong ideal. The Groebner.jl adapter checks its
-echoed generators against the sent system on every run, so a `Complete` status on a fourteen-
-variable rung is itself the proof; the Sagebrush driver prints no such echo, so there it is pinned
-by a behavioural test instead.
+bytes, so all of them would agree on the same wrong ideal. **Both adapters now check their echoed
+generators against the sent system on every run**, comparing canonical term multisets so that
+`x1*x10-1` and `1*x1*x10 + 1073741826` count as the same polynomial, and reporting a mismatch as
+`RunFailure::SelfInconsistent`. So a `Complete` status on a fourteen-variable rung is itself the
+proof, for Groebner.jl's `@gen` echo and for the Sagebrush driver's `#gen` echo alike. The
+behavioural test remains, because it checks the *consequence* in the computed basis and would still
+fail if a parser read the system correctly and then packed it wrongly.
+
+Because the Sagebrush driver lives in the provisioning prefix rather than in this repository, it
+prints a `#driver contract:` version that the adapter **requires**: an adapter that checked the echo
+only when it happened to be present would silently stop checking against an older installed binary,
+which is worse than not checking at all. A driver predating the marker fails with
+`RunFailure::Incomplete` naming `tools/external/provision.sh`, so the remedy is in the error.
 
 The agreement checks are live tests, `#[ignore]`d because CI has neither tool installed and a test
 that silently passed when the tool is absent would be worse than no test:

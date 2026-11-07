@@ -84,8 +84,8 @@ use std::time::Duration;
 
 use super::{
     contract::{
-        Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
-        RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
+        generators_agree, Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits,
+        Measurement, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
     process::{read_output, CpuBasis, Invocation, Supervisor},
 };
@@ -437,33 +437,13 @@ impl GroebnerJlSolver {
             });
         }
 
-        let p = instance.field.characteristic;
-        let mut ours: Vec<String> = instance
-            .system
-            .iter()
-            .map(|generator| canonical_generator(generator, p))
-            .collect();
-        let mut theirs: Vec<String> = echoed
-            .iter()
-            .map(|generator| canonical_generator(generator, p))
-            .collect();
-        ours.sort();
-        theirs.sort();
-        if ours != theirs {
-            // Report the first generator that differs rather than both whole systems: at the
-            // variable counts where this fires, a full dump is unreadable and the first
-            // disagreement is the diagnostic.
-            let first = ours
-                .iter()
-                .zip(&theirs)
-                .find(|(a, b)| a != b)
-                .map(|(a, b)| format!("sent {}, read {}", a, b))
-                .unwrap_or_else(|| "the generator multisets differ".to_string());
-            return Err(RunFailure::SelfInconsistent {
-                detail: format!("Groebner.jl read a different system: {}", first),
-            });
-        }
-        Ok(())
+        // Shared with the Sagebrush adapter, which performs the same check against its driver's
+        // `#gen` echo. One implementation, because the normalization is the subtle part.
+        generators_agree(&instance.system, &echoed, instance.field.characteristic).map_err(
+            |(sent, read)| RunFailure::SelfInconsistent {
+                detail: format!("Groebner.jl read a different system: sent {sent}, read {read}"),
+            },
+        )
     }
 
     /// The tool-reported solve time, which this adapter uses as the run's wall time.
@@ -521,79 +501,6 @@ fn undeclared_identifier(instance: &Instance) -> Option<String> {
         }
     }
     None
-}
-
-/// A polynomial as a canonical, sorted multiset of `coefficient*factors` terms over `GF(p)`.
-///
-/// For [`GroebnerJlSolver::check_echoed_generators`]: both sides print a flat signed sum of terms,
-/// but Zeebra writes a negative coefficient as `-1` where Groebner.jl prints the residue `p-1`, and
-/// neither term order nor factor order within a monomial is meaningful. Reducing every coefficient
-/// mod `p` and sorting both levels makes the comparison about the polynomial.
-///
-/// Tokenizing is on the explicit `*` and `^` separators and variable names are then matched
-/// **whole**, which is the property that makes `x1` and `x10` distinguishable — the same property
-/// the Sagebrush driver's parser has, and the one a greedy longest-prefix scan would lack.
-fn canonical_generator(text: &str, characteristic: u64) -> String {
-    let p = characteristic.max(2) as i128;
-    let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-
-    // Split into signed chunks without losing a sign, as the driver's parser does.
-    let mut chunks: Vec<(i128, String)> = Vec::new();
-    let mut sign: i128 = 1;
-    let mut current = String::new();
-    for character in compact.chars() {
-        match character {
-            '+' | '-' if !current.is_empty() => {
-                chunks.push((sign, std::mem::take(&mut current)));
-                sign = if character == '-' { -1 } else { 1 };
-            }
-            '+' => {}
-            '-' => sign = -sign,
-            _ => current.push(character),
-        }
-    }
-    if !current.is_empty() {
-        chunks.push((sign, current));
-    }
-
-    let mut terms: Vec<String> = Vec::new();
-    for (sign, chunk) in chunks {
-        let mut coefficient: i128 = 1;
-        let mut factors: Vec<String> = Vec::new();
-        for factor in chunk.split('*').filter(|factor| !factor.is_empty()) {
-            let (base, exponent) = match factor.split_once('^') {
-                Some((base, exponent)) => (base, exponent.parse::<u32>().unwrap_or(0)),
-                None => (factor, 1),
-            };
-            match base.parse::<i128>() {
-                // A numeric factor folds into the coefficient.
-                Ok(value) => {
-                    for _ in 0..exponent {
-                        coefficient = coefficient * value % p;
-                    }
-                }
-                // A variable name, matched whole.
-                Err(_) => factors.push(if exponent == 1 {
-                    base.to_string()
-                } else {
-                    format!("{}^{}", base, exponent)
-                }),
-            }
-        }
-        let coefficient = (sign * coefficient).rem_euclid(p);
-        if coefficient == 0 {
-            continue;
-        }
-        factors.sort();
-        let monomial = if factors.is_empty() {
-            "1".to_string()
-        } else {
-            factors.join("*")
-        };
-        terms.push(format!("{}*{}", coefficient, monomial));
-    }
-    terms.sort();
-    terms.join("+")
 }
 
 /// An integer-valued marker.
@@ -894,9 +801,11 @@ impl ExternalSolver for GroebnerJlSolver {
 #[cfg(test)]
 mod tests {
     use super::{
-        canonical_generator, error_line, groebner_ordering, internal_ordering, is_bindable_name,
-        GroebnerJlSolver, MAX_CHARACTERISTIC,
+        error_line, groebner_ordering, internal_ordering, is_bindable_name, GroebnerJlSolver,
+        MAX_CHARACTERISTIC,
     };
+    use crate::grobner::external::contract::canonical_generator;
+
     use crate::{
         grobner::external::{
             ExternalSolver, FieldSpec, Instance, Limits, RunFailure, RunStatus, Support, Task,

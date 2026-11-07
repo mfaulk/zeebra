@@ -792,6 +792,13 @@ fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it()
 /// The corpus tops out at seven variables, so this rung is deliberately hand-rolled: it is testing
 /// the two parsers rather than the ladder, and it is here so the hazard is pinned **before** a
 /// ten-or-more-variable rung is added rather than after.
+///
+/// **Both adapters now also check their own generator echo on every run** — Groebner.jl's `@gen`
+/// since #260, Sagebrush's `#gen` since #329 — so a `Complete` status on this rung is *itself* the
+/// proof that the two names were read apart, for both tools. This test keeps its own assertions
+/// anyway: it checks the *consequence* in the computed basis rather than the echo, so it would
+/// still fail if a parser read the system correctly and then packed or reduced it wrongly, which
+/// the echo cannot see.
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
 fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
@@ -836,6 +843,10 @@ fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
             Task::ReducedGrobnerBasis,
             &Limits::wall(Duration::from_secs(120)),
         );
+        // `answered` requires `Complete`, and for both tools reaching `Complete` on this instance
+        // means the adapter already compared the echoed generators against the fourteen-variable
+        // system it sent. That is the per-run half of this hazard's coverage; the assertions below
+        // are the behavioural half.
         let answer = answered(&report);
         let leading = answer
             .invariants
@@ -862,6 +873,56 @@ fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
             name,
             basis
         );
+    }
+}
+
+/// The Sagebrush driver's echoed generators are the system that was sent, on a live run.
+///
+/// The unit tests cover the adapter's half against fixtures. This covers the half that cannot be
+/// faked: that the **real** driver's `#gen` rendering, after its own parse and pack, canonicalizes
+/// to the same thing as Zeebra's renderer did on the way in. A disagreement between the two
+/// spellings would make the check reject every honest run, which is the way a check like this
+/// usually fails.
+///
+/// Run on a fourteen-variable system because that is where `x1` is a prefix of `x10`, and the
+/// generator `x1*x10-1` is the one a greedy tokenizer annihilates.
+#[test]
+#[ignore = "needs the provisioned sagebrush-gb-driver"]
+fn test_the_sagebrush_driver_echoes_the_system_it_was_sent() {
+    let Some(mut solver) = sagebrush("sb-echo") else {
+        panic!("the Sagebrush driver is not installed; see the module documentation")
+    };
+    let variables: Vec<String> = (1..=14).map(|i| format!("x{}", i)).collect();
+    let names: Vec<&str> = variables.iter().map(String::as_str).collect();
+    let mut system = vec!["x1*x10-1".to_string(), "x1^2-x10".to_string()];
+    system.extend(
+        (1..=14)
+            .filter(|i| *i != 1 && *i != 10)
+            .map(|i| format!("x{}^2-x1", i)),
+    );
+    let instance = Instance::new(
+        "echo-14",
+        "prefix",
+        FieldSpec::prime(P),
+        names.iter().map(|v| v.to_string()).collect(),
+        system,
+        MonomialOrder::GradedReverseLexicographic,
+    );
+
+    let report = solver.run(
+        &instance,
+        Task::ReducedGrobnerBasis,
+        &Limits::wall(Duration::from_secs(120)),
+    );
+    // Reaching `Complete` *is* the assertion: the adapter refuses the run with
+    // `SelfInconsistent` if the echo and the sent system disagree, and with `Incomplete` if the
+    // installed driver is too old to echo at all.
+    match &report.status {
+        RunStatus::Complete(_) => {}
+        RunStatus::Failed(RunFailure::Incomplete { detail }) => {
+            panic!("the installed driver is too old: {detail}")
+        }
+        other => panic!("the driver did not echo the system it was sent: {other:?}"),
     }
 }
 

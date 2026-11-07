@@ -358,6 +358,21 @@ fn order_variant(o: Order) -> &'static str {
 const USAGE: &str =
     "usage: sagebrush-gb-driver <file.ms> [--order lex|deglex|degrevlex|invlex] [--route f4|fglm]";
 
+/// The output format this driver speaks, printed as `#driver contract:`.
+///
+/// The adapter **requires** a value at least as high as the one it was written against, and
+/// refuses a run otherwise rather than skipping the checks the missing markers would have fed.
+/// That is the point of having it: an adapter that checked the generator echo only when it
+/// happened to be present would stop checking, silently, against an older installed binary.
+///
+/// Bump it whenever a marker the adapter checks is added, renamed or given a new meaning, and
+/// raise `sagebrush::DRIVER_CONTRACT` in the same change.
+///
+/// * 1 — the degrevlex basis, its leading monomials, and the echoed characteristic, variable order
+///   and monomial order.
+/// * 2 — `--order` / `--route`, `#route:`, `#quotient dimension:`, and the `#gen` echo.
+const DRIVER_CONTRACT: u32 = 2;
+
 /// The command line: the input path, the order and the route.
 ///
 /// Strict about unknown flags. A driver that ignored one would answer a question other than the
@@ -436,6 +451,21 @@ fn main() -> Result<(), String> {
 
     let bits = (64 / n) as u32;
     let sys: Vec<QPoly> = parsed.iter().map(|t| to_qpoly(t, n, bits, p)).collect();
+
+    // Echoed **before** anything is computed, and rendered from the packed `QPoly`s rather than
+    // from the input text — so this is a round trip through this driver's own parser and packer,
+    // and the adapter comparing it against what it sent is what turns "the parser matches variable
+    // names whole" from a belief into a per-run assertion. The hazard is `x1` being a prefix of
+    // `x10`: a greedy tokenizer reads `x1*x10` as `x1*x1*0` and annihilates the term, and because
+    // every engine is handed the same bytes no amount of cross-engine agreement can detect it.
+    //
+    // Rendered in degrevlex whatever `--order` is, so the echo does not depend on the route and
+    // stays comparable across tasks; the adapter compares as a set of canonical terms anyway.
+    println!("#driver contract:      {DRIVER_CONTRACT}");
+    println!("#generators:           {}", sys.len());
+    for f in &sys {
+        println!("#gen {}", render(&from_qpoly(f, Order::DegRevLex), &vars));
+    }
 
     let t0 = std::time::Instant::now();
     let mut g: Vec<Poly> = match route {
