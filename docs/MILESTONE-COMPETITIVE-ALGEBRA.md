@@ -427,15 +427,71 @@ installation.** No comparable measurement exists. It is a produced figure.
 
 ### 8.4 Gate M25-C — the next Poseidon rung
 
-Decided from the measured cost model, not from round count. Under the *measured* 2.70 s core-time per
-order-1458 determinant, `rf4-rp2` (59 050 samples) is ≈44 single-core hours ≈ **1.4 h on 32
-workers**, and `rf6-rp0` (531 442 samples) is ≈12.5 h on 32 workers; the build is ≈50 min and
-identical for every six-round row, since all three have resultant degree 729 at Sylvester order
-1 458. **Those numbers are extrapolations from two points and are superseded by #289's fit.** Before
-any attempt: predict construction time and memory, predict determinant count and cost, account for
-verification, state a maximum wall time and RSS ceiling, record whether the computation is bounded
-and realistic, and decide go/no-go first. An improved six-round run is a valid result even if no
-harder instance is reached. **The next rung is not launched because more memory became available.**
+Decided from the measured cost model, not from round count. Before any attempt: predict construction
+time and memory, predict determinant count and cost, account for verification, state a maximum wall
+time and RSS ceiling, record whether the computation is bounded and realistic, and decide go/no-go
+first. An improved six-round run is a valid result even if no harder instance is reached. **The next
+rung is not launched because more memory became available.**
+
+#### 8.4.1 The decision, taken against #289's fit: `rf4-rp2` is costed, bounded, and **not
+authorized**
+
+The gate ran as written, and this subsection is its output. Everything below supersedes the
+two-point extrapolation this section originally carried, which put `rf4-rp2` at ≈1.4 h on the
+strength of a 2.70 s core-time; #289's calibration measures that figure at **3.148 s**.
+
+`rf4-rp2` is the right candidate. It is a registered faithful reduction whose best recorded result is
+`stopped: max_live_nonzeros at degree 4`, so a witness there would be a frontier extension rather
+than a cheaper version of something already done; and at six rounds it shares `rf2-rp4`'s Sylvester
+order 1 458 and resultant degree 729, so the only thing that grows is the sample count — 6 562 to
+**59 050**, exactly `3^(2·4+2) + 1`.
+
+Costed, each line labelled:
+
+| stage | cost | basis |
+|---|---:|---|
+| symbolic build | **48.4 min**, **57 GB** peak RSS | measured, §6.8; identical for every six-round row |
+| 59 050 order-1458 determinants, 32 workers | **1.79 h** | model (`RowCost::of`, 10% conservative by construction) |
+| the same, from measured core-times alone | **1.61 h** | 59 050 × 3.148 s / 32, measured per-determinant |
+| off-domain validation, 8 points | **< 1%** of the row | measured, now on the parallel path (#285) |
+| root finding at degree 59 049 | **not estimated** | §6.3 measured 70x for a 9x degree step (729 → 6 561); extrapolating that again is not defensible |
+| **total** | **≈ 2.6 h**, **≈ 57 GB** | build + determinants, root finding unpriced |
+
+**Against the §9 ceiling of ~2 h wall and ~64 GB peak RSS, this fails on time.** It is close on memory
+too — 57 GB against 64 GB is 89% of the ceiling, with the largest single unpriced term (root finding
+at a degree nine times anything measured) sitting on the wrong side of the estimate.
+
+So the decision is **no-go pending explicit owner authorization**, and that is a completed research
+decision rather than an unfinished attempt. Three things follow from recording it this way:
+
+1. **The run is bounded and realistic, which is a different statement from authorized.** `rf4-rp2`
+   is not out of reach — it is roughly a workday's third of a machine, and nothing in the cost model
+   is extrapolated beyond the order it was fitted at. What it is not is inside a ceiling chosen for
+   unattended work. An owner who wants it can authorize ~3 h and 64 GB and expect it to land.
+2. **#243 changes the memory, not the time.** A collecting multiply bounds the build's 57 GB by its
+   output, which removes the memory half of this gate almost entirely — but the build's 48.4 min is
+   arithmetic the collecting multiply still has to do, so the total stays ≈2.6 h. Memory was never
+   what blocked this row; it only looked like the binding constraint because it was the number that
+   had been wrong by 838x.
+3. **`rf6-rp0` is not close.** 531 442 samples is **16.15 h** on 32 workers by the model, **14.5 h**
+   from measured core-times. Eight rounds is worse by three orders: `rf4-rp4` at order 13 122 is
+   **490.5 d** on 32 workers, and that figure is extrapolated three times past the largest order
+   measured. Neither is a candidate for any ceiling, and neither becomes one through a constant
+   factor — which is what makes #297's axes 3–5 the only directions that matter, and #297's axis 1
+   close to zero-sum against a sweep already 92–95% efficient.
+
+**What would change this decision.** Not more memory, and not a faster determinant by a constant:
+`rf4-rp2` needs a factor of ~1.3 to fit the existing ceiling, which a 10%-conservative model and an
+unpriced root-finding term could swallow entirely. The honest routes are an owner authorization at
+~3 h, or an asymptotic improvement from #297.
+
+Two figures in the calibration are **unexplained and bound every ratio quoted against the older
+records**, and they are the reason this decision is stated with its basis rather than as a number.
+Determinant measurements taken now are **~1.2x slower** than the same measurements on record —
+same registered row, same code path, same lock, months and a commit range apart (#318). And the
+width penalty measures **31–44%** at 32 workers where §6.6 recorded **4–9%** (#319). Both were
+treated as findings rather than repaired. A factor computed between a figure from §6.5 and a figure
+taken today carries a ~20% systematic that is a property of neither implementation.
 
 ### 8.5 Gate M25-D — each research item separately
 
@@ -463,6 +519,11 @@ fix, expected far less after); #237's 14 GB rungs; #289's determinant sweep thro
 (~153 MB per matrix); #286 at its measured ≈8 GB projection. **Not** authorized without a fresh
 decision: `rf4-rp2`, `rf6-rp0`, any eight-round row, and PCICO `N = 6` before FCICO `N = 6` is
 measured.
+
+Resolved during the milestone, with the arithmetic in §8.4.1: **`rf4-rp2` remains unauthorized** at
+≈2.6 h against the ~2 h ceiling, and it is the *time* that fails, not the memory — a result that
+only became visible once #289 measured the per-determinant cost at 3.148 s rather than the 2.70 s on
+record. `rf6-rp0` (16.15 h) and every eight-round row (≥490 d) are not near any ceiling.
 
 ---
 
