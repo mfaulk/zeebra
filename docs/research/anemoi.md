@@ -774,7 +774,7 @@ msolve on **one core** (`taskset --cpu-list 0`, `-t` defaulting to 1), Zeebra on
 | `n4-pcico` | 0.03 s | 9 MB | 0.366 s | 0.332 s | 1.480 s |
 | `n5-fcico` | **1.81 s** | 32 MB | **63.71 s** | 47.53 s | 136.8 s |
 | `n5-pcico` | **1.85 s** | 34 MB | **39.0 s** | 38.19 s | 75.96 s |
-| `n6-pcico` | *withdrawn — see below* | 635 MB | §8a.8 | §8a.8 | 11 777.0 s |
+| `n6-pcico` | **340.66 s** (re-taken) | 635 MB | §8a.8 | §8a.8 | 11 777.0 s |
 
 > **msolve solves `N = 5` end to end in 1.8 s on one core and 32 MB. Zeebra takes 63.7 s on eight
 > cores and 330 MB — 35x the wall for `FCICO` and 21x for `PCICO`, and 10x the memory. Same machine,
@@ -792,10 +792,17 @@ outside the lock, ~19:00–19:05**, overlapping nearly the whole measurement. A 
 takes cores, memory bandwidth and the all-core turbo budget simultaneously, which is the one
 contamination mode a wall-clock figure cannot be corrected for after the fact.
 
-So the figure is **withdrawn, not annotated**. It was a comparand for a reproduction of a published
+So the figure was **withdrawn, not annotated**. It was a comparand for a reproduction of a published
 Magma number, and a contaminated comparand is worse than no comparand: it would have made the
-reproduction look validated against something that was not measured under the stated protocol. The
-re-take is queued under the lock and lands in §8a.8.
+reproduction look validated against something that was not measured under the stated protocol.
+
+**The clean re-take is 340.66 s** against the contaminated 353.88 s — the stray neighbour cost
+**3.9%**. Small, and that is the point worth recording: a 3.9% error is far too small to notice by
+inspection and far too small for any plausibility check to catch, which is exactly why the
+correction had to come from the lock log rather than from the number looking wrong. Had the overlap
+been reported less promptly, the contaminated figure would have been indistinguishable from a clean
+one. The sub-stage split moves the same way and in the same proportion: scalar sequence 337.39 s of
+340.66 s, **99.0%**, against 349.52 s of 353.88 s before.
 
 **What the window does and does not touch.** The stray job was 19:00–19:05. From
 `$HOME/.zeebra/benchlock.log`:
@@ -851,6 +858,80 @@ The reason is visible in where each engine spends its conversion, and the three 
 Three implementations, three different dominant stages, one specification. **A conversion ratio
 between any two of them is not a measurement of FGLM**, and that is the most transferable thing
 #283 produced.
+
+### 8a.8 `N = 6`, attempted — two outcomes, and one of them is not a result
+
+Recorded in the order they happened, including the two that produced no figure, because a
+resource-attributed failure is a completed research decision and an infrastructure loss is not one.
+
+All figures in this subsection are on **`origin/main` including #305**, which is a different build
+from §8a.3's `N ≤ 5` column (commit `eb79e05`, pre-#305). #305 bounds symbolic preprocessing's
+monomial queue by the symbolic closure, and the first `FCICO` refusal below was *on that structure*,
+so the two are not mixable and the `N ≤ 5` basis figures would need re-taking before any
+cross-rung basis comparison. The conversion figures are unaffected — #305 is an F4 change.
+
+#### Attempt 1, `FCICO`: refused in 3.8 s, on the third budget of four
+
+```
+| grobner | 3.813820931s | did not complete: symbolic preprocessing needed
+                            more than the 200000 rows allowed |
+```
+
+`F4Error::TooManyRows`, not a memory refusal and not the conversion. §8a.5's pre-flight had lifted
+`max_live_nonzeros` and `max_live_bytes`; it had not lifted `max_matrix_rows`, because nothing had
+yet crossed it. **Three of F4's four relevant budgets were discovered by separate refusals rather
+than by reading the struct**, which is #322's complaint with a third instance.
+
+The comparison this produced is worth more than the fix. The published Magma run on **this exact
+row** peaks at **173 808 × 189 401** — *inside* the 200 000 default it refused on. So this crate's
+symbolic preprocessing enumerates more rows than Magma's for the same system at the same rung, and
+the default is not obviously the wrong size for a library. That is an **F4** observation, and it
+lands on the structure #305 has just bounded, which is why the re-attempt is on a post-#305 build
+rather than the one that produced the refusal.
+
+#### Attempt 1, `PCICO`: lost to infrastructure at 3 177 s of 5 400 s — **not** a result
+
+The run reached 3 177 s of its 5 400 s budget at a flat 4.53 GB and was then killed — **not** by its
+watchdog, **not** by its RSS guard, and not by any resource limit. The harness stopped the
+background shell that had launched it and took the whole process tree with it: `benchlock`,
+`timeout`, `taskset` and the binary. `benchlock.log` records `END pid=2761621` at 20:01:47 with a
+clean status, so from the lock's point of view the measurement simply finished, and the output file
+holds the eleven header lines and no stage table.
+
+**This is categorically not a resource-attributed failure and must not be recorded as one.** It
+says nothing whatever about whether `D = 15 625` is reachable; it says a measurement was coupled to
+the lifetime of the thing that started it. The fix is `setsid`, so the run becomes its own session
+leader and survives its launcher. Recorded because an unbounded-compute policy is only as good as
+its ability to tell "the budget stopped it" from "something unrelated stopped it", and these two
+look identical in the lock log — the second is the one that silently wastes an hour of a serialized
+mutex and reports success.
+
+#### Attempt 2, both models, on the post-#305 build and detached
+
+Re-queued `PCICO` first then `FCICO`, each acquiring `benchlock` separately so the queue interleaves
+between them, both under `setsid`, with all four F4 budgets lifted for `N >= 6`, the 2.5 h backstop
+on `FCICO` and the corrected RSS guard. Ordering deliberately puts both behind the fourteen jobs
+already waiting: a milestone's Minimum criteria are worth more than a Strong-criteria refinement,
+and `PCICO` alone already yields the reproduction, the `D = 15 625` check and the conversion figure.
+
+*Outcome pending; this subsection is completed with whatever it produces, including a backstop.*
+
+#### What is already established at `N = 6`, independently of either run
+
+Three results at this rung do **not** depend on a Zeebra timing landing, and they are the ones #286
+was filed to get:
+
+| established | by | value |
+|---|---|---|
+| `D = 15 625` = `5^6` | this crate's F4 + Hilbert series, all three characteristics | the §5 invariant, 36/36 rows |
+| `D = 15 625` | the reference's own log (`unideg`, `Get rep mat`) | agreement with a printed number, not a formula |
+| `D = 15 625` | msolve 0.11.0, independently | a third witness |
+| conversion is reachable at this `D` | msolve, **340.66 s** on one core, 635 MB | the rung is not a wall for a modern implementation |
+
+So the question `N = 6` was filed to answer — *is the published conversion wall real, and is this
+rung reachable* — is already answered **yes, reachable**, by a same-machine measurement, before any
+Zeebra figure. What a Zeebra figure adds is this crate's position against it, which §8a.7 has
+already established is one and a half orders of magnitude behind.
 
 ## 9. Open
 
