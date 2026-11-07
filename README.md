@@ -1344,9 +1344,10 @@ X_k = w^T(k) * sum_j (x_j w^(T(j) + j)) * w^(-T(k - j)).
 Every exponent is an integer and every factor is a power of the `n`th root the caller already
 holds, so there is no second root to construct, validate, or fail to find. Nothing is lost by it:
 for odd `n`, `n | q - 1` already implies `2n | q - 1`, and for even `n` the convolution length
-needs two-adicity at least `log2(n) + 1`, which is *more* than the `2n`-th root's `v2(n) + 1`. A
-field that can host the convolution always has a `2n`-th root; one that cannot never gets far
-enough to want it.
+needs two-adicity at least `log2(n) + 1` — because `2n - 1` is odd and above one, so it is not a
+power of two and `L >= 2n` — which is never less than the `2n`-th root's own `v2(n) + 1`. A field
+that can host the convolution always has a `2n`-th root; one that cannot never gets far enough to
+want it.
 
 So the convolution length is the single demand on the field, and `bluestein_convolution_domain`
 is where it is either met or reported:

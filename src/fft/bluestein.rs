@@ -57,9 +57,10 @@ pub fn bluestein_convolution_length(size: usize) -> usize {
 ///
 /// This subsumes the `2n`-th root the halved-squares form of the identity would have needed. A
 /// `2n`-th root exists whenever `2n | q - 1`; for odd `n` that follows from `n | q - 1` alone, and
-/// for even `n` it needs two-adicity at least `v2(n) + 1`, which is strictly less than the
-/// `log2(2n - 1).ceil() >= log2(n) + 1` this asks for. So a field that can host the convolution
-/// can always host the `2n`-th root, and the stronger condition is the only one worth checking.
+/// for even `n` it needs two-adicity at least `v2(n) + 1`, which never exceeds the `log2(n) + 1`
+/// this asks for — `2n - 1` is odd and above one, so it is not itself a power of two and `L >= 2n`.
+/// So a field that can host the convolution can always host the `2n`-th root, and this is the only
+/// condition worth checking.
 pub fn bluestein_convolution_domain<F: KnownOrder, R: RngCore + CryptoRng>(
     size: usize,
     rng: &mut R,
