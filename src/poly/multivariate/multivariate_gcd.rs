@@ -324,49 +324,190 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
     /// The squarefree part of `self`: the product of its distinct irreducible factors.
     ///
-    /// `self / gcd(self, ∂self/∂x_0, ..., ∂self/∂x_{N-1})`, normalized. For
-    /// `self = ∏ g_i^(e_i)` that GCD is `∏ g_i^(e_i - 1)`, so the quotient is `∏ g_i` — the
-    /// radical. A nonzero constant is a unit and has squarefree part one.
+    /// The radical, normalized. A nonzero constant is a unit and has squarefree part one.
+    ///
+    /// `self / gcd(self, ∂self/∂x_0, ..., ∂self/∂x_{N-1})` where the characteristic exceeds the
+    /// total degree, which is `∏ g_i` for `self = ∏ g_i^(e_i)` and costs `N + 1` GCDs. Otherwise
+    /// that quotient is only *part* of the radical — see [`Self::squarefree_decomposition`] — and
+    /// the radical comes from the decomposition instead.
     ///
     /// # Errors
-    /// Refuses when the field's characteristic does not exceed the total degree, where
-    /// differentiation can annihilate a repeated factor and the answer would be wrong rather than
-    /// absent. See [`SquarefreeError`].
+    /// [`SquarefreeError::Zero`] only. Before #408 this also refused in small characteristic.
     pub fn squarefree_part(&self) -> Result<Self, SquarefreeError> {
-        if self.is_zero() {
-            return Err(SquarefreeError::Zero);
+        match self.gradient_radical() {
+            Ok(radical) => Ok(radical),
+            Err(SquarefreeError::Zero) => Err(SquarefreeError::Zero),
+            // The characteristic divides some multiplicity, or might: the gradient alone cannot
+            // see every factor, so the radical is assembled from the decomposition, which can.
+            Err(SquarefreeError::CharacteristicTooSmall { .. }) => Ok(self
+                .squarefree_decomposition()?
+                .into_iter()
+                .fold(Self::one(), |product, (factor, _)| &product * &factor)
+                .normalized()),
         }
-        self.check_characteristic()?;
-
-        let mut repeated = self.clone();
-        for index in 0..N {
-            repeated = repeated.gcd(&self.derivative(index));
-            if repeated.is_one() {
-                break;
-            }
-        }
-        Ok(self
-            .exact_div(&repeated)
-            .expect("the repeated part divides")
-            .normalized())
     }
 
     /// The squarefree decomposition of `self`, as `(factor, multiplicity)` pairs.
     ///
     /// The factors are squarefree, pairwise coprime, normalized, and listed at most once per
     /// multiplicity; their product with multiplicity is `self` up to that normalization. A unit
-    /// decomposes into nothing.
+    /// decomposes into nothing. **Defined in every characteristic**, including the one where the
+    /// derivative is blind.
     ///
-    /// Built from repeated radicals rather than by Yun's algorithm: with
-    /// `f_1 = self`, `r_i = radical(f_i)` and `f_{i+1} = f_i / r_i`, the radical `r_i` is the
-    /// product of the factors of multiplicity at least `i`, so `r_i / r_{i+1}` is exactly the
-    /// factor of multiplicity `i`. That costs one radical — `N + 1` GCDs — per distinct
-    /// multiplicity, where Yun's costs one GCD; it is the cheaper thing to get right, and the
-    /// faster form is a follow-on.
+    /// # Why the derivative is not enough
+    /// For `self = ∏ g_i^(e_i)`, `gcd(self, ∇self)` is
+    /// `∏_{p | e_i} g_i^(e_i) * ∏_{p ∤ e_i} g_i^(e_i - 1)`: a factor whose multiplicity the
+    /// characteristic divides contributes *all* of itself, because `e_i` enters each derivative as
+    /// a field element and vanishes. So `self / gcd(self, ∇self)` is the product of the distinct
+    /// factors whose multiplicity `p` does not divide — the **visible** ones — and over GF(2) every
+    /// even multiplicity is invisible. #128 refused rather than answer here, and that refusal was a
+    /// fact about the method and not about the problem.
+    ///
+    /// # The two halves
+    /// *The visible half* is resolved by a ladder: with `P_1` the visible part and `Q_1 = f / P_1`,
+    /// `P_{j+1} = gcd(P_j, Q_j)` and `Q_{j+1} = Q_j / P_{j+1}`. `P_j` is the product of the visible
+    /// factors of multiplicity at least `j`, so `P_j / P_{j+1}` is the one of multiplicity exactly
+    /// `j`. That is **one GCD per multiplicity**, between a squarefree `P_j` that only shrinks,
+    /// where [`Self::squarefree_decomposition_by_radicals`] pays a whole radical — `N + 1` GCDs
+    /// over operands that stay large — for each.
+    ///
+    /// *The invisible half* is whatever the ladder leaves, which is `∏_{p | e_i} g_i^(e_i)`: every
+    /// multiplicity is a multiple of `p`, so it is a `p`-th power, and [`Self::pth_root`] takes the
+    /// root exactly. Recursing on the root gives those factors with multiplicities divided by `p`,
+    /// and multiplying each by `p` puts them back. Each level divides the degree by at least `p`,
+    /// so the recursion is at most `log_p(degree)` deep.
+    ///
+    /// # Not Yun's algorithm, and why
+    /// #408 asked for Yun's. Yun's recurrence is univariate: it carries `b_i` and `c_i` and forms
+    /// `d_i = b_i' - c_i`, one derivative and one GCD per multiplicity. Generalized to `N`
+    /// variables honestly it carries a `d_i` per variable and needs `gcd(b_i, d_i^(0), …,
+    /// d_i^(N-1))` — `N` GCDs per multiplicity, which is *worse* than the ladder above and no
+    /// better than the radicals it was meant to replace. The ladder achieves the cost Yun's is
+    /// wanted for, one GCD per multiplicity, with the gradient taken once rather than once per
+    /// level. Stated here rather than in a commit message because the issue names the other
+    /// algorithm.
     ///
     /// # Errors
-    /// As [`Self::squarefree_part`].
+    /// [`SquarefreeError::Zero`] only.
     pub fn squarefree_decomposition(&self) -> Result<Vec<(Self, u32)>, SquarefreeError> {
+        if self.is_zero() {
+            return Err(SquarefreeError::Zero);
+        }
+        let mut decomposition = Vec::new();
+        self.normalized().collect_squarefree(1, &mut decomposition);
+        Ok(decomposition)
+    }
+
+    /// Append `self`'s decomposition to `out`, with every multiplicity scaled by `scale`.
+    ///
+    /// `self` must be nonzero and normalized. `scale` is the power of the characteristic this
+    /// level was reached through: a factor of multiplicity `j` here had multiplicity `j * scale` in
+    /// the polynomial the recursion started from.
+    fn collect_squarefree(&self, scale: u32, out: &mut Vec<(Self, u32)>) {
+        if self.is_one() {
+            return;
+        }
+
+        let visible = match self.gradient_radical_unguarded() {
+            Some(visible) => visible,
+            // A unit, which `is_one` above has already excluded after normalization.
+            None => return,
+        };
+
+        let mut level = visible;
+        let mut rest = self
+            .exact_div(&level)
+            .expect("the visible part divides its own polynomial");
+        let mut multiplicity = 1u32;
+        while !level.is_one() {
+            let next = level.gcd(&rest);
+            rest = rest
+                .exact_div(&next)
+                .expect("a visible factor of the next level occurs again in the remainder");
+            let factor = level
+                .exact_div(&next)
+                .expect("the next level divides this one")
+                .normalized();
+            if !factor.is_one() {
+                out.push((factor, multiplicity * scale));
+            }
+            level = next;
+            multiplicity += 1;
+        }
+
+        // What the ladder left is `∏_{p | e_i} g_i^(e_i)`, a `p`-th power.
+        let rest = rest.normalized();
+        if rest.is_one() {
+            return;
+        }
+        let characteristic = F::characteristic_u128()
+            .and_then(|characteristic| u32::try_from(characteristic).ok())
+            // A characteristic that divides a multiplicity of a nonzero polynomial is at most its
+            // total degree, which a `Monomial`'s exponents hold in a `u32`.
+            .expect("a characteristic that divides a multiplicity fits the degree it divides");
+        let root = rest
+            .pth_root()
+            .expect("what the ladder leaves has every multiplicity divisible by p");
+        root.collect_squarefree(scale * characteristic, out);
+    }
+
+    /// The `p`-th root of `self`, or `None` if `self` is not a `p`-th power.
+    ///
+    /// In characteristic `p` the Frobenius map `c -> c^p` is a ring homomorphism, so
+    /// `(Σ d_α x^α)^p = Σ d_α^p x^(pα)`: a `p`-th power is exactly a polynomial every one of whose
+    /// exponents `p` divides, and its root divides the exponents and takes the `p`-th root of each
+    /// coefficient. Every finite field is perfect, so each coefficient has one and it is unique.
+    ///
+    /// The coefficient root is `c^(q/p)`, since `(c^(q/p))^p = c^q = c`. The exponent is formed on
+    /// the order's limbs rather than on a machine integer, so nothing here caps the field's size;
+    /// over a prime field `q/p` is one and the root is the identity, which is correct because
+    /// Frobenius is the identity on GF(p).
+    ///
+    /// `None` also for a field whose characteristic exceeds a `u32`, which divides no nonzero
+    /// exponent this ring can hold — so no non-constant polynomial over it is a `p`-th power.
+    pub fn pth_root(&self) -> Option<Self> {
+        if self.is_zero() {
+            return Some(Self::zero());
+        }
+        let characteristic = match F::characteristic_limbs() {
+            [characteristic] => u32::try_from(*characteristic).ok()?,
+            _ => return None,
+        };
+        let exponent = divide_limbs(F::order_limbs(), u64::from(characteristic));
+
+        let mut terms: Vec<(Monomial<N>, F)> = Vec::with_capacity(self.terms.len());
+        for (monomial, coefficient) in self.terms.iter() {
+            let mut exponents = [0u32; N];
+            for (root, exponent) in exponents.iter_mut().zip(monomial.exponents()) {
+                if !exponent.is_multiple_of(characteristic) {
+                    return None;
+                }
+                *root = exponent / characteristic;
+            }
+            terms.push((Monomial::new(&exponents), coefficient.pow_limbs(&exponent)));
+        }
+        Some(Self::new(&terms))
+    }
+
+    /// The squarefree decomposition built from repeated radicals: the reference implementation.
+    ///
+    /// #128's form, kept as the thing [`Self::squarefree_decomposition`] is differentially tested
+    /// against rather than deleted. With `f_1 = self`, `r_i = radical(f_i)` and
+    /// `f_{i+1} = f_i / r_i`, the radical `r_i` is the product of the factors of multiplicity at
+    /// least `i`, so `r_i / r_{i+1}` is the factor of multiplicity exactly `i`. Simple enough to be
+    /// obviously correct, and that is its whole job.
+    ///
+    /// It is a reference and not the implementation for two reasons: it costs a radical — `N + 1`
+    /// GCDs over operands that do not shrink — per distinct multiplicity, and it is **only valid
+    /// where differentiation sees every factor**, so it still refuses in small characteristic.
+    /// That refusal is a true statement about this method.
+    ///
+    /// # Errors
+    /// [`SquarefreeError::Zero`], and [`SquarefreeError::CharacteristicTooSmall`] when the
+    /// characteristic does not exceed the total degree.
+    pub fn squarefree_decomposition_by_radicals(
+        &self,
+    ) -> Result<Vec<(Self, u32)>, SquarefreeError> {
         if self.is_zero() {
             return Err(SquarefreeError::Zero);
         }
@@ -376,7 +517,7 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
         let mut radicals: Vec<Self> = vec![];
         let mut remaining = self.normalized();
         loop {
-            let radical = remaining.squarefree_part()?;
+            let radical = remaining.gradient_radical()?;
             let done = radical.is_one();
             radicals.push(radical.clone());
             if done {
@@ -399,7 +540,48 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
         Ok(decomposition)
     }
 
-    /// The characteristic guard [`Self::squarefree_part`] documents.
+    /// `self / gcd(self, ∇self)`, refused where differentiation can be blind to a factor.
+    ///
+    /// The shape [`Self::squarefree_part`] had before #408, kept because
+    /// [`Self::squarefree_decomposition_by_radicals`] is built from it: a reference implementation
+    /// has to be what it was, not a wrapper over the implementation it is meant to check.
+    ///
+    /// # Errors
+    /// As [`Self::squarefree_decomposition_by_radicals`].
+    fn gradient_radical(&self) -> Result<Self, SquarefreeError> {
+        if self.is_zero() {
+            return Err(SquarefreeError::Zero);
+        }
+        self.check_characteristic()?;
+        Ok(self
+            .gradient_radical_unguarded()
+            .expect("a nonzero polynomial has a gradient radical"))
+    }
+
+    /// `self / gcd(self, ∇self)`, normalized, with no characteristic guard.
+    ///
+    /// The product of the distinct irreducible factors whose multiplicity the characteristic does
+    /// **not** divide — the whole radical only where it divides none of them. `None` for the zero
+    /// polynomial, which has no radical.
+    fn gradient_radical_unguarded(&self) -> Option<Self> {
+        if self.is_zero() {
+            return None;
+        }
+        let mut repeated = self.clone();
+        for index in 0..N {
+            repeated = repeated.gcd(&self.derivative(index));
+            if repeated.is_one() {
+                break;
+            }
+        }
+        Some(
+            self.exact_div(&repeated)
+                .expect("the repeated part divides")
+                .normalized(),
+        )
+    }
+
+    /// The characteristic guard [`Self::squarefree_decomposition_by_radicals`] documents.
     fn check_characteristic(&self) -> Result<(), SquarefreeError> {
         let degree = self.degree();
         match F::characteristic_u128() {
@@ -412,6 +594,24 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
             }),
         }
     }
+}
+
+/// `limbs / divisor`, little-endian, for a divisor that fits a `u64`.
+///
+/// Exact at its one call site, where the divisor is the characteristic and the dividend the order
+/// `q = p^k`. Written out rather than taken from an integer type so that
+/// [`SparseMultiPoly::pth_root`] does not cap the field's order at the width of a `u128` — the
+/// orders in this crate reach 255 bits.
+fn divide_limbs(limbs: &[u64], divisor: u64) -> Vec<u64> {
+    let divisor = u128::from(divisor);
+    let mut quotient = vec![0u64; limbs.len()];
+    let mut remainder = 0u128;
+    for index in (0..limbs.len()).rev() {
+        let current = (remainder << 64) | u128::from(limbs[index]);
+        quotient[index] = (current / divisor) as u64;
+        remainder = current % divisor;
+    }
+    quotient
 }
 
 #[cfg(test)]
@@ -626,9 +826,14 @@ mod tests {
         );
     }
 
-    /// Squarefree decomposition is refused, not guessed, when the characteristic is too small.
+    /// The refusal in small characteristic moved to the reference route, which still earns it.
+    ///
+    /// `(x + y)^3` over GF(3) is the case #128 refused: the whole gradient vanishes, so the
+    /// repeated-radical form cannot see the factor and says so. `squarefree_part` now answers it
+    /// through the Frobenius route instead — asserted in `characteristic_p` — so the refusal is a
+    /// statement about one method and no longer about the crate.
     #[test]
-    fn test_squarefree_part_is_refused_in_small_characteristic() {
+    fn test_the_reference_route_still_refuses_in_small_characteristic() {
         type Small = PrimeFieldElement64<3>;
         // (x + y)^3 has total degree 3, which the characteristic does not exceed.
         let factor: SparseMultiPoly<2, Small> = SparseMultiPoly::new(&[
@@ -637,13 +842,441 @@ mod tests {
         ]);
         let cube = &(&factor * &factor) * &factor;
         assert_eq!(
-            cube.squarefree_part(),
+            cube.squarefree_decomposition_by_radicals(),
             Err(SquarefreeError::CharacteristicTooSmall {
                 characteristic: 3,
                 degree: 3,
             })
         );
+        // And the implementation answers the same input.
+        assert_eq!(cube.squarefree_part().unwrap(), factor);
     }
+
+    mod characteristic_p {
+        use super::*;
+        use crate::fields::{Gf256, Zp2};
+
+        /// GF(3), where a cube is what the derivative cannot see.
+        type Zp3 = PrimeFieldElement64<3>;
+
+        /// `(factor, multiplicity)` pairs sorted by multiplicity, for a stable comparison.
+        fn sorted<const N: usize, G: crate::KnownOrder>(
+            mut decomposition: Vec<(SparseMultiPoly<N, G>, u32)>,
+        ) -> Vec<(SparseMultiPoly<N, G>, u32)> {
+            decomposition.sort_by_key(|(_, multiplicity)| *multiplicity);
+            decomposition
+        }
+
+        /// `∏ factor^multiplicity`, to check a decomposition against what it decomposed.
+        fn product<const N: usize, G: crate::KnownOrder>(
+            decomposition: &[(SparseMultiPoly<N, G>, u32)],
+        ) -> SparseMultiPoly<N, G> {
+            decomposition
+                .iter()
+                .fold(SparseMultiPoly::one(), |acc, (factor, multiplicity)| {
+                    (0..*multiplicity).fold(acc, |acc, _| &acc * factor)
+                })
+        }
+
+        /// Over GF(2) a factor of even multiplicity is recovered, which the derivative cannot see.
+        ///
+        /// `x^2` differentiates to zero: the exponent `2` enters as a field element and vanishes.
+        /// So this is exactly the case #128's guard refused, and the whole point of #408.
+        #[test]
+        fn test_an_even_multiplicity_is_recovered_over_gf2() {
+            type P = SparseMultiPoly<2, Zp2>;
+            let x: P = SparseMultiPoly::parse("x", VARS).unwrap();
+            let square = &x * &x;
+            assert!(
+                square.derivative(0).is_zero() && square.derivative(1).is_zero(),
+                "the whole gradient must vanish, or this proves nothing"
+            );
+            assert_eq!(
+                square.squarefree_decomposition().unwrap(),
+                vec![(x.clone(), 2)]
+            );
+            assert_eq!(square.squarefree_part().unwrap(), x);
+        }
+
+        /// A multiplicity divisible by the characteristic twice over needs two Frobenius steps.
+        #[test]
+        fn test_a_fourth_power_is_recovered_over_gf2() {
+            type P = SparseMultiPoly<2, Zp2>;
+            let x: P = SparseMultiPoly::parse("x", VARS).unwrap();
+            let fourth = &(&x * &x) * &(&x * &x);
+            assert_eq!(fourth.squarefree_decomposition().unwrap(), vec![(x, 4)]);
+        }
+
+        /// A visible and an invisible multiplicity in one polynomial are both recovered.
+        ///
+        /// `x^2 * (x + 1)^3` over GF(2): the gradient sees `(x + 1)^3` and is blind to `x^2`, so
+        /// the two halves have to be found by different means and recombined.
+        #[test]
+        fn test_a_visible_and_an_invisible_factor_together_over_gf2() {
+            type P = SparseMultiPoly<2, Zp2>;
+            let x: P = SparseMultiPoly::parse("x", VARS).unwrap();
+            let shifted: P = SparseMultiPoly::parse("x + 1", VARS).unwrap();
+            let f = &(&x * &x) * &(&shifted * &(&shifted * &shifted));
+
+            let decomposition = sorted(f.squarefree_decomposition().unwrap());
+            assert_eq!(
+                decomposition,
+                vec![(x.clone(), 2), (shifted.clone(), 3)],
+                "the gradient-blind factor and the visible one must both appear"
+            );
+            assert_eq!(product(&decomposition), f);
+            assert_eq!(f.squarefree_part().unwrap(), &x * &shifted);
+        }
+
+        /// Over GF(2^8) a factor of even multiplicity with extension coefficients is recovered.
+        ///
+        /// The coefficients are past the prime subfield, so this also exercises the `p`-th root:
+        /// over GF(2^8) it is `c^128`, not the identity it is over GF(2).
+        #[test]
+        fn test_an_even_multiplicity_is_recovered_over_gf256() {
+            type P = SparseMultiPoly<2, Gf256>;
+            let parse = |s| P::parse(s, VARS).unwrap();
+            // 87 and 131 are 0x57 and 0x83, the pair whose product distinguishes the two GF(2^8)
+            // moduli; nothing here depends on that, they are simply not in GF(2).
+            let a = parse("87*x + 131");
+            let b = parse("200*y + 57");
+            let f = &(&a * &a) * &b;
+
+            let decomposition = sorted(f.squarefree_decomposition().unwrap());
+            assert_eq!(decomposition.len(), 2);
+            assert_eq!(decomposition[0].1, 1);
+            assert_eq!(decomposition[1].1, 2);
+            assert_eq!(product(&decomposition), f.normalized());
+        }
+
+        /// The `p`-th root inverts the `p`-th power, over a field where Frobenius is not identity.
+        #[test]
+        fn test_the_pth_root_inverts_the_pth_power() {
+            type P = SparseMultiPoly<2, Gf256>;
+            let f = P::parse("87*x*y + 131*x + 200", VARS).unwrap();
+            let square = &f * &f;
+            assert_eq!(square.pth_root(), Some(f));
+            // A polynomial that is not a `p`-th power has none.
+            assert_eq!(P::parse("x", VARS).unwrap().pth_root(), None);
+        }
+
+        /// A multiplicity of `p` in odd characteristic is recovered too, so nothing is special
+        /// about two.
+        #[test]
+        fn test_a_cube_is_recovered_over_gf3() {
+            type P = SparseMultiPoly<2, Zp3>;
+            let factor: P = SparseMultiPoly::parse("x + y", VARS).unwrap();
+            let cube = &(&factor * &factor) * &factor;
+            assert!(
+                cube.derivative(0).is_zero() && cube.derivative(1).is_zero(),
+                "the gradient must vanish, or this is not the characteristic case"
+            );
+            assert_eq!(
+                cube.squarefree_decomposition().unwrap(),
+                vec![(factor.clone(), 3)]
+            );
+            assert_eq!(cube.squarefree_part().unwrap(), factor);
+        }
+
+        /// The only remaining refusal is the zero polynomial.
+        ///
+        /// `SquarefreeError::CharacteristicTooSmall` is still reachable, but only from the
+        /// repeated-radical reference route, which keeps the guard because the guard is a true
+        /// statement about *that* method.
+        #[test]
+        fn test_the_only_refusal_left_is_zero() {
+            type P = SparseMultiPoly<2, Zp2>;
+            let factor: P = SparseMultiPoly::parse("x + y", VARS).unwrap();
+            let fourth = &(&factor * &factor) * &(&factor * &factor);
+            assert!(fourth.squarefree_decomposition().is_ok());
+            assert!(fourth.squarefree_part().is_ok());
+            assert_eq!(
+                P::zero().squarefree_decomposition(),
+                Err(SquarefreeError::Zero)
+            );
+            assert_eq!(P::zero().squarefree_part(), Err(SquarefreeError::Zero));
+
+            // The reference route still refuses this, which is why it is a reference and not the
+            // implementation.
+            assert!(matches!(
+                fourth.squarefree_decomposition_by_radicals(),
+                Err(SquarefreeError::CharacteristicTooSmall { .. })
+            ));
+        }
+
+        /// The two routes agree wherever the reference route can answer at all.
+        ///
+        /// The differential test #408 asks for: the repeated-radical form becomes the reference,
+        /// and where its characteristic guard passes it must give exactly what the new route
+        /// gives. Over GF(13) with total degree below 13 that is every case here.
+        #[test]
+        fn test_the_two_routes_agree_where_the_reference_applies() {
+            let g1 = parse("x + 1");
+            let g2 = parse("y + 1");
+            let g3 = parse("x + y");
+            let cases = [
+                g1.clone(),
+                &g1 * &g1,
+                &(&g1 * &g1) * &g2,
+                &(&(&g1 * &g1) * &(&g2 * &g2)) * &g3,
+                &(&g3 * &(&g3 * &g3)) * &g2,
+                parse("x^2 - y^2"),
+                Poly::one(),
+            ];
+            for f in cases {
+                let reference = sorted(f.squarefree_decomposition_by_radicals().unwrap());
+                let computed = sorted(f.squarefree_decomposition().unwrap());
+                assert_eq!(reference, computed, "the two routes disagree about {f}");
+            }
+        }
+    }
+
+    mod squarefree_contract {
+        use crate::{
+            fields::{Gf256, Zp2},
+            poly::multivariate::sparse_multivariate_polynomial::SparseMultiPoly,
+            FiniteField, KnownOrder, Monomial,
+        };
+        use rand::{prelude::StdRng, Rng, SeedableRng};
+
+        /// Everything a squarefree decomposition must satisfy, asserted against `f` itself.
+        ///
+        /// Checked as a contract rather than against an expected answer, so it can be applied to
+        /// inputs nobody factored by hand: the factors multiply back to `f`, each is squarefree,
+        /// they are pairwise coprime, their multiplicities are distinct, and none is a unit. A
+        /// decomposition that is silently wrong fails at least one of these.
+        pub(super) fn assert_contract<const N: usize, G: KnownOrder>(
+            f: &SparseMultiPoly<N, G>,
+        ) -> Vec<(SparseMultiPoly<N, G>, u32)> {
+            let decomposition = f
+                .squarefree_decomposition()
+                .unwrap_or_else(|e| panic!("{f} has no decomposition: {e}"));
+
+            let product = decomposition
+                .iter()
+                .fold(SparseMultiPoly::one(), |acc, (factor, multiplicity)| {
+                    (0..*multiplicity).fold(acc, |acc, _| &acc * factor)
+                });
+            // `f` up to the unit the factors are normalized by, which is what `normalized` pins.
+            assert_eq!(
+                product,
+                normalized(f),
+                "the decomposition {decomposition:?} does not multiply back to {f}"
+            );
+
+            let mut multiplicities: Vec<u32> = decomposition.iter().map(|(_, m)| *m).collect();
+            multiplicities.sort_unstable();
+            let distinct = {
+                let mut unique = multiplicities.clone();
+                unique.dedup();
+                unique.len()
+            };
+            assert_eq!(
+                distinct,
+                multiplicities.len(),
+                "{f} lists a multiplicity twice: {multiplicities:?}"
+            );
+            assert!(
+                multiplicities.iter().all(|m| *m >= 1),
+                "{f} has a factor of multiplicity zero"
+            );
+
+            for (i, (factor, _)) in decomposition.iter().enumerate() {
+                assert!(!factor.is_one(), "{f} lists a unit as a factor");
+                // Squarefree: its own decomposition is itself, once.
+                assert_eq!(
+                    factor.squarefree_decomposition().unwrap(),
+                    vec![(normalized(factor), 1)],
+                    "the factor {factor} of {f} is not squarefree"
+                );
+                for (other, _) in decomposition.iter().skip(i + 1) {
+                    assert!(
+                        factor.gcd(other).is_one(),
+                        "the factors {factor} and {other} of {f} share a divisor"
+                    );
+                }
+            }
+            // The radical is the product of the distinct factors, which is the same list.
+            let radical = decomposition
+                .iter()
+                .fold(SparseMultiPoly::one(), |acc, (factor, _)| &acc * factor);
+            assert_eq!(
+                f.squarefree_part().unwrap(),
+                normalized(&radical),
+                "the squarefree part of {f} is not the product of its distinct factors"
+            );
+            decomposition
+        }
+
+        /// Scaled so the lexicographic leading coefficient is one, as the decomposition is.
+        fn normalized<const N: usize, G: FiniteField>(
+            p: &SparseMultiPoly<N, G>,
+        ) -> SparseMultiPoly<N, G> {
+            let leading = p.leading_coefficient(crate::poly::MonomialOrder::Lexicographic);
+            if leading.is_zero() || leading.is_one() {
+                p.clone()
+            } else {
+                p.scale(&leading.inverse())
+            }
+        }
+
+        /// The eight polynomials over GF(2) in two variables of total degree at most one.
+        fn linear_over_gf2() -> Vec<SparseMultiPoly<2, Zp2>> {
+            let monomials = [
+                Monomial::new(&[0, 0]),
+                Monomial::new(&[1, 0]),
+                Monomial::new(&[0, 1]),
+            ];
+            (0..8usize)
+                .map(|code| {
+                    let terms: Vec<(Monomial<2>, Zp2)> = monomials
+                        .iter()
+                        .enumerate()
+                        .map(|(bit, monomial)| (*monomial, Zp2::new(((code >> bit) & 1) as u64)))
+                        .collect();
+                    SparseMultiPoly::new(&terms)
+                })
+                .collect()
+        }
+
+        /// Every planted `u^a * v^b` over GF(2) decomposes to exactly `u` and `v`.
+        ///
+        /// Exhaustive over the distinct non-constant linear factors — all irreducible, and
+        /// pairwise coprime because they are distinct and of degree one — and over multiplicities
+        /// one to four. Half of the `(a, b)` pairs have at least one even multiplicity, which is
+        /// precisely what the derivative cannot see over GF(2).
+        #[test]
+        fn test_every_planted_product_over_gf2_is_recovered() {
+            let linear: Vec<SparseMultiPoly<2, Zp2>> = linear_over_gf2()
+                .into_iter()
+                .filter(|p| !p.is_zero() && !p.is_constant())
+                .collect();
+            assert_eq!(linear.len(), 6, "GF(2) has six non-constant linear forms");
+
+            let mut even_multiplicities = 0;
+            for (i, u) in linear.iter().enumerate() {
+                for v in linear.iter().skip(i + 1) {
+                    for a in 1..=4u32 {
+                        for b in 1..=4u32 {
+                            let f = (0..a).fold(SparseMultiPoly::one(), |acc, _| &acc * u);
+                            let f = (0..b).fold(f, |acc, _| &acc * v);
+                            let decomposition = assert_contract(&f);
+
+                            // The expected answer, grouped: two factors of the same multiplicity
+                            // are reported once, as their product.
+                            let mut expected: Vec<(SparseMultiPoly<2, Zp2>, u32)> = if a == b {
+                                vec![(normalized(&(u * v)), a)]
+                            } else {
+                                vec![(normalized(u), a), (normalized(v), b)]
+                            };
+                            expected.sort_by_key(|(_, m)| *m);
+                            let mut found = decomposition;
+                            found.sort_by_key(|(_, m)| *m);
+                            assert_eq!(found, expected, "u = {u}, v = {v}, a = {a}, b = {b}");
+
+                            if a % 2 == 0 || b % 2 == 0 {
+                                even_multiplicities += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                even_multiplicities >= 100,
+                "only {even_multiplicities} cases had an even multiplicity, which is the case \
+                 the derivative cannot see"
+            );
+        }
+
+        /// Every polynomial over GF(2) on the degree-two monomials satisfies the contract.
+        ///
+        /// 64 inputs nobody chose, including the ones that are squares and the ones that are not,
+        /// checked against the contract rather than against an expected factorization — which is
+        /// the only way to cover inputs whose factorization is not known in advance.
+        #[test]
+        fn test_the_contract_holds_over_every_small_polynomial_over_gf2() {
+            let monomials: Vec<Monomial<2>> = (0..=2u32)
+                .flat_map(|d| (0..=d).map(move |i| Monomial::new(&[i, d - i])))
+                .collect();
+            assert_eq!(monomials.len(), 6);
+
+            let mut checked = 0;
+            for code in 0..(1u32 << monomials.len()) {
+                let terms: Vec<(Monomial<2>, Zp2)> = monomials
+                    .iter()
+                    .enumerate()
+                    .map(|(bit, monomial)| (*monomial, Zp2::new(u64::from((code >> bit) & 1))))
+                    .collect();
+                let f: SparseMultiPoly<2, Zp2> = SparseMultiPoly::new(&terms);
+                if f.is_zero() {
+                    continue;
+                }
+                assert_contract(&f);
+                checked += 1;
+            }
+            assert_eq!(checked, 63, "the sweep did not cover every nonzero input");
+        }
+
+        /// A planted product over GF(2^8) with extension coefficients satisfies the contract.
+        ///
+        /// Over GF(2) the `p`-th root of a coefficient is the identity, so GF(2) alone would not
+        /// exercise the inverse Frobenius at all. Here it is `c^128`.
+        #[test]
+        fn test_the_contract_holds_over_gf256_with_extension_coefficients() {
+            type P = SparseMultiPoly<2, Gf256>;
+            let parse = |s| P::parse(s, ["x", "y"]).unwrap();
+            let u = parse("87*x + 131*y + 200");
+            let v = parse("57*x*y + 3");
+            for (a, b) in [(2u32, 1u32), (4, 1), (2, 2), (1, 2), (6, 3), (2, 3)] {
+                let f = (0..a).fold(P::one(), |acc, _| &acc * &u);
+                let f = (0..b).fold(f, |acc, _| &acc * &v);
+                let decomposition = assert_contract(&f);
+                assert!(
+                    decomposition.iter().any(|(_, m)| *m == a || *m == b),
+                    "a = {a}, b = {b} produced {decomposition:?}"
+                );
+            }
+        }
+
+        /// A random product satisfies the contract, over every field `for_each_field!` covers.
+        pub(super) fn assert_random_products_satisfy_the_contract<const N: usize, G: KnownOrder>() {
+            let mut rng = StdRng::seed_from_u64(0x0408_5f5e);
+            let mut nontrivial = 0;
+            for _ in 0..8 {
+                let draw = |rng: &mut StdRng| -> SparseMultiPoly<N, G> {
+                    let terms: Vec<(Monomial<N>, G)> = (0..3)
+                        .map(|_| {
+                            let mut exponents = [0u32; N];
+                            for e in exponents.iter_mut() {
+                                *e = rng.gen_range(0..2);
+                            }
+                            (Monomial::new(&exponents), G::random(rng))
+                        })
+                        .collect();
+                    SparseMultiPoly::new(&terms)
+                };
+                let u = draw(&mut rng);
+                let v = draw(&mut rng);
+                if u.is_zero() || v.is_zero() {
+                    continue;
+                }
+                // `u^2 * v` plants a multiplicity the derivative cannot see in characteristic two
+                // and can in every other field here, so one body covers both cases.
+                let f = &(&u * &u) * &v;
+                assert_contract(&f);
+                nontrivial += 1;
+            }
+            assert!(nontrivial > 0, "every drawn case was degenerate");
+        }
+    }
+
+    // The squarefree-decomposition contract holds over every field, at two arities.
+    for_each_field!(
+        fn the_squarefree_contract_holds<F>() {
+            squarefree_contract::assert_random_products_satisfy_the_contract::<2, F>();
+            squarefree_contract::assert_random_products_satisfy_the_contract::<3, F>();
+        }
+    );
 
     /// The GCD of three variables' worth of input still finds a shared factor.
     #[test]

@@ -95,6 +95,9 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Multivariate GCD by recursive primitive PRS, with content, primitive part, the formal partial
       derivative and squarefree decomposition on top of it — the GCD's defining property checked by
       exhaustive enumeration over a small ring rather than against a reference implementation
+- [x] Squarefree decomposition in characteristic `p`, where the derivative is blind to every
+      multiplicity `p` divides: the invisible part is a `p`-th power, so its root is taken exactly
+      and recursed on, and the zero polynomial is the only refusal left
 - [x] Reed-Solomon codes over an FFT domain: encoding, erasure recovery, and a Euclidean
       decoder that verifies its correction rather than returning the nearest codeword
 
@@ -2142,6 +2145,8 @@ classical primitive PRS. The recursion terminates because the coefficients of a 
 | `exact_div(&divisor)` | the quotient, or `None` when the division leaves a remainder |
 | `derivative(i)` | the formal partial derivative |
 | `squarefree_part()` / `squarefree_decomposition()` | the radical, and the factors with multiplicities |
+| `squarefree_decomposition_by_radicals()` | the reference route the above is tested against |
+| `pth_root()` | the `p`-th root of a `p`-th power, or `None` |
 
 ```rust
 use zeebra::{fields::Zp13, MultivariatePolynomial};
@@ -2170,23 +2175,60 @@ decomposition.sort_by_key(|(_, multiplicity)| *multiplicity);
 assert_eq!(decomposition, vec![(parse("x + 1"), 1), (parse("y + 1"), 2)]);
 ```
 
-The squarefree part is `f / gcd(f, ∂f/∂x_0, ..., ∂f/∂x_{N-1})`, which for `f = ∏ g_i^(e_i)` is
-`∏ g_i`. Differentiation multiplies a factor of multiplicity `e` by `e`, and in characteristic `p`
-that is zero whenever `p` divides `e` — so these two **refuse** rather than answer when the
-characteristic does not exceed the total degree:
+#### Characteristic `p`, where the derivative is blind
+
+Differentiation multiplies a factor of multiplicity `e` by `e`, and in characteristic `p` that is
+zero whenever `p` divides `e`. So `f / gcd(f, ∂f/∂x_0, ..., ∂f/∂x_{N-1})` is **not** the radical
+in general: for `f = ∏ g_i^(e_i)` that GCD is
+`∏_{p | e_i} g_i^(e_i) * ∏_{p ∤ e_i} g_i^(e_i - 1)`, so the quotient is the product of only the
+factors whose multiplicity `p` does not divide. Over GF(2) every *even* multiplicity is invisible,
+and over GF(2) and GF(2^8) is where this crate runs the whole solving pipeline.
+
+Both are nonetheless computed, because the decomposition exists in characteristic `p` and only the
+*method* was restricted. What the GCD leaves is `∏_{p | e_i} g_i^(e_i)`, in which every
+multiplicity is a multiple of `p` — so it is a `p`-th power, `pth_root` takes the root exactly, and
+recursing on the root finds those factors with their multiplicities divided by `p`. The only
+refusal left is the zero polynomial, which is divisible by every square.
 
 ```rust
-use zeebra::{fields::PrimeFieldElement64, MultivariatePolynomial, SquarefreeError};
+use zeebra::{fields::Zp2, MultivariatePolynomial, SquarefreeError};
 
-type F = PrimeFieldElement64<3>;
 let vars = ["x", "y"];
-let factor = MultivariatePolynomial::<2, F>::parse("x + y", vars).unwrap();
-let cube = &(&factor * &factor) * &factor;
+let parse = |s| MultivariatePolynomial::<2, Zp2>::parse(s, vars).unwrap();
+
+// Over GF(2) the whole gradient of x^2 vanishes, and the factor is recovered anyway.
+let x = parse("x");
+let square = &x * &x;
+assert!(square.derivative(0).is_zero() && square.derivative(1).is_zero());
+assert_eq!(square.squarefree_decomposition().unwrap(), vec![(x.clone(), 2)]);
+
+// A visible multiplicity and an invisible one in the same polynomial.
+let shifted = parse("x + 1");
+let f = &square * &(&shifted * &(&shifted * &shifted));
+let mut decomposition = f.squarefree_decomposition().unwrap();
+decomposition.sort_by_key(|(_, multiplicity)| *multiplicity);
+assert_eq!(decomposition, vec![(x, 2), (shifted, 3)]);
+
+// The zero polynomial is the only refusal.
 assert_eq!(
-    cube.squarefree_part(),
-    Err(SquarefreeError::CharacteristicTooSmall { characteristic: 3, degree: 3 })
+    MultivariatePolynomial::<2, Zp2>::zero().squarefree_part(),
+    Err(SquarefreeError::Zero)
 );
 ```
+
+The visible half costs **one GCD per multiplicity**: with `P_1` the visible part and
+`Q_1 = f / P_1`, the ladder `P_{j+1} = gcd(P_j, Q_j)`, `Q_{j+1} = Q_j / P_{j+1}` has `P_j` the
+product of the visible factors of multiplicity at least `j`, so `P_j / P_{j+1}` is the one of
+multiplicity exactly `j`. `squarefree_decomposition_by_radicals` is #128's repeated-radical form,
+kept as the reference the two are differentially tested against: it pays a whole radical — `N + 1`
+GCDs over operands that do not shrink — for each multiplicity, and it still refuses in small
+characteristic, which is a true statement about *that* method.
+
+**Not Yun's algorithm, deliberately.** Yun's recurrence is univariate; generalized to `N` variables
+honestly it carries a `d_i` per variable and needs `gcd(b_i, d_i^(0), ..., d_i^(N-1))` — `N` GCDs
+per multiplicity, worse than the ladder and no better than the radicals it was meant to replace.
+The ladder reaches the cost Yun's is wanted for with the gradient taken once rather than once per
+level.
 
 The GCD's correctness is pinned by an exhaustive check rather than by a reference implementation:
 over a two-variable ring on a three-element field, `multivariate_gcd.rs` enumerates every candidate
@@ -2194,12 +2236,10 @@ divisor and asserts the defining property — the result divides both inputs, an
 divisor divides the result. That is the property to test, because a GCD is only unique up to a unit
 and several candidates share the maximal degree.
 
-Faster routes are deliberately not taken here. The subresultant PRS replaces the per-step content
-GCD with one exact division, over a prime field Brown's modular algorithm evaluates down to
-univariate GCDs and lifts, and Yun's algorithm computes the squarefree decomposition in one GCD per
-multiplicity where the repeated-radical form used here costs `N + 1`. No timings are published for
-any of this: the implementation is the one whose coefficient growth is bounded by construction, and
-it has not been measured.
+Faster GCD routes are deliberately not taken here. The subresultant PRS replaces the per-step
+content GCD with one exact division, and over a prime field Brown's modular algorithm evaluates
+down to univariate GCDs and lifts. No timings are published for either: the implementation is the
+one whose coefficient growth is bounded by construction, and it has not been measured.
 
 ### Composition
 
