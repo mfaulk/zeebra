@@ -8,6 +8,7 @@
 //! cargo run --release --example determinant_sweep -- --order 1458 --determinants 128
 //!                                                    # several determinants a worker, so the
 //!                                                    # first-touch page faults are amortized
+//! cargo run --release --example determinant_sweep -- --kernel euclidean # the O(n²) route, #350
 //! cargo run --release --example determinant_sweep -- --cost-only      # print the budget, run nothing
 //! ```
 //!
@@ -49,7 +50,7 @@ use zeebra::{
     fields::PrimeFieldElement64,
     grobner::research::{
         fit_power_law, random_bivariate, time_sylvester_determinants, DeterminantBatch,
-        PowerLawFit, KOALABEAR_PRIME,
+        DeterminantKernel, PowerLawFit, KOALABEAR_PRIME,
     },
     util::peak_resident_bytes,
     FiniteField,
@@ -94,6 +95,27 @@ fn flag_value(flag: &str) -> Option<usize> {
     let args: Vec<String> = std::env::args().collect();
     let at = args.iter().position(|a| a == flag)?;
     args.get(at + 1)?.parse().ok()
+}
+
+/// The kernel named by `--kernel <dense|euclidean>`, defaulting to dense.
+///
+/// Dense by default so that a figure taken before the remainder sequence existed is reproduced
+/// exactly by a run that does not ask for anything else.
+///
+/// # Panics
+/// On an unrecognized value. Falling back to the default would report a dense sweep as whatever the
+/// caller mistyped, and the two kernels differ by three orders of magnitude at the same order — the
+/// one confusion this flag must not permit.
+fn kernel_flag() -> DeterminantKernel {
+    let args: Vec<String> = std::env::args().collect();
+    let Some(at) = args.iter().position(|a| a == "--kernel") else {
+        return DeterminantKernel::Dense;
+    };
+    match args.get(at + 1).map(String::as_str) {
+        Some("dense") | None => DeterminantKernel::Dense,
+        Some("euclidean") => DeterminantKernel::Euclidean,
+        Some(other) => panic!("--kernel takes dense or euclidean, not {other}"),
+    }
 }
 
 /// Every value of a repeatable `--flag <value>` argument.
@@ -185,7 +207,13 @@ fn bytes(n: usize) -> String {
 }
 
 /// One draw at one order: build a fresh random pair, then time `determinants` determinants.
-fn draw(order: usize, determinants: usize, concurrency: usize, seed: u64) -> DeterminantBatch {
+fn draw(
+    order: usize,
+    determinants: usize,
+    concurrency: usize,
+    seed: u64,
+    kernel: DeterminantKernel,
+) -> DeterminantBatch {
     assert!(
         order.is_multiple_of(2),
         "the order is split evenly between the pair"
@@ -199,7 +227,7 @@ fn draw(order: usize, determinants: usize, concurrency: usize, seed: u64) -> Det
     let g = random_bivariate::<K, _>(1, half, &mut rng);
     // Abscissae away from 0 and 1, where a Sylvester entry could be degenerate by accident.
     let at: Vec<K> = (0..determinants).map(|i| K::new(i as u64 + 7)).collect();
-    let (_, batch) = time_sylvester_determinants(&f, &g, 1, &at, concurrency)
+    let (_, batch) = time_sylvester_determinants(&f, &g, 1, &at, concurrency, kernel)
         .expect("both polynomials have positive degree in the eliminated variable");
     assert_eq!(batch.matrix_order, order, "the pair has the named order");
     batch
@@ -231,6 +259,7 @@ fn report_fit(name: &str, points: &[&Point], fit: &PowerLawFit) {
 
 fn main() {
     let repeats = flag_value("--repeats").unwrap_or(3).max(1);
+    let kernel = kernel_flag();
     let concurrency = flag_value("--concurrency").unwrap_or(1).max(1);
     let wanted = flag_values("--order");
     let orders: Vec<usize> = if wanted.is_empty() {
@@ -250,6 +279,18 @@ fn main() {
         concurrency,
         if concurrency == 1 { "" } else { "s" }
     );
+    // Stated before any figure: the two kernels differ by three orders of magnitude at the same
+    // order, so a table that does not name its kernel is a number nothing can be compared with.
+    println!("Kernel: **{kernel}**.\n");
+    if kernel == DeterminantKernel::Euclidean {
+        println!(
+            "The matrix and live-set columns below are the **dense** footprint, reported for \
+             reference only: the remainder sequence never forms the Sylvester matrix and holds two \
+             coefficient vectors instead. The predicted-wall column is likewise the cubic dense \
+             anchor and does **not** model this kernel — it is `O(n²)`, so expect the prediction \
+             to overshoot by orders of magnitude.\n"
+        );
+    }
 
     // The budget, printed before anything runs. Order 4 374 is about a minute a determinant
     // single-threaded, so a sweep whose cost nobody costed is how an afternoon disappears.
@@ -302,6 +343,7 @@ fn main() {
                 determinants,
                 concurrency,
                 0x5_e51u64.wrapping_add(order as u64) ^ (repeat as u64 + 1),
+                kernel,
             );
             point.matrix_bytes = batch.matrix_bytes;
             point.core.push(batch.core_per_determinant());
