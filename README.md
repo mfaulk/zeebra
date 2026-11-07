@@ -3815,6 +3815,42 @@ same coupling: each is a separate comparison against its own requirement in its 
 of one there does take effect. `fglm::conversion`'s
 `test_lifting_one_span_budget_leaves_the_other_binding_in_its_own_unit` is what keeps that true.
 
+**`FglmOptions::max_quotient_dimension` is derived from the budget beside it, not from the
+corpus.** It used to be justified as "26x the largest quotient dimension in the benchmark corpus,
+which is cyclic-6's 156", and that stopped being true the moment #261's cross-library corpus added
+rungs at 16,384 — four times the cap rather than a fraction of it. A default whose stated reason is
+a corpus figure goes stale on every corpus expansion, and nothing was checking it (#348). So the
+cap is now `RECOMMENDED_MAX_QUOTIENT_DIMENSION`, the next power of two at or above what
+`max_span_entries` itself admits:
+
+```rust
+use zeebra::grobner::{largest_quotient_dimension_within, FglmOptions,
+                      RECOMMENDED_MAX_QUOTIENT_DIMENSION, RECOMMENDED_MAX_SPAN_ENTRIES};
+
+// `D^2 + D (D + 1)` cells reaches 20,000,000 at D = 3,162.
+assert_eq!(largest_quotient_dimension_within(RECOMMENDED_MAX_SPAN_ENTRIES), 3_162);
+assert_eq!(RECOMMENDED_MAX_QUOTIENT_DIMENSION, 4_096);
+assert_eq!(FglmOptions::recommended().max_quotient_dimension, 4_096);
+```
+
+Note what that ordering means: **the dimension cap is not the limit that bounds memory**, and is
+not meant to be. `max_span_entries` admits at most D = 3,162 and `max_span_bytes` at most 2,235
+over BN254, so one of those binds first on every dimension the cap allows. The cap sits above them
+as the pre-enumeration tripwire for a walk so far out of envelope that enumerating `N * D` operator
+columns is itself the waste. `test_the_span_budget_binds_before_the_dimension_cap` asserts that
+ordering rather than asserting it in a comment, which is how the previous justification came to be
+false without anything noticing.
+
+**The corpus reaches past the cap, deliberately.** The planted MQ family's quotient dimension is
+`2^N`, so `mq-planted-14` is 16,384 and the conversion declines it. That refusal is the budget
+working: Singular converts the same instance in 45.8 s and 10.4 GB, and Zeebra's own `DirectLexF4`
+route solves it, so declining the conversion is a budget decision rather than an inability — and it
+is recorded as a limit stop, not a failure (#347). `test_the_corpus_reaches_past_the_recommended_cap`
+and `test_every_planted_rung_has_a_declared_quotient_dimension` keep that relationship pinned to
+the ladder, so adding a planted rung forces the decision instead of silently invalidating a
+sentence. Five rungs — the poseidon and anemoi ones — have no recorded quotient dimension in this
+tree and are therefore outside that trap; that is #473.
+
 Neither is a ceiling on the process. `F4Statistics::peak_live_bytes` reports what the budget
 enforces; `max_dense_buffer_bytes` reports what it deliberately omits — the dense buffer the
 elimination backend allocates, which under `Backend::Dense` is `rows * columns` cells and a
