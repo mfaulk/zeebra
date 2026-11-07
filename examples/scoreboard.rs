@@ -8,6 +8,7 @@
 //!                                                         # that crosses the column budget
 //! cargo run --release --example scoreboard -- frontier     # adds the full-width rows (M23-B)
 //! cargo run --release --example scoreboard -- smoke --write
+//! cargo run --release --example scoreboard -- render --write   # re-render, measure nothing
 //! ```
 //!
 //! Without `--write` nothing is written and the tables go to standard output; with it,
@@ -118,6 +119,33 @@ fn main() {
     let registry = registry();
     let environment = detect_environment();
     let mut board = Scoreboard::new();
+
+    // Re-render the tables from the accumulated history, measuring nothing.
+    //
+    // `SCOREBOARD.md` and `best.json` are rendered from the history rather than from the current
+    // process's board, so any writer that appends a record leaves them stale — and
+    // `examples/resultant_cico --write` is one: it appends a run and tells the operator to "rerun
+    // tools/scoreboard.sh to re-render the tables", which until now meant re-measuring rows to
+    // refresh a table that is a pure function of a file already on disk.
+    //
+    // An **empty** board is the whole mechanism: `write_tree` appends `board.runs()` to the
+    // history and then renders from the accumulation, so contributing no runs preserves the
+    // append-only contract exactly — nothing is added, no position changes, and
+    // `Scoreboard::verified_somehow`'s tie-break on recording order still reads what it read
+    // before.
+    if tier == "render" {
+        if !write {
+            println!("`render` only writes; pass --write to re-render research/scoreboard/");
+            return;
+        }
+        write_tree(
+            &PathBuf::from("research/scoreboard"),
+            &Scoreboard::new(),
+            &registry,
+        );
+        println!("re-rendered research/scoreboard/ from the accumulated history; no runs added");
+        return;
+    }
 
     // One registered problem, with the frontier budget and a wall-clock supervisor, then exit.
     //

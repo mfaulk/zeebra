@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "id": "anemoi32-cico-n2-fcico",
+  "digest": "83b9ba3e22d1dc319c9166a513472d8c2f1fbb450c12f525c952e541d1f6f472",
+  "class": "official",
+  "family": "anemoi-cico",
+  "objective": "cico-exact",
+  "objective_statement": "find the free input words for which the permutation-with-initial-linear-layer reproduces the target output words exactly; the remaining output words are unconstrained",
+  "parameters": [
+    "prime 4294967087",
+    "alpha 3",
+    "l 1",
+    "rounds 2",
+    "model fcico"
+  ],
+  "variables": 4,
+  "equations": 4,
+  "program": {
+    "name": "Six Worlds of Gröbner Basis Cryptanalysis: Application to Anemoi",
+    "version": "ToSC 2024 no. 4, pp. 138-190, DOI 10.46586/tosc.v2024.i4.138-190; experimental output at github.com/IAIK/six-worlds-anemoi commit fa056e6f, read 2026-11-06",
+    "url": "https://tosc.iacr.org/index.php/ToSC/article/view/11953",
+    "reward": null,
+    "redistribution": "the paper is open access and the experimental output is MIT, so its data may be redistributed; the committed CICO witnesses cite the results file they were extracted from"
+  },
+  "disclosed_method": {
+    "state": "not_applicable"
+  },
+  "external_status": {
+    "state": "published_with_answer"
+  },
+  "reference_points": [
+    {
+      "source": "Six Worlds, results/anemoi_p4294967087_n1_l1_a3_m<MODEL>_o1.txt",
+      "parameters": "N = 2, FCICO",
+      "step": "Groebner basis (Magma F4)",
+      "reported_time": "0.000 s, below the log's resolution",
+      "reported_memory": null,
+      "hardware": "Intel Xeon E5-2630 v3 @ 2.40 GHz, 378 GB, Debian 11",
+      "software": "Magma V2.26-2"
+    },
+    {
+      "source": "Six Worlds, results/anemoi_p4294967087_n1_l1_a3_m<MODEL>_o1.txt",
+      "parameters": "N = 2, FCICO",
+      "step": "FGLM order change",
+      "reported_time": "0.000 s, below the log's resolution",
+      "reported_memory": null,
+      "hardware": "Intel Xeon E5-2630 v3 @ 2.40 GHz, 378 GB, Debian 11",
+      "software": "Magma V2.26-2"
+    }
+  ],
+  "verifier": "Anemoi::is_cico_solution runs the permutation on (0, y) and checks that the first output word is zero, so the check goes through the permutation rather than through the polynomial system - independent of the model and of every transformation applied to it. The reference's own check_polynomial_verification is the designers' equivalent and needs Sage; docs/research/anemoi.md section 4 records what was used instead.",
+  "notes": "The same system over 2^32 - 209, the sweep's 32-bit prime. Registered for #283, to separate field arithmetic from conversion algorithmics: the reference's published conversion cost here is within 7% of its cost at 2^64 - 353 while its basis step is comparable, so a within-implementation ratio that moves between these two primes is about arithmetic and not about N. The sweep stops after the basis step at N = 5, so N = 6 here has no published figure for either step. As at 2^64 - 353, a result here says nothing about full-round Anemoi."
+}

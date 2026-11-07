@@ -24,6 +24,32 @@ The externally specified problems, unmodified. A witness here is a witness for t
 | `anemoi64-cico-n4-pcico` | `b61cd0a62722` | 5 | 5 | not attempted | published with its answer | — |
 | `anemoi64-cico-n5-fcico` | `a56639921520` | 10 | 10 | not attempted | published with its answer | — |
 | `anemoi64-cico-n5-pcico` | `d285b0cf43aa` | 6 | 6 | not attempted | published with its answer | — |
+| `anemoi64-cico-n6-fcico` | `981fd5554d29` | 12 | 12 | not attempted | published with its answer | — |
+| `anemoi64-cico-n6-pcico` | `251e04c1ff09` | 7 | 7 | not attempted | published with its answer | — |
+| `anemoi32-cico-n1-fcico` | `d80be905379a` | 2 | 2 | not attempted | published with its answer | — |
+| `anemoi32-cico-n1-pcico` | `29d5929e63ef` | 2 | 2 | not attempted | published with its answer | — |
+| `anemoi32-cico-n2-fcico` | `83b9ba3e22d1` | 4 | 4 | not attempted | published with its answer | — |
+| `anemoi32-cico-n2-pcico` | `c2270ee63ae0` | 3 | 3 | not attempted | published with its answer | — |
+| `anemoi32-cico-n3-fcico` | `89380648f042` | 6 | 6 | not attempted | published with its answer | — |
+| `anemoi32-cico-n3-pcico` | `1f4b9bc83e29` | 4 | 4 | not attempted | published with its answer | — |
+| `anemoi32-cico-n4-fcico` | `2fa7c1697b07` | 8 | 8 | not attempted | published with its answer | — |
+| `anemoi32-cico-n4-pcico` | `3b63b01e4100` | 5 | 5 | not attempted | published with its answer | — |
+| `anemoi32-cico-n5-fcico` | `4d27b32c7ab0` | 10 | 10 | not attempted | published with its answer | — |
+| `anemoi32-cico-n5-pcico` | `98887225a4ed` | 6 | 6 | not attempted | published with its answer | — |
+| `anemoi32-cico-n6-fcico` | `b84a0c55fcb7` | 12 | 12 | not attempted | published with its answer | — |
+| `anemoi32-cico-n6-pcico` | `afce463aadb0` | 7 | 7 | not attempted | published with its answer | — |
+| `anemoi17-cico-n1-fcico` | `99d6301147c1` | 2 | 2 | not attempted | published with its answer | — |
+| `anemoi17-cico-n1-pcico` | `e1d49467499d` | 2 | 2 | not attempted | published with its answer | — |
+| `anemoi17-cico-n2-fcico` | `25033fe92545` | 4 | 4 | not attempted | published with its answer | — |
+| `anemoi17-cico-n2-pcico` | `a141ec7980da` | 3 | 3 | not attempted | published with its answer | — |
+| `anemoi17-cico-n3-fcico` | `4a68dbe1e5ca` | 6 | 6 | not attempted | published with its answer | — |
+| `anemoi17-cico-n3-pcico` | `6001cba36737` | 4 | 4 | not attempted | published with its answer | — |
+| `anemoi17-cico-n4-fcico` | `518762ead134` | 8 | 8 | not attempted | published with its answer | — |
+| `anemoi17-cico-n4-pcico` | `5a8388253ebf` | 5 | 5 | not attempted | published with its answer | — |
+| `anemoi17-cico-n5-fcico` | `f7cf58903c69` | 10 | 10 | not attempted | published with its answer | — |
+| `anemoi17-cico-n5-pcico` | `204e51b602ae` | 6 | 6 | not attempted | published with its answer | — |
+| `anemoi17-cico-n6-fcico` | `db25820df213` | 12 | 12 | not attempted | published with its answer | — |
+| `anemoi17-cico-n6-pcico` | `35142599ae39` | 7 | 7 | not attempted | published with its answer | — |
 | `fukuoka-mq-III-n10-seed0` | `ae24edf8efc8` | 10 | 20 | **verified witness** in 106.4 ms (as published) | published with its answer | — |
 | `fukuoka-mq-III-n15-seed0` | `0552d3b51070` | 15 | 30 | **verified witness** in 7798.5 ms (as published) | published with its answer | — |
 | `fukuoka-mq-III-n20-seed0` | `434135c809f6` | 20 | 40 | stopped: max_live_nonzeros at degree 5 | published with its answer | — |
@@ -41,7 +67,7 @@ The official field, state width, `k`, constants and objective; fewer rounds. A w
 | `poseidon31-cico-t16-rf2-rp2` | `af93deb46aa5` | 48 | 36 | **verified witness** in 47598.5 ms (resultant, slice(12 fixed, seed 1)) | — | — |
 | `poseidon31-cico-t16-rf2-rp4` | `08e66c87a885` | 50 | 38 | **verified witness** in 3274316.5 ms on 32 workers (resultant, slice(12 fixed, seed 1)) | — | — |
 | `poseidon31-cico-t16-rf4-rp0` | `a9242143a8c6` | 78 | 66 | **verified witness** in 50638.1 ms (resultant, slice(12 fixed, seed 1)) | — | — |
-| `poseidon31-cico-t16-rf4-rp2` | `80957f3ccf46` | 80 | 68 | stopped: max_live_nonzeros at degree 4 | — | — |
+| `poseidon31-cico-t16-rf4-rp2` | `80957f3ccf46` | 80 | 68 | **verified witness** in 328219.0 ms on 32 workers (resultant, slice(12 fixed, seed 1)) | — | — |
 | `poseidon31-cico-t16-rf4-rp4` | `2d8f8531107d` | 82 | 70 | stopped: max_live_nonzeros at degree 4 | — | — |
 | `poseidon31-cico-t16-rf6-rp0` | `78215e51ccef` | 110 | 98 | stopped: max_live_nonzeros at degree 4 | — | — |
 | `poseidon31-cico-t16-rf6-rp2` | `4e79a017932d` | 112 | 100 | stopped: max_live_nonzeros at degree 4 | — | — |
