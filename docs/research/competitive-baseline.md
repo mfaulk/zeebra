@@ -1,0 +1,408 @@
+# The first competitive baseline: where Zeebra leads, lags, and cannot be compared
+
+Decision gate for #263, and the deliverable that decides which of H12–H17 (#268–#273) is worth
+engineering effort. Every figure elsewhere in `docs/` is stated against Zeebra's own past; this is
+the first statement of where Zeebra stands against other software on the same machine.
+
+**Read §1 and §9 if you read nothing else.** §1 is the one place a reader can be misled, and §9 is
+what this decided.
+
+---
+
+## 0. Conventions, before any number
+
+- **Noise band: a difference under about 20% should not be read.** The convention
+  `docs/research/pair-scheduling.md` established, and it is the band this machine's run-to-run
+  variation actually occupies. Conclusions below rest on order-of-magnitude gaps and on exact
+  structural counters, never on a 1.1x.
+- **No cross-machine and no cross-concurrency ratio appears anywhere.** Where two figures came from
+  different worker counts the fact is stated and no ratio is formed.
+- Every measured row was taken under `tools/benchlock.sh`, whose overlapping `START..END` windows
+  are the machine-checkable proof that two figures were *not* taken under the protocol.
+- A **limit stop is a lower bound** and never a measurement; an **unsupported input has no time at
+  all**. The five outcomes and what each licenses are §3 of
+  `docs/research/external-comparison-protocol.md`, and
+  `CompetitiveBoard::speedups` is the only place a ratio is computed.
+- Zeebra runs in-process and gets **no process-startup charge**, where msolve's and Julia's wall
+  times include theirs. That favours Zeebra. It is immaterial at the sizes where the gaps are
+  interesting and material on the millisecond rungs, so no conclusion below rests on a
+  sub-100 ms row.
+
+### Pinned versions
+
+| engine | version | how obtained |
+|---|---|---|
+| Zeebra | this tree, `cargo` release profile | in-process |
+| msolve | 0.11.0 | source build, `/home/…/zeebra-ext` |
+| Groebner.jl | 0.10.11 on Julia 1.11.7 | provisioned |
+| Sagebrush | `86d9f1c7` | provisioned |
+| Singular | 4.4.1, build 44105 | distribution |
+
+---
+
+## 1. The headline: Zeebra loses to msolve on order conversion, and the reason is the algorithm
+
+The cleanest comparable measurement M25 produced. One machine, byte-identical generators (msolve is
+fed the system from the same `instance.system::<N>()` the Zeebra rows use), both under `benchlock`,
+**msolve on one core and Zeebra on eight**.
+
+| row | msolve | Zeebra | wall ratio | msolve RSS | Zeebra RSS |
+|---|---:|---:|---:|---:|---:|
+| Anemoi `n5-fcico` | **1.81 s** | **63.71 s** | **35x** | 32 MB | 330 MB |
+| Anemoi `n5-pcico` | **1.85 s** | **39.0 s** | **21x** | 34 MB | 216 MB |
+| Anemoi `n6-pcico` | **353.88 s** | — | — | 635 MB | ~4.5 GB |
+
+**Zeebra is roughly one and a half orders of magnitude behind msolve on this family.** A tighter
+bound is not defensible from six rows.
+
+**The conversion stage alone is ~30x** — 47.53 s against msolve's ~1.6 s of FGLM at `n5-fcico`.
+
+### What may and may not be said about per-core cost
+
+Zeebra's conversion is **single-threaded** (~1 CPU-second per wall second, observed), so for *that
+stage* the wall and per-core ratios nearly coincide. A per-core figure of **~280x is defensible for
+the conversion stage and for nothing else.** Quoting it for the whole solve would overstate the
+result, because the basis stage is parallel and was given eight cores.
+
+### Three caveats that travel with the row
+
+1. **Everything is at `p = 65537`.** msolve refuses `p = 2^64 − 353` outright
+   (`characteristic must be 0 or < 2^31`), so the comparison was taken at a 17-bit control prime.
+   **Whether the deficit holds at 64-bit characteristic is unmeasured.** Zeebra's own conversion
+   being characteristic-flat to 12% across a 47-bit prime range is *weak evidence* that it would,
+   and that is an inference, not a measurement.
+2. **Verified at `N = 4`, `N = 5`, and `N = 6` `PCICO` (msolve only).** Nothing extrapolates to
+   `N = 7` or to `α ≠ 3`.
+3. **Eight cores against one.** No per-core ratio is quoted for the end-to-end rows, for exactly
+   that reason.
+
+### A correction this report must not inherit
+
+`anemoi.md` §8a.1 recorded an apparent **507x Zeebra advantage** over published Magma. #283 found
+that the published 2 400x Anemoi conversion/basis ratio is mostly **Magma's generic finite-field
+arithmetic at `p ≥ 2^32`**, not a property of the problem — the same ratio is 124.6 at
+`p = 65537`. **That 507x is not a competitive lead and does not appear in this report as one.**
+§8a.1 is marked superseded-in-part in #302.
+
+---
+
+## 2. The finding underneath the ratio: three engines, three different conversion algorithms
+
+| engine | dominant conversion stage | share |
+|---|---|---:|
+| Zeebra | **lex walk / dependence test** | 82.8% (`FCICO`, `N = 5`) |
+| Magma V2.26-2 | `Get rep mat` + **Keller-Gehrig spin** | 96.6% (`FCICO`, `N = 6`) |
+| msolve 0.11.0 | **scalar sequence (Wiedemann)** | 349.52 s of 353.88 s (`PCICO`, `N = 6`) |
+
+Zeebra does border reduction plus an `O(D³)` incremental-span dependence test; msolve runs a
+Wiedemann scalar sequence; Magma spins a representation matrix.
+
+> **A conversion ratio between any two of these three is not a measurement of FGLM.** They are not
+> on the same cost curve.
+
+This is worth more to the report than the ratio is, and it has two consequences:
+
+- It is the sharpest case in the milestone for why §7.4 of the plan labels a stage attribution a
+  **hypothesis** when the stages are not comparable. The 30x is a real, reproducible fact about two
+  programs; it is *not* evidence that Zeebra's FGLM is 30x off the achievable, because the
+  achievable here is a different algorithm.
+- **It bears directly on #58**, which defers Wiedemann/Krylov methods. Wiedemann is precisely what
+  msolve uses for the stage where Zeebra's measured deficit is largest. §9 revisits that.
+
+---
+
+## 3. Where Zeebra cannot be compared at all — reported as prominently as the wins and losses
+
+These are **results**, not gaps in the work. Each is a statement about the state of the available
+tools, and each would be invisible if the row were simply omitted.
+
+### 3.1 The solution tasks have no comparand, at any field size
+
+`Task::OneFiniteFieldSolution` and `Task::AllFiniteFieldSolutions` are **unsupported by all four
+comparands**, now unanimous and each verified from source rather than inferred:
+
+| engine | why |
+|---|---|
+| msolve | the operation is **absent from its source** (`main.c:96-97`); it returns a rational parametrization, not explicit finite-field points |
+| Groebner.jl | ships no finite-field solver to drive |
+| Sagebrush | ships no finite-field solver to drive |
+| Singular | no route with conventions this project has verified; declared `Unsupported::Task` rather than guessed at |
+
+**Those two columns are empty for every engine at every field size.** No tuning changes it. This is
+the cleanest illustration of why `Unsupported` must be a separate outcome: folded into "failed", or
+left as a missing row, the empty column would read as though Zeebra's solver had never been
+compared because nobody got round to it — when in fact there is nothing to compare it against.
+
+### 3.2 Two field ceilings, not one — and above the second, msolve does not terminate
+
+| task | msolve bound | source |
+|---|---|---|
+| `ReducedGrobnerBasis` | `p < 2^31` | `iofiles.c:564` |
+| **`UnivariateEliminant`** | **`p < 1515531529`** | `linalg-fglm.c:38` |
+
+`corpus::REFERENCE_CHARACTERISTIC` is `2^31 − 1 = 2147483647`, which is **above the eliminant
+ceiling**. So **msolve is a basis comparand on the corpus reference field and not an eliminant
+one.**
+
+And the failure above that ceiling is worse than a refusal. msolve's sparse-FGLM refuses
+`p >= 1518500213` (`fglm_core.c:1385`), the `NULL` is laundered into the genericity signal
+(`msolve.c:1740-1752`), and that reaches a `goto restart` loop with **no exit**:
+`add_linear_form_to_input_system` has no failure path (`msolve.c:649`) and
+`undo_variable_order_change` permanently returns 0 once a linear form exists (`msolve.c:482-484`).
+Measured on katsura-5 over `GF(2^31 − 1)`: **25 353 retries and 1.37 M lines of output in 8 s,
+never exiting.**
+
+**Why this is a measurement-integrity problem and not a footnote.** A sweep that asked msolve for
+an eliminant at the reference prime would hang a worker until the wall limit killed it, and the row
+would read **`StoppedByLimit`** — which is *timing-adjacent* and wrong. The truth is
+`Unsupported::Characteristic`. The sweep harness therefore **refuses to ask**
+(`MSOLVE_ELIMINANT_CEILING` in `examples/competitive_sweep.rs`), which is the only way to guarantee
+the row is never produced. The adapter declares the documented-safe `1515531529` rather than
+msolve's own guard, because the 2 968 684-wide window between them runs with no accumulation
+guarantee.
+
+### 3.3 The field-width ladder
+
+| Zeebra field width | engines that can accept it |
+|---|---|
+| ≤ `2^31 − 1` | msolve, Singular, Groebner.jl, Sagebrush |
+| 32–64 bit (Goldilocks, KoalaBear-derived) | Groebner.jl and Sagebrush only — **and they cannot corroborate each other against a third** |
+| 254/255-bit (BN254, BLS12-381 scalar fields) | **none, at any size** |
+
+The second row is the uncomfortable one. The differential harness's whole argument for Singular as
+an oracle is that its `std` is Buchberger/slimgb lineage and therefore *algorithmically*
+independent. **Two engines that agree prove less than two engines that agree for different
+reasons.** Where only Groebner.jl and Sagebrush are available, the rows say so.
+
+The third row means Zeebra's widest fields are validated by its own cross-field agreement and by
+`ark-ff` on the arithmetic — **not by any Gröbner comparand**. That is a fact about the state of
+the tools, and this report states it rather than omitting those rows.
+
+### 3.4 Characteristic two is not yet comparable
+
+No corpus rung is in `GF(2^k)` for `k > 1`, because two engines' default `GF(2^8)` need not be the
+same ring: different defining polynomials give isomorphic but not identical representations, and a
+basis compared element by element across them disagrees for no mathematical reason.
+`SingularSolver::supports` returns `Unsupported::ExtensionField` rather than guessing. Until the
+convention is established per engine, **there is no measured gap in characteristic two** — which
+matters for #272, see §9.
+
+---
+
+## 4. Where Zeebra agrees: the correctness result that licenses every timing
+
+All **seven** corpus ladder rungs — `katsura-4/5/6/7`, `cyclic-4/5/6` — agree **exactly** with
+Zeebra's own F4 on **leading monomials and basis cardinality**, with each rung's digest asserted
+against `corpus::ladder()`. **No disagreements.**
+
+Two properties of that check are worth stating because they are what make it evidence:
+
+- **Zeebra's F4 was the oracle, not Singular.** So none of the `dp`/`Dp` ordering traps or
+  `simplify` conventions are in the loop.
+- The comparison is on **invariants, not text**: the initial ideal and the cardinality, which are
+  properties of the ideal and the order, so a different print order or sign convention cannot
+  produce a false disagreement.
+
+Quotient dimensions were additionally checked against **published** values rather than against a
+previous run of this code — Katsura-n has `2^(n-1)` solutions and cyclic-5 has 70 — because an
+engine agreeing with itself proves nothing.
+
+### Two text-interface hazards, one closed and one still open
+
+Both are the same shape, and it is the shape this milestone has been chasing: **a malformed render
+that produces a well-formed answer to a different ideal.**
+
+| hazard | status |
+|---|---|
+| `x1` is a **prefix** of `x10`, so a greedy tokenizer reads `x1*x10` as something else | **Closed for Zeebra and msolve.** Zeebra pinned at the 14-variable rung; msolve verified safe by construction (`store_exponent` splits on `*` and matches with full `strcmp`, never `strncmp`) and by measurement over 53 distinct degree-2 monomials in `x1..x14`. **Groebner.jl and the Sagebrush driver are still unverified.** |
+| A generator naming an **undeclared** variable has that factor **silently dropped** — `iofiles.c:57-62` has no `else` branch, so `x*z-1` with only `x,y` declared reads as `x-1`, exit 0, `#invalid equations 0` | **Not reachable from this corpus**, which renders its own variable list — and now asserted rather than assumed (`test_every_identifier_in_every_rung_is_a_declared_variable`). The msolve adapter checks every identifier in `supports()`. |
+
+The msolve prefix check works because distinct degree-2 monomials are pairwise non-dividing, so the
+Gröbner basis *is* the generating set — which is why a set round-trip is a sound test there.
+
+---
+
+## 5. Zeebra's own stage split, and the correction #269 was built on
+
+`examples/f4_profile recommended`, milliseconds, from `MILESTONE-F4-OPTIMIZATION.md` §8.5.
+
+| system | order | total | symbolic | construction | elimination | extraction | interreduction |
+|---|---|---|---|---|---|---|---|
+| cyclic-5 | lex | 3.14 | 0.65 | **1.48** | 0.37 | 0.09 | 0.35 |
+| katsura-5 | lex | 0.88 | 0.12 | **0.35** | 0.09 | 0.06 | 0.17 |
+| katsura-6 | lex | 19.53 | 4.42 | **9.33** | 1.28 | 0.99 | 2.33 |
+| katsura-6 | grlex | 4.40 | 0.30 | 1.11 | 0.77 | 0.11 | **1.98** |
+| katsura-6 | grevlex | 3.77 | 0.31 | 1.14 | 0.80 | 0.08 | **1.33** |
+| katsura-7 | grlex | 46.72 | 2.58 | 6.21 | 8.00 | 0.63 | **28.71** |
+| katsura-7 | grevlex | 32.13 | 1.64 | 5.53 | 7.12 | 0.40 | **16.90** |
+
+> ### #269's premise is false, and it is the premise the issue's title states
+>
+> #269 is titled "F4 elimination kernels — **the 65–88% stage**". That figure was true **at M16-0**
+> and has not been true since. Elimination is now **7%–22%** of every instance in the table:
+> 6.6% on katsura-6 lex, 22.2% on katsura-7 grevlex.
+>
+> It was corrected on the issue, including that the `la_ff_small_prime.c` it cites **does not
+> exist**.
+
+**The Amdahl ceiling this puts on #269.** Even an *infinitely fast* elimination kernel buys:
+
+| instance | elimination share | ceiling if elimination became free |
+|---|---:|---:|
+| katsura-6 lex | 6.6% | **1.07x** |
+| katsura-7 grlex | 17.1% | **1.21x** |
+| katsura-7 grevlex | 22.2% | **1.29x** |
+
+Every one of those is at or barely above the 20% noise band. **No kernel work on elimination can
+produce a readable end-to-end result on these instances.**
+
+### Where the cost actually is
+
+| stage | share | instances |
+|---|---:|---|
+| **Interreduction** | **61%** / 53% | katsura-7 grlex (28.71 of 46.72 ms), grevlex (16.90 of 32.13) |
+| **Matrix construction** | **48%** / 47% | katsura-6 lex (9.33 of 19.53), cyclic-5 lex (1.48 of 3.14) |
+
+Both are consequences of succeeding elsewhere — the pair criteria replaced 59 large matrices with
+107 small ones, and construction's per-matrix cost (the monomial-to-column `HashMap`, the sort)
+does not shrink with the matrix. Their ceilings are **2.56x** and **1.92x**, which are worth
+chasing where elimination's 1.07x is not.
+
+---
+
+## 6. The per-stage gap map, ranked by absolute time lost
+
+The report's central table. "Measured against" names what the gap was measured against, because a
+gap with no comparand is a hypothesis.
+
+| rank | stage | absolute time lost | measured against | is the comparand on the same cost curve? |
+|---:|---|---:|---|---|
+| **1** | **Order conversion / FGLM** | **~46 s** on one row (47.53 s against ~1.6 s) | msolve 0.11.0, same machine, `p = 65537` | **No** — lex walk against Wiedemann. §2. |
+| **2** | Interreduction | 28.71 ms of 46.72 (katsura-7 grlex) | Zeebra's own past only | n/a — internal |
+| **3** | Matrix construction | 9.33 ms of 19.53 (katsura-6 lex) | Zeebra's own past only | n/a — internal |
+| **4** | Elimination | 8.00 ms of 46.72 | Zeebra's own past only | n/a — internal |
+| — | Basis stage, cross-library | **not yet measured** on the corpus | corpus sweep pending adapter merge (#259, #260) | — |
+
+**The honest shape of this table is that rank 1 dwarfs everything below it by three orders of
+magnitude, and rank 1 is the one whose comparand is a different algorithm.** Ranks 2–4 are
+internal profile shares with no external comparand at all yet.
+
+That is the single most important structural fact in this report, and §9 is built on it.
+
+---
+
+## 7. The six-axis ranking
+
+Per the plan's §7.4, candidates are ranked on **six axes, not raw ratios**: absolute cost, measured
+gap, expected benefit, implementation difficulty, effect on maximum solvable size, and
+applicability to cryptanalytic systems. A raw ratio is excluded deliberately — §2 is the reason.
+
+Scores are `+` favourable, `0` neutral, `−` unfavourable, `?` unmeasured.
+
+| candidate | absolute cost | measured gap | expected benefit | difficulty | max solvable size | cryptanalytic applicability |
+|---|---|---|---|---|---|---|
+| **Krylov/Wiedemann conversion** (#58, currently deferred) | **+ ~46 s/row** | **+ 30x, measured** | **+ 2.56x–30x** | **− high** | **+** large: conversion is the wall | **+** CICO rows are conversion-dominated |
+| **#268 H12** compact representations | + 28.71 ms (interreduction) | ? none external | + up to 2.56x | 0 moderate | + fewer bytes per entry | + MQ and CICO both |
+| **#273 H17** adaptive strategy selection | 0 varies | ? none external | 0 route-dependent | **+ low** — extends existing planner | 0 | + picks the route per instance |
+| **#271 H15** modular composition / factoring | 0 extraction is 0.4–1 ms | ? none external | − extraction is already small | − high | 0 | 0 |
+| **#269 H13** elimination kernels | **− 8 ms, 7–22%** | **− premise false** | **− ceiling 1.07x–1.29x** | − high | 0 | 0 |
+| **#270 H14** per-field-width arithmetic | ? | **− premise undermined** | **− see below** | − high | 0 | 0 |
+| **#272 H16** bit-packed `GF(2)`/`GF(2^e)` | ? | **? no char-2 rung exists** | ? | − high | ? | + if char 2 matters |
+
+### The evidence against #270, which is new and decisive
+
+#270's premise is that **per-field-width specialization is where msolve's advantage lies.** Two
+facts from the msolve source study say the gap it reasons from does not exist at the fields being
+compared:
+
+1. **msolve's delayed reduction is active only below `2^18`.** At Zeebra's benchmark prime msolve
+   runs a **per-MAC correction** — so whatever its narrow per-bitwidth kernels gain is **invisible
+   on the instances being compared.**
+2. **All three of msolve's kernels use `int64_t`.** So the narrow kernels buy **bytes and SIMD
+   lanes, not accumulator headroom** — which is a different and much smaller claim than the one
+   #270 is scoped around.
+
+---
+
+## 8. Acceptance against #263's own criteria
+
+| criterion | status |
+|---|---|
+| ≥3 external tools | **Partially met, with reasons.** msolve measured (§1). Singular integrated through the contract and sweeping. Groebner.jl and Sagebrush **provisioned but their adapters are unmerged** (#259, #260) — the sweep harness takes them in three lines when they land. |
+| ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** established on seven rungs of two of them (§4), cross-library **timing** on `anemoi` only (§1). |
+| every row verified or classified unverified, method named | **Met.** §4 names the method (invariant agreement against Zeebra's F4, dimensions against published values). §1's rows are verified at `N = 4, 5, 6`. |
+| failure stages and limits recorded for incomplete runs | **Met** by construction: `StoppedByLimit` carries the limit and `Unsupported` the missing capability, and neither is timing evidence. |
+| no cross-machine or cross-concurrency ratio | **Met.** §1 states 8-core against 1-core and quotes **no** per-core ratio for the end-to-end rows; the per-core figure is restricted to the single-threaded conversion stage. |
+| recommendation for each H12–H17, issue updated | §9, and the issues updated. |
+
+**What is missing and why.** A cross-library basis-stage number on the corpus is the one deliverable
+not yet taken, and it is blocked on #259/#260 merging rather than on anything in this report. The
+harness exists, is runnable, and is queued behind four other agents on `benchlock` — which is the
+protocol working, not a failure.
+
+---
+
+## 9. What this decided
+
+| question | answer |
+|---|---|
+| Where does Zeebra lag by more than the noise band? | **Order conversion, by ~30x against msolve** on Anemoi `N = 5` at `p = 65537`. That is the only measured cross-library gap, and it is three orders of magnitude larger in absolute terms than every internal stage share. |
+| Is that gap in elimination, symbolic preprocessing, conversion, or extraction? | **Conversion**, unambiguously — 82.8% of Zeebra's conversion is the lex walk and dependence test. |
+| Is it a tuning gap or an algorithm gap? | **Algorithm.** Zeebra walks and tests dependence in `O(D³)`; msolve runs a Wiedemann scalar sequence; Magma spins a representation matrix. **A conversion ratio between any two of the three is not a measurement of FGLM.** |
+| Does Zeebra's measured 65–88% elimination share hold? | **No, and it no longer holds for Zeebra either.** It is **7%–22%** (§5). The figure in #269's title is from M16-0 and was superseded by M16's own success. |
+| Does the per-field-width hypothesis survive? | **No.** msolve's delayed reduction is active only below `2^18`, so it is inactive at the compared fields, and all three of its kernels use `int64_t` — narrow kernels buy lanes, not headroom. |
+| Which instances does Zeebra solve that no comparand does, and is that capability or performance? | **Capability, in three distinct ways**: the solution tasks (no comparand at any size), 32–64-bit fields (two comparands, neither independent of the other), and 254/255-bit fields (none). None of these is a speedup and none is reported as one. |
+| Do the external anchors agree in rank order? | **Not assessed.** #199's Magma page and Sagebrush's `bench/magma-scoreboard/` are cross-machine, and §0 forbids a cross-machine ratio. Deliberately left open rather than answered weakly. |
+| **Should H12–H17 proceed as scoped?** | **No. The measurement points at a lever the H-series does not contain.** |
+
+### The conclusion that matters
+
+**H12–H17 were scoped before the measurement, and the measurement says the largest lever is not
+among them.** The one measured cross-library gap is in order conversion, and the candidate that
+addresses it is **#58** — Wiedemann/Krylov — which is currently *deferred*. Meanwhile the two
+H-series items with the strongest a-priori stories, #269 and #270, both rest on premises this
+report falsifies.
+
+### Recommendations, per issue
+
+| issue | recommendation | reason |
+|---|---|---|
+| **#58** (Krylov/Wiedemann) | **Reopen the FGLM half for measurement.** Highest-value candidate in the whole set. | It is the algorithm msolve uses for the stage where Zeebra's only measured cross-library deficit lies (~46 s on one row, ~30x). #58 deferred it on the strength of there being no measured need; there now is one. |
+| **#268 H12** compact representations | **Raise to the top of the H-series.** | Addresses interreduction (61%) and matrix construction (48%) — the two largest *internal* stages, with ceilings of 2.56x and 1.92x. |
+| **#273 H17** adaptive strategy | **Keep, at low cost.** | Extends the existing planner, cheap, and §2 shows route choice matters more than kernel speed. |
+| **#271 H15** modular composition | **Defer.** | Extraction is 0.4–1.0 ms of 32–47 ms. There is no gap to close. |
+| **#269 H13** elimination kernels | **Deprioritize, and correct the title.** | The 65–88% premise is false; the stage is 7–22%, giving an Amdahl ceiling of 1.07x–1.29x, at or inside the noise band. The cited `la_ff_small_prime.c` does not exist. |
+| **#270 H14** per-field-width arithmetic | **Deprioritize; close unless re-scoped.** | msolve's delayed reduction is inactive at the compared fields and all its kernels are `int64_t`. The advantage #270 is scoped to chase is not present in the comparand at these field sizes. |
+| **#272 H16** bit-packed `GF(2)`/`GF(2^e)` | **Hold, pending a char-2 rung.** | Not refuted — **unmeasured**. No corpus rung is in `GF(2^k)`, blocked on the defining-polynomial convention (§3.4). Measure before committing. |
+
+### Two follow-ups this report generates
+
+- **Verify the `x1`/`x10` prefix handling in Groebner.jl and the Sagebrush driver**, as #311 did for
+  msolve. Both are unverified, and the failure is invisible from the engine's side.
+- **Settle the `GF(2^k)` defining-polynomial convention per engine**, which is what blocks both a
+  char-2 corpus rung and any decision on #272.
+
+---
+
+## 10. Reproducing
+
+```sh
+# The corpus, its digests, and the equivalence evidence for each family
+cargo test --lib external::corpus
+
+# What the sweep would run
+cargo run --release --example competitive_sweep -- --list
+
+# One measured row: one process, so its peak RSS is attributable to it
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh runner taskset -c 0-7 \
+  cargo run --release --example competitive_sweep -- \
+    --row katsura-6 --task reduced-grobner-basis --measure --wall 600 --write
+
+# Render the board from its accumulated history
+cargo run --release --example competitive -- --write
+```
+
+`--measure` without `--row` is refused: a peak-RSS figure is only attributable in a process that
+runs one row, and a harness that silently dropped the figure would make a sweep look like a
+measurement.

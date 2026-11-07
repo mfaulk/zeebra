@@ -88,6 +88,15 @@ pub enum RssBasis {
     /// measured process. No external solver can report it.
     AllocatorTracked,
 
+    /// `VmHWM` of the **harness's own** process, for an in-crate engine that runs in it.
+    ///
+    /// The same quantity as [`Self::DirectChildHighWater`] — a kernel-maintained high-water mark
+    /// for one process — and comparable with it, but with a weaker attribution: a subprocess
+    /// figure covers the one solve the supervisor spawned, while this one covers everything the
+    /// harness process has done. So it is only reported when the caller declares that the process
+    /// is doing one row and nothing else.
+    SelfHighWater,
+
     /// No figure: not Linux, `/proc` unreadable, measurement disabled, or the child exited before
     /// the first poll.
     Unavailable,
@@ -108,6 +117,7 @@ impl Display for RssBasis {
                     "peak bytes allocated by a tracking allocator (not resident)"
                 )
             }
+            Self::SelfHighWater => write!(f, "harness-process VmHWM (exact, one row per process)"),
             Self::Unavailable => write!(f, "unavailable"),
         }
     }
@@ -492,8 +502,8 @@ impl Watcher {
 
     /// The peak RSS figure and the basis that describes it.
     fn rss(&self) -> (Option<u64>, RssBasis) {
-        // `AllocatorTracked` is deliberately unreachable here: it comes from inside the measured
-        // process, and nothing this supervisor can observe from outside produces it.
+        // `AllocatorTracked` and `SelfHighWater` are deliberately unreachable here: both come from
+        // inside a process, and nothing this supervisor observes from outside produces either.
         match self.policy {
             RssPolicy::None => (None, RssBasis::Unavailable),
             RssPolicy::DirectChild => match self.direct_high_water {

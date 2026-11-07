@@ -28,6 +28,8 @@
 //! * [`corpus`] — the cross-library ladder, and the two naming hazards that produce a different
 //!   ideal without producing an error: Katsura's off-by-one indexing and affine-versus-homogenized
 //!   Cyclic. Both resolved against another engine's own distributed input files.
+//! * [`zeebra`] — Zeebra's own engine behind the same contract, so the board has something to
+//!   compare against and the in-crate row cannot acquire a privilege the subprocess rows lack.
 //! * [`singular`] — the reference adapter, over the Singular installation the differential
 //!   harness already drives. Read it as the worked example.
 //!
@@ -59,6 +61,8 @@ pub mod corpus;
 pub mod process;
 #[cfg(feature = "external-runners")]
 pub mod singular;
+#[cfg(feature = "external-runners")]
+pub mod zeebra;
 
 #[cfg(feature = "external-runners")]
 pub use board::{
@@ -78,3 +82,5 @@ pub use process::{
 };
 #[cfg(feature = "external-runners")]
 pub use singular::SingularSolver;
+#[cfg(feature = "external-runners")]
+pub use zeebra::ZeebraSolver;
