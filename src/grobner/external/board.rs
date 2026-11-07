@@ -700,6 +700,45 @@ pub struct Speedup {
     /// **Zero means the ratio is between two unchecked answers**, which §5 of the protocol forbids
     /// publishing. Carried rather than filtered so that a renderer can say so.
     pub shared_invariants: usize,
+
+    /// The baseline's wall time as a multiple of that library's observed startup floor.
+    ///
+    /// **Below about 2.0 the ratio is not an engine comparison in either direction** — it is
+    /// dominated by the cost of *starting* the comparand. Measured on this board: Singular's floor
+    /// is 36.0 ms, and four apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x** are entirely
+    /// that floor. The 450x is the one that would have been published.
+    ///
+    /// `None` when the library has too few rows to observe a floor. Carried rather than filtered,
+    /// for the same reason as `shared_invariants`: a dropped row is a gap a reader cannot see, and
+    /// the board is the artifact that has to stop somebody recomputing the 450x from the raw
+    /// numbers later.
+    pub baseline_floor_multiple: Option<f64>,
+}
+
+impl Speedup {
+    /// The multiple below which a ratio is startup-dominated rather than an engine comparison.
+    ///
+    /// Two: at that point half the comparand's wall is the cost of starting it, so the other half
+    /// cannot carry a conclusion through the 20% noise band this project reads results against.
+    pub const FLOOR_MULTIPLE_REQUIRED: f64 = 2.0;
+
+    /// Whether this ratio says anything about the **engines** rather than about process startup.
+    ///
+    /// `false` when the baseline's wall is within [`Self::FLOOR_MULTIPLE_REQUIRED`] of its
+    /// library's observed startup floor. An unknown floor is treated as acceptable: refusing on
+    /// absent evidence would silently drop every row of a library with few measurements.
+    pub fn is_engine_comparison(&self) -> bool {
+        self.baseline_floor_multiple
+            .is_none_or(|multiple| multiple >= Self::FLOOR_MULTIPLE_REQUIRED)
+    }
+
+    /// Whether this ratio may be published: an engine comparison with a checked invariant.
+    ///
+    /// The conjunction of the protocol's two gates, so a renderer cannot satisfy one and forget
+    /// the other.
+    pub fn is_publishable(&self) -> bool {
+        self.is_engine_comparison() && self.shared_invariants > 0
+    }
 }
 
 /// Rows from every library, with the renderers.
@@ -769,6 +808,7 @@ impl CompetitiveBoard {
     /// unchecked instead of silently dropping it — a dropped row is a gap a reader cannot see.
     pub fn speedups(&self, baseline: &str) -> Vec<Speedup> {
         let mut found = Vec::new();
+        let floor = self.startup_floor(baseline);
         for reference in self.rows.iter().filter(|row| row.library == baseline) {
             if !reference.is_timing_evidence() {
                 continue;
@@ -793,11 +833,45 @@ impl CompetitiveBoard {
                     subject: subject.library.clone(),
                     ratio: theirs.as_secs_f64() / ours.as_secs_f64(),
                     shared_invariants: reference.invariants.overlap(&subject.invariants),
+                    baseline_floor_multiple: floor
+                        .filter(|floor| !floor.is_zero())
+                        .map(|floor| theirs.as_secs_f64() / floor.as_secs_f64()),
                 });
             }
         }
         found
     }
+
+    /// The shortest wall time `library` recorded, which is its **process-startup floor**.
+    ///
+    /// Derived from the board rather than configured, which is the point: the floor is a property
+    /// of a library on a machine, and the board already holds enough rows to observe it. Singular's
+    /// came out at 36.0 ms across instances whose quotient dimensions differ by a factor of 2 000
+    /// — five rows within 0.07 ms of each other — and a figure that constant across that range is
+    /// not a computation.
+    ///
+    /// Requires at least [`Self::ROWS_FOR_A_FLOOR`] answered rows, because one fast row is a fast
+    /// row and not a floor. `None` below that, which [`Speedup::is_engine_comparison`] then treats
+    /// as acceptable rather than as a refusal.
+    ///
+    /// An under-estimate is the safe direction: it makes fewer ratios look startup-dominated, so a
+    /// row it passes is one a reader must still check. It is an over-estimate only if the library's
+    /// genuinely fastest instance is faster than its own startup, which cannot happen.
+    pub fn startup_floor(&self, library: &str) -> Option<Duration> {
+        let walls: Vec<Duration> = self
+            .rows
+            .iter()
+            .filter(|row| row.library == library && row.is_timing_evidence())
+            .filter_map(|row| row.wall)
+            .collect();
+        if walls.len() < Self::ROWS_FOR_A_FLOOR {
+            return None;
+        }
+        walls.into_iter().min()
+    }
+
+    /// Answered rows a library needs before its fastest one counts as a startup floor.
+    pub const ROWS_FOR_A_FLOOR: usize = 4;
 
     /// The board as Markdown, grouped by family then problem.
     ///
@@ -881,10 +955,15 @@ impl CompetitiveBoard {
                     speedup.task,
                     speedup.subject,
                     speedup.ratio,
-                    if speedup.shared_invariants > 0 {
-                        format!("{} invariants agreed", speedup.shared_invariants)
-                    } else {
+                    if !speedup.is_engine_comparison() {
+                        format!(
+                            "**NOT AN ENGINE COMPARISON: baseline is {:.1}x its startup floor**",
+                            speedup.baseline_floor_multiple.unwrap_or_default()
+                        )
+                    } else if speedup.shared_invariants == 0 {
                         "**NOT PUBLISHABLE: no invariant was checked**".to_string()
+                    } else {
+                        format!("{} invariants agreed", speedup.shared_invariants)
                     }
                 );
             }
@@ -1011,6 +1090,29 @@ mod tests {
         )
         .with_version(ToolVersion::new(library, "1.0"))
         .with_command_line(format!("{} katsura-8.in", library));
+        CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    /// A row on a named problem, so several rows can sit on one board without sharing a digest.
+    fn named_row(
+        problem: &str,
+        library: &str,
+        status: RunStatus,
+        wall_ms: f64,
+    ) -> CompetitiveRecord {
+        let mut instance = instance();
+        instance.name = problem.to_string();
+        // The digest covers the generators, so perturb one to make each problem distinct.
+        instance.system[0] = format!("x1^2+x2-{}", problem.len() + problem.as_bytes()[0] as usize);
+        let report = RunReport::new(
+            library,
+            &instance,
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(600)),
+            status,
+            Measurement::wall(Duration::from_secs_f64(wall_ms / 1e3)),
+        )
+        .with_version(ToolVersion::new(library, "1.0"));
         CompetitiveRecord::of(&report, &instance, &environment())
     }
 
@@ -1247,6 +1349,97 @@ mod tests {
             markdown.contains("NOT PUBLISHABLE"),
             "an unchecked ratio must be marked: {}",
             markdown
+        );
+    }
+
+    /// A startup floor is observed from the board, and a ratio against it is disqualified.
+    ///
+    /// The measured case, reproduced: Singular's floor on the real sweep was 36.0 ms, and
+    /// `mq-planted-6` finished in 0.08 ms against Singular's 36.01 ms — an apparent **450x** that
+    /// is entirely the cost of starting Singular. The board must refuse to call that an engine
+    /// comparison, and must still **keep the row**, because it is the artifact that stops somebody
+    /// recomputing the 450x from the raw numbers later.
+    #[test]
+    fn test_a_ratio_against_a_startup_floor_is_not_an_engine_comparison() {
+        let mut board = CompetitiveBoard::new();
+        // Four Singular rows at its floor, plus one far above it: the shape the real sweep had.
+        for (name, zeebra_ms, singular_ms) in [
+            ("a", 0.08, 36.01),
+            ("b", 0.14, 36.04),
+            ("c", 0.58, 36.05),
+            ("d", 0.55, 36.08),
+            ("e", 29963.0, 7290.0),
+        ] {
+            board.add(named_row(name, "zeebra", answered(8), zeebra_ms));
+            board.add(named_row(name, "singular", answered(8), singular_ms));
+        }
+
+        let floor = board
+            .startup_floor("singular")
+            .expect("five answered rows is enough to observe a floor");
+        assert!(
+            (floor.as_secs_f64() * 1e3 - 36.01).abs() < 0.001,
+            "{:?} is not Singular's 36.0 ms floor",
+            floor
+        );
+
+        let speedups = board.speedups("singular");
+        let disqualified: Vec<&super::Speedup> = speedups
+            .iter()
+            .filter(|s| !s.is_engine_comparison())
+            .collect();
+        assert_eq!(
+            disqualified.len(),
+            4,
+            "the four rows at Singular's floor must all be disqualified"
+        );
+        for speedup in &disqualified {
+            assert!(!speedup.is_publishable());
+            assert!(speedup.baseline_floor_multiple.unwrap() < 2.0);
+        }
+
+        // The one real row survives: Singular's wall there is 200x its floor.
+        let real: Vec<&super::Speedup> = speedups
+            .iter()
+            .filter(|s| s.is_engine_comparison())
+            .collect();
+        assert_eq!(real.len(), 1);
+        assert_eq!(real[0].problem, "e");
+        assert!(real[0].is_publishable());
+        assert!(
+            (real[0].ratio - 7290.0 / 29963.0).abs() < 1e-6,
+            "Zeebra is slower here, so the ratio is below one: {}",
+            real[0].ratio
+        );
+        assert!(real[0].baseline_floor_multiple.unwrap() > 100.0);
+
+        // And the rows are still on the board, all ten of them.
+        assert_eq!(board.rows().len(), 10);
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("NOT AN ENGINE COMPARISON"),
+            "the renderer must mark the disqualification: {}",
+            markdown
+        );
+    }
+
+    /// Too few rows to observe a floor yields none, and does not disqualify anything.
+    ///
+    /// Refusing on absent evidence would silently drop every row of a library that has only been
+    /// measured once or twice, which is worse than letting a reader check.
+    #[test]
+    fn test_too_few_rows_to_observe_a_floor_disqualifies_nothing() {
+        let mut board = CompetitiveBoard::new();
+        board.add(named_row("a", "zeebra", answered(8), 1.0));
+        board.add(named_row("a", "singular", answered(8), 36.0));
+        assert_eq!(board.startup_floor("singular"), None);
+
+        let speedups = board.speedups("singular");
+        assert_eq!(speedups.len(), 1);
+        assert_eq!(speedups[0].baseline_floor_multiple, None);
+        assert!(
+            speedups[0].is_engine_comparison(),
+            "an unknown floor must not be read as a disqualification"
         );
     }
 
