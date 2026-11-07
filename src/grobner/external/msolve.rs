@@ -1392,7 +1392,7 @@ mod tests {
                 corpus, ExternalSolver, FieldSpec, Instance, Invariants, Limits, RunFailure,
                 RunStatus, Support, Task, Unsupported, REFERENCE_CHARACTERISTIC,
             },
-            f4,
+            f4, f4_with_options, F4Options,
         },
         FiniteField, MonomialOrder, MultivariatePolynomial,
     };
@@ -1631,58 +1631,285 @@ rational param(cpu)             0.75 sec
         )
     }
 
+    /// A corpus rung as the rendered [`Instance`] #263's sweep will hand msolve.
+    ///
+    /// **Digest-identical** to the sweep's, including the `x1..xN` naming — which is the naming
+    /// with the `x1`/`x10` prefix hazard in it. Separate from [`corpus_pair`] so that a caller
+    /// wanting only the instance does not ask for an oracle it then discards: several rungs here
+    /// are built at [`P30`], where an oracle over [`Reference`] would be over the *wrong field*.
+    fn corpus_instance(name: &str, characteristic: u64) -> Instance {
+        corpus::instance(name, characteristic, GREVLEX)
+            .unwrap_or_else(|| panic!("{} is a corpus rung", name))
+    }
+
     /// A corpus instance, and Zeebra's own invariants for it under grevlex.
     ///
-    /// The instance comes from [`corpus::instance`], so it is **digest-identical** to the one
-    /// #263's sweep will hand msolve — including the `x1..xN` naming, which is the naming with the
-    /// `x1`/`x10` prefix hazard in it. Zeebra's side is computed here and now by `f4`, so an
-    /// agreement test is live Zeebra against recorded msolve rather than two recordings.
+    /// Zeebra's side is computed here and now, so an agreement test is live Zeebra against
+    /// recorded msolve rather than two recordings.
+    ///
+    /// Panics if the rung has no oracle. Every caller names its rung as a literal at [`P31`], so
+    /// that is a programming error rather than a gap; the ladder-wide test uses
+    /// [`has_compiled_pair`] and [`zeebra_oracle`] directly, because it needs to tell a rung with
+    /// no oracle from one whose oracle ran out of budget.
     fn corpus_pair(name: &str, characteristic: u64) -> (Instance, Invariants) {
-        try_corpus_pair(name, characteristic)
-            .unwrap_or_else(|| panic!("no compiled instantiation for {}", name))
+        let instance = corpus_instance(name, characteristic);
+        let invariants = zeebra_oracle(&instance).unwrap_or_else(|| {
+            panic!(
+                "no oracle for {} at characteristic {}",
+                name, characteristic
+            )
+        });
+        (instance, invariants)
     }
 
-    /// [`corpus_pair`], returning `None` where Zeebra's side has no compiled instantiation.
+    /// The variable counts Zeebra's side has a compiled instantiation for.
     ///
-    /// Only the ladder-wide test needs this: every other caller names its rung as a literal, so
-    /// a missing instantiation there is a programming error and should panic.
-    fn try_corpus_pair(name: &str, characteristic: u64) -> Option<(Instance, Invariants)> {
-        let instance = corpus::instance(name, characteristic, GREVLEX)
-            .unwrap_or_else(|| panic!("{} is a corpus rung", name));
-        let refs: Vec<&str> = instance.variable_refs();
-        let leading = match name {
-            "katsura-4" => zeebra_leading(&katsura::<4, Reference>(), &refs),
-            "katsura-5" => zeebra_leading(&katsura::<5, Reference>(), &refs),
-            "katsura-6" => zeebra_leading(&katsura::<6, Reference>(), &refs),
-            "katsura-7" => zeebra_leading(&katsura::<7, Reference>(), &refs),
-            "cyclic-4" => zeebra_leading(&cyclic::<4, Reference>(), &refs),
-            "cyclic-5" => zeebra_leading(&cyclic::<5, Reference>(), &refs),
-            "cyclic-6" => zeebra_leading(&cyclic::<6, Reference>(), &refs),
-            _ => return None,
+    /// The whole coupling this list replaces: the dispatch used to be on **family name**, so each
+    /// of the twelve families #324 added needed an edit in two places before it had an oracle, and
+    /// had none until someone made it. Dispatching on width means a family added at a count
+    /// already here is covered with no edit at all. Only a genuinely new width needs a line — and
+    /// [`zeebra_oracle`] panics rather than silently reporting "no oracle" if this list and its
+    /// match ever disagree.
+    const COMPILED_WIDTHS: &[usize] = &[4, 5, 6, 7, 10, 14];
+
+    /// Whether a rung can have an oracle at all, from its field and its width alone.
+    ///
+    /// Cheap by design: it runs no F4, so the ladder-wide coverage assertion can cover all
+    /// eighteen rungs without computing a fourteen-variable basis.
+    ///
+    /// The field check is not a formality. Parsing a rung's text into [`Reference`] reduces its
+    /// coefficients modulo [`REFERENCE_CHARACTERISTIC`], so an oracle built for a rung over any
+    /// other prime would be an answer to a different problem — silently.
+    fn has_compiled_pair(instance: &Instance) -> bool {
+        instance.field.characteristic == REFERENCE_CHARACTERISTIC
+            && COMPILED_WIDTHS.contains(&instance.variables.len())
+    }
+
+    /// Zeebra's invariants for a rung, by **parsing the rung's own text**.
+    ///
+    /// `None` for two different reasons, which [`has_compiled_pair`] separates: the rung has no
+    /// oracle (another field, or an uncompiled width), or Zeebra's own F4 crossed
+    /// [`ZEEBRA_ORACLE_BUDGET`]. Neither is a disagreement, and a caller must not report them as
+    /// one.
+    ///
+    /// # Why parse rather than re-instantiate the family
+    ///
+    /// Rebuilding from `katsura::<4, _>()` *assumes* that the rendered corpus text and the typed
+    /// generator agree. Parsing the text instead means **the bytes checked are the bytes every
+    /// engine is handed**: the corpus renders through `polynomial_to_string` and this reads back
+    /// through `parse`, so a round-trip failure in either direction surfaces as a disagreement
+    /// rather than as a silently different problem.
+    ///
+    /// That matters most for msolve. The one hazard cross-engine agreement structurally *cannot*
+    /// catch is text misread identically by everything, because every engine was handed the same
+    /// bytes — and `iofiles.c:57-62` has no `else`, so a factor naming a variable not on line 1 is
+    /// **silently dropped**. The fourteen-variable rungs are where that is live.
+    fn zeebra_oracle(instance: &Instance) -> Option<Invariants> {
+        if !has_compiled_pair(instance) {
+            return None;
+        }
+        let leading = match instance.variables.len() {
+            4 => zeebra_leading_parsed::<4>(instance),
+            5 => zeebra_leading_parsed::<5>(instance),
+            6 => zeebra_leading_parsed::<6>(instance),
+            7 => zeebra_leading_parsed::<7>(instance),
+            10 => zeebra_leading_parsed::<10>(instance),
+            14 => zeebra_leading_parsed::<14>(instance),
+            // `has_compiled_pair` admitted this width, so a missing arm is a bug in this file and
+            // not a rung without an oracle. Reporting it as the latter is how a rung quietly loses
+            // its oracle, which is the recurring defect this issue exists to remove.
+            other => panic!("COMPILED_WIDTHS admits {} with no dispatch arm", other),
+        }?;
+        Some(Invariants::none().with_leading_monomials(leading))
+    }
+
+    /// How long Zeebra's own F4 is given per rung when it is acting as the oracle.
+    ///
+    /// Not a measurement and not a claim about Zeebra's speed — it is the budget that keeps this
+    /// test runnable. The default `F4Options` limits are *resource* bounds with `max_wall_time`
+    /// unset, so a hard rung such as fourteen random quadratics in fourteen variables can grind
+    /// for a long time before crossing one. An oracle slower than the tool it checks makes the
+    /// test impractical to run, which is how a test stops being run and therefore stops being
+    /// true. It is also symmetric with the external side, which always gets a `Limits::wall`.
+    ///
+    /// The same budget and the same reasoning as `tests/external_comparands.rs`.
+    ///
+    /// **It is not a reliable bound, which is why [`DEFAULT_ORACLE_WIDTH_CEILING`] exists too.**
+    /// The check is cooperative and happens once per batch (`src/grobner/f4/mod.rs:416`), so a
+    /// single long matrix reduction overruns it: measured here, `mq-random-10` ran past **ten
+    /// minutes** under this 120-second budget. The budget still earns its place for rungs where a
+    /// batch boundary arrives in time; it just cannot be the only guard.
+    const ZEEBRA_ORACLE_BUDGET: Duration = Duration::from_secs(120);
+
+    /// The widest rung the live ladder test builds an oracle for unless asked otherwise.
+    ///
+    /// **A test-runtime bound, not a capability claim.** [`zeebra_oracle`] handles every width in
+    /// [`COMPILED_WIDTHS`]; this only decides what one `cargo test` pays for by default, because
+    /// `test_a_real_msolve_agrees_with_zeebra_on_katsura_and_cyclic` is deliberately **not**
+    /// `#[ignore]`d — it runs whenever msolve is installed.
+    ///
+    /// Measured on the provisioning machine: the nine rungs at or below seven variables build
+    /// their oracles in **1.4 seconds in total**, while `mq-random-10` alone did not finish in ten
+    /// minutes. A test that takes ten minutes stops being run, and a test that stops being run
+    /// stops being true.
+    ///
+    /// `ZEEBRA_FULL_CORPUS_ORACLE=1` lifts it, for a machine that wants the ten- and
+    /// fourteen-variable rungs covered. Rungs left out are **printed**, never silently dropped.
+    const DEFAULT_ORACLE_WIDTH_CEILING: usize = 7;
+
+    /// [`DEFAULT_ORACLE_WIDTH_CEILING`], or no ceiling when `ZEEBRA_FULL_CORPUS_ORACLE` is set.
+    fn oracle_width_ceiling() -> usize {
+        if std::env::var_os("ZEEBRA_FULL_CORPUS_ORACLE").is_some() {
+            usize::MAX
+        } else {
+            DEFAULT_ORACLE_WIDTH_CEILING
+        }
+    }
+
+    /// The leading monomials of Zeebra's grevlex basis of `instance`, parsed from its own text.
+    ///
+    /// `None` when Zeebra's F4 crosses one of its `F4Options` limits, including
+    /// [`ZEEBRA_ORACLE_BUDGET`]. A parse failure is **not** folded into that: the corpus text is
+    /// Zeebra's own rendering, so failing to read it back is a defect rather than a budget, and it
+    /// panics with the offending generator.
+    fn zeebra_leading_parsed<const N: usize>(instance: &Instance) -> Option<Vec<String>> {
+        let names: Vec<&str> = instance.variable_refs();
+        let fixed: [&str; N] = names.clone().try_into().ok()?;
+        let system: Vec<MultivariatePolynomial<N, Reference>> = instance
+            .system
+            .iter()
+            .map(|generator| {
+                MultivariatePolynomial::parse(generator, fixed).unwrap_or_else(|e| {
+                    panic!(
+                        "Zeebra cannot parse its own corpus text {:?}: {}",
+                        generator, e
+                    )
+                })
+            })
+            .collect();
+        let options = F4Options {
+            max_wall_time: Some(ZEEBRA_ORACLE_BUDGET),
+            ..F4Options::default()
         };
-        Some((instance, Invariants::none().with_leading_monomials(leading)))
+        let (basis, _statistics) = f4_with_options(&system, GREVLEX, &options).ok()?;
+        Some(
+            basis
+                .iter()
+                .map(|p| monomial_to_string(&p.leading_monomial(GREVLEX), &names))
+                .collect(),
+        )
     }
 
-    /// The corpus rungs `corpus_pair` cannot yet build Zeebra's side for, and why.
+    /// The corpus rungs that can have no Zeebra oracle, and why.
     ///
-    /// `corpus::instance` hands out rendered text; computing Zeebra's own invariants needs the
-    /// typed system, which is a per-family `const`-generic instantiation. The seven katsura and
-    /// cyclic rungs have one; the twelve families #324 added do not. Listing them here rather
-    /// than skipping silently keeps the coverage gap visible and makes a newly added rung fail
-    /// at an assertion that names it — #333 is the issue for closing the gap.
+    /// **Not a coverage gap — a correct residue.** Poseidon carries KoalaBear and Anemoi
+    /// `2^64 - 353`, and neither shares [`Reference`]'s type, so each needs a second *field type*
+    /// rather than a second match arm. Every rung at the reference field now has an oracle
+    /// whatever its family, because the dispatch is on [`COMPILED_WIDTHS`].
+    ///
+    /// Asserted two-sidedly, so a rung that silently *gained* coverage is caught as well as one
+    /// that lost it (#338's contribution, kept).
     const WITHOUT_A_COMPILED_PAIR: &[&str] = &[
-        "mq-random-6",
-        "mq-random-10",
-        "mq-random-14",
-        "mq-planted-6",
-        "mq-planted-10",
-        "mq-planted-14",
         "poseidon-t2-rf2-rp0-planted",
         "poseidon-t2-rf2-rp2-planted",
         "poseidon-t2-rf4-rp0-planted",
         "anemoi64-cico-n1-fcico",
         "anemoi64-cico-n2-fcico",
     ];
+
+    /// Every rung at the reference field has an oracle; only the other-field ones do not.
+    ///
+    /// The property #345 is about. The dispatch is on **variable count**, so a family added at a
+    /// width already present — 4, 5, 6, 7, 10 or 14 — is covered with no edit here, and
+    /// [`WITHOUT_A_COMPILED_PAIR`] shrinks to the rungs that are genuinely out of reach. The
+    /// previous dispatch was on family name, so each of the twelve families #324 added arrived
+    /// with no oracle until someone wrote a match arm.
+    ///
+    /// Deliberately checks the *decision* and not the oracle: `has_compiled_pair` reads the
+    /// instance's characteristic and width, so this covers all eighteen rungs without running
+    /// Zeebra's F4 on a fourteen-variable system.
+    #[test]
+    fn test_every_reference_field_rung_has_a_compiled_oracle() {
+        let mut without: Vec<&str> = Vec::new();
+        for entry in corpus::ladder() {
+            let instance = corpus_instance(entry.name, P31);
+            if !has_compiled_pair(&instance) {
+                without.push(entry.name);
+                continue;
+            }
+            assert_eq!(
+                instance.field.characteristic, P31,
+                "{}: an oracle at another field would parse into the wrong one",
+                entry.name
+            );
+            assert!(
+                COMPILED_WIDTHS.contains(&instance.variables.len()),
+                "{}: {} variables",
+                entry.name,
+                instance.variables.len()
+            );
+        }
+        without.sort_unstable();
+        let mut expected = WITHOUT_A_COMPILED_PAIR.to_vec();
+        expected.sort_unstable();
+        assert_eq!(
+            without, expected,
+            "a corpus rung gained or lost a compiled Zeebra side; see #333"
+        );
+    }
+
+    /// The rungs with no oracle are exactly the ones carrying their own field, not their own name.
+    ///
+    /// Poseidon is over KoalaBear and Anemoi over `2^64 - 353`; neither shares [`Reference`]'s
+    /// type, so each needs a second field type rather than a second match arm. That residue is
+    /// correct rather than a coverage gap, and this test is what says so.
+    #[test]
+    fn test_the_rungs_without_an_oracle_are_the_ones_at_another_field() {
+        for name in WITHOUT_A_COMPILED_PAIR {
+            let instance = corpus_instance(name, P31);
+            assert_ne!(
+                instance.field.characteristic, P31,
+                "{}: it is at the reference field, so it should have an oracle",
+                name
+            );
+        }
+        assert_eq!(
+            WITHOUT_A_COMPILED_PAIR.len(),
+            5,
+            "three Poseidon rungs and two Anemoi rungs"
+        );
+    }
+
+    /// Parsing the rung's own text gives the same basis as instantiating the family in Rust.
+    ///
+    /// The guard on replacing the route. Rebuilding from `katsura::<4, _>()` *assumes* that the
+    /// rendered corpus text and the typed generator agree; parsing the text instead makes a
+    /// round-trip failure in either direction show up, because the bytes parsed are the bytes
+    /// every engine is handed. This asserts the two routes coincide where both exist, so the
+    /// change is a strengthening rather than a substitution.
+    #[test]
+    fn test_the_parsed_oracle_agrees_with_the_instantiated_one() {
+        // Both sides go through `with_leading_monomials`, which sorts: the initial ideal is a
+        // *set*, so comparing print order would be comparing something that carries no meaning.
+        let instantiated =
+            |leading: Vec<String>| Invariants::none().with_leading_monomials(leading);
+
+        let katsura_4 = corpus_instance("katsura-4", P31);
+        let refs: Vec<&str> = katsura_4.variable_refs();
+        assert_eq!(
+            zeebra_oracle(&katsura_4).expect("katsura-4 has an oracle"),
+            instantiated(zeebra_leading(&katsura::<4, Reference>(), &refs)),
+            "parsing katsura-4's text must give the basis katsura::<4> does"
+        );
+
+        let cyclic_4 = corpus_instance("cyclic-4", P31);
+        let refs: Vec<&str> = cyclic_4.variable_refs();
+        assert_eq!(
+            zeebra_oracle(&cyclic_4).expect("cyclic-4 has an oracle"),
+            instantiated(zeebra_leading(&cyclic::<4, Reference>(), &refs)),
+            "parsing cyclic-4's text must give the basis cyclic::<4> does"
+        );
+    }
 
     /// The leading monomials of Zeebra's grevlex basis, rendered with `variables`.
     fn zeebra_leading<const N: usize, F: FiniteField>(
@@ -1898,7 +2125,7 @@ rational param(cpu)             0.75 sec
             4,
             "katsura::<4> is four equations"
         );
-        let (instance, _) = corpus_pair("katsura-4", P31);
+        let instance = corpus_instance("katsura-4", P31);
         assert_eq!(instance.variables.len(), 4);
         // And msolve's echo of that input agrees it read four variables, under the corpus's own
         // `x1..xN` naming.
@@ -1934,7 +2161,7 @@ rational param(cpu)             0.75 sec
             "#monomial order:       graded reverse lexicographical",
             "#monomial order:       eliminating first variable, blocks: graded reverse lexicographical",
         );
-        let (instance, _) = corpus_pair("katsura-4", P31);
+        let instance = corpus_instance("katsura-4", P31);
         match parse_basis(&elimination, &instance, "") {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("monomial order"), "got {:?}", detail)
@@ -1947,7 +2174,7 @@ rational param(cpu)             0.75 sec
     #[test]
     fn test_a_declared_length_that_disagrees_with_the_list_is_rejected() {
         let lying = KATSURA_4_BASIS.replace("7 elements", "9 elements");
-        let (instance, _) = corpus_pair("katsura-4", P31);
+        let instance = corpus_instance("katsura-4", P31);
         match parse_basis(&lying, &instance, "") {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("declares 9"), "got {:?}", detail)
@@ -1964,7 +2191,7 @@ rational param(cpu)             0.75 sec
     #[test]
     fn test_a_verbose_basis_size_that_disagrees_is_self_inconsistent() {
         let lying = KATSURA_4_LOG.replace("size of basis                     7", "size of basis 9");
-        let (instance, _) = corpus_pair("katsura-4", P31);
+        let instance = corpus_instance("katsura-4", P31);
         match parse_basis(KATSURA_4_BASIS, &instance, &lying) {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("verbose log"), "got {:?}", detail)
@@ -2037,7 +2264,7 @@ rational param(cpu)             0.75 sec
     /// zero-dimensional — recorded rather than assumed from Zeebra's classification.
     #[test]
     fn test_cyclic_4_has_no_eliminant_and_says_why() {
-        let (instance, _) = corpus_pair("cyclic-4", P30);
+        let instance = corpus_instance("cyclic-4", P30);
         // The corpus agrees it is not zero-dimensional, which is why the rung is there.
         assert!(corpus::ladder()
             .iter()
@@ -2643,7 +2870,7 @@ rational param(cpu)             0.75 sec
     /// msolve's own `#invalid equations` echo is checked, so a discarded generator is a failure.
     #[test]
     fn test_a_discarded_generator_is_self_inconsistent() {
-        let (instance, _) = corpus_pair("katsura-4", P31);
+        let instance = corpus_instance("katsura-4", P31);
         let discarded = KATSURA_4_LOG.replace(
             "size of basis                     7",
             "#invalid equations               1\nsize of basis                     7",
@@ -2697,18 +2924,49 @@ rational param(cpu)             0.75 sec
         // A rung with no compiled Zeebra side is skipped, and the skipped set is asserted below
         // rather than left implicit: a loop that silently covers less than it appears to is the
         // failure this milestone keeps finding.
+        //
+        // Three outcomes per rung, not two, because "no oracle" has two causes that must not be
+        // conflated. `skipped` is the structural one — another field — and is asserted against an
+        // explicit constant. `over_budget` is Zeebra's own F4 running out of time, which varies
+        // with the machine and so cannot be asserted, and is therefore **printed**: a rung that
+        // quietly loses its oracle is the recurring defect of this milestone, and making it say so
+        // is the fix.
         let mut skipped: Vec<&str> = Vec::new();
+        let mut over_budget: Vec<&str> = Vec::new();
         for entry in corpus::ladder() {
-            let Some((instance, ours)) = try_corpus_pair(entry.name, P31) else {
-                skipped.push(entry.name);
-                continue;
-            };
+            let instance = corpus_instance(entry.name, P31);
+            // Checked for every rung, including the ones with no oracle: a row is only the problem
+            // the corpus pinned if its digest is the frozen one.
             assert_eq!(
                 instance.digest(),
                 entry.digest,
                 "{}: the corpus digest must be frozen",
                 entry.name
             );
+            if !has_compiled_pair(&instance) {
+                skipped.push(entry.name);
+                continue;
+            }
+            if instance.variables.len() > oracle_width_ceiling() {
+                eprintln!(
+                    "{}: NO ORACLE — {} variables is above the default ceiling of {}; \
+                     set ZEEBRA_FULL_CORPUS_ORACLE=1 to include it",
+                    entry.name,
+                    instance.variables.len(),
+                    DEFAULT_ORACLE_WIDTH_CEILING
+                );
+                over_budget.push(entry.name);
+                continue;
+            }
+            let Some(ours) = zeebra_oracle(&instance) else {
+                eprintln!(
+                    "{}: NO ORACLE — Zeebra's own F4 crossed its {:?} budget, so msolve's answer \
+                     for this rung is unchecked",
+                    entry.name, ZEEBRA_ORACLE_BUDGET
+                );
+                over_budget.push(entry.name);
+                continue;
+            };
             let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
             let answer = match &report.status {
                 RunStatus::Complete(answer) => answer,
@@ -2745,6 +3003,19 @@ rational param(cpu)             0.75 sec
             skipped, expected,
             "a corpus rung gained or lost a compiled Zeebra side; see #333"
         );
+        // Printed and not asserted: the width ceiling is liftable and a budget crossing depends on
+        // the machine, so pinning either would make the test fail for being run somewhere slower
+        // or configured differently. Saying how many rungs went unchecked is what stops the loop
+        // from appearing to cover more than it did — which is the recurring defect this issue is
+        // about.
+        if !over_budget.is_empty() {
+            eprintln!(
+                "{} of {} rungs had msolve's answer left unchecked: {:?}",
+                over_budget.len(),
+                corpus::ladder().len(),
+                over_budget
+            );
+        }
     }
 
     /// Against a real msolve, a fourteen-variable monomial ideal round-trips as a **set**.
@@ -2841,7 +3112,7 @@ rational param(cpu)             0.75 sec
 
         // `P30`, not the corpus's reference field: `P31` is above
         // `MAX_CHARACTERISTIC_ELIMINANT`, so an eliminant row over it is `Unsupported` by design.
-        let (katsura_5, _) = corpus_pair("katsura-5", P30);
+        let katsura_5 = corpus_instance("katsura-5", P30);
         match &solver
             .run(&katsura_5, Task::UnivariateEliminant, &limits)
             .status
@@ -2858,7 +3129,7 @@ rational param(cpu)             0.75 sec
             other => panic!("katsura-5's eliminant did not complete: {:?}", other),
         }
 
-        let (cyclic_4, _) = corpus_pair("cyclic-4", P30);
+        let cyclic_4 = corpus_instance("cyclic-4", P30);
         match &solver
             .run(&cyclic_4, Task::UnivariateEliminant, &limits)
             .status

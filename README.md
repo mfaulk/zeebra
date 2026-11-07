@@ -2430,6 +2430,21 @@ same wrong ideal — which is why that check is against the input rather than ag
 All three, the mapping from msolve's F4 stage names onto Zeebra's, and what of its design is worth
 reimplementing are in `docs/research/msolve-implementation.md`.
 
+The msolve adapter's corpus agreement test builds **Zeebra's side by parsing the rung's own text**
+and dispatching on **variable count**, so a corpus family added at a width already present — 4, 5,
+6, 7, 10 or 14 — gets an oracle with no edit. It is also the stronger check: the bytes parsed are
+the bytes every engine is handed, so a round-trip failure in either direction shows up as a
+disagreement rather than as a silently different problem. The rungs with no oracle are only the
+Poseidon and Anemoi ones, which carry their own fields (KoalaBear and `2^64 - 353`) and so need a
+second field *type* rather than a second match arm.
+
+That test is not `#[ignore]`d — it runs whenever msolve is installed — so by default it builds
+oracles only up to seven variables, which is 1.4 s for nine rungs where `mq-random-10` alone did
+not finish in ten minutes. **`ZEEBRA_FULL_CORPUS_ORACLE=1` lifts that ceiling** for a machine that
+wants the ten- and fourteen-variable rungs covered. Rungs left out are printed with the remedy,
+never silently dropped. (`F4Options::max_wall_time` does not substitute for the ceiling: it is
+checked once per batch, so one long matrix reduction overruns it.)
+
 `GroebnerJlSolver` and `SagebrushSolver` are built the same way, and both read what
 `tools/external/env.sh` exports: `GroebnerJlSolver::from_env(work_dir)` and
 `SagebrushSolver::from_env(work_dir)`. Two things about them are worth knowing before reading
