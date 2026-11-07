@@ -1041,11 +1041,13 @@ impl PowerLawFit {
 
 /// Ordinary least squares on `(ln x, ln y)`.
 ///
-/// `None` unless there are at least two points with positive coordinates and at least two distinct
-/// abscissae — a single point admits any exponent, and an exponent that the data does not constrain
-/// must not be returned as if it were measured.
+/// `None` unless there are at least two points with finite positive coordinates and at least two
+/// distinct abscissae — a single point admits any exponent, and an exponent that the data does not
+/// constrain must not be returned as if it were measured. A non-finite coordinate is refused rather
+/// than propagated, since a NaN exponent would be printed as a fit.
 pub fn fit_power_law(points: &[(f64, f64)]) -> Option<PowerLawFit> {
-    if points.iter().any(|(x, y)| !(*x > 0.0) || !(*y > 0.0)) {
+    let usable = |v: f64| v.is_finite() && v > 0.0;
+    if points.iter().any(|(x, y)| !usable(*x) || !usable(*y)) {
         return None;
     }
     let n = points.len();
@@ -2284,7 +2286,11 @@ mod tests {
         let fit = super::fit_power_law(&points).expect("three positive points");
         assert!(fit.worst_residual() > 0.05, "{}", fit.worst_residual());
         assert!(fit.exponent_stderr > 0.0, "three points estimate a spread");
-        assert!(fit.residuals[1] > 0.0, "the middle is over-predicted: {:?}", fit.residuals);
+        assert!(
+            fit.residuals[1] > 0.0,
+            "the middle is over-predicted: {:?}",
+            fit.residuals
+        );
         assert!(
             fit.residuals[0] < 0.0 && fit.residuals[2] < 0.0,
             "and both ends under-predicted: {:?}",

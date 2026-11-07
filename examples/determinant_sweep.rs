@@ -30,8 +30,10 @@
 //!
 //! Then two fits, both printed with **per-point residuals**: one power law over all orders, and a
 //! piecewise pair split at the order whose matrix stops fitting in L2. The piecewise verdict is the
-//! point of the exercise — three timings on record already have a rising local slope (2.65 from 18
-//! to 162, 3.12 from 162 to 1 458), which is convex in log-log and therefore not a single law.
+//! point of the exercise, and as measured it goes to the piecewise model: a single law misses by
+//! 14.9% with residual signs that flip twice, while above L2 the exponent is 2.9953 ± 0.0285 with a
+//! worst residual of 3.7%. Below L2 it is 2.79 — fixed per-determinant overhead the small orders
+//! cannot amortize. See `docs/research/resultant-elimination.md` §6.9.
 //!
 //! The degrees are chosen so the matrix order is the variable and nothing else is: degree 1 in the
 //! surviving variable and `order / 2` in the eliminated one. Each matrix entry is then a linear
@@ -46,8 +48,8 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::research::{
-        fit_power_law, random_bivariate, time_sylvester_determinants, DeterminantBatch, PowerLawFit,
-        KOALABEAR_PRIME,
+        fit_power_law, random_bivariate, time_sylvester_determinants, DeterminantBatch,
+        PowerLawFit, KOALABEAR_PRIME,
     },
     util::peak_resident_bytes,
     FiniteField,
@@ -59,9 +61,12 @@ type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 ///
 /// These are the Sylvester orders the CICO ladder actually produces — a row of `r` rounds gives two
 /// polynomials of degree `3^r` and a matrix of order `2 · 3^r` — plus 486, which no measured row
-/// reaches but which sits in the gap between the 162 and 1 458 already on record. 4 374 is the
-/// order whose 153 MB matrix separates L3 from main memory on this machine and is the point the
-/// cache argument turns on, so it is in the default sweep rather than behind a flag.
+/// reaches but which sits in the gap between the 162 and 1 458 already on record. 4 374 is in the
+/// default sweep rather than behind a flag because its 153 MB matrix is where L3 stops holding the
+/// working set, and that was the suspected mechanism for the curvature. It is **not** the
+/// mechanism: its local exponent is 3.045, no different from the orders below it. Crout LU does
+/// `O(n³)` work on `O(n²)` data, about 180 operations per byte of matrix at this order, so it is
+/// compute-bound at every level of the hierarchy.
 const ORDERS: [usize; 5] = [18, 162, 486, 1_458, 4_374];
 
 /// Determinants evaluated per draw at each order, chosen so every point costs seconds not hours.
@@ -147,9 +152,9 @@ fn median(values: &[f64]) -> f64 {
 
 /// The smallest and largest of a nonempty sample.
 fn extremes(values: &[f64]) -> (f64, f64) {
-    values.iter().fold((f64::MAX, f64::MIN), |(lo, hi), v| {
-        (lo.min(*v), hi.max(*v))
-    })
+    values
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)))
 }
 
 /// A duration in whatever unit a reader can hold in their head.
@@ -181,7 +186,10 @@ fn bytes(n: usize) -> String {
 
 /// One draw at one order: build a fresh random pair, then time `determinants` determinants.
 fn draw(order: usize, determinants: usize, concurrency: usize, seed: u64) -> DeterminantBatch {
-    assert!(order % 2 == 0, "the order is split evenly between the pair");
+    assert!(
+        order.is_multiple_of(2),
+        "the order is split evenly between the pair"
+    );
     let half = (order / 2) as u32;
     let mut rng = StdRng::seed_from_u64(seed);
     // Degree 1 in the surviving variable, `order / 2` in the eliminated one: the matrix order is
@@ -367,8 +375,14 @@ fn main() {
     }
 
     const L2_BYTES: usize = 512 * 1024;
-    let small: Vec<&Point> = points.iter().filter(|p| p.matrix_bytes <= L2_BYTES).collect();
-    let large: Vec<&Point> = points.iter().filter(|p| p.matrix_bytes > L2_BYTES).collect();
+    let small: Vec<&Point> = points
+        .iter()
+        .filter(|p| p.matrix_bytes <= L2_BYTES)
+        .collect();
+    let large: Vec<&Point> = points
+        .iter()
+        .filter(|p| p.matrix_bytes > L2_BYTES)
+        .collect();
     println!(
         "\nSplit at the L2 footprint — {} a core on this machine — which puts orders {:?} below and \
          {:?} above.",
