@@ -271,6 +271,17 @@ fn failure_from_oracle_error(error: OracleError) -> RunFailure {
                 characteristic, MAX_CHARACTERISTIC
             ),
         },
+        // Two variants with no contract counterpart, because the contract's comparands are over
+        // prime fields: a ring whose modulus is not the one it was given, and a polynomial that
+        // cannot be written in the other side's syntax. Both are the tool reporting something
+        // about itself, which is what `Reported` is.
+        OracleError::ModulusMismatch { asked, reported } => RunFailure::Reported {
+            message: format!(
+                "the ring was given the modulus {} and reports {}",
+                asked, reported
+            ),
+        },
+        OracleError::Untranslatable { reason } => RunFailure::Reported { message: reason },
         OracleError::SelfInconsistent { detail } => RunFailure::SelfInconsistent { detail },
         OracleError::Io { reason } => RunFailure::Io { reason },
     }

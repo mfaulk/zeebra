@@ -27,7 +27,10 @@ use crate::{
     FiniteField, KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
-use super::text::{monomial_to_string, polynomial_to_string};
+use super::{
+    field::CaseField,
+    text::{monomial_to_string, polynomial_to_string},
+};
 
 /// The order the source basis is computed under, on both sides.
 pub const SOURCE_ORDER: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
@@ -156,8 +159,10 @@ pub struct DifferentialCase {
     /// A stable identifier, used in reports and fixture file names.
     pub name: String,
 
-    /// The field's characteristic. Checked against the field the case is verified in.
-    pub characteristic: u64,
+    /// The field the case is stated over, modulus included. Checked against the field it is
+    /// verified in, which is what keeps a GF(2) case from being checked over GF(2^8) — or a case
+    /// recorded modulo one degree-8 polynomial from being checked modulo another.
+    pub field: CaseField,
 
     /// Variable names, in the order both sides declare them. Length is the variable count.
     pub variables: Vec<String>,
@@ -231,15 +236,18 @@ pub fn verify_case_with<const N: usize, F: KnownOrder>(
 ) -> Result<Agreement, Disagreement> {
     let fail = |check: Check, detail: String| Disagreement { check, detail };
 
-    // Singular's fixtures are over small prime fields, so a characteristic that does not fit in
-    // a u128 cannot be the one the case was generated over.
-    if Some(u128::from(case.characteristic)) != F::characteristic_u128() {
+    // Characteristic alone would not do it: GF(2) and GF(2^8) share one, and two degree-8
+    // moduli give two fields of the same order in which the same byte has two different squares.
+    // `CaseField::matches` pins the modulus through the arithmetic rather than trusting a label.
+    if !case.field.matches::<F>() {
         return Err(fail(
             Check::Field,
             format!(
-                "the case is over GF({}) and is being checked over a field of characteristic {:?}",
-                case.characteristic,
-                F::characteristic_limbs()
+                "the case is over GF({}) and is being checked over a field of characteristic \
+                 {:?} and order {:?}",
+                case.field,
+                F::characteristic_limbs(),
+                F::order_limbs()
             ),
         ));
     }

@@ -463,8 +463,8 @@ fn planted_point<const N: usize, F: FiniteField>() -> [F; N] {
 /// A seeded random multivariate-quadratic instance in `n` variables.
 ///
 /// `GeneratedSystem` is the differential harness's generator: entirely determined by the seed, the
-/// shape and the characteristic, and it **round-trips through text**, which is what makes it usable
-/// as a cross-library instance at all. `max_degree: 2` is what makes it MQ.
+/// shape and the field, and it **round-trips through text**, which is what makes it usable as a
+/// cross-library instance at all. `max_degree: 2` is what makes it MQ.
 pub fn random_mq_instance(
     n: usize,
     seed: u64,
@@ -478,7 +478,11 @@ pub fn random_mq_instance(
         // generated system does not become an accidental linear system after cancellation.
         max_terms: 4 * n,
     };
-    let generated = GeneratedSystem::generate(seed, shape, characteristic);
+    let generated = GeneratedSystem::generate(
+        seed,
+        shape,
+        crate::grobner::differential::CaseField::prime(characteristic),
+    );
     Instance::new(
         format!("mq-random-{}", n),
         "mq-random",

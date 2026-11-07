@@ -14,13 +14,14 @@
 //! basis — so verifying one exercises the multiplication operators column by
 //! column without Singular being installed.
 
+use super::field::CaseField;
 use super::fixture::DifferentialFixture;
 
 /// 240 ideals, with every answer Singular gave about them.
 pub(super) const FIXTURES: &[DifferentialFixture] = &[
     DifferentialFixture {
         name: "seed-1000-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2+2*x4", "2*x3^3+x2+2*x1*x3*x4", "x1+2*x1^2*x4^2+2*x1*x2+x2*x3*x4*x5+x1*x3*x4", "2*x3", "2*x5+x3^2*x5^2+x2^2*x3*x4"],
         quotient_dimension: Some(2),
@@ -31,7 +32,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1001-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["2*x2+3*x1^2*x2^2+x1^3", "4*x1+5*x2^2+6+4*x2"],
         quotient_dimension: Some(5),
@@ -42,7 +43,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1002-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["x1*x2+x1+6*x2^2+5*x1^2*x2^2", "4*x3", "x1*x3+1+x1+4*x2"],
         quotient_dimension: Some(4),
@@ -53,7 +54,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1003-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2", "4*x1*x3^2*x4", "6*x3^2+2*x2*x4+2*x3*x4", "2"],
         quotient_dimension: Some(0),
@@ -64,7 +65,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1004-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x1*x4^2+5*x1*x2^2*x5+3*x3*x4+5*x1*x2+6", "5*x1*x5^2+4*x1*x2^2*x4+3*x2*x3+3*x1*x4+2*x1*x2", "4*x3+2*x1+2+4*x4+6*x1^2*x3*x4", "6*x4^3*x5", "x1*x4*x5+2*x1^2*x2^2+4*x1"],
         quotient_dimension: Some(32),
@@ -75,7 +76,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1005-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["6*x1+3*x1*x2^3", "6*x1^2*x2"],
         quotient_dimension: None,
@@ -86,7 +87,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1006-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["x3^2+5*x3+2*x1^2*x2*x3+2", "12*x2^2*x3^2+5*x1^2*x2*x3+x1*x2*x3+6+5*x1*x3", "8*x1^2*x3+x2*x3^2+9*x2^2"],
         quotient_dimension: Some(18),
@@ -97,7 +98,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1007-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["11+7*x2^2*x3*x4+5*x1^2*x2*x3+9*x4", "11+x3", "8*x3^2+12*x3+5+4*x2^2*x4", "6*x3*x4+12*x1"],
         quotient_dimension: Some(3),
@@ -108,7 +109,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1008-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x3", "11+x1*x4^2", "6*x1*x5+8*x1^2*x2*x5+2+4*x2*x3*x5", "10+12*x4^2*x5+12*x4^3*x5", "x1*x2*x5+11*x2^2*x3*x5+2+12*x2"],
         quotient_dimension: Some(10),
@@ -119,7 +120,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1009-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["18781*x2+59879*x1^3*x2+7882*x1^2*x2^2", "56785*x2^2"],
         quotient_dimension: None,
@@ -130,7 +131,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1010-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["48500*x1*x3", "3171*x1+11038*x2^2*x3^2+44235*x1*x2+8425*x2^2*x3", "7457*x2+30899*x1^2*x3+49403*x1^2*x2+12494*x1^3*x2"],
         quotient_dimension: None,
@@ -141,7 +142,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1011-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["59287*x1+29562*x2*x3+11444*x2", "35764*x4^2+44440+121*x1^2*x2*x3", "25404*x1*x3*x4^2+63247*x2*x4+53775+56399*x4", "44661*x1*x2*x3+22524*x1*x2+47084*x2+34630*x4^2+34535*x4"],
         quotient_dimension: Some(16),
@@ -152,7 +153,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1012-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["3771*x1*x2*x3+4103+32202*x3*x4", "63705*x1*x5^2", "49814*x1*x2*x4*x5+7682*x1*x2*x3+4123*x4*x5^3+27571*x1*x5+41076*x1^2*x2", "41517*x1*x5^2+1819*x1^2*x2+60079*x4^2+36023*x1^2*x2*x5", "58748*x1"],
         quotient_dimension: Some(0),
@@ -163,7 +164,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1013-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["1662839544*x1^2*x2^2", "845172538*x2^3+551170310*x2+406922571*x1^2*x2+1687520780"],
         quotient_dimension: Some(6),
@@ -174,7 +175,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1014-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["678246801+34268986*x3+87728894*x1*x2*x3+1184999872*x2^2*x3^2", "417255812+1309734171*x1^2*x2*x3", "1207785117*x1^2*x2+1925796501*x2^3*x3+195645956+291758383*x1^2*x2*x3"],
         quotient_dimension: Some(8),
@@ -185,7 +186,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1015-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1087530396+470310128*x3", "339536226*x2*x3+1260524275*x3*x4+1803669314", "292618336*x2^2*x3+1901340606*x2*x3^3", "421722112*x1"],
         quotient_dimension: Some(2),
@@ -196,7 +197,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-1016-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["462622835*x3^2*x4", "1362638905*x3", "143274582*x1+1756777273*x1*x4^2+1905078077+27038011*x2^2*x5^2", "956038468+629921215*x1*x2*x4+1905028397*x3", "1041077529*x1*x3*x4*x5+1572217101*x5+1691847640*x1*x3^2+1524843249*x3^2+397254550*x1*x3^2*x4"],
         quotient_dimension: None,
@@ -207,7 +208,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-777-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["1+x1*x2^2+x2+x1^3", "1+x1+x1*x2^2"],
         quotient_dimension: Some(7),
@@ -218,7 +219,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-778-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["x1^2*x2*x3+x2^2+x1^2*x2^2", "x1^2*x3+x1^2*x2+x2", "x1*x2"],
         quotient_dimension: None,
@@ -229,7 +230,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-779-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x4+x1*x4+x1*x2", "x1*x2^2+x1*x2*x4^2+x2*x3^2", "x3+x1+x4", "x2*x3*x4+1"],
         quotient_dimension: Some(6),
@@ -240,7 +241,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-780-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x3+x3^2*x4*x5+1", "x3*x4+x1^2*x5", "x3", "x2+x5^2", "x1^3*x2"],
         quotient_dimension: Some(0),
@@ -251,7 +252,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-781-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["x1^2", "1+2*x1*x2^3+x1*x2^2+2*x1^3*x2"],
         quotient_dimension: Some(0),
@@ -262,7 +263,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-782-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["x1+x2*x3^3+2*x1*x2+x3^2+x2^2", "x1*x2^2", "x1+x1*x2+x1*x2*x3+2*x1*x3"],
         quotient_dimension: None,
@@ -273,7 +274,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-783-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1*x4+2*x1*x2", "2+2*x3+2*x1^2*x4+x2^2", "x3+2*x1^2", "2*x1*x2^2*x4"],
         quotient_dimension: None,
@@ -284,7 +285,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-784-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x2*x4+2*x1*x4*x5^2+2*x4*x5", "x1*x2*x3+2*x3*x5", "2*x2*x4+2*x1^4+x3*x4^3+2", "0", "1+2*x2*x4"],
         quotient_dimension: None,
@@ -295,7 +296,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-785-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["6", "6*x1*x2+6*x1^2*x2+5*x1+2*x2+2*x1*x2^3"],
         quotient_dimension: Some(0),
@@ -306,7 +307,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-786-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["1+3*x1", "1+4*x1^2*x2+5*x3^2", "5*x1^2*x2"],
         quotient_dimension: Some(2),
@@ -317,7 +318,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-787-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1+x1*x4^2", "2*x1^2", "4*x2^3*x3+4*x3*x4^2+6*x1*x2^2+4+4*x2", "6*x3+6*x1*x2^2+5*x1+4+4*x1*x3*x4"],
         quotient_dimension: None,
@@ -328,7 +329,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-788-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["5*x3*x5^2+4*x1*x5^2+4*x1*x4^2*x5+2*x1*x5", "6*x1^2*x5+5*x1*x2*x4+1+6*x1^2*x3", "2*x1*x3^2+2+4*x2*x5+4*x1", "5*x1*x5+2+3*x3^2*x5", "2*x1*x4*x5^2+4*x1^4+6*x1*x2*x4*x5"],
         quotient_dimension: Some(57),
@@ -339,7 +340,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-789-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["5*x2^2+12*x1^2", "2*x1*x2^2"],
         quotient_dimension: Some(6),
@@ -350,7 +351,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-790-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["10*x2+9*x1^2*x3+12*x1^3*x2+11*x1^3*x3+8*x1*x2*x3", "6*x1*x2^2*x3+10", "6+7*x1*x3^2+3*x1^2*x2*x3"],
         quotient_dimension: Some(15),
@@ -361,7 +362,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-791-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["6+10*x2*x3*x4+3*x2^2*x4", "6*x4+12*x2^2*x3^2+x2*x3+8*x2^2*x4", "11*x3+10*x1*x3^2", "9+9*x4^2"],
         quotient_dimension: Some(8),
@@ -372,7 +373,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-792-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x1*x2*x3+2*x4+9*x1*x2", "7*x1*x2", "8*x2", "11*x2+5+x1^3*x5", "9*x2*x3*x4+10*x3*x4*x5^2+10*x1+7*x2"],
         quotient_dimension: Some(0),
@@ -383,7 +384,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-793-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["36840*x1^3+9486*x2", "11559*x1*x2^2+19025*x1+11093*x1^3*x2"],
         quotient_dimension: Some(7),
@@ -394,7 +395,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-794-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["57943*x3+29411*x1*x2^2*x3+28207+43430*x1^2*x2^2", "2276*x2^3+5344+59407*x1^2*x2", "30342*x1^2*x2*x3+11703*x2*x3+12901*x1*x2*x3^2+37831*x2*x3^2"],
         quotient_dimension: Some(20),
@@ -405,7 +406,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-795-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["62874*x2+3127*x1*x4+13595*x1*x2+23681*x4", "58299", "19136*x1*x3^2*x4+21100*x1^2*x4+26990*x1", "25674*x3+7511*x4^2"],
         quotient_dimension: Some(0),
@@ -416,7 +417,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-796-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["39684*x3", "9377*x2+9946+39180*x2*x3^3", "42361*x1*x5+47053*x2^2*x3*x4+10307+47883*x2", "30106*x2^2*x3*x4", "9565*x1^2*x2*x4"],
         quotient_dimension: None,
@@ -427,7 +428,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-797-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["1063899624*x1^3*x2+1839209024*x1*x2^2", "1044411408*x1^2*x2^2+1171445334"],
         quotient_dimension: Some(6),
@@ -438,7 +439,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-798-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["49710887*x2+1298641025", "1233690208*x2^2*x3^2+2140042535*x2+140991193*x1^2*x3^2+2019074984*x1^3+592911539*x1", "340428212*x1^3*x3+326634584*x1^2*x3^2+2073778241*x1*x3^2"],
         quotient_dimension: Some(11),
@@ -449,7 +450,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-799-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["424891700*x4+1290318159*x3*x4^2+1493446044+83460480*x2*x3^2+1375132462*x2*x3*x4", "215562699+600920950*x1^3*x2", "1482737643*x1^2*x3+1515132841*x3", "497259783*x1*x2^2+584770786*x1*x4+9810716*x1^2*x3*x4+1992036069*x2*x3"],
         quotient_dimension: Some(14),
@@ -460,7 +461,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-800-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1356654242+833690542*x1*x2+1916124619*x1^2", "1984920737*x1*x4", "628515164*x2*x3^2*x5+1559991350*x1^2*x5^2+336170557+1335421260*x1^2*x2+1482771192*x1*x2", "168863718*x1+242970697*x3^2*x5+1633178161*x3*x5+1680459451*x1*x3*x4+801105732*x4", "937134399*x5+1263514738*x2*x3^2+182090614+27317526*x1*x4"],
         quotient_dimension: Some(18),
@@ -471,7 +472,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-801-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1*x2^3", "x1^3*x2"],
         quotient_dimension: None,
@@ -482,7 +483,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-802-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["x1*x2^3+1+x2*x3+x1*x3+x1*x3^2", "x1^2+x2^2+1+x3+x1*x2*x3^2", "1+x1*x2*x3+x3^2+x1^2*x3"],
         quotient_dimension: Some(29),
@@ -493,7 +494,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-803-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1^2+1+x3", "x1", "x2*x4^2+x1*x2*x3*x4", "x3*x4+x1*x2"],
         quotient_dimension: None,
@@ -504,7 +505,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-804-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x2^2*x3+x3^2*x5", "x1*x5", "x5+x3+x1^2*x4^2", "x5+x2*x3*x4", "x4^3*x5+x2^2*x3^2"],
         quotient_dimension: None,
@@ -515,7 +516,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-805-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["2*x1*x2+2*x1", "2"],
         quotient_dimension: Some(0),
@@ -526,7 +527,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-806-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["2+x2^2*x3^2", "2*x2*x3+2*x2*x3^2+1+2*x2^2*x3^2+2*x1*x2*x3", "1+x1*x3^2"],
         quotient_dimension: Some(6),
@@ -537,7 +538,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-807-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2+2*x1*x4^3", "x1+x1*x2+x1*x2*x3*x4", "x1^3*x3", "2*x3*x4^2"],
         quotient_dimension: None,
@@ -548,7 +549,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-808-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x2*x3", "2*x1*x4+x2^2*x4+x1*x2*x3*x5", "x4+2*x1+x2^2*x5+2*x2+x2^3", "x1^2*x3*x4", "x1*x5^2+1+2*x1*x3+2*x4+x2^2*x4*x5"],
         quotient_dimension: None,
@@ -559,7 +560,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-809-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["3+6*x1^2", "2*x1^2+3*x1*x2^3+4*x1^2*x2+3*x2"],
         quotient_dimension: Some(6),
@@ -570,7 +571,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-810-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["4*x1+x3+4*x1^3", "5*x1*x2+4*x1*x2^3", "5*x2^2"],
         quotient_dimension: None,
@@ -581,7 +582,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-811-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["5", "6*x1+4*x4+4*x2*x4^3+5*x1*x2*x3*x4+3*x2^2*x4", "x4+2*x1+1+6*x2*x4+6*x3", "2*x1+2*x2^2*x3^2+4*x4"],
         quotient_dimension: Some(0),
@@ -592,7 +593,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-812-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["6*x1+6+6*x4", "6*x1^2*x3*x5+3*x3*x4*x5^2", "3*x1*x2^2*x3+5*x1*x2*x3+x2^2*x3*x5+2*x1*x3^2*x4", "4*x5+3*x3+x2+6*x4*x5", "5*x3+4*x1^2*x2*x4+4*x1*x2*x5"],
         quotient_dimension: None,
@@ -603,7 +604,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-813-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["7*x1*x2+8*x2+8", "3*x1*x2+7+10*x2^2"],
         quotient_dimension: Some(2),
@@ -614,7 +615,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-814-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["11*x1^3*x2", "5+4*x2+3*x1*x2*x3", "7*x2*x3^2+6*x3+5*x1*x2*x3+9*x1^2*x3"],
         quotient_dimension: Some(6),
@@ -625,7 +626,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-815-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["11*x1^2*x4^2+8*x2*x3^2*x4+11", "3*x1*x4", "6+9*x3+6*x2^2*x3+11*x2^2*x3^2", "8*x1*x2+6*x2*x4"],
         quotient_dimension: Some(0),
@@ -636,7 +637,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-816-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["4*x2*x3*x4+9", "3+5*x1*x3*x4+4*x3+4*x4*x5", "9+9*x2*x4*x5", "3*x3*x4*x5^2+9*x4+12*x2*x4", "3+9*x4^2+12*x1*x2*x3*x5"],
         quotient_dimension: Some(17),
@@ -647,7 +648,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-817-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["13350*x1*x2+1554*x1*x2^2", "17312+35188*x1+50235*x2^2"],
         quotient_dimension: Some(4),
@@ -658,7 +659,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-818-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["32389+4216*x2^3*x3+58402*x1^2*x3^2", "43160*x1*x3^2+33330*x2*x3", "9579*x1^2+25707+25298*x1^3*x2+17649*x3"],
         quotient_dimension: Some(16),
@@ -669,7 +670,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-819-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["35933*x2*x3", "19535", "742*x1*x2^3+40253+1841*x1*x3^2*x4", "27993*x3^2+34375+44566*x1*x2^2*x4"],
         quotient_dimension: Some(0),
@@ -680,7 +681,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-820-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["4159+27546*x5+43229*x1*x3^2*x4+45596*x3*x5", "48127*x1+52753*x2^3", "18044*x1^2*x3^2", "10601*x1*x3^2*x5+48491*x1*x5", "51120*x4*x5+40286*x3^2*x5"],
         quotient_dimension: None,
@@ -691,7 +692,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-821-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["703938509+1712510287*x2^3+521485037*x1^2", "444277377*x1*x2+1080229185*x1^2*x2+1092536525*x1+876390993*x2+1245335397*x1*x2^2"],
         quotient_dimension: Some(8),
@@ -702,7 +703,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-822-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["250994317*x1*x3+1206511328*x1*x2^2*x3+1283571709*x2*x3^3", "2129501895*x1^2*x2+784014639+1450856313*x1*x2^2*x3", "335871257*x2*x3+541582589*x1+1269289571*x1^2*x3+970847697+1750154358*x1^2*x3^2"],
         quotient_dimension: Some(23),
@@ -713,7 +714,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-823-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1377567470*x1^2*x2*x4+1751970575*x4+1609763754*x1*x2*x4", "978938484*x3+205636330*x1+1640141374*x1*x2*x3*x4", "1109202404*x2^3*x4+724370873+1754748561*x4+1424242423*x2*x3^2*x4", "1889778127*x2"],
         quotient_dimension: Some(0),
@@ -724,7 +725,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-824-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["817943543*x2^2*x3*x4+855313692*x4", "1099023869*x5+1475732220*x3^2*x4+665904317*x4+1235625338*x3*x4", "366528373*x1*x3*x5^2+660718403*x2*x4*x5^2+1182304084*x2*x3*x4*x5", "1173713214*x1*x5^2+954614464*x4^3+196352675*x2*x3+2053008644*x1*x2^3", "1435110606*x2+708607099+42553845*x1"],
         quotient_dimension: None,
@@ -735,7 +736,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-825-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1^2*x2^2+x2^2+x1^2*x2", "x1^3+x1"],
         quotient_dimension: Some(4),
@@ -746,7 +747,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-826-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["x2^2*x3^2+x1*x2+x1*x2^2*x3", "1+x1^4+x1+x1^2*x2+x2", "x2+x1*x2"],
         quotient_dimension: None,
@@ -757,7 +758,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-827-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1+x2^2", "1+x1*x2*x3*x4+x1*x4+x1*x3+x1^2*x4^2", "x3+x2*x3*x4", "x1+x1^2*x4"],
         quotient_dimension: Some(0),
@@ -768,7 +769,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-828-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x1+1+x3*x4", "x2^2*x3*x4+x4^2*x5+x1^2*x2", "1+x4+x3*x5+x1+x2*x3", "x1*x4+x1*x3*x5+x2", "x3*x4"],
         quotient_dimension: None,
@@ -779,7 +780,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-829-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["1+2*x1^2*x2", "x1*x2+x1"],
         quotient_dimension: Some(2),
@@ -790,7 +791,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-830-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["2*x1*x2", "2*x1^2*x2*x3+2*x3+2+2*x2+2*x2*x3^2", "x2^2+x2+x1*x3^3+2*x1*x2*x3^2"],
         quotient_dimension: Some(4),
@@ -801,7 +802,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-831-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1*x2^3+2*x2+1+x2*x3*x4", "x1^2+1+x2*x3", "2*x3+x1+2*x2", "x1*x3^2+x1^2*x2*x3+x4^3"],
         quotient_dimension: Some(24),
@@ -812,7 +813,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-832-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x2*x3+2*x3+x2*x5^2+2*x1*x4", "2*x3+2*x5+2*x2*x4*x5^2+x2*x3", "x5+2*x3^3*x5", "x2*x3*x4*x5", "2+x1*x2+x2"],
         quotient_dimension: None,
@@ -823,7 +824,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-833-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["5*x1+x2^2+6*x1^2*x2", "x1^2*x2^2"],
         quotient_dimension: Some(6),
@@ -834,7 +835,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-834-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["2*x1^2*x2*x3+3*x1^2+6*x2^2*x3^2+5*x2+3", "6+5*x2*x3", "3*x1^2"],
         quotient_dimension: Some(2),
@@ -845,7 +846,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-835-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2+x1*x3*x4+4*x1*x4+5*x2+x1^2*x2", "5*x1*x3^2*x4+6*x1^2*x4^2", "6*x2^2*x3*x4+5*x3^2*x4^2+x3*x4^3+5", "2+3*x1^2*x2+x1^2*x2^2+4*x1*x3"],
         quotient_dimension: Some(40),
@@ -856,7 +857,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-836-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2", "x2^2*x4^2+4*x1^2*x2*x5+5*x2*x3*x4*x5+6*x3^2", "2*x3+6*x2*x3*x4^2", "3*x2*x4*x5", "4*x2*x3*x4*x5+6*x2*x3*x5^2+4*x1^3+5*x2*x5^3+5*x1*x2*x3*x4"],
         quotient_dimension: Some(0),
@@ -867,7 +868,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-837-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["8*x1", "9*x2^2+3*x1^2+10*x1*x2^2"],
         quotient_dimension: Some(2),
@@ -878,7 +879,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-838-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["2*x3^2+11*x1", "8", "2*x1"],
         quotient_dimension: Some(0),
@@ -889,7 +890,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-839-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["3*x3*x4+5*x1*x3+2+3*x4", "12*x1*x2*x4", "8*x1+9*x3+10*x2*x4^2+9*x2*x3*x4+3*x1*x2", "9*x1*x2+4*x1*x3+10*x1"],
         quotient_dimension: None,
@@ -900,7 +901,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-840-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2+11*x2*x3^2+2*x1*x2*x3^2", "8+12*x4*x5+x1*x2+3*x4*x5^2+2*x1", "7*x1*x2^2*x4+5*x2+x2*x4+9*x1*x4", "10*x2*x4", "4+2*x1*x2*x5"],
         quotient_dimension: Some(0),
@@ -911,7 +912,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-841-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["64829*x1*x2+6210*x1^2*x2^2+58385*x1^2", "7680*x1^2"],
         quotient_dimension: None,
@@ -922,7 +923,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-842-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["12151*x1*x2^2+47631+28087*x1^2*x3+17271*x2^2*x3+41604*x1*x2", "30136*x1*x2^2*x3+60448*x1+62644+30856*x2^2", "57432*x1*x3+19362*x2+3099"],
         quotient_dimension: Some(8),
@@ -933,7 +934,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-843-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["45638*x4^3", "58281*x1^2*x2", "41200*x2*x3+1745*x1*x3+15188*x1*x2*x3^2+36994*x2", "37139*x2*x4^3+48902+6170*x4"],
         quotient_dimension: Some(0),
@@ -944,7 +945,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-844-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["10545*x2^2*x3*x5+49842+21644*x2^2*x4", "61980*x2*x5+30280*x3*x4+27575*x1", "38319*x1*x2*x3+61584", "50125*x3*x5+20380*x3*x4*x5+33379*x1*x3*x5", "62759*x2*x3+10668*x2^2*x5^2+37314"],
         quotient_dimension: Some(12),
@@ -955,7 +956,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-845-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["1892612816*x1^2*x2+1413745794*x1*x2+1687696658+1640349561*x1^3*x2+168118924*x2", "1306608791*x2^3+40659212*x1^2*x2+1149823986+944121245*x1*x2^2"],
         quotient_dimension: Some(9),
@@ -966,7 +967,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-846-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["1970126018*x1*x2^3", "1972701788", "1614395502*x1*x2*x3+1361877428*x1*x2"],
         quotient_dimension: Some(0),
@@ -977,7 +978,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-847-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1941464533*x3*x4+181705074*x1*x2^2*x3+1249932369*x1^2*x2+551050807", "1160742026+1032780648*x1^3*x3+1481286647*x1*x2+282818121*x1^3+71034148*x1*x3", "707639883*x1*x2*x4+1169674515*x3*x4^3+2186335*x3", "89910188"],
         quotient_dimension: Some(0),
@@ -988,7 +989,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-848-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1598091450*x1*x2*x3^2+216251039*x3+1141583709*x4*x5", "1686910667*x3+1544148793*x2+1201301135*x1*x2*x3*x5+665504090*x4*x5^3", "1797396715*x3*x5+1857913631*x1*x3*x4^2+1554536853*x1", "1188513952", "1753525447*x1^3*x4+807984619*x1*x4^2*x5"],
         quotient_dimension: Some(0),
@@ -999,7 +1000,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-849-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1*x2+x1", "x1+x1^4+x1^2"],
         quotient_dimension: None,
@@ -1010,7 +1011,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-850-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["x1*x2+x1*x3+x3", "1+x1*x2*x3^2+x2*x3", "x3"],
         quotient_dimension: Some(0),
@@ -1021,7 +1022,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-851-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1*x2^2*x3+x2^2+1", "x2+x1*x2^2", "x1*x2*x3*x4+x3^2", "1"],
         quotient_dimension: Some(0),
@@ -1032,7 +1033,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-852-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x2*x3*x5", "x3^2+x1^3+x1*x3", "x3*x4+x4*x5^2+x1*x5+x1^2*x5^2+x1*x2*x4", "x1*x4*x5+x1*x2*x3+1", "x1+x2^2+x3^2"],
         quotient_dimension: Some(28),
@@ -1043,7 +1044,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-853-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["2*x2+2*x1^2*x2^2+2*x1*x2^2+2", "x2+x1"],
         quotient_dimension: Some(4),
@@ -1054,7 +1055,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-854-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["2", "2*x1*x2*x3^2", "x2"],
         quotient_dimension: Some(0),
@@ -1065,7 +1066,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-855-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2+2*x2*x3*x4^2", "2*x1*x3^2+2*x1*x2+2*x4+x1+x1*x3*x4^2", "2*x1*x4+2*x2*x3^2+1+2*x1*x3+x1^2*x2", "1+2*x4+2*x1*x3+x3*x4"],
         quotient_dimension: Some(25),
@@ -1076,7 +1077,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-856-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x4", "x3*x5", "2*x2*x3*x5^2+2*x1*x5^2+2*x3^2*x4^2", "2*x4^2+x1*x2*x4*x5", "x1*x2*x3^2+2"],
         quotient_dimension: None,
@@ -1087,7 +1088,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-857-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["6*x2+4*x2^4+4*x1^2*x2^2", "5*x1^2*x2^2+1"],
         quotient_dimension: Some(8),
@@ -1098,7 +1099,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-858-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["3", "2*x1", "3*x1^2*x3+4*x1*x2^2*x3+x2*x3+3*x1^2*x3^2+2*x2"],
         quotient_dimension: Some(0),
@@ -1109,7 +1110,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-859-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1*x2*x3+3*x2^2+x1*x3*x4+5", "2+6*x2*x3*x4+4*x2", "3*x1*x2*x4^2", "2*x1^2+x1*x2*x3+5*x1*x2+2"],
         quotient_dimension: Some(4),
@@ -1120,7 +1121,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-860-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["6*x3*x4*x5+4+5*x2*x4", "3*x2*x3*x4*x5+1+2*x2*x5", "x1*x3^2*x4+1+x4", "4+2*x2+2*x2^2*x3*x5+4*x3^2*x4", "2*x3^2+5+5*x2+x2*x3*x5+3*x1*x2^3"],
         quotient_dimension: Some(24),
@@ -1131,7 +1132,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-861-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["8+4*x2^4+9*x1^2*x2^2+11*x1*x2", "8*x1+7*x1*x2+7+4*x1*x2^2"],
         quotient_dimension: Some(8),
@@ -1142,7 +1143,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-862-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["12*x1*x2*x3+3*x1*x2+x1^2*x2", "11*x1^2+1+3*x2*x3^3+4*x2^2", "2"],
         quotient_dimension: Some(0),
@@ -1153,7 +1154,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-863-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["8*x1^2*x4+5*x1^2*x3", "4+5*x1*x4+11*x3+8*x2", "9*x1^2*x3*x4", "5*x2*x3^2*x4+5*x1^2*x2+8*x2^3+11*x3^2*x4^2"],
         quotient_dimension: None,
@@ -1164,7 +1165,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-864-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["5*x1", "5*x1*x2*x3*x5+4*x3+6*x1*x4+7*x1^2", "x1*x3+9", "11*x2^2*x3*x4", "11*x5^3+7*x5+11*x3^2*x4*x5"],
         quotient_dimension: Some(0),
@@ -1175,7 +1176,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-865-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["60987*x1^2+49147*x1^3", "55527*x1*x2+54113*x1^4"],
         quotient_dimension: None,
@@ -1186,7 +1187,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-866-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["56354*x1^3+62842*x1^2*x2^2+51424*x1^2*x3^2", "28330*x1*x3^2+19503", "5708*x3^2+34360*x2+55500"],
         quotient_dimension: Some(6),
@@ -1197,7 +1198,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-867-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["41323+7981*x1*x2+9081*x3", "983", "23504*x2*x3", "28495*x4+52121+62299*x2*x3^2"],
         quotient_dimension: Some(0),
@@ -1208,7 +1209,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-868-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["24931*x5+49274+14617*x2*x4+41855*x2*x4*x5", "17802*x4*x5^3+23181*x3", "1891*x4*x5+39139+41236*x2^2*x3*x4+55499*x2", "49611+50850*x1", "38025*x5+63581*x4+16115*x1*x5+28100*x2*x3^2*x4+40071*x2"],
         quotient_dimension: Some(21),
@@ -1219,7 +1220,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-869-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["1983845792*x1^3*x2+1198697622*x1*x2^2+65271382+1012836133*x1*x2^3", "1081960875+322856657*x1*x2+1089161262*x1^4"],
         quotient_dimension: Some(12),
@@ -1230,7 +1231,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-870-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["1846809421*x1*x3", "825876080*x1*x2^2*x3+188097622*x1*x2^3+824907421*x2*x3^2+54684768*x3^3+1588238446", "1693125045*x2"],
         quotient_dimension: Some(3),
@@ -1241,7 +1242,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-871-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["94376367*x1", "1959719658+624247462*x1*x2*x3*x4", "1505753754*x2*x3", "806896583*x2*x3+1621767383*x1*x3^3+379320571+1710609045*x1*x2*x3*x4"],
         quotient_dimension: Some(0),
@@ -1252,7 +1253,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-872-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["95324042+1120427090*x3^2+120544525*x1*x2+634569082*x1*x3", "1388960084*x2^2*x4+225967171*x1*x3+2129039995*x3+237618979*x1", "1187834721*x1+138511790*x1*x3*x4*x5+204949189*x1*x3^2*x4", "58270458*x2*x4*x5", "60618590*x2+1255851054*x1*x4+1078208251+710623543*x1^2*x3*x4"],
         quotient_dimension: Some(20),
@@ -1263,7 +1264,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-873-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["1+x1*x2^2+x1*x2", "x1^3"],
         quotient_dimension: Some(0),
@@ -1274,7 +1275,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-874-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["0", "x1^2*x2*x3+x1*x2*x3^2", "x1^4"],
         quotient_dimension: None,
@@ -1285,7 +1286,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-875-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1+x1^2", "x2*x4+1+x1*x2^2", "1", "x3*x4^2+x2^2*x3"],
         quotient_dimension: Some(0),
@@ -1296,7 +1297,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-876-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x5", "x3*x4*x5+x3^2*x5+x3*x5^2+x4", "x1*x5", "x3^2*x5+1+x1*x5+x3*x4+x1^2*x2", "x3*x4^2*x5"],
         quotient_dimension: None,
@@ -1307,7 +1308,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-877-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["2*x1*x2^3+x1^2*x2+2*x1*x2", "x1"],
         quotient_dimension: None,
@@ -1318,7 +1319,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-878-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["2*x1*x3+2*x2*x3", "x3", "x1"],
         quotient_dimension: None,
@@ -1329,7 +1330,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-879-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1", "2*x1^2+2*x1+x2+2*x2*x3+2*x3^2*x4^2", "x1^2+2", "1+x2"],
         quotient_dimension: Some(0),
@@ -1340,7 +1341,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-880-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x1*x2*x4^2+x1+2*x4", "2*x1*x2*x3*x5+2*x1*x4+2*x5+2", "x2*x4+2*x1*x3*x5+x3*x4^2", "x1*x3*x4*x5+2+x3*x4+x1*x4", "2*x2^3*x3+1+2*x3*x4*x5^2+x4^2"],
         quotient_dimension: Some(44),
@@ -1351,7 +1352,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-881-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["2*x2^4", "4*x1*x2^3+1"],
         quotient_dimension: Some(0),
@@ -1362,7 +1363,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-882-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["1+2*x2*x3^3+4*x1+5*x1*x2*x3+3*x2", "6+5*x1+5*x2^2+x1*x2*x3^2+6*x2", "5*x1+2*x1^2*x3"],
         quotient_dimension: Some(14),
@@ -1373,7 +1374,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-883-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["5*x2^2*x3*x4+4*x2*x3", "6*x1^2*x3*x4", "5*x1+x1^2*x4^2", "5*x1*x2+x4"],
         quotient_dimension: None,
@@ -1384,7 +1385,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-884-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x4^2*x5+5*x2*x4*x5", "4*x1^2+3*x2*x4^2", "6*x2*x3*x5+x3+5", "x3*x4", "6*x1*x2*x5+2*x4+4*x4^2+4+3*x3^2"],
         quotient_dimension: None,
@@ -1395,7 +1396,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-885-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["8*x1^2*x2", "x1^2*x2+8*x1*x2^2+3*x1+12*x2^3"],
         quotient_dimension: Some(7),
@@ -1406,7 +1407,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-886-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["5*x2^2+4*x1*x2", "12*x3+6*x2^2*x3+9", "3*x2*x3+12*x1*x3^3+10*x3+3*x1^2*x2"],
         quotient_dimension: Some(10),
@@ -1417,7 +1418,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-887-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["6*x3", "4+8*x4+9*x1^3*x2", "12*x1*x2*x4^2+9*x2*x3", "6*x2^2+8"],
         quotient_dimension: Some(14),
@@ -1428,7 +1429,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-888-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["11*x1+10*x1*x2*x3^2+10*x3^4+10*x2*x3*x4", "2*x3*x4*x5+9*x2^2", "12*x5", "5*x2*x3*x4*x5+12*x1^4+11*x3^3*x4", "5*x3^2*x4+3+4*x2*x4^2"],
         quotient_dimension: Some(30),
@@ -1439,7 +1440,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-889-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["51529*x1^3+52944*x2", "16704*x2+37225*x1*x2^2+28242*x1"],
         quotient_dimension: Some(7),
@@ -1450,7 +1451,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-890-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["31214*x1^2*x2*x3+31395*x2", "55067*x2^2*x3+53786*x1*x3+32661*x1*x2+13228*x1+10221*x1*x2*x3^2", "45631*x1^3"],
         quotient_dimension: None,
@@ -1461,7 +1462,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-891-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["12344*x2*x3*x4+46604*x1", "52432*x1", "6538*x3+54440", "12083*x3*x4+32924*x2*x3+584*x1*x3^3"],
         quotient_dimension: Some(2),
@@ -1472,7 +1473,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-892-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["23126*x1*x2*x3+16636*x2*x4*x5^2+25432*x3", "40497*x2*x3^2*x4", "16237*x1*x4+390*x1*x3", "54631*x3+54739*x3*x5^2", "10875"],
         quotient_dimension: Some(0),
@@ -1483,7 +1484,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-893-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["1165478585*x1^2", "377758533*x1^2+452616505*x1*x2"],
         quotient_dimension: None,
@@ -1494,7 +1495,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-894-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["790920459*x1+465571151+1756913952*x2*x3", "280185663+1988128775*x3", "902573318+59258909*x3"],
         quotient_dimension: Some(0),
@@ -1505,7 +1506,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-895-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["625359048+712101185*x2^2+61152295*x1^2+14899679*x1*x2*x4", "1444251281+2095267267*x1*x3+809683002*x2*x3*x4+636833454*x2^3", "2082331656*x1*x2*x3^2+670858929*x1*x2*x4", "1590624693*x1*x2*x3^2+1948716046*x1*x2*x4+1934134061*x4^2+1284432292"],
         quotient_dimension: Some(38),
@@ -1516,7 +1517,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-896-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1098043181*x3^2+1937405238*x2^3*x5+500818188*x1^2*x2*x3+777345453", "529018166*x3^2*x4", "296651783*x1*x3*x5+1627544142*x2^2*x4^2+754599508*x3*x5", "1576429379*x5^2+215251132*x4*x5", "993684992*x1^2*x3+512215646*x2*x4"],
         quotient_dimension: None,
@@ -1527,7 +1528,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-897-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1*x2^3+x1^2*x2^2", "x1^2+x1*x2"],
         quotient_dimension: None,
@@ -1538,7 +1539,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-898-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["x1+x2*x3+x2", "x2*x3", "x1*x2*x3"],
         quotient_dimension: None,
@@ -1549,7 +1550,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-899-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x1*x2*x3^2+1+x3+x4+x2^2*x3*x4", "x3^2*x4^2+x1*x3*x4^2+x1+x2", "x2*x4^2", "x1"],
         quotient_dimension: Some(6),
@@ -1560,7 +1561,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-900-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x4*x5+x1", "x4", "x1*x2+x1*x2^3+x1*x3+x1*x2*x4", "x1*x3*x5", "x4+x5+1+x3*x4*x5"],
         quotient_dimension: None,
@@ -1571,7 +1572,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-901-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["x2^2", "2+2*x1+2*x2^3"],
         quotient_dimension: Some(2),
@@ -1582,7 +1583,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-902-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["x2", "2*x1*x2*x3", "2*x1*x2+2*x2^2*x3"],
         quotient_dimension: None,
@@ -1593,7 +1594,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-903-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2*x4+2*x1*x3+2", "2*x1*x3+x3*x4^2", "x1*x3^2+2*x2*x4+x1*x4+2*x3+x3^2", "2*x1*x3*x4+x3*x4+2*x2^2*x3*x4"],
         quotient_dimension: None,
@@ -1604,7 +1605,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-904-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x4", "x3+x2*x4*x5+x1*x2*x3^2", "x5+1+2*x3*x5^3+2*x1*x4", "2*x1*x4^2", "x2+2*x4^3*x5"],
         quotient_dimension: None,
@@ -1615,7 +1616,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-905-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["x1^2*x2^2+4*x1^4", "6*x2+4*x2^2+2+4*x1*x2^2+2*x1"],
         quotient_dimension: Some(10),
@@ -1626,7 +1627,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-906-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["4*x2+5+5*x1*x3", "4*x3", "5*x2^2+2*x2"],
         quotient_dimension: Some(0),
@@ -1637,7 +1638,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-907-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["5*x4", "3*x3+x1^2*x4^2+x1^2*x3", "6*x3*x4+1+3*x2*x4^2+4*x3^2*x4^2", "5+5*x1+5*x4+6*x2*x3+3*x3"],
         quotient_dimension: Some(0),
@@ -1648,7 +1649,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-908-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x2^2*x3*x4+2*x3^2*x4^2+3*x1^2*x2*x4", "6*x1*x4+2*x1*x2*x4", "3+5*x1*x2+5*x1*x3*x4+3*x1*x2*x4", "4*x3*x5^2+5+x2*x4*x5+2*x1", "3*x1*x2*x3*x5+4*x1*x3*x5"],
         quotient_dimension: None,
@@ -1659,7 +1660,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-909-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["2*x1^4+4*x1", "1+12*x1^2*x2^2"],
         quotient_dimension: Some(6),
@@ -1670,7 +1671,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-910-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["7*x1*x3^2+4*x1*x2^2*x3", "3+8*x1^2*x2*x3+2*x1*x3+2*x3^2", "6*x2*x3+2*x2^2*x3"],
         quotient_dimension: Some(6),
@@ -1681,7 +1682,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-911-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["8*x1^2*x2*x4", "5+12*x1^2*x2*x3", "12*x1+2*x3*x4+11*x2*x3^2*x4+5*x3", "9*x4+2*x2*x4+11*x3*x4"],
         quotient_dimension: None,
@@ -1692,7 +1693,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-912-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["7*x1*x2^2*x5+6*x2^2*x4+8", "x4+10*x3^2+8*x1+2*x2*x5+6*x3", "2*x2*x4^3+6*x3*x4*x5", "11*x1*x3*x4+2+11*x1*x2*x4^2+9*x1*x2+10*x4", "3*x4+6*x2*x3*x5+2*x1"],
         quotient_dimension: Some(33),
@@ -1703,7 +1704,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-913-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["25651*x1^4", "44696*x1^3*x2"],
         quotient_dimension: None,
@@ -1714,7 +1715,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-914-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["6735*x2+61515*x1*x2+51867", "57855*x1^2*x3+64528*x1*x2+13131", "37937*x1*x2^2*x3+44791+20257*x1*x2*x3^2+2028*x3+27015*x1"],
         quotient_dimension: Some(7),
@@ -1725,7 +1726,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-915-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["3205*x1*x2*x4+30547*x3*x4", "10729*x1^2+57499+4627*x2^2*x4", "64582*x2*x3*x4^2+27896*x1^2+2608*x1^2*x4", "65436*x4^4+9360"],
         quotient_dimension: Some(24),
@@ -1736,7 +1737,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-916-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["24638*x2*x3+11423*x3+27120*x3*x4*x5+537*x1*x3*x4", "30521*x5+1594*x3*x5", "48061*x2*x5+61049*x2*x3^2*x4+54073*x3+62182*x1*x3+33452*x2*x4*x5^2", "59653*x2*x3*x4+52657*x1*x3*x5+55736*x2*x3^2+43319*x2^2*x4+19129*x2", "38893*x4*x5^3+25881*x1*x2*x3*x4"],
         quotient_dimension: None,
@@ -1747,7 +1748,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-917-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["1201095925*x1^3*x2", "1354081985*x2+246961153*x1^3*x2"],
         quotient_dimension: None,
@@ -1758,7 +1759,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-918-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["1712710337+92288531*x2", "1801711314*x1*x3", "1305105488+1368120010*x2*x3"],
         quotient_dimension: Some(1),
@@ -1769,7 +1770,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-919-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1912882529*x3*x4+729553101*x1*x2+22559138*x2^2", "1569151368*x1^2*x3*x4+417483379*x4+658559455*x3+988674017*x1*x2*x4+1988552197*x1*x3", "1449354013*x1*x2^2*x4+1459721594*x1+389545138*x1*x2*x3", "333800643+1235322326*x2+1193243913*x3^2*x4+1283745070*x1*x2^2*x3"],
         quotient_dimension: Some(27),
@@ -1780,7 +1781,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-920-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["723800172*x1*x2*x5", "1528174094*x4+862529786+1446899714*x1^3", "1427976994*x3+1770485840*x1^3*x3+2026209259*x1*x4+952343490*x1*x3", "1561716256*x3+424441234+344522708*x1*x5+673979779*x4", "603269632*x1*x3*x5^2+1675107186*x4^2"],
         quotient_dimension: Some(15),
@@ -1791,7 +1792,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-921-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["1", "x1+x2"],
         quotient_dimension: Some(0),
@@ -1802,7 +1803,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-922-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["1+x1*x3^3+x1*x2^2*x3+x1*x3^2", "x1*x2^2+x2^2*x3", "x1*x2*x3^2+x1^3*x3+x1*x3^2+x1*x2*x3+1"],
         quotient_dimension: Some(23),
@@ -1813,7 +1814,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-923-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x2", "x4+x1*x2*x3*x4+1+x3", "1+x1*x2+x1^2*x4+x1*x2*x4+x3*x4^2", "x1*x2*x3+x1*x2*x4^2"],
         quotient_dimension: None,
@@ -1824,7 +1825,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-924-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x3*x4", "x3*x5^2+1", "x1*x3*x5", "x1^3+1+x3^3*x5+x2+x1*x2", "x1^3*x3+x1*x3*x5+x2*x5+x1"],
         quotient_dimension: Some(5),
@@ -1835,7 +1836,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-925-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["1+2*x2", "x1*x2^2+2*x1*x2+x1^2*x2"],
         quotient_dimension: Some(2),
@@ -1846,7 +1847,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-926-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["1+x1^2+x1^2*x3^2+x1+2*x1*x2", "2*x2*x3^2+2*x3+2*x1^2*x3^2", "1+x1*x3+x1*x2^2"],
         quotient_dimension: Some(18),
@@ -1857,7 +1858,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-927-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2*x2*x3*x4^2+x3*x4^2+2*x4+2*x1*x2*x3*x4+2*x1^2*x4^2", "x1*x2*x3*x4+2*x2+x1*x3^3", "2*x1*x3^2+1+2*x1*x3+x1", "x1*x3+x1^2*x3^2+2*x2^3*x3+2*x1*x2*x3^2"],
         quotient_dimension: Some(37),
@@ -1868,7 +1869,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-928-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x5+2", "2+x3", "x1*x2^2*x4+2+2*x3+x2^3*x4", "2*x2^2*x5^2+x2*x3*x5+2*x1^2*x4", "2*x1*x4+2*x1^3*x2+1+x3"],
         quotient_dimension: Some(19),
@@ -1879,7 +1880,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-929-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["x2+4", "6*x1^2*x2^2+5*x1^2*x2+4*x2^2+4*x1*x2^2"],
         quotient_dimension: Some(2),
@@ -1890,7 +1891,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-930-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["x1*x3^2+6+2*x1^2*x2+6*x1+4*x1*x2*x3", "5*x2*x3+3*x1*x3+5+5*x3+4*x1^2*x2", "3*x1*x2*x3^2+4*x1*x2*x3+5*x1+4*x2"],
         quotient_dimension: Some(11),
@@ -1901,7 +1902,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-931-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x4^2+5*x3^2*x4", "2*x3+3+2*x2*x3", "3*x2+2*x2*x3*x4", "4*x2"],
         quotient_dimension: None,
@@ -1912,7 +1913,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-932-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["3*x5+3+6*x2*x3^2*x5+2*x1*x5+3*x3*x4", "4+3*x2+2*x1*x2", "x1*x2^2+5*x5+2*x1*x2*x4", "5*x4+2*x2^3+4*x3", "4*x1*x3*x5+5*x1*x2*x4*x5+6*x1*x2^2*x4"],
         quotient_dimension: Some(23),
@@ -1923,7 +1924,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-933-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["3*x1^2*x2+3+6*x1+11*x1^3", "5*x1*x2+4*x1+7*x2^2+10*x1^2*x2"],
         quotient_dimension: Some(7),
@@ -1934,7 +1935,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-934-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["8*x1*x2^2+12*x3+3", "10*x3+11*x2*x3^2+3*x1^2*x2+8*x2", "3*x1*x2*x3+10*x3"],
         quotient_dimension: Some(8),
@@ -1945,7 +1946,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-935-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["11+3*x3+10*x1*x3", "11*x2*x4+8*x1^2*x3+4*x1*x2*x3+x2", "x2+9*x1*x3^2+x3*x4", "11+11*x3^2*x4^2+9*x1*x3+12*x1^2"],
         quotient_dimension: Some(12),
@@ -1956,7 +1957,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-936-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["10*x5+4*x1*x2+7*x2*x3", "8*x1*x5+4+8*x1*x3*x5+12*x5^2", "6*x1^2*x2*x4+6*x1*x4^2+8", "11*x1+5*x2*x4+10+9*x5+5*x1*x3", "4*x2*x4^2+5+3*x4^2*x5+12*x3*x4+2*x1*x5"],
         quotient_dimension: Some(31),
@@ -1967,7 +1968,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-937-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["9252*x2^2+29972*x1^2*x2", "55063*x1*x2^3+10927+31083*x2"],
         quotient_dimension: Some(7),
@@ -1978,7 +1979,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-938-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["53754*x2^2+49874*x1*x2+22854*x2+52759*x1", "24355*x1^2*x2*x3+943*x2*x3^2+6701*x1*x2*x3+8127*x1*x2^3", "61123*x1^3+17471*x2"],
         quotient_dimension: None,
@@ -1989,7 +1990,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-939-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["18192*x2^2*x3+58536*x4+4377", "52325*x3+7861+28678*x1*x2+43607*x1^2*x2*x4", "15587*x2*x4+60082*x1*x2*x4", "26739*x1*x4^2+55865*x2^2*x4+51060*x1+22922"],
         quotient_dimension: Some(12),
@@ -2000,7 +2001,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-940-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["27382*x4^2+47554*x3^2", "8945*x1*x2+4855+21251*x3^3", "3028*x4+23149*x1*x2*x4", "64373*x2*x4+38899*x2+20878*x1*x3+51943+57026*x2^2", "45345*x1^2*x2*x3+7430*x1*x2"],
         quotient_dimension: Some(0),
@@ -2011,7 +2012,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-941-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["2057444060*x1^3", "344362022*x1^2*x2+1629031450*x1"],
         quotient_dimension: None,
@@ -2022,7 +2023,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-942-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["722852998*x1+853954864*x1^2", "59526150*x1*x2+1106213961*x1", "1770007333*x2^2*x3+1772190230*x1*x2^2+1699154093"],
         quotient_dimension: None,
@@ -2033,7 +2034,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-943-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1646132672*x1*x2^2*x4", "788032932*x3+995746989*x1^2*x2*x4+1917227642*x2^2*x3", "1529014835*x2*x3", "1056848829*x2*x3^2*x4+1497504440+855045061*x1*x2*x4^2+1292405902*x1*x2*x3"],
         quotient_dimension: Some(0),
@@ -2044,7 +2045,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-944-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1132260097*x3", "1183145492*x3^2*x5+753719684*x5+467876282*x2*x4^2+69814783*x1^2*x4", "438632599*x3*x4^2*x5", "758106707*x3^2*x5", "832338841*x3*x4+133717141*x2*x3*x4+145587983"],
         quotient_dimension: Some(0),
@@ -2055,7 +2056,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-945-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1^2*x2+x2^2+x1^2*x2^2", "x2+x1^2*x2^2"],
         quotient_dimension: None,
@@ -2066,7 +2067,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-946-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["1", "x1*x2*x3+x3+x2^2", "x1*x3^2+x2+1"],
         quotient_dimension: Some(0),
@@ -2077,7 +2078,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-947-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1", "x1*x4^2", "x1*x2*x3*x4", "x1*x2*x3*x4+x2+x2*x4"],
         quotient_dimension: Some(0),
@@ -2088,7 +2089,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-948-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1+x3*x4^2", "x1+x1*x4*x5+x2+x4+x2*x5", "x3*x4+x2^2+x1^2", "x3*x4+x1^2*x5+x1*x2*x3^2+x2*x3*x4*x5+x3^2*x4", "x3"],
         quotient_dimension: Some(0),
@@ -2099,7 +2100,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-949-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["2*x1*x2", "x2"],
         quotient_dimension: None,
@@ -2110,7 +2111,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-950-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["x1*x2^2+1+2*x1^2*x2*x3", "1+x2^2*x3^2", "2+2*x2^3*x3+2*x1^2"],
         quotient_dimension: Some(12),
@@ -2121,7 +2122,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-951-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x2^2*x3*x4+2*x3^3*x4+1", "x2^3+2*x1^2*x2^2", "2*x1*x2", "x1^2*x4+x1*x2+2*x1*x2*x3^2+1"],
         quotient_dimension: None,
@@ -2132,7 +2133,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-952-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x1^2*x2^2+2*x3*x4+2*x1+x2", "x2*x5+x1*x2*x4^2+2*x2+x3^2*x4*x5", "2*x2*x3*x5+2*x2+x2*x4*x5+x1*x4*x5^2+2*x4^2", "x2", "2*x2*x3*x4+2*x2^3*x3+x3*x4+2*x1^2"],
         quotient_dimension: None,
@@ -2143,7 +2144,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-953-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["4*x1*x2^2", "2*x2^3+3*x1^3*x2+6+6*x2+6*x1*x2^3"],
         quotient_dimension: Some(3),
@@ -2154,7 +2155,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-954-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["4*x1*x2^2+6*x2+1", "6*x1*x2", "5*x1*x2*x3^2+x1*x3+2*x3"],
         quotient_dimension: Some(1),
@@ -2165,7 +2166,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-955-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["6*x1^2*x3*x4+6*x1*x2*x4^2+2*x1*x4+5*x4+6*x2^3*x4", "x1^2+4*x3^2*x4+x1*x3*x4+2*x2*x4^2+4*x1*x2^2*x3", "6*x2^2*x4", "6*x2*x3"],
         quotient_dimension: None,
@@ -2176,7 +2177,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-956-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["2*x1*x5+6+5*x1*x2^2*x3+2*x2*x3", "3*x1+3", "2*x1*x2*x5+x2*x4*x5^2+4*x1+5*x2*x5", "3*x1^2*x4*x5+x2^2*x3+2*x2*x3+3*x3", "x1*x2*x3^2"],
         quotient_dimension: Some(2),
@@ -2187,7 +2188,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-957-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["5*x1+9*x2^2", "7*x1^2+6+4*x1^2*x2^2"],
         quotient_dimension: Some(6),
@@ -2198,7 +2199,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-958-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["5*x1+1", "1+7*x1*x2*x3", "2+11*x1"],
         quotient_dimension: Some(0),
@@ -2209,7 +2210,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-959-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["8*x2*x4+11*x1*x3+9*x1", "8+9*x2*x4+x1*x2*x4", "10*x2+7", "5*x2*x4^2+7*x1*x2^2"],
         quotient_dimension: Some(3),
@@ -2220,7 +2221,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-960-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["6+3*x1*x3^2*x5+5*x1*x2^2*x5+12*x1*x2*x5", "4*x2+6*x1*x4^2*x5", "x3+9*x1*x4*x5^2+12*x1+7*x4+12*x2*x5", "3+4*x1*x5+6*x1*x3^2*x4+10*x1*x3", "11*x1^2*x4"],
         quotient_dimension: Some(4),
@@ -2231,7 +2232,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-961-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["3079", "23888*x1*x2+3250*x1^2*x2+56800*x1*x2^3+1778"],
         quotient_dimension: Some(0),
@@ -2242,7 +2243,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-962-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["40061*x1+5447", "36718*x1*x2*x3^2", "33915*x1*x2^3+38196*x2+106*x3^2"],
         quotient_dimension: Some(8),
@@ -2253,7 +2254,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-963-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["56972*x1^3*x3+34401*x1+50192", "751*x2^2*x3*x4+25984*x1*x3+30231*x1^2*x3^2+45722*x1*x2", "28810*x1*x2*x4^2", "42250*x2*x3*x4^2+37193*x1*x2*x3+33153*x2^2*x4"],
         quotient_dimension: None,
@@ -2264,7 +2265,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-964-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["64061*x2", "21356*x1", "64133*x5", "2934*x4*x5+18942+6542*x1*x2*x3^2+5785*x2*x3*x5^2", "7682+15174*x2*x3*x4^2"],
         quotient_dimension: Some(0),
@@ -2275,7 +2276,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-965-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["170082315*x1*x2^3+799600255*x1+884555281", "388108818*x2+1984385002*x1^2*x2^2+435122133*x1*x2^2+324904097*x1^3*x2+1014293707*x1^2*x2"],
         quotient_dimension: Some(10),
@@ -2286,7 +2287,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-966-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["687273957*x2*x3+38026136*x1*x2*x3", "454436809*x1*x3+370833503", "1654707399*x1*x2^2*x3+726206393*x1+599348121*x3+1140894973*x2^4"],
         quotient_dimension: Some(6),
@@ -2297,7 +2298,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-967-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["1900638649*x1*x2*x3^2+2087040810+409903528*x2^3*x3", "1452764598*x1+1141774016*x2^2+937896670*x1^2*x2*x3", "1496626483*x1*x3+506055631*x2*x3+371642001*x1*x2*x4+1797877938*x1*x2", "1409342092*x1+1723105920+1122740943*x1*x2^3+887113019*x1*x2*x4"],
         quotient_dimension: Some(16),
@@ -2308,7 +2309,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-968-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1572826174*x1*x4^2+1520617605*x4+993891507*x1*x4^3", "537150752*x1*x4+409634965", "170803076*x1+1042776283*x5+1973189283*x5^4", "564643743+1327428657*x2^2*x4+1472518162*x1*x3*x4*x5", "489667132*x1*x3*x5+1122712866*x3+1416861332+820314091*x4+497218830*x2*x5"],
         quotient_dimension: Some(8),
@@ -2319,7 +2320,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-969-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1*x2+x1*x2^2", "x1^2*x2^2+x1"],
         quotient_dimension: None,
@@ -2330,7 +2331,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-970-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["x3+x1*x3^2+1", "x1^2*x2^2", "x2+x1*x2*x3+x1*x3+x3+x1^2*x2*x3"],
         quotient_dimension: Some(6),
@@ -2341,7 +2342,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-971-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x3*x4^2+1", "x1*x2*x3+x3*x4", "x3*x4", "x1*x3"],
         quotient_dimension: Some(0),
@@ -2352,7 +2353,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-972-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x1^2*x5", "x1+x2*x3^2*x4+1+x5", "x4+x1*x3*x4*x5+x3", "x1+x1^2*x5+x2*x5+x2+1", "x2*x3*x5+x1*x3^2*x4"],
         quotient_dimension: Some(12),
@@ -2363,7 +2364,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-973-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["2*x1^2*x2+x2", "1+x1*x2"],
         quotient_dimension: Some(2),
@@ -2374,7 +2375,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-974-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["x1*x2+x1^2*x2*x3", "2*x1*x2^2+x2", "x1*x2+2*x1*x2*x3+x1*x3"],
         quotient_dimension: None,
@@ -2385,7 +2386,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-975-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2+x2+2*x4^2", "x2+2+x1*x2*x4^2", "x3+x1^2", "x3+2*x1"],
         quotient_dimension: Some(6),
@@ -2396,7 +2397,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-976-p3-n5",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["1", "1+x2^3*x3", "1", "2*x1+2*x2*x3+x2*x5+2*x4*x5+2*x2", "x4+x2^2*x4*x5+2*x1*x2*x5"],
         quotient_dimension: Some(0),
@@ -2407,7 +2408,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-977-p7-n2",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2"],
         system: &["2*x1+2*x1*x2+3", "4*x1+x2"],
         quotient_dimension: Some(2),
@@ -2418,7 +2419,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-978-p7-n3",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3"],
         system: &["4*x3^2+4*x2", "2*x1", "3*x1^2*x2*x3"],
         quotient_dimension: None,
@@ -2429,7 +2430,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-979-p7-n4",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["3*x1*x2*x3+4*x2", "5*x1*x2", "6*x1^2*x2*x3+6*x2+4*x1+x2*x4", "4*x1*x2*x3^2+x2^2*x3"],
         quotient_dimension: None,
@@ -2440,7 +2441,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-980-p7-n5",
-        characteristic: 7,
+        field: CaseField::prime(7),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["5*x1*x4^3+2", "2*x2*x4+5*x1*x2^2*x4+5*x2*x3+1", "2*x2+4*x1*x2+3*x1*x3+5*x1*x5", "4+x1*x2*x3^2+4*x2^2*x4*x5", "x2*x4+4"],
         quotient_dimension: Some(11),
@@ -2451,7 +2452,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-981-p13-n2",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2"],
         system: &["10*x1*x2", "12*x1^3*x2+12+12*x2^2+11*x1"],
         quotient_dimension: Some(3),
@@ -2462,7 +2463,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-982-p13-n3",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3"],
         system: &["7", "2*x1^2*x2+5+10*x1^3*x3", "12+2*x1*x2*x3^2"],
         quotient_dimension: Some(0),
@@ -2473,7 +2474,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-983-p13-n4",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["5*x4+9*x1*x3^2*x4", "12*x2^2*x4", "9*x4^2+7+9*x1*x3^3", "8*x1*x4+9*x1*x3^2+10*x2+2*x1*x2*x4"],
         quotient_dimension: None,
@@ -2484,7 +2485,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-984-p13-n5",
-        characteristic: 13,
+        field: CaseField::prime(13),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["7*x4^2*x5+10*x1*x2*x3*x5+5*x4*x5+8+x4", "9+4*x2*x3+12*x5^2+2*x5", "4*x1*x5+2+8*x3*x5", "7+5*x2^2*x4*x5+4*x1*x2^2*x4+9*x5+7*x1", "3*x2^2*x5^2"],
         quotient_dimension: Some(8),
@@ -2495,7 +2496,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-985-p65537-n2",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2"],
         system: &["19257*x1^2*x2", "11507*x2^3+49299+30420*x1^2"],
         quotient_dimension: Some(8),
@@ -2506,7 +2507,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-986-p65537-n3",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3"],
         system: &["55405+35129*x1^2*x2*x3+16582*x3^2", "17078*x1*x3+43853*x1*x2^2*x3+7861*x1^2*x3+38139*x2^3*x3", "50031*x2*x3+42852*x2*x3^2"],
         quotient_dimension: Some(12),
@@ -2517,7 +2518,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-987-p65537-n4",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["38459+64988*x3+44404*x1^2+9591*x1*x2", "41493*x1*x3*x4+46570*x1^2*x2*x4+45743*x2*x3", "43673*x3^2+8907*x3^2*x4+59826+4136*x1*x3+16985*x3", "51296*x1*x3+23435*x1*x2*x3^2+52038*x1*x2*x4+12607"],
         quotient_dimension: Some(22),
@@ -2528,7 +2529,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-988-p65537-n5",
-        characteristic: 65537,
+        field: CaseField::prime(65537),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["27330", "31370*x5^3+6191*x2", "51410*x1*x3*x5^2+28300", "4538*x4^2+368*x1^2*x2*x4+42983*x1*x2*x5+28353+1650*x4^2*x5", "19935*x2*x5+23813+61368*x1*x4*x5^2+63318*x2*x4+43971*x4*x5^2"],
         quotient_dimension: Some(0),
@@ -2539,7 +2540,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-989-p2147483647-n2",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2"],
         system: &["752557891*x1^2*x2+323779368*x1+1360348608", "972597267*x1*x2+637726066*x1*x2^3+1587313475*x1+581953263+1930906279*x2^4"],
         quotient_dimension: Some(9),
@@ -2550,7 +2551,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-990-p2147483647-n3",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3"],
         system: &["1513768736+899019518*x3+813770126*x1*x3", "1611920813+468907754*x1^2+188274804*x2^2*x3", "461985355+1443289088*x1"],
         quotient_dimension: Some(2),
@@ -2561,7 +2562,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-991-p2147483647-n4",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["268582633*x2^2*x3*x4", "1359396572*x4", "443879259*x3^2*x4+159277370+1786271443*x2", "2021363669*x1^2*x2+1082059427*x2+1213923210*x2^4"],
         quotient_dimension: None,
@@ -2572,7 +2573,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-992-p2147483647-n5",
-        characteristic: 2147483647,
+        field: CaseField::prime(2147483647),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["171100235*x1*x3^3+618368995+529023729*x1*x4", "1676986030", "1713817024*x2^2*x5+488308553+196866571*x5", "1787125012*x1*x3*x4", "334196036*x2*x3^2*x5+182903432*x3+2050295230*x1*x4^2+319611819*x4"],
         quotient_dimension: Some(0),
@@ -2583,7 +2584,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-993-p2-n2",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2"],
         system: &["x1+x1^3*x2+x1^2", "x1^3+1"],
         quotient_dimension: Some(3),
@@ -2594,7 +2595,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-994-p2-n3",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3"],
         system: &["1", "x2*x3^2+x3+x2^2+x1*x2*x3+x2*x3", "1+x2^2*x3^2"],
         quotient_dimension: Some(0),
@@ -2605,7 +2606,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-995-p2-n4",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["x3+x1*x2*x3", "x1*x3*x4+x2*x3*x4", "x2*x3^2*x4+x3^3", "x1*x3*x4^2+1"],
         quotient_dimension: Some(6),
@@ -2616,7 +2617,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-996-p2-n5",
-        characteristic: 2,
+        field: CaseField::prime(2),
         variables: &["x1", "x2", "x3", "x4", "x5"],
         system: &["x1*x3*x4*x5+x1*x4*x5+x1*x5^2", "x1*x2*x5+x4^3+x5^2+x2*x4+x5", "x5+x1+x1^2*x3", "x3^2*x4^2+1", "1"],
         quotient_dimension: Some(0),
@@ -2627,7 +2628,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-997-p3-n2",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2"],
         system: &["1", "2*x2+x1*x2+x2^4"],
         quotient_dimension: Some(0),
@@ -2638,7 +2639,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-998-p3-n3",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3"],
         system: &["2+2*x1*x3^2+x1+x3", "2+2*x3", "2*x2^3*x3+x3"],
         quotient_dimension: Some(0),
@@ -2649,7 +2650,7 @@ pub(super) const FIXTURES: &[DifferentialFixture] = &[
     },
     DifferentialFixture {
         name: "seed-999-p3-n4",
-        characteristic: 3,
+        field: CaseField::prime(3),
         variables: &["x1", "x2", "x3", "x4"],
         system: &["2*x1*x2*x3*x4", "2+2*x2*x4^2+2*x2*x3", "x3*x4+2", "x2*x3^2+x1*x2^3+x2^2*x3*x4+x1*x2*x4^2+x2"],
         quotient_dimension: Some(5),

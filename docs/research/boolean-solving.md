@@ -7,12 +7,15 @@ breaks, in detail. A list of concrete failures is the most valuable possible out
 There are none at the pipeline level. The real gaps were elsewhere, and one of them is a correctness
 hazard that nothing had noticed.
 
-**Written in three passes.** §1–§5 are the first (#233): the stale blocker, the pipeline result, the
+**Written in four passes.** §1–§5 are the first (#233): the stale blocker, the pipeline result, the
 `0x11D` hazard, and the field-equation mechanism. §6–§10 are the second (#379), which asserted the
 *solving* half the first pass left out, answered questions 4 and 5, and found three gaps — one of
 them a panic on any text input over `GF(2^8)`. §13 is the third: that panic is **closed** (#377),
-and §13 records the trait-level decision it turned on. §9 is why the issue is still open: question
-3's measurement was deliberately not taken.
+and §13 records the trait-level decision it turned on. §14 is the fourth: the differential oracle
+now reaches `GF(2^8)` (#378), with the minimal polynomial asserted to agree on both sides rather
+than conventionally shared — which is what §4's `0x11B`/`0x11D` hazard turns into once two
+implementations have to talk. §9 is why the issue is still open: question 3's measurement was
+deliberately not taken.
 
 ## 1. The blocker everyone was waiting on had already cleared
 
@@ -241,6 +244,7 @@ solution or invents one over an extension; recovering exactly the enumerated set
 recorded it as not attempted. It did not need attempting. `src/grobner/differential/check.rs`:
 
 ```rust
+// before #378; the list is now `SUPPORTED_FIELDS: &[CaseField]`, and has GF(2^8) in it.
 pub const SUPPORTED_CHARACTERISTICS: &[u64] = &[2, 3, 7, 13, 65537, 2147483647];
 ```
 
@@ -248,22 +252,19 @@ Characteristic two has been in the sweep all along. `src/grobner/differential/fi
 **40 committed cases at characteristic 2** of 240 — an even 40 per characteristic — they are verified
 offline on every run of `differential::tests::test_every_committed_fixture_agrees`, and a live sweep
 against a local **Singular 4.4.1** covering all six characteristics passes
-(`test_a_live_sweep_against_singular_agrees`, `--ignored`, 24 systems).
+(`test_a_live_sweep_against_singular_agrees`, `--ignored`, 28 systems since #378 added a
+seventh field).
 
 So two claims in the tree were wrong in the same direction and are superseded here: #65's "the oracle
 path is small-field only today", and this document's own first-pass statement that characteristic-two
 fixtures had not been tried. Characteristic two was never the restriction.
 
-**The restriction is extension fields**, and it is three things rather than one: the dispatch at
-`check.rs:190` monomorphizes only into `PrimeFieldElement64<p>`; `DifferentialCase` carries a
-`characteristic: u64` and nothing else, so `GF(2)` and `GF(2^8)` are both `characteristic: 2` and
-cannot be told apart; and the two sides do not agree on how an element is written — Zeebra now reads
-and writes `Gf256` as a coefficient bit pattern (§13), while Singular needs its Galois-field ring
-syntax with a declared minimal polynomial, which has to be *the same* polynomial on both sides,
-which §4 showed is a real distinction.
-
-The consequence for the issues: **#219 (G1) and #221 (G4) are over `GF(2)` and have their oracle
-today.** What lacks one is the `GF(2^8)` half of #197 and #198, which is **#378**.
+The restriction *was* extension fields, in three places rather than one: the dispatch at
+`check.rs:190` monomorphized only into `PrimeFieldElement64<p>`; `DifferentialCase` carried a
+`characteristic: u64` and nothing else, so `GF(2)` and `GF(2^8)` were both `characteristic: 2` and
+could not be told apart; and the two sides did not agree on how an element is written. All three are
+**closed** (#378) — see §14. The oracle now reaches `GF(2^8)`, and nothing in this document's tree
+is waiting on a field.
 
 ## 8. Question 5 decided: `Zp2`
 
@@ -333,10 +334,11 @@ scoped to exactly this for the linear-algebra kernel, and **#218 stays open on t
   resource failure, which is what
   `one_missing_field_equation_is_still_a_resource_failure` pins: seven of the eight field equations
   leave *this* ideal zero-dimensional, and the lex budget is then genuinely to blame.
-- **#378 — the differential oracle is prime-field only.** §7. Was blocked on #377 — there was no
-  point emitting `GF(2^8)` rings while Zeebra could not read an element back. **Unblocked by §13**;
-  what remains on it is the dispatch at `check.rs:190`, `DifferentialCase`'s missing degree, and
-  agreeing the minimal polynomial with Singular.
+- **#378 — the differential oracle is prime-field only.** **Closed**; see §14. Was blocked on #377
+  — there was no point emitting `GF(2^8)` rings while Zeebra could not read an element back — and
+  unblocked by §13. All three parts are done: the dispatch keys on a field rather than a
+  characteristic, `DifferentialCase` names its modulus, and the minimal polynomial is *asserted*
+  to agree on both sides rather than conventionally shared.
 
 Still deliberately out of scope, as in the first pass: **no import was enabled** (`MqField::Gf2` and
 `MqField::Gf256` still refuse, with accurate reasons; wiring the importer against a published answer
@@ -363,20 +365,30 @@ un-ignored and green (§13). The live Singular sweep of §7 needs a local instal
 ```sh
 cargo test --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
+
+# needs a local Singular; the GF(2^8) half of the same (§14)
+cargo test --release --lib -- --ignored --exact \
+    grobner::differential::tests::test_a_live_gf256_sweep_against_singular_agrees
 ```
 
 ## 12. Consequences for the issues that were waiting on this
 
 - **#219 (G1, SAT4CryptoBench)** — unblocked, including the part that matters: field equations exist,
   the `GF(2)` solve path returns verified points, and the Singular oracle is available in
-  characteristic two (§7). Nothing on #218 still gates it.
+  characteristic two (§7). Nothing on #218 still gates it, and #378 was never one of its gates —
+  SAT4CryptoBench is over `GF(2)`, so what #378 added it did not need. What it still needs is its
+  own: the benchmark's instances fetched and converted, and a decision on which of them are within
+  reach at all.
 - **#221 (G4, LowMC)** — unblocked, oracle included. Still rank 4 on its merits.
 - **#197 (A5, Fukuoka types I–V)** — unblocked at the field level, and `Gf256Mq` exists. The
   `GF(2^8)` types are now importable from text too (§13); a coefficient is written as its
-  coefficient bit pattern, `0..255`. The `GF(2)` types always could — use `Zp2` for those (§8).
+  coefficient bit pattern, `0..255`. The `GF(2)` types always could — use `Zp2` for those (§8). The
+  `GF(2^8)` types also have a *basis* oracle now (§14), not only a published answer file — but
+  only under `Gf256`'s modulus; the Fukuoka modulus is `Gf256Mq`'s `0x11D`, which is a one-line
+  addition to the dispatch and is #197's to make when it needs it.
 - **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked, and the `GF(2^8)` text input the
-  ladder's upper rungs need now exists (§13). HFE-80 remains far out of reach; the reduced
-  `HFE n_D` rungs on Steel's page are the target.
+  ladder's upper rungs need now exists (§13), with a `GF(2^8)` differential oracle behind it (§14).
+  HFE-80 remains far out of reach; the reduced `HFE n_D` rungs on Steel's page are the target.
 - **#206 (F2, MinRank modellings)** — gets the field-equation mechanism it needs for challenges D–F,
   and §5.1's rule says the mechanism is worthless for A–C over `GF(65521)`. That is the answer to
   F2's question 5 for the prime-field half, derived rather than assumed.
@@ -427,3 +439,63 @@ Pinned by `from_str_inverts_display` and `new_is_the_integer_embedding` over all
 `for_each_field!` types, `element_at_covers_the_field_exactly_once` over the small ones, and
 `fields::finite_field::tests::test_element_at_covers_an_extension_field_where_new_does_not`, which
 runs both maps over `0..q` and counts their images: `q` against `p`.
+
+
+## 14. #378 closed: the oracle reaches GF(2^8), and the modulus is asserted
+
+§7 left three things between the harness and an extension field. All three are done.
+
+**The case names a field.** `DifferentialCase`, `DifferentialFixture` and `GeneratedSystem` carried
+`characteristic: u64`; they now carry a `CaseField` — `Prime { characteristic }` or
+`Binary { modulus }`, the modulus as a bit pattern with the extension degree read off its degree. So
+`GF(2)` and `GF(2^8)` are distinct values, and a `GF(2^8)` case records *which* degree-8 polynomial
+the oracle reduced by. `SUPPORTED_CHARACTERISTICS` became `SUPPORTED_FIELDS`, and the dispatch in
+`check.rs` matches a field rather than an integer.
+
+**The modulus agreement is an assertion, in two independent places.** `Gf256` is `x^8+x^4+x^3+x+1`
+and `Gf256Mq` is `x^8+x^4+x^3+x^2+1`: same characteristic, same order, and `0x57 * 0x83` is `0xc1`
+in one and `0x52` in the other — §4's distinction, now load-bearing.
+
+On Zeebra's side, `CaseField::matches` does not ask a field type what its modulus is; it multiplies.
+In `GF(2)[x]/(P)` with `P = x^m + r` the relation `x^m = r` holds and determines `P`, so raising the
+element whose bit pattern is `2` to the `m`-th power and comparing it with the element whose pattern
+is `r` accepts exactly one modulus. That needed no new trait method and no change to `src/fields/`.
+`test_a_gf256_case_checked_modulo_the_other_polynomial_is_rejected` is the assertion: a case
+recorded modulo `0x11B` and checked against `Gf256Mq` fails on `Check::Field`.
+
+On Singular's side, the harness does **not** use `ring R = (2^8, a), ...`. Singular's small Galois
+fields take their minimal polynomial from an internal table a script cannot choose, which is exactly
+the wrong property here. It declares an algebraic extension of the prime field instead —
+`ring R = (2,a),(x1,…),dp;` with `minpoly = a^8+a^4+a^3+a+1` — which is the only form in which the
+modulus is the harness's to state. Singular echoes `minpoly` back, the echo is parsed and compared,
+and a ring reducing by something else is an `OracleError::ModulusMismatch`: an oracle failure, never
+a comparison. `minpoly` is set in every ring, since it is a property of a ring and not of a session.
+
+**The two sides write an element differently, and the text is translated.** Zeebra writes the decimal
+of the coefficient bit pattern (§13); Singular writes `(a^3+a)`. Every polynomial crossing the
+boundary is rewritten in both directions, so a committed fixture is always in Zeebra's syntax and
+needs no conversion step to be read or pasted. Over a prime field both rewrites are the identity,
+which is why the 240 recorded prime answers are byte-for-byte what they were — the migration renamed
+their field and touched no datum.
+
+**The corpus.** `FIXTURES_GF256`: 40 ideals over `GF(2^8)` in two to five variables — 19
+zero-dimensional, 11 unit ideals, 10 positive-dimensional — generated against a live Singular 4.4.1
+(build 44105) and verified offline, recording the source basis, the quotient dimension, the standard
+monomials, every border normal form and the lex basis. So CI exercises the multiplication operators
+column by column over an extension field with no Singular present. It is a *second* table rather
+than more rows in the first: a generated header's regeneration command is only true of the sweep
+that wrote it, and adding a seventh field to the first sweep's list changes which field every seed
+above index 23 is generated over — so 240 recorded prime answers would all have been replaced to add
+one `GF(2^8)` row. Each table is reproducible by the one command in its own header.
+
+`test_the_gf256_fixtures_reach_past_the_prime_subfield` is why the corpus means something: a table
+of `GF(2^8)` cases whose every coefficient happened to be `0` or `1` would pass every other test
+while covering nothing the `GF(2)` corpus already covers.
+
+**What is still not there.** Only `Gf256`'s modulus is in the dispatch. `Gf256Mq`'s `0x11D` — the
+Fukuoka MQ Challenge modulus, which #197 needs — is a one-line arm away, and deliberately not added
+here: nothing in the repo generates systems over it yet, and a supported field with no fixture would
+fail `test_the_fixtures_cover_every_field_and_variable_count` by design. Extensions of odd
+characteristic (`Gf13Pow4`) are not covered either; `CaseField` has no variant for them, because
+Singular's `minpoly` syntax would need the coefficient translation generalized past GF(2) and no
+open issue wants it. Both are noted on the issues that would use them rather than left implicit.

@@ -31,6 +31,7 @@
 
 pub mod check;
 pub mod comparison;
+pub mod field;
 pub mod fixture;
 pub mod generator;
 pub mod singular;
@@ -41,6 +42,15 @@ pub mod text;
 #[cfg(test)]
 mod fixtures;
 
+/// The GF(2^8) half of the same, recorded by its own sweep.
+///
+/// A second table rather than more rows in the first: a generated header's regeneration command is
+/// only true of the sweep that wrote it, and adding a seventh field to the first sweep's list would
+/// change which field every seed above index 23 is generated over — so the 240 recorded prime
+/// answers would all be replaced to add one GF(2^8) row.
+#[cfg(test)]
+mod fixtures_gf256;
+
 pub use check::{
     check_generated, check_system, verify_recorded, verify_recorded_with, SystemOutcome,
 };
@@ -48,7 +58,10 @@ pub use comparison::{
     verify_case, verify_case_with, Agreement, Check, DifferentialCase, Disagreement, SOURCE_ORDER,
     TARGET_ORDER,
 };
-pub use fixture::{emit_failure, emit_fixture, emit_fixture_module, DifferentialFixture};
+pub use field::{CaseField, FieldTextError};
+pub use fixture::{
+    emit_failure, emit_fixture, emit_fixture_module, emit_named_fixture_module, DifferentialFixture,
+};
 pub use generator::{GeneratedSystem, GeneratedTerm, SystemShape};
 pub use singular::{Oracle, OracleError, OracleQuery, SingularOracle, MAX_CHARACTERISTIC};
 pub use sweep::{run_sweep, Failure, SweepOptions, SweepReport};
@@ -60,23 +73,47 @@ mod tests {
 
     use super::{
         check::{
-            check_generated, verify_recorded, verify_recorded_with, SUPPORTED_CHARACTERISTICS,
-            SUPPORTED_VARIABLES,
+            check_generated, verify_recorded, verify_recorded_with, GF256_MODULUS,
+            SUPPORTED_FIELDS, SUPPORTED_VARIABLES,
         },
         comparison::{verify_case, Check, DifferentialCase},
+        field::CaseField,
         fixtures::FIXTURES,
+        fixtures_gf256::FIXTURES_GF256,
         generator::{GeneratedSystem, SystemShape},
         run_sweep,
         singular::{Oracle, OracleError, OracleQuery},
-        SweepReport, SystemOutcome,
+        DifferentialFixture, SweepReport, SystemOutcome,
     };
     use crate::{
-        fields::{Zp13, Zp7},
+        fields::{Gf256, Gf256Mq, Zp13, Zp7},
         grobner::{
             f4::F4Options,
             fglm::{FglmOptions, OperatorConstruction, OperatorStorage},
         },
     };
+
+    /// GF(2^8) modulo the AES polynomial — the field the second fixture table is recorded over.
+    const GF256: CaseField = CaseField::binary(GF256_MODULUS);
+
+    /// The six primes the first fixture table was swept over, in the sweep's own order.
+    const PRIME_FIELDS: [CaseField; 6] = [
+        CaseField::prime(2),
+        CaseField::prime(3),
+        CaseField::prime(7),
+        CaseField::prime(13),
+        CaseField::prime(65537),
+        CaseField::prime(2147483647),
+    ];
+
+    /// Every committed fixture, over both fields' tables.
+    ///
+    /// The two tables exist because each is reproducible by the one command in its own header; the
+    /// tests that are about *coverage* of the corpus want them joined, and nothing should have to
+    /// remember to add a new table to each such test by hand.
+    fn all_fixtures() -> Vec<&'static DifferentialFixture> {
+        FIXTURES.iter().chain(FIXTURES_GF256).collect()
+    }
 
     /// An oracle that answers from a recorded table and refuses anything else.
     ///
@@ -106,7 +143,7 @@ mod tests {
             seed: 777,
             systems: 240,
             variables: SUPPORTED_VARIABLES.to_vec(),
-            characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+            fields: PRIME_FIELDS.to_vec(),
             max_degree: DEFAULT_MAX_DEGREE,
             max_terms: DEFAULT_MAX_TERMS,
             minimize_attempts: 0,
@@ -158,8 +195,9 @@ mod tests {
     #[test]
     fn test_every_committed_fixture_agrees() {
         assert!(!FIXTURES.is_empty(), "the fixture table is empty");
+        assert!(!FIXTURES_GF256.is_empty(), "the GF(2^8) table is empty");
 
-        for fixture in FIXTURES {
+        for fixture in all_fixtures() {
             let case = fixture.to_case();
             match verify_recorded(&case, &FglmOptions::unbounded()) {
                 Ok(_) => {}
@@ -188,7 +226,7 @@ mod tests {
                 let options = FglmOptions::unbounded()
                     .with_operator_construction(construction)
                     .with_operator_storage(storage);
-                for fixture in FIXTURES {
+                for fixture in all_fixtures() {
                     if let Err(disagreement) = verify_recorded(&fixture.to_case(), &options) {
                         panic!(
                             "{} under {:?} and {:?}: {}",
@@ -284,7 +322,7 @@ mod tests {
     /// not against Zeebra's own default. 240 ideals over six fields and four variable counts.
     fn agrees_with_the_recorded_oracle(name: &str, f4: &F4Options) {
         let options = FglmOptions::unbounded();
-        for fixture in FIXTURES {
+        for fixture in all_fixtures() {
             if let Err(disagreement) = verify_recorded_with(&fixture.to_case(), &options, f4) {
                 panic!("{} under {}: {}", fixture.name, name, disagreement);
             }
@@ -457,9 +495,9 @@ mod tests {
     }
 
     /// The fixture with this name, which is a defect in the test if it is missing.
-    fn fixture_by_name(name: &str) -> &'static super::DifferentialFixture {
-        FIXTURES
-            .iter()
+    fn fixture_by_name(name: &str) -> &'static DifferentialFixture {
+        all_fixtures()
+            .into_iter()
             .find(|fixture| fixture.name == name)
             .unwrap_or_else(|| panic!("the corpus no longer contains {}", name))
     }
@@ -469,17 +507,17 @@ mod tests {
     /// Each M22 workstream asserts its strategy returns the *baseline's* basis on a fixed
     /// correctness corpus, and the baseline is differentially tested against Singular. Composing
     /// the two is a valid argument — and it is an argument. This checks the strategies against the
-    /// oracle directly, on random systems nobody chose, over six characteristics.
+    /// oracle directly, on random systems nobody chose, over seven fields.
     ///
     /// ```text
     /// cargo test --release --lib -- --ignored --exact \
     ///     grobner::differential::tests::test_m22_strategies_agree_with_singular
     /// ```
     ///
-    /// Twenty-four systems per strategy, which is exactly the `4 x 6` cross product of supported
-    /// variable counts and characteristics — the sweep walks it in a fixed order, so that count is
-    /// the smallest one that reaches every field. Eight would reach two. The field coverage is
-    /// then *asserted* from the agreed cases rather than assumed from the index arithmetic.
+    /// Twenty-eight systems per strategy, which is exactly the `4 x 7` cross product of supported
+    /// variable counts and fields — the sweep walks it in a fixed order, so that count is the
+    /// smallest one that reaches every field. Eight would reach two. The field coverage is then
+    /// *asserted* from the agreed cases rather than assumed from the index arithmetic.
     ///
     /// `src/bin/zeebra-differential.rs` is the tool for a longer sweep, and `--f4-*` is not wired
     /// into it because a sweep that takes an hour should be pointed at one configuration
@@ -557,9 +595,9 @@ mod tests {
         for (name, f4) in configurations {
             let options = SweepOptions {
                 seed: 22_000,
-                systems: 24,
+                systems: 28,
                 variables: SUPPORTED_VARIABLES.to_vec(),
-                characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+                fields: SUPPORTED_FIELDS.to_vec(),
                 max_degree: 3,
                 max_terms: 4,
                 minimize_attempts: 0,
@@ -586,14 +624,11 @@ mod tests {
 
             // Coverage is asserted, not inferred. `clean()` is also true of a sweep where every
             // system was rejected before reaching a field, and an earlier version of this test
-            // ran eight systems and reached two of the six characteristics while asserting
-            // nothing about which.
-            let reached: BTreeSet<u64> = report
-                .agreed_cases
-                .iter()
-                .map(|case| case.characteristic)
-                .collect();
-            let expected: BTreeSet<u64> = SUPPORTED_CHARACTERISTICS.iter().copied().collect();
+            // ran eight systems and reached two of the fields while asserting nothing about
+            // which.
+            let reached: BTreeSet<CaseField> =
+                report.agreed_cases.iter().map(|case| case.field).collect();
+            let expected: BTreeSet<CaseField> = SUPPORTED_FIELDS.iter().copied().collect();
             assert_eq!(
                 reached, expected,
                 "{} agreed over {:?} and the sweep advertises {:?}",
@@ -626,7 +661,7 @@ mod tests {
         let mut zero_dimensional = 0;
         let mut in_shape_position = 0;
 
-        for fixture in FIXTURES {
+        for fixture in all_fixtures() {
             let case = fixture.to_case();
             let agreement = verify_recorded(&case, &options)
                 .unwrap_or_else(|disagreement| panic!("{}: {}", fixture.name, disagreement));
@@ -649,21 +684,18 @@ mod tests {
         );
     }
 
-    /// The fixtures cover every characteristic and variable count the harness supports.
+    /// The fixtures cover every field and variable count the harness supports.
     ///
     /// A table that happened to hold only large-prime two-variable cases would pass the test above
-    /// while checking almost nothing, which is the failure this prevents.
+    /// while checking almost nothing, which is the failure this prevents. GF(2^8) is in
+    /// `SUPPORTED_FIELDS`, so this is also what fails if the second table is ever lost.
     #[test]
     fn test_the_fixtures_cover_every_field_and_variable_count() {
-        let characteristics: HashSet<u64> = FIXTURES.iter().map(|f| f.characteristic).collect();
-        let variables: HashSet<usize> = FIXTURES.iter().map(|f| f.variables.len()).collect();
+        let fields: HashSet<CaseField> = all_fixtures().iter().map(|f| f.field).collect();
+        let variables: HashSet<usize> = all_fixtures().iter().map(|f| f.variables.len()).collect();
 
-        for characteristic in SUPPORTED_CHARACTERISTICS {
-            assert!(
-                characteristics.contains(characteristic),
-                "no fixture over GF({})",
-                characteristic
-            );
+        for field in SUPPORTED_FIELDS {
+            assert!(fields.contains(field), "no fixture over GF({})", field);
         }
         for count in SUPPORTED_VARIABLES {
             assert!(
@@ -680,15 +712,15 @@ mod tests {
     /// positive-dimensional ideal that both sides must reject.
     #[test]
     fn test_the_fixtures_cover_every_ideal_class() {
-        let zero_dimensional = FIXTURES
+        let zero_dimensional = all_fixtures()
             .iter()
             .filter(|f| matches!(f.quotient_dimension, Some(d) if d > 0))
             .count();
-        let unit = FIXTURES
+        let unit = all_fixtures()
             .iter()
             .filter(|f| f.quotient_dimension == Some(0))
             .count();
-        let positive = FIXTURES
+        let positive = all_fixtures()
             .iter()
             .filter(|f| f.quotient_dimension.is_none())
             .count();
@@ -704,7 +736,7 @@ mod tests {
     /// enforces that — so this asserts the table is not merely passing by being asked nothing.
     #[test]
     fn test_the_fixtures_record_border_normal_forms() {
-        let with_border = FIXTURES
+        let with_border = all_fixtures()
             .iter()
             .filter(|f| !f.border_normal_forms.is_empty())
             .count();
@@ -713,7 +745,7 @@ mod tests {
             "no fixture records a border normal form, so no operator column was checked"
         );
 
-        for fixture in FIXTURES {
+        for fixture in all_fixtures() {
             if fixture.quotient_dimension.unwrap_or(0) == 0 {
                 continue;
             }
@@ -815,11 +847,105 @@ mod tests {
         );
     }
 
+    /// A GF(2^8) case checked modulo the *other* degree-8 polynomial is rejected.
+    ///
+    /// The acceptance criterion of #378. `Gf256` and `Gf256Mq` are both GF(2^8), of the same
+    /// characteristic and the same order, and `0x57 * 0x83` is `0xc1` in one and `0x52` in the
+    /// other — so a recorded case checked against the wrong one would disagree, or worse agree, for
+    /// a reason that has nothing to do with Zeebra. The field, modulus included, is what
+    /// `verify_case` checks before it parses anything.
+    #[test]
+    fn test_a_gf256_case_checked_modulo_the_other_polynomial_is_rejected() {
+        // The two moduli really are two fields, not two spellings of one.
+        assert_ne!(
+            (Gf256::new(0x57) * Gf256::new(0x83)).coefficients(),
+            (Gf256Mq::new(0x57) * Gf256Mq::new(0x83)).coefficients(),
+            "the two moduli agree on this product, so this test proves nothing"
+        );
+
+        let case = FIXTURES_GF256
+            .iter()
+            .find(|fixture| fixture.variables.len() == 2)
+            .expect("a two-variable GF(2^8) fixture")
+            .to_case();
+
+        verify_case::<2, Gf256>(&case, &FglmOptions::unbounded())
+            .expect("the case agrees over the field it was recorded in");
+        assert_eq!(
+            verify_case::<2, Gf256Mq>(&case, &FglmOptions::unbounded())
+                .expect_err("a case recorded modulo 0x11B must not be checked modulo 0x11D")
+                .check,
+            Check::Field
+        );
+    }
+
+    /// A GF(2) case is not checkable over GF(2^8), although the two share a characteristic.
+    ///
+    /// The second half of #378's naming gap: before a case named a field rather than a
+    /// characteristic, `characteristic: 2` matched both and the dispatch could not tell them apart.
+    #[test]
+    fn test_a_gf2_case_is_not_a_gf256_case() {
+        let case = FIXTURES
+            .iter()
+            .find(|fixture| fixture.field == CaseField::prime(2) && fixture.variables.len() == 2)
+            .expect("a two-variable GF(2) fixture")
+            .to_case();
+        assert_eq!(
+            verify_case::<2, Gf256>(&case, &FglmOptions::unbounded())
+                .expect_err("a GF(2) case must not be checked over GF(2^8)")
+                .check,
+            Check::Field
+        );
+    }
+
+    /// The GF(2^8) corpus really is over the extension and not over its prime subfield.
+    ///
+    /// A table of GF(2^8) cases whose every coefficient happened to be `0` or `1` would pass every
+    /// test above while exercising nothing the GF(2) corpus does not already cover — so the
+    /// coefficients the oracle actually produced are asserted to range over the extension.
+    #[test]
+    fn test_the_gf256_fixtures_reach_past_the_prime_subfield() {
+        let coefficients: HashSet<u64> = FIXTURES_GF256
+            .iter()
+            .flat_map(|fixture| {
+                fixture
+                    .system
+                    .iter()
+                    .chain(fixture.grevlex_basis)
+                    .chain(fixture.lex_basis.unwrap_or(&[]))
+                    .copied()
+            })
+            .flat_map(|text| {
+                // A coefficient is a decimal run that is not an exponent, which over this field is
+                // the element's bit pattern. See `CaseField::to_singular`.
+                text.split(['+', '-', '*'])
+                    .filter(|token| !token.contains('^'))
+                    .filter_map(|token| token.parse::<u64>().ok())
+                    .collect::<Vec<u64>>()
+            })
+            .collect();
+
+        assert!(
+            coefficients.iter().any(|value| *value > 1),
+            "every recorded GF(2^8) coefficient is in GF(2), so the corpus says nothing about the \
+             extension"
+        );
+        assert!(
+            coefficients.len() > 20,
+            "only {} distinct coefficients across the GF(2^8) corpus",
+            coefficients.len()
+        );
+        assert!(
+            coefficients.iter().all(|value| *value < 256),
+            "a recorded coefficient is not a byte, so it is not an element of GF(2^8)"
+        );
+    }
+
     /// A case over a field the harness does not instantiate is rejected rather than checked.
     #[test]
     fn test_a_case_over_an_uninstantiated_field_is_rejected() {
         let mut case = FIXTURES[0].to_case();
-        case.characteristic = 11;
+        case.field = CaseField::prime(11);
         assert_eq!(
             verify_recorded(&case, &FglmOptions::unbounded())
                 .unwrap_err()
@@ -828,9 +954,9 @@ mod tests {
         );
     }
 
-    /// Verifying a case at the wrong variable count or characteristic is rejected, not attempted.
+    /// Verifying a case at the wrong variable count or field is rejected, not attempted.
     ///
-    /// `verify_recorded` dispatches *from* the case's own variable count and characteristic, so it
+    /// `verify_recorded` dispatches *from* the case's own variable count and field, so it
     /// cannot reach this. It is reachable by calling the generic entry point directly, which is
     /// what a future caller with its own dispatch table would do — and a case checked in the wrong
     /// ring would otherwise agree or disagree for reasons that have nothing to do with the ideal.
@@ -841,7 +967,11 @@ mod tests {
         // below pass or fail on which fixture happened to come first in the table.
         let case = FIXTURES
             .iter()
-            .find(|f| f.variables.len() == 2 && f.characteristic != 7 && f.characteristic != 13)
+            .find(|f| {
+                f.variables.len() == 2
+                    && f.field != CaseField::prime(7)
+                    && f.field != CaseField::prime(13)
+            })
             .expect("a two-variable fixture over neither GF(7) nor GF(13)")
             .to_case();
 
@@ -869,7 +999,7 @@ mod tests {
     #[test]
     fn test_the_harness_path_agrees_against_a_recorded_oracle() {
         let mut checked = 0;
-        for fixture in FIXTURES {
+        for fixture in all_fixtures() {
             // Only fixtures still named after their seed can be regenerated; a minimized one
             // cannot, and is covered by the fixture test above instead.
             let Some(system) = system_of(fixture.name) else {
@@ -908,7 +1038,7 @@ mod tests {
                 max_degree: 2,
                 max_terms: 3,
             },
-            13,
+            CaseField::prime(13),
         );
         let mut oracle = RecordedOracle { cases: Vec::new() };
         let outcome = check_generated(
@@ -931,7 +1061,7 @@ mod tests {
                 max_degree: 2,
                 max_terms: 3,
             },
-            13,
+            CaseField::prime(13),
         );
         let mut oracle = RecordedOracle { cases: Vec::new() };
         let outcome = check_generated(
@@ -971,9 +1101,9 @@ mod tests {
 
         let options = SweepOptions {
             seed: 90_000,
-            systems: 24,
+            systems: 28,
             variables: SUPPORTED_VARIABLES.to_vec(),
-            characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+            fields: SUPPORTED_FIELDS.to_vec(),
             max_degree: 3,
             max_terms: 4,
             minimize_attempts: 0,
@@ -994,7 +1124,7 @@ mod tests {
             report.zeebra_failures.len(),
             report.zeebra_failures,
         );
-        assert_eq!(report.agreed, 24);
+        assert_eq!(report.agreed, 28);
         assert!(
             report.zero_dimensional > 0,
             "the sweep found no zero-dimensional ideal, so it checked no operator column"
@@ -1047,7 +1177,7 @@ mod tests {
             seed: 91_000,
             systems: SYSTEMS,
             variables: SUPPORTED_VARIABLES.to_vec(),
-            characteristics: SUPPORTED_CHARACTERISTICS.to_vec(),
+            fields: SUPPORTED_FIELDS.to_vec(),
             max_degree: 3,
             max_terms: 4,
             minimize_attempts: 0,
@@ -1106,11 +1236,79 @@ mod tests {
         let _ = std::fs::remove_dir_all(&work_dir);
     }
 
-    /// `seed-<n>-p<p>-n<v>` back to the system it names.
+    /// A live GF(2^8) sweep against a local Singular, which must be installed to run this.
+    ///
+    /// The live half of #378. `#[ignore]`d for the same reason as the prime sweep: CI has no
+    /// Singular, and a test that passed when the oracle is absent would be worse than no test. The
+    /// offline half is `test_every_committed_fixture_agrees` over `FIXTURES_GF256`.
+    ///
+    /// ```text
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::differential::tests::test_a_live_gf256_sweep_against_singular_agrees
+    /// ```
+    ///
+    /// What this exercises that the prime sweep cannot: the extension ring declaration and its
+    /// `minpoly`, the modulus echo, and the coefficient rewriting in both directions — the last of
+    /// which the `OracleInput` check verifies on every system, since a rewrite that lost a
+    /// coefficient would read back as a different polynomial.
+    #[test]
+    #[ignore = "needs a local Singular installation"]
+    fn test_a_live_gf256_sweep_against_singular_agrees() {
+        use super::{SingularOracle, SweepOptions};
+        use std::time::Duration;
+
+        let work_dir =
+            std::env::temp_dir().join(format!("zeebra-differential-gf256-{}", std::process::id()));
+        let mut oracles =
+            SingularOracle::fleet("Singular", &work_dir, Duration::from_secs(60), false, 1)
+                .expect("a writable scratch directory");
+        let version = oracles[0].version().expect("Singular runs");
+
+        let options = SweepOptions {
+            seed: 93_000,
+            systems: 8,
+            variables: SUPPORTED_VARIABLES.to_vec(),
+            fields: vec![GF256],
+            max_degree: 3,
+            max_terms: 4,
+            minimize_attempts: 0,
+            minimize_budget: Duration::from_secs(0),
+            jobs: 1,
+            fglm: FglmOptions::unbounded(),
+            f4: F4Options::default(),
+        };
+        let report = run_sweep(&options, &mut oracles, &mut |_, _, _| {});
+
+        assert!(
+            report.clean(),
+            "Singular build {}: {} disagreements, {} oracle failures {:?}, {} Zeebra failures {:?}",
+            version,
+            report.failures.len(),
+            report.oracle_failures.len(),
+            report.oracle_failures,
+            report.zeebra_failures.len(),
+            report.zeebra_failures,
+        );
+        assert_eq!(report.agreed, 8);
+        assert!(
+            report.zero_dimensional > 0,
+            "the sweep found no zero-dimensional ideal, so it checked no operator column"
+        );
+        assert!(
+            report.agreed_cases.iter().all(|case| case.field == GF256),
+            "a case in a GF(2^8) sweep is not over GF(2^8)"
+        );
+        let _ = std::fs::remove_dir_all(&work_dir);
+    }
+
+    /// `seed-<n>-p<field>-n<v>` back to the system it names.
+    ///
+    /// The field part is `CaseField::slug`, so `2` and `2^8_283` are both readable here and a
+    /// GF(2) fixture cannot be regenerated as a GF(2^8) one.
     fn system_of(name: &str) -> Option<GeneratedSystem> {
         let rest = name.strip_prefix("seed-")?;
         let (seed, rest) = rest.split_once("-p")?;
-        let (characteristic, variables) = rest.split_once("-n")?;
+        let (field, variables) = rest.split_once("-n")?;
         Some(GeneratedSystem::generate(
             seed.parse().ok()?,
             SystemShape {
@@ -1118,7 +1316,7 @@ mod tests {
                 max_degree: DEFAULT_MAX_DEGREE,
                 max_terms: DEFAULT_MAX_TERMS,
             },
-            characteristic.parse().ok()?,
+            field.parse().ok()?,
         ))
     }
 

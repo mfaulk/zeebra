@@ -5,20 +5,28 @@
 //! sides are given the same characters, and a failing case can be pasted into a test or a Singular
 //! session unchanged.
 //!
-//! Generation does not depend on the field type, only on its characteristic as an integer. The same
-//! seed therefore produces the *same* system shape at every prime, which is what makes
+//! Generation does not depend on the field type, only on the [`CaseField`] naming it. The same
+//! seed therefore produces the *same* system shape over every field, which is what makes
 //! "this ideal has the same quotient dimension over GF(13) and GF(2^31 - 1)" a statement about one
 //! system rather than about two.
+//!
+//! A coefficient is an *integer representation* of a field element, not an integer: a residue over
+//! a prime field and a coefficient bit pattern over a binary extension, which is the reading #377
+//! settled for a bare decimal. [`CaseField::add`] and [`CaseField::nonzero`] are where that
+//! distinction lives, and merging two terms with the wrong one would send the two sides different
+//! polynomials.
 
 use rand::{prelude::StdRng, Rng, SeedableRng};
 
-/// One term: an exponent per variable, and a coefficient in `[1, characteristic)`.
+use super::field::CaseField;
+
+/// One term: an exponent per variable, and a coefficient in `[1, q)`.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GeneratedTerm {
     /// One exponent per variable, so `exponents.len()` is the variable count.
     pub exponents: Vec<u32>,
 
-    /// Never zero, so a term is never silently absent. Reduced modulo the characteristic.
+    /// Never zero, so a term is never silently absent. The element's integer representation.
     pub coefficient: u64,
 }
 
@@ -71,8 +79,8 @@ pub struct GeneratedSystem {
     /// thing that reproduces the original.
     pub seed: u64,
 
-    /// The field's characteristic, as an integer. Coefficients are reduced modulo it.
-    pub characteristic: u64,
+    /// The field this system is stated over. Coefficients are representations of its elements.
+    pub field: CaseField,
 
     /// `x1`, `x2`, ... — one per variable, in the order both sides declare them.
     pub variables: Vec<String>,
@@ -82,19 +90,16 @@ pub struct GeneratedSystem {
 }
 
 impl GeneratedSystem {
-    /// A pseudorandom system, determined entirely by `seed`, `shape` and `characteristic`.
+    /// A pseudorandom system, determined entirely by `seed`, `shape` and `field`.
     ///
-    /// The draws are taken in a fixed order that does not depend on the characteristic, so two
-    /// primes draw the same monomials and the same term count for a seed — see
-    /// [`Self::drawn_monomials`]. The *generated* monomials can still differ between primes,
-    /// because two terms on one monomial are merged and their coefficients can cancel modulo one
-    /// characteristic and not another.
+    /// The draws are taken in a fixed order that does not depend on the field, so two fields draw
+    /// the same monomials and the same term count for a seed — see [`Self::drawn_monomials`]. The
+    /// *generated* monomials can still differ between fields, because two terms on one monomial
+    /// are merged and their coefficients can cancel in one field and not another.
     ///
     /// # Panics
-    /// If `characteristic` is below 2, or `shape.variables` is zero, or `shape.max_terms` is zero.
-    pub fn generate(seed: u64, shape: SystemShape, characteristic: u64) -> Self {
-        assert!(characteristic >= 2, "a field has at least two elements");
-
+    /// If `shape.variables` is zero, or `shape.max_terms` is zero.
+    pub fn generate(seed: u64, shape: SystemShape, field: CaseField) -> Self {
         let polynomials = draw(seed, shape)
             .into_iter()
             .map(|polynomial| {
@@ -105,16 +110,16 @@ impl GeneratedSystem {
                         // Never zero: a zero coefficient is an absent term, and a generator that
                         // silently has fewer terms than the draw said makes minimization harder to
                         // interpret.
-                        coefficient: 1 + coefficient % (characteristic - 1),
+                        coefficient: field.nonzero(coefficient),
                     })
                     .collect();
-                merge(reduced, characteristic)
+                merge(reduced, field)
             })
             .collect();
 
         Self {
             seed,
-            characteristic,
+            field,
             variables: (1..=shape.variables).map(|i| format!("x{}", i)).collect(),
             polynomials,
         }
@@ -122,10 +127,10 @@ impl GeneratedSystem {
 
     /// The monomials a seed and a shape draw, before any field is chosen.
     ///
-    /// Takes no characteristic, which is the point: it is what makes "this ideal has the same
-    /// quotient dimension over GF(13) and over GF(2^31 - 1)" a statement about one system. A
-    /// generated polynomial's monomials are these with the merged-and-cancelled ones removed, so
-    /// they are a sub-multiset of these and nothing more can be said without the characteristic.
+    /// Takes no field, which is the point: it is what makes "this ideal has the same quotient
+    /// dimension over GF(13) and over GF(2^31 - 1)" a statement about one system. A generated
+    /// polynomial's monomials are these with the merged-and-cancelled ones removed, so they are a
+    /// sub-multiset of these and nothing more can be said without the field.
     ///
     /// # Panics
     /// As [`Self::generate`], for the shape.
@@ -146,10 +151,12 @@ impl GeneratedSystem {
         self.variables.iter().map(String::as_str).collect()
     }
 
-    /// Each generator as a string both Zeebra's parser and Singular accept.
+    /// Each generator in **Zeebra's** syntax: a coefficient is the decimal of its representation.
     ///
-    /// Every coefficient is positive and below the characteristic, so no term needs a sign and the
-    /// rendering is the same on both sides. The zero polynomial renders as `0`.
+    /// Every coefficient is positive, so no term needs a sign. Over a prime field this is also what
+    /// Singular reads; over a binary extension it is not, and
+    /// [`CaseField::to_singular`](super::field::CaseField::to_singular) is what crosses the gap.
+    /// The zero polynomial renders as `0`.
     pub fn render(&self) -> Vec<String> {
         self.polynomials
             .iter()
@@ -183,7 +190,7 @@ impl GeneratedSystem {
         format!(
             "seed-{}-p{}-n{}",
             self.seed,
-            self.characteristic,
+            self.field.slug(),
             self.variables.len()
         )
     }
@@ -242,7 +249,7 @@ fn draw(seed: u64, shape: SystemShape) -> Vec<Vec<(Vec<u32>, u64)>> {
     polynomials
 }
 
-/// Terms with the same monomial summed, in first-occurrence order, zeros dropped.
+/// Terms with the same monomial added in `field`, in first-occurrence order, zeros dropped.
 ///
 /// **Not cosmetic.** Two terms on the same monomial are two integer literals in the text, and
 /// Singular sums bare integer literals in 32-bit arithmetic before coercing them into the ring: at
@@ -253,17 +260,19 @@ fn draw(seed: u64, shape: SystemShape) -> Vec<Vec<(Vec<u32>, u64)>> {
 /// Found by the harness itself, on seed 55770 over GF(2^31 - 1). The oracle-input check in
 /// [`comparison`](super::comparison) is the belt to this brace — it verifies that Singular read the
 /// system it was sent rather than trusting that it did.
-fn merge(terms: Vec<GeneratedTerm>, characteristic: u64) -> Vec<GeneratedTerm> {
+fn merge(terms: Vec<GeneratedTerm>, field: CaseField) -> Vec<GeneratedTerm> {
     let mut merged: Vec<GeneratedTerm> = Vec::with_capacity(terms.len());
     for term in terms {
         match merged
             .iter_mut()
             .find(|existing| existing.exponents == term.exponents)
         {
-            // Both coefficients are below the characteristic, so the sum is below twice it and
-            // cannot overflow a `u64` for any characteristic this crate's prime fields accept.
+            // `CaseField::add` and not `+`: over a binary extension addition is XOR, and summing
+            // two bit patterns as integers would give a coefficient the field never produced.
+            // Both are below q, so the prime arm cannot overflow a `u64` for any characteristic
+            // this crate's prime fields accept.
             Some(existing) => {
-                existing.coefficient = (existing.coefficient + term.coefficient) % characteristic
+                existing.coefficient = field.add(existing.coefficient, term.coefficient)
             }
             None => merged.push(term),
         }
@@ -275,9 +284,9 @@ fn merge(terms: Vec<GeneratedTerm>, characteristic: u64) -> Vec<GeneratedTerm> {
 
 #[cfg(test)]
 mod tests {
-    use super::{merge, GeneratedSystem, GeneratedTerm, SystemShape};
+    use super::{merge, CaseField, GeneratedSystem, GeneratedTerm, SystemShape};
     use crate::{
-        fields::{Zp13, Zp2147483647},
+        fields::{Gf256, Zp13, Zp2147483647},
         MultivariatePolynomial,
     };
 
@@ -287,11 +296,25 @@ mod tests {
         max_terms: 4,
     };
 
-    /// The same seed and characteristic give the same system, every time.
+    /// GF(2^8) modulo the AES polynomial, which is `Gf256`'s.
+    const GF256: CaseField = CaseField::binary(0x11B);
+
+    /// The fields the generator's own tests sweep: the six primes and one binary extension.
+    const FIELDS: [CaseField; 7] = [
+        CaseField::prime(2),
+        CaseField::prime(3),
+        CaseField::prime(7),
+        CaseField::prime(13),
+        CaseField::prime(65537),
+        CaseField::prime(2147483647),
+        GF256,
+    ];
+
+    /// The same seed and field give the same system, every time.
     #[test]
     fn test_generation_is_deterministic() {
-        let a = GeneratedSystem::generate(12345, SHAPE, 13);
-        let b = GeneratedSystem::generate(12345, SHAPE, 13);
+        let a = GeneratedSystem::generate(12345, SHAPE, CaseField::prime(13));
+        let b = GeneratedSystem::generate(12345, SHAPE, CaseField::prime(13));
         assert_eq!(a, b);
         assert_eq!(a.render(), b.render());
     }
@@ -300,7 +323,7 @@ mod tests {
     #[test]
     fn test_different_seeds_give_different_systems() {
         let systems: Vec<Vec<String>> = (0..16)
-            .map(|seed| GeneratedSystem::generate(seed, SHAPE, 65537).render())
+            .map(|seed| GeneratedSystem::generate(seed, SHAPE, CaseField::prime(65537)).render())
             .collect();
         let distinct: std::collections::HashSet<&Vec<String>> = systems.iter().collect();
         assert!(
@@ -310,17 +333,17 @@ mod tests {
         );
     }
 
-    /// The monomials a seed draws do not depend on the characteristic.
+    /// The monomials a seed draws do not depend on the field.
     ///
     /// The property that makes a cross-field comparison a statement about one system. Stated on the
-    /// *draws* rather than on the generated polynomials, because merging can cancel a monomial
-    /// modulo one characteristic and not another — which the next test shows really happens.
+    /// *draws* rather than on the generated polynomials, because merging can cancel a monomial in
+    /// one field and not another — which the next test shows really happens.
     #[test]
-    fn test_the_drawn_monomials_do_not_depend_on_the_characteristic() {
+    fn test_the_drawn_monomials_do_not_depend_on_the_field() {
         for seed in 0..64 {
             let drawn = GeneratedSystem::drawn_monomials(seed, SHAPE);
-            for characteristic in [2u64, 3, 7, 13, 65537, 2147483647] {
-                let system = GeneratedSystem::generate(seed, SHAPE, characteristic);
+            for field in FIELDS {
+                let system = GeneratedSystem::generate(seed, SHAPE, field);
 
                 // Every generated monomial was drawn, and nothing was drawn twice that is not
                 // merged: so the generated monomials are the drawn ones less the cancellations.
@@ -330,7 +353,7 @@ mod tests {
                             drawn.contains(&term.exponents),
                             "seed {} over GF({}): {:?} was not drawn",
                             seed,
-                            characteristic,
+                            field,
                             term.exponents
                         );
                     }
@@ -338,24 +361,24 @@ mod tests {
                         generated.len() <= drawn.len(),
                         "seed {} over GF({}): more terms than were drawn",
                         seed,
-                        characteristic
+                        field
                     );
                 }
             }
         }
     }
 
-    /// Merging really does cancel at a small characteristic and not at a large one.
+    /// Merging really does cancel over a small field and not over a large one.
     ///
     /// Asserted so that the weaker claim above is known to be the strongest one available, rather
     /// than a hedge against something that never happens. Over GF(2) two draws on one monomial
     /// cancel half the time; over GF(2^31 - 1) it takes a one-in-two-billion coincidence.
     #[test]
-    fn test_cancellation_depends_on_the_characteristic() {
+    fn test_cancellation_depends_on_the_field() {
         // Distinct drawn monomials, not drawn terms: merging two terms on one monomial reduces the
         // count at every characteristic, and what varies is only whether the merged coefficient is
         // zero. Counting raw terms would measure the merging and call it cancellation.
-        let cancelled = |characteristic: u64| -> usize {
+        let cancelled = |field: CaseField| -> usize {
             (0..256)
                 .map(|seed| {
                     let distinct: usize = GeneratedSystem::drawn_monomials(seed, SHAPE)
@@ -367,36 +390,36 @@ mod tests {
                                 .len()
                         })
                         .sum();
-                    let generated = GeneratedSystem::generate(seed, SHAPE, characteristic).terms();
+                    let generated = GeneratedSystem::generate(seed, SHAPE, field).terms();
                     distinct - generated
                 })
                 .sum()
         };
 
         assert!(
-            cancelled(2) > 0,
+            cancelled(CaseField::prime(2)) > 0,
             "no draw cancelled over GF(2), so the weaker claim is untested"
         );
         assert_eq!(
-            cancelled(2147483647),
+            cancelled(CaseField::prime(2147483647)),
             0,
             "a coincidence modulo 2^31 - 1 would be remarkable"
         );
     }
 
-    /// Every coefficient is a nonzero residue, so no term is secretly absent.
+    /// Every coefficient is the representation of a nonzero element, so no term is secretly absent.
     #[test]
-    fn test_coefficients_are_nonzero_residues() {
-        for characteristic in [2u64, 3, 7, 13, 65537, 2147483647] {
+    fn test_coefficients_are_nonzero_elements() {
+        for field in FIELDS {
             for seed in 0..24 {
-                let system = GeneratedSystem::generate(seed, SHAPE, characteristic);
+                let system = GeneratedSystem::generate(seed, SHAPE, field);
                 for term in system.polynomials.iter().flatten() {
                     assert!(term.coefficient >= 1, "a zero coefficient was generated");
                     assert!(
-                        term.coefficient < characteristic,
-                        "{} is not a residue modulo {}",
+                        u128::from(term.coefficient) < field.order(),
+                        "{} is not an element of GF({})",
                         term.coefficient,
-                        characteristic
+                        field
                     );
                 }
             }
@@ -413,7 +436,7 @@ mod tests {
                 max_terms: 5,
             };
             for seed in 0..24 {
-                let system = GeneratedSystem::generate(seed, shape, 7);
+                let system = GeneratedSystem::generate(seed, shape, CaseField::prime(7));
                 assert!(
                     system.degree() <= max_degree,
                     "degree {} exceeds {} at seed {}",
@@ -434,7 +457,7 @@ mod tests {
         type F = Zp13;
 
         for seed in 0..64 {
-            let system = GeneratedSystem::generate(seed, SHAPE, 13);
+            let system = GeneratedSystem::generate(seed, SHAPE, CaseField::prime(13));
             let names = <[&str; 3]>::try_from(system.variable_names().as_slice()).expect("three");
 
             for (polynomial, text) in system.polynomials.iter().zip(system.render()) {
@@ -463,7 +486,7 @@ mod tests {
     /// A polynomial with no terms renders as `0` and parses as the zero polynomial.
     #[test]
     fn test_the_zero_polynomial_round_trips() {
-        let mut system = GeneratedSystem::generate(1, SHAPE, 13);
+        let mut system = GeneratedSystem::generate(1, SHAPE, CaseField::prime(13));
         system.polynomials[0].clear();
         assert_eq!(system.render()[0], "0");
 
@@ -497,7 +520,7 @@ mod tests {
     /// Over GF(2) every coefficient is 1, which is the only nonzero residue.
     #[test]
     fn test_characteristic_two_has_only_unit_coefficients() {
-        let system = GeneratedSystem::generate(7, SHAPE, 2);
+        let system = GeneratedSystem::generate(7, SHAPE, CaseField::prime(2));
         for term in system.polynomials.iter().flatten() {
             assert_eq!(term.coefficient, 1);
         }
@@ -510,18 +533,110 @@ mod tests {
     /// `p = 2^31 - 1` an unmerged polynomial is a different ideal on the two sides. See `merge`.
     #[test]
     fn test_every_generated_polynomial_is_canonical() {
-        for characteristic in [2u64, 3, 7, 13, 65537, 2147483647] {
+        for field in FIELDS {
             for seed in 0..64 {
-                let system = GeneratedSystem::generate(seed, SHAPE, characteristic);
+                let system = GeneratedSystem::generate(seed, SHAPE, field);
                 assert!(
                     system.is_canonical(),
                     "seed {} over GF({}) has a repeated monomial: {:?}",
                     seed,
-                    characteristic,
+                    field,
                     system.render()
                 );
             }
         }
+    }
+
+    /// Over GF(2^8) a coefficient reaches past the prime subfield and is merged by XOR.
+    ///
+    /// The generator's share of #378: `nonzero` draws from all 255 nonzero bytes rather than from
+    /// GF(2)'s single one, and two terms on one monomial are added in the field. Summing the two
+    /// bit patterns as integers instead would render a coefficient neither side computed.
+    #[test]
+    fn test_a_binary_extension_reaches_past_its_prime_subfield() {
+        let coefficients: std::collections::HashSet<u64> = (0..256u64)
+            .flat_map(|seed| {
+                GeneratedSystem::generate(seed, SHAPE, GF256)
+                    .polynomials
+                    .into_iter()
+                    .flatten()
+                    .map(|term| term.coefficient)
+            })
+            .collect();
+        assert!(
+            coefficients.len() > 100,
+            "only {} distinct coefficients over GF(2^8), so the draw is folding onto a subfield",
+            coefficients.len()
+        );
+
+        let shared = |a: u64, b: u64| {
+            merge(
+                vec![
+                    GeneratedTerm {
+                        exponents: vec![1, 0, 0],
+                        coefficient: a,
+                    },
+                    GeneratedTerm {
+                        exponents: vec![1, 0, 0],
+                        coefficient: b,
+                    },
+                ],
+                GF256,
+            )
+        };
+        assert_eq!(shared(0b1010, 0b0110)[0].coefficient, 0b1100);
+        assert!(shared(0x57, 0x57).is_empty(), "a + a is zero in GF(2^8)");
+    }
+
+    /// A GF(2^8) rendering parses back to the same polynomial over `Gf256`.
+    ///
+    /// The rendering is Zeebra's syntax, so a bare decimal is the coefficient's bit pattern — the
+    /// reading #377 settled. A rendering that embedded the integer instead would round-trip to the
+    /// prime subfield and lose every coefficient above one.
+    #[test]
+    fn test_a_binary_extension_rendering_parses_back() {
+        for seed in 0..32 {
+            let system = GeneratedSystem::generate(seed, SHAPE, GF256);
+            let names = <[&str; 3]>::try_from(system.variable_names().as_slice()).expect("three");
+
+            for (polynomial, text) in system.polynomials.iter().zip(system.render()) {
+                let parsed: MultivariatePolynomial<3, Gf256> =
+                    MultivariatePolynomial::parse(&text, names)
+                        .unwrap_or_else(|e| panic!("cannot parse {:?}: {}", text, e));
+
+                let terms: Vec<(crate::Monomial<3>, Gf256)> = polynomial
+                    .iter()
+                    .map(|term| {
+                        let exponents =
+                            <[u32; 3]>::try_from(term.exponents.as_slice()).expect("three");
+                        (
+                            crate::Monomial::new(&exponents),
+                            Gf256::new(term.coefficient),
+                        )
+                    })
+                    .collect();
+                assert_eq!(
+                    parsed,
+                    MultivariatePolynomial::new(&terms),
+                    "seed {}: {:?}",
+                    seed,
+                    text
+                );
+            }
+        }
+    }
+
+    /// A system's name carries its field, so GF(2) and GF(2^8) cases are not confusable.
+    #[test]
+    fn test_a_name_distinguishes_gf2_from_gf256() {
+        assert_eq!(
+            GeneratedSystem::generate(5, SHAPE, CaseField::prime(2)).name(),
+            "seed-5-p2-n3"
+        );
+        assert_eq!(
+            GeneratedSystem::generate(5, SHAPE, GF256).name(),
+            "seed-5-p2^8_283-n3"
+        );
     }
 
     /// Merging sums coefficients on a shared monomial, in first-occurrence order.
@@ -541,7 +656,7 @@ mod tests {
                 coefficient: 4,
             },
         ];
-        let merged = merge(terms, 13);
+        let merged = merge(terms, CaseField::prime(13));
         assert_eq!(merged.len(), 2);
         assert_eq!(merged[0].exponents, vec![1, 0]);
         assert_eq!(merged[0].coefficient, 7);
@@ -562,7 +677,7 @@ mod tests {
                 coefficient: 7,
             },
         ];
-        assert!(merge(terms, 13).is_empty());
+        assert!(merge(terms, CaseField::prime(13)).is_empty());
     }
 
     /// The reconstruction a minimized failure's name implies still produces a canonical system.
@@ -574,7 +689,7 @@ mod tests {
         // Deliberate, and documented rather than fixed: a shrunk system is no longer canonical, and
         // the oracle-input check is what protects a comparison made on one. The generator's
         // guarantee is about what it generates.
-        let mut system = GeneratedSystem::generate(3, SHAPE, 13);
+        let mut system = GeneratedSystem::generate(3, SHAPE, CaseField::prime(13));
         system.polynomials[0] = vec![
             GeneratedTerm {
                 exponents: vec![2, 0, 0],
