@@ -258,14 +258,16 @@ produce a readable end-to-end result on these instances.**
 
 ### Where the cost actually is
 
-| stage | share | instances |
-|---|---:|---|
-| **Interreduction** | **61%** / 53% | katsura-7 grlex (28.71 of 46.72 ms), grevlex (16.90 of 32.13) |
-| **Matrix construction** | **48%** / 47% | katsura-6 lex (9.33 of 19.53), cyclic-5 lex (1.48 of 3.14) |
+| stage | share | instance | ceiling if it became free |
+|---|---:|---|---:|
+| **Interreduction** | **61.5%** | katsura-7 grlex (28.71 of 46.72 ms) | **2.59x** |
+| Interreduction | 52.6% | katsura-7 grevlex (16.90 of 32.13) | 2.11x |
+| **Matrix construction** | **47.8%** | katsura-6 lex (9.33 of 19.53) | **1.92x** |
+| Matrix construction | 47.1% | cyclic-5 lex (1.48 of 3.14) | 1.89x |
 
 Both are consequences of succeeding elsewhere — the pair criteria replaced 59 large matrices with
 107 small ones, and construction's per-matrix cost (the monomial-to-column `HashMap`, the sort)
-does not shrink with the matrix. Their ceilings are **2.56x** and **1.92x**, which are worth
+does not shrink with the matrix. Their best ceilings are **2.59x** and **1.92x**, which are worth
 chasing where elimination's 1.07x is not.
 
 ---
@@ -301,8 +303,8 @@ Scores are `+` favourable, `0` neutral, `−` unfavourable, `?` unmeasured.
 
 | candidate | absolute cost | measured gap | expected benefit | difficulty | max solvable size | cryptanalytic applicability |
 |---|---|---|---|---|---|---|
-| **Krylov/Wiedemann conversion** (#58, currently deferred) | **+ ~46 s/row** | **+ 30x, measured** | **+ 2.56x–30x** | **− high** | **+** large: conversion is the wall | **+** CICO rows are conversion-dominated |
-| **#268 H12** compact representations | + 28.71 ms (interreduction) | ? none external | + up to 2.56x | 0 moderate | + fewer bytes per entry | + MQ and CICO both |
+| **Krylov/Wiedemann conversion** (#58, currently deferred) | **+ ~46 s/row** | **+ 30x, measured** | **+ 2.59x–30x** | **− high** | **+** large: conversion is the wall | **+** CICO rows are conversion-dominated |
+| **#268 H12** compact representations | + 28.71 ms (interreduction) | ? none external | + up to 2.59x | 0 moderate | + fewer bytes per entry | + MQ and CICO both |
 | **#273 H17** adaptive strategy selection | 0 varies | ? none external | 0 route-dependent | **+ low** — extends existing planner | 0 | + picks the route per instance |
 | **#271 H15** modular composition / factoring | 0 extraction is 0.4–1 ms | ? none external | − extraction is already small | − high | 0 | 0 |
 | **#269 H13** elimination kernels | **− 8 ms, 7–22%** | **− premise false** | **− ceiling 1.07x–1.29x** | − high | 0 | 0 |
@@ -368,7 +370,7 @@ report falsifies.
 | issue | recommendation | reason |
 |---|---|---|
 | **#58** (Krylov/Wiedemann) | **Reopen the FGLM half for measurement.** Highest-value candidate in the whole set. | It is the algorithm msolve uses for the stage where Zeebra's only measured cross-library deficit lies (~46 s on one row, ~30x). #58 deferred it on the strength of there being no measured need; there now is one. |
-| **#268 H12** compact representations | **Raise to the top of the H-series.** | Addresses interreduction (61%) and matrix construction (48%) — the two largest *internal* stages, with ceilings of 2.56x and 1.92x. |
+| **#268 H12** compact representations | **Raise to the top of the H-series.** | Addresses interreduction (61%) and matrix construction (48%) — the two largest *internal* stages, with ceilings of 2.59x and 1.92x. |
 | **#273 H17** adaptive strategy | **Keep, at low cost.** | Extends the existing planner, cheap, and §2 shows route choice matters more than kernel speed. |
 | **#271 H15** modular composition | **Defer.** | Extraction is 0.4–1.0 ms of 32–47 ms. There is no gap to close. |
 | **#269 H13** elimination kernels | **Deprioritize, and correct the title.** | The 65–88% premise is false; the stage is 7–22%, giving an Amdahl ceiling of 1.07x–1.29x, at or inside the noise band. The cited `la_ff_small_prime.c` does not exist. |
