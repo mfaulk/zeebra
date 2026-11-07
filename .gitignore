@@ -9,3 +9,7 @@
 
 # Fukuoka MQ Challenge data: "All Rights Reserved", fetched by tools/fetch-mq-challenge.sh
 research/instances/
+
+# Python bytecode from tools/
+__pycache__/
+*.pyc
