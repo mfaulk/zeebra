@@ -141,7 +141,9 @@ pub fn ecm_find_factor<R: RngCore + CryptoRng>(
             return Some(factor);
         }
 
-        if budget.b2 > budget.b1 {
+        // A `Z` of zero means stage 1 drove the point to the identity modulo all of `n`, so every
+        // stage-2 multiple of it is the identity too and the continuation has nothing to find.
+        if budget.b2 > budget.b1 && !reached.z.is_zero() {
             let accumulated = stage_two(&curve, &reached, budget.b1, budget.b2);
             if let Some(factor) = non_trivial_gcd(n, &accumulated) {
                 return Some(factor);
@@ -807,5 +809,22 @@ mod tests {
             assert!(pair[1].b2 >= pair[0].b2);
             assert!(pair[1].curves >= pair[0].curves);
         }
+    }
+
+    /// The reason ECM is here: a semiprime of two 15-digit primes is factored completely, where
+    /// Pollard rho would need about `p^(1/2)` — some `10^7` — iterations per factor.
+    #[test]
+    // A full digit-level budget is many curves of BigUInt arithmetic, which is slow enough in a
+    // debug build to be a tax on the default suite. Release mode finishes it promptly.
+    #[ignore]
+    fn test_factors_a_semiprime_beyond_the_reach_of_pollard_rho() {
+        let mut rng = StdRng::seed_from_u64(20260131);
+        let p = BigUInt::from_dec_str("100000000000031").unwrap();
+        let q = BigUInt::from_dec_str("100000000000067").unwrap();
+        let factorization = factor_with_budget(&(&p * &q), &EcmBudget::for_digits(15), &mut rng);
+        assert!(factorization.is_complete());
+        assert_eq!(factorization.primes, vec![p.clone(), q.clone()]);
+        assert_eq!(factorization.powers, vec![1, 1]);
+        assert_eq!(factorization.product(), &p * &q);
     }
 }
