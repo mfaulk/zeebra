@@ -810,7 +810,9 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
     let mut covered: MonomialSet<N> = MonomialSet::default();
-    // Monomials already tested for reducibility, so no monomial is handled twice.
+    // Monomials already offered to the queue, so no monomial is enqueued or handled twice. The
+    // one in `symbolic_preprocessing_pop_deduplicated` holds the monomials already *handled*,
+    // which is the difference between the two disciplines and the subject of the note below.
     let mut examined: MonomialSet<N> = MonomialSet::default();
     let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
 
