@@ -144,6 +144,7 @@ scoreboard population; merge-result CI.
 | #330 | M26-C | **Conditional on #349.** Column indexing from symbolic preprocessing |
 | #256 | M26-I | The competitive research parent |
 | #339 | M26-I | A PR is tested against its base, not the merged result, so two green PRs can merge red. M25 hit this for real |
+| #395 | M26-I | `max_wall_time` is checked once per batch and **never during final interreduction**, which #349 measured at 80.4% of `mq-random-10`, so a bounded run can overrun by an order of magnitude. A **prerequisite of #369**, which sets wall limits on rows that may not finish — an unhonored limit there records an incomplete row as a completed comparison |
 
 Nineteen of the twenty issues above are attached as sub-issues of the M26 epic. **#297 is not**, and
 the reason is mechanical rather than a scope judgement: GitHub permits an issue only one parent, #297
@@ -416,6 +417,12 @@ Operator sparsity and shape position are measured in the same pass.
 unfunded until §8.1 returns.
 
 ### 8.5 Gate M26-I — the protocol is not weakened to fill the board
+
+**#395 lands before #369.** Populating Scoreboard A means setting wall limits on rows that may not
+finish, and `competitive_sweep.rs` relies on a cooperative stop *returning* with its statistics. A
+limit that is not honored is worse than no limit, because the row is then recorded as a completed
+comparison rather than as a resource stop. No retained record is affected — all 72 carry no time-stop
+marker — so this is a gate on new records rather than a correction to old ones.
 
 Adding records will add startup-floor disqualifications. They are reported, never dropped. A ratio
 against a tool that could not accept the input is not recorded.
