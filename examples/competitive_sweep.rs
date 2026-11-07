@@ -31,8 +31,8 @@ use std::{fs, path::Path, time::Duration};
 use zeebra::grobner::{
     external::{
         corpus::{instance, ladder},
-        CompetitiveBoard, CompetitiveRecord, ExternalSolver, Instance, Limits, SingularSolver,
-        Task, ZeebraSolver,
+        CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance, Limits,
+        MsolveSolver, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
     },
     research::{Environment, Json},
     F4Options,
@@ -220,28 +220,60 @@ fn run_one(
     let report = zeebra.run(built, task, limits);
     board.add(CompetitiveRecord::of(&report, built, environment));
 
-    // Singular. The scratch directory is per process and per row, which is what keeps two
-    // concurrent sweeps from handing one filename to two processes.
+    // The four external engines. The scratch directory is per process and per row, which is what
+    // keeps two concurrent sweeps from handing one filename to two processes.
+    //
+    // Every engine is probed once per row rather than once per sweep. That costs a process per
+    // row and buys a version string on **every** record, including the rows of a sweep that was
+    // interrupted — and a figure without a version is not reproducible.
     let scratch = std::env::temp_dir().join(format!(
         "zeebra-competitive-{}-{}",
         std::process::id(),
         built.name.replace('/', "-")
     ));
-    match SingularSolver::with_binary("Singular", &scratch, limits.wall) {
-        Ok(mut singular) => {
-            // Probed once per row rather than once per sweep, which costs a process per row and
-            // buys a version string on every record even when the sweep is interrupted.
-            let _ = singular.probe_version();
-            let report = singular.run(built, task, limits);
-            board.add(CompetitiveRecord::of(&report, built, environment));
-        }
+
+    match SingularSolver::with_binary("Singular", scratch.join("singular"), limits.wall) {
+        Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
         Err(failure) => eprintln!("- Singular unavailable: {}", failure),
     }
-    let _ = fs::remove_dir_all(&scratch);
 
-    // msolve, Groebner.jl and Sagebrush plug in here through the same three lines as Singular
-    // once their adapters land (#259, #260). Nothing else in this file changes: that is what the
-    // contract was frozen for.
+    let mut msolve = MsolveSolver::new(
+        std::env::var("ZEEBRA_MSOLVE").unwrap_or_else(|_| "msolve".to_string()),
+        scratch.join("msolve"),
+    );
+    drive(board, &mut msolve, built, task, limits, environment);
+
+    match GroebnerJlSolver::from_env(scratch.join("groebner-jl")) {
+        Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+        Err(failure) => eprintln!("- Groebner.jl unavailable: {}", failure),
+    }
+
+    match SagebrushSolver::from_env(scratch.join("sagebrush")) {
+        Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+        Err(failure) => eprintln!("- Sagebrush unavailable: {}", failure),
+    }
+
+    let _ = fs::remove_dir_all(&scratch);
+}
+
+/// Probe one engine, run it, and record whatever came back.
+///
+/// Every outcome is recorded, including the ones with no answer: a board that kept only its
+/// successes would report each engine's best cases as its behaviour. **Sagebrush is recorded but
+/// must never be a speedup denominator** — five weeks old, nothing versioned, six F4 tests, and no
+/// oracle in its own repository exercising the elimination. That is a maturity judgement and it is
+/// enforced by the report rather than here, since the row itself is worth having.
+fn drive(
+    board: &mut CompetitiveBoard,
+    solver: &mut dyn ExternalSolver,
+    built: &Instance,
+    task: Task,
+    limits: &Limits,
+    environment: &Environment,
+) {
+    let _ = solver.probe_version();
+    let report = solver.run(built, task, limits);
+    board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
 /// One line describing a row's outcome, with the figure or the reason there is none.

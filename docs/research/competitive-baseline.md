@@ -161,22 +161,44 @@ the row is never produced. The adapter declares the documented-safe `1515531529`
 msolve's own guard, because the 2 968 684-wide window between them runs with no accumulation
 guarantee.
 
-### 3.3 The field-width ladder
+### 3.3 The corroboration bands — and the limit is usually corroboration, not representability
 
-| Zeebra field width | engines that can accept it |
-|---|---|
-| ≤ `2^31 − 1` | msolve, Singular, Groebner.jl, Sagebrush |
-| 32–64 bit (Goldilocks, KoalaBear-derived) | Groebner.jl and Sagebrush only — **and they cannot corroborate each other against a third** |
-| 254/255-bit (BN254, BLS12-381 scalar fields) | **none, at any size** |
+The capability boundary, derived from four engine ceilings rather than stated per family.
+`corpus::corroboration` is the function and `corpus::ceilings` the constants, so a corrected
+ceiling corrects every statement that depends on it.
 
-The second row is the uncomfortable one. The differential harness's whole argument for Singular as
-an oracle is that its `std` is Buchberger/slimgb lineage and therefore *algorithmically*
-independent. **Two engines that agree prove less than two engines that agree for different
-reasons.** Where only Groebner.jl and Sagebrush are available, the rows say so.
+| band | engines that reach it | corroboration |
+|---|---|---|
+| `p < 2^31` | msolve, Singular, Groebner.jl, Sagebrush | **four-way** |
+| `2^31 ≤ p < 2^62` | Groebner.jl, Sagebrush | **two-way**, neither checkable against a third |
+| `2^62 ≤ p < 2^64` | Groebner.jl only | **none** |
+| 254/255-bit (BN254, BLS12-381 scalar) | none | none |
 
-The third row means Zeebra's widest fields are validated by its own cross-field agreement and by
-`ark-ff` on the arithmetic — **not by any Gröbner comparand**. That is a fact about the state of
-the tools, and this report states it rather than omitting those rows.
+The ceilings: msolve `2^31` (`iofiles.c:564`), Singular `2^31`, Sagebrush `2^62` (its own gate,
+`lib.rs:1552`), Groebner.jl `typemax(UInt64)` — measured computing correctly at `2^31 − 1`,
+`2^32 − 5`, Goldilocks, `2^64 − 353` and `2^64 − 59`.
+
+**Row 2 is the uncomfortable one, and for a sharper reason than "only two".** The differential
+harness's whole argument for Singular as an oracle is that its `std` is Buchberger/slimgb lineage
+and therefore *algorithmically* independent. **Two engines that agree prove less than two engines
+that agree for different reasons** — and with exactly two, a disagreement says one of them is wrong
+without saying which.
+
+**Row 3 is where Anemoi's field sits**, at `2^64 − 353`. One engine reaches it, so a timing is
+publishable and its invariants are checkable against that one engine — but nothing can
+triangulate. Goldilocks is in the same band.
+
+**Row 4 means Zeebra's widest fields are validated by its own cross-field agreement and by
+`ark-ff` on the arithmetic, not by any Gröbner comparand.**
+
+> **The distinction rows 3 and 4 draw is the one to take away, because the two have different
+> fixes.** Row 4 is a *representability* limit and needs a **new** tool. Row 3 is a
+> *corroboration* limit and needs a **second** tool at the same field — Sagebrush is the obvious
+> candidate and its `2^62` gate is exactly what excludes it from Anemoi's prime.
+>
+> An earlier draft of this report collapsed both into "no comparand can represent this", which was
+> wrong for row 3 and wrong in the expensive direction: it would have told a reader to wait for a
+> new engine when what is needed is a second one at a field two engines nearly share.
 
 ### 3.4 Characteristic two is not yet comparable
 
@@ -390,7 +412,7 @@ protocol working, not a failure.
 | Is it a tuning gap or an algorithm gap? | **Algorithm.** Zeebra walks and tests dependence in `O(D³)`; msolve runs a Wiedemann scalar sequence; Magma spins a representation matrix. **A conversion ratio between any two of the three is not a measurement of FGLM.** |
 | Does Zeebra's measured 65–88% elimination share hold? | **No, and it no longer holds for Zeebra either.** It is **7%–22%** (§5). The figure in #269's title is from M16-0 and was superseded by M16's own success. |
 | Does the per-field-width hypothesis survive? | **No.** msolve's delayed reduction is active only below `2^18`, so it is inactive at the compared fields, and all three of its kernels use `int64_t` — narrow kernels buy lanes, not headroom. |
-| Which instances does Zeebra solve that no comparand does, and is that capability or performance? | **Capability, in three distinct ways**: the solution tasks (no comparand at any size), 32–64-bit fields (two comparands, neither independent of the other), and 254/255-bit fields (none). None of these is a speedup and none is reported as one. |
+| Which instances does Zeebra solve that no comparand does, and is that capability or performance? | **Capability, in four distinct ways** (§3.3): the solution tasks (no comparand at any size); `2^31`–`2^62` (two engines, neither checkable against a third); `2^62`–`2^64`, where Anemoi and Goldilocks sit (**one** engine — publishable but uncorroborated); and 254/255-bit (none at all). None is a speedup and none is reported as one. **Only the last is a representability limit; the middle two are corroboration limits, and they have a different fix.** |
 | Do the external anchors agree in rank order? | **Not assessed.** #199's Magma page and Sagebrush's `bench/magma-scoreboard/` are cross-machine, and §0 forbids a cross-machine ratio. Deliberately left open rather than answered weakly. |
 | **Should H12–H17 proceed as scoped?** | **No. The measurement points at a lever the H-series does not contain.** |
 
@@ -451,12 +473,24 @@ of #58 more than anything else in it.
 
 **#58's won't-do for F4 is untouched** and rests on reasoning nothing here disturbs.
 
-### Two follow-ups this report generates
+### Three follow-ups this report generates
 
 - **Verify the `x1`/`x10` prefix handling in Groebner.jl and the Sagebrush driver**, as #311 did for
   msolve. Both are unverified, and the failure is invisible from the engine's side.
 - **Settle the `GF(2^k)` defining-polynomial convention per engine**, which is what blocks both a
   char-2 corpus rung and any decision on #272.
+- **Find a second engine above `2^62`.** That band currently has one, so every figure Zeebra takes
+  at Goldilocks or at Anemoi's `2^64 − 353` is uncorroborated by construction. This is the cheapest
+  available improvement to the *trustworthiness* of the widest rows, as distinct from their speed,
+  and it is a different task from finding an engine for the 254/255-bit fields.
+
+### A note on Sagebrush's maturity, which is separate from its ceiling
+
+Sagebrush **disagreed with nothing** — term-for-term on every family tried, including at a 62-bit
+prime. But it is five weeks old, nothing is versioned, it has six F4 tests, and no oracle run in
+its own repository exercises the elimination. So it is reportable **with its SHA** and **never as a
+speedup denominator**. That is a maturity judgement, not a correctness one, and it is independent
+of the `2^62` ceiling that keeps it out of Anemoi's band.
 
 ---
 
