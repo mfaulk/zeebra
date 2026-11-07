@@ -788,6 +788,7 @@ tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 
 cargo run --release --example competitive          # render research/competitive/ from its history
 cargo run --release --example competitive -- --write   # and update COMPETITIVE.md in place
 cargo run --release --example competitive_sweep -- --list   # corpus x engines x tasks, exploratory
+. tools/external/env.sh                            # REQUIRED FIRST, or the sweep sees one engine
 tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
     --row katsura-6 --task reduced-grobner-basis --measure --write   # one measured row
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock

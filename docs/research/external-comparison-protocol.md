@@ -369,6 +369,26 @@ generated Markdown renderer so the human-readable table cannot drift from the da
 by digest, unsuccessful runs recorded rather than dropped, and an append-only history with its
 contract written into the file.
 
+### The board must state its own roster and its own exclusions
+
+Two things about a run are invisible in a table of its rows, and both change what the table means.
+
+**Which libraries were there.** A board taken on a machine where three of four engines were
+unreachable renders exactly like a board taken where three were never asked for. The adapters all
+return `Result<Self, RunFailure>` from their probe, and `RunFailure::Unavailable`'s own contract is
+that "a sweep must continue, **the board must show the row as not attempted**" — so an unreachable
+engine is recorded as a row, and `to_markdown` opens with a roster naming every library, its row
+count, and how many of those rows are timing evidence. A library at zero answers is the signal that
+a run lost an engine; without it, a lost engine and an unasked engine are the same artifact.
+
+**How many ratios the gates removed.** §7's conditions are enforced in code and every excluded row
+is marked individually, but a marked row is only visible to a reader who tallies the column. The
+speedup section therefore states its counts first: total pairs, how many the startup floor
+disqualified, how many carry no checked invariant, and of the publishable remainder how many sit
+inside the 20% band results are read against. On the populated board that tally **is** the headline
+— the survivors are a small minority of the pairs, and a reader who sees only them sees a different
+comparison from the one that was run.
+
 ---
 
 ## 7. Ratios
