@@ -2178,6 +2178,7 @@ pub fn transcribed_rows() -> Vec<CostRow> {
     let f4_scaling_d4 = "docs/research/f4-resource-scaling.md 9.3 (#237)";
     let build = "docs/research/resultant-elimination.md 6.8 (#243)";
     let law = "docs/research/resultant-elimination.md 6.9 (#289)";
+    let collecting = "docs/research/resultant-elimination.md 6.12 (#243, merged)";
 
     // The documents state the machine and the policy and never a commit. Recorded as stated.
     let workstation = |policy: &str| Environment {
@@ -2513,6 +2514,53 @@ pub fn transcribed_rows() -> Vec<CostRow> {
                 build,
             )),
         )
+        .with_reproduce(
+            "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
+             --build-only",
+        ),
+        // ---- #243 merged: the same claim, re-measured. A NEW row, not an edit to the one above ----
+        CostRow::new(
+            "six-round symbolic build, peak RSS",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp4",
+            collecting,
+        )
+        .with_formulation("bivariate CICO, t = 16, symbolic build alone, collecting multiply")
+        .with_parameter("rounds", 6)
+        .with_parameter("state words cubed", 16)
+        .with_parameter("output degree", 729)
+        .with_largest_intermediate(Intermediate::new(
+            "the output state, held two to three times over across the MDS layer",
+            266_815,
+            "terms a word, sixteen words at (Monomial<2>, F)",
+        ))
+        .with_predicted_peak(Figure::predicted(
+            68_000_000,
+            "7.4's \"peak memory is not a concern ... ~68 MB\"",
+            "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.4",
+        ))
+        .with_measured_resident(
+            325_500_928,
+            "VmHWM: an external /proc poll and util::peak_resident_bytes agreeing exactly at \
+             317 872 kB, taken off tools/benchlock.sh per f4-resource-scaling.md 8",
+            collecting,
+        )
+        .with_attribution(Attribution::MagnitudeOnly {
+            detail: "7.4's estimate is now wrong by 4.7x rather than 838x, in the same direction, \
+                     and the quantity is no longer wrong: the remaining 0.32 GB is the *output* \
+                     two to three times over, because Add still materialises |a| + |b| terms and \
+                     rebuilds a fresh map across the MDS layer. A constant factor on the output is \
+                     the regime #243 set out to reach. 179x smaller than 6.8 for an identical \
+                     result -- deg 729 / 729, 266 815 / 266 815 terms"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::BasisStorage)
+        .with_environment(Environment {
+            policy:
+                "off tools/benchlock.sh for the peak-RSS probe; after #243's collecting multiply"
+                    .to_string(),
+            ..workstation("")
+        })
         .with_reproduce(
             "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
              --build-only",
@@ -3475,6 +3523,75 @@ mod tests {
             );
             seen.push(identity);
         }
+    }
+
+    /// The committed register keeps both measurements of the six-round build's peak RSS.
+    ///
+    /// The acceptance criterion made concrete on real data: #243 made that build 179x smaller, and
+    /// the 838x row is still there. A board that overwrote it would report that the estimate had
+    /// always been nearly right, which is the opposite of what happened.
+    #[test]
+    fn test_the_six_round_build_keeps_both_of_its_measurements() {
+        let board = CostModelBoard::load(
+            &Json::parse(include_str!(
+                "../../../research/cost-model/results/history.json"
+            ))
+            .expect("parses"),
+        )
+        .expect("every row");
+
+        let trail = board.history_of(
+            "resultant-elimination|poseidon31-cico-t16-rf2-rp4|six-round symbolic build, peak RSS",
+        );
+        assert_eq!(
+            trail.len(),
+            2,
+            "the re-measurement is a second row, not an edit"
+        );
+
+        let factor = |row: &CostRow| {
+            row.prediction_errors()
+                .into_iter()
+                .find(|error| error.quantity == "peak memory")
+                .expect("a peak memory pair")
+                .factor
+        };
+        assert!(
+            (factor(trail[0]) - 838.0).abs() < 1.0,
+            "6.8's 838x must survive #243: {:.1}x",
+            factor(trail[0])
+        );
+        assert!(
+            (factor(trail[1]) - 4.7).abs() < 0.1,
+            "6.12 publishes \"now wrong by 4.7x\": {:.2}x",
+            factor(trail[1])
+        );
+        assert!(
+            trail[0].source != trail[1].source,
+            "each row cites the section that published it"
+        );
+        // 57.0 GB -> 0.32 GB is the shrink the issue turns on, and it falls out of the two rows.
+        //
+        // 175x here against the published 179x, and the difference is arithmetic rather than
+        // disagreement: 6.12 divides a rounded 0.32 GB where the row holds the exact 317 872 kB
+        // the two instruments agreed on, and the numerator is itself quoted to three figures.
+        // Asserted as a range for that reason -- a register that reproduced 179x exactly from
+        // these inputs would be fitting itself to the prose.
+        let shrink = trail[0]
+            .measured_peak_resident_bytes
+            .as_ref()
+            .unwrap()
+            .value as f64
+            / trail[1]
+                .measured_peak_resident_bytes
+                .as_ref()
+                .unwrap()
+                .value as f64;
+        assert!(
+            (170.0..180.0).contains(&shrink),
+            "{:.0}x is not the published ~179x to within the rounding of either figure",
+            shrink
+        );
     }
 
     /// The committed Markdown is exactly what the renderer produces from the committed records.
