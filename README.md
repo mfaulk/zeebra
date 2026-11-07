@@ -38,6 +38,8 @@ As the saying goes, you can either make software so simple that it obviously has
       scoreboard and a cross-concurrency comparison refused rather than quoted
 - [x] The whole solving pipeline in characteristic two, over GF(2) and GF(2^8), and field equations
       `x^q - x` that make a quotient dimension count base-field points
+- [x] Text input and exhaustive enumeration over an extension field, on a settled split between the
+      integer embedding `FiniteField::new` and the element index `KnownOrder::element_at`
 - [x] A contract for driving external Gröbner engines as subprocesses, which separates "this tool
       cannot represent the input" from "this tool was slower", and refuses to quote a ratio against
       a comparand that could not accept the problem
@@ -81,6 +83,10 @@ As the saying goes, you can either make software so simple that it obviously has
       read as wins for this crate, up to 501x, and settle nothing. Of the seven that qualify: four
       losses, two inside the noise band, one win — on a corpus whose raw numbers show this crate
       ahead on every pair
+- [x] Multivariate composition: `x_i -> g_i(x_i)` for univariate `g_i`, and the general form that
+      substitutes a polynomial in all `N` variables for each one — so a permutation round can be
+      written the way it is defined, with the substituted powers memoized and formed by repeated
+      squaring
 - [x] Multivariate GCD by recursive primitive PRS, with content, primitive part, the formal partial
       derivative and squarefree decomposition on top of it — the GCD's defining property checked by
       exhaustive enumeration over a small ring rather than against a reference implementation
@@ -1022,6 +1028,43 @@ the 65025 nonzero operand pairs separate them. An order check cannot tell them a
 order 256 — so the field is named at the type level rather than inferred.
 `docs/research/fukuoka-mq.md` §2.4 has the consequence for importing an instance.
 
+**An integer names an element of an extension field in two different ways, and the API keeps them
+apart.** `FiniteField::new` is the image of an integer under the unique ring homomorphism from the
+integers — `val mod p` — so over an extension it only ever reaches the prime subfield, and walking
+it over `0..q` is not an enumeration. `KnownOrder::element_at` is the bijection from `0..q`, and
+`FiniteField::from_str` reads the text `Display` writes, which is the coefficient bit pattern over
+GF(2^m) and the bracketed coefficient list over GF(p^k):
+
+```rust
+use zeebra::{fields::{Gf13Pow4, Gf256}, FiniteField, KnownOrder, One};
+
+// `new` is the embedding: 5 copies of one, which in characteristic two is one.
+assert_eq!(<Gf256 as FiniteField>::new(5), Gf256::one());
+
+// `from_str` is the representation, and inverts `Display`.
+let x2_plus_1 = <Gf256 as FiniteField>::from_str("5").unwrap();
+assert_eq!(x2_plus_1.to_string(), "5");
+assert_eq!(Gf256::element_at(5), Some(x2_plus_1));
+
+// Out of range is a `Result`, not a panic.
+assert!(<Gf256 as FiniteField>::from_str("256").is_err());
+
+// Over GF(13^4) a bare decimal is the base-13 digits; `Display`'s own form reads back too.
+assert_eq!(
+    <Gf13Pow4 as FiniteField>::from_str("170").unwrap().to_string(),
+    "[1, 0, 1, 0]",
+);
+assert_eq!(
+    <Gf13Pow4 as FiniteField>::from_str("[1, 0, 1, 0]"),
+    <Gf13Pow4 as FiniteField>::from_str("170"),
+);
+```
+
+`element_at`'s default is `new`, which is that bijection exactly when `q = p`, and returns `None`
+for every index over a field whose order and characteristic differ — so a field that has not
+overridden it reports that it cannot be enumerated rather than enumerating its prime subfield and
+returning a count that is wrong rather than failed.
+
 ### Characteristic two in the solver, and field equations
 
 The Gröbner stack is generic over `FiniteField` and had never been run in even characteristic. It
@@ -1086,9 +1129,11 @@ Three caveats a caller should know, each asserted rather than described:
 - **GF(2) is `Zp2`, not `BinaryFieldElement<0b11>`.** The two are the same field — the full operation
   tables agree — but `Zp2` is 4 bytes to the other's 8 and needs no carry-less multiply for a field
   where multiplication is `and`.
-- **No GF(2^8) system can be read from text.** `FiniteField::from_str` is `todo!()` for
-  `BinaryFieldElement`, and `MultivariatePolynomial::parse` unwraps it, so parsing over `Gf256`
-  **panics**. GF(2) parses fine. This is #377, and it is what actually blocks the GF(2^8) importers.
+- **A GF(2^8) coefficient is written as its bit pattern.** `MultivariatePolynomial::parse` works over
+  `Gf256`, reading each decimal `0..255` as the coefficient bit pattern `Display` writes — so
+  `from_str` inverts `Display` over every field, and over an extension it is deliberately not
+  `FiniteField::new`, which only ever reaches the prime subfield. `KnownOrder::element_at` is the
+  route that enumerates all `q` elements. #377.
 - **Omitting the field equations is diagnosed on only one route.** `SolveStrategy::GrevlexF4ThenFglm`
   reports a positive-dimensional ideal immediately; the default `DirectLexF4` exhausts a
   Macaulay-matrix budget and reports a *resource* failure, which invites raising a limit that cannot
@@ -2139,6 +2184,49 @@ univariate GCDs and lifts, and Yun's algorithm computes the squarefree decomposi
 multiplicity where the repeated-radical form used here costs `N + 1`. No timings are published for
 any of this: the implementation is the one whose coefficient growth is bounded by construction, and
 it has not been measured.
+
+### Composition
+
+`compose_univariate` substitutes one univariate polynomial per variable, `x_i -> g_i(x_i)`, and
+`compose` is the general form, replacing each `x_i` by a polynomial in all `N` variables at once.
+Both are simultaneous rather than sequential: a substitution's own variables are not themselves
+substituted. `from_univariate(i, &g)` is the lift the univariate form is built on — the same `g`
+read as a polynomial in variable `i` alone.
+
+A round of a sponge permutation is exactly this shape: an S-box `x -> x^d` per state word followed
+by an affine layer.
+
+```rust
+use zeebra::{fields::Zp13, FiniteField, MultivariatePolynomial, Polynomial, UnivariatePolynomial};
+
+let vars = ["x", "y"];
+let p: MultivariatePolynomial<2, Zp13> =
+    MultivariatePolynomial::parse("x^2*y + 3*x + 2", vars).unwrap();
+
+// x -> x + 1, y -> y^2, written as coefficients in ascending order.
+let shift = UnivariatePolynomial::new(&[Zp13::new(1), Zp13::new(1)]);
+let square = UnivariatePolynomial::new(&[Zp13::new(0), Zp13::new(0), Zp13::new(1)]);
+assert_eq!(
+    p.compose_univariate(&[shift, square]),
+    MultivariatePolynomial::parse("x^2*y^2 + 2*x*y^2 + y^2 + 3*x + 5", vars).unwrap()
+);
+
+// The general form can mix variables: x*y under x -> x + y, y -> x - y is x^2 - y^2.
+let product: MultivariatePolynomial<2, Zp13> = MultivariatePolynomial::parse("x*y", vars).unwrap();
+let sum = MultivariatePolynomial::parse("x + y", vars).unwrap();
+let difference = MultivariatePolynomial::parse("x - y", vars).unwrap();
+assert_eq!(
+    product.compose(&[sum, difference]),
+    MultivariatePolynomial::parse("x^2 - y^2", vars).unwrap()
+);
+```
+
+Degree grows multiplicatively — `deg(p(g_0, ..., g_{N-1}))` is bounded by the largest
+`sum_i e_i * deg(g_i)` over the monomials `x^e` of `p` — so forming the powers `g_i^(e_i)` is where
+the work is. They are memoized per variable and built by repeated squaring, which makes a distinct
+exponent `e` cost `O(log e)` multiplications and a repeated one cost none. Cancellation is handled
+by the same canonical invariant as everything else: a composition that collapses returns the zero
+polynomial as no terms at all.
 
 ## Gröbner Bases
 
@@ -3253,9 +3341,9 @@ bytes — and the GF(2) and GF(2^8) families are refused by name, each for its o
 want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
 long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
 path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
-*and* #377, because `FiniteField::from_str` is `todo!()` for `BinaryFieldElement`, so a `Gf256`
-system cannot be read from text at all; the challenge's modulus, which is not the AES one, is
-`Gf256Mq`.
+too, and no longer anything else: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, so
+a `Gf256` system reads from text with each coefficient as its bit pattern. The challenge's modulus,
+which is not the AES one, is `Gf256Mq`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
@@ -3338,9 +3426,10 @@ The finding that matters is negative. The paper proposes "six **sets of paramete
 publishes no matrices, offers no prize, and the scheme's official page — archived eight times
 between 2001 and 2003 — carries papers and slides only. **No authentic instance of any of A–F was
 ever published**, and the construction that would regenerate one needs a 160-bit seed and a
-generator the paper names neither of. Both published breaks, the 2010 one on C and the 2026 one on
-D, ran on instances their authors generated; the 2026 abstract says so in as many words ("**an**
-instance"). So a same-parameter instance here is not a degraded substitute — it is the same kind of
+generator the paper names neither of. Every published break ran on an instance its authors generated — the only
+executed solve of C, Steel's of 23 August 2014, on "a random instance over `GF(65521)`", and the
+2026 one on D, whose abstract says so in as many words ("**an** instance"); the 2010 result on C is
+a method and a projection, not a completed run. So a same-parameter instance here is not a degraded substitute — it is the same kind of
 object every published result used — but the published costs stay a **difficulty scale and not a
 comparand**, and nothing is in [the registry](#the-challenge-registry) until a generator exists to
 digest. The document also corrects the verifier: the condition is `rank(Σ αᵢ Mᵢ − M₀) ≤ r` over

@@ -95,9 +95,46 @@ where
     for<'a> Self: Mul<&'a Self, Output = Self>,
     for<'a> Self: Div<&'a Self, Output = Self>,
 {
+    /// The image of the integer `val` under the unique ring homomorphism from the integers into
+    /// this field: `val` copies of [`one`](crate::One::one), which is `val mod p` for
+    /// characteristic `p`.
+    ///
+    /// **This is not an index into the field.** Over a prime field the two coincide, which is why
+    /// the distinction went unnoticed until #377; over an extension of degree `k > 1` the image is
+    /// the prime subfield — `p` of the `q = p^k` elements — so `new` is not onto and walking it
+    /// over `0..q` covers the field `q/p` times rather than once. Use
+    /// [`KnownOrder::element_at`] to address elements by index.
+    ///
+    /// Both characteristic-two types also have an *inherent* `new` that takes a representation
+    /// (a bit pattern, or an array of coefficients) rather than an integer. Inherent methods win
+    /// method resolution, so `BinaryFieldElement::<P>::new(5)` is the bit pattern `0b101` while
+    /// `<BinaryFieldElement<P> as FiniteField>::new(5)` is `5 mod 2 = 1`.
     fn new(val: u64) -> Self;
 
-    /// Parse a string representation of a finite field element.
+    /// Parse a field element from the text [`Display`] writes for it.
+    ///
+    /// `Self::from_str(&a.to_string()) == Ok(a)` for every element `a` of every field in this
+    /// crate. That round trip, and not the integer embedding of [`Self::new`], is the contract:
+    /// `Display` has to distinguish all `q` elements, which an integer embedding cannot, so over
+    /// an extension field the accepted syntax is a *representation* and `from_str("5")` is
+    /// deliberately not `new(5)`.
+    ///
+    /// Per field, the accepted syntax is:
+    ///
+    /// - **prime fields** — a decimal integer, taken mod `p`. Representation and embedding agree
+    ///   here, so this is both.
+    /// - **[`BinaryFieldElement`](super::BinaryFieldElement)** — a decimal integer read as the
+    ///   coefficient bit pattern, which is what its `Display` writes.
+    /// - **[`ExtensionFieldElement`](super::ExtensionFieldElement)** — either the bracketed
+    ///   coefficient list `[c_0, c_1, ..., c_{k-1}]` its `Display` writes, or a bare decimal read
+    ///   as the base-`p` digits of the same list.
+    ///
+    /// The two characteristic-two readings are the same rule: a bare decimal is the element's
+    /// index, [`KnownOrder::element_at`]. It agrees with `new` on `0..p` — so on `0` and `1` in
+    /// every field — and extends it to the whole field instead of folding onto the subfield.
+    ///
+    /// Returns [`ParseFieldElementError`] rather than panicking; a value outside the field's
+    /// representation is [`ParseFieldElementError::OutOfRange`].
     fn from_str(_value: &str) -> Result<Self, ParseFieldElementError>;
 
     /// A uniformly random field element.
@@ -297,6 +334,37 @@ pub trait KnownOrder: FiniteField {
     /// The characteristic p, or `None` if it does not fit in a `u128`.
     fn characteristic_u128() -> Option<u128> {
         limbs_to_u128(Self::characteristic_limbs())
+    }
+
+    /// The element at `index` in a fixed enumeration of the field, or `None` if `index >= q`.
+    ///
+    /// A bijection from `0..q` onto the field, which is what [`FiniteField::new`] is not: over an
+    /// extension `new` lands in the prime subfield, so an enumeration driven by it covers `p` of
+    /// the `q` elements. The two agree on `0..p`, and so on `0` and `1` in every field. Which
+    /// element sits at which index is implementation-defined beyond that; only coverage is
+    /// promised.
+    ///
+    /// The index is a `u128` because that is the widest the order is exposed as — see
+    /// [`Self::order_u128`].
+    ///
+    /// # The default
+    /// The default is `new`, which is that bijection exactly when `q = p`. Over a field whose
+    /// order and characteristic differ it returns `None` for every index rather than an element
+    /// `new` would have put in the wrong place: a field that has not overridden this reports that
+    /// it cannot be enumerated, and never enumerates wrongly. Both extension families in this
+    /// crate override it.
+    ///
+    /// `new` takes a `u64`, so the default also stops at index `2^64` over a prime field wider
+    /// than that. Nothing is lost: a field of order above `2^64` is not enumerable by any route.
+    fn element_at(index: u128) -> Option<Self> {
+        if Self::order_limbs() != Self::characteristic_limbs() {
+            // An extension field: `new` would fold `0..q` onto the prime subfield.
+            return None;
+        }
+        if Self::order_u128().is_some_and(|q| index >= q) {
+            return None;
+        }
+        Some(Self::new(u64::try_from(index).ok()?))
     }
 
     /// A primitive element of the finite field is a generator of the field's multiplicative group.
@@ -503,6 +571,8 @@ fn limbs_to_u128(limbs: &[u64]) -> Option<u128> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use rand::{prelude::StdRng, SeedableRng};
 
     use super::{default_primitive_element, fermat_inverse_via_recursive_pow, RootOfUnityError};
@@ -511,7 +581,7 @@ mod tests {
             binary_field::BinaryFieldElement,
             extension_field::ExtensionFieldElement,
             irreducible_polynomials::{Modulus13Pow4, X8_X4_X3_X_1},
-            Bn254Fr, PrimeFieldElement128, Zp13, Zp2147483647,
+            Bn254Fr, Gf13Pow4, Gf256, PrimeFieldElement128, Zp13, Zp2, Zp2147483647,
         },
         FiniteField, KnownOrder, One, Zero,
     };
@@ -537,6 +607,81 @@ mod tests {
             }
         }
     );
+
+    // `from_str` reads back exactly the text `Display` wrote, over every field.
+    for_each_field!(
+        fn from_str_inverts_display<F>() {
+            let mut rng = StdRng::seed_from_u64(377);
+            for _ in 0..20 {
+                let a = F::random(&mut rng);
+                assert_eq!(F::from_str(&a.to_string()), Ok(a), "{a} did not round trip");
+            }
+            assert_eq!(F::from_str(&F::zero().to_string()), Ok(F::zero()));
+            assert_eq!(F::from_str(&F::one().to_string()), Ok(F::one()));
+        }
+    );
+
+    // `new(k)` is k copies of one — the integer embedding — in every field.
+    for_each_field!(
+        fn new_is_the_integer_embedding<F>() {
+            let mut sum = F::zero();
+            for k in 0..10u64 {
+                assert_eq!(F::new(k), sum, "new({k}) is not {k} copies of one");
+                sum += F::one();
+            }
+        }
+    );
+
+    // `element_at` is a bijection from `0..q` onto the field, and `None` at `q`.
+    for_each_small_field!(
+        fn element_at_covers_the_field_exactly_once<F>() {
+            let q = F::order_u128().expect("a small field has an order");
+            let elements: HashSet<F> = (0..q)
+                .map(|i| F::element_at(i).expect("every index below q names an element"))
+                .collect();
+            assert_eq!(elements.len(), q as usize, "element_at repeated an element");
+            assert_eq!(F::element_at(q), None);
+        }
+    );
+
+    /// Over GF(2) the embedding and the index coincide, so text input there is unchanged by #377.
+    #[test]
+    fn test_over_gf2_the_embedding_and_the_index_agree() {
+        for value in 0..2u64 {
+            assert_eq!(Zp2::element_at(value as u128), Some(Zp2::new(value)));
+            assert_eq!(Zp2::from_str(&value.to_string()), Ok(Zp2::new(value)));
+        }
+        assert_eq!(Zp2::element_at(2), None);
+        assert_eq!(Zp2::new(0).to_string(), "0");
+        assert_eq!(Zp2::new(1).to_string(), "1");
+    }
+
+    /// `element_at` covers an extension field; `new` over the same range covers only `p` elements.
+    ///
+    /// The distinction #377 turns on, asserted rather than described: both maps are run over
+    /// `0..q` and their images counted.
+    #[test]
+    fn test_element_at_covers_an_extension_field_where_new_does_not() {
+        fn both_maps<F: KnownOrder>() {
+            let q = F::order_u128().expect("a small field has an order");
+            let p = F::characteristic_u128().expect("a small characteristic");
+
+            let indexed: HashSet<F> = (0..q)
+                .map(|i| F::element_at(i).expect("every index below q names an element"))
+                .collect();
+            assert_eq!(indexed.len(), q as usize, "element_at missed an element");
+
+            let embedded: HashSet<F> = (0..q).map(|i| F::new(i as u64)).collect();
+            assert_eq!(
+                embedded.len(),
+                p as usize,
+                "new reaches more than the prime subfield"
+            );
+        }
+
+        both_maps::<Gf256>();
+        both_maps::<Gf13Pow4>();
+    }
 
     /// An order below 2^64 reports one limb, not a word padded with a zero.
     #[test]
