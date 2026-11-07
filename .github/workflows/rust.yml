@@ -9,6 +9,16 @@ on:
   pull_request:
   # So the benchmark job, which pull requests skip, can be run against a branch on demand.
   workflow_dispatch:
+  # A daily re-test of `main` as it actually is, which is the cheap half of #339's fix. A pull
+  # request is tested as a merge into `main` *as of when the run was queued*, and nothing re-runs
+  # when `main` advances — so two changes that are each green can be red once both have landed, and
+  # #311 and #324 were. Push runs on `main` catch most of that within minutes, but not a red `main`
+  # that nobody pushes to afterwards, and not the drift that comes from resolving the toolchain to
+  # `stable`, which moves. This bounds how long either can go unnoticed to a day, for one run of
+  # roughly 25 job-minutes. It is not a substitute for the merge-staleness notice below: this finds
+  # a semantic conflict after the merge, that one warns before it.
+  schedule:
+    - cron: '17 9 * * *'
 
 # One run per pull request and per branch, and the newest wins. A stack of dependent pull requests
 # is merged one commit at a time, so pushing a stack sends a burst of pushes seconds apart: eight
@@ -221,3 +231,58 @@ jobs:
         run: |
           bash scripts/agent/test/zb-claim-test.sh
           bash tools/test/rss-guard-test.sh
+          bash tools/test/merge-base-age-test.sh
+
+  # How stale the base of this run's merge is, and whether the gap touches the same files the pull
+  # request does (#339).
+  #
+  # A `pull_request` run does test a merged result — `actions/checkout` resolves
+  # `refs/pull/N/merge`, logging `HEAD is now at <sha> Merge <head> into <base>`. What no event
+  # recomputes is that merge when `<base>` advances. Both #311 and #324 were green against their own
+  # snapshot of `main` and the combination panicked, with no textual conflict for git to refuse.
+  #
+  # GitHub's "Require branches to be up to date" closes that by re-running the suite against the new
+  # base before every merge. Measured, that is not affordable here: the release job is 806 s mean
+  # over the last 25 successful runs (983 s worst), so a serialized merge queue admits 4.5 merges an
+  # hour against a peak of 14 observed on 2026-11-06 and 58 merges that day — 13.0 h of CI inside a
+  # 24 h day, and 59 % of consecutive merges were less than one release job apart. See the README
+  # section "Testing the merged result".
+  #
+  # So this reports instead of gating. It is **advisory by construction**: a stale-and-overlapping
+  # result is a workflow warning and the job still succeeds, because making it a required check
+  # would be the gate again with extra steps. A failed *read* does fail the job — a staleness check
+  # that cannot read the repository must not look like a clean one (CLAUDE.md §0).
+  merge-staleness:
+    name: Merge base staleness
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # `fetch-depth: 0`: the script diffs the tested base against the current tip of the base
+      # branch, and the default single-commit fetch has neither.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare the tested merge base against the base branch
+        env:
+          TESTED_BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -uo pipefail
+          git fetch --quiet origin "$BASE_REF"
+          rc=0
+          report="$(bash tools/merge-base-age.sh "$TESTED_BASE" "$HEAD_SHA" "origin/$BASE_REF" 2>&1)" || rc=$?
+          printf '%s\n' "$report" >>"$GITHUB_STEP_SUMMARY"
+          case $rc in
+            0|1) printf '%s\n' "$report" ;;
+            3)
+              printf '%s\n' "$report"
+              echo "::warning title=Tested merge base is stale and overlapping::This run's merge was computed against an older $BASE_REF, and the commits since then touch files this pull request changes. Rebase and let CI re-run before merging (#339)."
+              ;;
+            *)
+              printf '%s\n' "$report" >&2
+              echo "::error title=Staleness check failed::The staleness check could not read the repository. This is not evidence that the merge base is current."
+              exit 1
+              ;;
+          esac

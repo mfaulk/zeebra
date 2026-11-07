@@ -91,11 +91,16 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --doc
 ```
 
-The shell tooling under `scripts/agent/` is checked separately, by CI's `agent-scripts` job:
+The shell tooling under `scripts/agent/` and `tools/` is invisible to every Rust job, so CI's
+`agent-scripts` job checks it separately. The shellcheck arguments are globs rather than a file
+list, so a script added under either directory is checked without anyone remembering to add it:
 
 ```sh
-shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh
+shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
+  tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 bash scripts/agent/test/zb-claim-test.sh
+bash tools/test/rss-guard-test.sh
+bash tools/test/merge-base-age-test.sh
 ```
 
 The Rust examples in this file are **compiled and run** by `cargo test --doc`, through a
@@ -256,6 +261,72 @@ The suite is not sharded across parallel jobs. Warm the 968 tests take under 3s 
 `#[ignore]`d systems dominate everything else, with all but 0.3s of that being a single test that
 no partitioning can divide; a shard would pay a checkout, a toolchain, a cache restore and a
 release build to split seconds of test execution.
+
+### Testing the merged result
+
+A pull-request run **does** test a merged result, which is worth stating because the obvious
+assumption is that it does not. `actions/checkout` on a `pull_request` event resolves
+`refs/pull/N/merge` and logs `HEAD is now at <sha> Merge <head> into <base>`; the suite runs on that
+merge commit, not on the branch tip. What nothing recomputes is the merge when `<base>` advances. A
+green check therefore means "this change is consistent with `main` **as it was when this run was
+queued**", and with several agents landing work in the same hour the gap between that and "as
+`main` will be" is where a semantic conflict lives.
+
+One landed. #324 took `corpus::ladder()` from 7 rungs to 19; #311 added a test that resolved each
+rung through an exhaustive match over the 7 that existed when it was written. Each was green. The
+merge of both panicked, and git saw no textual conflict because there was none. It then stayed
+unnoticed for about forty minutes with every check green, because the test's comparand — msolve —
+is absent on the runner, so the test returned early and passed. #338 fixed the instance and made
+that early return say `NOT CHECKED` on stderr; #339 is about the class.
+
+GitHub's **"Require branches to be up to date"** closes the gap exactly: it re-runs the suite
+against the new base before each merge. It is not used here, and the cost is the reason rather than
+an assertion. The release job is **806 s mean over the last 25 successful runs**, worst case 983 s,
+and it is the critical path — the debug job is 318 s. A serialized merge queue therefore admits
+**4.5 merges an hour**. Against that, the week to 2026-11-07 merged 155 pull requests, **58 of them
+on 2026-11-06 alone**, peaking at **14 in one hour**; the median gap between consecutive merges was
+686 s, and **59 % of consecutive merges were less than one release job apart**. Re-running before
+each of that day's 58 merges is **13.0 hours of CI inside a 24-hour day**. The setting would not
+have slowed that day down, it would have made it impossible.
+
+What is used instead is two cheaper things, neither of which subsumes the gate:
+
+- **A staleness notice on every pull request.** `tools/merge-base-age.sh` compares the base this
+  run's merge was computed from against the current tip of the base branch, and reports which files
+  the pull request changes *also* changed in that gap. The overlap is the signal; a bare
+  behind-count is nonzero on nearly every pull request here and would be ignored within a day. The
+  `merge-staleness` job takes seconds, needs no toolchain, and is **advisory by construction** — an
+  overlapping result is a workflow warning and the job still passes, because a required check would
+  be the gate again with extra steps. A failed *read* does fail the job: a staleness check that
+  could not read the repository must not be reported as a clean one.
+
+  ```sh
+  tools/merge-base-age.sh <tested-base-sha> <head-sha> origin/main
+  # 0 current   1 behind   3 behind and overlapping   2 a git read failed   64 usage
+  ```
+
+- **A daily run on `main`.** Push runs on `main` already test the merged result within minutes of a
+  merge, so they catch the combination after the fact. What they do not catch is a red `main` that
+  nobody pushes to afterwards, or drift from resolving the toolchain to `stable`, which moves and
+  has delivered a new clippy lint mid-project before. The `schedule` trigger bounds both to a day
+  for one run of roughly 25 job-minutes.
+
+Neither covers the second half of the failure, which is that CI skipped the broken test entirely.
+Provisioning the external comparands in ordinary CI is deliberately not done — building GMP, MPFR,
+FLINT and msolve on every run is the cost #308 was told not to add, and the ordinary CI path must
+not come to depend on an external binary being present. Asserting that coverage is therefore a
+**local pre-merge step**, on a machine where `tools/external/provision.sh` has already run:
+
+```sh
+ZEEBRA_REQUIRE_MSOLVE=1 cargo nextest run --profile ci --lib -E 'test(/^grobner::external::/)'
+```
+
+`ZEEBRA_REQUIRE_MSOLVE=1` turns an absent msolve from a silent early return into a failure, so the
+command either exercises the comparand or says it could not. It is 199 tests in 1.4s once built —
+a debug build is enough, because every msolve comparison runs on a corpus rung small enough to be
+instant — so this is cheap to run before merging anything that changes the corpus, the challenge
+registry, or either engine's side of the comparison. The test that #339 is named for lives here:
+`grobner::external::msolve::tests`, driven from `corpus::ladder()`.
 
 ### Build configuration
 
