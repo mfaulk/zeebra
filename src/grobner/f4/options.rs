@@ -173,6 +173,13 @@ pub struct F4Options {
     /// notably symbolic preprocessing's monomial queue and the `O(|G|²)` pair queue, neither of
     /// which the row and column budgets bound either. Treat it as the knob that keeps matrix growth
     /// recoverable, not as a memory limit.
+    ///
+    /// **Not the effective limit on its own.** That is
+    /// [`live_entry_allowance`](Self::live_entry_allowance), the `min` of this and what
+    /// [`max_live_bytes`](Self::max_live_bytes) pays for — and at
+    /// [`recommended`](Self::recommended) over a 16-byte entry the two are *equal*, so assigning
+    /// this field by itself moves nothing (#322). [`with_live_entries`](Self::with_live_entries)
+    /// sets both.
     pub max_live_nonzeros: usize,
 
     /// The bytes those live entries may occupy at once.
@@ -182,6 +189,11 @@ pub struct F4Options {
     /// [`max_operator_bytes`](crate::grobner::FglmOptions::max_operator_bytes) is one: changing what
     /// the older limit counted would make every figure recorded against it ambiguous. Both are
     /// enforced, and [`live_entry_allowance`](Self::live_entry_allowance) is the smaller of the two.
+    ///
+    /// **So the two knobs interact, and at [`recommended`](Self::recommended) they are numerically
+    /// identical over a 16-byte entry** — `320_000_000 / 16` is exactly `20_000_000`. Assigning
+    /// either alone therefore leaves the other binding at precisely the old value;
+    /// [`with_live_budget`](Self::with_live_budget) sets both from one number (#322).
     ///
     /// An entry is a column index and a field element, so it costs `size_of::<(usize, F)>()`:
     /// **16 bytes over a 64-bit prime field and 40 over a 254-bit one.** An entry budget alone
@@ -379,6 +391,18 @@ impl F4Options {
     /// the dense accumulator's gain there is smaller than the harness's run-to-run variation and
     /// the ordering against `Structured + ALL` alone flips between runs. It is still selected,
     /// because on the instances where elimination dominates it is worth 1.9x on its own.
+    ///
+    /// # The two live budgets this inherits are numerically identical over a 16-byte entry
+    ///
+    /// `max_live_nonzeros` is 20 000 000 and `max_live_bytes` is 320 000 000, and
+    /// `320_000_000 / 16` is **exactly** 20 000 000. Over every `PrimeFieldElement64`
+    /// instantiation — most of the corpus — the two knobs are therefore the same number by
+    /// construction, and since
+    /// [`live_entry_allowance`](Self::live_entry_allowance) is their `min`, **raising either one
+    /// alone has no effect whatsoever**. Use [`with_live_budget`](Self::with_live_budget) or
+    /// [`with_live_entries`](Self::with_live_entries), which set the pair together. The run #322
+    /// was filed from lifted `max_live_nonzeros` to 200 000 000, met the identical refusal, and
+    /// had to read the source to find out why.
     pub fn recommended() -> Self {
         Self {
             elimination: Backend::Adaptive,
@@ -409,6 +433,33 @@ impl F4Options {
     pub fn live_entry_allowance<F: FiniteField>(&self) -> usize {
         self.max_live_nonzeros
             .min(self.max_live_bytes / Self::bytes_per_entry::<F>())
+    }
+
+    /// Both live budgets set to the same quantity of memory, stated in bytes.
+    ///
+    /// **Use this rather than assigning either field alone.** The effective limit is the `min` of
+    /// the two, so assigning one leaves the other binding — and at
+    /// [`recommended`](Self::recommended) over a 16-byte entry they are numerically identical, so
+    /// a lift of `max_live_nonzeros` by itself changes the limit by exactly nothing (#322). There
+    /// is nothing to keep in step here: the entry count is derived.
+    ///
+    /// Generic over `F` because an entry's cost is, and the derivation is wrong by a factor of 2.5
+    /// if it assumes the wrong width.
+    pub fn with_live_budget<F: FiniteField>(mut self, bytes: usize) -> Self {
+        self.max_live_bytes = bytes;
+        self.max_live_nonzeros = bytes / Self::bytes_per_entry::<F>();
+        self
+    }
+
+    /// Both live budgets set to the same quantity of memory, stated in entries.
+    ///
+    /// [`with_live_budget`](Self::with_live_budget) from the other direction, which is the
+    /// direction the run #322 was filed from came at it: the caller thought in entries, raised
+    /// `max_live_nonzeros` alone, and was refused at the old limit.
+    pub fn with_live_entries<F: FiniteField>(mut self, entries: usize) -> Self {
+        self.max_live_nonzeros = entries;
+        self.max_live_bytes = entries.saturating_mul(Self::bytes_per_entry::<F>());
+        self
     }
 
     /// Whether [`max_live_bytes`](Self::max_live_bytes) is the budget that binds over `F`.
@@ -877,6 +928,66 @@ mod tests {
             !options.bytes_bind_first::<Narrow>(),
             "with the two budgets equal the older one must be the one reported"
         );
+    }
+
+    /// Raising the entry budget alone changes the allowance by nothing, and the error says so.
+    ///
+    /// The trap #322 was filed for. `recommended()`'s two budgets are numerically identical over a
+    /// 16-byte entry, so the effective limit is the `min` and lifting one knob leaves the other
+    /// binding at exactly the old value. What made it cost a run is that the refusal has to name
+    /// the budget that *bound* and not the one the caller just raised, or the message points away
+    /// from the cause.
+    #[test]
+    fn test_raising_the_entry_budget_alone_moves_nothing_and_the_error_names_the_byte_budget() {
+        let default = F4Options::default();
+        let lifted = F4Options {
+            max_live_nonzeros: 200_000_000,
+            ..F4Options::default()
+        };
+        assert_eq!(
+            lifted.live_entry_allowance::<Narrow>(),
+            default.live_entry_allowance::<Narrow>(),
+            "a 10x lift of one knob must not change the effective limit when the other binds"
+        );
+        assert!(lifted.bytes_bind_first::<Narrow>());
+        assert_eq!(
+            lifted.entry_budget_error::<Narrow>(20_000_112),
+            F4Error::TooManyLiveBytes {
+                bytes: 20_000_112 * 16,
+                limit: 320_000_000
+            },
+            "the refusal must not name the 200000000 the caller set and the run never met"
+        );
+    }
+
+    /// `with_live_budget` sets the pair consistently, so the half-done lift cannot be written.
+    #[test]
+    fn test_one_live_budget_sets_both_knobs_at_every_field_width() {
+        for bytes in [320_000_000usize, 3_200_000_000, 1_000] {
+            let narrow = F4Options::default().with_live_budget::<Narrow>(bytes);
+            assert_eq!(narrow.max_live_bytes, bytes);
+            assert_eq!(narrow.live_entry_allowance::<Narrow>(), bytes / 16);
+            assert_eq!(narrow.max_live_nonzeros, bytes / 16);
+            assert!(
+                !narrow.bytes_bind_first::<Narrow>(),
+                "the two must describe the same quantity, so neither binds first"
+            );
+
+            // The same bytes over a 40-byte entry is a different entry count, which is the whole
+            // reason the derivation has to know the field.
+            let wide = F4Options::default().with_live_budget::<Bn254Fr>(bytes);
+            assert_eq!(wide.max_live_nonzeros, bytes / 40);
+            assert_eq!(wide.live_entry_allowance::<Bn254Fr>(), bytes / 40);
+        }
+    }
+
+    /// `with_live_entries` is the same consistency from the other direction, the victim's own.
+    #[test]
+    fn test_one_live_budget_in_entries_sets_the_byte_budget_to_match() {
+        let lifted = F4Options::default().with_live_entries::<Narrow>(200_000_000);
+        assert_eq!(lifted.max_live_nonzeros, 200_000_000);
+        assert_eq!(lifted.max_live_bytes, 200_000_000 * 16);
+        assert_eq!(lifted.live_entry_allowance::<Narrow>(), 200_000_000);
     }
 
     /// Over a wide field the same default admits 2.5x fewer entries, which is the same memory.

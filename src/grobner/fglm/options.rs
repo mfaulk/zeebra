@@ -374,4 +374,19 @@ mod tests {
         assert_eq!(baseline.border_batch, recommended.border_batch);
         assert_eq!(baseline.measure_stages, recommended.measure_stages);
     }
+
+    /// FGLM carries the same budget pairs as F4, at the same two numbers.
+    ///
+    /// Half of the check #322's scope note asks for: the configuration that could have the same
+    /// trap. The other half — that these do **not** interact, because each is checked against its
+    /// own requirement in its own unit with no `min` between them — is
+    /// `conversion::tests::test_lifting_one_span_budget_leaves_the_other_binding_in_its_own_unit`.
+    #[test]
+    fn test_the_span_and_operator_budgets_carry_f4s_two_numbers() {
+        let options = FglmOptions::baseline();
+        assert_eq!(options.max_span_entries, 20_000_000);
+        assert_eq!(options.max_span_bytes, 320_000_000);
+        assert_eq!(options.max_operator_entries, 20_000_000);
+        assert_eq!(options.max_operator_bytes, 320_000_000);
+    }
 }

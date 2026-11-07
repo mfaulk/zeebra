@@ -1026,6 +1026,51 @@ mod tests {
         assert!(fglm_to_lex_with_options(&source, source_order, &options).is_ok());
     }
 
+    /// Lifting one span budget takes effect; the other goes on binding in its own unit.
+    ///
+    /// The check #322's scope note asks for, and the answer is that FGLM does **not** have F4's
+    /// trap. F4's `live_entry_allowance` is the `min` of two budgets which are numerically equal at
+    /// the default, so raising one of them moves the effective limit by nothing. Here the two are
+    /// separate comparisons against separate requirements — 528 cells and `528 * size_of::<F>()`
+    /// bytes — so a 10x lift of the cell budget does exactly what it says, and the byte budget then
+    /// refuses in bytes against its own limit. Neither refusal can name the budget the caller just
+    /// raised.
+    #[test]
+    fn test_lifting_one_span_budget_leaves_the_other_binding_in_its_own_unit() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let source = f4(&katsura::<5, F>(), order).expect("within limits");
+        let bytes = 528 * size_of::<F>();
+
+        // The cell budget lifted far past the requirement, the byte budget one short of it.
+        let mut options = FglmOptions::unbounded();
+        options.max_span_entries = 5_280;
+        options.max_span_bytes = bytes - 1;
+        assert_eq!(
+            fglm_to_lex_with_options(&source, order, &options).unwrap_err(),
+            FglmError::SpanBytesExceeded {
+                bytes,
+                limit: bytes - 1
+            },
+            "the lift of the cell budget must take effect, leaving the byte budget to refuse"
+        );
+
+        // And the other way round, so neither is the one that silently dominates.
+        let mut options = FglmOptions::unbounded();
+        options.max_span_bytes = bytes * 10;
+        options.max_span_entries = 527;
+        assert_eq!(
+            fglm_to_lex_with_options(&source, order, &options).unwrap_err(),
+            FglmError::SpanStorageExceeded {
+                entries: 528,
+                limit: 527
+            }
+        );
+
+        // Both lifted together: nothing binds, which is what a half-done lift could not reach.
+        options.max_span_entries = 5_280;
+        assert!(fglm_to_lex_with_options(&source, order, &options).is_ok());
+    }
+
     /// The span's cell budget alone admits four times the memory over BN254 as over a 64-bit field,
     /// and the byte budget is what makes the two widths cost the same.
     #[test]

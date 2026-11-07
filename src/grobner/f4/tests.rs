@@ -1758,6 +1758,23 @@ fn test_structured_elimination_enforces_the_budgets() {
         ),
         Err(F4Error::TooManyLiveBytes { limit: 16, .. })
     ));
+
+    // #322, end to end: raising the entry budget while the byte budget stays tight must not
+    // produce a refusal that names the entry budget. The caller who did this on Anemoi `N = 6`
+    // was told "over the limit of 200000000" while the real ceiling was `max_live_bytes / 16`,
+    // and the message pointed away from the cause.
+    match f4_with_options(
+        &generators,
+        order,
+        &F4Options {
+            max_live_nonzeros: 200_000_000,
+            max_live_bytes: 16,
+            ..structured.clone()
+        },
+    ) {
+        Err(F4Error::TooManyLiveBytes { limit, .. }) => assert_eq!(limit, 16),
+        other => panic!("expected the byte budget to be named, got {:?}", other),
+    }
 }
 
 /// One entry budget admits 2.5x the memory over BN254 as over a 64-bit field; the byte budget does
