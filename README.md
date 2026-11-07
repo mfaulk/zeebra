@@ -812,6 +812,7 @@ cargo run --release --example determinant_sweep    # the Sylvester determinant c
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
 cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
+cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -833,7 +834,12 @@ candidate extraction, and the final interreduction, with the remainder shown as 
 unattributed cost cannot hide. It takes the name of a configuration — `baseline` by default,
 `recommended` for what `F4Options::default()` is — so the effect of one optimization can be read
 off against another's. The timing comes from
-`F4Options::measure_stages`, which reads a clock four times per batch and is off by default.
+`F4Options::measure_stages`, which reads a clock four times per batch and is off by default. Two
+modes take no configuration: `mq` is the digest-pinned `mq-random-10` stage split (#349), and
+`mq-instance` prints that instance's canonical text — field, order, variables and generators, the
+bytes the identity digest is taken over — so an external engine's own counters can be taken on the
+same ideal and compared against these columns. `docs/research/groebner-jl-gap.md` is what that
+comparison produced.
 
 `f4_memory` is the same question for bytes rather than for time, and it exists because the answer
 turned out not to be the matrix. It runs a tracking `#[global_allocator]` beside the solver's own
@@ -2811,6 +2817,15 @@ What is inside each engine — Groebner.jl's monomial encodings, hashtable and l
 and which of those are msolve's rather than its own; Sagebrush's F4, its 2^62 modulus ceiling, and
 what reusing any of it would require — is in `docs/research/groebner-jl-implementation.md` and
 `docs/research/sagebrush-implementation.md`.
+
+`tools/external/groebner-jl-counts.jl` takes the other side of the comparison: it reads the
+canonical text of a digest-pinned instance (`f4_profile -- mq-instance`), rebuilds it in the same
+ring and ordering the adapter uses, and reports **Groebner.jl's own** pair, matrix and row counters
+plus its per-stage split — the latter by enabling the package's own `TimerOutputs` timer at runtime,
+which needs no patched build. It is a measurement instrument on no build path, and
+`docs/research/groebner-jl-gap.md` is what it produced: the 348x on `mq-random-10` decomposed into
+randomized linear algebra (4.89x, declined by policy), interreduction done by division rather than
+by one Macaulay matrix (5.03x), and a per-operation representation constant (14.0x).
 
 ### Solving zero-dimensional systems
 

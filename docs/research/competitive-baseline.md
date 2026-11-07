@@ -461,6 +461,14 @@ are reported because the direction and the magnitude survive any plausible corre
 does not come from JIT warmup — but the ratio's precision should not be quoted until that is
 checked.
 
+> **Checked, in #447, and it errs the other way.** Three successive `groebner` calls in one process
+> after the adapter's proxy warm-up gave 88.745, 87.706, 86.842 ms on `mq-random-10` — a monotone
+> **2.2% spread**, so the residual compilation inside the inner timer *inflates* Groebner.jl's
+> figure rather than flattering it, exactly as `groebner_jl.rs:33-35` predicted. Ratios on an
+> instance of this size are accurate to about 2% and two significant figures are defensible. **The
+> caveat still bars the floor**: 2.2% of 0.734 ms is a different proposition, and this comparand
+> should not be quoted below a few milliseconds at all. See `docs/research/groebner-jl-gap.md` §6.
+
 ### Why these rows were measured twice, and what moved
 
 A first full pass was taken, then discarded and retaken, for two reasons worth recording because
@@ -679,6 +687,26 @@ cross-library deficit**, and it is the only one. Three consequences, and the fir
 The screen bounds a candidate from above and cannot promise anything from below — that is the whole
 discipline of §6a, and it applies to the candidate it favours exactly as it applied to the ones it
 killed. What has changed is that the work is now aimed at the stage the deficit is actually in.
+
+### 6b.1a #447: the same screen against the fastest comparand, and the gap decomposes
+
+§6b's screen is against Singular's 4.13x. **`docs/research/groebner-jl-gap.md`** ran the same
+instance against Groebner.jl's own counters and its own per-stage timer, and the 348x resolves into
+three independently measured factors whose product is the measured ratio:
+
+| factor | size | what it is |
+|---|---:|---|
+| **4.89x** | randomized linear algebra, which Zeebra declines by policy | not Zeebra's to close |
+| **5.03x** | final interreduction by iterated division where Groebner.jl uses one Macaulay matrix | #304's stage, now an *algorithm* finding |
+| **14.0x** | a per-operation constant uniform to 2.2x across every other stage | the monomial and polynomial representations |
+
+Two results that change how §6b should be read. **The work counts are the same** — 10 batches,
+1 777 against 1 787 pairs, 247 elements, `vdim = 354` on the same digest — so the deficit is a
+constant and not an exponent. And **interreduction at 80.4% is an outlier in kind, not only in
+size**: paired against Groebner.jl's `f4_autoreduce!` it is 24 136 ms against **1.74 ms**, a factor
+of 13 871, where every other stage pairs at 11.6x–25.5x. #304 was filed as a memory finding and
+promoted here on a share; the measurement says the stage is computing the right thing by the wrong
+mechanism.
 
 **And one finding that is not about priorities at all.** The `baseline()` refusal above means the
 ablation's starting configuration cannot run the instance the competitive board runs, over a budget
