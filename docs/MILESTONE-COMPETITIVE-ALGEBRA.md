@@ -689,8 +689,9 @@ overstate it.
 **Loss 2 — the basis stage, 4.11x against Singular**, on `mq-random-10`: 29 963 ms against 7 291 ms,
 with conversion 3.57x behind as well. Zeebra against Singular 4.4.1 on all 19 corpus rungs × both
 tasks, one machine, `taskset -c 0-7`, one worker, under `benchlock`. Every completed row agreed on
-the quotient dimension — 9, 25, 57, 64, 81, 156, 354, 1024, 16 384 — which is what licenses the
-timings at all.
+the quotient dimension **where both engines reported one** — 9, 25, 57, 64, 81, 156, 354, 1024,
+16 384 — which is what licenses the timings at all. That qualifier is a correction; see §13.6a
+item 9, which is this milestone's most self-illustrating defect.
 
 Two things make it more consequential than its size:
 
@@ -977,7 +978,7 @@ so its acceptance test is a before/after on a corpus rung rather than a number r
 
 ### 13.6a Six measurement-integrity defects, and the pattern they share
 
-M25 found eight places where a mechanism reported confidently about something other than what the
+M25 found nine places where a mechanism reported confidently about something other than what the
 caller meant. They are listed together because the pattern is the milestone's methodological result
 and it is more transferable than any single fix.
 
@@ -989,10 +990,27 @@ and it is more transferable than any single fix.
 | 4 | **F4's two memory knobs are numerically identical at the default**, and the error names the limit the caller **set** rather than the one that **bound** (#322) | `320_000_000 / 16` is exactly `20_000_000`, so raising one does nothing and the message confirms the wrong ceiling. |
 | 5 | **`pgrep -f` matched a heredoc wrapper on its own script text**, returning two matches for a job that had not started and **zero** for the binary that was running (#328) | Anti-correlated, not merely imprecise. The RSS guard built on it was safe only because a 4 MB wrapper cannot cross a 16 GiB ceiling — a guard correct by accident, in the instrument §9's policy depends on. |
 | 6 | **A test that returns early on an absent tool is indistinguishable from one that ran and agreed** (#333, class filed as #339) | `main` was red for ~40 minutes with every check green. #311 and #324 were each green against their own base and red only once combined: **CI tests a PR against its base, not against the merged result.** |
+| 9 | **A row sat in a table of *agreeing* quotient dimensions while being silently unverified**, because only one engine reported one | `mq-planted-14`'s basis finishes in 0.28 ms, but its *dimension* was obtained by running a full `fglm_to_lex`, which trips the 4 096 **conversion** cap — so a **basis** row's verifiability was hostage to a **conversion** budget. `Invariants::agree` compares only fields both sides carry, so this produced **neither agreement nor disagreement**. That is precisely the "nothing shared is not a verification" trap `overlap()` was built to catch: **the mechanism worked and the prose summarising it did not.** Fixed at the root — a dimension now comes from `QuotientBasis::new`, which enumerates standard monomials and needs neither operators nor dense blocks — and a missing invariant is now recorded as a stage saying so, because a row with a missing invariant must say so or it reads as a row nobody checked. |
 | 8 | **A measurement crate outside the worktree does not inherit `.cargo/config.toml`**, so it silently loses `-C target-cpu=x86-64-v3` with **nobody setting `RUSTFLAGS` at all** | A third route to the failure that has already cost this repository two sets of figures — and the first with **no trigger to avoid**, since the other two are both "someone set `RUSTFLAGS`". Building a harness outside `src/` is good practice, which is what makes it dangerous. Caught only because the corrected build changed the headline: **1 930x → 1 692x**. Both runs kept. |
 | 7 | **A harness-killed run records a clean `END status=0` in `benchlock.log`**, so the lock cannot distinguish "the budget stopped it" from "something unrelated stopped it" | The Anemoi PCICO run was stopped at 3 177 s of its 5 400 s budget when the background shell that launched it was terminated, taking `benchlock`, `timeout`, `taskset` and the binary with it. The lock recorded success. Worse than the others, because it consumes an hour of a **serialized mutex** while reporting that a measurement completed — and it makes every historical `END status=0` retroactively ambiguous. Fixed with `setsid`, so the run is its own session leader. |
 
-The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the eight
+**Item 9 deserves the last word, because it is the only one that indicts a document rather than a
+mechanism — and this document is the same kind of object.** The code refused to claim a verification
+it did not have; the sentence summarising the code claimed it anyway. The honest conclusion is the one
+the agent who found it drew: **a renderer computing these claims beats an author writing them.** The
+competitive board already does this for ratios — `is_publishable()` is the conjunction of two gates
+precisely so no summary can satisfy one and forget the other — and §13.1's startup-floor rule is
+enforced in code for the same reason. Every claim in §13 that is *not* derived from a retained record
+carries the exposure item 9 describes, and the two places this report was already wrong (the memory
+clause in §8.4.1, the row-count overstatement in §13.2) were both prose about measurements rather
+than the measurements.
+
+A related sequencing catch belongs with it: a `benchlock` job resolves its binary path at launch but
+executes when the lock frees, so a queued run would have persisted rows from a **pre-fix** binary —
+"the thing that runs is not the thing that was reviewed", which is #333's shape again at a different
+layer.
+
+The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the nine
 produced well-formed output. Three were caught only because an agent ran something locally for an
 unrelated reason, and that is not a detection strategy. The repository already applies the right
 discipline in two places — `zb-claim.sh`'s three outcomes for a board read, and
