@@ -145,6 +145,11 @@ scoreboard population; merge-result CI.
 | #256 | M26-I | The competitive research parent |
 | #339 | M26-I | A PR is tested against its base, not the merged result, so two green PRs can merge red. M25 hit this for real |
 
+Nineteen of the twenty issues above are attached as sub-issues of the M26 epic. **#297 is not**, and
+the reason is mechanical rather than a scope judgement: GitHub permits an issue only one parent, #297
+is already a sub-issue of #292, and M25's record is left intact rather than rewritten. #297's M26
+scope is carried by the `M26` label and by §5.2 of this document, and a comment on the issue says so.
+
 ### 4.2 New issues
 
 | issue | workstream | why it did not exist |
