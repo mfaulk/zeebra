@@ -50,6 +50,20 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
       `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
       symbolic closure checked unchanged batch by batch rather than inferred from the basis
+- [x] The Sylvester determinant's cost law measured over five matrix orders instead of two: cubic to
+      within the measurement above L2 — `2.9953 ± 0.0285`, worst residual 3.7% — and **no cache
+      cliff**, since order 4 374's 153 MB matrix exceeds L3 and still fits the law. The budget guard
+      takes the larger of the fitted and cubic laws, because a model that under-predicts authorizes
+      a run nobody costed
+- [x] A cost-and-resource-model register in which prediction error is **derived** from the predicted
+      and measured columns rather than authored, every figure labelled measured / fitted / predicted
+      / extrapolated, and rows append-only — so a re-measurement sits beside the estimate it
+      corrects instead of erasing how wrong it was
+- [x] The first same-machine comparison against msolve, Groebner.jl, Sagebrush and Singular, and it
+      is a **loss**: order conversion is ~30x behind msolve on an identical Anemoi system with
+      byte-identical generators. The gap is in the one stage that has the fewest external
+      corroborators, and it is outside the issue series that had been scoped to contain Zeebra's
+      next optimization
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
