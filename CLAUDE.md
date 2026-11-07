@@ -210,9 +210,17 @@ race resolution, and the lease arithmetic:
 
 ```bash
 bash scripts/agent/test/zb-claim-test.sh
-shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh
+bash tools/test/rss-guard-test.sh
+shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
+  tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 ```
 
-Both run in CI (the `agent-scripts` job). The subcommands that call `gh` are
+`tools/rss-guard.sh` is the memory-ceiling guard for benchmark runs; its tests
+cover the pure half against a synthetic `/proc`, because the failure it exists
+to prevent is a guard watching the wrong pid. Never find a measured binary with
+`pgrep -f`: a heredoc script's own text is in its wrapper's cmdline, so the
+pattern matches the wrapper (#328).
+
+All of the above run in CI (the `agent-scripts` job). The subcommands that call `gh` are
 deliberately not unit-tested: they are thin wrappers whose failure modes are the
 API's, and a test that mocked `gh` would pin the mock rather than the behaviour.

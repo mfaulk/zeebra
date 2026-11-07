@@ -46,12 +46,21 @@ use super::{
     corpus::REFERENCE_CHARACTERISTIC,
     process::{CpuBasis, RssBasis},
 };
+/// The quotient dimension this adapter will enumerate to **report an invariant**.
+///
+/// Deliberately far above `FglmOptions`'s conversion default of 4 096. A dimension is obtained by
+/// enumerating standard monomials, which `FglmOptions`'s own documentation calls cheap at any such
+/// dimension — it is the operator and span entry budgets that bound memory, and an invariant needs
+/// neither. Tying the two together made a *basis* row's verifiability hostage to a *conversion*
+/// budget, which cost the `mq-planted-14` basis row its dimension.
+const INVARIANT_DIMENSION_CEILING: usize = 1 << 20;
+
 use crate::{
     fields::PrimeFieldElement64,
     grobner::{
         differential::polynomial_to_string,
         f4_reported,
-        fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions},
+        fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
         research::{ANEMOI_64_PRIME, KOALABEAR_PRIME},
         F4Error, F4Options, IdealClass,
     },
@@ -215,8 +224,30 @@ fn solve<const N: usize, F: FiniteField>(
             // none rather than zero.
             if classify_ideal(&basis, order) == IdealClass::ZeroDimensional {
                 let at = Instant::now();
-                if let Ok((_, statistics)) = fglm_to_lex_with_options(&basis, order, fglm_options) {
-                    invariants = invariants.with_quotient_dimension(statistics.quotient_dimension);
+                // `QuotientBasis::new` and **not** a full conversion. Enumerating the standard
+                // monomials is all a dimension needs; running `fglm_to_lex` for it meant a
+                // *basis* row's verifiability depended on an unrelated FGLM budget, and on
+                // `mq-planted-14` it did: the basis finished in 0.28 ms, the 16 384-dimensional
+                // enumeration tripped the 4 096 operator cap, and the row went out with **no
+                // dimension at all** — against a Singular row that reported 16 384. Nothing
+                // shared is not agreement, so that row was silently unverified while looking
+                // like one of a set that agreed.
+                //
+                // `INVARIANT_DIMENSION_CEILING` is its own bound, far above the conversion
+                // default, because `FglmOptions`'s own documentation says the enumeration is
+                // cheap at any such dimension and it is the entry budgets that bound memory.
+                match QuotientBasis::new(&basis, order, INVARIANT_DIMENSION_CEILING) {
+                    Ok(quotient) => {
+                        invariants = invariants.with_quotient_dimension(quotient.dimension());
+                    }
+                    Err(error) => {
+                        // Recorded as a stage rather than swallowed: a row whose invariant could
+                        // not be computed must say so, or it reads as a row nobody checked.
+                        stages.push((
+                            format!("quotient-dimension UNAVAILABLE: {}", error),
+                            at.elapsed(),
+                        ));
+                    }
                 }
                 // Charged as its own stage: it is work done to *report an invariant*, not part of
                 // the task, and leaving it in the basis time would make this row slower than the
@@ -283,13 +314,45 @@ fn solve<const N: usize, F: FiniteField>(
                         stages,
                     }
                 }
-                Err(error) => Solved {
-                    status: RunStatus::Failed(RunFailure::Reported {
-                        message: error.to_string(),
-                    }),
-                    wall: started.elapsed(),
-                    stages,
-                },
+                // **A declared budget is a limit stop, not a failure.** Recording
+                // `QuotientDimensionExceeded` as `Failed` put a resource cap in the bucket
+                // reserved for an engine that broke — the exact confusion this contract exists
+                // to prevent, and it showed up on the first corpus sweep that reached a rung
+                // over the cap. The two genuine failures are kept apart: a positive-dimensional
+                // ideal is a fact about the ideal, and a source that was not a Gröbner basis is
+                // a caller error.
+                Err(error) => {
+                    use crate::grobner::FglmError::*;
+                    let status = match error {
+                        OperatorStorageExceeded { .. }
+                        | OperatorBytesExceeded { .. }
+                        | SpanStorageExceeded { .. }
+                        | SpanBytesExceeded { .. }
+                        | BorderBatchExceeded { .. }
+                        | QuotientDimensionExceeded { .. } => {
+                            RunStatus::StoppedByLimit(LimitStop::ToolCap {
+                                detail: error.to_string(),
+                            })
+                        }
+                        // Not a budget: no limit would make this possible, so it is a statement
+                        // about the input rather than about the resources.
+                        PositiveDimensional => {
+                            RunStatus::Unsupported(Unsupported::Representation {
+                                detail: "order conversion needs a finite quotient algebra, and \
+                                         this ideal is positive-dimensional"
+                                    .to_string(),
+                            })
+                        }
+                        other => RunStatus::Failed(RunFailure::Reported {
+                            message: other.to_string(),
+                        }),
+                    };
+                    Solved {
+                        status,
+                        wall: started.elapsed(),
+                        stages,
+                    }
+                }
             }
         }
         // `statistics` is read here only so that a reader can see the basis stage was genuinely
@@ -604,6 +667,93 @@ mod tests {
                 .any(|n| n.starts_with("conversion: dependence")),
             "the lex walk is the stage the report attributes the gap to: {:?}",
             names
+        );
+    }
+
+    /// A basis row reports its quotient dimension even where a *conversion* would be refused.
+    ///
+    /// The defect this guards cost a real row its invariant. `mq-planted-14`'s basis finishes in
+    /// 0.28 ms, but its quotient is 16 384-dimensional, and the dimension was being obtained by
+    /// running a full `fglm_to_lex` — which trips the 4 096 conversion cap. So the row went out
+    /// with **no dimension at all**, against a Singular row that reported 16 384, and
+    /// `Invariants::agree` compares only fields both sides carry: nothing shared is not agreement,
+    /// so the row was silently unverified while sitting in a table of rows that agreed.
+    ///
+    /// A dimension needs the standard monomials enumerated and nothing else, so it gets its own
+    /// far higher ceiling and a basis row's verifiability no longer depends on a conversion budget.
+    #[test]
+    fn test_a_basis_row_reports_its_dimension_above_the_conversion_cap() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let mut solver = ZeebraSolver::new();
+        let report = solver.run(&built, Task::ReducedGrobnerBasis, &limits());
+
+        let answer = match &report.status {
+            RunStatus::Complete(answer) => answer,
+            other => panic!("the basis itself succeeds: {:?}", other),
+        };
+        assert_eq!(
+            answer.invariants.quotient_dimension,
+            Some(16_384),
+            "the basis row must carry the dimension Singular also reports"
+        );
+
+        // And the conversion on the same rung is still refused, by the conversion's own budget.
+        let conversion = solver.run(&built, Task::LexBasisByConversion, &limits());
+        assert!(
+            matches!(conversion.status, RunStatus::StoppedByLimit(_)),
+            "{:?}",
+            conversion.status
+        );
+    }
+
+    /// An FGLM budget is a **limit stop**, not a failure, so no ratio can use its time.
+    ///
+    /// Found on the first corpus sweep that reached a rung over the default cap:
+    /// `mq-planted-14` has a 16 384-dimensional quotient against `FglmOptions`'s default of 4 096,
+    /// and the row was being recorded as `Failed` — putting a declared budget in the bucket
+    /// reserved for an engine that broke. `StoppedByLimit` is the honest outcome and, unlike
+    /// `Failed`, it is also what keeps the row out of a speedup.
+    #[test]
+    fn test_an_fglm_budget_is_a_limit_stop_and_not_a_failure() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let mut solver = ZeebraSolver::new();
+        let report = solver.run(&built, Task::LexBasisByConversion, &limits());
+
+        match &report.status {
+            RunStatus::StoppedByLimit(stop) => {
+                let detail = stop.to_string();
+                assert!(detail.contains("dimension"), "{}", detail);
+            }
+            other => panic!(
+                "a declared quotient-dimension budget must be a limit stop, got {:?}",
+                other
+            ),
+        }
+        assert!(
+            !report.status.is_timing_evidence(),
+            "a limit stop is a lower bound, never a measurement"
+        );
+    }
+
+    /// Raising the budget past the quotient dimension lets the same rung through.
+    ///
+    /// Evidence that the stop above is the **cap** and not the instance: the default of 4 096 was
+    /// chosen when the corpus's largest quotient dimension was cyclic-6's 156, and the corpus has
+    /// since grown a 16 384-dimensional rung. The refusal is correct behaviour; the default is
+    /// now mis-set relative to the corpus it guards.
+    #[test]
+    #[ignore = "a 16384-dimensional conversion needs minutes and gigabytes"]
+    fn test_raising_the_budget_lets_the_same_rung_through() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let mut solver = ZeebraSolver::new().with_fglm_options(crate::grobner::FglmOptions {
+            max_quotient_dimension: 32_768,
+            ..crate::grobner::FglmOptions::default()
+        });
+        let report = solver.run(&built, Task::LexBasisByConversion, &limits());
+        assert!(
+            matches!(report.status, RunStatus::Complete(_)),
+            "{:?}",
+            report.status
         );
     }
 

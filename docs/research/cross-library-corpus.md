@@ -130,15 +130,22 @@ A family's ideal equivalence is established by **one** of four kinds of evidence
 `Equivalence` on every ladder entry. The kind is a property of the *construction*, so every rung of
 a family shares it.
 
-| Evidence | What it is | Licenses a timing? |
-|---|---|---|
-| `ComparandFile { tool, file }` | agrees with a comparand's **own distributed input file**, generator for generator | **yes** — the strongest: it compares against bytes somebody else shipped, not against this crate's reading of a paper |
-| `KnownSolution` | a **known solution must satisfy the system as handed to every engine** | **yes** — and in one respect stronger than a digest: an engine whose parser read the text differently will not vanish at the point, which is detectable without that engine computing anything |
-| `LiveOracle { tool }` | checked against live Singular's invariants | **yes**, weakest of the three |
-| `NoComparand { reason }` | no comparand can represent the field at all | **no** |
+| Evidence | What it is | Licenses a timing? | Corroborated? |
+|---|---|---|---|
+| `ComparandFile { tool, file }` | agrees with a comparand's **own distributed input file**, generator for generator | **yes** — the strongest: it compares against bytes somebody else shipped, not against this crate's reading of a paper | yes |
+| `KnownSolution` | a **known solution must satisfy the system as handed to every engine** | **yes** — and in one respect stronger than a digest: an engine whose parser read the text differently will not vanish at the point, which is detectable without that engine computing anything | yes |
+| `LiveOracle { tool }` | checked against live Singular's invariants | **yes**, weakest of the three | yes |
+| `SoleComparand { tool, reason }` | exactly **one** external engine reaches the field | **yes, with the fact stated** — the ratio is valid and invariants are checkable against the one engine | **no** — agreement is two-way and cannot be triangulated |
+| `NoComparand { reason }` | **no** external engine reaches the field | **no** | no |
 
-`Equivalence::licenses_timing` is the gate, and
-`test_only_families_with_a_comparand_license_a_timing` asserts it holds for every rung.
+Two methods, two questions. `Equivalence::licenses_timing` asks whether a figure may be published;
+`Equivalence::is_corroborated` asks whether a **third** opinion exists, so that a disagreement
+could name the odd engine out. `test_every_family_licenses_a_timing_and_only_some_are_corroborated`
+asserts both for every rung.
+
+> **The distinction is the whole point of the field, because the two limits have different fixes.**
+> Representability needs a **new** tool. Corroboration needs a **second** tool at the same field.
+> A reader deciding whether to trust a row has to be told which one applies.
 
 ### Family status
 
@@ -149,7 +156,7 @@ a family shares it.
 | Random MQ | `mq-random-6,10,14` | live Singular invariants; seeded, reproducible from the name | **yes** |
 | Planted MQ | `mq-planted-6,10,14` | the planted point satisfies the **rendered text** | **yes** |
 | Poseidon | `poseidon-t2-rf2-rp0/rp2-planted`, `poseidon-t2-rf4-rp0-planted` | planted target, from the cryptanalysis registry | **yes** |
-| Anemoi | `anemoi64-cico-n1/n2-fcico` | **none possible** — see below | **no** |
+| Anemoi | `anemoi64-cico-n1/n2-fcico` | **Groebner.jl only** — see below | **yes, uncorroborated** |
 | Zero-dimensional FGLM workloads | Katsura, Cyclic, both MQ families | as above | **yes**, as `lex-basis-by-conversion` |
 | Fukuoka MQ Type III | — | **excluded by licence**, not by effort — see below | n/a |
 | Characteristic two | — | **blocked on a convention** — see §6 | no |
@@ -158,25 +165,64 @@ a family shares it.
 `test_the_corpus_covers_six_families_each_with_recorded_evidence` asserts both the count and that
 each of the four kinds of evidence is actually used — so none of the vocabulary is dead.
 
-### Anemoi is in the corpus precisely because it cannot be compared
+### Anemoi's limit is corroboration, not representability
 
-Anemoi's published parameters are over `2^64 − 353`, and msolve and Singular both stop below
-`2^31`. So no comparand can represent the field at any size, and no cross-library figure is
-publishable for it. It is in the corpus anyway, because **the ceiling should be a row rather than
-an absence**: a reader scanning the board sees `unsupported: characteristic …` against every
-external engine, which is a statement about the state of the tools. Omitting the family would make
-the same fact invisible.
+**Groebner.jl reaches Anemoi's field.** Its ceiling is `typemax(UInt64)` and it was measured
+computing correctly at `2^31 − 1`, `2^32 − 5`, Goldilocks, `2^64 − 353` and `2^64 − 59`. Anemoi's
+published parameters are over `2^64 − 353`, so the family **is** representable and a timing against
+Groebner.jl **is** publishable.
 
-The two Poseidon-versus-Anemoi field choices are worth contrasting, because the difference is luck.
-Poseidon's rows are over KoalaBear, `2^31 − 2^24 + 1 = 2130706433`, which happens to sit **below**
-every comparand's ceiling, so those rows are comparable. Nothing was designed for that and it does
-not generalize.
+What is missing is a *second* external engine. Sagebrush stops at `2^62` (its own gate,
+`lib.rs:1552`) and msolve and Singular at `2^31`, so at Anemoi's field there is exactly one
+external engine and nothing to check it against. Agreement is two-way — Zeebra against
+Groebner.jl — and **cannot be triangulated**: a disagreement says one of the two is wrong without
+saying which, where a three-way disagreement usually names the odd one out.
+
+That is recorded as `Equivalence::SoleComparand`, and it is **derived** from §5a's bands rather
+than asserted about this family, so the row is a consequence of a general fact.
+
+An earlier draft of this document said no engine could represent the field. That was wrong, and
+wrong in the direction that matters: it would have told a reader to wait for a new tool when what
+is actually needed is a second one at the same field.
+
+The Poseidon contrast still holds and is still luck. Poseidon's rows are over KoalaBear,
+`2^31 − 2^24 + 1 = 2130706433`, which happens to sit **below every** comparand's ceiling, so those
+rows are four-way corroborated. Nothing was designed for that and it does not generalize.
 
 Note that for both, the corpus uses the **registry's** field and ignores the `characteristic`
 argument. Poseidon's round constants come out of a seeded LFSR keyed on the prime and Anemoi's
 depend on the smallest primitive root, so the same row over another prime is **another problem** —
 the characteristic cannot be varied the way it can for Katsura.
 `test_a_poseidon_rung_keeps_the_registrys_field_whatever_is_asked_for` pins that.
+
+## 5a. The corroboration bands
+
+The capability boundary, derived from four engine ceilings rather than written down per family.
+`corpus::ceilings` holds the constants and `corpus::corroboration` is the function;
+`test_the_corroboration_bands_follow_from_the_engine_ceilings` checks each band at a real field.
+
+| band | engines that reach it | corroboration |
+|---|---|---|
+| `p < 2^31` | msolve, Singular, Groebner.jl, Sagebrush | **four-way** |
+| `2^31 ≤ p < 2^62` | Groebner.jl, Sagebrush | **two-way**, neither checkable against a third |
+| `2^62 ≤ p < 2^64` | Groebner.jl only | **none** |
+| 254/255-bit | none | none |
+
+The ceilings, each from the engine's own gate:
+
+| engine | ceiling | source |
+|---|---|---|
+| msolve | `2^31` | `iofiles.c:564` |
+| Singular | `2^31` | identical to msolve's |
+| Sagebrush | `2^62` | `lib.rs:1552` |
+| Groebner.jl | `typemax(UInt64)` | measured correct at `2^31 − 1`, `2^32 − 5`, Goldilocks, `2^64 − 353`, `2^64 − 59` |
+
+Deriving this means a corrected ceiling corrects every statement that depends on it. The alternative
+— a sentence per family — is how the Anemoi error got in.
+
+Note where Zeebra's own fields fall: the corpus reference prime is four-way, KoalaBear is four-way,
+**Goldilocks and Anemoi's `2^64 − 353` are both sole-engine**, and the 254/255-bit scalar fields
+have nothing.
 
 ### Fukuoka MQ Type III is excluded by licence, and that is a justified variant
 
@@ -238,8 +284,8 @@ exercises `StoppedByLimit`, the outcome the protocol spends the most care on.
 ```
 # zeebra cross-library corpus, characteristic 2147483647 order grevlex
 # name family rung equivalence dimension variables digest
-anemoi64-cico-n1-fcico anemoi easy no-comparand zero-dimensional 2 c053c6ff0186e3b4…
-anemoi64-cico-n2-fcico anemoi intermediate no-comparand zero-dimensional 4 e3a6312e85c486b0…
+anemoi64-cico-n1-fcico anemoi easy sole-comparand zero-dimensional 2 c053c6ff0186e3b4…
+anemoi64-cico-n2-fcico anemoi intermediate sole-comparand zero-dimensional 4 e3a6312e85c486b0…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 e1d8d59448b3d648…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 3274d14b224664ae…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 ed89afe173d16024…
