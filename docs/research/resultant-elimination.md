@@ -1165,18 +1165,20 @@ pinned core, against §6.8's recorded before:
 | | §6.8, recorded | after #243 | |
 |---|---:|---:|---|
 | peak RSS | 57.0 GB | **0.32 GB** | **179x smaller** |
-| elapsed | 48.37 min | 5.6 min | ~8.6x — see the protocol note |
+| elapsed | 48.37 min | **5.4 min** | **9.0x faster** |
 | output | deg 729 / 729, 266 815 / 266 815 terms | **identical** | the same two polynomials |
 
-**The protocol, because the two rows were not taken under the same one.** `f4-resource-scaling.md`
-§8 states that peak-RSS probes do not need `tools/benchlock.sh` and timings do, so the peak was
-taken **off the lock**, with the binary backgrounded directly and `/proc/<pid>/status` polled for
-`VmHWM` — no `timeout` wrapper, because `taskset` execs and keeps the pid where `timeout` forks and
-does not, a confusion that once reported 2 MB for a 14 GB run in this repository. The external poll
-and `resultant_cico`'s own `util::peak_resident_bytes` agreed exactly at 317 872 kB. **The 5.6 min
-from that same off-lock run is an indicative upper bound, not a result**; the on-lock timing is
-queued behind several hours of other agents' work and will be filed when it lands. Nothing about
-the memory claim depends on it.
+**The protocol, which differs by row.** `f4-resource-scaling.md` §8 states that peak-RSS probes do
+not need `tools/benchlock.sh` and that timings do. The elapsed above is **under the lock**, as a
+timing must be — it waited 2 698 s for it. The peak is from a separate **off-lock** probe taken
+while that wait ran, with the binary backgrounded directly and `/proc/<pid>/status` polled for
+`VmHWM`: no `timeout` wrapper, because `taskset` execs and keeps the pid where `timeout` forks and
+does not, a confusion that once reported 2 MB for a 14 GB run here; and the pid captured from `$!`
+rather than `pgrep -f`, which can match a wrapper's own script text (#328).
+
+The two runs agree, which is the cross-check worth having: 5.4 min on the lock against 5.6 min off
+it, and 0.32 GB both times — the off-lock probe's external `VmHWM` poll and `resultant_cico`'s own
+`util::peak_resident_bytes` landing on the same 317 872 kB.
 
 Read 57.0 GB → 0.32 GB as the ratio, not the absolute: **179x**, for a build whose output is 4.3 MB.
 §6.8's "wrong by 838x" is now wrong by 4.7x, and in the same direction.
