@@ -241,7 +241,9 @@ pub struct ResultantOptions {
     /// Points outside the sample set checked against a direct Sylvester determinant. At least 1.
     ///
     /// Only [`bivariate_resultant_predicted`] reads this: the other routes sample against a
-    /// *proven* bound and have nothing to validate.
+    /// *proven* bound and have nothing to validate. The checks are spread over the same
+    /// `concurrency` workers as the interpolation's samples, so raising the worker count shortens
+    /// them too — at six rounds a serial check was 3% of the row.
     pub off_domain_checks: usize,
 }
 
@@ -640,7 +642,14 @@ pub fn bivariate_resultant_predicted<F: FiniteField + Send + Sync>(
     let interpolation = at.elapsed();
 
     let at = Instant::now();
-    let held = agrees_off_domain(&fc, &gc, &candidate, points, options.off_domain_checks)?;
+    let held = agrees_off_domain(
+        &fc,
+        &gc,
+        &candidate,
+        points,
+        options.off_domain_checks,
+        options.concurrency,
+    )?;
     let validation = at.elapsed();
 
     if held {
@@ -673,29 +682,31 @@ pub fn bivariate_resultant_predicted<F: FiniteField + Send + Sync>(
     Ok((resultant, stages))
 }
 
-/// Whether `candidate` agrees with `det Syl(f, g)` at `checks` points outside the sample set.
+/// `checks` distinct abscissae outside the sample set `0, 1, …, points − 1`.
 ///
-/// The samples are `0, 1, …, points − 1`; a point drawn from outside that set was never
-/// interpolated through, so agreement there is evidence about the construction rather than a
-/// restatement of it. The draws are from a fixed seed, which keeps a run reproducible, and are
-/// rejected if they land in the sample set.
+/// Pure in `(points, checks)` and in the fixed seed, and in particular **independent of the
+/// candidate and of the concurrency**: the points can therefore be drawn before any determinant is
+/// evaluated, which is what lets the validation ride the same parallel sample loop as the
+/// interpolation instead of a serial loop of its own.
+///
+/// Distinctness is explicit rather than left to the field's size. Over KoalaBear a repeat among
+/// eight draws has probability about `8²/2^32`, so this changes no run on record — but the
+/// probability bound in `resultant-elimination.md` is an argument about `checks` *independent*
+/// points, and a silently repeated point would weaken the bound without changing the count.
 ///
 /// # Errors
 /// [`ResultantError::FieldTooSmall`] if the field cannot supply `checks` points outside the sample
 /// set.
-fn agrees_off_domain<F: FiniteField>(
-    fc: &[UnivariatePolynomial<F>],
-    gc: &[UnivariatePolynomial<F>],
-    candidate: &UnivariatePolynomial<F>,
+fn off_domain_abscissae<F: FiniteField>(
     points: usize,
     checks: usize,
-) -> Result<bool, ResultantError> {
+) -> Result<Vec<F>, ResultantError> {
     let mut rng = StdRng::seed_from_u64(0x00ff_d01a);
     let in_sample_set = |x: &F| (0..points as u64).any(|i| *x == F::new(i));
 
-    let mut agreed = 0usize;
+    let mut at: Vec<F> = Vec::with_capacity(checks);
     let mut drawn = 0usize;
-    while agreed < checks {
+    while at.len() < checks {
         if drawn > 8 * checks + 64 {
             return Err(ResultantError::FieldTooSmall {
                 needed: points + checks,
@@ -703,15 +714,51 @@ fn agrees_off_domain<F: FiniteField>(
         }
         let x = F::random(&mut rng);
         drawn += 1;
-        if in_sample_set(&x) {
+        if in_sample_set(&x) || at.contains(&x) {
             continue;
         }
-        if candidate.eval(&x) != sylvester_determinant(fc, gc, x) {
-            return Ok(false);
-        }
-        agreed += 1;
+        at.push(x);
     }
-    Ok(true)
+    Ok(at)
+}
+
+/// Whether `candidate` agrees with `det Syl(f, g)` at `checks` points outside the sample set.
+///
+/// The samples are `0, 1, …, points − 1`; a point drawn from outside that set was never
+/// interpolated through, so agreement there is evidence about the construction rather than a
+/// restatement of it. The draws are from a fixed seed, which keeps a run reproducible.
+///
+/// **This is a probabilistic consistency check and not a proof of a polynomial identity.** What it
+/// establishes is that a candidate of degree below `points` agreeing with the determinant at
+/// `checks` further points is wrong with probability at most `(2d²/p)^checks` over the draws — see
+/// `resultant-elimination.md` §6.9. The *proven*-bound routes need no such argument, because there
+/// a polynomial of degree at most the bound agreeing on `bound + 1` points is the resultant
+/// outright; the predicted count buys its sample saving at the price of this being evidence rather
+/// than a certificate.
+///
+/// The determinants go through [`sample_determinants`] at `concurrency` workers, the same indexed
+/// path the interpolation's samples take, and **every** check is evaluated before any is compared.
+/// A short-circuit on the first disagreement would make the verdict depend on which worker got
+/// there first in a falsifying case; evaluating all of them costs `checks` determinants on the path
+/// that is about to pay for a whole proven-bound fallback anyway.
+///
+/// # Errors
+/// [`ResultantError::FieldTooSmall`] if the field cannot supply `checks` points outside the sample
+/// set.
+fn agrees_off_domain<F: FiniteField + Send + Sync>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    candidate: &UnivariatePolynomial<F>,
+    points: usize,
+    checks: usize,
+    concurrency: usize,
+) -> Result<bool, ResultantError> {
+    let at = off_domain_abscissae::<F>(points, checks)?;
+    let direct = sample_determinants(fc, gc, &at, concurrency);
+    Ok(at
+        .iter()
+        .zip(&direct)
+        .all(|(x, determinant)| candidate.eval(x) == *determinant))
 }
 
 /// `Res_{x_eliminate}(f, g)`, interpolated on a power-of-two subgroup, with stage costs.
@@ -1381,7 +1428,10 @@ mod tests {
     ///
     /// The hazard of composing a guard with a rewritten loop is that it stops executing silently.
     /// `PredictionHeld` is only reachable after the check passes and `PredictionFalsified` only
-    /// after it fails, so observing both at concurrency 8 and 32 shows the guard still decides.
+    /// after it fails, so observing both at concurrency 1, 8 and 32 shows the guard still decides
+    /// after the checks themselves were spread over workers — and the recovered polynomial is
+    /// compared across the three, because a verdict that agreed while the answer drifted would be
+    /// worse than a verdict that flipped.
     #[test]
     fn test_the_off_domain_validation_runs_on_the_parallel_path() {
         use rand::{prelude::StdRng, SeedableRng};
@@ -1389,8 +1439,9 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0x0ffd);
         let f = random_bivariate(4, 4, &mut rng);
         let g = random_bivariate(4, 4, &mut rng);
+        let truth = bivariate_resultant(&f, &g, 1).expect("ok");
         // The true resultant has degree 4·4 + 4·4 = 32.
-        for workers in [8usize, 32] {
+        for workers in [1usize, 8, 32] {
             let options = ResultantOptions::with_concurrency(workers);
             let (_, held) =
                 bivariate_resultant_predicted(&f, &g, 1, 32, options).expect("both involve y");
@@ -1413,11 +1464,89 @@ mod tests {
                 "and must have taken its checks"
             );
             assert_eq!(
-                recovered,
-                bivariate_resultant(&f, &g, 1).expect("ok"),
+                recovered, truth,
                 "the fallback is the real resultant at {workers} workers"
             );
         }
+    }
+
+    /// A held prediction gives the identical verdict and the identical resultant at 1, 8 and 32.
+    ///
+    /// The validation's determinants now go through the same indexed parallel loop as the
+    /// interpolation's, so the thing to pin is that spreading them changed neither the decision nor
+    /// the polynomial the decision was made about.
+    #[test]
+    fn test_a_held_verdict_and_its_resultant_are_identical_at_every_concurrency() {
+        use crate::grobner::research::{challenge, Specialization};
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let mut expected: Option<UnivariatePolynomial<Koala>> = None;
+        for workers in [1usize, 8, 32] {
+            let (resultant, stages) = bivariate_resultant_predicted(
+                &outputs[0],
+                &outputs[1],
+                1,
+                81,
+                ResultantOptions::with_concurrency(workers),
+            )
+            .expect("both involve the second");
+            assert_eq!(
+                stages.degree_source,
+                DegreeSource::PredictionHeld { degree: 81 },
+                "the same verdict at {workers} workers"
+            );
+            assert_eq!(
+                stages.off_domain_checks,
+                ResultantOptions::DEFAULT_OFF_DOMAIN_CHECKS,
+                "all eight checks at {workers} workers"
+            );
+            match &expected {
+                None => expected = Some(resultant),
+                Some(first) => assert_eq!(&resultant, first, "{workers} workers"),
+            }
+        }
+    }
+
+    /// The off-domain points are deterministic, distinct, and outside the sample set.
+    #[test]
+    fn test_the_off_domain_points_are_distinct_and_outside_the_sample_set() {
+        let at = super::off_domain_abscissae::<Koala>(82, 8).expect("a 31-bit field has room");
+        assert_eq!(at.len(), 8, "exactly the checks asked for");
+        for x in &at {
+            assert!(
+                !(0..82u64).any(|i| *x == Koala::new(i)),
+                "{x} is in the sample set"
+            );
+        }
+        for (i, x) in at.iter().enumerate() {
+            assert!(
+                !at[i + 1..].contains(x),
+                "{x} was drawn twice, which is not eight independent points"
+            );
+        }
+        assert_eq!(
+            at,
+            super::off_domain_abscissae::<Koala>(82, 8).expect("again"),
+            "the fixed seed makes the draw reproducible"
+        );
+    }
+
+    /// A field with no room outside the sample set is reported, not looped on forever.
+    #[test]
+    fn test_the_off_domain_draw_refuses_a_field_with_no_room() {
+        // Zp13's thirteen elements are all inside a sample set of twelve points but one.
+        let error = super::off_domain_abscissae::<F>(12, 8).expect_err("no room for eight");
+        assert_eq!(error, ResultantError::FieldTooSmall { needed: 20 });
     }
 
     /// A held prediction on the parallel path records that it was validated.
