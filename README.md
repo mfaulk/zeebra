@@ -3299,9 +3299,10 @@ The finding that matters is negative. The paper proposes "six **sets of paramete
 publishes no matrices, offers no prize, and the scheme's official page — archived eight times
 between 2001 and 2003 — carries papers and slides only. **No authentic instance of any of A–F was
 ever published**, and the construction that would regenerate one needs a 160-bit seed and a
-generator the paper names neither of. Both published breaks, the 2010 one on C and the 2026 one on
-D, ran on instances their authors generated; the 2026 abstract says so in as many words ("**an**
-instance"). So a same-parameter instance here is not a degraded substitute — it is the same kind of
+generator the paper names neither of. Every published break ran on an instance its authors generated — the only
+executed solve of C, Steel's of 23 August 2014, on "a random instance over `GF(65521)`", and the
+2026 one on D, whose abstract says so in as many words ("**an** instance"); the 2010 result on C is
+a method and a projection, not a completed run. So a same-parameter instance here is not a degraded substitute — it is the same kind of
 object every published result used — but the published costs stay a **difficulty scale and not a
 comparand**, and nothing is in [the registry](#the-challenge-registry) until a generator exists to
 digest. The document also corrects the verifier: the condition is `rank(Σ αᵢ Mᵢ − M₀) ≤ r` over
