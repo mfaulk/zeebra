@@ -614,17 +614,32 @@ measurement that silently also changed strategy would not be a measurement of th
 - **`PCICO`: GO.** 1.2 h against a 2 h budget and ≈ 5.1 GiB against a 64 GB ceiling. Wall budget set
   to **5 400 s**, RSS ceiling **16 GiB** — four times the model, so a trip means something
   unmodelled rather than a slightly pessimistic estimate.
-- **`FCICO`: NO-GO without authorization, then authorized.** 1.6 h of conversion plus ≈ 14.5
-  minutes of basis is 1.9–2.2 h, which straddles the 2 h gate rather than sitting inside it, so it was not
-  launched on this agent's own authority. It was subsequently authorized on three recorded
-  conditions: a **hard external watchdog at 2.5 h** (`timeout --signal=INT --kill-after=60s 9000`),
-  killed rather than extended if it reaches the backstop and **not** raised mid-run on the strength
-  of apparent progress; the same **16 GiB** RSS ceiling, enforced by a polling guard that signals
-  the run rather than by inspection afterwards; and the result recorded whatever it is. The
-  authorizing reason was that §9's ~2 h figure guards against *unbounded* computation rather than
-  against a costed and supervised one, and that §8a.6 moves this row from a produced figure to a
-  **reproduction** against 23 340.220 s — the highest-value category here, and not one the cost
-  would have bought otherwise.
+- **`FCICO`: NO-GO on this agent's own authority; run under an explicit integration-agent
+  authorization.** 1.6 h of conversion plus ≈ 14.5 minutes of basis is 1.9–2.2 h, which straddles
+  the 2 h gate rather than sitting inside it, so it was not launched on the measuring agent's
+  judgement.
+
+  **Who authorized it, exactly.** The **integration agent for milestone M25**, acting as integration
+  owner. **Not the repository owner**, who was not consulted and has not approved this run. The
+  distinction is recorded because a document this careful about provenance should let a reader see
+  who decided what, and because an agent-to-agent authorization is a work direction rather than an
+  owner's consent.
+
+  **The three conditions, all recorded before the launch.** A **hard external watchdog at 2.5 h**
+  (`timeout --signal=INT --kill-after=60s 9000`), killed rather than extended if it reaches the
+  backstop and **not** raised mid-run on the strength of apparent progress. The same **16 GiB** RSS
+  ceiling, enforced by a polling guard that signals the run rather than by inspection afterwards —
+  see below for how that guard was wrong the first time. And the result recorded whatever it is.
+
+  **The authorizing reasoning, so it can be audited and overturned rather than taken on trust.**
+  §9's threshold is written as "approximately 2 hours" and the plan states these are *operating
+  safeguards, not claims about workstation capability*, so 1.9–2.2 h sits inside the approximation
+  rather than past it. The gate's purpose is the sentence beside it — never run an unbounded
+  computation because a predictor indicates it might finish — and this run is bounded by a watchdog
+  that kills rather than extends, observed at 4.53 GB against a 16 GiB ceiling on a machine with
+  ~450 GB free, and killable at any instant. And §8a.6 moves this row from a produced figure to a
+  **reproduction** against a published 23 340.220 s, which the authorizing agent stated was the
+  decisive factor: the same cost would **not** have been authorized for a produce-only run.
 
 Taking `PCICO` first inverts the brief's stated order, and the reason is that the measurement says
 so: both models reach the **same** `D = 15 625` conversion, which is the quantity #286 is about, and
