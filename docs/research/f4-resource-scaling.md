@@ -618,12 +618,17 @@ pairs and the page faults on 20 GB of `VecDeque` the allocator never needed.
 | `examples/f4_memory`, 20 000 000 cap, degree-5 refusal | 99.1 s (§9.2) | **83.1 s** |
 | `examples/f4_memory`, 10 000 000 cap, degree-4 refusal | not recorded | 5.1 s |
 
-**TIMING_AB_PLACEHOLDER**
+A locked before-against-after A/B of `examples/scoreboard` at both rungs, two interleaved
+repetitions from binaries built out of this one tree, is queued under `tools/benchlock.sh` and will
+be recorded here when it lands. It is not needed for the direction, which both rows above agree on
+and which the mechanism predicts, but it is needed before a *ratio* is quoted: the figures above
+were taken without the lock, and §9.6 is explicit that elapsed times from `f4_memory` are not
+results.
 
 The `f4_memory` figures run both allocating stages twice per batch, once under the allocator and
 once for real, so they are not the uninstrumented cost; §9.1 put that at 71 s against the
 instrumented 99.1 s. They are quoted only because they are the two numbers taken on the same
-instrument, and the direction they give is the one the locked comparison confirms.
+instrument.
 
 ### 10.6 Reproducing §10
 
@@ -638,7 +643,8 @@ ZEEBRA_MAX_ENTRIES=10000000 taskset --cpu-list 0-7 \
 ```
 
 As in §9.6, the example reads `VmHWM` itself so the pid hazard of §2 does not arise, and the
-peak-RSS runs do not need `tools/benchlock.sh`. The timings in §10.5 do, and were taken under it.
+peak-RSS runs do not need `tools/benchlock.sh`. A recorded timing does, which is why §10.5 reports
+the unlocked `f4_memory` elapsed times as indicative and leaves the ratio for the queued run.
 
 The before column of §10.2 is §9.2 and §9.3 and was deliberately **not** re-measured: #237's
 attribution is the baseline, and re-deriving it would have produced a second set of numbers to
