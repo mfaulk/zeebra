@@ -942,10 +942,16 @@ so its acceptance test is a before/after on a corpus rung rather than a number r
 
 1. **Zeebra's apparent 479x Anemoi FGLM advantage is the reference's arithmetic, not Zeebra's
    algorithm.** Zeebra's conversion/basis ratio is **flat to 12% across a 47-bit range of primes**
-   while Magma's moves **7.3x**; the 507x `N = 5` wall gap collapses to **2.85x** at `p = 65537`;
-   and msolve settles it at **1.81 s on one core against Zeebra's 63.7 s on eight**. Candidate (2),
-   "FGLM genuinely scaling better", is **ruled out**. A negative result favourable to this crate
-   needed more care, not less, and §8a.1's growth finding actually **reverses** at the control prime.
+   (1.57 / 1.43 / 1.40 at `N = 4` FCICO) while Magma's moves **7.3x** (33.1 / 144.0 / 242.0), so the
+   ratio-of-ratios collapses 173x → 21x and **the entire collapse is the reference's column moving.**
+   The 507x `N = 5` wall gap becomes **2.85x** at the control prime, and msolve settles it at
+   **1.81 s on one core against Zeebra's 63.71 s on eight**, byte-identical generators.
+
+   All three candidates are adjudicated, not one: **(1) faster arithmetic — supported**, in its
+   *reference-side* form; **(2) FGLM genuinely scaling better — ruled out**, and §8a.1's growth
+   finding actually **reverses** at the control prime; **(3) Magma's `Variety` computing more —
+   ruled out**, on Magma's own breakdown putting 97% of its time in dense linear algebra. A negative
+   result favourable to this crate needed more care, not less.
 2. **#289's own premise is not reproduced.** The 3.116 exponent came of dividing a **32-worker**
    core-time at order 1 458 by a **single-worker** one at order 162. The width was the excess. At one
    width the same interval gives 2.96. The issue's extrapolation table was also internally
