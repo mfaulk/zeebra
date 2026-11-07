@@ -797,7 +797,7 @@ reproduces here as 31–44%.** §6.6's own argument — that the limit is the al
 memory bandwidth — is if anything strengthened by the larger number, and the shape still supports
 it: the penalty is the same 1.44x at order 162 and at order 486, whose matrices differ by 9x, which
 a bandwidth limit would not do. But the size of it disagrees with what is on record and this
-milestone did not resolve why. Treated as a finding, not repaired.
+milestone did not resolve why. Treated as a finding, not repaired — #319.
 
 #### The figures on record are ~1.2x faster than the same measurements today
 
@@ -814,7 +814,7 @@ The first row is the same measurement, on the same registered row, through the s
 the same lock — only months and a commit range apart. Three of the four point the same way by about
 1.2x and the smallest order points the other way. **This is unexplained**, and until it is, a factor
 computed between a figure from §6.5 and a figure taken now carries a ~20% systematic that is not a
-property of either implementation. Filed as a follow-up rather than guessed at here. Two unrelated
+property of either implementation. Filed as #318 rather than guessed at here. Two unrelated
 single-core processes were resident during part of the M25 sweep — `tools/benchlock.sh` serializes
 benchmarks and not builds — which inflates a measurement rather than deflating it, and so cannot
 explain a figure on record being *faster*.
