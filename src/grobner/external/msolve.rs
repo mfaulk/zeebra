@@ -10,7 +10,7 @@
 //! and writes a text file, and no msolve source is reused. See
 //! `docs/research/external-provenance-policy.md`.
 //!
-//! # Two silent failure modes, and what each one is routed to
+//! # Three silent failure modes, and what each one is routed to
 //!
 //! ## 1. msolve substitutes a problem it can solve
 //!
@@ -54,6 +54,22 @@
 //! msolve's own message so that a run killed at its wall limit is still reported as a refusal
 //! rather than as a lower bound on msolve's speed. The `-g 2` basis path is unaffected.
 //!
+//! ## 3. msolve drops a factor it does not recognise
+//!
+//! The caller's mistake rather than msolve's, and the cheapest of the three to prevent.
+//! `store_exponent` (`iofiles.c:26-73`) splits each term on `*` and matches every factor's name
+//! against the declared list with a full `strcmp`. That exactness is a *good* property — it is
+//! exactly why msolve is immune to the `x1`/`x10` prefix collision that a greedy tokenizer would
+//! fall into, verified here by handing it 53 distinct degree-2 monomials over fourteen variables
+//! and getting the same 53 back as a set. But the matching loop (`iofiles.c:57-62`) has no `else`,
+//! so a factor matching nothing is **silently dropped**: `x*z-1` with only `x,y` declared is read
+//! as `x-1`, exit 0, `#invalid equations 0`, and the basis is of a different ideal.
+//!
+//! [`MsolveSolver::supports`] therefore checks every identifier in every generator against the
+//! declared variable order before anything runs. Note that cross-engine agreement cannot catch
+//! this class of bug — every engine is handed the same bytes, so a mis-tokenized generator makes
+//! all of them agree on the wrong ideal.
+//!
 //! # Why every header line is asserted
 //!
 //! `-g` output states the characteristic, the variable order, the monomial order and the basis
@@ -65,7 +81,9 @@
 //! Where msolve reports an invariant twice by two routes — basis size in the output file and in
 //! the verbose `COMPUTATIONAL DATA` block, quotient dimension in the parametrization and in the
 //! sparse-FGLM block — both are parsed and compared, which is what
-//! [`RunFailure::SelfInconsistent`] is for.
+//! [`RunFailure::SelfInconsistent`] is for. The `-v 1` `INPUT DATA` block's `#variables`,
+//! `#equations` and `#invalid equations` are checked the same way; the last is the only place
+//! msolve admits to having discarded a generator.
 
 use std::{path::PathBuf, time::Duration};
 
@@ -260,6 +278,41 @@ pub fn input_file(instance: &Instance) -> String {
     text.push_str(&instance.system.join(",\n"));
     text.push('\n');
     text
+}
+
+/// The first identifier in `generator` that is not one of `variables`, if there is one.
+///
+/// An identifier is a maximal run of letters, digits and underscores that **starts** with a letter
+/// or underscore; a run that starts with a digit is a coefficient. That is the whole lexical
+/// vocabulary of msolve's input format — the only other characters are `*`, `^`, `+` and `-` — so
+/// any identifier that is not a declared variable is a factor msolve will drop on the floor.
+///
+/// Whole-token comparison, not a prefix test: `x1` and `x10` are different identifiers here for
+/// the same reason they are different to msolve's `strcmp`, which is what makes a fourteen-variable
+/// system safe to hand over.
+fn unknown_identifier(generator: &str, variables: &[String]) -> Option<String> {
+    let bytes = generator.as_bytes();
+    let is_word = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    let mut i = 0;
+    while i < bytes.len() {
+        if !(bytes[i].is_ascii_alphabetic() || bytes[i] == b'_') {
+            // Skip the whole run, so that the `1` of a coefficient `12` never starts a token.
+            while i < bytes.len() && is_word(bytes[i]) {
+                i += 1;
+            }
+            i += usize::from(i < bytes.len());
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && is_word(bytes[i]) {
+            i += 1;
+        }
+        let token = &generator[start..i];
+        if !variables.iter().any(|name| name == token) {
+            return Some(token.to_string());
+        }
+    }
+    None
 }
 
 /// A `#key: value` header line from `-g` output, with the value trimmed.
@@ -517,6 +570,26 @@ fn parse_basis(output: &str, instance: &Instance, log: &str) -> Result<Answer, R
             marker: "#length of basis".to_string(),
             value: length.clone(),
         })?;
+
+    // msolve's `-v 1` INPUT DATA block echoes what it decided it read (`meta_data.c`'s
+    // `print_initial_statistics`). Weaker than the `-g` header but free, and `#invalid equations`
+    // is the only place msolve reports having discarded a generator.
+    for (label, expected) in [
+        ("#variables", instance.variables.len() as u64),
+        ("#equations", instance.system.len() as u64),
+        ("#invalid equations", 0),
+    ] {
+        if let Some(reported) = computational_datum(log, label) {
+            if reported != expected {
+                return Err(inconsistent(format!(
+                    "msolve reports {} as {} where the input file carries {}",
+                    label.trim_start_matches('#'),
+                    reported,
+                    expected
+                )));
+            }
+        }
+    }
 
     let basis = parse_list(output)?;
     if basis.len() != declared {
@@ -1062,6 +1135,49 @@ impl ExternalSolver for MsolveSolver {
                 });
             }
         }
+        // msolve catches this itself — `iofiles.c:1005` exits 1 with "Duplicate variable name" —
+        // but an instance with a repeated name is malformed before msolve is involved, and
+        // `Unsupported` is the better place to say so than a non-zero exit.
+        for (i, name) in instance.variables.iter().enumerate() {
+            if instance.variables[i + 1..].contains(name) {
+                return Support::No(Unsupported::Representation {
+                    detail: format!("{:?} appears twice in the variable order", name),
+                });
+            }
+        }
+
+        // The third silent failure mode, and the only one of the three that is the *caller's*
+        // mistake rather than msolve's. `store_exponent` (`iofiles.c:26-73`) splits a term on `*`
+        // and matches each factor's name with a full `strcmp` against the declared list — which is
+        // exactly why msolve is immune to the `x1`/`x10` prefix collision. But the matching loop
+        // has no else:
+        //
+        // ```c
+        // for (k = 0; k < gens->nvars; ++k) {
+        //     if (strcmp(gens->vnames[k], var) == 0) {
+        //         ((gens->exps) + pos)[k] = strtol(ev, NULL, 10);
+        //         break;
+        //     }
+        // }
+        // ```
+        //
+        // A factor naming nothing in the list is **silently dropped**. Measured: `x*z-1` with only
+        // `x,y` declared is read as `x-1`, exit 0, `#invalid equations 0`, and the basis is of a
+        // different ideal with no signal anywhere. So every identifier in every generator is
+        // checked against the declared names here, before anything runs.
+        for generator in &instance.system {
+            if let Some(unknown) = unknown_identifier(generator, &instance.variables) {
+                return Support::No(Unsupported::Representation {
+                    detail: format!(
+                        "the generator {:?} names {:?}, which is not in the variable order {}; \
+                         msolve would drop that factor silently",
+                        generator,
+                        unknown,
+                        instance.variables.join(", ")
+                    ),
+                });
+            }
+        }
 
         Support::Yes
     }
@@ -1264,8 +1380,8 @@ mod tests {
     use super::{
         computational_datum, eliminant_answer, failure_from_log, input_file, leading_monomial,
         parse_basis, parse_list, parse_parametrization, parse_stages, render_eliminant,
-        MsolveSolver, Parametrization, MAX_CHARACTERISTIC, MAX_CHARACTERISTIC_ELIMINANT,
-        MAX_STAGES,
+        unknown_identifier, MsolveSolver, Parametrization, MAX_CHARACTERISTIC,
+        MAX_CHARACTERISTIC_ELIMINANT, MAX_STAGES,
     };
     use crate::{
         fields::{PrimeFieldElement64, Zp2147483647},
@@ -2390,6 +2506,93 @@ rational param(cpu)             0.75 sec
     }
 
     // ---------------------------------------------------------------------------------------
+    // The prefix collision, and the undeclared-variable drop
+    // ---------------------------------------------------------------------------------------
+
+    /// `x1` and `x10` are distinct identifiers, so a fourteen-variable instance is representable.
+    ///
+    /// The hazard this guards: a greedy tokenizer reads `x1*x10` as `x1*x1*0`. msolve is immune by
+    /// construction — `store_exponent` (`iofiles.c:26-73`) splits each term on `*` and matches
+    /// factor names with a full `strcmp` — and this adapter's own identifier check has to be
+    /// whole-token for the same reason, or it would reject what msolve accepts.
+    #[test]
+    fn test_a_variable_that_is_a_prefix_of_another_is_not_confused() {
+        let names: Vec<String> = (1..=14).map(|i| format!("x{}", i)).collect();
+        assert_eq!(unknown_identifier("x1*x10+x10*x14-x1^2", &names), None);
+        assert_eq!(unknown_identifier("x1*x10", &names), None);
+        // And a genuinely absent name is still caught even though `x1` is present.
+        assert_eq!(unknown_identifier("x1*x15", &names).as_deref(), Some("x15"));
+
+        let solver = solver("msolve", "prefix");
+        let wide = instance(
+            "wide",
+            P30,
+            &names.iter().map(String::as_str).collect::<Vec<_>>(),
+            &["x1*x10-1", "x2*x11+x10*x14"],
+        );
+        assert!(solver
+            .supports(&wide, Task::ReducedGrobnerBasis)
+            .is_supported());
+        // Line 1 carries all fourteen in order, and `x1` is not `x10`.
+        let first = input_file(&wide).lines().next().unwrap().to_string();
+        assert_eq!(first, "x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14");
+    }
+
+    /// A coefficient is never mistaken for an identifier.
+    #[test]
+    fn test_digits_are_not_identifiers() {
+        let names = vec!["x".to_string(), "y".to_string()];
+        assert_eq!(unknown_identifier("1073741826*x^2+12*y+7", &names), None);
+        assert_eq!(unknown_identifier("-x+2*y-1", &names), None);
+    }
+
+    /// A generator naming a variable that is not declared is unsupported, not run.
+    ///
+    /// **The third silent failure mode.** `store_exponent`'s matching loop (`iofiles.c:57-62`) has
+    /// no `else`, so a factor matching no declared name is dropped and msolve computes a basis of a
+    /// different ideal, exits 0, and reports `#invalid equations 0`. Measured: `x*z-1` with only
+    /// `x,y` declared yields the leading ideal `{x, y^2}` instead of `{x*z, y^2}`.
+    #[test]
+    fn test_a_generator_naming_an_undeclared_variable_is_unsupported() {
+        let solver = solver("msolve", "undeclared");
+        let dropped = instance("dropped", P30, &["x", "y"], &["x*z-1", "y^2-1"]);
+        match solver.supports(&dropped, Task::ReducedGrobnerBasis) {
+            Support::No(Unsupported::Representation { detail }) => {
+                assert!(detail.contains("\"z\""), "got {:?}", detail);
+                assert!(detail.contains("silently"), "got {:?}", detail);
+            }
+            other => panic!("an undeclared variable must be refused, got {:?}", other),
+        }
+    }
+
+    /// A repeated variable name is unsupported.
+    #[test]
+    fn test_a_repeated_variable_name_is_unsupported() {
+        let solver = solver("msolve", "dup");
+        let repeated = instance("dup", P30, &["x", "y", "x"], &["x+y"]);
+        assert!(matches!(
+            solver.supports(&repeated, Task::ReducedGrobnerBasis),
+            Support::No(Unsupported::Representation { .. })
+        ));
+    }
+
+    /// msolve's own `#invalid equations` echo is checked, so a discarded generator is a failure.
+    #[test]
+    fn test_a_discarded_generator_is_self_inconsistent() {
+        let (instance, _) = zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u");
+        let discarded = KATSURA_4_LOG.replace(
+            "size of basis                     7",
+            "#invalid equations               1\nsize of basis                     7",
+        );
+        match parse_basis(KATSURA_4_BASIS, &instance, &discarded) {
+            Err(RunFailure::SelfInconsistent { detail }) => {
+                assert!(detail.contains("invalid equations"), "got {:?}", detail)
+            }
+            other => panic!("expected self-inconsistent, got {:?}", other),
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Live, and skipped wherever msolve is not installed
     // ---------------------------------------------------------------------------------------
 
@@ -2463,6 +2666,85 @@ rational param(cpu)             0.75 sec
                 instance.name
             );
         }
+    }
+
+    /// Against a real msolve, a fourteen-variable monomial ideal round-trips as a **set**.
+    ///
+    /// The direct test of the `x1`/`x10` prefix collision, and the reason it is a set equality
+    /// rather than a basis comparison: a set of *distinct degree-2 monomials* is pairwise
+    /// non-dividing, so the reduced Gröbner basis of the monomial ideal they generate **is that
+    /// set**. Any tokenizer error changes the set, and nothing else can. Every single-digit index
+    /// is paired with every double-digit one, in both orders of appearance.
+    ///
+    /// Cross-engine agreement cannot catch this class of bug — every engine is handed the same
+    /// bytes, so a prefix collision makes all of them agree on the wrong ideal — which is why the
+    /// check has to be against the input rather than against another tool.
+    #[test]
+    fn test_a_real_msolve_round_trips_fourteen_variables_as_a_set() {
+        let Some(binary) = installed_binary() else {
+            return;
+        };
+        let names: Vec<String> = (1..=14).map(|i| format!("x{}", i)).collect();
+        let render = |a: usize, b: usize| {
+            if a == b {
+                format!("x{}^2", a)
+            } else {
+                let (lo, hi) = (a.min(b), a.max(b));
+                format!("x{}*x{}", lo, hi)
+            }
+        };
+        let mut monomials: Vec<String> = Vec::new();
+        for i in 1..=9 {
+            for j in 10..=14 {
+                monomials.push(render(i, j));
+                monomials.push(render(j, i));
+            }
+        }
+        for (a, b) in [
+            (10, 11),
+            (11, 14),
+            (12, 13),
+            (1, 2),
+            (9, 9),
+            (10, 10),
+            (14, 14),
+            (1, 1),
+        ] {
+            monomials.push(render(a, b));
+        }
+        monomials.sort();
+        monomials.dedup();
+
+        let wide = Instance::new(
+            "prefix-14",
+            "test",
+            FieldSpec::prime(P30),
+            names,
+            monomials.clone(),
+            GREVLEX,
+        );
+        let mut solver = MsolveSolver::new(
+            &binary,
+            std::env::temp_dir().join(format!("zeebra-msolve-live-p-{}", std::process::id())),
+        );
+        let report = solver.run(
+            &wide,
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(60)),
+        );
+        let answer = match &report.status {
+            RunStatus::Complete(answer) => answer,
+            other => panic!(
+                "the fourteen-variable instance did not complete: {:?}",
+                other
+            ),
+        };
+        // The leading monomials msolve reports must be exactly the generators it was given.
+        assert_eq!(
+            answer.invariants.leading_monomials.as_ref(),
+            Some(&monomials),
+            "msolve did not round-trip the generators of a monomial ideal"
+        );
     }
 
     /// Against a real msolve, cyclic-4's eliminant is refused as positive-dimensional and

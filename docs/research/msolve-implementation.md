@@ -846,27 +846,69 @@ had to handle two of them.
 2. **A 2 968 684-wide window of primes runs with no accumulation guarantee** (§3.3): the runtime
    guard is looser than the documented-safe modulus, and the documented constants are never
    enforced.
-3. **The genericity recovery exits 0 after substituting a different ideal** — `-c 2` permutes the
+3. **A factor naming an undeclared variable is silently dropped.** `store_exponent`
+   (`iofiles.c:26-73`) splits each term on `*` and matches every factor against the declared names
+   with a full `strcmp` — which is the *good* news, and is exactly why msolve is immune to the
+   `x1`/`x10` prefix collision (§5a). But the matching loop (`iofiles.c:57-62`) has no `else`:
+
+   ```c
+   for (k = 0; k < gens->nvars; ++k) {
+       if (strcmp(gens->vnames[k], var) == 0) {
+           ((gens->exps) + pos)[k] = strtol(ev, NULL, 10);
+           break;
+       }
+   }
+   ```
+
+   Measured: `x*z-1` with only `x,y` declared yields the leading ideal `{x, y^2}` instead of
+   `{x*z, y^2}` — exit 0, `#invalid equations 0`, no signal anywhere. The adapter checks every
+   identifier in every generator against the declared order before running. (Duplicate variable
+   names, by contrast, msolve *does* catch: `iofiles.c:1005`, exit 1.)
+4. **The genericity recovery exits 0 after substituting a different ideal** — `-c 2` permutes the
    variables and appends a new one carrying a random linear form (`msolve.c:511-546`,
    `msolve.c:144-148`), and at the default `-v 0` says nothing. The adapter compares the output's
    variable list against the instance's on every run.
-4. **`-v 1`'s advisory output goes to stderr, not stdout.** `neogb/streams.h:24-26` defines
+5. **`-v 1`'s advisory output goes to stderr, not stdout.** `neogb/streams.h:24-26` defines
    `OUTSTREAM stdout`, `VERBSTREAM stderr`, `ERRSTREAM stderr`; measured, `-v 1` puts zero bytes on
    stdout. `external-comparands.md` §3.8 says stdout. Immaterial to the adapter (the supervisor
    merges both streams) but it matters to anyone driving msolve by hand with `2>/dev/null`.
-5. **`-C` can dereference NULL**: `nmod_fglm_guess_colon` returns `NULL` (`fglm_core.c:1808`) and
+6. **`-C` can dereference NULL**: `nmod_fglm_guess_colon` returns `NULL` (`fglm_core.c:1808`) and
    `msolve/msolve.c:4406`'s caller never checks before `:4420` dereferences it.
-6. **`-l 43` is silently rewritten to `-l 2`** (`io.c:700-704`), so the `_2` probabilistic variants
+7. **`-l 43` is silently rewritten to `-l 2`** (`io.c:700-704`), so the `_2` probabilistic variants
    are unreachable from the CLI.
-7. **A constant eliminant only recovers under `-v 2`**: the `goto restart` at
+8. **A constant eliminant only recovers under `-v 2`**: the `goto restart` at
    `fglm_core.c:1461-1465` is nested inside `if (info_level > 1)`.
-8. **`-q` hard-codes the characteristic** to 1073741827 regardless of the input
+9. **`-q` hard-codes the characteristic** to 1073741827 regardless of the input
    (`msolve/msolve.c:4039`) and requires homogeneous input.
 
 None of these is a reason to distrust msolve as a *basis* comparand: `-g 2` agreed exactly with
 Zeebra's F4 on katsura-4, katsura-5, katsura-6, cyclic-4 and cyclic-5 over `GF(2^31 - 1)`, on
 leading monomials and cardinality (#259's test suite). They bound what the **eliminant** rows can
 say.
+
+### 5.1 The prefix collision, which msolve gets right
+
+Recorded as a **positive** result, because it is the one hazard in this milestone that cross-engine
+agreement provably cannot catch. At ten or more variables `x1` is a prefix of `x10`, so a greedy
+tokenizer reads `x1*x10` as `x1*x1*0`. Every engine is handed the same bytes, so such a misparse
+makes all of them agree on the *wrong* ideal — four tools agreeing and disagreeing with nothing,
+which is indistinguishable from success by the check this milestone otherwise relies on. The only
+valid test is against the input.
+
+msolve is safe, by construction and by measurement:
+
+* **By construction.** `store_exponent` (`iofiles.c:26-73`) is delimiter-based, not greedy: it
+  splits each term on `*` or end-of-string, extracts the factor name up to `^` or the factor end,
+  and matches with `strcmp(gens->vnames[k], var) == 0` — a whole-string comparison, never
+  `strncmp`.
+* **By measurement.** 53 distinct degree-2 monomials over `x1..x14`, pairing every single-digit
+  index with every double-digit one in both orders of appearance, were handed to
+  `msolve -g 1`. A set of distinct degree-2 monomials is pairwise non-dividing, so the reduced
+  basis of the monomial ideal they generate *is* that set — and msolve returned all 53, identical
+  as a set. Pinned as a live test in `src/grobner/external/msolve.rs`.
+
+So no corpus rung is at risk from this through msolve. The adapter's own identifier check (defect 3
+above) had to be whole-token for the same reason, or it would have rejected what msolve accepts.
 
 ---
 
