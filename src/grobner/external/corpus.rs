@@ -51,10 +51,14 @@
 use crate::{
     fields::PrimeFieldElement64,
     grobner::{
-        benchmark_systems::{cyclic, katsura},
-        differential::polynomial_to_string,
+        benchmark_systems::{cyclic, katsura, planted},
+        differential::{polynomial_to_string, GeneratedSystem, SystemShape},
+        research::{
+            challenge, dispatch_anemoi_cico, dispatch_cico, AnemoiCicoVisitor, CicoVisitor,
+            ANEMOI_64_PRIME, KOALABEAR_PRIME,
+        },
     },
-    MonomialOrder, MultivariatePolynomial,
+    FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
 
 use super::{FieldSpec, Instance};
@@ -116,6 +120,9 @@ pub struct CorpusEntry {
     /// needs a finite quotient does not apply to it.
     pub zero_dimensional: bool,
 
+    /// How this family's ideal equivalence was established. **The gate on publishing a timing.**
+    pub equivalence: Equivalence,
+
     /// The frozen identity digest at [`REFERENCE_CHARACTERISTIC`] under grevlex.
     ///
     /// Pinned by `test_the_manifest_is_frozen`. A change here means the generated system changed,
@@ -140,6 +147,21 @@ pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option
         "cyclic-4" => Some(cyclic_instance::<4>(characteristic, order)),
         "cyclic-5" => Some(cyclic_instance::<5>(characteristic, order)),
         "cyclic-6" => Some(cyclic_instance::<6>(characteristic, order)),
+        // Seeds are part of the name, so a rung is reproducible from the name alone.
+        "mq-random-6" => Some(random_mq_instance(6, 6, characteristic, order)),
+        "mq-random-10" => Some(random_mq_instance(10, 10, characteristic, order)),
+        "mq-random-14" => Some(random_mq_instance(14, 14, characteristic, order)),
+        "mq-planted-6" => Some(planted_mq_instance::<6>(characteristic, order)),
+        "mq-planted-10" => Some(planted_mq_instance::<10>(characteristic, order)),
+        "mq-planted-14" => Some(planted_mq_instance::<14>(characteristic, order)),
+        // Poseidon and Anemoi carry the registry's own field, not `characteristic`: their round
+        // constants are derived from the prime, so the same row over another prime is another
+        // problem. The argument is unused for them by design, and the digest records the field
+        // that was actually used.
+        "poseidon-t2-rf2-rp0-planted"
+        | "poseidon-t2-rf2-rp2-planted"
+        | "poseidon-t2-rf4-rp0-planted" => poseidon_instance(name, order),
+        "anemoi64-cico-n1-fcico" | "anemoi64-cico-n2-fcico" => anemoi_instance(name, order),
         _ => None,
     }
 }
@@ -195,6 +217,231 @@ fn text_instance<const N: usize>(
     )
 }
 
+/// How a family's ideal equivalence was established.
+///
+/// **The gate on publishing a timing.** A family with no evidence here may appear in the corpus —
+/// several must, since the gap is itself a result — but no cross-library figure may be quoted for
+/// it. Recorded per family rather than per rung because the evidence is about the *construction*,
+/// which every rung of a family shares.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Equivalence {
+    /// Agrees with a comparand's own distributed input file, generator for generator.
+    ///
+    /// The strongest form, because it compares against bytes somebody else shipped rather than
+    /// against this crate's reading of a paper. Katsura and Cyclic, against msolve 0.11.0's
+    /// `input_files/`.
+    ComparandFile {
+        tool: &'static str,
+        file: &'static str,
+    },
+
+    /// A **known solution** must satisfy the system as handed to every engine.
+    ///
+    /// Stronger than it sounds for cross-library purposes, and in one respect stronger than a
+    /// digest: an engine whose parser read the text differently will not vanish at the point, and
+    /// that is detectable without the engine computing anything. Planted MQ and the planted
+    /// Poseidon rows.
+    KnownSolution,
+
+    /// Checked against live Singular's invariants, which needs an installation.
+    ///
+    /// For a family with neither a distributed file nor a known solution. The weakest of the three
+    /// that still licenses a timing.
+    LiveOracle { tool: &'static str },
+
+    /// No comparand can represent the field, so no cross-library check is possible at all.
+    ///
+    /// **Not a gap in the work.** Anemoi's published parameters are over `2^64 - 353`, and msolve
+    /// and Singular both stop below `2^31`; the family is in the corpus as the concrete case that
+    /// makes the ceiling visible. No timing is publishable, and the reason is permanent until a
+    /// 64-bit-capable comparand is validated against something.
+    NoComparand { reason: &'static str },
+}
+
+impl Equivalence {
+    /// Whether a cross-library timing may be published for a family with this evidence.
+    pub fn licenses_timing(&self) -> bool {
+        !matches!(self, Self::NoComparand { .. })
+    }
+
+    /// The stable tag used in the manifest.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Self::ComparandFile { .. } => "comparand-file",
+            Self::KnownSolution => "known-solution",
+            Self::LiveOracle { .. } => "live-oracle",
+            Self::NoComparand { .. } => "no-comparand",
+        }
+    }
+}
+
+/// The seeded point the planted family plants, and the planted Poseidon rows echo.
+///
+/// Derived from the instance's variable count by a fixed rule rather than drawn from an RNG, so
+/// the corpus needs no seed to reproduce it and the digest is stable without one. Values are small
+/// and non-zero, and distinct per coordinate so a system that confused two variables does not
+/// accidentally still vanish.
+fn planted_point<const N: usize, F: FiniteField>() -> [F; N] {
+    let mut point = [F::zero(); N];
+    for (i, slot) in point.iter_mut().enumerate() {
+        *slot = F::new(3 + 2 * i as u64);
+    }
+    point
+}
+
+/// A seeded random multivariate-quadratic instance in `n` variables.
+///
+/// `GeneratedSystem` is the differential harness's generator: entirely determined by the seed, the
+/// shape and the characteristic, and it **round-trips through text**, which is what makes it usable
+/// as a cross-library instance at all. `max_degree: 2` is what makes it MQ.
+pub fn random_mq_instance(
+    n: usize,
+    seed: u64,
+    characteristic: u64,
+    order: MonomialOrder,
+) -> Instance {
+    let shape = SystemShape {
+        variables: n,
+        max_degree: 2,
+        // Dense enough that the quadratic part matters, bounded so the text stays readable and the
+        // generated system does not become an accidental linear system after cancellation.
+        max_terms: 4 * n,
+    };
+    let generated = GeneratedSystem::generate(seed, shape, characteristic);
+    Instance::new(
+        format!("mq-random-{}", n),
+        "mq-random",
+        FieldSpec::prime(characteristic),
+        generated.variables.clone(),
+        generated.render(),
+        order,
+    )
+    .transformed(format!(
+        "seeded generation: seed {}, max_degree 2, max_terms {}",
+        seed, shape.max_terms
+    ))
+}
+
+/// A planted multivariate-quadratic instance in `N` variables, with a known solution.
+///
+/// Zero-dimensional by construction and the planted point is among the solutions, so **every
+/// engine must find it** — an oracle no digest provides. See
+/// [`planted`](crate::grobner::benchmark_systems::planted) on why the equations are nonlinear: a
+/// system of `x_i - a_i` is already a Gröbner basis under every order and measures nothing.
+pub fn planted_mq_instance<const N: usize>(characteristic: u64, order: MonomialOrder) -> Instance {
+    let point = planted_point::<N, Reference>();
+    let system = planted::<N, Reference>(&point);
+    text_instance(
+        format!("mq-planted-{}", N),
+        "mq-planted",
+        &system,
+        characteristic,
+        order,
+    )
+    .transformed("planted at (3, 5, 7, ...), one value per variable".to_string())
+}
+
+/// Render a const-generic system at an unknown dimension to `(variables, generators)`.
+///
+/// The visitor both CICO dispatchers want. `self` is consumed, so the order is carried in.
+struct AsText {
+    order: MonomialOrder,
+}
+
+impl AsText {
+    fn render<const N: usize, F: FiniteField>(
+        &self,
+        system: &[MultivariatePolynomial<N, F>],
+    ) -> (Vec<String>, Vec<String>) {
+        let names: Vec<String> = (1..=N).map(|i| format!("x{}", i)).collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let generators = system
+            .iter()
+            .map(|polynomial| polynomial_to_string(polynomial, &refs, self.order))
+            .collect();
+        (names, generators)
+    }
+}
+
+impl<F: KnownOrder> CicoVisitor<F> for AsText {
+    type Output = (Vec<String>, Vec<String>);
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Self::Output {
+        self.render(system)
+    }
+}
+
+impl<F: KnownOrder> AnemoiCicoVisitor<F> for AsText {
+    type Output = (Vec<String>, Vec<String>);
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Self::Output {
+        self.render(system)
+    }
+}
+
+/// A registered Poseidon CICO instance, as a corpus instance.
+///
+/// **The field is the registry's, not the corpus's.** Poseidon's round constants come out of a
+/// seeded LFSR keyed on the prime, so a Poseidon system over a different prime is a different
+/// problem — the characteristic cannot be varied the way it can for Katsura. KoalaBear
+/// (`2^31 - 2^24 + 1 = 2130706433`) happens to be **below every comparand's ceiling**, so these
+/// rows are comparable; that is luck rather than design, and it does not extend to Anemoi.
+///
+/// # Errors
+/// `None` if `id` is not a registered Poseidon CICO row, or is at a dimension the dispatcher does
+/// not compile.
+pub fn poseidon_instance(id: &str, order: MonomialOrder) -> Option<Instance> {
+    type K = PrimeFieldElement64<KOALABEAR_PRIME>;
+    let manifest = challenge(id)?;
+    let (variables, generators) = dispatch_cico::<K, _>(&manifest, AsText { order }).ok()?;
+    Some(
+        Instance::new(
+            id.to_string(),
+            "poseidon",
+            FieldSpec::prime(KOALABEAR_PRIME).named("KoalaBear"),
+            variables,
+            generators,
+            order,
+        )
+        .transformed(format!(
+            "CICO constraints from registry row {} (digest {})",
+            id,
+            manifest.short_digest()
+        )),
+    )
+}
+
+/// A registered Anemoi CICO instance, as a corpus instance.
+///
+/// Over `2^64 - 353`, which **no comparand accepts**: msolve and Singular both stop below `2^31`.
+/// The family is in the corpus so that the ceiling is visible as a row rather than as an absence,
+/// and [`Equivalence::NoComparand`] records that no timing is publishable for it.
+///
+/// # Errors
+/// `None` if `id` is not a registered Anemoi CICO row, or is at a dimension the dispatcher does
+/// not compile.
+pub fn anemoi_instance(id: &str, order: MonomialOrder) -> Option<Instance> {
+    type A = PrimeFieldElement64<ANEMOI_64_PRIME>;
+    let manifest = challenge(id)?;
+    let instance = manifest.anemoi_cico_instance::<A>().ok()?;
+    let (variables, generators) = dispatch_anemoi_cico::<A, _>(&instance, AsText { order }).ok()?;
+    Some(
+        Instance::new(
+            id.to_string(),
+            "anemoi",
+            FieldSpec::prime(ANEMOI_64_PRIME).named("2^64 - 353"),
+            variables,
+            generators,
+            order,
+        )
+        .transformed(format!(
+            "CICO constraints from registry row {} (digest {})",
+            id,
+            manifest.short_digest()
+        )),
+    )
+}
+
 /// The corpus ladder: every rung, with its frozen digest.
 ///
 /// A constant function rather than a data file, for the same reason
@@ -215,6 +462,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Easy,
             zero_dimensional: true,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
             digest: "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
         },
         CorpusEntry {
@@ -222,6 +473,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Easy,
             zero_dimensional: true,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
             digest: "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
         },
         CorpusEntry {
@@ -229,6 +484,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
             digest: "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
         },
         CorpusEntry {
@@ -236,6 +495,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Challenging,
             zero_dimensional: true,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
             digest: "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
         },
         CorpusEntry {
@@ -244,6 +507,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Easy,
             // Positive-dimensional, and in the corpus deliberately for that reason.
             zero_dimensional: false,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
             digest: "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
         },
         CorpusEntry {
@@ -251,6 +518,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "cyclic",
             rung: Rung::Easy,
             zero_dimensional: true,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
             digest: "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
         },
         CorpusEntry {
@@ -258,7 +529,108 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "cyclic",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
             digest: "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+        },
+        CorpusEntry {
+            name: "mq-random-6",
+            family: "mq-random",
+            rung: Rung::Easy,
+            // Square and random, so zero-dimensional with high probability but not by
+            // construction. Asserted per rung rather than assumed; see
+            // `test_every_zero_dimensional_claim_is_checked`.
+            zero_dimensional: true,
+            equivalence: Equivalence::LiveOracle { tool: "Singular" },
+            digest: "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+        },
+        CorpusEntry {
+            name: "mq-random-10",
+            family: "mq-random",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            equivalence: Equivalence::LiveOracle { tool: "Singular" },
+            digest: "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+        },
+        CorpusEntry {
+            name: "mq-random-14",
+            family: "mq-random",
+            rung: Rung::Challenging,
+            zero_dimensional: true,
+            equivalence: Equivalence::LiveOracle { tool: "Singular" },
+            digest: "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+        },
+        CorpusEntry {
+            name: "mq-planted-6",
+            family: "mq-planted",
+            rung: Rung::Easy,
+            zero_dimensional: true,
+            equivalence: Equivalence::KnownSolution,
+            digest: "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+        },
+        CorpusEntry {
+            name: "mq-planted-10",
+            family: "mq-planted",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            equivalence: Equivalence::KnownSolution,
+            digest: "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+        },
+        CorpusEntry {
+            name: "mq-planted-14",
+            family: "mq-planted",
+            rung: Rung::Challenging,
+            zero_dimensional: true,
+            equivalence: Equivalence::KnownSolution,
+            digest: "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+        },
+        CorpusEntry {
+            name: "poseidon-t2-rf2-rp0-planted",
+            family: "poseidon",
+            rung: Rung::Easy,
+            zero_dimensional: true,
+            equivalence: Equivalence::KnownSolution,
+            digest: "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+        },
+        CorpusEntry {
+            name: "poseidon-t2-rf2-rp2-planted",
+            family: "poseidon",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            equivalence: Equivalence::KnownSolution,
+            digest: "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+        },
+        CorpusEntry {
+            name: "poseidon-t2-rf4-rp0-planted",
+            family: "poseidon",
+            rung: Rung::Challenging,
+            zero_dimensional: true,
+            equivalence: Equivalence::KnownSolution,
+            digest: "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+        },
+        CorpusEntry {
+            name: "anemoi64-cico-n1-fcico",
+            family: "anemoi",
+            rung: Rung::Easy,
+            zero_dimensional: true,
+            // Over 2^64 - 353, which no comparand accepts. In the corpus so the ceiling is a row
+            // rather than an absence; no timing is publishable.
+            equivalence: Equivalence::NoComparand {
+                reason: "2^64 - 353 exceeds msolve's and Singular's 2^31 prime-field ceiling",
+            },
+            digest: "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+        },
+        CorpusEntry {
+            name: "anemoi64-cico-n2-fcico",
+            family: "anemoi",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            equivalence: Equivalence::NoComparand {
+                reason: "2^64 - 353 exceeds msolve's and Singular's 2^31 prime-field ceiling",
+            },
+            digest: "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
         },
     ]
 }
@@ -280,10 +652,11 @@ pub fn manifest() -> String {
             )
             .expect("every ladder entry is buildable");
             format!(
-                "{} {} {} {} {} {}",
+                "{} {} {} {} {} {} {}",
                 entry.name,
                 entry.family,
                 entry.rung.tag(),
+                entry.equivalence.tag(),
                 if entry.zero_dimensional {
                     "zero-dimensional"
                 } else {
@@ -297,7 +670,7 @@ pub fn manifest() -> String {
     lines.sort();
     let mut text = format!(
         "# zeebra cross-library corpus, characteristic {} order grevlex\n\
-         # name family rung dimension variables digest\n",
+         # name family rung equivalence dimension variables digest\n",
         REFERENCE_CHARACTERISTIC
     );
     for line in lines {
@@ -315,8 +688,9 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura},
             external::Task,
+            research::{satisfies, ANEMOI_64_PRIME, KOALABEAR_PRIME},
         },
-        MonomialOrder, MultivariatePolynomial,
+        MonomialOrder, MultivariatePolynomial, One, Zero,
     };
     use std::collections::BTreeSet;
 
@@ -326,7 +700,12 @@ mod tests {
 
     /// `["x1", ..., "xN"]`, which is what `parse` wants and what every engine's files use.
     fn names<const N: usize>() -> [&'static str; N] {
-        const ALL: [&str; 8] = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"];
+        // Sixteen is enough for every rung in the ladder; a wider one must extend this rather
+        // than silently truncate, which `copy_from_slice` enforces by panicking.
+        const ALL: [&str; 16] = [
+            "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+            "x14", "x15", "x16",
+        ];
         let mut out = [""; N];
         out.copy_from_slice(&ALL[..N]);
         out
@@ -417,13 +796,34 @@ mod tests {
         );
     }
 
-    /// Every ladder entry builds, is named by its variable count, and has a distinct digest.
+    /// Every ladder entry builds, has a distinct digest, and the generated families are named by
+    /// their variable count.
+    ///
+    /// The naming rule is what closes the Katsura hazard, so it is asserted rather than trusted —
+    /// but it applies only to the families this module *generates*. Poseidon and Anemoi rows carry
+    /// their **registry id**, which is their identity elsewhere in the crate and must not be
+    /// renamed to suit a convention local to the corpus; their variable count is a consequence of
+    /// the round count and is recorded in the manifest instead.
     #[test]
-    fn test_every_ladder_entry_builds_and_is_named_by_its_variable_count() {
+    fn test_every_ladder_entry_builds_and_the_generated_families_are_named_by_variable_count() {
         let mut digests: BTreeSet<String> = BTreeSet::new();
         for entry in ladder() {
             let built = instance(entry.name, REFERENCE_CHARACTERISTIC, GREVLEX)
                 .unwrap_or_else(|| panic!("{} is in the ladder but not buildable", entry.name));
+            assert_eq!(built.family, entry.family);
+            assert!(
+                digests.insert(built.digest()),
+                "{} collides with another entry's digest",
+                entry.name
+            );
+
+            if matches!(entry.family, "poseidon" | "anemoi") {
+                assert_eq!(
+                    built.name, entry.name,
+                    "a registry row must keep its registry id"
+                );
+                continue;
+            }
             let expected: usize = entry
                 .name
                 .rsplit('-')
@@ -435,12 +835,6 @@ mod tests {
                 built.variable_count(),
                 expected,
                 "{} is not named by its variable count",
-                entry.name
-            );
-            assert_eq!(built.family, entry.family);
-            assert!(
-                digests.insert(built.digest()),
-                "{} collides with another entry's digest",
                 entry.name
             );
         }
@@ -471,7 +865,7 @@ mod tests {
     /// represented only by millisecond instances measures startup cost.
     #[test]
     fn test_the_ladder_spans_its_difficulties() {
-        for family in ["katsura", "cyclic"] {
+        for family in ["katsura", "cyclic", "mq-random", "mq-planted", "poseidon"] {
             let rungs: BTreeSet<Rung> = ladder()
                 .into_iter()
                 .filter(|entry| entry.family == family)
@@ -513,6 +907,249 @@ mod tests {
         assert_eq!(Task::LexBasisByConversion.tag(), "lex-basis-by-conversion");
     }
 
+    /// A rung with ten or more variables round-trips, so `x1` and `x10` are not confused.
+    ///
+    /// A genuine hazard of a text interface rather than a hypothetical one: `x1*x10` contains `x1`
+    /// as a prefix twice, and a greedy tokenizer reads it as `x1 * x1 * 0` or drops the `0`. Every
+    /// engine in the comparison is handed these bytes, so a prefix collision here would be a
+    /// silently different ideal in every one of them. Checked as a set equality against the
+    /// library's own generators at the widest rung.
+    #[test]
+    fn test_a_wide_rung_round_trips_without_confusing_x1_and_x10() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        assert!(
+            built.variables.contains(&"x14".to_string()),
+            "the premise: this rung has a two-digit variable"
+        );
+        assert!(
+            built.system.iter().any(|g| g.contains("x1")),
+            "and generators mentioning x1, whose name is a prefix of x14's"
+        );
+
+        let parsed: BTreeSet<String> = built
+            .system
+            .iter()
+            .map(|text| {
+                let polynomial: MultivariatePolynomial<14, F> =
+                    MultivariatePolynomial::parse(text, names::<14>()).expect("parses");
+                crate::grobner::differential::polynomial_to_string(
+                    &polynomial,
+                    &names::<14>(),
+                    GREVLEX,
+                )
+            })
+            .collect();
+        let point = super::planted_point::<14, F>();
+        let direct: BTreeSet<String> = crate::grobner::benchmark_systems::planted::<14, F>(&point)
+            .iter()
+            .map(|p| crate::grobner::differential::polynomial_to_string(p, &names::<14>(), GREVLEX))
+            .collect();
+        assert_eq!(
+            parsed, direct,
+            "a fourteen-variable rung does not survive the text round trip"
+        );
+    }
+
+    /// Every planted rung's known solution satisfies the system **as text**, after a round trip.
+    ///
+    /// The `KnownSolution` evidence, and the reason it is strong for a cross-library corpus: an
+    /// engine whose parser read the text differently will not vanish at the point, and that is
+    /// detectable without the engine computing a basis. Checking it after re-parsing the rendered
+    /// generators is what makes it a statement about the bytes every engine is handed, rather than
+    /// about the polynomials this crate holds in memory.
+    #[test]
+    fn test_every_planted_rungs_known_solution_satisfies_the_rendered_text() {
+        fn check<const N: usize>(name: &str) {
+            let built = instance(name, REFERENCE_CHARACTERISTIC, GREVLEX).expect("in the ladder");
+            let parsed: Vec<MultivariatePolynomial<N, F>> = built
+                .system
+                .iter()
+                .map(|text| MultivariatePolynomial::parse(text, names::<N>()).expect("parses"))
+                .collect();
+            let point = super::planted_point::<N, F>();
+            assert!(
+                satisfies(&parsed, &point),
+                "{}'s planted point does not satisfy its own rendered system",
+                name
+            );
+        }
+        check::<6>("mq-planted-6");
+        check::<10>("mq-planted-10");
+        check::<14>("mq-planted-14");
+    }
+
+    /// A planted rung's point is **not** a solution of a different rung's system.
+    ///
+    /// Guards the check above being vacuous. A system that vanished everywhere, or a point of all
+    /// zeros against a system with no constant term, would satisfy the test without the
+    /// construction meaning anything.
+    #[test]
+    fn test_a_planted_point_is_specific_to_its_own_system() {
+        let six = instance("mq-planted-6", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let parsed: Vec<MultivariatePolynomial<6, F>> = six
+            .system
+            .iter()
+            .map(|text| MultivariatePolynomial::parse(text, names::<6>()).expect("parses"))
+            .collect();
+
+        let mut wrong = super::planted_point::<6, F>();
+        wrong[0] += F::one();
+        assert!(
+            !satisfies(&parsed, &wrong),
+            "a perturbed point still satisfies the system, so the check proves nothing"
+        );
+
+        let zeros = [F::zero(); 6];
+        assert!(
+            !satisfies(&parsed, &zeros),
+            "the all-zero point satisfies the system, so it has no constant terms"
+        );
+    }
+
+    /// Every family's recorded equivalence licenses a timing exactly when a comparand exists.
+    ///
+    /// The gate itself. `Anemoi` is over `2^64 - 353`, above msolve's and Singular's `2^31`
+    /// ceiling, so it is in the corpus **and** barred from any published cross-library figure —
+    /// which is a result about the state of the tools, not a gap in the corpus.
+    #[test]
+    fn test_only_families_with_a_comparand_license_a_timing() {
+        for entry in ladder() {
+            let licensed = entry.equivalence.licenses_timing();
+            match entry.family {
+                "anemoi" => assert!(
+                    !licensed,
+                    "{} has no comparand at its field size and must not license a timing",
+                    entry.name
+                ),
+                _ => assert!(licensed, "{} should license a timing", entry.name),
+            }
+        }
+
+        // The two field facts the table above rests on. `const` assertions rather than runtime
+        // ones because both are compile-time constants, so a change to either prime should fail
+        // the build rather than wait for this test to be run.
+        const {
+            assert!(
+                KOALABEAR_PRIME < REFERENCE_CHARACTERISTIC,
+                "KoalaBear must sit below the comparands' ceiling for the Poseidon rows to be \
+                 comparable at all"
+            )
+        };
+        const {
+            assert!(
+                ANEMOI_64_PRIME > REFERENCE_CHARACTERISTIC,
+                "the Anemoi rows' exclusion rests on their prime being above the ceiling"
+            )
+        };
+    }
+
+    /// Six families, which is the milestone's minimum, each with its evidence recorded.
+    #[test]
+    fn test_the_corpus_covers_six_families_each_with_recorded_evidence() {
+        let families: BTreeSet<&str> = ladder().iter().map(|entry| entry.family).collect();
+        assert!(
+            families.len() >= 6,
+            "the corpus has {} families, below the minimum of six: {:?}",
+            families.len(),
+            families
+        );
+        // Each kind of evidence is actually exercised, so none of the vocabulary is dead.
+        let kinds: BTreeSet<&str> = ladder()
+            .iter()
+            .map(|entry| entry.equivalence.tag())
+            .collect();
+        for expected in [
+            "comparand-file",
+            "known-solution",
+            "live-oracle",
+            "no-comparand",
+        ] {
+            assert!(kinds.contains(expected), "no family uses {}", expected);
+        }
+    }
+
+    /// A Poseidon rung is built from the registry at the registry's own field, not the corpus's.
+    ///
+    /// Poseidon's round constants come out of a seeded LFSR keyed on the prime, so the same row
+    /// over another prime is another problem. The `characteristic` argument is therefore ignored
+    /// for these rows, and this pins that rather than leaving it to a doc comment.
+    #[test]
+    fn test_a_poseidon_rung_keeps_the_registrys_field_whatever_is_asked_for() {
+        let asked = instance("poseidon-t2-rf2-rp0-planted", 65521, GREVLEX).expect("builds");
+        assert_eq!(asked.field.characteristic, KOALABEAR_PRIME);
+        assert_eq!(asked.field.name, "KoalaBear");
+
+        let other = instance(
+            "poseidon-t2-rf2-rp0-planted",
+            REFERENCE_CHARACTERISTIC,
+            GREVLEX,
+        )
+        .expect("builds");
+        assert_eq!(
+            asked.digest(),
+            other.digest(),
+            "the characteristic argument must not change a registry row's identity"
+        );
+
+        // And the transformation names the registry row it came from, so the provenance is in the
+        // instance rather than only in this module.
+        assert!(
+            asked
+                .transformation
+                .as_deref()
+                .unwrap_or_default()
+                .contains("poseidon-t2-rf2-rp0-planted"),
+            "{:?}",
+            asked.transformation
+        );
+    }
+
+    /// An Anemoi rung is built from the registry over `2^64 - 353`.
+    #[test]
+    fn test_an_anemoi_rung_is_built_over_the_published_prime() {
+        let built =
+            instance("anemoi64-cico-n1-fcico", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        assert_eq!(built.field.characteristic, ANEMOI_64_PRIME);
+        assert_eq!(built.family, "anemoi");
+        assert!(!built.system.is_empty());
+    }
+
+    /// A random MQ rung is reproducible from its name alone, and is genuinely quadratic.
+    ///
+    /// The seed is part of the dispatcher, so two calls agree; and the generated system has to be
+    /// degree two or it is not an MQ instance, which cancellation could in principle undo.
+    #[test]
+    fn test_a_random_mq_rung_is_reproducible_and_quadratic() {
+        let once = instance("mq-random-6", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let twice = instance("mq-random-6", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        assert_eq!(once.digest(), twice.digest(), "the seed is not pinned");
+        assert_eq!(once.variable_count(), 6);
+        assert_eq!(once.system.len(), 6, "square, which is what MQ means here");
+
+        let parsed: Vec<MultivariatePolynomial<6, F>> = once
+            .system
+            .iter()
+            .map(|text| MultivariatePolynomial::parse(text, names::<6>()).expect("parses"))
+            .collect();
+        let degree = parsed
+            .iter()
+            .flat_map(|p| p.terms().keys())
+            .map(|m| m.exponents().iter().sum::<u32>())
+            .max()
+            .expect("a nonzero system");
+        assert_eq!(degree, 2, "a random MQ rung must be quadratic, not linear");
+
+        // The transformation records the seed, so a reader can reproduce it outside this module.
+        assert!(
+            once.transformation
+                .as_deref()
+                .unwrap_or_default()
+                .contains("seed 6"),
+            "{:?}",
+            once.transformation
+        );
+    }
+
     /// Every ladder entry's frozen digest is the digest the generator actually produces.
     ///
     /// The pin. A failure here means the generated system changed, which means every figure ever
@@ -545,9 +1182,9 @@ mod tests {
         assert_eq!(rows.len(), ladder().len());
         for row in &rows {
             let columns: Vec<&str> = row.split(' ').collect();
-            assert_eq!(columns.len(), 6, "{}", row);
-            assert_eq!(columns[5].len(), 64, "a full sha256 digest: {}", row);
-            assert!(columns[5].chars().all(|c| c.is_ascii_hexdigit()));
+            assert_eq!(columns.len(), 7, "{}", row);
+            assert_eq!(columns[6].len(), 64, "a full sha256 digest: {}", row);
+            assert!(columns[6].chars().all(|c| c.is_ascii_hexdigit()));
         }
         // Sorted, so the file is diffable across runs.
         let mut sorted = rows.clone();

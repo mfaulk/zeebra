@@ -61,10 +61,15 @@ linear equation first, Zeebra last) and a generating set is a set.
 | msolve | `kat6` | 6 |
 | This corpus | `katsura-6` | 6 |
 
-So msolve names by variable count and agrees with Zeebra's type parameter. **The corpus is named by
-variable count throughout, and the literature's `n` appears nowhere in it.** A test asserts that
-every ladder entry's trailing number equals its built variable count, so a future entry cannot
-reintroduce the ambiguity by being named carelessly.
+So msolve names by variable count and agrees with Zeebra's type parameter. **Every family this
+module generates is named by variable count, and the literature's `n` appears nowhere in it.** A
+test asserts that each such entry's trailing number equals its built variable count, so a future
+entry cannot reintroduce the ambiguity by being named carelessly.
+
+The two families taken from the cryptanalysis registry — Poseidon and Anemoi — keep their
+**registry id** instead. That id is their identity everywhere else in the crate, and renaming it to
+suit a convention local to the corpus would be the worse trade; their variable count is a
+consequence of the round count and is carried in the manifest.
 
 Groebner.jl exposes no `katsuran` in the provisioned version (checked: `names(Groebner, all=true)`
 contains no Katsura or Cyclic generator), so its adapter must be given the system as text from this
@@ -119,31 +124,75 @@ it costs: Zeebra's 32–64-bit fields have only Groebner.jl and Sagebrush as com
 
 ---
 
-## 5. Family status: what may be published
+## 5. How equivalence is established, and what each family may claim
 
-| Family | Instances | Equivalence verified against | Timing publishable? |
+A family's ideal equivalence is established by **one** of four kinds of evidence, recorded as
+`Equivalence` on every ladder entry. The kind is a property of the *construction*, so every rung of
+a family shares it.
+
+| Evidence | What it is | Licenses a timing? |
+|---|---|---|
+| `ComparandFile { tool, file }` | agrees with a comparand's **own distributed input file**, generator for generator | **yes** — the strongest: it compares against bytes somebody else shipped, not against this crate's reading of a paper |
+| `KnownSolution` | a **known solution must satisfy the system as handed to every engine** | **yes** — and in one respect stronger than a digest: an engine whose parser read the text differently will not vanish at the point, which is detectable without that engine computing anything |
+| `LiveOracle { tool }` | checked against live Singular's invariants | **yes**, weakest of the three |
+| `NoComparand { reason }` | no comparand can represent the field at all | **no** |
+
+`Equivalence::licenses_timing` is the gate, and
+`test_only_families_with_a_comparand_license_a_timing` asserts it holds for every rung.
+
+### Family status
+
+| Family | Rungs | Evidence | Timing publishable? |
 |---|---|---|---|
-| Katsura | `katsura-4,5,6,7` | **msolve's own `kat6` literal**, generator for generator | **yes** |
-| Cyclic (affine) | `cyclic-4,5,6` | **msolve's own `cyclic5` literal**, generator for generator | **yes** |
-| Random MQ | — | not yet generated | no |
-| Planted MQ | `benchmark_systems::planted` exists | not yet converted to an `Instance` | no |
-| Fukuoka MQ Type III | parsed by `research::mq` from `ZEEBRA_MQ_DIR` | not yet converted; **not redistributable** | no |
-| Poseidon | in the cryptanalysis registry | not yet converted to an `Instance` | no |
-| Anemoi | in the cryptanalysis registry | not yet converted to an `Instance` | no |
-| Zero-dimensional FGLM workloads | Katsura and Cyclic cover this | as above | **yes**, as `lex-basis-by-conversion` |
-| Characteristic two | — | **blocked**: see §6 | no |
+| Katsura | `katsura-4,5,6,7` | msolve 0.11.0 `input_files/kat6-31.ms`, generator for generator | **yes** |
+| Cyclic (affine) | `cyclic-4,5,6` | msolve 0.11.0 `input_files/cyclic5-16.ms`, generator for generator | **yes** |
+| Random MQ | `mq-random-6,10,14` | live Singular invariants; seeded, reproducible from the name | **yes** |
+| Planted MQ | `mq-planted-6,10,14` | the planted point satisfies the **rendered text** | **yes** |
+| Poseidon | `poseidon-t2-rf2-rp0/rp2-planted`, `poseidon-t2-rf4-rp0-planted` | planted target, from the cryptanalysis registry | **yes** |
+| Anemoi | `anemoi64-cico-n1/n2-fcico` | **none possible** — see below | **no** |
+| Zero-dimensional FGLM workloads | Katsura, Cyclic, both MQ families | as above | **yes**, as `lex-basis-by-conversion` |
+| Fukuoka MQ Type III | — | **excluded by licence**, not by effort — see below | n/a |
+| Characteristic two | — | **blocked on a convention** — see §6 | no |
 
-The four "not yet converted" rows are honest status, not oversight. Each needs a conversion from an
-existing generator into the `Instance` text form, and each conversion is a place the ideal can
-change silently — so each gets its own equivalence test against a second engine before any figure
-is published. Doing four of those badly is worse than doing two of them properly.
+**Six families**, which is the milestone's minimum, and
+`test_the_corpus_covers_six_families_each_with_recorded_evidence` asserts both the count and that
+each of the four kinds of evidence is actually used — so none of the vocabulary is dead.
 
-**Fukuoka MQ carries an extra constraint.** The instances are "All Rights Reserved, no stated
-licence" and **must never be redistributed** (`docs/research/external-provenance-policy.md`). They
-are fetched locally by `tools/fetch-mq-challenge.sh` into `ZEEBRA_MQ_DIR` and referenced by digest.
-A corpus entry for them therefore cannot carry the system text — it has to name the file and its
-digest and build the instance at run time, which is a different shape from the generated families
-and is why it is not bolted on here.
+### Anemoi is in the corpus precisely because it cannot be compared
+
+Anemoi's published parameters are over `2^64 − 353`, and msolve and Singular both stop below
+`2^31`. So no comparand can represent the field at any size, and no cross-library figure is
+publishable for it. It is in the corpus anyway, because **the ceiling should be a row rather than
+an absence**: a reader scanning the board sees `unsupported: characteristic …` against every
+external engine, which is a statement about the state of the tools. Omitting the family would make
+the same fact invisible.
+
+The two Poseidon-versus-Anemoi field choices are worth contrasting, because the difference is luck.
+Poseidon's rows are over KoalaBear, `2^31 − 2^24 + 1 = 2130706433`, which happens to sit **below**
+every comparand's ceiling, so those rows are comparable. Nothing was designed for that and it does
+not generalize.
+
+Note that for both, the corpus uses the **registry's** field and ignores the `characteristic`
+argument. Poseidon's round constants come out of a seeded LFSR keyed on the prime and Anemoi's
+depend on the smallest primitive root, so the same row over another prime is **another problem** —
+the characteristic cannot be varied the way it can for Katsura.
+`test_a_poseidon_rung_keeps_the_registrys_field_whatever_is_asked_for` pins that.
+
+### Fukuoka MQ Type III is excluded by licence, and that is a justified variant
+
+The instances are **"All Rights Reserved, no stated licence"** and must never be redistributed
+(`docs/research/external-provenance-policy.md`). They are fetched locally by
+`tools/fetch-mq-challenge.sh` into `ZEEBRA_MQ_DIR` and referenced by digest.
+
+That is not a scheduling problem, it is structural: **a corpus entry cannot carry their system
+text**, which is what every other entry here is. An entry would have to name the file and its
+digest and build the instance at run time, so it would be a different shape from the generated
+families and would not be reproducible for anyone who has not fetched the files. The two MQ
+families in the corpus — random and planted — cover the same shape of problem with instances that
+are freely reproducible from a seed, which is why they are the substitute and not a consolation.
+
+Fukuoka III remains covered by the **cryptanalysis** scoreboard, where instances are referenced by
+digest rather than carried, and that is the right home for it.
 
 ---
 
@@ -188,15 +237,29 @@ exercises `StoppedByLimit`, the outcome the protocol spends the most care on.
 
 ```
 # zeebra cross-library corpus, characteristic 2147483647 order grevlex
-# name family rung dimension variables digest
-cyclic-4 cyclic easy positive-dimensional 4 e1d8d59448b3d648…
-cyclic-5 cyclic easy zero-dimensional 5 3274d14b224664ae…
-cyclic-6 cyclic intermediate zero-dimensional 6 ed89afe173d16024…
-katsura-4 katsura easy zero-dimensional 4 825a3aa54e152da5…
-katsura-5 katsura easy zero-dimensional 5 6f305e37b2cc4ade…
-katsura-6 katsura intermediate zero-dimensional 6 aa992992dfe29a23…
-katsura-7 katsura challenging zero-dimensional 7 545cef6185ed10e4…
+# name family rung equivalence dimension variables digest
+anemoi64-cico-n1-fcico anemoi easy no-comparand zero-dimensional 2 c053c6ff0186e3b4…
+anemoi64-cico-n2-fcico anemoi intermediate no-comparand zero-dimensional 4 e3a6312e85c486b0…
+cyclic-4 cyclic easy comparand-file positive-dimensional 4 e1d8d59448b3d648…
+cyclic-5 cyclic easy comparand-file zero-dimensional 5 3274d14b224664ae…
+cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 ed89afe173d16024…
+katsura-4 katsura easy comparand-file zero-dimensional 4 825a3aa54e152da5…
+katsura-5 katsura easy comparand-file zero-dimensional 5 6f305e37b2cc4ade…
+katsura-6 katsura intermediate comparand-file zero-dimensional 6 aa992992dfe29a23…
+katsura-7 katsura challenging comparand-file zero-dimensional 7 545cef6185ed10e4…
+mq-planted-10 mq-planted intermediate known-solution zero-dimensional 10 0eef4b55bce6fdc6…
+mq-planted-14 mq-planted challenging known-solution zero-dimensional 14 063f5b1ddbab6ef1…
+mq-planted-6 mq-planted easy known-solution zero-dimensional 6 55fb9b0622b6217a…
+mq-random-10 mq-random intermediate live-oracle zero-dimensional 10 72d0ad315fc25409…
+mq-random-14 mq-random challenging live-oracle zero-dimensional 14 029def705543e29b…
+mq-random-6 mq-random easy live-oracle zero-dimensional 6 d98e5e5bf82b4618…
+poseidon-t2-rf2-rp0-planted poseidon easy known-solution zero-dimensional 5 f4cf6699cee835a6…
+poseidon-t2-rf2-rp2-planted poseidon intermediate known-solution zero-dimensional 7 3b3bfb037ceb32de…
+poseidon-t2-rf4-rp0-planted poseidon challenging known-solution zero-dimensional 9 95cec79371a8751a…
 ```
+
+Nineteen rungs across six families. Digests are abbreviated above; the manifest carries all 64
+hex digits.
 
 Line-oriented and ASCII so another language's harness can read it and a digest can be reproduced by
 hand — the same property that makes `Instance::canonical` reproducible outside Rust.
@@ -215,7 +278,10 @@ touching the constant, not after.
    definition, which would drift. `corpus::text_instance` renders through
    `differential::polynomial_to_string`, the renderer whose output Zeebra's own parser and
    Singular both accept.
-2. Name it by **variable count**.
+2. Name it by **variable count** — unless it comes from the cryptanalysis registry, in which case
+   it keeps its **registry id**, which is its identity everywhere else in the crate and must not be
+   renamed to suit a convention local to the corpus. `test_every_ladder_entry_builds_and_the_
+   generated_families_are_named_by_variable_count` enforces both halves.
 3. Add a match arm to `corpus::instance` and an entry to `corpus::ladder`. The arm is deliberate
    friction: a size nobody wrote down is a size nobody checked the equivalence of.
 4. Write an equivalence test against a second engine's own literal, as §2 and §3 do. If no second
