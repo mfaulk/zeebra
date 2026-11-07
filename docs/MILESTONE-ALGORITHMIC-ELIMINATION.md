@@ -356,6 +356,41 @@ speedup. Any end-to-end claim is measured end to end.
 
 #318 and #319 resolve or are explicitly bounded **before** M26-A re-costs `rf4-rp2`.
 
+#### 8.1.1 Answered, and the gate as written was slightly wrong
+
+**#349 is done (PR #393), and the answer is interreduction at 80.4%.** On `mq-random-10` at the
+recorded digest, under `F4Options::default()` because that is what the record used, over four runs
+with identical pairs, batches and basis:
+
+| stage | share | ceiling if free | against the measured 4.13x |
+|---|---:|---:|---|
+| symbolic | 1.4% | — | — |
+| construction | 3.5% | — | — |
+| **#268**, symbolic + construction | **4.9%** | **1.05x** | **cannot explain it** |
+| **#269**, elimination | **13.9%** | **1.16x** | **cannot explain it** |
+| **#304**, interreduction | **80.4%** | **5.10x** | **spans it** |
+
+So **#268 is ruled out on external evidence** — the reversal of what §13.9 expected, which was that
+this profile would give it the first external support any H-series item had — and **#304 is promoted
+to High**, now the F4 priority rather than only a memory finding.
+
+**The table above this one conflated two stages that point at different issues.** Its first row
+reads "interreduction and matrix construction dominate → #268 and #330 promoted", but #268 targets
+symbolic and construction while #304 targets interreduction, so the row bundled an outcome with a
+consequence that does not follow from it. The measured outcome — interreduction dominating and
+construction at 3.5% — promotes #304 and **rules #268 out**, which is nearer the third row than the
+first. The gate still decided the question; it would have mis-stated the answer if read literally,
+and a gate that can do that is written badly. The lesson for the remaining gates is to key each
+branch to the **issue** a stage implicates, never to a stage name.
+
+**#330 is not promoted.** It targets column indexing during symbolic preprocessing and matrix
+construction, which together are 4.9% here. It stays deferred on the same evidence as #268.
+
+**A second finding, outside the gate.** Under `F4Options::baseline()` this instance does not finish,
+refusing at 20 000 277 live nonzero entries against the shared 20 000 000 budget. That is the second
+unrelated workload to cross #322's coupled limit by one part in 10^5, after Anemoi `N = 6` (#323),
+and it strengthens #322's promotion in §5.4 rather than changing it.
+
 ### 8.2 Gate M26-A — the correctness problem before the speedup
 
 1. Differential agreement against `Matrix::determinant` at every size, including specialization points
