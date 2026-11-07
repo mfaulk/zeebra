@@ -453,6 +453,17 @@ impl CicoVisitor<K> for Solve<'_> {
 fn frontier_options() -> F4Options {
     F4Options {
         profile_degrees: true,
+        // The cooperative time budget, set from `ZEEBRA_WALL_SECONDS` like the supervisor's
+        // backstop but deliberately **shorter**, so the cooperative check wins the race. Losing it
+        // costs the whole frontier: the `recv_timeout` arm cannot reach the `(Result,
+        // F4Statistics)` tuple the abandoned thread still owns, so it emits an empty frontier with
+        // every group-B counter zeroed. The cooperative stop *returns*, and a return carries the
+        // statistics.
+        //
+        // One batch of margin is what the gap buys. The check runs between batches, so a stop
+        // overshoots by however much the batch in progress still needed; the backstop has to allow
+        // for that or it fires first and the statistics are lost anyway.
+        max_wall_time: Some(cooperative_budget()),
         max_matrix_columns: 200_000,
         // `ZEEBRA_MAX_ENTRIES` raises the bound that binds, for the one question a fixed budget
         // cannot answer: whether a row is out of reach or merely out of *this* budget. The default
@@ -467,7 +478,14 @@ fn frontier_options() -> F4Options {
     }
 }
 
-/// The per-row wall clock, from the environment. A backstop, not the budget.
+/// The per-row wall clock, from the environment. The supervisor's **backstop**, not the budget.
+///
+/// Two clocks govern a frontier row and the order they fire in matters. [`cooperative_budget`] is
+/// F4's own `max_wall_time`, which **returns** and so carries its statistics out; this is the
+/// `recv_timeout` that abandons the worker thread, which cannot. The cooperative one is set
+/// shorter so that it is the one that normally fires, and this stays what it should always have
+/// been: the thing that catches a single batch running long enough that the cooperative check
+/// never gets a turn.
 fn wall_clock() -> Duration {
     Duration::from_secs(
         std::env::var("ZEEBRA_WALL_SECONDS")
@@ -477,12 +495,23 @@ fn wall_clock() -> Duration {
     )
 }
 
+/// How much of [`wall_clock`] F4's own cooperative check is given.
+///
+/// Nine tenths, with a floor of one second. A fraction rather than a fixed subtraction so the
+/// margin scales: a 60 s row and a 6 h row need different slack for the batch in progress, and the
+/// overshoot is roughly proportional to how large the matrices have grown by then.
+fn cooperative_budget() -> Duration {
+    let wall = wall_clock();
+    (wall * 9 / 10).max(Duration::from_secs(1)).min(wall)
+}
+
 fn frontier_policy() -> String {
     format!(
         "grevlex F4 only; 200000 columns, {} live entries (the binding bound), 10000 batches, \
-         wall clock {} s as a backstop",
+         F4 max_wall_time {} s cooperative, supervisor wall clock {} s as a backstop",
         std::env::var("ZEEBRA_MAX_ENTRIES").unwrap_or_else(|_| "20000000".to_string()),
-        std::env::var("ZEEBRA_WALL_SECONDS").unwrap_or_else(|_| "600".to_string())
+        cooperative_budget().as_secs(),
+        wall_clock().as_secs()
     )
 }
 
@@ -790,9 +819,12 @@ impl CicoVisitor<K> for Frontier<'_> {
 
 /// F4 under a wall-clock supervisor, then the rest of the pipeline if a basis came back.
 ///
-/// The supervisor is why this takes the system by value: F4 has no cooperative time check, so a
-/// run that outlasts its clock is abandoned in a worker thread and the process exits after the
-/// record is written. A thread that owns its data can be abandoned safely.
+/// Two clocks, and which one fires decides whether the row has a frontier. F4's own
+/// `max_wall_time` is set shorter (see [`cooperative_budget`]) and **returns**, so its stop
+/// carries the matrix statistics out through the channel. This `recv_timeout` is the backstop for
+/// the case the cooperative check cannot cover — a single batch running past the margin — and it
+/// can only abandon the worker thread, which is why the system is taken by value: a thread that
+/// owns its data can be abandoned safely, and the process exits after the record is written.
 fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
     system: Vec<MultivariatePolynomial<D, F>>,
     wall: Duration,
@@ -842,6 +874,19 @@ fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
                     }
                     (outcome, stages, frontier)
                 }
+                // A stop that **returned**, so `statistics` and therefore `frontier` are real.
+                // This now includes the cooperative time stop, which is the whole point of #284:
+                // before it, a run that ran long could only be abandoned, and an abandoned run
+                // reports nothing.
+                //
+                // `resource` is `F4Error::limit_name()`, which separates the kinds without a
+                // second field: `max_wall_time` is a `StopKind::Time` and every other name here
+                // is a `StopKind::Resource`. The distinction has to survive into the record
+                // because a wall clock is a fact about one machine and an entry count is not, so
+                // the two must never be ranked against each other. Nothing ranks them today —
+                // `Scoreboard::best` and `verified_somehow` both admit only verified witnesses,
+                // and `unfinished` preserves insertion order without comparing — and a renderer
+                // that starts ranking stops has to read this field first.
                 Err(error) => (
                     RunOutcome::StoppedAtLimit(Limit {
                         resource: resource_of(&error),
@@ -855,9 +900,12 @@ fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
             }
         }
         Err(_) => {
-            // Nothing from the worker: no statistics exist, and the only account of the state is
-            // the observer's. Reported as a wall-clock stop rather than as a budget, because it is
-            // a fact about this supervisor and not about the system.
+            // The backstop fired, which means F4's own cooperative check never got a turn — a
+            // single batch ran longer than the margin between the two clocks. Nothing came back
+            // from the worker, so no statistics exist and the only account of the state is the
+            // observer's. Reported as `wall_clock` and not as `max_wall_time`, because those are
+            // two different stops: one is a fact about this supervisor, the other a fact about the
+            // budget F4 was given.
             let batches = progress.batches.load(Ordering::Relaxed);
             let degree = progress.degree.load(Ordering::Relaxed);
             stages.push(
@@ -873,10 +921,12 @@ fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
                 RunOutcome::StoppedAtLimit(Limit {
                     resource: "wall_clock".to_string(),
                     detail: format!(
-                        "stopped after {} s with {} batches started; F4 has no cooperative time \
-                         check, so no matrix statistics exist for a run killed this way",
+                        "the supervisor's backstop fired after {} s with {} batches started, so \
+                         F4's cooperative {} s budget never reached a batch boundary; the worker \
+                         was abandoned and no matrix statistics exist for a run stopped this way",
                         wall.as_secs(),
-                        batches
+                        batches,
+                        cooperative_budget().as_secs()
                     ),
                     degree: (degree > 0).then_some(degree),
                     last_completed_stage: Stage::Generation,
@@ -1344,19 +1394,14 @@ fn finish_from_basis<const N: usize, F: zeebra::KnownOrder>(
 }
 
 /// Which bound bound, as a stable name a consumer can key on.
+/// The stable name of whatever limit stopped a run.
+///
+/// Delegated to `F4Error::limit_name` rather than matched here. The hand-rolled match this
+/// replaces ended in a `_ => "other"` catch-all, so `max_wall_time` would have been recorded as
+/// `other` — a new stop reason silently losing its name is exactly what a catch-all buys. The
+/// library's version is exhaustive, so a variant added there stops compiling until it is named.
 fn resource_of(error: &zeebra::grobner::F4Error) -> String {
-    use zeebra::grobner::F4Error::*;
-    match error {
-        TooManyRows { .. } => "max_matrix_rows",
-        TooManyColumns { .. } => "max_matrix_columns",
-        TooManyNonzeros { .. } => "max_live_nonzeros",
-        TooManyLiveBytes { .. } => "max_live_bytes",
-        TooManyBatches { .. } => "max_batches",
-        TooManyBasisElements { .. } => "max_basis_elements",
-        InvalidOptions { .. } => "invalid_options",
-        _ => "other",
-    }
-    .to_string()
+    error.limit_name().to_string()
 }
 
 /// The machine and build this measurement came from.
