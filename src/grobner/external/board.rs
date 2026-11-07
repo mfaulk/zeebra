@@ -306,13 +306,23 @@ impl CompetitiveRecord {
 
     /// True if `other` measured the same thing under the same conditions.
     ///
-    /// Problem, task, limits, machine and build. The precondition of a ratio, minus the invariant
-    /// agreement, which is checked separately because it is a property of the *answers*.
+    /// Problem, task, limits, machine, build **and policy**. The precondition of a ratio, minus the
+    /// invariant agreement, which is checked separately because it is a property of the *answers*.
+    ///
+    /// `Environment::comparable` covers machine, cpu and build and **not** `policy`, which is where
+    /// the measurement discipline lives — `many rows per process (no memory figure)` against `one
+    /// row per process`. Those are different measurements of the same row: one is cold in a fresh
+    /// process, the other inherits the allocator and cache state of every row that ran before it in
+    /// the same one. Left to `Environment::comparable` alone the board paired them, which doubled
+    /// its own pair count and ratioed a cold row against a warm one. Checked here rather than in
+    /// `Environment` because that type is shared with the cryptanalysis scoreboard, whose own
+    /// comparability rules are #77's to change.
     pub fn comparable_with(&self, other: &CompetitiveRecord) -> bool {
         self.problem_digest == other.problem_digest
             && self.task == other.task
             && self.limits.comparable_with(&other.limits)
             && self.environment.comparable(&other.environment)
+            && self.environment.policy == other.environment.policy
     }
 
     /// The row as JSON.
@@ -1784,6 +1794,35 @@ mod tests {
         let markdown = CompetitiveBoard::new().to_markdown();
         assert!(markdown.contains("No rows yet"));
         assert!(!markdown.contains("| problem |"));
+    }
+
+    /// Two rows taken under different measurement policies are not comparable, so a row measured
+    /// one-per-process is never ratioed against one measured many-per-process.
+    #[test]
+    fn test_a_different_measurement_policy_is_not_comparable() {
+        let warm = named_row("p1", "singular", answered(64), 40.0);
+        let mut cold = named_row("p1", "singular", answered(64), 40.0);
+        cold.environment.policy = "60 s wall, 1 worker, one row per process".to_string();
+
+        assert!(
+            warm.comparable_with(&warm.clone()),
+            "a row is comparable with itself"
+        );
+        assert!(
+            !warm.comparable_with(&cold),
+            "the policy differs, so these are two different measurements"
+        );
+
+        // And the board does not pair across the two, which is what doubled its pair count.
+        let mut board = CompetitiveBoard::new();
+        board.add(named_row("p1", "zeebra", answered(64), 1.0));
+        board.add(warm);
+        board.add(cold);
+        assert_eq!(
+            board.speedups("zeebra").len(),
+            1,
+            "only the row sharing zeebra's policy pairs with it"
+        );
     }
 
     /// The board names the libraries it holds and how many rows each answered, so a short roster
