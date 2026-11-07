@@ -1,7 +1,7 @@
 //! Inverse Fast Fourier Transform (IFFT).
 
 use crate::{
-    fft::{domain::FFTDomain, transform::transform_in_place},
+    fft::{domain::FFTDomain, prime_factor::transform_any},
     FiniteField, UnivariatePolynomial,
 };
 
@@ -34,7 +34,7 @@ pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolyn
     let w_inv = w.inverse();
 
     let mut coefficients = x.to_vec();
-    transform_in_place(&mut coefficients, w_inv.powers());
+    transform_any(&mut coefficients, w_inv.powers());
     for c in coefficients.iter_mut() {
         *c *= size_inverse;
     }
@@ -139,6 +139,33 @@ mod tests {
         check::<PrimeFieldElement64<18_446_744_069_414_584_321>>(0x6011);
         check::<Bn254Fr>(0xb211);
         check::<Bls12_381Fr>(0xb311);
+    }
+
+    /// Evaluating then interpolating recovers the polynomial at sizes that are not powers of two.
+    ///
+    /// The inverse direction needs nothing new — the same prime-factor decomposition over the
+    /// inverse domain, scaled by `1/n` — and this is what says so. `1/n` exists for every size a
+    /// domain exists at: a primitive `n`th root of unity requires `n | q - 1`.
+    #[test]
+    fn test_evaluate_then_interpolate_at_sizes_that_are_not_powers_of_two() {
+        // 65520 = 2^4 * 3^2 * 5 * 7 * 13.
+        type F = PrimeFieldElement64<65521>;
+        let mut rng = StdRng::seed_from_u64(0x125c);
+        for n in [3u64, 5, 6, 9, 12, 15, 45, 63, 105, 144, 2520] {
+            let g = F::root_of_unity(n, &mut rng);
+            let domain = FFTDomain::from_generator(g, n as usize);
+            let p = UnivariatePolynomial::<F>::rand(n - 1, &mut rng);
+            let evaluations = evaluate(&p, &domain);
+            assert_eq!(interpolate(&evaluations, &domain), p, "n = {n}");
+
+            // And the recovered coefficients against the values themselves, so a forward and
+            // inverse transform that were inverse but both wrong would still fail.
+            let values: Vec<F> = (0..n).map(|_| F::random(&mut rng)).collect();
+            let q = interpolate(&values, &domain);
+            for (i, value) in values.iter().enumerate() {
+                assert_eq!(q.eval(&domain[i]), *value, "n = {n}, point {i}");
+            }
+        }
     }
 
     /// A length mismatch between the values and the domain is rejected.

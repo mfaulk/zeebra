@@ -3,10 +3,18 @@
 //! The Fast Fourier Transform is a "divide-and-conquer" algorithm that decomposes a Fourier transform
 //! of size n = n_1 * n_2 into smaller Fourier transforms of size n_1 and n_2. These can also be
 //! decomposed recursively if n_1 and n_2 are composite, and the FFT is fastest when the size
-//! n is the product of small prime factors. The simplest case, assumed here, is when the size
-//! is a power of 2.
+//! n is the product of small prime factors.
+//!
+//! A power-of-two size takes the radix-2 kernel; any other size is decomposed by
+//! [`prime_factor`](super::prime_factor). A domain of any size is therefore constructible, and
+//! what it costs to transform over is a property of the size's factorization rather than a
+//! precondition on building it.
 
-use crate::{fft::evens_and_odds, fields::batch_inverse, powers_of, FiniteField};
+use crate::{
+    fft::{evens_and_odds, prime_factor::distinct_prime_factors as prime_factors},
+    fields::batch_inverse,
+    powers_of, FiniteField,
+};
 use std::{
     fmt::{Display, Formatter},
     ops::Index,
@@ -18,8 +26,8 @@ use std::{
 /// [`FFTDomain::try_from_generator`] returns them instead of aborting.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DomainError {
-    /// Only power-of-two sizes are supported; see the module comment.
-    SizeNotPowerOfTwo { size: usize },
+    /// A domain of no points, which no transform is defined over.
+    SizeZero,
 
     /// `g^size != 1`, so the powers of `g` do not close up after `size` of them.
     NotAnNthRoot { size: usize },
@@ -31,8 +39,8 @@ pub enum DomainError {
 impl Display for DomainError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SizeNotPowerOfTwo { size } => {
-                write!(f, "an FFT domain of size {size} is not a power of two")
+            Self::SizeZero => {
+                write!(f, "an FFT domain must have at least one point")
             }
             Self::NotAnNthRoot { size } => {
                 write!(f, "the generator is not a {size}-th root of unity")
@@ -57,12 +65,16 @@ pub struct FFTDomain<F: FiniteField> {
 impl<F: FiniteField> FFTDomain<F> {
     /// An FFT domain.
     ///
+    /// Any size: a transform whose size is not a power of two goes through the prime-factor
+    /// decomposition rather than the radix-2 kernel. See [`prime_factor`](super::prime_factor).
+    ///
     /// # Arguments
     /// * `powers` - Powers of the generator `g` : 1, g, g^2, ...
     pub fn new(powers: Vec<F>) -> Self {
-        assert!(powers.len().is_power_of_two());
-        // assert_eq!(powers[0], F::one(), "First element must be 1");
-        // assert!(powers.len() > 1, "Domain must have at least 2 elements");
+        assert!(
+            !powers.is_empty(),
+            "an FFT domain must have at least one point"
+        );
         Self { powers }
     }
 
@@ -79,16 +91,20 @@ impl<F: FiniteField> FFTDomain<F> {
     /// * `generator` - A primitive `size`-th root of unity.
     /// * `size` - The number of elements `n` in the domain.
     pub fn try_from_generator(generator: F, size: usize) -> Result<Self, DomainError> {
-        if !size.is_power_of_two() {
-            return Err(DomainError::SizeNotPowerOfTwo { size });
+        if size == 0 {
+            return Err(DomainError::SizeZero);
         }
         if generator.pow(size as u128) != F::one() {
             return Err(DomainError::NotAnNthRoot { size });
         }
-        // For a power-of-two n the order is exactly n unless `g^(n/2) = 1`, so this needs no
-        // factorization. The size-one domain is the powers of 1, where n / 2 would be zero.
-        if size > 1 && generator.pow((size / 2) as u128) == F::one() {
-            return Err(DomainError::NotPrimitive { size });
+        // The order is exactly `size` iff `g^(size/p) != 1` for every prime `p | size`. For a
+        // power of two that is the single check `g^(size/2) != 1`; for a general size it is one
+        // check per distinct prime factor, which is why the factorization is needed at all. The
+        // size-one domain is the powers of one and has no prime factors to check.
+        for p in prime_factors(size) {
+            if generator.pow((size / p) as u128) == F::one() {
+                return Err(DomainError::NotPrimitive { size });
+            }
         }
 
         Ok(Self {
@@ -122,7 +138,17 @@ impl<F: FiniteField> FFTDomain<F> {
     }
 
     /// Split the domain into even and odd powers of the generator.
+    ///
+    /// # Panics
+    /// Panics on an odd size, where the two halves would not be the same length. This is the
+    /// radix-2 decomposition; an odd factor is handled by
+    /// [`prime_factor`](super::prime_factor) instead.
     pub fn split(&self) -> (FFTDomain<F>, FFTDomain<F>) {
+        assert!(
+            self.size().is_multiple_of(2),
+            "a domain of odd size {} does not split in two",
+            self.size()
+        );
         let (evens, odds) = evens_and_odds(self.powers());
         (FFTDomain::new(evens), FFTDomain::new(odds))
     }
@@ -200,16 +226,65 @@ mod tests {
         let _domain = FFTDomain::from_generator(g, 540);
     }
 
-    /// A size that is not a power of two is an error value, naming the size.
+    /// A size the field cannot supply a root for fails on the root, not on the size.
+    ///
+    /// Three does not divide 65536, so this field has no element of order three. Since #125 the
+    /// size itself is no longer a reason to refuse — the prime-factor decomposition handles a
+    /// size that is not a power of two — so what is refused here is the generator: one satisfies
+    /// `1^3 = 1` but has order one, a proper divisor of three.
     #[test]
-    fn test_a_size_that_is_not_a_power_of_two_is_an_error() {
+    fn test_a_size_the_field_has_no_root_for_is_an_error() {
         type F = PrimeFieldElement64<65537>;
-        // The size is rejected before the generator is looked at: 3 does not divide 65536, so
-        // this field has no element of order three to offer.
         assert_eq!(
             FFTDomain::try_from_generator(F::one(), 3),
-            Err(DomainError::SizeNotPowerOfTwo { size: 3 })
+            Err(DomainError::NotPrimitive { size: 3 })
         );
+    }
+
+    /// A size of zero is refused: there is no transform over no points.
+    #[test]
+    fn test_a_size_of_zero_is_an_error() {
+        type F = PrimeFieldElement64<65537>;
+        assert_eq!(
+            FFTDomain::try_from_generator(F::one(), 0),
+            Err(DomainError::SizeZero)
+        );
+    }
+
+    /// A domain of a size that is not a power of two is built, since #125, from a root of that
+    /// exact order.
+    #[test]
+    fn test_a_domain_of_a_size_that_is_not_a_power_of_two() {
+        // 65520 = 2^4 * 3^2 * 5 * 7 * 13, so this field has a primitive 12th root of unity.
+        type F = PrimeFieldElement64<65521>;
+        let mut rng = StdRng::seed_from_u64(125);
+        let g = F::root_of_unity(12, &mut rng);
+        let domain = FFTDomain::try_from_generator(g, 12).expect("a primitive 12th root");
+        assert_eq!(domain.size(), 12);
+        for (i, w_i) in domain.powers().iter().enumerate() {
+            assert_eq!(*w_i, g.pow(i as u128));
+        }
+    }
+
+    /// A root whose order is a proper divisor is still refused at a size that is not a power of
+    /// two, which needs one check per distinct prime factor rather than the single `g^(n/2)` one.
+    #[test]
+    fn test_a_non_primitive_root_is_refused_at_a_composite_size() {
+        type F = PrimeFieldElement64<65521>;
+        let mut rng = StdRng::seed_from_u64(7);
+        let g = F::root_of_unity(12, &mut rng);
+        // Order 6 and order 4: each is caught by a different prime's check, and `g^(12/2) != 1`
+        // holds for the first of them, so the power-of-two test alone would have let it through.
+        for divisor in [2u128, 3] {
+            let not_primitive = g.pow(divisor);
+            assert!(not_primitive.pow(12).is_one());
+            assert_eq!(
+                FFTDomain::try_from_generator(not_primitive, 12),
+                Err(DomainError::NotPrimitive { size: 12 }),
+                "g^{divisor} has order {}",
+                12 / divisor
+            );
+        }
     }
 
     /// A generator that is not an nth root of unity is an error value rather than a panic.
