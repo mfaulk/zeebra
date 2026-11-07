@@ -234,6 +234,56 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
     g: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
+    match reduce_grobner_basis_until(g, order, || false) {
+        Ok(reduced) => reduced,
+        // Unreachable: the predicate above is constant `false`.
+        Err(stopped) => unreachable!(
+            "a never-stopping predicate stopped after {} elements",
+            stopped.elements_reduced
+        ),
+    }
+}
+
+/// How far [`reduce_grobner_basis_until`] had got when its caller asked it to stop.
+///
+/// Carries the progress rather than only the fact, because the stage is **not** a loop over
+/// batches: a caller reporting a stop here has no degree to name, and the element counts are the
+/// only honest measure of how far a run got. See [`F4Error::InterreductionTimeBudgetExceeded`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct InterreductionStopped {
+    /// Basis elements whose normal form had been written back before the stop.
+    pub elements_reduced: usize,
+    /// Elements in the minimized basis, which is how many the stage had to do.
+    pub elements: usize,
+}
+
+/// [`reduce_grobner_basis`], asking `should_stop` before each element.
+///
+/// # Why this stage needs a stop at all
+///
+/// Final interreduction runs **after** F4's batch loop, so a per-batch wall-clock check cannot see
+/// it: a budget can be honored at every check and then overrun inside this function. That is not a
+/// corner case. #349 measured this stage at **80.4%** of `mq-random-10`, so on the instance M25
+/// used to measure Zeebra against Singular, four fifths of the computation sat in a stage no clock
+/// was consulted in — which is how a 120-second budget returned at ten minutes (#395).
+///
+/// # Granularity, and what it does not fix
+///
+/// One element. A single `normal_form` against a large basis can be arbitrarily long, so the
+/// elapsed time at a stop is the budget plus whatever that one reduction still needed — the same
+/// caveat the batch-loop check carries, and an external supervisor is still the right backstop.
+/// What this removes is the unbounded case, where the stage is never checked at all.
+///
+/// # Errors
+/// [`InterreductionStopped`] when `should_stop` returns true, with the element counts. The partial
+/// basis is deliberately **not** returned: `F4Error`'s contract is that a successful return is
+/// always a complete reduced Gröbner basis, and a half-interreduced basis handed back as success
+/// is exactly the confusion that contract exists to prevent.
+pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
+    g: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    mut should_stop: impl FnMut() -> bool,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
     let mut minimal = minimize_grobner_basis(g, order);
 
     // Ascending by leading monomial, which is the whole optimization.
@@ -265,8 +315,17 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
     // which is what `normal_form` takes. The alternative, and what this replaced, is to clone all
     // `n - 1` of them once per element before computing anything.
     let last = reduced.len().saturating_sub(1);
+    let elements = reduced.len();
     if reduced.len() > 1 {
         for i in 0..reduced.len() {
+            // Before the element, not after: a stop that has already paid for the reduction it
+            // was meant to prevent is not a stop.
+            if should_stop() {
+                return Err(InterreductionStopped {
+                    elements_reduced: i,
+                    elements,
+                });
+            }
             reduced.swap(i, last);
             let p = std::mem::take(&mut reduced[last]);
             let remainder = p.normal_form(&reduced[..last], order);
@@ -284,7 +343,58 @@ pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
     // result, and a reduced Gröbner basis is unique as a set — which makes the sequence unique
     // too. Without this the order came from `HashSet` iteration and varied between runs.
     reduced.reverse();
-    reduced
+    Ok(reduced)
+}
+
+#[cfg(test)]
+mod interreduction_stop_tests {
+    use super::{reduce_grobner_basis, reduce_grobner_basis_until};
+    use crate::{fields::Zp13, poly::MonomialOrder, MultivariatePolynomial};
+
+    const VARS: [&str; 2] = ["x", "y"];
+
+    fn basis() -> Vec<MultivariatePolynomial<2, Zp13>> {
+        // Two elements, so the interreduction loop runs at all.
+        ["x^2 + y", "y^2 + x"]
+            .iter()
+            .map(|t| MultivariatePolynomial::parse(t, VARS).expect("a bivariate polynomial"))
+            .collect()
+    }
+
+    /// A never-stopping predicate reproduces `reduce_grobner_basis` exactly.
+    #[test]
+    fn a_never_stopping_predicate_is_the_unbounded_result() {
+        let g = basis();
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let bounded = reduce_grobner_basis_until(&g, order, || false).expect("never stops");
+        assert_eq!(bounded, reduce_grobner_basis(&g, order));
+    }
+
+    /// An always-stopping predicate stops before reducing any element.
+    #[test]
+    fn an_always_stopping_predicate_stops_before_the_first_element() {
+        let g = basis();
+        let stopped =
+            reduce_grobner_basis_until(&g, MonomialOrder::GradedReverseLexicographic, || true)
+                .expect_err("an always-true predicate must stop");
+        assert_eq!(stopped.elements_reduced, 0, "nothing was paid for");
+        assert_eq!(stopped.elements, 2, "and it reports the work it had to do");
+    }
+
+    /// The predicate is consulted once per element, so a stop after the first is reported as such.
+    #[test]
+    fn the_predicate_is_consulted_once_per_element() {
+        let g = basis();
+        let mut calls = 0usize;
+        let stopped =
+            reduce_grobner_basis_until(&g, MonomialOrder::GradedReverseLexicographic, || {
+                calls += 1;
+                calls > 1
+            })
+            .expect_err("stops on the second element");
+        assert_eq!(stopped.elements_reduced, 1, "the first element was reduced");
+        assert_eq!(calls, 2, "asked once per element, not once per basis");
+    }
 }
 
 #[cfg(test)]

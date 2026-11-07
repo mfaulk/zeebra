@@ -548,6 +548,30 @@ pub enum F4Error {
         budget_millis: u64,
     },
 
+    /// [`F4Options::max_wall_time`] elapsed during **final interreduction**, after the batch loop
+    /// had finished.
+    ///
+    /// Separate from [`Self::TimeBudgetExceeded`] because that variant's `degree` is the selection
+    /// degree of the batch the budget was noticed at, and this stage has no batch and no selection
+    /// degree — reporting one would be a fabrication. The element counts are the honest measure of
+    /// how far the stage got.
+    ///
+    /// **This is not a rare stop.** #349 measured interreduction at **80.4%** of `mq-random-10`,
+    /// the instance M25 compared against Singular, so a budget that is honored at every batch can
+    /// still be overrun by four fifths of the computation (#395). Before that issue the stage was
+    /// not checked at all, and a bounded run could return an order of magnitude late.
+    ///
+    /// `elapsed_millis` may exceed `budget_millis` by one element's reduction: the check is before
+    /// each element, and a single `normal_form` against a large basis is not interruptible.
+    InterreductionTimeBudgetExceeded {
+        /// Basis elements whose normal form was written back before the stop.
+        elements_reduced: usize,
+        /// Elements the minimized basis held, which is how many the stage had to do.
+        elements: usize,
+        elapsed_millis: u64,
+        budget_millis: u64,
+    },
+
     /// The basis held, or grew beyond, more elements than allowed.
     ///
     /// Applies to the generators as supplied, not only to what the computation appends: a basis
@@ -584,7 +608,9 @@ impl F4Error {
             | Self::TooManyLiveBytes { .. }
             | Self::TooManyBatches { .. }
             | Self::TooManyBasisElements { .. } => StopKind::Resource,
-            Self::TimeBudgetExceeded { .. } => StopKind::Time,
+            Self::TimeBudgetExceeded { .. } | Self::InterreductionTimeBudgetExceeded { .. } => {
+                StopKind::Time
+            }
             Self::InvalidOptions { .. } => StopKind::Caller,
             Self::CertificationFailed { .. } => StopKind::Certification,
         }
@@ -602,7 +628,9 @@ impl F4Error {
             Self::TooManyLiveBytes { .. } => "max_live_bytes",
             Self::TooManyBatches { .. } => "max_batches",
             Self::TooManyBasisElements { .. } => "max_basis_elements",
-            Self::TimeBudgetExceeded { .. } => "max_wall_time",
+            Self::TimeBudgetExceeded { .. } | Self::InterreductionTimeBudgetExceeded { .. } => {
+                "max_wall_time"
+            }
             Self::InvalidOptions { .. } => "invalid_options",
             Self::CertificationFailed { .. } => "certification",
         }
@@ -643,6 +671,17 @@ impl Display for F4Error {
                 f,
                 "the computation did not finish within {} ms, and had reached degree {} after {} ms",
                 budget_millis, degree, elapsed_millis
+            ),
+            Self::InterreductionTimeBudgetExceeded {
+                elements_reduced,
+                elements,
+                elapsed_millis,
+                budget_millis,
+            } => write!(
+                f,
+                "the computation did not finish within {} ms: final interreduction had reduced {} \
+                 of {} basis elements after {} ms",
+                budget_millis, elements_reduced, elements, elapsed_millis
             ),
             Self::TooManyBasisElements { elements, limit } => write!(
                 f,
