@@ -321,13 +321,18 @@ scoped to exactly this for the linear-algebra kernel, and **#218 stays open on t
   count that is **wrong rather than failed**. Mitigated here in the one caller this branch owned:
   `rational_points_by_enumeration` refused a field whose order and characteristic differ. **Now
   closed — see §13**, which records the trait-level decision about what `new(val: u64)` means.
-- **#376 — `solve_one`'s default route misdiagnoses a missing field equation.** #218's gap 2 was "no
-  field-equation mechanism, and no refusal when they are absent". The refusal exists and is correct,
-  but not on the default path: `GrevlexF4ThenFglm` says *the system is not zero-dimensional* at once,
-  while the default `DirectLexF4` exhausts a Macaulay-matrix budget and reports a **resource
-  failure** — an error that tells a caller to raise a limit when the fix is to adjoin the equations.
-  Both halves are asserted, so closing #376 breaks the test on purpose and brings this section with
-  it.
+- **#376 — `solve_one`'s default route misdiagnosed a missing field equation. Now fixed.** #218's
+  gap 2 was "no field-equation mechanism, and no refusal when they are absent". The refusal existed
+  and was correct, but not on the default path: `GrevlexF4ThenFglm` said *the system is not
+  zero-dimensional* at once, while the default `DirectLexF4` exhausted a Macaulay-matrix budget and
+  reported a **resource failure** — an error that tells a caller to raise a limit when the fix is to
+  adjoin the equations. The fix is that a direct-lex attempt which crosses a resource limit has no
+  basis to classify, so it computes a **grevlex** one and classifies that instead; both routes now
+  end at `PositiveDimensional`. The diagnosis is a proof, not a guess — it fires only from a
+  complete grevlex basis — so a zero-dimensional ideal that really is out of budget keeps its
+  resource failure, which is what
+  `one_missing_field_equation_is_still_a_resource_failure` pins: seven of the eight field equations
+  leave *this* ideal zero-dimensional, and the lex budget is then genuinely to blame.
 - **#378 — the differential oracle is prime-field only.** §7. Was blocked on #377 — there was no
   point emitting `GF(2^8)` rings while Zeebra could not read an element back. **Unblocked by §13**;
   what remains on it is the dispatch at `check.rs:190`, `DifferentialCase`'s missing degree, and

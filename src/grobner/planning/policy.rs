@@ -12,7 +12,7 @@
 //!
 //! | | binding budget | checked | cost of a refusal |
 //! |---|---|---|---|
-//! | direct lex F4 | live matrix entries | after every row operation | the whole elimination so far |
+//! | direct lex F4 | live matrix entries | after every row operation | the whole elimination so far, plus a grevlex basis to say what it means |
 //! | grevlex + FGLM | the span's `2D² + D(D+1)/2` cells | from `D`, before allocating | one quotient-basis enumeration |
 //!
 //! Measured on the corpus: katsura-7's direct attempt burns 28.3 s and 1.3 GB before refusing,
@@ -44,7 +44,9 @@ use crate::{
             analyze,
             report::{Attempt, Choice, OutcomeClass, SolvePlan},
         },
-        solve_from_lex_basis, SolveError, SolveOptions, SolveOutcome, SolveStrategy,
+        solve_from_lex_basis,
+        solve_zero_dimensional::explain_lex_failure,
+        SolveError, SolveOptions, SolveOutcome, SolveStrategy,
     },
     KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
@@ -273,8 +275,15 @@ fn run<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
         .budget
         .batches_for_attempt(plan.total_batches(), options.attempt.f4.max_batches);
 
+    // Whether a crossed lex budget is worth diagnosing, which it is not once some attempt has
+    // already computed — or failed to compute — a grevlex basis of the same system.
+    let diagnose = !plan
+        .attempts
+        .iter()
+        .any(|a| a.strategy == SolveStrategy::GrevlexF4ThenFglm);
+
     let at = Instant::now();
-    let (outcome, statistics) = attempt(system, strategy, batches, rng, options);
+    let (outcome, statistics) = attempt(system, strategy, batches, diagnose, rng, options);
     plan.attempts.push(Attempt {
         strategy,
         choice,
@@ -304,6 +313,7 @@ fn attempt<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     system: &[MultivariatePolynomial<N, F>],
     strategy: SolveStrategy,
     batches: Option<usize>,
+    diagnose: bool,
     rng: &mut R,
     options: &PlannedSolveOptions,
 ) -> (
@@ -329,7 +339,16 @@ fn attempt<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
     statistics.f4 = Some(f4);
     let basis = match basis {
         Ok(basis) => basis,
-        Err(e) => return (Err(SolveError::Grobner(e)), statistics),
+        Err(e) => {
+            // A crossed lex budget leaves nothing to classify, so #376's misdiagnosis is reachable
+            // from here too. `diagnose` is false once a grevlex attempt has run in this plan: its
+            // basis either classified or was itself out of budget, so recomputing it would answer
+            // a question already answered.
+            let diagnose = diagnose && strategy == SolveStrategy::DirectLexF4;
+            let (error, diagnosis) = explain_lex_failure(system, e, &per_attempt.f4, diagnose);
+            statistics.diagnosis = diagnosis;
+            return (Err(error), statistics);
+        }
     };
 
     // Step 3. Classification is a question about leading monomials and costs the same under any
@@ -564,6 +583,69 @@ mod tests {
                 .expect("a basis was computed");
             assert!(f4.batches > 0);
         }
+    }
+
+    /// An explicit direct-lex plan diagnoses a crossed budget, and charges the plan for doing so.
+    ///
+    /// The planner composes the stages itself, so #376's misdiagnosis was reachable through
+    /// `Explicit(DirectLexF4)` as well as through `solve_one_with_options`.
+    #[test]
+    fn test_an_explicit_direct_lex_plan_diagnoses_a_positive_dimensional_ideal() {
+        let mut system = katsura::<6, F>();
+        system.pop();
+        let options = PlannedSolveOptions {
+            attempt: SolveOptions {
+                f4: F4Options {
+                    max_matrix_rows: 1000,
+                    max_matrix_columns: 1000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..PlannedSolveOptions::with_policy(SolvePolicy::Explicit(SolveStrategy::DirectLexF4))
+        };
+
+        let (outcome, plan) = solve_one_planned(&system, &mut StdRng::seed_from_u64(44), &options);
+        assert_eq!(outcome, Err(SolveError::PositiveDimensional));
+
+        let statistics = &plan.attempts[0].statistics;
+        let diagnosis = statistics
+            .diagnosis
+            .as_ref()
+            .expect("the crossed lex budget was diagnosed");
+        assert_eq!(
+            plan.total_batches(),
+            statistics.f4.as_ref().expect("a lex attempt").batches + diagnosis.batches,
+            "the diagnosis is work the shared budget must see"
+        );
+    }
+
+    /// A plan that already ran grevlex does not recompute it to diagnose the fallback.
+    ///
+    /// Its outcome is known: either the basis classified, or it was itself out of budget. cyclic-7
+    /// is out of budget under both orders here, so the fallback fails with nothing new to learn.
+    #[test]
+    fn test_a_fallback_after_grevlex_is_not_diagnosed_again() {
+        let options = PlannedSolveOptions {
+            attempt: SolveOptions {
+                f4: F4Options {
+                    max_matrix_rows: 1000,
+                    max_matrix_columns: 1000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..PlannedSolveOptions::with_policy(SolvePolicy::AutoWithFallback)
+        };
+
+        let (outcome, plan) =
+            solve_one_planned(&cyclic::<7, F>(), &mut StdRng::seed_from_u64(45), &options);
+        assert!(outcome.unwrap_err().is_resource_failure());
+        assert_eq!(plan.attempts.len(), 2);
+        assert!(plan
+            .attempts
+            .iter()
+            .all(|a| a.statistics.diagnosis.is_none()));
     }
 
     /// An inconsistent system is settled by the structural pass, with no attempt at all.
