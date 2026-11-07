@@ -690,6 +690,14 @@ pub enum Unsupported {
     /// The instance has more variables than the tool accepts.
     VariableCount { variables: usize, maximum: usize },
 
+    /// The task needs a finite quotient algebra and the instance is positive-dimensional.
+    ///
+    /// A fact about the **ideal**, which is why it is named rather than left to
+    /// [`Self::Representation`]: four adapters rediscovered the same classification from first
+    /// principles and two of them put it in the failure bucket, so the distinction the protocol
+    /// depends on was being re-derived per tool instead of being structural.
+    PositiveDimensional { task: Task },
+
     /// The tool cannot represent the input for a reason the variants above do not cover.
     Representation { detail: String },
 }
@@ -721,6 +729,11 @@ impl Display for Unsupported {
                 f,
                 "{} variables exceeds the tool's maximum of {}",
                 variables, maximum
+            ),
+            Self::PositiveDimensional { task } => write!(
+                f,
+                "{} needs a finite quotient algebra, and this ideal is positive-dimensional",
+                task
             ),
             Self::Representation { detail } => write!(f, "{}", detail),
         }

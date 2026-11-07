@@ -158,6 +158,14 @@ The five outcomes, and what each licenses:
   merely obeyed. The live instance is Sagebrush's seven `SB_*` switches, every one read with
   `env::var(..).is_ok()` — truthy if set, so `SB_SIGF4=0` *enables* the experimental signature
   path — two of which also write a trace into the stream the basis is parsed from.
+- **A fact about the ideal is `Unsupported`, even when the tool announced it by exiting non-zero.**
+  A task needing a finite quotient algebra does not apply to a positive-dimensional ideal; no tool
+  can do it, so no tool failed. Four adapters derived that classification independently and two of
+  them put it in the failure bucket — Singular's on `cyclic-4`, fixed in M26, and Sagebrush's on the
+  same instance, fixed in M27 — so it is now the named variant `Unsupported::PositiveDimensional`,
+  carrying the task that does not apply. A fifth adapter gets it by returning the variant rather
+  than by rediscovering the rule; a driver's own error line is still the evidence the condition
+  holds, but it is classified before the exit status is consulted.
 - `RunReport::was_skipped()` covers `Unsupported`, `Unavailable` and `Environment` together,
   because all three mean "not attempted" rather than "attempted and lost".
 - A tool that contradicts itself (`SelfInconsistent`) produces **no finding at all**. Nothing may be

@@ -505,6 +505,15 @@ apply". That is a capability statement in the failure bucket — the distinction
 — and every other library on that row classifies the same mathematical truth as `unsupported`. It
 carries no timing, so no ratio is affected.
 
+**Closed in M27, structurally rather than per adapter** (#446). Sagebrush's run classifies the
+driver's zero-dimensionality error line before it consults the exit status, so the row now reads
+`unsupported`. The fourth occurrence is what argued against a fourth bespoke fix: the same sentence
+had been written out by hand in three adapters, once with its whitespace mangled into the stored
+board row, so the classification was being rediscovered rather than shared. It is now
+`Unsupported::PositiveDimensional { task }`, which all four adapters return and which renders the
+task that does not apply instead of a hardcoded "order conversion". A fifth adapter inherits the
+rule. The protocol's §3 states it as a rule in its own right.
+
 **And a third, which the board caught about itself.** `Environment::comparable` checks machine, cpu
 and build and **not** `policy`, where the measurement discipline lives: `many rows per process (no
 memory figure)` against `one row per process`. The board was pairing the two cohorts, reporting
