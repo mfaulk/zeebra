@@ -273,18 +273,30 @@ fn run_one(
     if wanted("groebner.jl") {
         match GroebnerJlSolver::from_env(scratch.join("groebner-jl")) {
             Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
-            Err(failure) => {
-                unreachable_engine(board, "groebner.jl", built, task, limits, environment, failure)
-            }
+            Err(failure) => unreachable_engine(
+                board,
+                "groebner.jl",
+                built,
+                task,
+                limits,
+                environment,
+                failure,
+            ),
         }
     }
 
     if wanted("sagebrush") {
         match SagebrushSolver::from_env(scratch.join("sagebrush")) {
             Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
-            Err(failure) => {
-                unreachable_engine(board, "sagebrush", built, task, limits, environment, failure)
-            }
+            Err(failure) => unreachable_engine(
+                board,
+                "sagebrush",
+                built,
+                task,
+                limits,
+                environment,
+                failure,
+            ),
         }
     }
 
