@@ -1924,6 +1924,101 @@ cost for `δ = 3^13`: the ladder stops at `3^9`.
   the construction stage scales linearly in `δ` while the ladder's per-row budget does not.
 - §9.4 applies to every figure above without exception.
 
+## 9.7 #351: all roots by deflation, measured against the gcd finder
+
+§4.4 priced `graeffe_root` at **one** root, and the elimination route needs **every candidate**, so
+nothing in this document before now was a like-for-like comparison with `roots`. #351 closes that,
+and the gap is the reason the comparison was worth making rather than assuming.
+
+### 9.7.1 The bridge, and what bounds it
+
+`graeffe_all_roots` takes a root, divides it out by synthetic division in `O(d)`, and repeats until
+the deflated polynomial has no base-field root left. Multiplicity falls out: a root of multiplicity
+`m` survives `m − 1` deflations and is reported `m` times.
+
+**Its cost is `(roots + 1)` searches, so it is a bet on the root count and not on the degree.** That
+is the honest framing — against a polynomial with `O(d)` base-field roots it would lose to a single
+gcd pass, and §9.7.3 is the measurement that decides which regime the real route is in.
+
+### 9.7.2 Both finders on one polynomial per degree
+
+`examples/graeffe_root -- deflate`, KoalaBear in a `u64`, one pinned core, on the lock. `agree` is
+the two finders' root sets compared — a mismatch is a test failure, not a footnote.
+
+| degree | deflation | roots found | roots/s | `roots` | **speedup** | agree |
+|---:|---:|---:|---:|---:|---:|:---:|
+| 729 | 0.0117 s | 4 | 340.5 | 0.0595 s | **5.1×** | yes |
+| 6 561 | 0.1133 s | 5 | 44.1 | 2.8677 s | **25.3×** | yes |
+| 32 768 | 0.3022 s | 4 | 13.2 | 48.6214 s | **161×** | yes |
+| **59 049** | **0.5001 s** | 4 | 8.0 | **153.2146 s** | **306×** | yes |
+
+The speedup **grows with the degree** because the two sides scale differently: deflation pays a fixed
+number of Graeffe searches whose cost is near-linear in the degree, while `roots` pays one
+quasi-quadratic pass. It is not a constant factor and should not be quoted as one.
+
+### 9.7.3 The root count of a real resultant, measured
+
+The regime question from §9.7.1, answered on **registered rows** rather than on planted inputs, via
+`examples/resultant_cico --row`:
+
+| row | resultant degree | `F_p` roots | verified witnesses |
+|---|---:|---:|---:|
+| `poseidon31-cico-t16-rf2-rp0` | 81 | **3** | 3 |
+| `poseidon31-cico-t16-rf2-rp2` | 729 | **1** | 1 |
+
+**`O(1)`, not `O(d)`** — which is the regime deflation wins in, and it is consistent with the
+Poisson(1) behaviour §9.6 measured for a different family. Two rows is two rows, and the six-round
+rows are unmeasured; but a degree-729 resultant having **one** base-field root is a strong indication
+that the candidate count is set by the problem's structure rather than by the eliminant's degree.
+
+### 9.7.4 The `roots` curve, superseding the two-point fit
+
+#351's other half. `roots` by doubling, eight points rather than the two in
+`resultant-elimination.md` §6.3:
+
+| degree | 256 | 512 | 1 024 | 2 048 | 4 096 | 8 192 | 16 384 | 32 768 | 65 536 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| seconds | 0.0048 | 0.0163 | 0.0651 | 0.2380 | 0.8519 | 3.1612 | 11.7957 | 44.7701 | 175.5648 |
+| local exponent | — | 1.76 | 2.00 | 1.87 | 1.84 | 1.89 | 1.90 | 1.92 | 1.97 |
+
+The local exponent settles at **1.90–1.97**, so the two-point **1.933** was right and is now
+supported by eight points instead of two. It was flagged as the weakest number in the M25-D analysis
+and it survives; what does not survive is the figure built on top of it.
+
+### 9.7.5 What this does to `rf4-rp2`, and what it does not
+
+`MILESTONE-COMPETITIVE-ALGEBRA.md` §8.4.2 left `rf4-rp2` as **no-go pending one measurement**, with
+root finding at degree 59 049 the single unpriced term, extrapolated to **~285 s** from two points
+and taking the row to 1.78–1.96 h against a ~2 h ceiling — "inside the ceiling, but inside it by
+minutes, on a term extrapolated from two points."
+
+That term is now measured twice:
+
+| route | degree 59 049 | against the ~285 s extrapolation |
+|---|---:|---|
+| `roots` | **153.2 s** | **46% lower** |
+| deflation | **0.50 s** | effectively off the row |
+
+So the extrapolation was conservative by about a factor of two even on the slow route, and the fast
+route removes the term. **The margin is no longer minutes**, which was the whole basis of the
+refusal.
+
+**What this does not do.** It does not re-cost the row — that is #367's job, and it needs the
+determinant term from #350 and the ~20% systematic of #318/#319 carried or removed. It does not
+license a launch: §8.4 requires the cost stated and the owner's decision taken *before* execution,
+and a cheaper term changes the arithmetic rather than the rule. And it says nothing about `rf6-rp0`
+or any eight-round row — at degree 531 441 the root-finding term is unmeasured here, deliberately,
+because the row it belongs to is 16 h away for other reasons.
+
+One figure worth stating for #367 to use: at **59 050 samples**, the Euclidean kernel's measured
+single-core 1.109 ms per determinant is **65.5 s of core time**, so even with **no concurrency
+assumed at all**, determinants plus root finding on this row are **about 1.1 minutes** against a
+5.4-minute symbolic build. The 32-worker behaviour of that kernel is a **hypothesis** (#350 axis 4
+predicts it recovers #319's width penalty, on a working set of ~6 kB against 17 MB) and is not needed
+for the conclusion.
+
+---
+
 ## 10. Proposed PR decomposition
 
 Each row is independently reviewable, has its own oracle, and does not depend on any cryptanalytic

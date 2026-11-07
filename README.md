@@ -747,6 +747,7 @@ cargo run --release --example multivariate_mul     # multivariate multiply: time
 cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
 cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
+cargo run --release --example graeffe_root -- deflate   # all roots by deflation, #351
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
 cargo run --release --example graeffe_cico         # the univariate CICO route, and the family economics

@@ -24,6 +24,7 @@
 //! cargo run --release --example graeffe_root -- koalabear degrees=6561,19683
 //! cargo run --release --example graeffe_root -- all budget=5.0
 //! cargo run --release --example graeffe_root -- koalabear no-comparand
+//! cargo run --release --example graeffe_root -- deflate degrees=729,6561,59049  # #351
 //! ```
 //!
 //! Pin the run, as `tools/scoreboard.sh` does, and give it a private target directory:
@@ -45,8 +46,8 @@ use std::{
 use rand::{prelude::StdRng, Rng, SeedableRng};
 use zeebra::{
     fields::{two_adic::two_adic_decomposition, KoalaBear, PrimeFieldElement64},
-    graeffe_root_with_stats, roots, FiniteField, GraeffeStats, KnownOrder, Polynomial,
-    UnivariatePolynomial,
+    graeffe_all_roots, graeffe_root_with_stats, roots, FiniteField, GraeffeStats, KnownOrder,
+    Polynomial, UnivariatePolynomial,
 };
 
 // === the fields ===
@@ -490,6 +491,78 @@ fn print_scope() {
     );
 }
 
+/// #351: deflate-and-repeat against the gcd finder, on the **same** polynomial per degree.
+///
+/// `graeffe_root` returns one root where the elimination route needs every candidate, so the
+/// comparison in the sections above is not like for like. This one is: both finders see the same
+/// input, and the figure that decides between them is **roots found per second**, not wall clock,
+/// because deflation's cost is `(roots + 1)` searches while the gcd finder's is one pass whatever
+/// the root count.
+///
+/// The planted polynomials carry [`PLANTED`] roots plus whatever the random cofactor contributes,
+/// so the counts here are **not** an estimate of a real resultant's root count — that is measured
+/// separately on a registered row, because it is the quantity the comparison turns on.
+fn deflation_ladder<F: KnownOrder>(label: &str, degrees: &[usize], budget: Duration, seed: u64) {
+    println!();
+    println!("## #351: deflate-and-repeat over {label}");
+    println!();
+    println!(
+        "Both finders on one polynomial per degree. `deflation` is `graeffe_all_roots`, which is          repeated `graeffe_root` plus `O(d)` synthetic division; `roots` is the gcd finder.          Deflation reports multiplicity, the gcd finder reports distinct roots, so the counts are          compared as sets and a mismatch is a failure rather than a note."
+    );
+    println!();
+    let widths = [9usize, 12, 14, 12, 14, 12, 9];
+    println!(
+        "| {:>7} | {:>10} | {:>12} | {:>10} | {:>12} | {:>10} | {:>7} |",
+        "degree", "defl roots", "defl seconds", "defl r/s", "roots seconds", "gcd roots", "agree"
+    );
+    println!("{}", rule(&widths));
+
+    for &degree in degrees {
+        let mut rng = StdRng::seed_from_u64(seed ^ degree as u64);
+        let (f, _planted) = with_planted_roots::<F, _>(degree, &mut rng);
+
+        let (deflated, deflate_wall, _) = measure(|| graeffe_all_roots(&f, &mut rng));
+        let deflated = match deflated {
+            Ok(found) => found,
+            Err(error) => {
+                println!("degree {degree}: {error}");
+                break;
+            }
+        };
+        // Every reported root is checked against the polynomial, not trusted.
+        for root in &deflated {
+            assert!(f.eval(root).is_zero(), "degree {degree}: not a root");
+        }
+
+        let (gcd_found, gcd_wall, _) = measure(|| roots(&f, &mut rng));
+
+        let mut as_set: Vec<F> = deflated.clone();
+        as_set.dedup();
+        let agree =
+            as_set.len() == gcd_found.len() && gcd_found.iter().all(|r| deflated.contains(r));
+
+        println!(
+            "| {:>7} | {:>10} | {:>12.4} | {:>10.1} | {:>12.4} | {:>10} | {:>7} |",
+            degree,
+            deflated.len(),
+            deflate_wall.as_secs_f64(),
+            deflated.len() as f64 / deflate_wall.as_secs_f64().max(1e-9),
+            gcd_wall.as_secs_f64(),
+            gcd_found.len(),
+            agree
+        );
+
+        if deflate_wall > budget && gcd_wall > budget {
+            println!();
+            println!(
+                "stopped: both finders exceeded the {:.1} s budget.",
+                budget.as_secs_f64()
+            );
+            break;
+        }
+    }
+}
+
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
 
@@ -497,6 +570,7 @@ fn main() {
     let mut budget = Duration::from_secs_f64(60.0);
     let mut degrees: Vec<usize> = Vec::new();
     let mut comparand = true;
+    let mut deflate = false;
     for argument in &arguments {
         if let Some(seconds) = argument.strip_prefix("budget=") {
             budget =
@@ -512,6 +586,8 @@ fn main() {
                 .collect();
         } else if argument == "no-comparand" {
             comparand = false;
+        } else if argument == "deflate" {
+            deflate = true;
         } else {
             selector = argument.clone();
         }
@@ -522,6 +598,7 @@ fn main() {
         println!("options: budget=SECONDS (default 60.0), the wall clock allowed per measurement");
         println!("         degrees=N,N,... replaces the default 3^k ladder");
         println!("         no-comparand skips the `roots` sweep");
+        println!("         deflate runs #351's deflate-and-repeat comparison instead");
         return;
     }
 
@@ -540,6 +617,15 @@ fn main() {
     );
     println!();
     println!("Degrees: {degrees:?}");
+
+    // #351's comparison stands alone: it is the like-for-like one, and running it beside the
+    // one-root ladder would invite reading a one-root figure against an all-roots one.
+    if deflate {
+        deflation_ladder::<KoalaBearIn64>("KoalaBear in a u64", &degrees, budget, 0x4b0a);
+        println!();
+        print_scope();
+        return;
+    }
 
     let run_all = selector == "all";
     if run_all || selector == "koalabear" {
