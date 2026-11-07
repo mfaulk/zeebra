@@ -1,0 +1,1148 @@
+{
+  "schema": 1,
+  "contract": "every cost-model row ever recorded, APPEND-ONLY and in the order recorded, INCLUDING the rows whose prediction has no measurement yet. Every figure carries a basis: measured, fitted, predicted or extrapolated. A `measured_` field holds ONLY a measured figure and a `predicted_` field NEVER holds one -- a row that violates either is a schema error, not a caveat. Peak allocated and peak resident are separate columns and are not comparable (see grobner::external::contract::RssBasis). Prediction error is DERIVED from the predicted and measured columns; the stored `derived` object is a convenience and is recomputed on load. A re-measurement is a new row with a new commit, never an edit to an old one.",
+  "row_count": 20,
+  "rows": [
+    {
+      "schema": 1,
+      "claim": "mean roots per family, which sets families per witness at p / roots",
+      "algorithm": "univariate-cico",
+      "formulation": "univariate CICO, one family end to end",
+      "subject": "poseidon31-cico, univariate route, k = 1",
+      "parameters": [
+        {
+          "name": "families enumerated",
+          "value": 17838
+        },
+        {
+          "name": "roots examined",
+          "value": 17901
+        }
+      ],
+      "predicted_quantity": {
+        "name": "mean roots per family",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 10000,
+          "basis": {
+            "kind": "predicted",
+            "model": "one root per family in expectation, from the random-polynomial heuristic"
+          },
+          "source": "docs/research/graeffe-root-finding.md 9.3"
+        }
+      },
+      "measured_quantity": {
+        "name": "mean roots per family",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 9997,
+          "basis": {
+            "kind": "measured",
+            "instrument": "17 838 families enumerated; chi-squared independence inside +/-3 sigma"
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+        }
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "root-finding",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "univariate route, cost per family",
+      "algorithm": "univariate-cico",
+      "formulation": "univariate CICO, one family end to end",
+      "subject": "poseidon31-cico, univariate route, k = 1",
+      "parameters": [],
+      "measured_runtime": {
+        "elapsed_nanos": 15200000000,
+        "basis": {
+          "kind": "measured",
+          "instrument": "wall clock, 12 + 0.09 + 3.11 s of stages"
+        },
+        "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+      },
+      "predicted_runtime": {
+        "elapsed_nanos": 120000000000,
+        "basis": {
+          "kind": "predicted",
+          "model": "9.2's per-family stage budget"
+        },
+        "source": "docs/research/graeffe-root-finding.md 9.2"
+      },
+      "attribution": {
+        "kind": "stage-not-in-scope",
+        "stage": "a ~100 s r = 2^24 subgroup scan belonging to Zeebra's single-root descent, which a loop filtering ~1 root does not run and whose W_check the published paper itself calls negligible"
+      },
+      "limiting_stage": "root-finding",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "advantage over the published 7 h on 96 GPUs",
+      "algorithm": "univariate-cico",
+      "formulation": "univariate CICO against the published attack",
+      "subject": "poseidon31-cico, univariate route, k = 1",
+      "parameters": [
+        {
+          "name": "published GPU-hours",
+          "value": 672
+        },
+        {
+          "name": "implied per-GPU factor over one core",
+          "value": 13500
+        }
+      ],
+      "predicted_quantity": {
+        "name": "advantage over the published figure",
+        "unit": "x",
+        "figure": {
+          "count": 10000,
+          "basis": {
+            "kind": "predicted",
+            "model": "\"four orders of magnitude after any plausible GPU factor\""
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 5.4"
+        }
+      },
+      "measured_quantity": {
+        "name": "advantage over the published figure",
+        "unit": "x",
+        "figure": {
+          "count": 13,
+          "basis": {
+            "kind": "measured",
+            "instrument": "~1 036 core-years against 672 GPU-hours at a 10^3 per-GPU factor"
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+        }
+      },
+      "attribution": {
+        "kind": "incomparable-figures",
+        "detail": "two separable errors: core-years divided by a wall clock, and the subgroup-scan stage charged to every family. 43x at 10^2.5 and 135x at 10^2, so the gap is inside two orders for any per-GPU factor above ~140"
+      },
+      "limiting_stage": "root-finding",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "family count under round reduction",
+      "algorithm": "univariate-cico",
+      "formulation": "univariate CICO at reduced R_F and R_P",
+      "subject": "poseidon31-cico, the round ladder",
+      "parameters": [
+        {
+          "name": "span of delta across the ladder",
+          "value": 6561
+        }
+      ],
+      "measured_quantity": {
+        "name": "mean roots per family across the round ladder",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 10000,
+          "basis": {
+            "kind": "measured",
+            "instrument": "the full round ladder; delta spans 6 561x and the mean root count never leaves 1.0"
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 6.4"
+        }
+      },
+      "attribution": {
+        "kind": "wrong-quantity",
+        "predicted_quantity": "a family count falling with R_F and R_P (6.3's assumption)",
+        "actual_quantity": "p / (roots per family), which contains neither R_F nor R_P"
+      },
+      "limiting_stage": "root-finding",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "the published per-family stage ordering",
+      "algorithm": "univariate-cico",
+      "formulation": "univariate CICO, one family end to end",
+      "subject": "poseidon31-cico, univariate route, k = 1",
+      "parameters": [],
+      "measured_quantity": {
+        "name": "construction's share of the per-family cost",
+        "unit": "basis points",
+        "figure": {
+          "count": 7700,
+          "basis": {
+            "kind": "measured",
+            "instrument": "per-stage timings: 77% construction, 23% root finding, microseconds checking"
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+        }
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "root-finding",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "parallel efficiency of the determinant sweep to 32 cores",
+      "algorithm": "resultant-elimination",
+      "formulation": "sample determinants over a worker pool",
+      "subject": "Sylvester determinants, 32 cores",
+      "parameters": [
+        {
+          "name": "workers",
+          "value": 32
+        }
+      ],
+      "predicted_quantity": {
+        "name": "parallel efficiency at 32 workers",
+        "unit": "basis points",
+        "figure": {
+          "count": 10000,
+          "basis": {
+            "kind": "predicted",
+            "model": "\"a constant factor bounded by core count\""
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.3"
+        }
+      },
+      "measured_quantity": {
+        "name": "parallel efficiency at 32 workers",
+        "unit": "basis points",
+        "figure": {
+          "count": 9200,
+          "basis": {
+            "kind": "measured",
+            "instrument": "the 32-core sweep, 92-95% efficient; the low end is recorded"
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+        }
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, 32 workers"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "fftmul's reported ceiling is checker-limited, not multiply-limited",
+      "algorithm": "fftmul",
+      "formulation": "the multiply's own reported ceiling",
+      "subject": "fftmul degree ceiling",
+      "parameters": [],
+      "work": [
+        {
+          "name": "ceiling before, as a degree",
+          "count": 262144
+        },
+        {
+          "name": "ceiling after, as a degree",
+          "count": 4194304
+        }
+      ],
+      "measured_quantity": {
+        "name": "reported degree ceiling",
+        "unit": "log2 degree",
+        "figure": {
+          "count": 22,
+          "basis": {
+            "kind": "measured",
+            "instrument": "#189: the ceiling moved from 2^18 to 2^22, 16x, with the budget now on the multiply"
+          },
+          "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+        }
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "linear-algebra",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "F4 budget ladder, the memory the entry budget bounds",
+      "algorithm": "f4",
+      "formulation": "full-width grevlex under a live-entry cap",
+      "subject": "fukuoka-mq-III-n20-seed0",
+      "parameters": [
+        {
+          "name": "variables",
+          "value": 20
+        }
+      ],
+      "peak_estimated_bytes": {
+        "bytes": 204472320,
+        "basis": {
+          "kind": "predicted",
+          "model": "live matrix entries x 16 B, which is what the budget accounts"
+        },
+        "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+      },
+      "measured_peak_resident_bytes": {
+        "bytes": 15468593152,
+        "basis": {
+          "kind": "measured",
+          "instrument": "VmHWM"
+        },
+        "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1"
+      },
+      "predicted_peak_bytes": {
+        "bytes": 16000000000,
+        "basis": {
+          "kind": "predicted",
+          "model": "9.1's entry-storage ladder, 0.32 / 1.6 / 6.4 / 16 GB at 16 bytes an entry"
+        },
+        "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 9.1"
+      },
+      "attribution": {
+        "kind": "wrong-quantity",
+        "predicted_quantity": "the entry storage of one allocation, which the entry budget bounds",
+        "actual_quantity": "the peak resident set of the process: 195 MB accounted inside 14 752 MB, a factor of 75. README said the budget bounds one allocation"
+      },
+      "limiting_stage": "symbolic-preprocessing-queue",
+      "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "ZEEBRA_AFFINITY=0-7, one live-entry cap per rung"
+      },
+      "reproduce": "",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "six-round symbolic build, peak RSS",
+      "algorithm": "resultant-elimination",
+      "formulation": "bivariate CICO, t = 16, symbolic build alone",
+      "subject": "poseidon31-cico-t16-rf2-rp4",
+      "parameters": [
+        {
+          "name": "rounds",
+          "value": 6
+        },
+        {
+          "name": "state words cubed",
+          "value": 16
+        },
+        {
+          "name": "output degree",
+          "value": 729
+        }
+      ],
+      "largest_intermediate": {
+        "what": "the (p^2) * p transient of SparseMultiPoly's multiply",
+        "extent": 3540000000,
+        "unit": "term-products"
+      },
+      "work": [
+        {
+          "name": "term-products in p * p",
+          "count": 886000000
+        },
+        {
+          "name": "term-products in (p^2) * p",
+          "count": 3540000000
+        },
+        {
+          "name": "terms in the result",
+          "count": 266815
+        }
+      ],
+      "measured_peak_resident_bytes": {
+        "bytes": 57000000000,
+        "basis": {
+          "kind": "measured",
+          "instrument": "VmHWM, polled externally and cross-checked against util::peak_resident_bytes"
+        },
+        "source": "docs/research/resultant-elimination.md 6.8 (#243)"
+      },
+      "predicted_peak_bytes": {
+        "bytes": 68000000,
+        "basis": {
+          "kind": "predicted",
+          "model": "7.4's \"peak memory is not a concern ... ~68 MB\""
+        },
+        "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.4"
+      },
+      "attribution": {
+        "kind": "unlisted-risk",
+        "detail": "7.5 named the build's *time* as the one unchecked cost and did not list its memory as a risk at all. The term-count extrapolation was right and the memory estimate was not: the transient is four orders of magnitude larger than the 4.3 MB result it builds, and the RSS trace is a sawtooth with one peak per state word rather than a leak"
+      },
+      "limiting_stage": "polynomial-multiply-transient",
+      "source": "docs/research/resultant-elimination.md 6.8 (#243)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, single-threaded on one pinned core"
+      },
+      "reproduce": "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "six-round symbolic build, elapsed",
+      "algorithm": "resultant-elimination",
+      "formulation": "bivariate CICO, t = 16, symbolic build alone",
+      "subject": "poseidon31-cico-t16-rf2-rp4",
+      "parameters": [
+        {
+          "name": "rounds",
+          "value": 6
+        }
+      ],
+      "measured_runtime": {
+        "elapsed_nanos": 2902200000000,
+        "basis": {
+          "kind": "measured",
+          "instrument": "wall clock under tools/benchlock.sh, reported as an upper bound"
+        },
+        "source": "docs/research/resultant-elimination.md 6.8 (#243)"
+      },
+      "predicted_runtime": {
+        "elapsed_nanos": 2160000000000,
+        "basis": {
+          "kind": "predicted",
+          "model": "7.4's ~36 min estimate"
+        },
+        "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.4"
+      },
+      "attribution": {
+        "kind": "magnitude-only",
+        "detail": "1.34x and the same order, so the time estimate holds. The build is now a binding stage at about half of 7.4's whole ~1-1.5 h for the row, where it had been 0.8% of every row before it"
+      },
+      "limiting_stage": "polynomial-multiply-transient",
+      "source": "docs/research/resultant-elimination.md 6.8 (#243)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, single-threaded on one pinned core"
+      },
+      "reproduce": "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "the six-round build's peak RSS, from the multiply's term-product count",
+      "algorithm": "resultant-elimination",
+      "formulation": "bivariate CICO, t = 16, symbolic build alone",
+      "subject": "poseidon31-cico-t16-rf2-rp4",
+      "parameters": [
+        {
+          "name": "rounds",
+          "value": 6
+        }
+      ],
+      "largest_intermediate": {
+        "what": "the (p^2) * p transient of SparseMultiPoly's multiply",
+        "extent": 3540000000,
+        "unit": "term-products"
+      },
+      "measured_peak_resident_bytes": {
+        "bytes": 57000000000,
+        "basis": {
+          "kind": "measured",
+          "instrument": "VmHWM, polled externally and cross-checked against util::peak_resident_bytes"
+        },
+        "source": "docs/research/resultant-elimination.md 6.8 (#243)"
+      },
+      "predicted_peak_bytes": {
+        "bytes": 56600000000,
+        "basis": {
+          "kind": "predicted",
+          "model": "3.54e9 term-products for (p^2) * p at 16 bytes an entry"
+        },
+        "source": "docs/research/resultant-elimination.md 6.8 (#243)"
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "polynomial-multiply-transient",
+      "next_size": {
+        "next": "eight rounds, bounded by the output instead of the product count",
+        "peak_bytes": {
+          "bytes": 4300000,
+          "basis": {
+            "kind": "predicted",
+            "model": "the product's actual size, which a collecting or chunked multiply would bound the live set by (#243)"
+          },
+          "source": "docs/research/resultant-elimination.md 6.8 (#243)"
+        }
+      },
+      "source": "docs/research/resultant-elimination.md 6.8 (#243)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, single-threaded on one pinned core"
+      },
+      "reproduce": "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "F4 peak RSS at the 20 000 000-entry rung, attributed",
+      "algorithm": "f4",
+      "formulation": "full-width grevlex, 200 000 columns, 20 000 000 live entries",
+      "subject": "fukuoka-mq-III-n20-seed0",
+      "parameters": [
+        {
+          "name": "variables",
+          "value": 20
+        },
+        {
+          "name": "equations",
+          "value": 40
+        },
+        {
+          "name": "characteristic",
+          "value": 31
+        },
+        {
+          "name": "live-entry cap",
+          "value": 20000000
+        }
+      ],
+      "solving_degree": 5,
+      "largest_intermediate": {
+        "what": "the VecDeque<Monomial<20>> pending-monomial queue of symbolic preprocessing",
+        "extent": 162188194,
+        "unit": "monomials at the queue's high water, 80 B each"
+      },
+      "work": [
+        {
+          "name": "monomials at the queue's high water",
+          "count": 162188194
+        },
+        {
+          "name": "rows in the refused closure",
+          "count": 64062
+        },
+        {
+          "name": "basis terms at peak",
+          "count": 5389241
+        },
+        {
+          "name": "named sites' share of peak RSS, basis points",
+          "count": 9600
+        }
+      ],
+      "peak_estimated_bytes": {
+        "bytes": 195433980,
+        "basis": {
+          "kind": "predicted",
+          "model": "max_live_nonzeros 12 212 087 x 16 B + 40 588 B of dense buffer"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.2 (#237)"
+      },
+      "measured_peak_resident_bytes": {
+        "bytes": 14675869696,
+        "basis": {
+          "kind": "measured",
+          "instrument": "util::peak_resident_bytes (VmHWM), in-process after F4 returned"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.2 (#237)"
+      },
+      "measured_peak_allocated_bytes": {
+        "bytes": 22726836224,
+        "basis": {
+          "kind": "measured",
+          "instrument": "a tracking #[global_allocator] with LIVE/PEAK atomics"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.2 (#237)"
+      },
+      "measured_quantity": {
+        "name": "the pending-monomial queue's share of peak RSS",
+        "unit": "basis points",
+        "figure": {
+          "count": 8840,
+          "basis": {
+            "kind": "measured",
+            "instrument": "162 188 194 monomials x 80 B against VmHWM"
+          },
+          "source": "docs/research/f4-resource-scaling.md 9.2 (#237)"
+        }
+      },
+      "attribution": {
+        "kind": "wrong-quantity",
+        "predicted_quantity": "matrix entry storage, which max_live_nonzeros budgets and which measures 1.3% of the peak",
+        "actual_quantity": "one VecDeque<Monomial<20>> in symbolic preprocessing at 88.4%, reached before any matrix exists and therefore before any budget can be crossed. The basis held twice is 6.5%"
+      },
+      "limiting_stage": "symbolic-preprocessing-queue",
+      "source": "docs/research/f4-resource-scaling.md 9.2 (#237)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "ZEEBRA_AFFINITY=0-7, max_live_bytes set clear of the entry cap"
+      },
+      "reproduce": "cargo run --release --example f4_memory",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "peak allocated against peak resident, on one row",
+      "algorithm": "f4",
+      "formulation": "full-width grevlex, 200 000 columns, 20 000 000 live entries",
+      "subject": "fukuoka-mq-III-n20-seed0",
+      "parameters": [],
+      "solving_degree": 5,
+      "largest_intermediate": {
+        "what": "the pending-monomial queue's capacity, one allocation",
+        "extent": 268435456,
+        "unit": "slots at 80 B = 20 480 MiB, about 60% never written"
+      },
+      "measured_peak_resident_bytes": {
+        "bytes": 14675869696,
+        "basis": {
+          "kind": "measured",
+          "instrument": "util::peak_resident_bytes (VmHWM), which counts touched pages"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.2 (#237)"
+      },
+      "measured_peak_allocated_bytes": {
+        "bytes": 22726836224,
+        "basis": {
+          "kind": "measured",
+          "instrument": "a tracking #[global_allocator], which counts reservations"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.2 (#237)"
+      },
+      "attribution": {
+        "kind": "wrong-quantity",
+        "predicted_quantity": "\"peak memory\", read as one quantity",
+        "actual_quantity": "two: the queue's 20 480 MiB capacity against its 12 374 MiB of touched pages. One allocation larger than the whole resident peak is why no amount of care in reading \"peak memory\" distinguishes them -- only recording which one it is does"
+      },
+      "limiting_stage": "symbolic-preprocessing-queue",
+      "source": "docs/research/f4-resource-scaling.md 9.2 (#237)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "ZEEBRA_AFFINITY=0-7, max_live_bytes set clear of the entry cap"
+      },
+      "reproduce": "cargo run --release --example f4_memory",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "F4 peak RSS at the 10 000 000-entry rung, attributed",
+      "algorithm": "f4",
+      "formulation": "full-width grevlex, 200 000 columns, 10 000 000 live entries",
+      "subject": "fukuoka-mq-III-n20-seed0",
+      "parameters": [
+        {
+          "name": "live-entry cap",
+          "value": 10000000
+        }
+      ],
+      "solving_degree": 4,
+      "largest_intermediate": {
+        "what": "the VecDeque<Monomial<20>> pending-monomial queue of symbolic preprocessing",
+        "extent": 6196886,
+        "unit": "monomials at the queue's high water, 473 MB"
+      },
+      "work": [
+        {
+          "name": "rows in the refused closure",
+          "count": 10297
+        },
+        {
+          "name": "basis terms at peak",
+          "count": 240551
+        }
+      ],
+      "peak_estimated_bytes": {
+        "bytes": 6081741,
+        "basis": {
+          "kind": "predicted",
+          "model": "the budgeted matrix entries at 16 B each"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.3 (#237)"
+      },
+      "measured_peak_resident_bytes": {
+        "bytes": 637534208,
+        "basis": {
+          "kind": "measured",
+          "instrument": "util::peak_resident_bytes (VmHWM), in-process; the external poller caught 609 MB"
+        },
+        "source": "docs/research/f4-resource-scaling.md 9.3 (#237)"
+      },
+      "measured_quantity": {
+        "name": "the pending-monomial queue's share of peak RSS",
+        "unit": "basis points",
+        "figure": {
+          "count": 7800,
+          "basis": {
+            "kind": "measured",
+            "instrument": "6 196 886 monomials x 80 B against VmHWM"
+          },
+          "source": "docs/research/f4-resource-scaling.md 9.3 (#237)"
+        }
+      },
+      "attribution": {
+        "kind": "wrong-quantity",
+        "predicted_quantity": "matrix entry storage, 5.8 MB of a 608 MB peak",
+        "actual_quantity": "the same queue at 78%. The queue dominates at both rungs, so this is not a degree-5 phenomenon -- it is what symbolic preprocessing costs at every degree, scaling with the closure"
+      },
+      "limiting_stage": "symbolic-preprocessing-queue",
+      "source": "docs/research/f4-resource-scaling.md 9.3 (#237)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "ZEEBRA_AFFINITY=0-7, max_live_bytes set clear of the entry cap"
+      },
+      "reproduce": "cargo run --release --example f4_memory",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "per-determinant cost at order 1 458, one worker",
+      "algorithm": "resultant-elimination",
+      "formulation": "degree 1 in the surviving variable, order / 2 in the eliminated one",
+      "subject": "determinant sweep, synthetic bivariate pairs",
+      "parameters": [
+        {
+          "name": "matrix order",
+          "value": 1458
+        },
+        {
+          "name": "workers",
+          "value": 1
+        },
+        {
+          "name": "determinants x draws",
+          "value": 24
+        }
+      ],
+      "largest_intermediate": {
+        "what": "the Sylvester matrix, with L, U, P and a clone of A live",
+        "extent": 1458,
+        "unit": "matrix order (17.0 MB of matrix, 68.0 MB live per worker)"
+      },
+      "measured_runtime": {
+        "elapsed_nanos": 2404000000,
+        "basis": {
+          "kind": "measured",
+          "instrument": "median of three draws; wall equals core-time at one worker, under tools/benchlock.sh"
+        },
+        "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+      },
+      "predicted_runtime": {
+        "elapsed_nanos": 2493000000,
+        "basis": {
+          "kind": "fitted",
+          "law": "8.3216e-10 * order^2.9953",
+          "worst_residual_bp": 370,
+          "fitted_to": 4374
+        },
+        "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "next_size": {
+        "next": "order 4 374, inside the fitted range",
+        "runtime": {
+          "elapsed_nanos": 66960000000,
+          "basis": {
+            "kind": "fitted",
+            "law": "8.3216e-10 * order^2.9953",
+            "worst_residual_bp": 370,
+            "fitted_to": 4374
+          },
+          "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+        }
+      },
+      "source": "docs/research/resultant-elimination.md 6.9 (#289)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, one pinned core"
+      },
+      "reproduce": "cargo run --release --example determinant_sweep",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "per-determinant cost at order 13 122",
+      "algorithm": "resultant-elimination",
+      "formulation": "degree 1 in the surviving variable, order / 2 in the eliminated one",
+      "subject": "determinant sweep, synthetic bivariate pairs",
+      "parameters": [
+        {
+          "name": "matrix order",
+          "value": 13122
+        },
+        {
+          "name": "workers",
+          "value": 1
+        }
+      ],
+      "work": [
+        {
+          "name": "upper end of the stated range, in seconds",
+          "count": 1926
+        }
+      ],
+      "predicted_runtime": {
+        "elapsed_nanos": 1833000000000,
+        "basis": {
+          "kind": "extrapolated",
+          "law": "8.3216e-10 * order^2.9953",
+          "fitted_to": 4374,
+          "evaluated_at": 13122
+        },
+        "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+      },
+      "attribution": {
+        "kind": "no-measurement-yet"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "next_size": {
+        "next": "rf4-rp4 at eight rounds, 531 442 determinants on 32 workers",
+        "runtime": {
+          "elapsed_nanos": 42379200000000000,
+          "basis": {
+            "kind": "extrapolated",
+            "law": "8.3216e-10 * order^2.9953, with the 1.00 / 1.17 / 1.31 width penalty extrapolated at the same slope beyond 32 workers",
+            "fitted_to": 4374,
+            "evaluated_at": 13122
+          },
+          "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+        }
+      },
+      "source": "docs/research/resultant-elimination.md 6.9 (#289)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, one pinned core"
+      },
+      "reproduce": "cargo run --release --example determinant_sweep -- --order 13122",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "the exponent of the per-determinant cost law above L2",
+      "algorithm": "resultant-elimination",
+      "formulation": "ordinary least squares on (ln order, ln core-time)",
+      "subject": "determinant sweep, orders 486 / 1 458 / 4 374",
+      "parameters": [
+        {
+          "name": "orders fitted",
+          "value": 3
+        }
+      ],
+      "work": [
+        {
+          "name": "worst residual, basis points",
+          "count": 370
+        },
+        {
+          "name": "standard error of the exponent, per 10 000",
+          "count": 285
+        }
+      ],
+      "predicted_quantity": {
+        "name": "exponent of the cost law",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 30000,
+          "basis": {
+            "kind": "predicted",
+            "model": "Crout LU is O(order^3), so the cost law is cubic"
+          },
+          "source": "docs/research/resultant-elimination.md 6.5"
+        }
+      },
+      "measured_quantity": {
+        "name": "exponent of the cost law",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 29953,
+          "basis": {
+            "kind": "measured",
+            "instrument": "fit_power_law over orders 486 / 1 458 / 4 374, exponent +/-0.0285"
+          },
+          "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+        }
+      },
+      "attribution": {
+        "kind": "prediction-held"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "source": "docs/research/resultant-elimination.md 6.9 (#289)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, one pinned core"
+      },
+      "reproduce": "cargo run --release --example determinant_sweep",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "the exponent of the per-determinant cost law below L2",
+      "algorithm": "resultant-elimination",
+      "formulation": "exact through two points, so no residual and no standard error",
+      "subject": "determinant sweep, orders 18 / 162",
+      "parameters": [
+        {
+          "name": "orders fitted",
+          "value": 2
+        }
+      ],
+      "predicted_quantity": {
+        "name": "exponent of the cost law",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 30000,
+          "basis": {
+            "kind": "predicted",
+            "model": "Crout LU is O(order^3), so the cost law is cubic at every order"
+          },
+          "source": "docs/research/resultant-elimination.md 6.5"
+        }
+      },
+      "measured_quantity": {
+        "name": "exponent of the cost law",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 27902,
+          "basis": {
+            "kind": "measured",
+            "instrument": "fit_power_law over orders 18 and 162, exact through two points"
+          },
+          "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+        }
+      },
+      "attribution": {
+        "kind": "magnitude-only",
+        "detail": "genuinely sub-cubic at the bottom: fixed per-determinant cost -- the coefficient-row evaluations, the (m+n)^2 build, four (m+n)^2 allocations and the Matrix::new copy -- that an order-18 determinant's 2 000 multiply-subtract steps cannot amortize and an order-162 determinant's 1.4 million already can. A single law over all five orders misses by 14.9% with residual signs -, +, +, +, -, which is curvature and not noise"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "source": "docs/research/resultant-elimination.md 6.9 (#289)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, one pinned core"
+      },
+      "reproduce": "cargo run --release --example determinant_sweep",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "order-162 determinant on the 13 123-sample reference route, rf2-rp2",
+      "algorithm": "resultant-elimination",
+      "formulation": "the reference interpolation route, one worker",
+      "subject": "poseidon31-cico-t16-rf2-rp2",
+      "parameters": [
+        {
+          "name": "matrix order",
+          "value": 162
+        },
+        {
+          "name": "samples",
+          "value": 13123
+        },
+        {
+          "name": "workers",
+          "value": 1
+        }
+      ],
+      "measured_runtime": {
+        "elapsed_nanos": 3439000,
+        "basis": {
+          "kind": "measured",
+          "instrument": "45 131.0 ms / 13 123 samples, same registered row, same code path, same lock"
+        },
+        "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+      },
+      "predicted_runtime": {
+        "elapsed_nanos": 2868000,
+        "basis": {
+          "kind": "predicted",
+          "model": "6.5's figure on record -- 37 634.3 ms / 13 123 -- carried forward as the expectation for the same measurement"
+        },
+        "source": "docs/research/resultant-elimination.md 6.5"
+      },
+      "attribution": {
+        "kind": "unexplained",
+        "issue": "#318",
+        "detail": "the same measurement months and a commit range apart. Three of four re-measurements point the same way by about 1.2x and the smallest order points the other way, so a factor computed between a 6.5 figure and one taken now carries a ~20% systematic that is not a property of either implementation"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "source": "docs/research/resultant-elimination.md 6.9 (#289)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 1,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, one pinned core"
+      },
+      "reproduce": "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp2",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    },
+    {
+      "schema": 1,
+      "claim": "core-time penalty at 32 workers, order 1 458",
+      "algorithm": "resultant-elimination",
+      "formulation": "the same sweep at three widths, 4 determinants a worker",
+      "subject": "determinant sweep, synthetic bivariate pairs",
+      "parameters": [
+        {
+          "name": "matrix order",
+          "value": 1458
+        },
+        {
+          "name": "workers",
+          "value": 32
+        }
+      ],
+      "predicted_quantity": {
+        "name": "core-time penalty at 32 workers",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 10900,
+          "basis": {
+            "kind": "predicted",
+            "model": "6.6's measured 4-9% out to 32 workers, carried forward as the expectation"
+          },
+          "source": "docs/research/resultant-elimination.md 6.6"
+        }
+      },
+      "measured_quantity": {
+        "name": "core-time penalty at 32 workers",
+        "unit": "per 10 000",
+        "figure": {
+          "count": 13100,
+          "basis": {
+            "kind": "measured",
+            "instrument": "3.148 s against 2.404 s at one worker, with 4 determinants a worker so the 68 MB live set's page faults are amortized; 1.52x at one determinant a worker"
+          },
+          "source": "docs/research/resultant-elimination.md 6.9 (#289)"
+        }
+      },
+      "attribution": {
+        "kind": "unexplained",
+        "issue": "#319",
+        "detail": "6.6 measured this penalty as 4-9% out to 32 workers and it reproduces as 31-44%. 6.6's own argument -- that the limit is the all-core clock rather than memory bandwidth -- is if anything strengthened, and the shape still supports it: the penalty is the same 1.44x at orders 162 and 486, whose matrices differ by 9x, which a bandwidth limit would not do. The size disagrees with what is on record and this milestone did not resolve why"
+      },
+      "limiting_stage": "determinant-evaluation",
+      "source": "docs/research/resultant-elimination.md 6.9 (#289)",
+      "environment": {
+        "commit": "",
+        "machine": "workstation",
+        "cpu": "64 logical",
+        "concurrency": 32,
+        "build": "release, -C target-cpu=x86-64-v3",
+        "policy": "tools/benchlock.sh, 32 workers"
+      },
+      "reproduce": "cargo run --release --example determinant_sweep -- --workers 32",
+      "prediction_error": "NOT STORED. Compute it from the predicted and measured fields: see CostRow::prediction_errors."
+    }
+  ]
+}

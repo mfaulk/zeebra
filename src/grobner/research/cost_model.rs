@@ -910,22 +910,6 @@ impl PredictionError {
             relative_percent: (measured - predicted) / predicted * 100.0,
         })
     }
-
-    /// The error as JSON, under a name that cannot be mistaken for an input.
-    fn to_json(&self) -> Json {
-        Json::object([
-            ("quantity", Json::string(&self.quantity)),
-            ("predicted", Json::string(&self.predicted)),
-            ("measured", Json::string(&self.measured)),
-            // Rendered as text because `Json` has no float, and because this object is a
-            // convenience for a reader rather than an input: `from_json` recomputes it.
-            ("factor", Json::string(format!("{:.4}", self.factor))),
-            (
-                "relative_percent",
-                Json::string(format!("{:+.2}", self.relative_percent)),
-            ),
-        ])
-    }
 }
 
 /// Why a row is not a legal row, or why a stored one could not be read.
@@ -1350,7 +1334,7 @@ impl CostRow {
                 "peak memory",
                 predicted.value as f64,
                 measured.value as f64,
-                |bytes| bytes_text(bytes),
+                bytes_text,
             ));
         }
         if let (Some(estimated), Some(measured)) = (
@@ -1361,7 +1345,7 @@ impl CostRow {
                 "accounted storage",
                 estimated.value as f64,
                 measured.value as f64,
-                |bytes| bytes_text(bytes),
+                bytes_text,
             ));
         }
         if let (Some(predicted), Some(measured)) =
@@ -1629,34 +1613,18 @@ impl CostRow {
         fields.push(("source", Json::string(&self.source)));
         fields.push(("environment", self.environment.to_json()));
         fields.push(("reproduce", Json::string(&self.reproduce)));
-        let errors = self.prediction_errors();
-        if !errors.is_empty() {
-            // Under `derived` so that no reader and no reimplementation mistakes it for an input.
-            fields.push((
-                "derived",
-                Json::object([
-                    (
-                        "note",
-                        Json::string(
-                            "computed from the predicted and measured fields; recomputed on load \
-                             and never read back",
-                        ),
-                    ),
-                    (
-                        "prediction_errors",
-                        Json::Array(errors.iter().map(PredictionError::to_json).collect()),
-                    ),
-                ]),
-            ));
-        } else {
-            fields.push((
-                "derived",
-                Json::object([(
-                    "note",
-                    Json::string("no prediction on this row has been measured yet"),
-                )]),
-            ));
-        }
+        // **No error column is stored.** Not even under a hedged name: a number in the file is a
+        // number someone will quote, and the file would then also have to be rewritten whenever
+        // the renderer's precision changed -- in an append-only history, rewriting everything is
+        // the operation the contract exists to forbid. The error is computed by
+        // `prediction_errors` from the fields above, which are inputs.
+        fields.push((
+            "prediction_error",
+            Json::string(
+                "NOT STORED. Compute it from the predicted and measured fields: see \
+                 CostRow::prediction_errors.",
+            ),
+        ));
         Json::object(fields)
     }
 
@@ -1942,7 +1910,6 @@ impl CostModelBoard {
             );
             let _ = writeln!(out, "|---|---|---|---|---|---|---|---|---|");
             for row in rows {
-                let errors = row.prediction_errors();
                 let _ = writeln!(
                     out,
                     "| {} | `{}` | {} | {} | {} | {} | `{}` | {} | {} |",
@@ -1950,7 +1917,7 @@ impl CostModelBoard {
                     row.subject,
                     predicted_cell(row),
                     measured_cell(row),
-                    error_cell(&errors),
+                    error_cell(row),
                     row.attribution.detail(),
                     row.limiting_stage,
                     next_size_cell(row),
@@ -2028,8 +1995,8 @@ fn predicted_cell(row: &CostRow) -> String {
     }
     if let Some(quantity) = &row.predicted_quantity {
         parts.push(format!(
-            "{} {} {}",
-            quantity.figure.value, quantity.unit, quantity.name
+            "{}: {} {}",
+            quantity.name, quantity.figure.value, quantity.unit
         ));
     }
     if parts.is_empty() {
@@ -2077,8 +2044,8 @@ fn measured_cell(row: &CostRow) -> String {
     }
     if let Some(quantity) = &row.measured_quantity {
         parts.push(format!(
-            "{} {} {}",
-            quantity.figure.value, quantity.unit, quantity.name
+            "{}: {} {}",
+            quantity.name, quantity.figure.value, quantity.unit
         ));
     }
     if parts.is_empty() {
@@ -2088,14 +2055,22 @@ fn measured_cell(row: &CostRow) -> String {
     }
 }
 
-/// The derived error cell, or a note that there is nothing to divide.
-fn error_cell(errors: &[PredictionError]) -> String {
+/// The derived error cell, or a note saying which side of the division is missing.
+///
+/// `_open_` and `_no numeric prediction_` are different states and the table says which: the first
+/// is a prediction waiting to be checked and the second is a measurement nobody predicted.
+fn error_cell(row: &CostRow) -> String {
+    let errors = row.prediction_errors();
     if errors.is_empty() {
-        return "_open_".to_string();
+        return if row.has_prediction() {
+            "_open_".to_string()
+        } else {
+            "_no numeric prediction_".to_string()
+        };
     }
     errors
         .iter()
-        .map(|error| format!("{}: **{:.2}x**", error.quantity, error.factor))
+        .map(|error| format!("{}: **{}**", error.quantity, factor_text(error.factor)))
         .collect::<Vec<String>>()
         .join("; ")
 }
@@ -2121,16 +2096,37 @@ fn next_size_cell(row: &CostRow) -> String {
 
 /// A byte count in the largest unit that keeps it readable.
 ///
+/// **GiB and MiB, spelled out.** The source documents use `MB` for both decimal and binary
+/// megabytes, and the stored figure is exact bytes either way; rendering it in an ambiguous unit
+/// would reintroduce the conflation one column over from where the basis label removes it.
+///
 /// Takes `f64` because [`PredictionError`] renders both sides of a ratio through it.
 fn bytes_text(bytes: f64) -> String {
     const GIB: f64 = (1u64 << 30) as f64;
     const MIB: f64 = (1u64 << 20) as f64;
     if bytes >= GIB {
-        format!("{:.2} GB", bytes / GIB)
+        format!("{:.2} GiB", bytes / GIB)
     } else if bytes >= MIB {
-        format!("{:.1} MB", bytes / MIB)
+        format!("{:.1} MiB", bytes / MIB)
     } else {
         format!("{:.0} B", bytes)
+    }
+}
+
+/// A ratio at a precision that does not round it away.
+///
+/// `{:.2}` turns the 0.0013x of 13x-against-four-orders-of-magnitude into `0.00x`, which reports
+/// the opposite of the finding.
+fn factor_text(factor: f64) -> String {
+    let magnitude = factor.abs();
+    if magnitude >= 100.0 {
+        format!("{:.0}x", factor)
+    } else if magnitude >= 1.0 {
+        format!("{:.2}x", factor)
+    } else if magnitude >= 0.01 {
+        format!("{:.3}x", factor)
+    } else {
+        format!("{:.2e}x", factor)
     }
 }
 
@@ -2148,6 +2144,744 @@ fn duration_text(elapsed: Duration) -> String {
     } else {
         format!("{:.1} ms", seconds * 1e3)
     }
+}
+
+/// The rows transcribed from the documents that published them, in the order their claims were
+/// made.
+///
+/// **Every figure here is cited and none is invented.** The sources are
+/// `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §10.1, `docs/research/f4-resource-scaling.md` §9
+/// (#237), and `docs/research/resultant-elimination.md` §6.8 (#243) and §6.9 (#289, #318, #319).
+/// A transcribed row carries the environment its source document states; an **empty `commit`**
+/// means the document did not state one, which is a fact about the document and not a gap to be
+/// filled in.
+///
+/// Two conventions the transcription had to settle, because the documents are not uniform:
+///
+/// - `MB` means **MiB** wherever a figure was cross-checked against `/proc` (#237's 13 996 MB is
+///   `14 336 724 kB`), and decimal **MB** where a plan quoted a round number (§7.4's "~68 MB",
+///   against which 57.0 GB is the documented 838x). Each row's figure is the one its own source
+///   states.
+/// - A figure that was a *measurement* when taken and is quoted as the *expectation* for a later
+///   run enters as [`FigureBasis::Predicted`] with the earlier measurement named as its model.
+///   That is what #318 and #319 are: a measurement disagreeing with a measurement, which is only
+///   a prediction error once the earlier figure is being relied on.
+pub fn transcribed_rows() -> Vec<CostRow> {
+    /// A mebibyte, for the figures that were read against `/proc`.
+    const MIB: u64 = 1 << 20;
+
+    let m24 = "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1";
+    let f4_scaling = "docs/research/f4-resource-scaling.md 9.2 (#237)";
+    let f4_scaling_d4 = "docs/research/f4-resource-scaling.md 9.3 (#237)";
+    let build = "docs/research/resultant-elimination.md 6.8 (#243)";
+    let law = "docs/research/resultant-elimination.md 6.9 (#289)";
+
+    // The documents state the machine and the policy and never a commit. Recorded as stated.
+    let workstation = |policy: &str| Environment {
+        commit: String::new(),
+        machine: "workstation".to_string(),
+        cpu: "64 logical".to_string(),
+        concurrency: 1,
+        build: "release, -C target-cpu=x86-64-v3".to_string(),
+        policy: policy.to_string(),
+    };
+
+    vec![
+        // ---- M24 10.1, the univariate route ----
+        CostRow::new(
+            "mean roots per family, which sets families per witness at p / roots",
+            "univariate-cico",
+            "poseidon31-cico, univariate route, k = 1",
+            m24,
+        )
+        .with_formulation("univariate CICO, one family end to end")
+        .with_parameter("families enumerated", 17_838)
+        .with_parameter("roots examined", 17_901)
+        .with_predicted_quantity(Quantity {
+            name: "mean roots per family".to_string(),
+            unit: "per 10 000".to_string(),
+            figure: Figure::predicted(
+                10_000,
+                "one root per family in expectation, from the random-polynomial heuristic",
+                "docs/research/graeffe-root-finding.md 9.3",
+            ),
+        })
+        .with_measured_quantity(
+            "mean roots per family",
+            "per 10 000",
+            9_997,
+            "17 838 families enumerated; chi-squared independence inside +/-3 sigma",
+            m24,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::RootFinding)
+        .with_environment(workstation("tools/benchlock.sh")),
+        CostRow::new(
+            "univariate route, cost per family",
+            "univariate-cico",
+            "poseidon31-cico, univariate route, k = 1",
+            m24,
+        )
+        .with_formulation("univariate CICO, one family end to end")
+        .with_predicted_runtime(Figure::predicted(
+            Duration::from_secs(120),
+            "9.2's per-family stage budget",
+            "docs/research/graeffe-root-finding.md 9.2",
+        ))
+        .with_measured_runtime(
+            Duration::from_millis(15_200),
+            "wall clock, 12 + 0.09 + 3.11 s of stages",
+            m24,
+        )
+        .with_attribution(Attribution::StageNotInScope {
+            stage: "a ~100 s r = 2^24 subgroup scan belonging to Zeebra's single-root descent, \
+                    which a loop filtering ~1 root does not run and whose W_check the published \
+                    paper itself calls negligible"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::RootFinding)
+        .with_environment(workstation("tools/benchlock.sh")),
+        CostRow::new(
+            "advantage over the published 7 h on 96 GPUs",
+            "univariate-cico",
+            "poseidon31-cico, univariate route, k = 1",
+            m24,
+        )
+        .with_formulation("univariate CICO against the published attack")
+        .with_parameter("published GPU-hours", 672)
+        .with_parameter("implied per-GPU factor over one core", 13_500)
+        .with_predicted_quantity(Quantity {
+            name: "advantage over the published figure".to_string(),
+            unit: "x".to_string(),
+            figure: Figure::predicted(
+                10_000,
+                "\"four orders of magnitude after any plausible GPU factor\"",
+                "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 5.4",
+            ),
+        })
+        .with_measured_quantity(
+            "advantage over the published figure",
+            "x",
+            13,
+            "~1 036 core-years against 672 GPU-hours at a 10^3 per-GPU factor",
+            m24,
+        )
+        .with_attribution(Attribution::IncomparableFigures {
+            detail: "two separable errors: core-years divided by a wall clock, and the \
+                     subgroup-scan stage charged to every family. 43x at 10^2.5 and 135x at 10^2, \
+                     so the gap is inside two orders for any per-GPU factor above ~140"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::RootFinding)
+        .with_environment(workstation("tools/benchlock.sh")),
+        CostRow::new(
+            "family count under round reduction",
+            "univariate-cico",
+            "poseidon31-cico, the round ladder",
+            m24,
+        )
+        .with_formulation("univariate CICO at reduced R_F and R_P")
+        .with_parameter("span of delta across the ladder", 6_561)
+        .with_measured_quantity(
+            "mean roots per family across the round ladder",
+            "per 10 000",
+            10_000,
+            "the full round ladder; delta spans 6 561x and the mean root count never leaves 1.0",
+            "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 6.4",
+        )
+        .with_attribution(Attribution::WrongQuantity {
+            predicted_quantity: "a family count falling with R_F and R_P (6.3's assumption)"
+                .to_string(),
+            actual_quantity: "p / (roots per family), which contains neither R_F nor R_P"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::RootFinding)
+        .with_environment(workstation("tools/benchlock.sh")),
+        CostRow::new(
+            "the published per-family stage ordering",
+            "univariate-cico",
+            "poseidon31-cico, univariate route, k = 1",
+            m24,
+        )
+        .with_formulation("univariate CICO, one family end to end")
+        .with_measured_quantity(
+            "construction's share of the per-family cost",
+            "basis points",
+            7_700,
+            "per-stage timings: 77% construction, 23% root finding, microseconds checking",
+            m24,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::RootFinding)
+        .with_environment(workstation("tools/benchlock.sh")),
+        // ---- M24 10.1, the two predictions about already-measured stages ----
+        CostRow::new(
+            "parallel efficiency of the determinant sweep to 32 cores",
+            "resultant-elimination",
+            "Sylvester determinants, 32 cores",
+            m24,
+        )
+        .with_formulation("sample determinants over a worker pool")
+        .with_parameter("workers", 32)
+        .with_predicted_quantity(Quantity {
+            name: "parallel efficiency at 32 workers".to_string(),
+            unit: "basis points".to_string(),
+            figure: Figure::predicted(
+                10_000,
+                "\"a constant factor bounded by core count\"",
+                "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.3",
+            ),
+        })
+        .with_measured_quantity(
+            "parallel efficiency at 32 workers",
+            "basis points",
+            9_200,
+            "the 32-core sweep, 92-95% efficient; the low end is recorded",
+            m24,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(workstation("tools/benchlock.sh, 32 workers")),
+        CostRow::new(
+            "fftmul's reported ceiling is checker-limited, not multiply-limited",
+            "fftmul",
+            "fftmul degree ceiling",
+            m24,
+        )
+        .with_formulation("the multiply's own reported ceiling")
+        .with_work("ceiling before, as a degree", 262_144)
+        .with_work("ceiling after, as a degree", 4_194_304)
+        .with_measured_quantity(
+            "reported degree ceiling",
+            "log2 degree",
+            22,
+            "#189: the ceiling moved from 2^18 to 2^22, 16x, with the budget now on the multiply",
+            m24,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::LinearAlgebra)
+        .with_environment(workstation("tools/benchlock.sh")),
+        // ---- M24 10.1, the budget ladder: the right magnitude about the wrong quantity ----
+        CostRow::new(
+            "F4 budget ladder, the memory the entry budget bounds",
+            "f4",
+            "fukuoka-mq-III-n20-seed0",
+            m24,
+        )
+        .with_formulation("full-width grevlex under a live-entry cap")
+        .with_parameter("variables", 20)
+        .with_predicted_peak(Figure::predicted(
+            16_000_000_000,
+            "9.1's entry-storage ladder, 0.32 / 1.6 / 6.4 / 16 GB at 16 bytes an entry",
+            "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 9.1",
+        ))
+        .with_estimated_peak(Figure::predicted(
+            195 * MIB,
+            "live matrix entries x 16 B, which is what the budget accounts",
+            m24,
+        ))
+        .with_measured_resident(14_752 * MIB, "VmHWM", m24)
+        .with_attribution(Attribution::WrongQuantity {
+            predicted_quantity:
+                "the entry storage of one allocation, which the entry budget bounds".to_string(),
+            actual_quantity: "the peak resident set of the process: 195 MB accounted inside \
+                              14 752 MB, a factor of 75. README said the budget bounds one \
+                              allocation"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::SymbolicPreprocessingQueue)
+        .with_environment(workstation(
+            "ZEEBRA_AFFINITY=0-7, one live-entry cap per rung",
+        )),
+        // ---- M24 10.1 / #243, the six-round build ----
+        CostRow::new(
+            "six-round symbolic build, peak RSS",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp4",
+            build,
+        )
+        .with_formulation("bivariate CICO, t = 16, symbolic build alone")
+        .with_parameter("rounds", 6)
+        .with_parameter("state words cubed", 16)
+        .with_parameter("output degree", 729)
+        .with_largest_intermediate(Intermediate::new(
+            "the (p^2) * p transient of SparseMultiPoly's multiply",
+            3_540_000_000,
+            "term-products",
+        ))
+        .with_work("term-products in p * p", 886_000_000)
+        .with_work("term-products in (p^2) * p", 3_540_000_000)
+        .with_work("terms in the result", 266_815)
+        .with_predicted_peak(Figure::predicted(
+            68_000_000,
+            "7.4's \"peak memory is not a concern ... ~68 MB\"",
+            "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.4",
+        ))
+        .with_measured_resident(
+            57_000_000_000,
+            "VmHWM, polled externally and cross-checked against util::peak_resident_bytes",
+            build,
+        )
+        .with_attribution(Attribution::UnlistedRisk {
+            detail: "7.5 named the build's *time* as the one unchecked cost and did not list its \
+                     memory as a risk at all. The term-count extrapolation was right and the \
+                     memory estimate was not: the transient is four orders of magnitude larger \
+                     than the 4.3 MB result it builds, and the RSS trace is a sawtooth with one \
+                     peak per state word rather than a leak"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::PolynomialMultiplyTransient)
+        .with_environment(workstation(
+            "tools/benchlock.sh, single-threaded on one pinned core",
+        ))
+        .with_reproduce(
+            "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
+             --build-only",
+        ),
+        CostRow::new(
+            "six-round symbolic build, elapsed",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp4",
+            build,
+        )
+        .with_formulation("bivariate CICO, t = 16, symbolic build alone")
+        .with_parameter("rounds", 6)
+        .with_predicted_runtime(Figure::predicted(
+            Duration::from_secs(36 * 60),
+            "7.4's ~36 min estimate",
+            "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 7.4",
+        ))
+        .with_measured_runtime(
+            Duration::from_secs_f64(48.37 * 60.0),
+            "wall clock under tools/benchlock.sh, reported as an upper bound",
+            build,
+        )
+        .with_attribution(Attribution::MagnitudeOnly {
+            detail: "1.34x and the same order, so the time estimate holds. The build is now a \
+                     binding stage at about half of 7.4's whole ~1-1.5 h for the row, where it \
+                     had been 0.8% of every row before it"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::PolynomialMultiplyTransient)
+        .with_environment(workstation(
+            "tools/benchlock.sh, single-threaded on one pinned core",
+        ))
+        .with_reproduce(
+            "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
+             --build-only",
+        ),
+        // ---- #243: the one large prediction in this family that held ----
+        CostRow::new(
+            "the six-round build's peak RSS, from the multiply's term-product count",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp4",
+            build,
+        )
+        .with_formulation("bivariate CICO, t = 16, symbolic build alone")
+        .with_parameter("rounds", 6)
+        .with_largest_intermediate(Intermediate::new(
+            "the (p^2) * p transient of SparseMultiPoly's multiply",
+            3_540_000_000,
+            "term-products",
+        ))
+        .with_predicted_peak(Figure::predicted(
+            56_600_000_000,
+            "3.54e9 term-products for (p^2) * p at 16 bytes an entry",
+            build,
+        ))
+        .with_measured_resident(
+            57_000_000_000,
+            "VmHWM, polled externally and cross-checked against util::peak_resident_bytes",
+            build,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::PolynomialMultiplyTransient)
+        .with_environment(workstation(
+            "tools/benchlock.sh, single-threaded on one pinned core",
+        ))
+        .with_next_size(
+            NextSizeProjection::of(
+                "eight rounds, bounded by the output instead of the product count",
+            )
+            .with_peak_bytes(Figure::predicted(
+                4_300_000,
+                "the product's actual size, which a collecting or chunked multiply would bound \
+                     the live set by (#243)",
+                build,
+            )),
+        )
+        .with_reproduce(
+            "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
+             --build-only",
+        ),
+        // ---- #237: the attribution ----
+        CostRow::new(
+            "F4 peak RSS at the 20 000 000-entry rung, attributed",
+            "f4",
+            "fukuoka-mq-III-n20-seed0",
+            f4_scaling,
+        )
+        .with_formulation("full-width grevlex, 200 000 columns, 20 000 000 live entries")
+        .with_parameter("variables", 20)
+        .with_parameter("equations", 40)
+        .with_parameter("characteristic", 31)
+        .with_parameter("live-entry cap", 20_000_000)
+        .with_solving_degree(5)
+        .with_largest_intermediate(Intermediate::new(
+            "the VecDeque<Monomial<20>> pending-monomial queue of symbolic preprocessing",
+            162_188_194,
+            "monomials at the queue's high water, 80 B each",
+        ))
+        .with_work("monomials at the queue's high water", 162_188_194)
+        .with_work("rows in the refused closure", 64_062)
+        .with_work("basis terms at peak", 5_389_241)
+        .with_work("named sites' share of peak RSS, basis points", 9_600)
+        .with_estimated_peak(Figure::predicted(
+            195_433_980,
+            "max_live_nonzeros 12 212 087 x 16 B + 40 588 B of dense buffer",
+            f4_scaling,
+        ))
+        .with_measured_resident(
+            13_996 * MIB,
+            "util::peak_resident_bytes (VmHWM), in-process after F4 returned",
+            f4_scaling,
+        )
+        .with_measured_allocated(
+            21_674 * MIB,
+            "a tracking #[global_allocator] with LIVE/PEAK atomics",
+            f4_scaling,
+        )
+        .with_measured_quantity(
+            "the pending-monomial queue's share of peak RSS",
+            "basis points",
+            8_840,
+            "162 188 194 monomials x 80 B against VmHWM",
+            f4_scaling,
+        )
+        .with_attribution(Attribution::WrongQuantity {
+            predicted_quantity: "matrix entry storage, which max_live_nonzeros budgets and which \
+                                 measures 1.3% of the peak"
+                .to_string(),
+            actual_quantity: "one VecDeque<Monomial<20>> in symbolic preprocessing at 88.4%, \
+                              reached before any matrix exists and therefore before any budget \
+                              can be crossed. The basis held twice is 6.5%"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::SymbolicPreprocessingQueue)
+        .with_environment(workstation(
+            "ZEEBRA_AFFINITY=0-7, max_live_bytes set clear of the entry cap",
+        ))
+        .with_reproduce("cargo run --release --example f4_memory"),
+        CostRow::new(
+            "peak allocated against peak resident, on one row",
+            "f4",
+            "fukuoka-mq-III-n20-seed0",
+            f4_scaling,
+        )
+        .with_formulation("full-width grevlex, 200 000 columns, 20 000 000 live entries")
+        .with_solving_degree(5)
+        .with_largest_intermediate(Intermediate::new(
+            "the pending-monomial queue's capacity, one allocation",
+            268_435_456,
+            "slots at 80 B = 20 480 MiB, about 60% never written",
+        ))
+        .with_measured_resident(
+            13_996 * MIB,
+            "util::peak_resident_bytes (VmHWM), which counts touched pages",
+            f4_scaling,
+        )
+        .with_measured_allocated(
+            21_674 * MIB,
+            "a tracking #[global_allocator], which counts reservations",
+            f4_scaling,
+        )
+        .with_attribution(Attribution::WrongQuantity {
+            predicted_quantity: "\"peak memory\", read as one quantity".to_string(),
+            actual_quantity: "two: the queue's 20 480 MiB capacity against its 12 374 MiB of \
+                              touched pages. One allocation larger than the whole resident peak \
+                              is why no amount of care in reading \"peak memory\" distinguishes \
+                              them -- only recording which one it is does"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::SymbolicPreprocessingQueue)
+        .with_environment(workstation(
+            "ZEEBRA_AFFINITY=0-7, max_live_bytes set clear of the entry cap",
+        ))
+        .with_reproduce("cargo run --release --example f4_memory"),
+        CostRow::new(
+            "F4 peak RSS at the 10 000 000-entry rung, attributed",
+            "f4",
+            "fukuoka-mq-III-n20-seed0",
+            f4_scaling_d4,
+        )
+        .with_formulation("full-width grevlex, 200 000 columns, 10 000 000 live entries")
+        .with_parameter("live-entry cap", 10_000_000)
+        .with_solving_degree(4)
+        .with_largest_intermediate(Intermediate::new(
+            "the VecDeque<Monomial<20>> pending-monomial queue of symbolic preprocessing",
+            6_196_886,
+            "monomials at the queue's high water, 473 MB",
+        ))
+        .with_work("rows in the refused closure", 10_297)
+        .with_work("basis terms at peak", 240_551)
+        .with_estimated_peak(Figure::predicted(
+            6_081_741,
+            "the budgeted matrix entries at 16 B each",
+            f4_scaling_d4,
+        ))
+        .with_measured_resident(
+            608 * MIB,
+            "util::peak_resident_bytes (VmHWM), in-process; the external poller caught 609 MB",
+            f4_scaling_d4,
+        )
+        .with_measured_quantity(
+            "the pending-monomial queue's share of peak RSS",
+            "basis points",
+            7_800,
+            "6 196 886 monomials x 80 B against VmHWM",
+            f4_scaling_d4,
+        )
+        .with_attribution(Attribution::WrongQuantity {
+            predicted_quantity: "matrix entry storage, 5.8 MB of a 608 MB peak".to_string(),
+            actual_quantity: "the same queue at 78%. The queue dominates at both rungs, so this \
+                              is not a degree-5 phenomenon -- it is what symbolic preprocessing \
+                              costs at every degree, scaling with the closure"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::SymbolicPreprocessingQueue)
+        .with_environment(workstation(
+            "ZEEBRA_AFFINITY=0-7, max_live_bytes set clear of the entry cap",
+        ))
+        .with_reproduce("cargo run --release --example f4_memory"),
+        // ---- #289: the determinant law ----
+        CostRow::new(
+            "per-determinant cost at order 1 458, one worker",
+            "resultant-elimination",
+            "determinant sweep, synthetic bivariate pairs",
+            law,
+        )
+        .with_formulation("degree 1 in the surviving variable, order / 2 in the eliminated one")
+        .with_parameter("matrix order", 1_458)
+        .with_parameter("workers", 1)
+        .with_parameter("determinants x draws", 24)
+        .with_largest_intermediate(Intermediate::new(
+            "the Sylvester matrix, with L, U, P and a clone of A live",
+            1_458,
+            "matrix order (17.0 MB of matrix, 68.0 MB live per worker)",
+        ))
+        .with_predicted_runtime(Figure::with_basis(
+            Duration::from_secs_f64(2.493),
+            FigureBasis::Fitted {
+                law: "8.3216e-10 * order^2.9953".to_string(),
+                worst_residual_bp: 370,
+                fitted_to: 4_374,
+            },
+            law,
+        ))
+        .with_measured_runtime(
+            Duration::from_secs_f64(2.404),
+            "median of three draws; wall equals core-time at one worker, under tools/benchlock.sh",
+            law,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(workstation("tools/benchlock.sh, one pinned core"))
+        .with_next_size(
+            NextSizeProjection::of("order 4 374, inside the fitted range").with_runtime(
+                Figure::with_basis(
+                    Duration::from_secs_f64(66.960),
+                    FigureBasis::Fitted {
+                        law: "8.3216e-10 * order^2.9953".to_string(),
+                        worst_residual_bp: 370,
+                        fitted_to: 4_374,
+                    },
+                    law,
+                ),
+            ),
+        )
+        .with_reproduce("cargo run --release --example determinant_sweep"),
+        CostRow::new(
+            "per-determinant cost at order 13 122",
+            "resultant-elimination",
+            "determinant sweep, synthetic bivariate pairs",
+            law,
+        )
+        .with_formulation("degree 1 in the surviving variable, order / 2 in the eliminated one")
+        .with_parameter("matrix order", 13_122)
+        .with_parameter("workers", 1)
+        .with_work("upper end of the stated range, in seconds", 1_926)
+        .with_predicted_runtime(Figure::with_basis(
+            Duration::from_secs(1_833),
+            FigureBasis::Extrapolated {
+                law: "8.3216e-10 * order^2.9953".to_string(),
+                fitted_to: 4_374,
+                evaluated_at: 13_122,
+            },
+            law,
+        ))
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(workstation("tools/benchlock.sh, one pinned core"))
+        .with_next_size(
+            NextSizeProjection::of("rf4-rp4 at eight rounds, 531 442 determinants on 32 workers")
+                .with_runtime(Figure::with_basis(
+                    Duration::from_secs_f64(490.5 * 86_400.0),
+                    FigureBasis::Extrapolated {
+                        law:
+                            "8.3216e-10 * order^2.9953, with the 1.00 / 1.17 / 1.31 width penalty \
+                              extrapolated at the same slope beyond 32 workers"
+                                .to_string(),
+                        fitted_to: 4_374,
+                        evaluated_at: 13_122,
+                    },
+                    law,
+                )),
+        )
+        .with_reproduce("cargo run --release --example determinant_sweep -- --order 13122"),
+        CostRow::new(
+            "the exponent of the per-determinant cost law above L2",
+            "resultant-elimination",
+            "determinant sweep, orders 486 / 1 458 / 4 374",
+            law,
+        )
+        .with_formulation("ordinary least squares on (ln order, ln core-time)")
+        .with_parameter("orders fitted", 3)
+        .with_work("worst residual, basis points", 370)
+        .with_work("standard error of the exponent, per 10 000", 285)
+        .with_predicted_quantity(Quantity {
+            name: "exponent of the cost law".to_string(),
+            unit: "per 10 000".to_string(),
+            figure: Figure::predicted(
+                30_000,
+                "Crout LU is O(order^3), so the cost law is cubic",
+                "docs/research/resultant-elimination.md 6.5",
+            ),
+        })
+        .with_measured_quantity(
+            "exponent of the cost law",
+            "per 10 000",
+            29_953,
+            "fit_power_law over orders 486 / 1 458 / 4 374, exponent +/-0.0285",
+            law,
+        )
+        .with_attribution(Attribution::PredictionHeld)
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(workstation("tools/benchlock.sh, one pinned core"))
+        .with_reproduce("cargo run --release --example determinant_sweep"),
+        CostRow::new(
+            "the exponent of the per-determinant cost law below L2",
+            "resultant-elimination",
+            "determinant sweep, orders 18 / 162",
+            law,
+        )
+        .with_formulation("exact through two points, so no residual and no standard error")
+        .with_parameter("orders fitted", 2)
+        .with_predicted_quantity(Quantity {
+            name: "exponent of the cost law".to_string(),
+            unit: "per 10 000".to_string(),
+            figure: Figure::predicted(
+                30_000,
+                "Crout LU is O(order^3), so the cost law is cubic at every order",
+                "docs/research/resultant-elimination.md 6.5",
+            ),
+        })
+        .with_measured_quantity(
+            "exponent of the cost law",
+            "per 10 000",
+            27_902,
+            "fit_power_law over orders 18 and 162, exact through two points",
+            law,
+        )
+        .with_attribution(Attribution::MagnitudeOnly {
+            detail: "genuinely sub-cubic at the bottom: fixed per-determinant cost -- the \
+                     coefficient-row evaluations, the (m+n)^2 build, four (m+n)^2 allocations and \
+                     the Matrix::new copy -- that an order-18 determinant's 2 000 \
+                     multiply-subtract steps cannot amortize and an order-162 determinant's 1.4 \
+                     million already can. A single law over all five orders misses by 14.9% with \
+                     residual signs -, +, +, +, -, which is curvature and not noise"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(workstation("tools/benchlock.sh, one pinned core"))
+        .with_reproduce("cargo run --release --example determinant_sweep"),
+        // ---- #318 and #319: measured, reproducible, unexplained ----
+        CostRow::new(
+            "order-162 determinant on the 13 123-sample reference route, rf2-rp2",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp2",
+            law,
+        )
+        .with_formulation("the reference interpolation route, one worker")
+        .with_parameter("matrix order", 162)
+        .with_parameter("samples", 13_123)
+        .with_parameter("workers", 1)
+        .with_predicted_runtime(Figure::predicted(
+            Duration::from_nanos(2_868_000),
+            "6.5's figure on record -- 37 634.3 ms / 13 123 -- carried forward as the expectation \
+             for the same measurement",
+            "docs/research/resultant-elimination.md 6.5",
+        ))
+        .with_measured_runtime(
+            Duration::from_nanos(3_439_000),
+            "45 131.0 ms / 13 123 samples, same registered row, same code path, same lock",
+            law,
+        )
+        .with_attribution(Attribution::Unexplained {
+            issue: "#318".to_string(),
+            detail: "the same measurement months and a commit range apart. Three of four \
+                     re-measurements point the same way by about 1.2x and the smallest order \
+                     points the other way, so a factor computed between a 6.5 figure and one \
+                     taken now carries a ~20% systematic that is not a property of either \
+                     implementation"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(workstation("tools/benchlock.sh, one pinned core"))
+        .with_reproduce(
+            "cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp2",
+        ),
+        CostRow::new(
+            "core-time penalty at 32 workers, order 1 458",
+            "resultant-elimination",
+            "determinant sweep, synthetic bivariate pairs",
+            law,
+        )
+        .with_formulation("the same sweep at three widths, 4 determinants a worker")
+        .with_parameter("matrix order", 1_458)
+        .with_parameter("workers", 32)
+        .with_predicted_quantity(Quantity {
+            name: "core-time penalty at 32 workers".to_string(),
+            unit: "per 10 000".to_string(),
+            figure: Figure::predicted(
+                10_900,
+                "6.6's measured 4-9% out to 32 workers, carried forward as the expectation",
+                "docs/research/resultant-elimination.md 6.6",
+            ),
+        })
+        .with_measured_quantity(
+            "core-time penalty at 32 workers",
+            "per 10 000",
+            13_100,
+            "3.148 s against 2.404 s at one worker, with 4 determinants a worker so the 68 MB \
+             live set's page faults are amortized; 1.52x at one determinant a worker",
+            law,
+        )
+        .with_attribution(Attribution::Unexplained {
+            issue: "#319".to_string(),
+            detail: "6.6 measured this penalty as 4-9% out to 32 workers and it reproduces as \
+                     31-44%. 6.6's own argument -- that the limit is the all-core clock rather \
+                     than memory bandwidth -- is if anything strengthened, and the shape still \
+                     supports it: the penalty is the same 1.44x at orders 162 and 486, whose \
+                     matrices differ by 9x, which a bandwidth limit would not do. The size \
+                     disagrees with what is on record and this milestone did not resolve why"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(Environment {
+            concurrency: 32,
+            ..workstation("tools/benchlock.sh, 32 workers")
+        })
+        .with_reproduce("cargo run --release --example determinant_sweep -- --workers 32"),
+    ]
 }
 
 #[cfg(test)]
@@ -2211,8 +2945,10 @@ mod tests {
         );
     }
 
-    /// A stored error column is ignored on load and recomputed from the predicted and measured
-    /// columns, so a hand-edited `derived` object cannot become a published finding.
+    /// An error column injected into a stored row has no effect on the error the row reports.
+    ///
+    /// Nothing in the file is read as an error, so a hand-edited or stale figure cannot become a
+    /// published finding.
     #[test]
     fn test_a_stored_error_column_is_recomputed_rather_than_read() {
         let original = row()
@@ -2231,23 +2967,25 @@ mod tests {
                     .to_string(),
             });
 
-        // Rewrite the stored `derived` object with a figure nobody computed.
+        // Inject an error column a reader might believe, under both the hedged name the writer
+        // uses and the plausible one it does not.
         let Json::Object(mut fields) = original.to_json() else {
             panic!("a row serialises as an object");
         };
         for (key, value) in fields.iter_mut() {
-            if key == "derived" {
-                *value = Json::object([(
-                    "prediction_errors",
-                    Json::Array(vec![Json::object([
-                        ("quantity", Json::string("runtime")),
-                        ("factor", Json::string("1.0000")),
-                    ])]),
-                )]);
+            if key == "prediction_error" {
+                *value = Json::string("1.0000");
             }
         }
+        fields.push((
+            "derived".to_string(),
+            Json::object([("factor", Json::string("1.0000"))]),
+        ));
         let tampered = Json::Object(fields).to_json();
-        assert!(tampered.contains("1.0000"), "the tampered value is stored");
+        assert!(
+            tampered.contains("1.0000"),
+            "the injected value is in the text"
+        );
 
         let back = CostRow::from_json(&Json::parse(&tampered).expect("valid")).expect("loads");
         let errors = back.prediction_errors();
@@ -2576,13 +3314,196 @@ mod tests {
     #[test]
     fn test_cells_render_in_readable_units() {
         assert_eq!(bytes_text(512.0), "512 B");
-        assert_eq!(bytes_text((2u64 << 20) as f64), "2.0 MB");
-        assert_eq!(bytes_text((3u64 << 30) as f64), "3.00 GB");
+        assert_eq!(bytes_text((2u64 << 20) as f64), "2.0 MiB");
+        assert_eq!(bytes_text((3u64 << 30) as f64), "3.00 GiB");
+        assert_eq!(factor_text(838.24), "838x");
+        assert_eq!(factor_text(1.3417), "1.34x");
+        assert_eq!(factor_text(0.1267), "0.127x");
+        assert_eq!(
+            factor_text(0.0013),
+            "1.30e-3x",
+            "a two-decimal ratio would round this to 0.00x and report the opposite finding"
+        );
         assert_eq!(duration_text(Duration::from_millis(12)), "12.0 ms");
         assert_eq!(duration_text(Duration::from_secs(90)), "1.50 min");
         assert_eq!(duration_text(Duration::from_secs(7_200)), "2.00 h");
         assert_eq!(duration_text(Duration::from_secs(172_800)), "2.00 d");
-        assert_eq!(error_cell(&[]), "_open_");
+    }
+
+    /// Every transcribed row is a legal row, and every figure on it is sourced.
+    #[test]
+    fn test_every_transcribed_row_is_legal_and_sourced() {
+        let rows = transcribed_rows();
+        assert!(rows.len() >= 18, "{} rows transcribed", rows.len());
+        let mut board = CostModelBoard::new();
+        for row in rows {
+            row.check()
+                .unwrap_or_else(|error| panic!("{}: {}", row.claim, error));
+            assert!(
+                !row.source.is_empty() && row.source.contains(|c: char| c.is_ascii_digit()),
+                "{} must cite a section or an issue, not just a file: {}",
+                row.claim,
+                row.source
+            );
+            board.add(row).expect("accepted");
+        }
+        // Three bases are exercised by the seed set; `Fitted` and `Extrapolated` are #289's.
+        let bases: Vec<&'static str> = board
+            .rows()
+            .iter()
+            .filter_map(|row| row.predicted_runtime.as_ref())
+            .map(|figure| figure.basis.tag())
+            .collect();
+        for expected in ["predicted", "fitted", "extrapolated"] {
+            assert!(
+                bases.contains(&expected),
+                "{} is not seeded: {:?}",
+                expected,
+                bases
+            );
+        }
+    }
+
+    /// The transcribed set reproduces the three sharpest factors its sources published.
+    ///
+    /// The derived column is only trustworthy if it agrees with the documents on the cases those
+    /// documents state outright: 838x for the six-round build's memory, 75x for the budget
+    /// ladder's accounting, and the one large prediction that held to within 1%.
+    #[test]
+    fn test_the_transcribed_factors_agree_with_their_sources() {
+        let rows = transcribed_rows();
+        let factor = |claim: &str, quantity: &str| -> f64 {
+            rows.iter()
+                .find(|row| row.claim == claim)
+                .unwrap_or_else(|| panic!("no row for {}", claim))
+                .prediction_errors()
+                .into_iter()
+                .find(|error| error.quantity == quantity)
+                .unwrap_or_else(|| panic!("no {} error on {}", quantity, claim))
+                .factor
+        };
+
+        let build = factor("six-round symbolic build, peak RSS", "peak memory");
+        assert!(
+            (build - 838.0).abs() < 1.0,
+            "resultant-elimination.md 6.8 publishes 838x, derived {:.1}x",
+            build
+        );
+        let ladder = factor(
+            "F4 budget ladder, the memory the entry budget bounds",
+            "accounted storage",
+        );
+        assert!(
+            (ladder - 75.0).abs() < 1.0,
+            "10.1 publishes 75x, derived {:.1}x",
+            ladder
+        );
+        let held = factor(
+            "the six-round build's peak RSS, from the multiply's term-product count",
+            "peak memory",
+        );
+        assert!(
+            (held - 1.0).abs() < 0.02,
+            "56.6 GB predicted against 57.0 GB measured is the prediction that held, derived {:.3}x",
+            held
+        );
+    }
+
+    /// The committed history declares, in the file, that it is append-only, and its count agrees
+    /// with its array.
+    ///
+    /// A contract string that can drift from the code is a liability — `solved.json`'s went stale
+    /// and had to be fixed in #290 — and `row_count` disagreeing with the array is the cheapest
+    /// evidence of a rewrite that dropped or reordered rows, which the contract forbids.
+    #[test]
+    fn test_the_committed_history_declares_its_append_only_contract() {
+        let history = Json::parse(include_str!(
+            "../../../research/cost-model/results/history.json"
+        ))
+        .expect("committed history.json parses");
+
+        let contract = history
+            .get("contract")
+            .and_then(Json::as_str)
+            .expect("history.json carries a contract string");
+        assert_eq!(
+            contract, COST_MODEL_HISTORY_CONTRACT,
+            "the committed contract must be the one the writer emits, character for character"
+        );
+        assert!(contract.contains("APPEND-ONLY"));
+
+        let rows = history.get("rows").expect("a rows array").items();
+        let count = history
+            .get("row_count")
+            .and_then(Json::as_int)
+            .expect("a row_count");
+        assert_eq!(
+            count as usize,
+            rows.len(),
+            "row_count disagrees with the array, so the file was rewritten rather than appended to"
+        );
+    }
+
+    /// The committed history loads, is self-consistent, and regenerates byte-for-byte from itself.
+    ///
+    /// "Regenerable from the retained records alone": the renderer reads only the file, and a
+    /// second pass over what it wrote produces the same file.
+    #[test]
+    fn test_the_committed_history_regenerates_from_itself() {
+        let text = include_str!("../../../research/cost-model/results/history.json");
+        let board = CostModelBoard::load(&Json::parse(text).expect("parses")).expect("every row");
+        assert!(board.rows().len() >= 18);
+
+        let rewritten = board.to_json().to_json() + "\n";
+        assert_eq!(
+            rewritten, text,
+            "a round trip through the register must not change the committed file"
+        );
+
+        // Seeding is idempotent: no (key, source) pair appears twice, so `--seed` appends nothing
+        // on a second run and the append-only history does not grow duplicates.
+        let mut seen: Vec<(String, String)> = Vec::new();
+        for row in board.rows() {
+            let identity = (row.key(), row.source.clone());
+            assert!(
+                !seen.contains(&identity),
+                "{:?} is recorded twice; --seed would duplicate it",
+                identity
+            );
+            seen.push(identity);
+        }
+    }
+
+    /// The committed register renders the unexplained findings and the open prediction it carries.
+    #[test]
+    fn test_the_committed_register_renders_its_open_and_unexplained_rows() {
+        let text = include_str!("../../../research/cost-model/results/history.json");
+        let board = CostModelBoard::load(&Json::parse(text).expect("parses")).expect("every row");
+        let markdown = board.to_markdown();
+
+        assert!(
+            markdown.contains("UNEXPLAINED (#318)"),
+            "#318 is on the board"
+        );
+        assert!(
+            markdown.contains("UNEXPLAINED (#319)"),
+            "#319 is on the board"
+        );
+        assert!(
+            markdown.contains("Open predictions"),
+            "order 13 122 is a prediction nobody has measured"
+        );
+        assert!(
+            markdown.contains("3.0x past the evidence"),
+            "the eight-round projection must say how far past its evidence it reaches"
+        );
+        assert!(
+            board
+                .open_predictions()
+                .iter()
+                .any(|row| row.claim.contains("13 122")),
+            "the order-13 122 row must be visibly incomplete rather than absent"
+        );
     }
 
     /// An empty register says so rather than rendering a table of nothing.
