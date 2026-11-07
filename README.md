@@ -367,7 +367,16 @@ So, for a harness built anywhere but here, in order of what it buys:
 
    Verified on a throwaway out-of-tree crate, counting VEX-encoded instructions over SIMD registers
    in the resulting binary: **0** for a plain `cargo build --release`, **70** with
-   `.cargo/config.toml` copied, **79** with all three settings passed by `--config`.
+   `.cargo/config.toml` copied, **79** with all three settings passed by `--config`. The profile
+   half is visible in `cargo build -v`: the `--config` route shows `-C lto=fat` and
+   `codegen-units=1` on the rustc command line, and the copied-config route shows neither.
+
+   One trap while checking any of this, which cost a figure here before it was noticed: if the
+   environment sets `CARGO_TARGET_DIR` — this workstation's `~/projects/.cargo/config.toml` does,
+   to a shared build cache — then `target/release/<name>` does not exist and `objdump` on it
+   silently reports nothing, which reads as "no AVX2". Pass `--target-dir` explicitly, or resolve
+   the path with `cargo metadata --format-version 1 --no-deps`, and confirm the file exists before
+   believing a census of it.
 
 Note that `tools/vec_census.sh` will not catch this for an arbitrary harness. Its signal is vector
 *multiplies*, which only exist for an artifact exercising a **4-byte** field — a 32-bit Montgomery
