@@ -3685,9 +3685,11 @@ rather than an answer.
 #### Stopping on a wall clock, and keeping the report
 
 `F4Options::max_wall_time` is `None` by default, so no clock is read on the shipping path. When it
-is set it is checked **once per batch**, which is what makes the counters a crossing leaves behind
-describe whole batches rather than a matrix caught halfway through being built. One batch is always
-reduced before the check can fire, so the report is never empty:
+is set it is checked in **two** places: **once per batch** in the main loop, which is what makes the
+counters a crossing leaves behind describe whole batches rather than a matrix caught halfway through
+being built; and **once per basis element during final interreduction**, which runs after the loop
+has finished. One batch is always reduced before the batch check can fire, so the report is never
+empty:
 
 ```rust
 use std::time::Duration;
@@ -3717,6 +3719,17 @@ It does not replace an external supervisor: a single batch can be arbitrarily lo
 time at a crossing is the budget *plus* whatever the batch in progress still needed, and both are
 reported. What the cooperative stop adds is that it **returns**, and a return carries the statistics
 an abandoned worker thread cannot.
+
+The two stages report **different variants**, because they can name different things.
+`F4Error::TimeBudgetExceeded` carries the selection `degree` of the batch the budget was noticed at;
+`F4Error::InterreductionTimeBudgetExceeded` carries `elements_reduced` of `elements`, because that
+stage has no batch and no selection degree, and inventing one would be a fabrication. Both are
+`StopKind::Time` and both answer `"max_wall_time"` to `limit_name()`, so a consumer that classifies
+by kind or by name sees one thing and a consumer that wants to know *where* can tell them apart.
+
+Interreduction was unchecked until #395, and the gap was not academic: #349 measured that stage at
+**80.4%** of `mq-random-10`, so a budget honored at every batch could be overrun by four fifths of
+the computation.
 
 #### Degree by degree, and which of the work was useful
 
