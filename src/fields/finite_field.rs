@@ -96,7 +96,8 @@ where
     for<'a> Self: Div<&'a Self, Output = Self>,
 {
     /// The image of the integer `val` under the unique ring homomorphism from the integers into
-    /// this field: `val` copies of [`One::one`], which is `val mod p` for characteristic `p`.
+    /// this field: `val` copies of [`one`](crate::One::one), which is `val mod p` for
+    /// characteristic `p`.
     ///
     /// **This is not an index into the field.** Over a prime field the two coincide, which is why
     /// the distinction went unnoticed until #377; over an extension of degree `k > 1` the image is
