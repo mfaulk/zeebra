@@ -860,8 +860,38 @@ same-machine measurement**, and neither answer came from this crate:
 `N = 6` conversion in both models (23 340 s / 11 775 s), so this is a reproduction target rather
 than a produced figure.
 
-**No Zeebra `N = 6` conversion time was obtained**, and the attempt is recorded rather than retried
-into one:
+**And then PCICO completed, with a verified witness — so `N = 6` is solved.** `Anemoi(0, 34600)` has
+first output word zero, **checked by running the permutation** rather than the system that produced
+it:
+
+| stage | elapsed | detail |
+|---|---:|---|
+| basis (F4) | 20.438 s | 109 elements, 43 batches, peak live nonzeros 28 435 493 |
+| **conversion (FGLM)** | **4 226.518 s** | `D = 15 625`, 7 relations, 84 669 823 operator entries |
+| univariate | 1.614 s | a point over the base field |
+| **total** | **4 248.571 s** (1.180 h) | inside its 5 400 s backstop |
+
+That **reproduces Magma's published 11 775.430 s** conversion on the same row — a reproduction, not a
+competitive claim, since the comparison is cross-machine.
+
+**#286's actual question was whether the `D³` model keeps holding at a third rung, and the answer is
+yes.** The predictions were recorded *before* the run: conversion **−3.9%**, operator entries
+**−1.5%**, total **−5.6%**; 115.2x predicted against 110.7x observed, against `D³`'s 125x. The basis
+estimate was the outlier at **+25%** — the same stage whose per-rung growth already needed correcting
+from 57x to 54x, which is a consistent signal that **the F4 extrapolations here are the weak ones**.
+
+Three earlier claims in this milestone were corrected by the completed run rather than left standing:
+the "crossed by **112 entries**" figure **understated it** — the true peak was 28 435 493 live
+nonzeros, **1.42x** the default, and the 112 was an artefact of F4 stopping the instant the budget
+went; the msolve conversion deficit **narrowed from 21.1x at `N = 5` to 12.5x at `N = 6`**, because
+msolve's conversion grew 184.1x per rung against this crate's 110.7x, so "one and a half orders of
+magnitude" is the **`N = 5`** figure and must not be quoted as rung-independent — and projecting the
+narrowing forward would be equally wrong, since Wiedemann is asymptotically the better algorithm and
+one crossing proves nothing about `N = 7`; and **#286's "memory is the gate" was half right**, in that
+the memory projection was excellent and memory never bound. F4 did.
+
+FCICO remains queued with all four budgets lifted. The record below is the attempt as it stood before
+PCICO completed, kept because it is what produced the Magma row-count observation:
 
 - **FCICO refused in 3.8 s on `max_matrix_rows`** — "symbolic preprocessing needed more than the
   200000 rows allowed". Not memory. This is the **third** of F4's four relevant budgets discovered
@@ -1011,7 +1041,7 @@ so its acceptance test is a before/after on a corpus rung rather than a number r
 
 ### 13.6a Six measurement-integrity defects, and the pattern they share
 
-M25 found nine places where a mechanism reported confidently about something other than what the
+M25 found ten places where a mechanism reported confidently about something other than what the
 caller meant. They are listed together because the pattern is the milestone's methodological result
 and it is more transferable than any single fix.
 
@@ -1023,6 +1053,7 @@ and it is more transferable than any single fix.
 | 4 | **F4's two memory knobs are numerically identical at the default**, and the error names the limit the caller **set** rather than the one that **bound** (#322) | `320_000_000 / 16` is exactly `20_000_000`, so raising one does nothing and the message confirms the wrong ceiling. |
 | 5 | **`pgrep -f` matched a heredoc wrapper on its own script text**, returning two matches for a job that had not started and **zero** for the binary that was running (#328) | Anti-correlated, not merely imprecise. The RSS guard built on it was safe only because a 4 MB wrapper cannot cross a 16 GiB ceiling — a guard correct by accident, in the instrument §9's policy depends on. |
 | 6 | **A test that returns early on an absent tool is indistinguishable from one that ran and agreed** (#333, class filed as #339) | `main` was red for ~40 minutes with every check green. #311 and #324 were each green against their own base and red only once combined: **CI tests a PR against its base, not against the merged result.** |
+| 10 | **A monitor announced a run complete the instant a *different* run finished**, reporting byte-identical, entirely plausible figures from a run that had not started | It keyed on an `--- exit` marker a previous attempt had left in the output file. Caught only by comparing the file's mtime (20:02:16) against the other run's completion (21:43:17), and it was nearly reported as a result. After items 5 and 7 the shape is unmistakable: **a completion marker is not evidence of completion unless something ties it to the run meant to produce it.** |
 | 9 | **A row sat in a table of *agreeing* quotient dimensions while being silently unverified**, because only one engine reported one | `mq-planted-14`'s basis finishes in 0.28 ms, but its *dimension* was obtained by running a full `fglm_to_lex`, which trips the 4 096 **conversion** cap — so a **basis** row's verifiability was hostage to a **conversion** budget. `Invariants::agree` compares only fields both sides carry, so this produced **neither agreement nor disagreement**. That is precisely the "nothing shared is not a verification" trap `overlap()` was built to catch: **the mechanism worked and the prose summarising it did not.** Fixed at the root — a dimension now comes from `QuotientBasis::new`, which enumerates standard monomials and needs neither operators nor dense blocks — and a missing invariant is now recorded as a stage saying so, because a row with a missing invariant must say so or it reads as a row nobody checked. |
 | 8 | **A measurement crate outside the worktree does not inherit `.cargo/config.toml`**, so it silently loses `-C target-cpu=x86-64-v3` with **nobody setting `RUSTFLAGS` at all** | A third route to the failure that has already cost this repository two sets of figures — and the first with **no trigger to avoid**, since the other two are both "someone set `RUSTFLAGS`". Building a harness outside `src/` is good practice, which is what makes it dangerous. Caught only because the corrected build changed the headline: **1 930x → 1 692x**. Both runs kept. |
 | 7 | **A harness-killed run records a clean `END status=0` in `benchlock.log`**, so the lock cannot distinguish "the budget stopped it" from "something unrelated stopped it" | The Anemoi PCICO run was stopped at 3 177 s of its 5 400 s budget when the background shell that launched it was terminated, taking `benchlock`, `timeout`, `taskset` and the binary with it. The lock recorded success. Worse than the others, because it consumes an hour of a **serialized mutex** while reporting that a measurement completed — and it makes every historical `END status=0` retroactively ambiguous. Fixed with `setsid`, so the run is its own session leader. |
@@ -1043,7 +1074,7 @@ executes when the lock frees, so a queued run would have persisted rows from a *
 "the thing that runs is not the thing that was reviewed", which is #333's shape again at a different
 layer.
 
-The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the nine
+The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the ten
 produced well-formed output. Three were caught only because an agent ran something locally for an
 unrelated reason, and that is not a detection strategy. The repository already applies the right
 discipline in two places — `zb-claim.sh`'s three outcomes for a board read, and
@@ -1176,12 +1207,13 @@ Scored against the criteria as written before the work, including where they wer
 | a validated, updated Poseidon resultant cost model | **met** | #289 — five orders, 2.9953 ± 0.0285, residuals published, no cache cliff, and `RowCost::of` deliberately keeping the **larger** of fitted and cubic |
 | one clear recommendation on the next algorithmic investment, from new measurement | **met**, and **contested** | §13.9 — order conversion, with the contest named and **#349** as the one run that decides it |
 
-**Stretch — not met, 0 of 4**, and the first criterion inverted:
+**Stretch — met, 1 of 4.** The frontier criterion is met by Anemoi `N = 6`; the other three are
+not, and the first is inverted:
 
 | criterion | | |
 |---|---|---|
 | a same-machine performance lead over a credible established implementation | **not met — the opposite** | Two measured deficits: ~30x on conversion against msolve, 4.11x on the basis against Singular. Four apparent wins were **disqualified by our own startup-floor rule**, including a 450x |
-| a verified cryptanalytic instance beyond M24's measured frontier | **not met — and now one measurement away** | `rf4-rp2` was costed at ≈2.6 h against a ~2 h ceiling and refused (§8.4.1). #243's 9.0x build speedup then took it to **1.70–1.88 h, inside the ceiling** (§8.4.2). It is unlaunched because root finding at degree 59 049 is unpriced and the margin is minutes, not because it is out of reach |
+| a verified cryptanalytic instance beyond M24's measured frontier | **met** | **Anemoi `N = 6` PCICO at `p = 65537`, solved with a verified witness** — `Anemoi(0, 34600)`, first output word zero, checked through the permutation. `D = 15 625`, 4 248.571 s total, inside its backstop. Zeebra's registered Anemoi ladder stopped at `N = 5` before this, so it is beyond the earlier measured frontier, and it **reproduces** Magma's published 11 775.430 s conversion. Separately, `rf4-rp2` is now **inside** the ~2 h ceiling at 1.70–1.88 h after #243's 9.0x build speedup and is unlaunched only because root finding at degree 59 049 is unpriced (§8.4.2) |
 | an improvement to a published attack surviving an equivalent comparison | **not met** | Griffin is a **no-go for M25** on worth; the capability it needs is costed as #306 |
 | an algorithmic change materially raising the maximum reachable problem size | **not met**, and a claim withdrawn | #305 took 9.06x off F4's working set but the stop reason is **unchanged** — `max_live_nonzeros` at degree 5, so M24's "out of reach, not out of budget" stands. And axis 4's round-count claim was **withdrawn** in §13.5 |
 
