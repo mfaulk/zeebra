@@ -330,7 +330,7 @@ impl CaseField {
                         let shift = exponent.ok_or_else(|| {
                             malformed(format!("{} has an unreadable exponent", name))
                         })?;
-                        if u32::from(shift) >= self.degree() {
+                        if shift >= self.degree() {
                             return Err(FieldTextError::OutOfRange {
                                 coefficient: format!("{}^{}", name, shift),
                                 field: *self,

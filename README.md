@@ -23,6 +23,9 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Gebauer-Moller and chain criteria, structured elimination, adaptive linear algebra
 - [x] FGLM monomial-order conversion and fallible zero-dimensional solving
 - [x] Differential testing of the zero-dimensional pipeline against Singular
+- [x] That oracle over an extension field: a differential case names a field rather than a
+      characteristic, and the irreducible polynomial the two sides reduce by is asserted to agree
+      rather than conventionally shared
 - [x] Batched border reduction and adaptive operator storage: 14x on katsura-7's conversion
 - [x] 254- and 255-bit prime fields, with F4, FGLM and solving over them end to end
 - [x] Two-adic roots of unity without factoring `q - 1`, so the NTT runs over the wide fields
@@ -2470,7 +2473,20 @@ cargo run --release --bin zeebra-differential -- --systems 500 --jobs 8   # eigh
 cargo run --release --bin zeebra-differential -- --seed 777 --systems 240 \
     --max-degree 4 --max-terms 5 \
     --fixtures src/grobner/differential/fixtures.rs   # regenerate the committed cases
+cargo run --release --bin zeebra-differential -- --fields 2^8/283 --seed 3780 --systems 40 \
+    --max-degree 4 --max-terms 5 --fixture-table FIXTURES_GF256 \
+    --fixtures src/grobner/differential/fixtures_gf256.rs   # the GF(2^8) table
 ```
+
+**`--fields` names a field and not a characteristic**, because a characteristic does not determine
+one: `GF(2)` and `GF(2^8)` share it, and `2^8/283` and `2^8/285` are two fields of the same order in
+which the same byte has two different squares — `Gf256` and `Gf256Mq`. A case records its modulus,
+and the modulus is *asserted* to agree on both sides rather than assumed: Zeebra's end by
+multiplying (`x^m = r` determines `P = x^m + r`, so one exponentiation accepts exactly one modulus),
+and Singular's by declaring `ring R = (2,a),...` with an explicit `minpoly` — its own `(2^8,a)`
+Galois fields take theirs from an internal table a script cannot choose — and comparing the echo.
+A ring reducing by something else is an oracle failure and never a comparison. `--characteristics`
+is still accepted as the old name, so the committed tables' regeneration commands keep running.
 
 **`--jobs` does not change the answer.** Each system is a Gröbner basis, an FGLM conversion and a
 blocking Singular subprocess, and `system(index)` is a pure function of `(seed, index)` — nothing
@@ -4045,9 +4061,11 @@ The sweep's F4 options are configurable through `SweepOptions::f4`, the analogue
 field one level up: it is how a workstream points the external oracle at a strategy under
 development rather than at the default. M22 uses it to check each of its configurations —
 `SmallMultiplierDegree`, `SmallMultiplierMonomial`, `Observe`, `CertifiedLimited`, `Deferred`,
-`certify`, and three together — against Singular on random systems over six characteristics, which
-is stronger than composing "strategy equals baseline on a fixed corpus" with "baseline agrees with
-Singular".
+`certify`, and three together — against Singular on random systems over every supported field,
+which is stronger than composing "strategy equals baseline on a fixed corpus" with "baseline agrees
+with Singular". Seven fields since the oracle reached `GF(2^8)`, and the sweep's size is the cross
+product of variable counts and fields rather than a round number, so adding a field widens the
+coverage instead of displacing some of it.
 
 The configuration has to reach the comparison for any of that to be true, and that is the
 distinction between two pairs of entry points:
