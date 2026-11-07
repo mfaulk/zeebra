@@ -54,6 +54,9 @@ As the saying goes, you can either make software so simple that it obviously has
       characteristics: this crate's conversion/basis ratio is flat to 12% across a 47-bit range of
       primes where the reference's moves 7.3x, so the gap is the reference's field arithmetic — and
       msolve on this machine is 35x faster than either
+- [x] Anemoi CICO at six rounds, `D = 15 625`: a witness verified through the permutation in
+      1.180 h, reproducing a published 11 775 s conversion, with the pre-recorded cost model landing
+      within 4% on the conversion and 1.5% on the operator count
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
