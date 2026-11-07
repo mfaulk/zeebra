@@ -260,6 +260,18 @@ wall limit, every row from `corpus::instance` so the generators are digest-ident
 startup floor is subtracted from no figure; the `startup share` column is what says whether a row
 means anything about the engines (§0).
 
+> **Provenance of this table, stated because §9's own standard requires it.** These figures come
+> from a real run — `benchlock` logs it `20:18:33 → 20:28:32`, status 0, after a 2 611-second wait
+> — but that run was invoked **without `--write`, so its records were not retained**. The table is
+> therefore sourced from the run's standard output rather than from
+> `research/competitive/results/history.json`.
+>
+> That is the wrong way round. #293's acceptance is "regenerable from the retained records", and a
+> figure that lives only in a document is the state Scoreboard C exists to prevent. A re-measured
+> `--write` run is queued on `benchlock`; when it lands, **these numbers are replaced by the
+> persisted ones** and any difference is run-to-run variation worth seeing. The 4.11x is a 4x gap
+> and will not move inside the 20% band, but the millisecond rows may.
+
 | row | task | Zeebra | Singular | wall ratio | startup share | verdict |
 |---|---|---:|---:|---:|---:|---|
 | **mq-random-10** | **basis** | **29 963 ms** | **7 291 ms** | **0.24x** | 0% | **Zeebra 4.11x slower** |
@@ -470,6 +482,7 @@ compared:
 | ≥3 external tools | **Partially met, with reasons.** msolve measured (§1); **Singular measured on 19 corpus rungs across both tasks (§4a)**. Groebner.jl and Sagebrush are now adapted and wired into the sweep, but their four-engine run is **queued behind a 90-minute reproduction on `benchlock`** — the serialization protocol working, not failing. |
 | ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** on seven rungs of two of them against Zeebra's F4 (§4) **plus quotient-dimension agreement on every completed Singular row across all six** (§4a); cross-library **timing** on `anemoi` (§1) and on `mq-random`, `mq-planted` and `poseidon` (§4a). |
 | every row verified or classified unverified, method named | **Met.** §4 names the method (invariant agreement against Zeebra's F4, dimensions against published values). §1's rows are verified at `N = 4, 5, 6`. |
+| **rows retained in the board** (#293, #299) | **Not yet met.** `research/competitive/results/history.json` holds **zero rows**: the sweep that produced §4a ran without `--write`. The schema, the renderer and the `--write` path all exist and are tested; what is missing is one re-measured run, which is queued on `benchlock` behind a 90-minute reproduction. **Until it lands, §4a's figures are documented but not regenerable, and that is a real gap rather than a presentational one.** |
 | failure stages and limits recorded for incomplete runs | **Met** by construction: `StoppedByLimit` carries the limit and `Unsupported` the missing capability, and neither is timing evidence. |
 | no cross-machine or cross-concurrency ratio | **Met.** §1 states 8-core against 1-core and quotes **no** per-core ratio for the end-to-end rows; the per-core figure is restricted to the single-threaded conversion stage. |
 | recommendation for each H12–H17, issue updated | §9, and the issues updated. |
