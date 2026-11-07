@@ -30,6 +30,8 @@
 //!   Cyclic. Both resolved against another engine's own distributed input files.
 //! * [`singular`] — the reference adapter, over the Singular installation the differential
 //!   harness already drives. Read it as the worked example.
+//! * [`msolve`] — msolve, the only comparand that reports its F4 stage timings under Zeebra's own
+//!   stage names. Read it for what an adapter owes a tool that fails silently.
 //!
 //! # Licensing
 //!
@@ -74,6 +76,8 @@ pub use contract::{
 };
 #[cfg(feature = "external-runners")]
 pub use corpus::{cyclic_instance, katsura_instance, CorpusEntry, Rung, REFERENCE_CHARACTERISTIC};
+#[cfg(feature = "external-runners")]
+pub use msolve::MsolveSolver;
 pub use process::{
     read_output, CpuBasis, Invocation, ProcessMeasurement, RssBasis, RssPolicy, SpawnError,
     Supervisor,

@@ -113,28 +113,51 @@ pub const MAX_CHARACTERISTIC: u64 = 1 << 31;
 /// }
 /// ```
 ///
-/// The bound is the Barrett-reduction kernel's: `matrix-mult.c:68-92` is commented
-/// `2^30 < p < 2^31` and accumulates two products per step (`res1 += prod1 + prod2`) before
-/// reducing, and `1518500213` is just under `sqrt(2^61)`.
+/// `1518500213` is `floor(sqrt(2^61)) + 1`-ish: the sparse-FGLM matrix-vector kernels accumulate
+/// **eight** products of magnitude under `p^2` before folding, so they need `8p^2 < 2^64`
+/// (`fglm/linalg-fglm.c:464-552` for the AVX2 kernel, with the carry fold at `:547-552`).
 ///
-/// # Why this is a capability bound and not a slow path
+/// # Why the constant is *tighter* than msolve's own guard
 ///
-/// **msolve does not terminate above it.** The `NULL` is returned to the genericity handler, which
-/// reads it as "the staircase was not generic enough" and retries with a fresh random linear form
-/// — forever. Measured on this machine: katsura-5 over `GF(2^31 - 1)` produced **25 353** retries
-/// and 1.37 million lines of `Prime 2147483647 is too large.` in eight seconds, and never exited.
-/// Without this constant every eliminant row above the bound would burn its whole wall limit and
-/// be recorded as "msolve needed more than the limit", which attributes a refusal to slowness.
+/// `linalg-fglm.c:33-39` documents the safe modulus as **`1515531528`**, inherited from FLINT:
 ///
-/// Verified either side of the boundary: `p = 1518500201` returns the correct degree-2 eliminant,
-/// `p = 1518500213` loops. The `-g 2` basis path is **unaffected** and works at every
-/// `p < MAX_CHARACTERISTIC`, so the two tasks genuinely have two different ceilings.
+/// ```c
+/// //  -> modulus <= DOT2_ACC8_MAX_MODULUS   (about 2**30.5, slightly less)
+/// #define DOT2_ACC8_MAX_MODULUS UWORD(1515531528)
+/// ```
+///
+/// Neither that constant nor its length companion is ever compared against anything in msolve's
+/// tree — they are documentation. So the guard admits `p <= 1518500212` while the kernel's stated
+/// precondition stops at `1515531528`, and primes in the **2 968 684-wide window** between them run
+/// to completion with no accumulation guarantee. A result that may be silently wrong is worse for
+/// this milestone than a row marked unsupported, so this bound is the documented-safe one and not
+/// msolve's. Nothing is lost in practice: no Zeebra benchmark prime lies in the window.
+///
+/// # Why it is a capability bound and not a slow path
+///
+/// **msolve does not terminate above its own guard**, and this is provable from its source rather
+/// than merely observed. The `NULL` is laundered into `success = 0` at `msolve/msolve.c:1740-1752`
+/// — the *same* encoding used for a non-generic staircase — which becomes return code 1
+/// ("not in generic position") at `msolve.c:2446`, which reaches the `goto restart` genericity
+/// handler at `msolve.c:4513-4533`. That loop cannot exit, because
+/// `add_linear_form_to_input_system` unconditionally `return 1` (`msolve.c:649`) and
+/// `undo_variable_order_change` permanently returns 0 once a linear form exists
+/// (`msolve.c:482-484`). Each round adds another linear form, so successive attempts get *slower*.
+///
+/// Measured: katsura-5 over `GF(2^31 - 1)` produced **25 353** retries and 1.37 million lines of
+/// `Prime 2147483647 is too large.` in eight seconds, and never exited. `p = 1518500201` returns
+/// the correct degree-2 eliminant; `p = 1518500213` loops. Without this constant every eliminant
+/// row above the bound would burn its whole wall limit and be recorded as "msolve needed more than
+/// the limit", which files a defect as slowness.
+///
+/// The `-g 2` basis path is **unaffected** and works at every `p < MAX_CHARACTERISTIC`, so the two
+/// tasks genuinely have two different ceilings.
 ///
 /// Note what this excludes: Zeebra's [`Mersenne31`](crate::fields::Mersenne31) and
 /// [`Zp2147483647`](crate::fields::Zp2147483647) are both **above** this bound, so msolve is not
 /// an eliminant comparand on Zeebra's most natural 31-bit field. An eliminant comparison needs a
 /// prime below it — `1073741827`, the one the smoke corpus uses, is inside.
-pub const MAX_CHARACTERISTIC_ELIMINANT: u64 = 1_518_500_213;
+pub const MAX_CHARACTERISTIC_ELIMINANT: u64 = 1_515_531_529;
 
 /// The stderr line msolve repeats when [`MAX_CHARACTERISTIC_ELIMINANT`] is exceeded.
 ///
@@ -1162,7 +1185,9 @@ impl ExternalSolver for MsolveSolver {
                 RunStatus::Failed(RunFailure::Reported {
                     message: format!(
                         "msolve's sparse-FGLM refused the prime and its genericity handler retried \
-                         without bound: {:?}. The eliminant bound is {} (fglm_core.c:1385).",
+                         without bound: {:?}. msolve's own guard is 1518500213 \
+                         (fglm_core.c:1385); this adapter stops at the documented-safe {} \
+                         (linalg-fglm.c:38).",
                         quoted, MAX_CHARACTERISTIC_ELIMINANT
                     ),
                 }),
