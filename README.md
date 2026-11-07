@@ -1202,7 +1202,39 @@ assert_eq!(&f / &g, quotient);
 assert_eq!(&f % &g, remainder);
 ```
 
-Both stay quadratic, and that is a decision rather than an omission. Newton-inversion division is
+**`resultant(f, g)` rides the same remainder sequence**, and it is the cheap way to eliminate a
+variable. `Res(f, g)` is `det Syl(f, g)`, but taking that determinant costs `O(d³)` where driving
+`f mod g` down to a constant costs `O(d²)` — at the Sylvester order 1 458 that the six-round
+resultant rows use, a factor of 3 888 in operation count. It is zero exactly when the two share a
+root in an extension:
+
+```rust
+use zeebra::{fields::Zp7, resultant, resultant_at_formal_degrees, FiniteField, UnivariatePolynomial};
+
+type P = UnivariatePolynomial<Zp7>;
+let f = P::try_from("6 + x^2").unwrap(); // x^2 - 1 = (x - 1)(x + 1)
+let g = P::try_from("5 + x").unwrap(); // x - 2
+
+// lc(f)^{deg g} * g(1) * g(-1) = (-1)(-3) = 3
+assert_eq!(resultant(&f, &g), Zp7::new(3));
+
+// Zero on a shared root: x^2 - 1 and x - 1 both vanish at 1.
+assert_eq!(resultant(&f, &P::try_from("6 + x").unwrap()), Zp7::new(0));
+
+// An elimination needs the determinant at the *formal* degrees its matrix was sized for, which
+// the true resultant of a specialized pair is not. `g` here has formal degree 2 and true degree
+// 1, and the correction is one power of lc(f).
+assert_eq!(resultant_at_formal_degrees(&f, &g, 2, 2), Zp7::new(3));
+```
+
+That second function is what a bivariate elimination calls: specializing at a point where a leading
+coefficient vanishes drops a degree, and the specialized resultant is then not the specialization of
+the resultant — the classic trap, closed in `O(1)` per sample. §5 of
+[`docs/research/structured-sylvester.md`](docs/research/structured-sylvester.md) has the derivation
+and the reason this is worth having at the orders the resultant route now reaches.
+
+Division and `gcd` both stay quadratic, and that is a decision rather than an omission.
+Newton-inversion division is
 `O(M(d))` and half-GCD is `O(M(d) log d)`, but `M(d)` *at the operator* is still schoolbook: `Mul`
 cannot choose an NTT domain from its signature, and Karatsuba is not wired into it either (§4.1 of
 [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)). With a quadratic `M`

@@ -26,7 +26,7 @@ deliverable.
    and not merely a faster route to an `r` that is already reachable. Per the M25 research gates,
    mathematical progress and implementation performance are scored separately.
 
-The verdict is in §8. It is **no-go for M25, defer the capability to #207**, and the gate it fails
+The verdict is in §8. It is **no-go for M25, defer the capability to #306**, and the gate it fails
 is gate 3, not gate 1 or 2 — which is the opposite of what #202 expected.
 
 ## 1. Gate 1: the system vanishes at the published witnesses, and the bypass line falls out
@@ -56,7 +56,7 @@ confirm every `p_i` and `g` vanish there. **Measured**, five of five:
 | 6 | 13453267118668680 | ✓ | ✓ | ✓ | ✓ |
 | 7 | 471901030567494 | ✓ | ✓ | ✓ | ✓ |
 
-### 1.2 A result the paper does not publish: the Appendix B bypass line, recovered
+### 1.2 A result the paper does not publish: the Appendix B bypass line, recovered out of sample
 
 Printing the roots exposes something the published data was not advertised as containing. The first
 three `α`-th roots are **the same three constants at every witness and every round count**, so they
@@ -87,9 +87,28 @@ b = [0, 0, 3315691270431207, 25091762789629580, 10771750388583441, 2631986855493
      10205561023577940, 20355927499979202]
 ```
 
-and the two `r = 6` witnesses and the one `r = 7` witness **lie on that same line, 3 of 3** — an
-independent confirmation that was not used to build it. `a_0 = b_0 = 0`, which is Appendix B's
-`l_0(a) = l_0(b) = 0` constraint, and branch 0 is the only `x_0`-independent branch of the input.
+**The confirmation is out of sample, which is what makes this a recovery rather than a consistency
+check.** The fit uses two points and has two degrees of freedom per coordinate, so it is
+*unfalsifiable* on those two: any two witnesses lie on some line. The claim rests on the three
+witnesses that were **not** used to build it:
+
+| witness | used in the fit | lies on the recovered line |
+|---|---|---|
+| `r = 5`, `x_0 = 3490692521816093` | yes (fit point) | — |
+| `r = 5`, `x_0 = 20508905520120247` | yes (fit point) | — |
+| `r = 6`, `x_0 = 15940424764849354` | **no** | ✓ |
+| `r = 6`, `x_0 = 13453267118668680` | **no** | ✓ |
+| `r = 7`, `x_0 = 471901030567494` | **no** | ✓ |
+
+Each out-of-sample test is 11 independent coordinate agreements: solving
+`x_0 = (w_j − b_j)·a_j^{-1}` in each of the 10 branches with `a_j ≠ 0` must give one common value,
+and branch 0 must satisfy `w_0 = b_0 = 0` separately. So the evidence is 3 witnesses × 11
+coordinates = **33 agreements over a 55-bit field against a 2-parameter fit**, and the two round
+counts tested were not the round count fitted. The probability of that by chance is `p^{-30}`-ish.
+Anyone can re-derive it: the arithmetic is in §9's `--witness-system`.
+
+`a_0 = b_0 = 0`, which is Appendix B's `l_0(a) = l_0(b) = 0` constraint, and branch 0 is the only
+`x_0`-independent branch of the input.
 
 So the Griffin FreeLunch instance is now pinned **including the attack's input parametrisation**,
 not only the permutation. `docs/research/additional-benchmarks.md` §4's note that "the published
@@ -134,7 +153,11 @@ Two separate things were conflated there, and separating them is the answer.
 - **For CICO-1 the only hypothesis is Proposition 6's**: `g` must contain the monomial
   `x_0^{d_{≤r}}`. Everything else in the proposition is structural. That hypothesis is now
   **verified locally**: `LM_{≺_G}(g) = x_0^{α_0}` with a nonzero coefficient at `r = 3, 4, 5`
-  (**measured**, §1.3). So the delicate assumption holds on the rungs that matter.
+  (**measured**, §1.3). So the delicate assumption is **verified locally at `r = 3, 4, 5`** --
+  which is what was measured. It is not shown to *hold* in the sense the paper's proof needs,
+  because that would be a statement about every `r` and about generic parameters; `r = 6` and
+  `r = 7` are not checked here (§10). The distinction matters precisely because 2025/2040 flags
+  this hypothesis as delicate for Griffin.
 
 And the Gröbner-basis property itself needs **no computation at all** — which also means it needs
 no Zeebra capability. The leading monomials are `x_1^α, …, x_{n−1}^α, x_0^{α_0}`: pure powers of
@@ -211,8 +234,8 @@ and it is a cost in blast radius rather than in algorithmic work**: `MonomialOrd
 through `src/poly/multivariate/`, `src/grobner/f4/`, and `src/grobner/fglm/`, and making it generic
 or reference-carrying touches all three. The comparison itself is ten lines. An honest estimate is
 **a day of mechanical refactoring plus a day of test repair**, dominated by the signature change,
-and it is shared with #201 (`ACICO` for `α > 3`) and #207 (bigraded support-minors) — one capability
-serving three consumers, which is why #207 should cost it once.
+and it is shared with #201 (`ACICO` for `α > 3`) -- one capability serving two consumers, which is
+why **#306** carries it and costs it once.
 
 A weighted order alone is not sufficient for the method, though. §4 explains what else is needed.
 
@@ -222,39 +245,74 @@ The paper asserts that the same system in grevlex "well exceeds the security lev
 own designers estimated the same. #202's question 6 says a measured wall beats a quotation. Here it
 is.
 
-**Engine caveat, stated plainly.** This is **Singular 4.x's `groebner`**, not Zeebra's F4. Running
-Zeebra's F4 would require a Griffin generator in `src/`, which M25-D's analysis does not authorise
-(§8). Singular's prime fields stop below `2^31`, so the comparand runs over Zeebra's own 31-bit
-prime `2147483647` with the Griffin coefficients reduced into it — a **surrogate**: grevlex's degree
-of regularity and matrix dimensions are set by the monomial support, which reduction preserves, but
-the field is not Griffin's. Both labels apply to every number in this table.
+### 3.1 Two engines, same machine
 
-Also note the comparand is **generous to grevlex**: the system fed to Singular is the
-FreeLunch-*reduced* system over the three-round bypass line, which is the smallest and best-behaved
-presentation there is. Without the bypass the naive system has `r + 1` variables and `D_I = 21^r`
-and grevlex is strictly worse.
+Neither is Zeebra's F4. Running Zeebra's F4 would require a Griffin generator in `src/`, which
+M25-D's analysis does not authorise (§8), so this is a third-party stand-in for the grevlex route
+and is labelled as one everywhere.
 
-| `r` | vars | `D_I` | degrevlex time | peak RSS | basis size | max degree in basis | `vdim` |
+**Both engines' prime fields stop below `2^31`** — msolve says so explicitly
+(`Warning: characteristic must be 0 or < 2^31`, **measured** by feeding it the real field) — so the
+comparand runs over Zeebra's own 31-bit prime `2147483647` with the Griffin coefficients reduced
+into it. That is a **surrogate**: grevlex's degree of regularity and matrix dimensions are set by
+the monomial support, which reduction preserves, but the field is not Griffin's, and no third-party
+engine available here can take the real field at all. Recording that limit is part of the result.
+
+The comparand is also **generous to grevlex**: the system fed in is the FreeLunch-*reduced* system
+over the three-round bypass line, the smallest and best-behaved presentation there is. Without the
+bypass the naive system has `r + 1` variables and `D_I = 21^r` and grevlex is strictly worse.
+
+| `r` | vars | `D_I` | **msolve 0.11.0** `-g 2`, 1 thread | peak RSS | **Singular 4.x** `groebner` | peak RSS | `vdim` |
 |---|---|---|---|---|---|---|---|
-| 3 | 1 | 21 | 0 ms | — | 1 | 21 | 21 |
-| 4 | 2 | 441 | 11 ms | — | 22 | 31 | 441 |
-| 5 | 3 | 9261 | **199 376 ms** | **483 MB** | 463 | 41 | 9261 |
+| 3 | 1 | 21 | 0.00 s | 5 MB | 0 ms | — | 21 |
+| 4 | 2 | 441 | 0.01 s | 5 MB | 11 ms | — | 441 |
+| 5 | 3 | 9 261 | **13.9 s** | **255 MB** | **199.4 s** | **483 MB** | 9 261 |
 
-All **measured**. `vdim` agrees with `D_I` at every rung, which is an independent confirmation of
-§1.3's symbolic construction by a second engine.
+All **measured** on this box, single-threaded, degrevlex, reduced basis in both cases.
+`vdim` agrees with `D_I` at every rung, which is an independent confirmation of §1.3's symbolic
+construction by a second engine. msolve returns 470 basis elements against Singular's 463.
+
+**The two engines differ by 14× at `r = 5`, which is why one of them was not enough.** An earlier
+draft of this section quoted Singular alone and reported a 277x gap; msolve's 13.9 s shows that
+figure was mostly a statement about Singular. The honest comparand is the faster engine, and the
+correction is recorded rather than quietly applied.
+
+### 3.2 What the number is, and what it is not
 
 Against FreeLunch's Table 3 at `r = 5` — `sysGen 0.17 + matGen 0.02 + polyDet 0.53 = 0.72 s`, 14 MB,
-on one core of an EPYC 7352 — the comparand is **277× the time and 34× the memory**. Those are
-*different algorithms computing different objects* (a full reduced grevlex basis versus a univariate
-polynomial in the ideal) on *different engines* and *different fields*, so this is a recorded
-outcome against a competitor figure, not a speedup. It is still the first number this repository
-has for a claim the literature only gestures at.
+on one core of an AMD EPYC 7352 @ 2.3 GHz — msolve's 13.9 s / 255 MB is **roughly one order of
+magnitude in time and in memory**.
 
-The scaling is the more useful part. 0 ms → 11 ms → 199 376 ms is a factor of **18 000 from `r = 4`
-to `r = 5`**. One more rung at that factor puts `r = 6` near **1 000 hours**, so degrevlex dies at
-`r = 6` while the FreeLunch order reaches `r = 7` in under four hours. That ratio is the whole
-architectural point, and it is now **measured at `r ≤ 5` and extrapolated by one rung**, rather than
-quoted.
+That comparison is asymmetric in **four** ways at once, and it is quoted to one significant figure
+for exactly that reason:
+
+1. **Different machines.** Their EPYC 7352 core against this workstation's.
+2. **Different fields.** Their 55-bit `p` against this surrogate's 31-bit `q`. Narrower field
+   arithmetic favours the surrogate, so the gap is if anything understated.
+3. **Different implementations.** msolve's F4 against SageMath/Magma/NTL/FLINT/PML.
+4. **Different objects.** A full reduced degrevlex Gröbner basis against a single univariate
+   polynomial in the ideal. These are not two algorithms for one task.
+
+So: a recorded outcome against a competitor figure, **not a speedup**, and "about an order of
+magnitude" rather than a ratio. It is still the first number this repository has for a claim the
+literature only gestures at.
+
+### 3.3 The per-round scaling is NOT determined by this data
+
+`0.00 → 0.01 → 13.9 s` is a factor of ~1 400 from `r = 4` to `r = 5` under msolve and ~18 000 under
+Singular. **Both ratios are unusable**: the `r = 3` and `r = 4` points are at or below the engines'
+timing floor, and the two engines disagree by an order of magnitude on the one ratio they can both
+form. Extrapolating a round-count wall from them would be exactly the complexity-formula reasoning
+`docs/research/elimination-beyond-grobner.md` retracted two conclusions for.
+
+What can be said without extrapolation: at `r = 5`, where FreeLunch spends 0.72 s, a
+state-of-the-art grevlex engine spends 13.9 s on a *smaller* object than the attack needs, from the
+most favourable presentation of the system that exists. The `r = 6` rung would settle the scaling and
+is **open** — it needs the `r = 6` system, which §10 records as beyond this tool's CPython reach.
+
+Griffin's designers' claim that grevlex "well exceeds the security level" at the suggested round
+count is therefore **neither confirmed nor refuted here**. It is made checkable: §9 reproduces the
+system, and one `r = 6` build away from an answer.
 
 ## 4. Gate 3: what Zeebra would still have to build, and what it would not
 
@@ -377,8 +435,9 @@ compare does not exist here.
 **Does a known-Gröbner-basis formulation make Zeebra's F4 irrelevant for this instance class?**
 Yes, and more completely than #202 framed it. The attack contains no Gröbner basis computation at
 all — not a cheap one, none — so `src/grobner/f4/` is not slow here, it is *unused*. The grevlex
-route is a different algorithm that computes a different object, and §3 measures it at 277× the
-cost of the whole FreeLunch pipeline at `r = 5` and extrapolates it to death at `r = 6`.
+route is a different algorithm that computes a different object, and §3 measures it at about an
+order of magnitude above the whole FreeLunch pipeline at `r = 5` -- on a smaller object, from the
+most favourable presentation of the system, with the per-round scaling left open.
 
 **What in Zeebra is still load-bearing?** Narrower than #202 hoped:
 
@@ -400,7 +459,7 @@ that is not the bottleneck at any rung of this ladder. If a future instance need
 thousands the decision changes — and the evidence that would change it is a target whose `D_H` makes
 `D_H^{4−ω}` exceed the fast algorithm's log factors, which is roughly `D_H > 10^3`.
 
-**Feed into #207, do not file separately:** the weighted-order capability of §2.3, costed at about
+**Filed as #306:** the weighted-order capability of §2.3, costed at about
 two days and dominated by `MonomialOrder`'s signature change rather than by the comparison, shared
 with #201. Plus the second half of the same capability, which #202 does not currently name: a
 **normal form against an externally supplied Gröbner basis** in that order (§4.2). The order alone
@@ -414,13 +473,13 @@ corpus. It is a registry entry, not an attack.
 
 ## 8. Verdict
 
-**No-go for M25. Defer the capability to #207. Do not file a polynomial-matrix determinant issue.**
+**No-go for M25. Capability deferred to #306. Do not file a polynomial-matrix determinant issue.**
 
 Scored against §0's gates:
 
 - **Gate 1, faithfulness: PASS**, and overachieved. The system vanishes at both `r = 5` witnesses,
-  `D_I` reproduces the paper's closed form at `r = 3, 4, 5`, Proposition 6's hypothesis — the one
-  2025/2040 flags — holds locally, and the unpublished Appendix B bypass line is recovered and
+  `D_I` reproduces the paper's closed form at `r = 3, 4, 5`, Proposition 6's hypothesis -- the one
+  2025/2040 flags -- is verified locally on those three rungs, and the unpublished Appendix B bypass line is recovered and
   confirmed 3 of 3 on witnesses not used to build it.
 - **Gate 2, expressibility: FAIL as asked, but cheaply.** `≺_G` is a weighted graded lex with
   reversed variables and integer weights `(1, 7, 49)` at `r = 5`; `MonomialOrder` has no weighted
@@ -436,8 +495,9 @@ Scored against §0's gates:
   this is at best the second kind, on an instance already solved.
 
 The three numbers that decided it: `D_H ≤ 81` (so `polyDet` is not a missing subsystem and the
-expected blocker evaporates); **199 376 ms** measured for degrevlex at `r = 5` against FreeLunch's
-**0.72 s** (so the architectural claim is real and the grevlex route is genuinely dead by `r = 6`);
+expected blocker evaporates); **13.9 s** measured for msolve's degrevlex basis at `r = 5` against
+FreeLunch's **0.72 s** on a smaller object (so the architectural claim is real at about an order of
+magnitude, with its four asymmetries stated and its scaling open);
 and `matGen` at `3 361 s` / `27.6 GB` at `r = 7` *in the authors' own optimised implementation*
 (so the stage Zeebra would have to build from nothing is the one that already dominates for the
 people who built it).

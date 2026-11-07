@@ -18,6 +18,7 @@ mod lagrange_interpolation;
 mod polynomial_trait;
 mod pow_mod;
 mod power_permutation;
+mod resultant;
 mod roots;
 mod univariate_parser;
 
@@ -51,6 +52,7 @@ pub use power_permutation::{
     inverse_exponent, is_permutation_exponent, is_permutation_polynomial, permutation_exponents,
     PowerPermutation,
 };
+pub use resultant::{resultant, resultant_at_formal_degrees};
 pub use roots::roots;
 use std::cmp::max;
 

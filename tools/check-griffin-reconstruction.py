@@ -578,6 +578,10 @@ def report_system(rounds: int, verbose: bool, singular_path: str | None) -> int:
     if singular_path:
         write_singular(ps, g, names, singular_path)
         print(f"  degrevlex comparand written to {singular_path}")
+        for prime, suffix in ((SURROGATE_PRIME, "q31"), (P, "p55")):
+            path = f"{singular_path}.{suffix}.ms"
+            write_msolve(ps, g, names, path, prime)
+            print(f"  msolve input at characteristic {prime} written to {path}")
     _ = Fraction, verbose
     return 0 if (ok and not bad) else 1
 
@@ -621,6 +625,22 @@ def write_singular(ps: list[dict], g: dict, names: list[str], path: str) -> None
     ]
     with open(path, "w", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
+
+
+def write_msolve(ps: list[dict], g: dict, names: list[str], path: str, prime: int) -> None:
+    """The same system in msolve's input format, at a chosen characteristic.
+
+    msolve's own prime-field arithmetic stops below 2^31, so the `p55` file exists to record that
+    the real field is out of reach for that engine rather than to be run through it.
+    """
+    polys = []
+    for f in (*ps, g):
+        reduced = {m: c % prime for m, c in f.items() if c % prime}
+        polys.append(singular_poly(reduced, names))
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(",".join(names) + "\n")
+        handle.write(f"{prime}\n")
+        handle.write(",\n".join(polys) + "\n")
 
 
 def main() -> int:
