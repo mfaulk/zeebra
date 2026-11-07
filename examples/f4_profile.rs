@@ -16,6 +16,7 @@
 //! cargo run --release --example f4_profile -- list         # the configurations available
 //! cargo run --release --example f4_profile -- mq           # #349: the competitive MQ split
 //! cargo run --release --example f4_profile -- mq-counts    # that stage's operation counts
+//! cargo run --release --example f4_profile -- mq-matrix    # #471: the two interreduction routes
 //! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
 //! ```
 //!
@@ -471,6 +472,93 @@ fn interreduction<const N: usize>(
     }
 }
 
+/// The division and matrix interreduction routes, measured against each other on one build.
+///
+/// Interleaved and repeated, because this box's run-to-run spread is wide enough that a single
+/// pair of runs cannot separate a real change from noise — and because the two routes have to be
+/// compared on *one* build to keep a compiler difference out of the ratio.
+///
+/// The bases are asserted **equal**, not merely both valid. A reduced Gröbner basis is unique, so
+/// this is exact equality and the right failure mode for a route substitution.
+fn compare_interreduction_routes() {
+    let built = mq_instance();
+    let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
+    let mut compiled = [""; 10];
+    compiled.copy_from_slice(&names[..10]);
+    let system: Vec<MultivariatePolynomial<10, F>> = built
+        .system
+        .iter()
+        .map(|text| {
+            MultivariatePolynomial::parse(text, compiled).expect("this crate rendered this text")
+        })
+        .collect();
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let division = F4Options {
+        measure_stages: true,
+        ..F4Options::default()
+    };
+    let matrix = F4Options {
+        measure_stages: true,
+        interreduce_by_matrix: true,
+        ..F4Options::default()
+    };
+
+    println!(
+        "{:<4} {:<9} {:>10} {:>10} {:>9} {:>6}",
+        "rep", "route", "total/ms", "inter/ms", "inter/%", "basis"
+    );
+
+    let mut reference: Option<Vec<MultivariatePolynomial<10, F>>> = None;
+    for rep in 1..=3 {
+        for (label, options) in [("division", &division), ("matrix", &matrix)] {
+            let (basis, s) = match f4_with_options(&system, order, options) {
+                Ok(result) => result,
+                Err(error) => {
+                    println!("{rep:<4} {label:<9} {error}");
+                    continue;
+                }
+            };
+            match &reference {
+                None => reference = Some(basis.clone()),
+                Some(expected) => assert_eq!(
+                    &basis, expected,
+                    "{label} returned a different basis from the first run; a reduced \
+                     Grobner basis is unique, so this is a correctness failure"
+                ),
+            }
+            let share = if s.total.is_zero() {
+                0.0
+            } else {
+                100.0 * s.stages.interreduction.as_secs_f64() / s.total.as_secs_f64()
+            };
+            println!(
+                "{:<4} {:<9} {:>10.2} {:>10.2} {:>9.2} {:>6}",
+                rep,
+                label,
+                millis(s.total),
+                millis(s.stages.interreduction),
+                share,
+                basis.len()
+            );
+            if let Some(m) = s.interreduction_matrix {
+                println!(
+                    "     matrix {} x {}, {} nonzeros, {} elements{}",
+                    m.rows,
+                    m.columns,
+                    m.nonzeros,
+                    m.elements,
+                    if m.fell_back {
+                        " -- FELL BACK to the division route, so this timing is not the matrix route's"
+                    } else {
+                        ""
+                    }
+                );
+            }
+        }
+    }
+}
+
 /// The competitive-board MQ instance, profiled per stage — #349.
 ///
 /// `mq-random-10` is the instance M25 measured Zeebra **4.11x slower than Singular** on, and it is
@@ -584,6 +672,21 @@ fn main() {
             ..F4Options::default()
         };
         competitive_mq(&options);
+        return;
+    }
+
+    if argument == "mq-matrix" {
+        // The two interreduction routes, interleaved in one process on one build. #471's A/B:
+        // `docs/research/groebner-jl-gap.md` §4 puts the division route at 13 871x Groebner.jl's
+        // for this stage and projects ~170 ms for a matrix pass at Zeebra's own per-operation
+        // constant. Both routes return the same reduced basis — asserted here, not assumed.
+        println!();
+        println!("## #471: final interreduction, division route against matrix route");
+        println!();
+        println!("Interleaved in one process on one build, so no cross-build or cross-session");
+        println!("difference is in the comparison. Both bases asserted equal.");
+        println!();
+        compare_interreduction_routes();
         return;
     }
 

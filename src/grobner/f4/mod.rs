@@ -23,6 +23,7 @@
 pub mod certify;
 pub mod degrees;
 pub mod hilbert_driven;
+pub(crate) mod interreduce;
 pub mod macaulay;
 pub mod observer;
 pub mod options;
@@ -41,7 +42,9 @@ pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy, StopKind};
 pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
-pub use statistics::{BatchStatistics, F4Statistics, HilbertCounts, StageClock, StageTimings};
+pub use statistics::{
+    BatchStatistics, F4Statistics, HilbertCounts, MatrixInterreduction, StageClock, StageTimings,
+};
 pub use symbolic::{
     symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
     MonicBasis, MonicElement, Preprocessed, PreprocessedRow, ReducerCache, RowBudgetExceeded,
@@ -53,9 +56,10 @@ use std::time::Instant;
 use crate::{
     grobner::{
         buchberger::{
-            reduce_grobner_basis_counted, reduce_grobner_basis_measured,
-            reduce_grobner_basis_until, InterreductionReport,
+            minimal_basis_for_interreduction, reduce_grobner_basis_counted,
+            reduce_grobner_basis_measured, reduce_grobner_basis_until, InterreductionReport,
         },
+        f4::interreduce::interreduce_by_matrix,
         pairs::{CriterionCounts, PairQueue},
     },
     poly::MonomialOrder,
@@ -532,7 +536,41 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // The measured variant is the same code behind a const-generic flag, so the split and the
     // operation counters cannot drift from the path that runs when nothing is being measured.
     let mut report = InterreductionReport::default();
-    let interreduction = if options.count_interreduction {
+    let interreduction = if options.interreduce_by_matrix {
+        // One matrix, not 247 divisions. The budgets are the batch loop's, so a basis whose
+        // closure is too wide falls back rather than exceeding a limit the rest of the
+        // computation obeyed — and the fallback is recorded, because a timing from a run that
+        // fell back is a timing about the division route.
+        let minimal = minimal_basis_for_interreduction(basis, order);
+        match interreduce_by_matrix(
+            minimal.clone(),
+            order,
+            options.max_matrix_rows,
+            options.max_matrix_columns,
+            options.live_entry_allowance::<F>(),
+        ) {
+            Ok((reduced, matrix)) => {
+                statistics.interreduction_matrix = Some(MatrixInterreduction {
+                    rows: matrix.rows,
+                    columns: matrix.columns,
+                    nonzeros: matrix.nonzeros,
+                    elements: matrix.elements,
+                    fell_back: false,
+                });
+                report.elements = matrix.elements;
+                Ok(reduced)
+            }
+            Err(refused) => {
+                statistics.interreduction_matrix = Some(MatrixInterreduction {
+                    elements: minimal.len(),
+                    fell_back: true,
+                    ..Default::default()
+                });
+                let _ = refused;
+                reduce_grobner_basis_until(minimal, order, should_stop)
+            }
+        }
+    } else if options.count_interreduction {
         reduce_grobner_basis_counted(basis, order, should_stop, &mut report)
     } else if options.measure_stages {
         reduce_grobner_basis_measured(basis, order, should_stop, &mut report)

@@ -805,16 +805,11 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     selection: ReducerSelection,
     cache: &mut ReducerCache<N>,
 ) -> Result<Preprocessed<N>, RowBudgetExceeded> {
-    let mut counts = SymbolicCounts::default();
+    let counts = SymbolicCounts::default();
     let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
     let mut covered: MonomialSet<N> = MonomialSet::default();
-    // Monomials already offered to the queue, so no monomial is enqueued or handled twice. The
-    // one in `symbolic_preprocessing_pop_deduplicated` holds the monomials already *handled*,
-    // which is the difference between the two disciplines and the subject of the note below.
-    let mut examined: MonomialSet<N> = MonomialSet::default();
-    let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
 
     // Both halves of each pair. Their common leading monomial is the lcm, which is therefore
     // covered by the pair itself and must not acquire a reducer multiple of its own: that would
@@ -878,6 +873,92 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
     //
     // `monomials_enqueued` still counts *offers* rather than admissions, so the figures recorded
     // against it before this change stay comparable. `max_pending_monomials` is what moves.
+    close_over_rows(basis, rows, covered, counts, max_rows, selection, cache)
+}
+
+/// The rows of the one Macaulay matrix that interreduces a whole basis.
+///
+/// # What this is
+///
+/// Every element of `basis` becomes a row at multiplier **one**, and the closure then supplies a
+/// reducer multiple for every reducible monomial those rows contain. Reducing the resulting matrix
+/// to *reduced* row echelon form clears every pivot column out of every other row, and the pivot
+/// columns are exactly the reducible monomials — so the row led by each element's own leading
+/// monomial comes out with no monomial divisible by any other element's leading monomial. That is
+/// the definition of the reduced Gröbner basis.
+///
+/// # Why each element's own leading monomial is seeded into `covered`
+///
+/// Without it the closure would find that `lm(g_i)` is divisible by `lm(g_i)` and add `1 · g_i` as
+/// a *reducer* row — a duplicate of the element row it came from. Seeding is the same device
+/// [`symbolic_preprocessing_with`] uses for a pair's lcm, and for the same reason.
+///
+/// # Why every leading monomial is a pivot, which is what makes the extraction sound
+///
+/// `basis` must be **minimized**: no element's leading monomial divides another's. Then a reducer
+/// row `t · g_j` has leading monomial `t · lm(g_j)`, which equals some `lm(g_i)` only if
+/// `lm(g_j)` divides `lm(g_i)` — excluded for `i != j` by minimality, and forcing `t = 1` for
+/// `i == j`, which is the element row rather than a reducer. So the input rows have **distinct**
+/// leading monomials, every one of them is a pivot, and exactly one row ends up led by each
+/// `lm(g_i)`.
+///
+/// # Errors
+/// [`RowBudgetExceeded`] if the closure would need more than `max_rows` rows.
+pub(crate) fn interreduction_rows<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    max_rows: usize,
+    selection: ReducerSelection,
+    cache: &mut ReducerCache<N>,
+) -> Result<Preprocessed<N>, RowBudgetExceeded> {
+    let counts = SymbolicCounts::default();
+    let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(basis.len());
+    let mut covered: MonomialSet<N> = MonomialSet::default();
+
+    for basis_index in 0..basis.len() {
+        if rows.len() == max_rows {
+            return Err(RowBudgetExceeded { limit: max_rows });
+        }
+        rows.push(PreprocessedRow {
+            multiplier: Monomial::one(),
+            basis_index,
+            // Not `Reducer`: these are the rows being reduced, which is what `PairComponent` means
+            // structurally even though no critical pair is involved. The index is the element's,
+            // so a row's origin is still recoverable.
+            kind: RowKind::PairComponent { pair: basis_index },
+        });
+        covered.insert(basis.element(basis_index).leading_monomial);
+    }
+
+    close_over_rows(basis, rows, covered, counts, max_rows, selection, cache)
+}
+
+/// Close a seed row set under divisibility, adding a reducer multiple for every reducible monomial
+/// no row already leads with.
+///
+/// Shared by [`symbolic_preprocessing_with`], whose seed is the two halves of each critical pair,
+/// and by final interreduction's matrix route, whose seed is every basis element at multiplier one.
+/// Written once because the push-time deduplication discipline below carries a correctness
+/// argument, and two copies of an argument is one copy too many.
+///
+/// `covered` must already hold the leading monomial of every seed row. That is what stops a seed
+/// row from acquiring a reducer multiple of itself — for a pair, the lcm whose cancellation is the
+/// point of the pair; for an interreduction row, the element's own leading monomial.
+///
+/// # Errors
+/// [`RowBudgetExceeded`] if the closure would need more than `max_rows` rows.
+#[allow(clippy::too_many_arguments)]
+fn close_over_rows<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    mut rows: Vec<PreprocessedRow<N>>,
+    mut covered: MonomialSet<N>,
+    mut counts: SymbolicCounts,
+    max_rows: usize,
+    selection: ReducerSelection,
+    cache: &mut ReducerCache<N>,
+) -> Result<Preprocessed<N>, RowBudgetExceeded> {
+    let mut examined: MonomialSet<N> = MonomialSet::default();
+    let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
+
     for row in &rows {
         for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
             enqueue(monomial, &mut pending, &mut examined, &mut counts);
