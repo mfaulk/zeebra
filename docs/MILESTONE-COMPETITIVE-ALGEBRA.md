@@ -713,6 +713,19 @@ That disqualifies apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x**. The 450
 warning this milestone produced about reading a ratio without checking its denominator's floor — and
 it would have been a very attractive number to publish.
 
+**The rule is enforced in code, not in prose, and it needed no new field.** The floor is *derived
+from the board's own rows*: `CompetitiveBoard::startup_floor(library)` is the shortest wall that
+library recorded, requiring four answered rows first, since one fast row is a fast row and not a
+floor. `Speedup` carries `baseline_floor_multiple`; `is_engine_comparison()` is false below **2.0**,
+because at that point half the comparand's wall is the cost of starting it and the other half cannot
+carry a conclusion through the 20% band; and `is_publishable()` is the **conjunction** of both gates,
+so a renderer cannot satisfy one and forget the other. The disqualified rows are **kept and marked**
+rather than dropped — the renderer prints `NOT AN ENGINE COMPARISON: baseline is 1.0x its startup
+floor` — because the board is the artifact that stops someone recomputing the 450x from the raw
+numbers next year. A test reproduces the measured shape exactly: four Singular rows at 36.01–36.08 ms
+plus `mq-random-10` at 7 290 ms, four ratios disqualified, the real one surviving at 200x its floor,
+and all ten rows still on the board.
+
 **Where Zeebra cannot be compared, which is three results rather than three gaps.**
 
 1. **Both solution tasks have no comparand at any field size.** `OneFiniteFieldSolution` and
