@@ -81,6 +81,14 @@ git fetch --prune
 `High → Medium → Low → unset`. Priority is a board field rather than a label, so
 the read joins each issue to its board row.
 
+The read is **paginated**, because GraphQL caps `first:` at 100 and this repo has
+more open issues than that. A pagination walk it cannot finish is status **2**
+under §0, not a shorter queue — the fourth outcome §0 was not written against is
+"succeeded, returned data, and was incomplete", which is how #448 hid the 12
+newest issues behind a `rc=0` queue that looked complete. If `orient` reports
+more than `ZB_ORIENT_MAX_PAGES` pages (default 20), raise it rather than reading
+the failure as an empty tail.
+
 Selection rule: take the highest-priority unclaimed, unblocked issue. Skip
 anything labeled `agent:claimed` unless its lease is stale (§5), anything
 labeled `blocked`, and anything a human has assigned to someone else. Respect

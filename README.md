@@ -4647,6 +4647,14 @@ here: every read exits **0 = data, 1 = genuinely empty, 2 = the read failed**, b
 rate-limited `gh` prints nothing and exits 0, and treating that as "nothing is claimed" would hand
 the same issue to every agent at once.
 
+That invariant had to grow a fourth case it was not written against: **succeeded, returned data,
+and was incomplete.** GraphQL caps `first:` at 100 per page, and once the repository passed 100
+open issues `orient` returned the oldest 100 and exited 0 with a queue that looked whole — dropping
+precisely the newest issues, which are the follow-ups agents file for each other (#448). It now
+walks `pageInfo.hasNextPage`, and a walk it cannot finish — no cursor to resume from, or more than
+`ZB_ORIENT_MAX_PAGES` pages (default 20) — is status **2**, never a short list. Silent truncation
+was the bug, so the only safe way to be incomplete is loudly.
+
 ## Why You *Shouldn’t* Use Zeebra
 I wrote Zeebra as an educational exercise. It is not yet complete or mature. It is not necessarily correct. For something more production-ready, please consider:
 
