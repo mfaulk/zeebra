@@ -50,6 +50,10 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
       `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
       symbolic closure checked unchanged batch by batch rather than inferred from the basis
+- [x] The published 2 400x Anemoi conversion gap attributed by measuring the same system at three
+      characteristics: this crate's conversion/basis ratio is flat to 12% across a 47-bit range of
+      primes where the reference's moves 7.3x, so the gap is the reference's field arithmetic — and
+      msolve on this machine is 35x faster than either
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
