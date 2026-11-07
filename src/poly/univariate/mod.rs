@@ -18,6 +18,8 @@ mod lagrange_interpolation;
 mod polynomial_trait;
 mod pow_mod;
 mod power_permutation;
+mod resultant;
+pub use resultant::{resultant, resultant_at_formal_degrees, resultant_from_coefficients};
 mod roots;
 mod univariate_parser;
 
