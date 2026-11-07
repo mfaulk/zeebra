@@ -698,9 +698,10 @@ fn basis_options(rounds: usize) -> F4Options {
     // struct — which is the #322 pattern three times over:
     //
     //   * `max_live_nonzeros`, crossed by PCICO N = 6 by 112 entries in 20 million;
-    //   * `max_live_bytes`, which must move with it because `live_entry_limit` is the *min* of the
-    //     two and 320 MB / 16 is exactly the same 20 M, so lifting the entry count alone is a
-    //     no-op;
+    //   * `max_live_bytes`, which must move with it because the allowance is the *min* of the two
+    //     and 320 MB / 16 is exactly the same 20 M, so lifting the entry count alone is a no-op.
+    //     `with_live_entries` now sets the pair from one number, so this no longer has to be kept
+    //     in step by hand — which is the half of #322 this workaround was standing in for;
     //   * `max_matrix_rows`, crossed by FCICO N = 6 in symbolic preprocessing after 3.8 s. For
     //     reference the published Magma run on this exact row peaks at 173 808 x 189 401, *inside*
     //     the 200 000 default — so this crate's preprocessing enumerates more rows than Magma's for
@@ -712,8 +713,9 @@ fn basis_options(rounds: usize) -> F4Options {
     // budget above, and a sparse row costs what its entries cost. Printed rather than silent, for
     // the same reason the conversion pre-flight is printed.
     let lifted = 200_000_000;
-    let lifted_bytes = lifted * F4Options::bytes_per_entry::<A64>();
     let lifted_rows = 4_000_000;
+    let budget = recommended.clone().with_live_entries::<A64>(lifted);
+    let lifted_bytes = budget.max_live_bytes;
     println!(
         "- f4 budget: LIFTED to {lifted} live nonzeros ({lifted_bytes} bytes) from {} ({}), and \
          to {lifted_rows} matrix rows/columns from {}/{} -- N = {rounds} crosses all four, each \
@@ -724,10 +726,8 @@ fn basis_options(rounds: usize) -> F4Options {
         recommended.max_matrix_columns
     );
     F4Options {
-        max_live_nonzeros: lifted,
-        max_live_bytes: lifted_bytes,
         max_matrix_rows: lifted_rows,
         max_matrix_columns: lifted_rows,
-        ..recommended
+        ..budget
     }
 }

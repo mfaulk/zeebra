@@ -3778,8 +3778,31 @@ assert_eq!(options.live_entry_allowance::<Bn254Fr>(), 8_000_000);   // the same 
 The two agree over a 64-bit field, which is the width every F4 figure in
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md) was measured at, so the
 byte budget binds only where it is needed. Whichever budget bound names the error:
-`F4Error::TooManyNonzeros` or `F4Error::TooManyLiveBytes`. `FglmOptions` is the same shape —
-`max_operator_bytes` beside `max_operator_entries`, and `max_span_bytes` beside `max_span_entries`.
+`F4Error::TooManyNonzeros` or `F4Error::TooManyLiveBytes`.
+
+**That agreement is also a trap, so set the two together.** The effective limit is the `min`, and at
+the default over a 16-byte entry the two are numerically *identical* — `320_000_000 / 16` is exactly
+`20_000_000` — so **assigning one field alone changes the limit by nothing**, while the error goes on
+reporting the limit that actually bound. A caller who raised `max_live_nonzeros` from 20 M to 200 M
+on Anemoi `N = 6`, re-ran, and was refused at ~20 M entries had to read the source to find out why
+([#322](https://github.com/mfaulk/zeebra/issues/322)). Two constructors set the pair from one
+number, each deriving the other side from the field's entry cost:
+
+```rust
+use zeebra::{fields::{Bn254Fr, Zp18446744073709551557}, grobner::F4Options};
+
+let budget = F4Options::default().with_live_budget::<Zp18446744073709551557>(3_200_000_000);
+assert_eq!(budget.max_live_nonzeros, 200_000_000);     // derived, so nothing to keep in step
+
+let entries = F4Options::default().with_live_entries::<Bn254Fr>(200_000_000);
+assert_eq!(entries.max_live_bytes, 200_000_000 * 40);  // a wide entry, costed as one
+```
+
+`FglmOptions` is the same *shape* — `max_operator_bytes` beside `max_operator_entries`, and
+`max_span_bytes` beside `max_span_entries`, at the same two numbers — and deliberately **not** the
+same coupling: each is a separate comparison against its own requirement in its own unit, so a lift
+of one there does take effect. `fglm::conversion`'s
+`test_lifting_one_span_budget_leaves_the_other_binding_in_its_own_unit` is what keeps that true.
 
 Neither is a ceiling on the process. `F4Statistics::peak_live_bytes` reports what the budget
 enforces; `max_dense_buffer_bytes` reports what it deliberately omits — the dense buffer the
