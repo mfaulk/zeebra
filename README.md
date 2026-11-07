@@ -3385,7 +3385,16 @@ mid-task does not strand the work behind a label nobody can clear.
 ./scripts/agent/zb-claim.sh heartbeat 119          # extend the lease
 ./scripts/agent/zb-claim.sh reap                   # claims whose lease expired
 ./scripts/agent/zb-claim.sh release 119            # finished; or --abandon to hand back
+./scripts/agent/zb-claim.sh token                  # this checkout's claim token
 ```
+
+An agent's id is `worktree@branch`, which is *derived* and so can change under it — a branch
+rename, a rebase onto a new base, a retargeted PR. Each claim therefore also records a **claim
+token**, minted once per checkout and kept in that worktree's own git directory, so ownership is
+proved rather than re-derived. Without it a rename orphaned the agent's own markers and `verify`
+reported `LOST RACE` against the agent itself, which is the dangerous direction for that signal to
+fail in: agents are told to obey it, so a spurious one trains the operator to override a signal
+that may next time be real.
 
 The protocol, the staleness rule, and the rules for fanning out writers are in
 [CLAUDE.md](CLAUDE.md#multi-agent-coordination-claiming-work). The one invariant worth repeating

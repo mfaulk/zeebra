@@ -35,13 +35,18 @@ marker() { # <agent> <at> <until>
   printf '<!-- zb-claim agent="%s" at="%s" until="%s" -->' "$1" "$2" "$3"
 }
 
+# A marker in the post-#325 format, which also records the claim token.
+marker_tok() { # <agent> <token> <at> <until>
+  printf '<!-- zb-claim agent="%s" token="%s" at="%s" until="%s" -->' "$1" "$2" "$3" "$4"
+}
+
 # --- zb_parse_claims -------------------------------------------------------
 
 # A single claim marker in one comment yields one agent/at/until row.
 one=$(jq -n --arg b "🔒 Claimed. $(marker alpha@feat/x 2026-01-01T00:00:00Z 2026-01-01T04:00:00Z)" '[$b]' \
   | zb_parse_claims)
-check "parse: single marker" \
-  "$(printf 'alpha@feat/x\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z')" "$one"
+check "parse: single marker, tokenless, reads as token -" \
+  "$(printf 'alpha@feat/x\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\t-')" "$one"
 
 # Comments carrying no marker contribute no rows, and the read still succeeds.
 none=$(jq -n '["just a normal comment", "another one"]' | zb_parse_claims)
@@ -55,14 +60,14 @@ multi=$(jq -n \
   --arg b "$(marker beta@b 2026-01-01T01:00:00Z 2026-01-01T05:00:00Z)" \
   '[$a, $b]' | zb_parse_claims)
 check "parse: two markers, document order" \
-  "$(printf 'alpha@a\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\nbeta@b\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z')" \
+  "$(printf 'alpha@a\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\t-\nbeta@b\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-')" \
   "$multi"
 
 # Two markers inside one comment body are both extracted.
 twoinone=$(jq -n --arg b "$(marker alpha@a 2026-01-01T00:00:00Z 2026-01-01T04:00:00Z) and $(marker beta@b 2026-01-01T02:00:00Z 2026-01-01T06:00:00Z)" '[$b]' \
   | zb_parse_claims)
 check "parse: two markers in one body" \
-  "$(printf 'alpha@a\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\nbeta@b\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z')" \
+  "$(printf 'alpha@a\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\t-\nbeta@b\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\t-')" \
   "$twoinone"
 
 # Malformed input that is not a JSON array is an UNREADABLE read, not an empty one.
@@ -135,6 +140,131 @@ case "$id" in
   *@*) pass=$((pass + 1)) ;;
   *) fail=$((fail + 1)); printf 'FAIL  agent id lacks @: %q\n' "$id" >&2 ;;
 esac
+
+# --- zb_agent_token --------------------------------------------------------
+
+IDENTITY_DIR="$(mktemp -d)"
+trap 'rm -rf "$IDENTITY_DIR"' EXIT
+export ZB_IDENTITY_FILE="$IDENTITY_DIR/zb-claim-identity"
+
+# The token is minted on first use and then stable: it is what ownership is
+# proved with, so a second read must not produce a second identity.
+first="$(zb_agent_token)"
+check "token: a second read returns the same token" "$first" "$(zb_agent_token)"
+case "$first" in
+  '' ) fail=$((fail + 1)); printf 'FAIL  token is empty\n' >&2 ;;
+  *) pass=$((pass + 1)) ;;
+esac
+
+# A token stored with trailing whitespace reads back without it, so it still
+# compares equal to the one written into a marker.
+printf '  deadbeefcafe0001  \n' >"$ZB_IDENTITY_FILE"
+check "token: surrounding whitespace is stripped" deadbeefcafe0001 "$(zb_agent_token)"
+
+# --- zb_claim_is_ours ------------------------------------------------------
+
+# The matching token wins even though the id has changed, which is the #325
+# case: a branch rename must not orphan markers the agent already wrote.
+check "ours: a matching token beats a changed id" token \
+  "$(zb_claim_is_ours alpha@old-branch tok-1 alpha@new-branch tok-1)"
+
+# A tokenless marker — every claim written before #325 — still resolves by id.
+check "ours: a tokenless marker matches by id" id \
+  "$(zb_claim_is_ours alpha@a - alpha@a tok-1)"
+
+# A different agent's claim is not ours by either half.
+zb_claim_is_ours beta@b tok-2 alpha@a tok-1
+check_rc "ours: a different token and a different id is not ours" 1 $?
+
+# Two tokenless markers from different ids stay distinct: the absent token must
+# not read as a wildcard that matches everything.
+zb_claim_is_ours beta@b - alpha@a -
+check_rc "ours: absent tokens on both sides do not match each other" 1 $?
+
+# --- zb_resolve_claim ------------------------------------------------------
+
+CUTOFF=2026-01-01T00:00:00Z
+
+# A claim written under one id is still held after the branch is renamed. This
+# is the acceptance criterion of #325, and it fails against the old script,
+# which compared the current id against the marker's and reported LOST RACE.
+renamed="$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-1\n')"
+check "resolve: a renamed branch still holds its own claim" \
+  "$(printf 'held\tzb-a@feat/old\ttoken')" \
+  "$(printf '%s' "$renamed" | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+printf '%s' "$renamed" | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF" >/dev/null
+check_rc "resolve: a renamed branch exits 0, not 1" 0 $?
+
+# The tiebreak is unchanged: against a genuinely competing claim the earliest
+# at= still wins, and the token does not rescue a later claim.
+contested="$(printf 'zb-b@feat/b\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-2\nzb-a@feat/old\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\ttok-1\n')"
+check "resolve: an earlier competing claim still wins" \
+  "$(printf 'lost\tzb-b@feat/b\t-')" \
+  "$(printf '%s' "$contested" | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+printf '%s' "$contested" | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF" >/dev/null
+check_rc "resolve: losing the race still exits 1" 1 $?
+
+# And winning it is still winning it, by the same earliest-at= rule.
+check "resolve: our earlier claim beats a later competitor" \
+  "$(printf 'held\tzb-a@feat/old\ttoken')" \
+  "$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-1\nzb-b@feat/b\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\ttok-2\n' \
+     | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+
+# A claim older than the lease window is spent, not a holder: it must not win
+# forever, which is why the window is applied before the tiebreak.
+check "resolve: a claim older than the window is not a holder" \
+  "$(printf 'none\t-\t-')" \
+  "$(printf 'zb-a@feat/old\t2025-12-01T01:00:00Z\t2025-12-01T05:00:00Z\ttok-1\n' \
+     | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+
+# A tokenless marker written by this very id still resolves as held, so claims
+# made before #325 landed are not abandoned by the upgrade.
+check "resolve: a pre-#325 marker is still held by its own id" \
+  "$(printf 'held\tzb-a@feat/old\tid')" \
+  "$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-\n' \
+     | zb_resolve_claim zb-a@feat/old tok-1 "$CUTOFF")"
+
+# An issue claimed before #325 and heartbeaten after it, then renamed: the
+# earliest live marker is the tokenless claim, so only the later heartbeat can
+# prove the old id was ours. Without the alias step the agent loses a claim it
+# demonstrably holds — the exact failure #325 reports, one marker further on.
+legacy="$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-\nzb-a@feat/old\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\ttok-1\n')"
+check "resolve: a later token-bearing heartbeat proves the earlier tokenless claim" \
+  "$(printf 'held\tzb-a@feat/old\talias')" \
+  "$(printf '%s' "$legacy" | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+
+# The alias set is built only from markers carrying OUR token, so another
+# agent's heartbeat cannot make its own earlier claim resolve as ours.
+check "resolve: another agent's token builds no alias of ours" \
+  "$(printf 'lost\tzb-b@feat/b\t-')" \
+  "$(printf 'zb-b@feat/b\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-\nzb-b@feat/b\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\ttok-2\n' \
+     | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+
+# An alias is only an alias inside the lease window: a spent marker of ours
+# cannot vouch for an id, because the window is applied before anything else.
+check "resolve: a marker outside the window builds no alias" \
+  "$(printf 'lost\tzb-a@feat/old\t-')" \
+  "$(printf 'zb-a@feat/old\t2025-11-01T02:00:00Z\t2025-11-01T06:00:00Z\ttok-1\nzb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-\n' \
+     | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+
+# --- the marker round trip -------------------------------------------------
+
+# A token-bearing marker parses into the fourth column, which is what connects
+# the writer to the resolver.
+tokrow=$(jq -n --arg b "🔒 Claimed. $(marker_tok alpha@feat/x tok-9 2026-01-01T00:00:00Z 2026-01-01T04:00:00Z)" '[$b]' \
+  | zb_parse_claims)
+check "parse: a token-bearing marker yields the token" \
+  "$(printf 'alpha@feat/x\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\ttok-9')" "$tokrow"
+
+# Mixed formats in one issue's comments both parse, in document order: an issue
+# claimed before #325 and heartbeaten after it has one of each.
+mixed=$(jq -n \
+  --arg a "$(marker alpha@a 2026-01-01T00:00:00Z 2026-01-01T04:00:00Z)" \
+  --arg b "$(marker_tok alpha@a tok-9 2026-01-01T01:00:00Z 2026-01-01T05:00:00Z)" \
+  '[$a, $b]' | zb_parse_claims)
+check "parse: tokenless and token-bearing markers coexist" \
+  "$(printf 'alpha@a\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\t-\nalpha@a\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-9')" \
+  "$mixed"
 
 # ---------------------------------------------------------------------------
 
