@@ -7,7 +7,11 @@ breaks, in detail. A list of concrete failures is the most valuable possible out
 There are none at the pipeline level. The real gaps were elsewhere, and one of them is a correctness
 hazard that nothing had noticed.
 
-§6 lists what this issue did *not* do, because three of its six questions remain open.
+**Written in two passes.** §1–§5 are the first (#233): the stale blocker, the pipeline result, the
+`0x11D` hazard, and the field-equation mechanism. §6–§10 are the second (#379), which asserted the
+*solving* half the first pass left out, answered questions 4 and 5, and found three gaps — one of
+them a panic on any text input over `GF(2^8)`. §9 is why the issue is still open: question 3's
+measurement was deliberately not taken.
 
 ## 1. The blocker everyone was waiting on had already cleared
 
@@ -47,8 +51,8 @@ strings.
 resolved at compile time.
 
 Declared as `fields::Zp2`, with a doc comment saying it is the one declared modulus that is not odd.
-**Which of `Zp2` and `BinaryFieldElement<0b11>` the Fukuoka importer should use is still open** — see
-§6.
+Which of `Zp2` and `BinaryFieldElement<0b11>` the Fukuoka importer should use was left open by the
+first pass and is **decided in §8: `Zp2`**.
 
 ## 3. The pipeline works in characteristic two
 
@@ -167,8 +171,9 @@ underdetermined, so without field equations there is no quotient dimension to co
 zero-dimensional solve to attempt. With them there are two points and a quotient of dimension two.
 
 The exhaustive-enumeration oracle is the design choice worth keeping. It is complete, trivially
-correct, internal to the crate, and independent of Singular's characteristic restriction — which
-means §6's open question about the differential oracle does not block this result.
+correct, internal to the crate, and independent of the differential oracle — so it would have held
+this result up even if §7 had found Singular unusable in characteristic two. It is also **prime
+fields only**, for the reason §10 gives.
 
 ### 5.1 The rule
 
@@ -196,33 +201,142 @@ The alternative mechanism named in #218's question 2 — reducing exponents modu
 monomial arithmetic, as PolyBoRi does with a ZDD over `GF(2)` — is faster and changes what `Monomial`
 means. **Not taken**, and recorded as a separate decision rather than deferred silently.
 
-## 6. What this issue did not do
+## 6. The solving half, which the first pass did not assert
 
-Three of #218's six questions are still open, and the issue should not be closed on this document
-alone.
+§5 took the `GF(2)` field-equation ideal as far as a **quotient dimension** and stopped. That is the
+counting result; it is not the result #219 needs. A SAT comparison needs *points*, so the question is
+whether FGLM converts an ideal that has `x_i^2 - x_i` among its generators and whether the search
+then returns a point of the **original** system rather than of the extended one. Neither was
+asserted. Both now are, in `tests/boolean_readiness.rs`, against the same 256-assignment enumeration
+§5 uses — so the oracle is still one that cannot be wrong.
 
-- **The representation cost is not measured** (question 3). `Monomial<N>` is an exponent array where
-  a bit set would do, and a sparse entry is `(usize, F)` padded by the index's alignment to 16 bytes
-  at any field width — **16 bytes to store one bit** over `GF(2)`, which is the strongest argument in
-  the crate for a bitset representation and is still an argument rather than a number.
-  `examples/elimination_density.rs` and `examples/field_width.rs` are the instruments and were not
-  run for this.
-- **The Singular oracle in characteristic two is untested** (question 4).
-  `differential/comparison.rs` matches a fixture's characteristic and #65 records the limit — "the
-  oracle path is small-field only today". Whether characteristic-two differential fixtures can be
-  generated and compared was not attempted. §5's enumeration oracle sidesteps it for that result
-  only; #219 and #221 will want an answer.
-- **The `GF(2)` representation decision is recorded as open, not made** (question 5). `Zp2` and
-  `BinaryFieldElement<0b11>` are the same field and not the same code path or storage.
-- **No import was enabled.** `MqField::Gf2` and `MqField::Gf256` still refuse, now with accurate
-  reasons. Wiring the importer and checking it against a published answer file under `0x11D` is
-  #197's deliverable and deliberately not bundled here — the same discipline
-  `docs/research/additional-benchmarks.md` §5 asked for in the other direction.
-- **No performance work.** Finding out what works came first.
+| claim over `GF(2)`, 6 quadratics in 8 variables, seed 9 | result |
+|---|---|
+| `fglm_to_lex` on the field-equation ideal | converts; the output is a lex Gröbner basis |
+| `solve_one` | returns a point, and it is one of the two the enumeration found |
+| that point re-evaluated against the **bare** system | vanishes |
+| `solve_zero_dimensional` against enumeration | **equal as sets** — both points, no others |
 
-## 7. Reproducing
+The set equality is the one worth having. Recovering *a* point is passed by a solver that drops a
+solution or invents one over an extension; recovering exactly the enumerated set is not.
+
+`GF(2^8)` is exercised too, and two of those results are new rather than confirmatory:
+
+- **`roots` works over `GF(2^8)`.** Equal-degree splitting branches on the characteristic: in
+  characteristic two the role of `h^((q^d - 1)/2)` falls to the absolute trace, which has `m * d`
+  terms for `q = 2^m`. Every existing test of that branch was over `GF(2)`, where `m = 1` and a wrong
+  `m` is invisible. It is also the solver's last step, so #197's and #198's ladders rest on it.
+- **The degree-256 field equations are usable, not merely representable.** A single quadratic that is
+  positive-dimensional bare becomes a zero-dimensional quotient of dimension **256** — one `GF(2^8)`
+  point per value of the free variable — with the equations adjoined. §5.1's rule says the mechanism
+  is *unwise* over `GF(2^8)`, and that is a statement about cost; it is not a capability limit, and
+  the two are now distinguished by a test rather than by a reader's charity.
+- **Solving works on a `GF(2^8)` system built by hand**, which keeps the §3 result from depending on
+  `planted`'s degeneracy into a perfect square (§3.1).
+
+## 7. Question 4 answered: Singular is the oracle in characteristic two, and already was
+
+#218 asked whether Singular can be the oracle in characteristic two, and §6 of the first pass
+recorded it as not attempted. It did not need attempting. `src/grobner/differential/check.rs`:
+
+```rust
+pub const SUPPORTED_CHARACTERISTICS: &[u64] = &[2, 3, 7, 13, 65537, 2147483647];
+```
+
+Characteristic two has been in the sweep all along. `src/grobner/differential/fixtures.rs` holds
+**40 committed cases at characteristic 2** of 240 — an even 40 per characteristic — they are verified
+offline on every run of `differential::tests::test_every_committed_fixture_agrees`, and a live sweep
+against a local **Singular 4.4.1** covering all six characteristics passes
+(`test_a_live_sweep_against_singular_agrees`, `--ignored`, 24 systems).
+
+So two claims in the tree were wrong in the same direction and are superseded here: #65's "the oracle
+path is small-field only today", and this document's own first-pass statement that characteristic-two
+fixtures had not been tried. Characteristic two was never the restriction.
+
+**The restriction is extension fields**, and it is three things rather than one: the dispatch at
+`check.rs:190` monomorphizes only into `PrimeFieldElement64<p>`; `DifferentialCase` carries a
+`characteristic: u64` and nothing else, so `GF(2)` and `GF(2^8)` are both `characteristic: 2` and
+cannot be told apart; and neither side can render or read the elements — Zeebra's parser panics over
+`Gf256` (§10), and Singular needs its Galois-field ring syntax with a declared minimal polynomial,
+which has to be *the same* polynomial on both sides, which §4 showed is a real distinction.
+
+The consequence for the issues: **#219 (G1) and #221 (G4) are over `GF(2)` and have their oracle
+today.** What lacks one is the `GF(2^8)` half of #197 and #198, which is **#378**.
+
+## 8. Question 5 decided: `Zp2`
+
+`BinaryFieldElement<0b11>` — `x + 1`, the only irreducible of degree one — does work, and it is the
+same field: its whole addition and multiplication tables agree with `Zp2`'s, all four pairs, which
+`gf2_by_either_route_is_one_field_at_twice_the_storage` asserts rather than samples. Given that the
+choice is free on behaviour, it is decided on storage and on code path:
+
+| | `Zp2` = `PrimeFieldElement32<2>` | `BinaryFieldElement<0b11>` |
+|---|---:|---|
+| `size_of` | **4 bytes** | 8 bytes |
+| multiplication | wide remainder, const-generic branch (§2) | `PCLMULQDQ` + Barrett, for a 1-bit modulus |
+| declared alias | `fields::Zp2` | none — the literal has no constant |
+
+**Decision: `GF(2)` is `Zp2` throughout, including in the Fukuoka importer of #197.** Half the
+storage, no carry-less-multiply machinery for a field where multiplication is `and`, and it is the
+**prime-field** route that every existing `GF(2)` test already takes — the differential harness
+reaches characteristic two as `PrimeFieldElement64<2>` (`check.rs:190`), the same field at the other
+declared width, so a caller picks a width rather than a field (§2). `BinaryFieldElement` earns its
+keep at `GF(2^8)` and `GF(2^63)`, not at `GF(2)`.
+
+## 9. Question 3: the layout facts, and the measurement deliberately not taken
+
+The storage argument is split here into the half that is a fact about layout and the half that is a
+number, because only the first could be settled without the machine.
+
+Asserted, in `a_gf2_coefficient_costs_the_same_sparse_entry_as_any_other`:
+
+| | bytes |
+|---|---:|
+| `(usize, Zp2)` — one sparse entry over `GF(2)` | **16** |
+| `(usize, Gf256)` | 16 |
+| `(usize, BinaryFieldElement<0b11>)` | 16 |
+| `Monomial<8>` — eight `u32` exponents for what 8 bits describe | 32 |
+
+So a `GF(2)` coefficient costs exactly what a `GF(2^8)` one costs and exactly what a 32-bit
+prime-field one costs: the index's alignment pads the pair, and **one bit of information occupies 16
+bytes**. That is #62/M19 §8's finding at the field where it bites hardest, and no arithmetic change
+narrows it — only a different representation does.
+
+**The per-nonzero cost is still not measured, and this pass did not measure it.** M26 holds this
+machine for recorded measurements, and a timing taken beside it would be noise reported as a figure.
+`examples/elimination_density.rs` and `examples/field_width.rs` remain the instruments, #272 (H16) is
+scoped to exactly this for the linear-algebra kernel, and **#218 stays open on this question alone.**
+
+## 10. Three gaps, filed, each pinned by a test
+
+- **#377 (High) — `FiniteField::new` and `from_str` are `todo!()` for `BinaryFieldElement`.** The
+  consequence is larger than it looks: `multi_poly_parser.rs` calls `F::from_str(..).unwrap()`, so
+  **`MultivariatePolynomial::parse` panics over `Gf256`**. No `GF(2^8)` system can be read from text
+  at all — which means *this*, and not the export of §1, is what blocks #197's and #198's importers.
+  Over `GF(2)` the identical call works, because `Zp2` is a prime field, which is why nothing
+  noticed. `ExtensionFieldElement::from_str` is `todo!()` too, and its `new` is the prime-subfield
+  embedding, so a generic enumeration through `new` would walk 2 of 256 elements and report a point
+  count that is **wrong rather than failed**. Fixed here in the one caller this branch owns:
+  `rational_points_by_enumeration` now refuses a field whose order and characteristic differ. The
+  general fix is a trait-level decision about what `new(val: u64)` means and is #377's.
+- **#376 — `solve_one`'s default route misdiagnoses a missing field equation.** #218's gap 2 was "no
+  field-equation mechanism, and no refusal when they are absent". The refusal exists and is correct,
+  but not on the default path: `GrevlexF4ThenFglm` says *the system is not zero-dimensional* at once,
+  while the default `DirectLexF4` exhausts a Macaulay-matrix budget and reports a **resource
+  failure** — an error that tells a caller to raise a limit when the fix is to adjoin the equations.
+  Both halves are asserted, so closing #376 breaks the test on purpose and brings this section with
+  it.
+- **#378 — the differential oracle is prime-field only.** §7. Blocked on #377: there is no point
+  emitting `GF(2^8)` rings while Zeebra cannot read an element back.
+
+Still deliberately out of scope, as in the first pass: **no import was enabled** (`MqField::Gf2` and
+`MqField::Gf256` still refuse, with accurate reasons; wiring the importer against a published answer
+file under `0x11D` is #197's), and **no performance work**.
+
+## 11. Reproducing
 
 ```sh
+cargo test --test boolean_readiness
 cargo test --lib -- grobner::field_equations
 cargo test --lib -- --exact grobner::tests::test_the_whole_pipeline_over_gf2
 cargo test --lib -- --exact grobner::tests::test_the_whole_pipeline_over_gf256
@@ -230,19 +344,32 @@ cargo test --lib -- --exact grobner::tests::test_planted_degenerates_to_a_square
 cargo test --lib -- --exact fields::binary_field::tests::test_the_two_degree_eight_moduli_are_different_fields
 cargo test --lib -- --exact fields::binary_field::tests::test_declared_moduli_are_irreducible
 cargo test --lib -- --exact grobner::research::mq::tests::test_the_binary_and_extension_fields_are_refused_by_name
+cargo test --lib -- --exact grobner::differential::tests::test_every_committed_fixture_agrees
 ```
 
-## 8. Consequences for the issues that were waiting on this
+`boolean_readiness` reports **8 passed, 2 ignored**; the two ignored name #377 and turn green when it
+closes. The live Singular sweep of §7 needs a local install and is `--ignored`:
 
-- **#197 (A5, Fukuoka types I–V)** — unblocked at the field level. `Gf256Mq` exists; the answer-file
-  test under the right modulus is the next step and is #197's.
-- **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked at the field level. HFE-80 itself
-  remains far out of reach; the reduced `HFE n_D` rungs on Steel's page are the target.
-- **#219 (G1, SAT4CryptoBench)** — unblocked, and it will want field equations present, which it now
-  can have. It will also want the Singular-oracle answer this issue did not produce.
-- **#221 (G4, LowMC)** — unblocked. Still rank 4 on its merits.
+```sh
+cargo test --lib -- --ignored --exact \
+    grobner::differential::tests::test_a_live_sweep_against_singular_agrees
+```
+
+## 12. Consequences for the issues that were waiting on this
+
+- **#219 (G1, SAT4CryptoBench)** — unblocked, including the part that matters: field equations exist,
+  the `GF(2)` solve path returns verified points, and the Singular oracle is available in
+  characteristic two (§7). Nothing on #218 still gates it.
+- **#221 (G4, LowMC)** — unblocked, oracle included. Still rank 4 on its merits.
+- **#197 (A5, Fukuoka types I–V)** — unblocked at the field level, and `Gf256Mq` exists, but the
+  `GF(2^8)` types **cannot be imported from text until #377**. The `GF(2)` types can. Use `Zp2` for
+  those (§8).
+- **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked. HFE-80 remains far out of reach;
+  the reduced `HFE n_D` rungs on Steel's page are the target.
 - **#206 (F2, MinRank modellings)** — gets the field-equation mechanism it needs for challenges D–F,
   and §5.1's rule says the mechanism is worthless for A–C over `GF(65521)`. That is the answer to
   F2's question 5 for the prime-field half, derived rather than assumed.
 - **Anemoi over `GF(2^n)`**, deferred in `docs/research/additional-benchmarks.md` §9 — unblocked at
-  the field level.
+  the field level; text input over `GF(2^8)` waits on #377.
+- **#272 (H16)** — owns the per-nonzero measurement of §9, and its end-to-end judgement belongs back
+  on #218.

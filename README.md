@@ -842,6 +842,31 @@ answer is no. Over GF(65521), the Courtois MinRank challenge field, degree 65521
 `field_equations` refuses outright only when `q` exceeds a monomial exponent, which is a
 representation limit rather than a policy.
 
+The *solving* half is covered end to end over both characteristic-two fields by
+`tests/boolean_readiness.rs`. Over GF(2), `fglm_to_lex` converts the field-equation ideal and
+`solve_zero_dimensional` returns **exactly** the point set an exhaustive walk of all 256 assignments
+finds — no dropped solution and none invented over an extension. Over GF(2^8) the degree-256
+equations are usable rather than merely representable, and `roots` works, which exercises the
+characteristic-two trace splitter at `m = 8` where every earlier test had `m = 1`.
+
+Three caveats a caller should know, each asserted rather than described:
+
+- **GF(2) is `Zp2`, not `BinaryFieldElement<0b11>`.** The two are the same field — the full operation
+  tables agree — but `Zp2` is 4 bytes to the other's 8 and needs no carry-less multiply for a field
+  where multiplication is `and`.
+- **No GF(2^8) system can be read from text.** `FiniteField::from_str` is `todo!()` for
+  `BinaryFieldElement`, and `MultivariatePolynomial::parse` unwraps it, so parsing over `Gf256`
+  **panics**. GF(2) parses fine. This is #377, and it is what actually blocks the GF(2^8) importers.
+- **Omitting the field equations is diagnosed on only one route.** `SolveStrategy::GrevlexF4ThenFglm`
+  reports a positive-dimensional ideal immediately; the default `DirectLexF4` exhausts a
+  Macaulay-matrix budget and reports a *resource* failure, which invites raising a limit that cannot
+  help. #376.
+
+[`docs/research/boolean-solving.md`](docs/research/boolean-solving.md) is the readiness write-up:
+what runs in characteristic two, what does not and why, and the Singular oracle's position (it has
+covered GF(2) all along — 40 of the 240 committed differential fixtures are at characteristic 2 —
+and is prime-field only, so there is no GF(2^8) oracle yet: #378).
+
 ### A 32-bit prime field
 
 `PrimeFieldElement32<P>` is the same field as `PrimeFieldElement64<P>` for any modulus both can
@@ -2655,8 +2680,13 @@ the 2.868 ms order-162 anchor every earlier projection used does not reproduce.
 `grobner::research::MqInstance` imports instances from the
 [Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
 no new arithmetic — `PrimeFieldElement64<31>` already exists, and `Zp31` is the same field in four
-bytes — and the GF(2) and GF(2^8) families
-are refused by name, because `binary_field` and `extension_field` are not publicly exported.
+bytes — and the GF(2) and GF(2^8) families are refused by name, each for its own reason. **Not for
+want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
+long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
+path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
+*and* #377, because `FiniteField::from_str` is `todo!()` for `BinaryFieldElement`, so a `Gf256`
+system cannot be read from text at all; the challenge's modulus, which is not the AES one, is
+`Gf256Mq`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
@@ -2694,7 +2724,9 @@ of published cryptanalysis instances worth importing next, with the rejections a
 Four candidates are accepted: reduced-round **Anemoi** CICO, whose reference data is raw Magma F4
 and FGLM logs under MIT and whose quotient dimension is a published `(α+2)^N` zeebra can be checked
 against; reduced-round **Griffin**; Anemoi's `ACICO` model as a second formulation of the first; and
-reduced-round **LowMC**, which is blocked on `binary_field` not being exported. UOV, MAYO, Arion and
+reduced-round **LowMC**, recorded there as blocked on `binary_field` not being exported — which it is
+not: the module is public and LowMC is over GF(2), where the whole solve path works
+(`docs/research/boolean-solving.md` §6). UOV, MAYO, Arion and
 XHash8 are rejected, each with a recorded reason. The document also states plainly that the
 [LowMC challenge](https://lowmcchallenge.github.io/) is a **claimed-complexity competition** — its
 results are `log₂ T` and `log₂ M` estimates, several with memory exponents past 65 bits, and there
