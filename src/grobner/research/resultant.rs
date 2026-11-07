@@ -5,19 +5,42 @@
 //! structure-aware elimination beat general F4, and is the univariate polynomial it produces
 //! manageable? — and so is this: two polynomials, two variables, one eliminated.
 //!
-//! # Why the determinant and not a Euclidean algorithm
+//! # Two kernels for one scalar, and why the second one now exists
 //!
 //! `Res_y(f, g)` is `det Syl(f, g)`, a determinant of a matrix whose entries are polynomials in
 //! the surviving variable. Evaluating that matrix at a point and taking a scalar determinant
 //! commutes with evaluation **always**, because a determinant is a polynomial in the entries. So
-//! the resultant is recovered by interpolating scalar determinants, and the construction needs no
-//! case analysis.
+//! the resultant is recovered by interpolating scalar determinants, and that construction needs no
+//! case analysis. It is [`DeterminantKernel::Dense`], and it remains the default.
 //!
-//! A subresultant or Euclidean approach would be asymptotically better and would need exactly the
-//! case analysis this avoids: specializing `f` at a point where its leading coefficient in `y`
-//! vanishes drops its degree, and the specialized resultant is then **not** the specialization of
-//! the resultant. That is the classic trap, and at the sizes M23-E measures — a Sylvester matrix
-//! of order at most a few dozen over a 31-bit prime — it buys nothing worth the risk.
+//! M23-E deliberately stopped there, on the grounds that a Euclidean approach "would be
+//! asymptotically better and would need exactly the case analysis this avoids … at the sizes M23-E
+//! measures — a Sylvester matrix of order at most a few dozen over a 31-bit prime — it buys nothing
+//! worth the risk." **That judgement was right for the sizes it was made at and is wrong for the
+//! sizes now in scope**, which is why [`DeterminantKernel::Euclidean`] was added under #350.
+//!
+//! What changed is the order, not the algorithm. Scoping moved from order 18 to **order 1 458**,
+//! taking the operation-count gap from 48x to 3 888x and the stage from milliseconds to 67% of a row
+//! that would not run. Driving `f mod g` down the remainder sequence costs `O(n²)` where the
+//! determinant costs `O(n³)`, and at order 1 458 that measures **1 692x** — 1.343 ms against
+//! 2.272 s on one pinned core (`docs/research/structured-sylvester.md` §5.5).
+//!
+//! The case analysis M23-E declined to write is real, and it is in
+//! [`formal_sylvester_determinant`]. Specializing `f` at a point where its leading coefficient in
+//! `y` vanishes drops its degree, and the specialized resultant is then **not** the specialization
+//! of the resultant: the Sylvester order stays fixed at the generic degrees while the actual degrees
+//! fall, and the two differ by a factor that is not even the same on both sides. Three corrections
+//! cover it, and differential tests assert agreement with the dense kernel at every point of a
+//! small field rather than trusting the derivation.
+//!
+//! **Neither kernel is more correct than the other, and the fast one is not trusted on that
+//! claim.** Both are kept, the default is unchanged so figures taken before this existed still
+//! reproduce, and `agrees_off_domain` validates against the *dense* kernel whatever the route used —
+//! a fast kernel checked against itself is not checked.
+//!
+//! What this does **not** do is raise the reachable round count. After the change the six-round
+//! route is 78% root finding, so the constant it removes is not the one that bounds `rf6-rp0` or any
+//! eight-round row; the gain is ~3x on the row against 1 692x on the stage.
 //!
 //! # What the resultant does and does not give
 //!
@@ -68,7 +91,10 @@ use crate::{
     grobner::research::poseidon::{CicoInstance, PoseidonError},
     interpolate,
     linalg::Matrix,
-    poly::{lagrange_interpolate, Monomial, Polynomial, UnivariatePolynomial},
+    poly::{
+        lagrange_interpolate, resultant_from_coefficients, Monomial, Polynomial,
+        UnivariatePolynomial,
+    },
     FFTDomain, FiniteField, KnownOrder, MultivariatePolynomial,
 };
 
@@ -245,6 +271,13 @@ pub struct ResultantOptions {
     /// `concurrency` workers as the interpolation's samples, so raising the worker count shortens
     /// them too — at six rounds a serial check was 3% of the row.
     pub off_domain_checks: usize,
+
+    /// Which kernel evaluates each scalar resultant. Defaults to [`DeterminantKernel::Dense`].
+    ///
+    /// This one does not change the answer either — the kernels agree at every point, including the
+    /// specialization points, and differential tests assert it. It changes only what the evaluation
+    /// costs, from `O(n³)` to `O(n²)` in the Sylvester order.
+    pub kernel: DeterminantKernel,
 }
 
 impl Default for ResultantOptions {
@@ -252,6 +285,7 @@ impl Default for ResultantOptions {
         Self {
             concurrency: 1,
             off_domain_checks: Self::DEFAULT_OFF_DOMAIN_CHECKS,
+            kernel: DeterminantKernel::Dense,
         }
     }
 }
@@ -286,6 +320,12 @@ impl ResultantOptions {
             "a predicted sample count must be validated off the domain"
         );
         self.off_domain_checks = checks;
+        self
+    }
+
+    /// The same options evaluating each scalar resultant by `kernel`.
+    pub fn with_kernel(mut self, kernel: DeterminantKernel) -> Self {
+        self.kernel = kernel;
         self
     }
 }
@@ -380,11 +420,12 @@ fn sample_determinants<F: FiniteField + Send + Sync>(
     gc: &[UnivariatePolynomial<F>],
     at: &[F],
     concurrency: usize,
+    kernel: DeterminantKernel,
 ) -> Vec<F> {
     let mut values = vec![F::zero(); at.len()];
     if concurrency <= 1 {
         for (slot, x) in values.iter_mut().zip(at) {
-            *slot = sylvester_determinant(fc, gc, *x);
+            *slot = determinant_at(fc, gc, *x, kernel);
         }
         return values;
     }
@@ -396,7 +437,7 @@ fn sample_determinants<F: FiniteField + Send + Sync>(
         for (chunk, abscissae) in values.chunks_mut(block).zip(at.chunks(block)) {
             scope.spawn(move || {
                 for (slot, x) in chunk.iter_mut().zip(abscissae) {
-                    *slot = sylvester_determinant(fc, gc, *x);
+                    *slot = determinant_at(fc, gc, *x, kernel);
                 }
             });
         }
@@ -592,7 +633,7 @@ pub fn bivariate_resultant_reference_with<F: FiniteField + Send + Sync>(
     let abscissae = consecutive_abscissae::<F>(points)?;
 
     let at = Instant::now();
-    let values = sample_determinants(&fc, &gc, &abscissae, options.concurrency);
+    let values = sample_determinants(&fc, &gc, &abscissae, options.concurrency, options.kernel);
     let sampling = at.elapsed();
 
     let at = Instant::now();
@@ -650,7 +691,7 @@ pub fn bivariate_resultant_predicted<F: FiniteField + Send + Sync>(
     let abscissae = consecutive_abscissae::<F>(points)?;
 
     let at = Instant::now();
-    let values = sample_determinants(&fc, &gc, &abscissae, options.concurrency);
+    let values = sample_determinants(&fc, &gc, &abscissae, options.concurrency, options.kernel);
     let sampling = at.elapsed();
 
     let at = Instant::now();
@@ -770,7 +811,10 @@ fn agrees_off_domain<F: FiniteField + Send + Sync>(
     concurrency: usize,
 ) -> Result<bool, ResultantError> {
     let at = off_domain_abscissae::<F>(points, checks)?;
-    let direct = sample_determinants(fc, gc, &at, concurrency);
+    // Deliberately DENSE regardless of the route's kernel: a fast kernel checked against
+    // itself is not checked. This makes every predicted run a differential test of the remainder
+    // sequence against the determinant, and eight dense evaluations are negligible against a row.
+    let direct = sample_determinants(fc, gc, &at, concurrency, DeterminantKernel::Dense);
     Ok(at
         .iter()
         .zip(&direct)
@@ -830,7 +874,13 @@ pub fn bivariate_resultant_ntt_with<F: KnownOrder + Send + Sync>(
     let domain = FFTDomain::from_generator(generator, size);
 
     let at = Instant::now();
-    let values = sample_determinants(&fc, &gc, domain.powers(), options.concurrency);
+    let values = sample_determinants(
+        &fc,
+        &gc,
+        domain.powers(),
+        options.concurrency,
+        options.kernel,
+    );
     let sampling = at.elapsed();
 
     let at = Instant::now();
@@ -912,6 +962,61 @@ fn sylvester_determinant<F: FiniteField>(
         .expect("a square matrix has a determinant")
 }
 
+/// `det Syl(f, g)` with the surviving variable set to `at`, by the remainder sequence.
+///
+/// The same scalar [`sylvester_determinant`] returns, for the same inputs, at `O(n²)` rather than
+/// `O(n³)` in the Sylvester order.
+fn sylvester_resultant_euclid<F: FiniteField>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    at: F,
+) -> F {
+    let a: Vec<F> = fc.iter().map(|c| c.eval(&at)).collect();
+    let b: Vec<F> = gc.iter().map(|c| c.eval(&at)).collect();
+    resultant_from_coefficients(&a, &b)
+}
+
+/// Which kernel evaluates one scalar resultant at one point.
+///
+/// Both are kept rather than one replacing the other, for the same reason both interpolation routes
+/// are: a figure is only a comparison if the thing it is compared against is still runnable. The
+/// two agree at every point including the specialization points, which is asserted by differential
+/// tests rather than assumed.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DeterminantKernel {
+    /// `det Syl(f, g)` by dense LU on the `(m + n)`-square matrix. `O(n³)` per evaluation.
+    ///
+    /// The default, so that a figure taken before the remainder sequence existed is reproduced
+    /// exactly by a run that does not ask for anything else.
+    #[default]
+    Dense,
+
+    /// `Res(f, g)` down the polynomial remainder sequence. `O(n²)` per evaluation.
+    Euclidean,
+}
+
+impl Display for DeterminantKernel {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dense => write!(formatter, "dense"),
+            Self::Euclidean => write!(formatter, "euclidean"),
+        }
+    }
+}
+
+/// One scalar resultant at one point, by the named kernel.
+fn determinant_at<F: FiniteField>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    at: F,
+    kernel: DeterminantKernel,
+) -> F {
+    match kernel {
+        DeterminantKernel::Dense => sylvester_determinant(fc, gc, at),
+        DeterminantKernel::Euclidean => sylvester_resultant_euclid(fc, gc, at),
+    }
+}
+
 /// A bivariate polynomial with the given degree in each variable and random coefficients.
 ///
 /// The top coefficient in both variables is forced nonzero so that the Sylvester matrix really has
@@ -955,9 +1060,17 @@ pub struct DeterminantBatch {
     ///
     /// The *matrix*, not the live set: `crout_lu_pivoting` allocates `L`, `U` and `P` beside a
     /// clone of it, so a worker's working set is about four times this.
+    ///
+    /// Reported for both kernels and meaningful only for [`DeterminantKernel::Dense`]: the
+    /// remainder sequence never forms the matrix, and holds two coefficient vectors instead.
     pub matrix_bytes: usize,
     /// Wall clock for the whole batch, excluding the one-off coefficient extraction.
     pub elapsed: Duration,
+    /// Which kernel produced it.
+    ///
+    /// Recorded because the two differ by orders of magnitude at the same `matrix_order`, so a
+    /// batch without its kernel is a number that cannot be compared with another.
+    pub kernel: DeterminantKernel,
 }
 
 impl DeterminantBatch {
@@ -990,12 +1103,13 @@ pub fn time_sylvester_determinants<F: FiniteField + Send + Sync>(
     eliminate: usize,
     at: &[F],
     concurrency: usize,
+    kernel: DeterminantKernel,
 ) -> Result<(Vec<F>, DeterminantBatch), ResultantError> {
     let (fc, gc, _) = sylvester_setup(f, g, eliminate)?;
     let matrix_order = fc.len() + gc.len() - 2;
 
     let started = Instant::now();
-    let values = sample_determinants(&fc, &gc, at, concurrency);
+    let values = sample_determinants(&fc, &gc, at, concurrency, kernel);
     let elapsed = started.elapsed();
 
     Ok((
@@ -1006,6 +1120,7 @@ pub fn time_sylvester_determinants<F: FiniteField + Send + Sync>(
             concurrency,
             matrix_bytes: matrix_order * matrix_order * std::mem::size_of::<F>(),
             elapsed,
+            kernel,
         },
     ))
 }
@@ -1106,7 +1221,7 @@ mod tests {
         bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
         bivariate_resultant_predicted, bivariate_resultant_reference_with, cico_bivariate,
         interpolation_route, predicted_resultant_degree, sylvester_determinant_at, DegreeSource,
-        ResultantError, ResultantOptions, ResultantRoute,
+        DeterminantKernel, ResultantError, ResultantOptions, ResultantRoute,
     };
     use crate::{
         fields::{Mersenne31, PrimeFieldElement64, Zp13},
@@ -2323,7 +2438,8 @@ mod tests {
         let g = random_bivariate(1, 9, &mut rng);
         let at: Vec<Koala> = (1..=12u64).map(Koala::new).collect();
         let (values, batch) =
-            super::time_sylvester_determinants(&f, &g, 1, &at, 1).expect("both involve y");
+            super::time_sylvester_determinants(&f, &g, 1, &at, 1, DeterminantKernel::Dense)
+                .expect("both involve y");
         assert_eq!(batch.matrix_order, 18, "9 + 9");
         assert_eq!(batch.determinants, 12);
         assert_eq!(batch.concurrency, 1);
@@ -2333,6 +2449,11 @@ mod tests {
             "the dense matrix one worker builds"
         );
         assert!(batch.core_per_determinant() >= batch.wall_per_determinant());
+        assert_eq!(
+            batch.kernel,
+            DeterminantKernel::Dense,
+            "the kernel is recorded"
+        );
         for (value, x) in values.iter().zip(&at) {
             assert_eq!(
                 *value,
@@ -2351,12 +2472,62 @@ mod tests {
         let f = random_bivariate(1, 5, &mut rng);
         let g = random_bivariate(1, 5, &mut rng);
         let at: Vec<Koala> = (1..=40u64).map(Koala::new).collect();
-        let (serial, _) = super::time_sylvester_determinants(&f, &g, 1, &at, 1).expect("ok");
-        for workers in [8usize, 32] {
-            let (parallel, batch) =
-                super::time_sylvester_determinants(&f, &g, 1, &at, workers).expect("ok");
-            assert_eq!(parallel, serial, "{workers} workers");
-            assert_eq!(batch.concurrency, workers);
+        // Both kernels, because the indexed hand-out is shared and neither may depend on width.
+        for kernel in [DeterminantKernel::Dense, DeterminantKernel::Euclidean] {
+            let (serial, _) =
+                super::time_sylvester_determinants(&f, &g, 1, &at, 1, kernel).expect("ok");
+            for workers in [8usize, 32] {
+                let (parallel, batch) =
+                    super::time_sylvester_determinants(&f, &g, 1, &at, workers, kernel)
+                        .expect("ok");
+                assert_eq!(parallel, serial, "{kernel} at {workers} workers");
+                assert_eq!(batch.concurrency, workers);
+                assert_eq!(batch.kernel, kernel);
+            }
+        }
+    }
+
+    /// Both resultant kernels agree at every point of the field, including the specialization
+    /// points where a leading coefficient in the eliminated variable vanishes.
+    #[test]
+    fn euclidean_and_dense_kernels_agree_at_every_point_of_the_field() {
+        // f's leading coefficient in y is x, which vanishes at exactly x = 0.
+        let f = parse("x*y^2 + 3*y + x + 1");
+        let g = parse("2*y^2 + x*y + 5");
+        let fc = super::coefficients_in(&f, 1);
+        let gc = super::coefficients_in(&g, 1);
+
+        let mut saw_specialization = false;
+        for i in 0..13u64 {
+            let at = F::new(i);
+            let dense = super::sylvester_determinant(&fc, &gc, at);
+            let euclid = super::sylvester_resultant_euclid(&fc, &gc, at);
+            assert_eq!(dense, euclid, "at x = {i}");
+            if fc[fc.len() - 1].eval(&at).is_zero() {
+                saw_specialization = true;
+            }
+        }
+        // The test is only meaningful if the sweep actually hit a dropped degree.
+        assert!(saw_specialization, "no specialization point in the sweep");
+    }
+
+    /// Over a large field the two kernels agree on random pairs at random points.
+    #[test]
+    fn euclidean_and_dense_kernels_agree_on_random_pairs() {
+        let mut rng = rand::rngs::OsRng;
+        for degree in 1..=4u32 {
+            let f = random_bivariate(degree, degree, &mut rng);
+            let g = random_bivariate(degree, degree, &mut rng);
+            let fc = super::coefficients_in(&f, 1);
+            let gc = super::coefficients_in(&g, 1);
+            for i in 0..8u64 {
+                let at = Koala::new(i * 7 + 1);
+                assert_eq!(
+                    super::sylvester_determinant(&fc, &gc, at),
+                    super::sylvester_resultant_euclid(&fc, &gc, at),
+                    "degree {degree}, at {i}"
+                );
+            }
         }
     }
 }

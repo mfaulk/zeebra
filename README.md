@@ -33,6 +33,8 @@ As the saying goes, you can either make software so simple that it obviously has
       reduced-round instance
 - [x] Graeffe-transform root finding: one root at degree `3^13` over KoalaBear in 3.1 s, against an
       extrapolated 57 hours for the quadratic finder
+- [x] Lenstra's elliptic curve method, with an explicit effort budget that can report the cofactors
+      it could not split
 - [x] The resultant route's Sylvester determinants in parallel: 92–95% efficiency out to 32 cores,
       the four-round CICO row from 49.7 s to 2.16 s, with the concurrency recorded on the
       scoreboard and a cross-concurrency comparison refused rather than quoted
@@ -87,6 +89,9 @@ As the saying goes, you can either make software so simple that it obviously has
       substitutes a polynomial in all `N` variables for each one — so a permutation round can be
       written the way it is defined, with the substituted powers memoized and formed by repeated
       squaring
+- [x] Multivariate GCD by recursive primitive PRS, with content, primitive part, the formal partial
+      derivative and squarefree decomposition on top of it — the GCD's defining property checked by
+      exhaustive enumeration over a small ring rather than against a reference implementation
 - [x] Reed-Solomon codes over an FFT domain: encoding, erasure recovery, and a Euclidean
       decoder that verifies its correction rather than returning the nearest codeword
 
@@ -749,6 +754,7 @@ cargo run --release --example multivariate_mul     # multivariate multiply: time
 cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
 cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
+cargo run --release --example graeffe_root -- deflate   # all roots by deflation, #351
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
 cargo run --release --example graeffe_cico         # the univariate CICO route, and the family economics
@@ -772,6 +778,7 @@ cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
+cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -2107,6 +2114,83 @@ monomial already present and the table never grows — the live set is the outpu
 scaled words into one accumulator peaks at **43 312 bytes** against **84 448**; there the output
 has to be allocated, so the 2x is all there is to win.
 
+### GCD, content, and squarefree decomposition
+
+`F[x_0, ..., x_{N-1}]` is not Euclidean, so `gcd` is recursive: read both polynomials as univariate
+in their highest occurring variable, over the polynomial ring in the remaining ones. That
+coefficient ring is a UFD and not a field, so the Euclidean step is *pseudo*-division — scale the
+dividend by a power of the divisor's leading coefficient instead of dividing by it — and the
+content comes out of every remainder, which is what keeps those powers from accumulating. The
+classical primitive PRS. The recursion terminates because the coefficients of a polynomial read in
+`x_v` do not involve `x_v`, so each content is a GCD in a strictly smaller ring.
+
+| method | what it gives |
+|---|---|
+| `gcd(&other)` | the GCD, normalized so the lexicographic leading coefficient is one |
+| `content(i)` / `primitive_part(i)` | the GCD of the coefficients in `x_i`, and the quotient by it |
+| `degree_in(i)` / `coefficients_in(i)` | the univariate-in-`x_i` view the recursion is built on |
+| `exact_div(&divisor)` | the quotient, or `None` when the division leaves a remainder |
+| `derivative(i)` | the formal partial derivative |
+| `squarefree_part()` / `squarefree_decomposition()` | the radical, and the factors with multiplicities |
+
+```rust
+use zeebra::{fields::Zp13, MultivariatePolynomial};
+
+let vars = ["x", "y"];
+let parse = |s| MultivariatePolynomial::<2, Zp13>::parse(s, vars).unwrap();
+
+// Two products sharing one factor.
+let shared = parse("x + y");
+let f = &parse("x - y") * &shared;
+let g = &parse("x*y + 1") * &shared;
+assert_eq!(f.gcd(&g), shared);
+
+// Coprime inputs have GCD one, and a nonzero constant is a unit.
+assert!(parse("x + 1").gcd(&parse("y + 1")).is_one());
+
+// Read in y, x*y^2 + x is x*(y^2 + 1): the content is x and the primitive part y^2 + 1.
+let h = parse("x*y^2 + x");
+assert_eq!(h.content(1), parse("x"));
+assert_eq!(h.primitive_part(1), parse("y^2 + 1"));
+
+// (x + 1) * (y + 1)^2, decomposed by multiplicity.
+let repeated = &parse("x + 1") * &(&parse("y + 1") * &parse("y + 1"));
+let mut decomposition = repeated.squarefree_decomposition().unwrap();
+decomposition.sort_by_key(|(_, multiplicity)| *multiplicity);
+assert_eq!(decomposition, vec![(parse("x + 1"), 1), (parse("y + 1"), 2)]);
+```
+
+The squarefree part is `f / gcd(f, ∂f/∂x_0, ..., ∂f/∂x_{N-1})`, which for `f = ∏ g_i^(e_i)` is
+`∏ g_i`. Differentiation multiplies a factor of multiplicity `e` by `e`, and in characteristic `p`
+that is zero whenever `p` divides `e` — so these two **refuse** rather than answer when the
+characteristic does not exceed the total degree:
+
+```rust
+use zeebra::{fields::PrimeFieldElement64, MultivariatePolynomial, SquarefreeError};
+
+type F = PrimeFieldElement64<3>;
+let vars = ["x", "y"];
+let factor = MultivariatePolynomial::<2, F>::parse("x + y", vars).unwrap();
+let cube = &(&factor * &factor) * &factor;
+assert_eq!(
+    cube.squarefree_part(),
+    Err(SquarefreeError::CharacteristicTooSmall { characteristic: 3, degree: 3 })
+);
+```
+
+The GCD's correctness is pinned by an exhaustive check rather than by a reference implementation:
+over a two-variable ring on a three-element field, `multivariate_gcd.rs` enumerates every candidate
+divisor and asserts the defining property — the result divides both inputs, and *every* common
+divisor divides the result. That is the property to test, because a GCD is only unique up to a unit
+and several candidates share the maximal degree.
+
+Faster routes are deliberately not taken here. The subresultant PRS replaces the per-step content
+GCD with one exact division, over a prime field Brown's modular algorithm evaluates down to
+univariate GCDs and lifts, and Yun's algorithm computes the squarefree decomposition in one GCD per
+multiplicity where the repeated-radical form used here costs `N + 1`. No timings are published for
+any of this: the implementation is the one whose coefficient growth is bounded by construction, and
+it has not been measured.
+
 ### Composition
 
 `compose_univariate` substitutes one univariate polynomial per variable, `x_i -> g_i(x_i)`, and
@@ -3141,10 +3225,27 @@ visible.
 the determinant of their Sylvester matrix recovered by interpolating scalar determinants;
 `bivariate_resultant_ntt` computes the same resultant with the samples taken on a power-of-two
 subgroup, so the recovery is an inverse NTT rather than a cubic solve. The
-determinant construction rather than a Euclidean algorithm on purpose: evaluating a matrix and
-taking its determinant commutes with evaluation *always*, so there is no case to analyse — where
-specializing `f` at a point that kills its leading coefficient in `y` drops its degree, and the
-specialized resultant is then not the specialization of the resultant.
+determinant construction needs no case analysis: evaluating a matrix and taking its determinant
+commutes with evaluation *always*, where specializing `f` at a point that kills its leading
+coefficient in `y` drops its degree, and the specialized resultant is then not the specialization of
+the resultant.
+
+**Which per-sample kernel evaluates that scalar is now a choice**, `ResultantOptions::kernel`:
+
+- `DeterminantKernel::Dense` — dense LU on the `(m + n)`-square matrix, `O(n³)`. The **default**, so
+  a figure taken before the alternative existed reproduces unchanged.
+- `DeterminantKernel::Euclidean` — `poly::resultant_from_coefficients`, driving `f mod g` down the
+  polynomial remainder sequence in `O(n²)`.
+
+Both return the same scalar, including at the specialization points, where the fixed Sylvester order
+and the fallen true degrees differ by a correcting power of a leading coefficient — the case analysis
+the dense route avoids, closed in `O(1)` per sample by `poly::resultant_at_formal_degrees` and
+asserted against an explicitly built determinant over all 15 625 degree-drop combinations. Measured
+same-binary on one pinned core, the Euclidean kernel is **137× faster at order 162 and 2 094× at
+order 1 458**, with fitted exponents of **2.94** and **1.85** — the ratio grows with the order
+because the kernels differ by a power of it. It does **not** raise the reachable round count: the
+six-round route becomes 78% root finding, so the row gains ~3×. See
+`docs/research/structured-sylvester.md` §5.6.
 
 It exists to answer one question, and the answer is worth knowing. On a registered `t = 16` CICO
 slice — twelve of the fourteen free inputs fixed, two unknowns left — the S-box variables can be
@@ -4094,6 +4195,103 @@ rather than as the `8^2` the `k = 2` pass finds.
 `p^(1/2)` iterations to split `p^k`, so `p^3` for a 20-digit prime does not factor in any practical
 time without it and factors in a single primality check with it
 (`test_factorization_of_a_prime_power_rho_cannot_reach`).
+
+## Lenstra's Elliptic Curve Method
+Pollard rho costs about `p^(1/2)` iterations in the smallest prime factor `p`, so it reaches
+20-digit factors and not 40-digit ones. ECM's expected cost depends on the size of the factor it
+finds rather than on the size of `n`, which makes it a complement to rho rather than a replacement.
+The workload it is here for is the factorization of `q - 1` for a wide prime field `q`, which is
+what finding a generator of the multiplicative group needs.
+
+`ecm_find_factor` returns one non-trivial factor, and `None` when the budget ran out without
+finding one. That `None` is an ordinary outcome, not an error:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::integers::{big_uint::BigUInt, ecm_find_factor, factor_with_budget, EcmBudget};
+
+let mut rng = StdRng::seed_from_u64(20260131);
+let budget = EcmBudget { b1: 200, b2: 20_000, curves: 40 };
+
+// 10_007 * 10_009, past the small-prime table that trial division uses.
+let n = BigUInt::new_from_u64(10_007) * &BigUInt::new_from_u64(10_009);
+let factor = ecm_find_factor(&n, &budget, &mut rng).unwrap();
+assert!(factor > BigUInt::one() && factor < n);
+assert!((&n % &factor).is_zero());
+
+// A prime has no factor to find, so the budget is spent and the answer is honest.
+assert_eq!(ecm_find_factor(&BigUInt::new_from_u64(1_000_003), &budget, &mut rng), None);
+```
+
+`factor_with_budget` drives trial division, the perfect-power test and ECM together. What it could
+not split is reported rather than dropped, so `product()` always returns the input:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::integers::{big_uint::BigUInt, factor_with_budget, EcmBudget};
+
+let mut rng = StdRng::seed_from_u64(3883);
+let budget = EcmBudget::for_digits(10);
+
+let n = BigUInt::new_from_u64(1_290_159_361_801_237); // 4409^3 * 15053
+let factorization = factor_with_budget(&n, &budget, &mut rng);
+assert!(factorization.is_complete());
+assert_eq!(factorization.primes, vec![BigUInt::new_from_u64(4409), BigUInt::new_from_u64(15053)]);
+assert_eq!(factorization.powers, vec![3, 1]);
+assert_eq!(factorization.product(), n);
+
+// A budget too small for the cofactor leaves it in `unfactored`, and the product still holds.
+let tiny = EcmBudget { b1: 100, b2: 0, curves: 1 };
+let hard = BigUInt::from_dec_str("1000000000000000003").unwrap()
+    * &BigUInt::from_dec_str("1000000000000000009").unwrap();
+let partial = factor_with_budget(&(BigUInt::new_from_u64(12) * &hard), &tiny, &mut rng);
+assert!(!partial.is_complete());
+assert_eq!(partial.unfactored, vec![(hard, 1)]);
+assert_eq!(partial.product(), BigUInt::new_from_u64(12) * &partial.unfactored[0].0);
+```
+
+That budget is the point of the API shape. `prime_field_256`'s `try_primitive_element` returns
+`Err(RootOfUnityError::NoKnownGenerator)` rather than searching, because finding a generator means
+factoring a 254-bit `q - 1` and that should not start by accident. ECM does not change that: a
+factorization of a 254-bit `q - 1` is still something a caller has to ask for, which is why the
+entry point makes the effort explicit and can say "I did not finish". Wiring the two together is
+tracked separately (#405); nothing in the crate calls it yet.
+
+### How it works
+Stage 1 multiplies a point on a **Montgomery curve** `B y^2 = x^3 + A x^2 + x` by every prime power
+up to `b1`, using the Montgomery ladder over `XZ`-only projective coordinates. If the curve's order
+modulo some prime factor `q` of `n` is `b1`-smooth, the point reaches the identity modulo `q`, and
+`q` then divides the resulting `Z` while `n` does not — so `gcd(Z, n)` names it. The `y`-coordinate
+is never needed, because `B` drops out of the `x`-only formulas.
+
+Stage 2 is the **standard continuation**, which additionally catches an order that is `b1`-smooth
+apart from a single prime in `(b1, b2]`. Writing such a prime as `p = v*D ± u` for a stride
+`D = 210` and a `u < D/2` coprime to it, `[p]Q` being the identity modulo `q` means `[v*D]Q` and
+`[u]Q` share an `x`-coordinate there — either sign of `u` will do, since `[-u]Q` and `[u]Q` have the
+same `x`. Sharing an `x` is `X_vD * Z_u - X_u * Z_vD` vanishing, and those differences accumulate
+into one product, so the whole stage costs a single gcd. A difference that is zero modulo *all* of
+`n` is skipped rather than multiplied in, since its gcd is `n` and it would erase what every other
+pair found. Coverage starts at `D/2 = 105`, so a `b1` below that would leave a gap; any realistic
+`b1` is far above it.
+
+Curves come from **Suyama's parameterization**, which forces the order to be divisible by 12 and so
+raises the chance of smoothness. It needs `(A + 2) / 4`, and `BigUInt` has no modular inverse — so
+the constant is carried as an unreduced fraction `num / den` and cleared projectively by scaling
+both coordinates of the doubling by `den`. That costs one multiply per doubling and buys more than
+it costs: inversion would fail exactly when `den` shares a factor with `n`, and that gcd is itself
+the factor being hunted, so the degenerate case returns an answer instead of an error. It is also
+why an even `n` is split immediately — `den` carries a factor of 16.
+
+`EcmBudget::for_digits` follows the usual ECM parameter table (`b1` of 2e3, 1.1e4, 5e4 and 2.5e5 for
+the 15-, 20-, 25- and 30-digit levels, with `b2 = 100 * b1`). Those are the asymptotically motivated
+choices from the literature and **not** measurements of this implementation: the inner loop here is
+a `BigUInt` multiply and remainder rather than Montgomery arithmetic, so a given budget costs
+considerably more wall-clock time than a tuned implementation would pay. Treat the digit levels as
+the shape of the parameter curve, not as a promise about runtime.
+
+Quadratic Sieve is deliberately absent. Its cost depends on the size of `n`, which makes it the
+right tool for a hard semiprime — and `q - 1` is not that. It is semi-smooth: a few small primes
+and a handful of middling ones, which is exactly the shape ECM is for.
 
 ## Permutation Polynomials
 An arithmetization-friendly hash is built from a **power permutation**: Poseidon's S-box is
