@@ -260,6 +260,18 @@ wall limit, every row from `corpus::instance` so the generators are digest-ident
 startup floor is subtracted from no figure; the `startup share` column is what says whether a row
 means anything about the engines (§0).
 
+> **Provenance of this table, stated because §9's own standard requires it.** These figures come
+> from a real run — `benchlock` logs it `20:18:33 → 20:28:32`, status 0, after a 2 611-second wait
+> — but that run was invoked **without `--write`, so its records were not retained**. The table is
+> therefore sourced from the run's standard output rather than from
+> `research/competitive/results/history.json`.
+>
+> That is the wrong way round. #293's acceptance is "regenerable from the retained records", and a
+> figure that lives only in a document is the state Scoreboard C exists to prevent. A re-measured
+> `--write` run is queued on `benchlock`; when it lands, **these numbers are replaced by the
+> persisted ones** and any difference is run-to-run variation worth seeing. The 4.11x is a 4x gap
+> and will not move inside the 20% band, but the millisecond rows may.
+
 | row | task | Zeebra | Singular | wall ratio | startup share | verdict |
 |---|---|---:|---:|---:|---:|---|
 | **mq-random-10** | **basis** | **29 963 ms** | **7 291 ms** | **0.24x** | 0% | **Zeebra 4.11x slower** |
@@ -273,8 +285,26 @@ means anything about the engines (§0).
 | mq-planted-6 | basis | 0.08 ms | 36.0 ms | 450x | 100% | **not an engine comparison** |
 | mq-random-14 | both | entry cap | 60 s wall | — | — | **different limits; no ratio** |
 
-All quotient dimensions agreed on every completed row — 9, 25, 57, 64, 81, 156, 354, 1024, 16 384 —
-which is the invariant check that licenses the timings at all (§5 of the protocol).
+Quotient dimensions agreed on every row where **both** engines reported one — 9, 25, 57, 64, 81,
+156, 354, 1024 — which is the invariant check that licenses those timings at all (§5 of the
+protocol).
+
+> **One row was an exception, and finding it is the reason `Invariants::overlap` exists.** On
+> `mq-planted-14`'s basis row Zeebra reported **no dimension**, against Singular's 16 384. The
+> basis itself finished in 0.28 ms; the *dimension* was being obtained by running a full
+> `fglm_to_lex`, which tripped the 4 096 conversion cap — so a **basis** row's verifiability was
+> hostage to a **conversion** budget.
+>
+> `Invariants::agree` compares only fields both sides carry, so this produced **no disagreement
+> and no agreement**: the row sat in a table of agreeing rows while being silently unverified.
+> That is precisely the "nothing shared is not a verification" trap the API was built to catch,
+> and an earlier draft of this sentence claimed all dimensions agreed — the prose walked into the
+> trap the code was designed to prevent.
+>
+> Fixed: a dimension now comes from `QuotientBasis::new`, which enumerates standard monomials and
+> needs neither operators nor dense blocks, under its own far higher ceiling. `mq-planted-14`'s
+> basis row now reports 16 384 and agrees with Singular, and the conversion on the same rung is
+> still correctly refused by the conversion's own budget.
 
 ### The new result: a basis-stage loss on random MQ
 
@@ -308,9 +338,11 @@ Zeebra's refusal is a self-imposed bound rather than an inability. The refusal i
 behaviour** — a refused budget is not a wrong answer — and raising the cap to 32 768 lets the rung
 through (`test_raising_the_budget_lets_the_same_rung_through`, `#[ignore]`d for cost).
 
-Two separate actions fall out, and only the first is a defect:
+Three separate actions fall out, and only the first two are defects:
 
-1. **The row was being recorded as `Failed`.** A declared budget is a **limit stop**, and putting
+0. **The basis row on the same rung lost its quotient dimension**, because the dimension was being
+   computed through a full conversion. See the note in §4a above. Fixed.
+1. **The conversion row was being recorded as `Failed`.** A declared budget is a **limit stop**, and putting
    it in the bucket reserved for an engine that broke is the exact confusion this contract exists
    to prevent — it also makes the row eligible for a ratio, which a limit stop never is. Fixed;
    every `FglmError` resource variant now maps to `StoppedByLimit`, `PositiveDimensional` to
@@ -470,6 +502,7 @@ compared:
 | ≥3 external tools | **Partially met, with reasons.** msolve measured (§1); **Singular measured on 19 corpus rungs across both tasks (§4a)**. Groebner.jl and Sagebrush are now adapted and wired into the sweep, but their four-engine run is **queued behind a 90-minute reproduction on `benchlock`** — the serialization protocol working, not failing. |
 | ≥6 families | **Corpus has six** (`katsura`, `cyclic`, `mq-random`, `mq-planted`, `poseidon`, `anemoi`); cross-library **agreement** on seven rungs of two of them against Zeebra's F4 (§4) **plus quotient-dimension agreement on every completed Singular row across all six** (§4a); cross-library **timing** on `anemoi` (§1) and on `mq-random`, `mq-planted` and `poseidon` (§4a). |
 | every row verified or classified unverified, method named | **Met.** §4 names the method (invariant agreement against Zeebra's F4, dimensions against published values). §1's rows are verified at `N = 4, 5, 6`. |
+| **rows retained in the board** (#293, #299) | **Not yet met.** `research/competitive/results/history.json` holds **zero rows**: the sweep that produced §4a ran without `--write`. The schema, the renderer and the `--write` path all exist and are tested; what is missing is one re-measured run, which is queued on `benchlock` behind a 90-minute reproduction. **Until it lands, §4a's figures are documented but not regenerable, and that is a real gap rather than a presentational one.** |
 | failure stages and limits recorded for incomplete runs | **Met** by construction: `StoppedByLimit` carries the limit and `Unsupported` the missing capability, and neither is timing evidence. |
 | no cross-machine or cross-concurrency ratio | **Met.** §1 states 8-core against 1-core and quotes **no** per-core ratio for the end-to-end rows; the per-core figure is restricted to the single-threaded conversion stage. |
 | recommendation for each H12–H17, issue updated | §9, and the issues updated. |

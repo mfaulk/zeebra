@@ -46,12 +46,21 @@ use super::{
     corpus::REFERENCE_CHARACTERISTIC,
     process::{CpuBasis, RssBasis},
 };
+/// The quotient dimension this adapter will enumerate to **report an invariant**.
+///
+/// Deliberately far above `FglmOptions`'s conversion default of 4 096. A dimension is obtained by
+/// enumerating standard monomials, which `FglmOptions`'s own documentation calls cheap at any such
+/// dimension — it is the operator and span entry budgets that bound memory, and an invariant needs
+/// neither. Tying the two together made a *basis* row's verifiability hostage to a *conversion*
+/// budget, which cost the `mq-planted-14` basis row its dimension.
+const INVARIANT_DIMENSION_CEILING: usize = 1 << 20;
+
 use crate::{
     fields::PrimeFieldElement64,
     grobner::{
         differential::polynomial_to_string,
         f4_reported,
-        fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions},
+        fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
         research::{ANEMOI_64_PRIME, KOALABEAR_PRIME},
         F4Error, F4Options, IdealClass,
     },
@@ -215,8 +224,30 @@ fn solve<const N: usize, F: FiniteField>(
             // none rather than zero.
             if classify_ideal(&basis, order) == IdealClass::ZeroDimensional {
                 let at = Instant::now();
-                if let Ok((_, statistics)) = fglm_to_lex_with_options(&basis, order, fglm_options) {
-                    invariants = invariants.with_quotient_dimension(statistics.quotient_dimension);
+                // `QuotientBasis::new` and **not** a full conversion. Enumerating the standard
+                // monomials is all a dimension needs; running `fglm_to_lex` for it meant a
+                // *basis* row's verifiability depended on an unrelated FGLM budget, and on
+                // `mq-planted-14` it did: the basis finished in 0.28 ms, the 16 384-dimensional
+                // enumeration tripped the 4 096 operator cap, and the row went out with **no
+                // dimension at all** — against a Singular row that reported 16 384. Nothing
+                // shared is not agreement, so that row was silently unverified while looking
+                // like one of a set that agreed.
+                //
+                // `INVARIANT_DIMENSION_CEILING` is its own bound, far above the conversion
+                // default, because `FglmOptions`'s own documentation says the enumeration is
+                // cheap at any such dimension and it is the entry budgets that bound memory.
+                match QuotientBasis::new(&basis, order, INVARIANT_DIMENSION_CEILING) {
+                    Ok(quotient) => {
+                        invariants = invariants.with_quotient_dimension(quotient.dimension());
+                    }
+                    Err(error) => {
+                        // Recorded as a stage rather than swallowed: a row whose invariant could
+                        // not be computed must say so, or it reads as a row nobody checked.
+                        stages.push((
+                            format!("quotient-dimension UNAVAILABLE: {}", error),
+                            at.elapsed(),
+                        ));
+                    }
                 }
                 // Charged as its own stage: it is work done to *report an invariant*, not part of
                 // the task, and leaving it in the basis time would make this row slower than the
@@ -636,6 +667,42 @@ mod tests {
                 .any(|n| n.starts_with("conversion: dependence")),
             "the lex walk is the stage the report attributes the gap to: {:?}",
             names
+        );
+    }
+
+    /// A basis row reports its quotient dimension even where a *conversion* would be refused.
+    ///
+    /// The defect this guards cost a real row its invariant. `mq-planted-14`'s basis finishes in
+    /// 0.28 ms, but its quotient is 16 384-dimensional, and the dimension was being obtained by
+    /// running a full `fglm_to_lex` — which trips the 4 096 conversion cap. So the row went out
+    /// with **no dimension at all**, against a Singular row that reported 16 384, and
+    /// `Invariants::agree` compares only fields both sides carry: nothing shared is not agreement,
+    /// so the row was silently unverified while sitting in a table of rows that agreed.
+    ///
+    /// A dimension needs the standard monomials enumerated and nothing else, so it gets its own
+    /// far higher ceiling and a basis row's verifiability no longer depends on a conversion budget.
+    #[test]
+    fn test_a_basis_row_reports_its_dimension_above_the_conversion_cap() {
+        let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let mut solver = ZeebraSolver::new();
+        let report = solver.run(&built, Task::ReducedGrobnerBasis, &limits());
+
+        let answer = match &report.status {
+            RunStatus::Complete(answer) => answer,
+            other => panic!("the basis itself succeeds: {:?}", other),
+        };
+        assert_eq!(
+            answer.invariants.quotient_dimension,
+            Some(16_384),
+            "the basis row must carry the dimension Singular also reports"
+        );
+
+        // And the conversion on the same rung is still refused, by the conversion's own budget.
+        let conversion = solver.run(&built, Task::LexBasisByConversion, &limits());
+        assert!(
+            matches!(conversion.status, RunStatus::StoppedByLimit(_)),
+            "{:?}",
+            conversion.status
         );
     }
 
