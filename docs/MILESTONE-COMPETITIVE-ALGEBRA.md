@@ -750,11 +750,18 @@ into one:
 - **FCICO refused in 3.8 s on `max_matrix_rows`** — "symbolic preprocessing needed more than the
   200000 rows allowed". Not memory. This is the **third** of F4's four relevant budgets discovered
   by hitting a refusal rather than by reading the struct (#322).
-- **And the refusal produced a competitive result that outlives the fix.** The published Magma run
-  on this exact row peaks at **173 808 × 189 401 — inside the 200 000 default Zeebra refused on.**
-  So Zeebra's symbolic preprocessing enumerates **more rows than Magma's for the same system**. That
-  is a measured algorithmic difference, not a budget-tuning problem, and raising the constant would
-  hide it.
+- **And the refusal produced an observation that outlives the fix.** The published Magma run on this
+  exact row peaks at **173 808 × 189 401 — inside the 200 000 default Zeebra refused on.** So for a
+  problem Magma reduces within a 173 808-row matrix, this crate's symbolic preprocessing enumerates
+  more than 200 000 rows. It is **not a budget-tuning problem**: the 200 000 default is not obviously
+  wrong for a library, precisely because Magma fits under it on this very row, so raising the
+  constant is a workaround that leaves the difference in place.
+
+  Two caveats travel with it and must not be dropped. **The counts are not strictly like for like** —
+  Magma reports a peak *reduced* matrix and Zeebra an enumerated row set *before* reduction — so the
+  honest claim is a **one-row observation, not a ratio**. And it lands on exactly what #305 bounds,
+  so the figure may move; that would be #305 earning its keep rather than the observation
+  evaporating. Recorded in #263's gap map as an **F4** row, independent of the FGLM deficit.
 - **PCICO is recorded as _not a result_.** It reached 3 177 s of its 5 400 s budget at a flat 4.53 GB
   and was killed by **none of its guards** — see §13.6a item 7.
 
