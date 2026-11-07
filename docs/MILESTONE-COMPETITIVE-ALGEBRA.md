@@ -690,17 +690,40 @@ overstate it.
    parametrization rather than finite-field points (verified at `main.c:96-97`), and the other
    three have no solver. Zeebra's end-to-end solving capability has no external baseline.
 2. **The corroboration boundary has four tiers**, and it is about corroboration rather than
-   representability — a distinction with different fixes:
+   representability — a distinction with different fixes. Representability needs a new tool;
+   corroboration needs a second tool **at the same field and for the same task**:
 
-   | band | engines | corroboration |
+   | band | engines | basis corroboration |
    |---|---|---|
    | `p < 2^31` | all four | four-way, term-for-term |
    | `2^31 ≤ p < 2^62` | Groebner.jl, Sagebrush | two-way, no third opinion |
    | `2^62 ≤ p < 2^64` | Groebner.jl only | **none** |
    | 254/255-bit | none | **none at any size** |
 
-   Anemoi's field is 2^64−353, so it sits in the one-engine band. The corpus's `NoComparand` reason
-   says so.
+   Anemoi's field is 2^64−353, so it sits in the sole-engine band — and so does **Goldilocks**, which
+   makes this a property of the band rather than an Anemoi peculiarity. The corpus records that case
+   as `SoleComparand { tool, reason }`, distinct from `NoComparand`, because the two have different
+   fixes: `licenses_timing()` is **true** for a sole comparand (one engine on one machine still gives
+   a valid ratio and a checkable invariant) while `is_corroborated()` is false. `NoComparand` narrows
+   to the 254/255-bit fields, and a test asserts no ladder rung uses it.
+
+   **Corroboration is task-specific, and the table above is the _basis_ table.** Conversion is
+   narrower, because Sagebrush exposes **no FGLM route at all** — a missing task, not a field
+   ceiling:
+
+   | task | `p < 2^31` | `p ≥ 2^31` |
+   |---|---|---|
+   | basis | four-way | two-way |
+   | **conversion** | **three-way** | **sole engine** |
+   | eliminant | two-way (msolve out at `2^31 − 1`) | sole engine |
+
+   This matters more than a refinement, because **conversion is the one stage where M25 measured a
+   cross-library deficit at all.** Reading a basis band as a conversion band would overstate what can
+   check the very row this milestone most wants checked. The boundary is derived from the engines'
+   own constants — `ceilings` re-exports each adapter's `MAX_CHARACTERISTIC` — so one source of truth
+   feeds every statement, and `corroboration_for(task, p)` is the task-aware form while
+   `corroboration(p)` is the documented basis shorthand. A per-family sentence is exactly how the
+   first version of this got it wrong.
 3. **The corpus reference field, `2^31 − 1`, is above msolve's eliminant ceiling.** So msolve is a
    basis comparand there and not an eliminant one. Asking it anyway does not fail — it **hangs**:
    the sparse-FGLM `NULL` is laundered into the genericity signal and reaches a `goto restart` loop
