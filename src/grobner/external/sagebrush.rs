@@ -33,31 +33,47 @@
 //! into the results table.** A fast wrong answer is not a competitive result, and eight agreeing
 //! instances is evidence rather than a guarantee.
 //!
-//! # What the driver exposes, and what Sagebrush has that it does not
+//! # What the driver exposes
 //!
 //! Sagebrush builds no Gröbner CLI: `engine/cli` depends on four crates that do not include
 //! `mpoly` and exposes no entry point. The provisioned `sagebrush-gb-driver` — Zeebra's own MIT
 //! code, built by `tools/external/provision.sh` against the pinned clone — reads an msolve-format
-//! file and calls `sagebrush_mpoly::f4::groebner_p(&sys, Order::DegRevLex, p)`.
+//! file and calls into `sagebrush_mpoly` on two selectable axes:
 //!
-//! **That driver is degrevlex-and-reduced-basis only, and the limitation is the driver's, not the
-//! engine's.** Sagebrush itself has `fglm::groebner_fglm` (`engine/mpoly/src/fglm.rs:325`,
-//! capped at `p < 2^31` by `:329`) and a lex route by homogenize → DegLex → dehomogenize
-//! (`engine/mpoly/src/f4.rs:491-547`), and computes a quotient-space dimension internally
-//! (`fglm.rs:97`) without exposing it. None of that is reachable here, so [`Self::supports`]
-//! refuses every other task and order outright rather than approximating one with another.
+//! | `--route` | `--order` | entry point | task |
+//! |---|---|---|---|
+//! | `f4` | `degrevlex`, `deglex`, `lex` | `f4::groebner_p` | [`Task::ReducedGrobnerBasis`], [`Task::LexBasis`] |
+//! | `fglm` | `lex` | `fglm::groebner_fglm` | [`Task::LexBasisByConversion`] |
 //!
-//! **A warning for whoever extends the driver: Sagebrush has a task-specific field ceiling.**
-//! [`MAX_CHARACTERISTIC`] is the *basis* bound. `fglm.rs:329` caps the FGLM route at `p < 2^31` —
-//! an eighth of it. That narrower bound is unreachable today because the driver exposes no FGLM,
-//! but the moment it does, declaring only the basis bound would let a sweep run a worker into its
-//! wall limit and record [`LimitStop`] where the truth is [`Unsupported`] — a timing-adjacent
-//! outcome for what is actually a capability gap, which is the one confusion this contract exists
-//! to prevent. msolve has the same shape and worse consequences: its eliminant ceiling is
+//! The lex basis under `f4` is the engine's own homogenize → DegLex → dehomogenize → re-reduce
+//! route (`engine/mpoly/src/f4.rs:491-547`); under `fglm` it is an order conversion from a
+//! degrevlex basis (`engine/mpoly/src/fglm.rs:325`). **The two routes are separate tasks and must
+//! not share a column** — that is what [`Task::LexBasisByConversion`] exists for — and Sagebrush
+//! is the only comparand here that offers both, Groebner.jl 0.10.11 having no FGLM at all.
+//!
+//! **Sagebrush has a task-specific field ceiling, and it is eight times narrower than the basis
+//! bound.** [`MAX_CHARACTERISTIC`] is the bound on `f4::groebner_p`; `fglm.rs:329` caps the FGLM
+//! route at [`FGLM_MAX_CHARACTERISTIC`] = `2^31`. Declaring only the basis bound would let a sweep
+//! run a worker into its wall limit and record [`LimitStop`] where the truth is [`Unsupported`] —
+//! a timing-adjacent outcome for what is actually a capability gap, which is the one confusion
+//! this contract exists to prevent. Worse, `fglm.rs:329` returns `Ok(None)` past the cap, the
+//! *same* value it returns for an ideal that is not zero-dimensional, so above the bound "no
+//! answer" stops meaning anything in particular; the driver refuses the modulus itself for that
+//! reason. msolve has the same shape and worse consequences: its eliminant ceiling is
 //! `p < 1515531529` and above it the sparse-FGLM failure is laundered into a retry loop with no
 //! exit. Groebner.jl, measured, has **no** task-specific ceiling: its lex route is the same F4
 //! under a different ordering and returns the same quotient dimension at every prime the basis
 //! route accepts, up to `2^64 - 59`.
+//!
+//! # The quotient dimension is the driver's own, which is what makes it worth having
+//!
+//! `fglm_p` computes the staircase length at `fglm.rs:97` and exposes only the boolean
+//! `zero_dimensional`, so there is nothing to read out of Sagebrush. The driver counts the
+//! monomials no leading monomial divides and reports `#quotient dimension:`, which is the
+//! definition rather than a restatement — so checking it against Zeebra's is a genuine third
+//! shared invariant on top of the leading monomials and the cardinality, taking
+//! [`Invariants::overlap`] against Zeebra from 2 to 3. A positive-dimensional ideal is reported as
+//! `-1`, the convention Singular's `vdim` already uses, and read here as "not reported".
 //!
 //! # The leading-monomial trap, handled in the driver
 //!
@@ -67,12 +83,20 @@
 //! stored term is therefore **not** the leading term: on the provisioning smoke system the second
 //! basis element stores as `x*z + … + z^4 + …`, whose degrevlex leading monomial is `z^4`.
 //!
-//! The driver computes leading terms with the public `Packing::key(o, w)`
+//! The driver re-sorts every polynomial under the requested order and prints the leading terms in
+//! a `--- leading monomials ---` section, so this adapter reads that section rather than taking a
+//! first term. Taking `exps[0]` yields a plausible-looking and entirely wrong leading-monomial
+//! list — the first version of the driver did exactly that, and only the four-way agreement caught
+//! it.
+//!
+//! The ordering key is the driver's own `order_key`, over exponent vectors rather than packed
+//! words, because the FGLM route's exponents do not pack (`fglm.rs:16`: a target basis can carry
+//! degrees "far beyond the packed words") and packing them back would silently truncate them. That
+//! makes it a *second* implementation of the engine's `Packing::key`
 //! (`engine/mpoly/src/order.rs:104-125`, which builds degrevlex as degree-then-complemented-and-
-//! field-reversed) and prints them in a `--- leading monomials ---` section, so this adapter reads
-//! that section rather than taking a first term. Taking `exps[0]` yields a plausible-looking and
-//! entirely wrong leading-monomial list — the first version of the driver did exactly that, and
-//! only the four-way agreement caught it.
+//! field-reversed), so the driver asserts the two rank every pair of 625 monomials identically
+//! under all four orders — this being precisely the function whose first version got degrevlex
+//! wrong.
 //!
 //! # Above `p = 2^31` nothing can check this tool
 //!
@@ -149,6 +173,23 @@ pub const PROVISIONED_COMMIT: &str = "86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b";
 /// [`MAX_CHARACTERISTIC`](super::groebner_jl::MAX_CHARACTERISTIC).
 pub const MAX_CHARACTERISTIC: u64 = 1 << 62;
 
+/// The largest modulus the **FGLM** route accepts, which is not [`MAX_CHARACTERISTIC`].
+///
+/// `engine/mpoly/src/fglm.rs:329` is the gate:
+///
+/// ```text
+/// if n == 0 || (p > 0 && p >= 1 << 31) {
+///     return Ok(None);
+/// }
+/// ```
+///
+/// `Ok(None)` is also what `fglm_p` returns for an ideal that is **not zero-dimensional**, so past
+/// this bound the two cases are indistinguishable in the return value — which is why the driver
+/// refuses an out-of-range modulus before calling, and why this bound is declared here rather than
+/// discovered. An eighth of the basis route's, and it applies only to
+/// [`Task::LexBasisByConversion`].
+pub const FGLM_MAX_CHARACTERISTIC: u64 = 1 << 31;
+
 /// The most variables the packed exponent representation can carry.
 ///
 /// Sagebrush packs every exponent into one `u64` with `bits` bits each, `ZPoly` holding the
@@ -165,6 +206,20 @@ pub const MAX_CHARACTERISTIC: u64 = 1 << 62;
 /// [`RunFailure::Reported`]. A bound in `supports` must describe what the tool declares, not
 /// predict what a run will do.
 pub const MAX_VARIABLES: usize = 32;
+
+/// The most variables the **direct lex** route can carry, which is one fewer than
+/// [`MAX_VARIABLES`].
+///
+/// A lex basis is computed by homogenizing, so the elimination runs in `n + 1` variables
+/// (`engine/mpoly/src/f4.rs:497-499` returns `Overflow` when `(n + 1) * bits > 64`, and
+/// `f4::bits_range` caps `bits` at `64 / (n + 1)` for a lex order). With the guard bit that leaves
+/// `bits >= 2`, hence `n <= 31` — the same arithmetic that gives [`MAX_VARIABLES`] its 32, applied
+/// to the extra homogenizing variable.
+///
+/// Applies to [`Task::LexBasis`] only. [`Task::LexBasisByConversion`] does **not** pay it: FGLM
+/// takes its source basis in degrevlex and converts over exponent vectors rather than packed
+/// words, so it stays inside [`MAX_VARIABLES`].
+pub const MAX_VARIABLES_LEX: usize = 31;
 
 /// Environment variables that change which algorithm Sagebrush runs, or what it prints.
 ///
@@ -206,6 +261,33 @@ const THREADS_VARIABLE: &str = "SAGEBRUSH_THREADS";
 
 /// The separator the driver prints between the basis and its leading monomials.
 const LEADING_SEPARATOR: &str = "--- leading monomials ---";
+
+/// Sagebrush's name for one of Zeebra's monomial orders, which is what the driver's `--order`
+/// takes and what its `#monomial order:` header echoes.
+///
+/// `deglex` and Zeebra's `grlex` are the same order under two names, and conflating the *names*
+/// with the orders is how a basis under the wrong order gets compared: the echo check in
+/// [`SagebrushSolver::answer`] compares against this, not against Zeebra's tag.
+fn sagebrush_order(order: MonomialOrder) -> &'static str {
+    match order {
+        MonomialOrder::Lexicographic => "lex",
+        MonomialOrder::GradedLexicographic => "deglex",
+        MonomialOrder::GradedReverseLexicographic => "degrevlex",
+    }
+}
+
+/// The `(--order, --route)` the driver is invoked with for `task` on `instance`.
+///
+/// The target order is the **task's**, not always the instance's: a conversion task is a lex basis
+/// however the instance declares itself, exactly as Singular's adapter computes its source basis
+/// under `dp` whatever the instance says, because the conversion is what is being measured.
+fn driver_arguments(instance: &Instance, task: Task) -> (&'static str, &'static str) {
+    match task {
+        Task::LexBasisByConversion => ("lex", "fglm"),
+        Task::LexBasis => ("lex", "f4"),
+        _ => (sagebrush_order(instance.order), "f4"),
+    }
+}
 
 /// The first identifier in `instance`'s generators that is not a declared variable.
 ///
@@ -312,15 +394,25 @@ impl SagebrushSolver {
         )
     }
 
-    /// An invocation of the driver on `input`, with the worker count set.
+    /// An invocation of the driver on `input` for `task`, with the worker count set.
+    ///
+    /// The order and the route are passed explicitly even when they are the driver's defaults, so
+    /// that the command line recorded on the report says which question was asked.
     fn invocation(
         &self,
         input: &std::path::Path,
         output: &std::path::Path,
+        instance: &Instance,
+        task: Task,
         limits: &Limits,
     ) -> Invocation {
+        let (order, route) = driver_arguments(instance, task);
         Invocation::new(&self.binary, &self.work_dir, output)
             .arg(input)
+            .arg("--order")
+            .arg(order)
+            .arg("--route")
+            .arg(route)
             .env(THREADS_VARIABLE, limits.workers.max(1).to_string())
     }
 
@@ -337,7 +429,7 @@ impl SagebrushSolver {
     /// The headers are the driver telling the adapter what it actually did, and checking them is
     /// what catches a mismatch that would otherwise produce a basis under the wrong order or in
     /// the wrong variables — the failure mode that does not announce itself.
-    fn answer(&self, output: &str, instance: &Instance) -> Result<Answer, RunFailure> {
+    fn answer(&self, output: &str, instance: &Instance, task: Task) -> Result<Answer, RunFailure> {
         let header = |name: &'static str| -> Result<&str, RunFailure> {
             output
                 .lines()
@@ -367,10 +459,27 @@ impl SagebrushSolver {
                 ),
             });
         }
+        let (expected_order, expected_route) = driver_arguments(instance, task);
         let order = header("#monomial order:")?;
-        if !order.starts_with("degrevlex") {
+        if !order.starts_with(expected_order) {
             return Err(RunFailure::SelfInconsistent {
-                detail: format!("the driver computed a {} basis, not degrevlex", order),
+                detail: format!(
+                    "the driver computed a {} basis, not {}",
+                    order, expected_order
+                ),
+            });
+        }
+        // The route is the difference between `LexBasis` and `LexBasisByConversion`, and the two
+        // produce the *same* basis — so nothing in the output but this line distinguishes a
+        // direct lex F4 from an FGLM conversion, and a column that mixed them would compare two
+        // complexities under one heading.
+        let route = header("#route:")?;
+        if !route.starts_with(expected_route) {
+            return Err(RunFailure::SelfInconsistent {
+                detail: format!(
+                    "the driver took the {} route where {} asks for {}",
+                    route, task, expected_route
+                ),
             });
         }
 
@@ -386,10 +495,36 @@ impl SagebrushSolver {
             })?;
 
         let (basis, leading) = Self::split_body(output, size)?;
-        Ok(
-            Answer::from_invariants(Invariants::none().with_leading_monomials(leading))
-                .with_basis(basis),
-        )
+        let mut invariants = Invariants::none().with_leading_monomials(leading);
+        // Negative is "no finite dimension to report" — `-1` a positive-dimensional ideal, `-2` an
+        // enumeration the driver abandoned at its own ceiling. Both read as absent, which per
+        // `Invariants` means "not reported" and never zero. A missing header is absent too, so a
+        // driver built before this marker existed still parses.
+        if let Some(dimension) = Self::quotient_dimension(output)? {
+            invariants = invariants.with_quotient_dimension(dimension);
+        }
+        Ok(Answer::from_invariants(invariants).with_basis(basis))
+    }
+
+    /// The driver's `#quotient dimension:`, or `None` when it reported no finite one.
+    ///
+    /// # Errors
+    /// [`RunFailure::Unparsable`] if the marker is present but not an integer. Present-and-wrong is
+    /// a different thing from absent, and silently reading it as absent would turn a driver defect
+    /// into one missing invariant nobody notices.
+    fn quotient_dimension(output: &str) -> Result<Option<usize>, RunFailure> {
+        let Some(value) = output
+            .lines()
+            .find_map(|line| line.strip_prefix("#quotient dimension:"))
+            .map(str::trim)
+        else {
+            return Ok(None);
+        };
+        let dimension: i64 = value.parse().map_err(|_| RunFailure::Unparsable {
+            marker: "#quotient dimension:".to_string(),
+            value: value.to_string(),
+        })?;
+        Ok(usize::try_from(dimension).ok())
     }
 
     /// The basis lines and the leading-monomial lines, each checked against the reported count.
@@ -501,15 +636,42 @@ impl ExternalSolver for SagebrushSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
-        // The driver calls `f4::groebner_p` with `Order::DegRevLex` and nothing else. Sagebrush has
-        // more than that (see the module documentation), and approximating `LexBasis` with a
-        // degrevlex basis is precisely the substitution the task taxonomy forbids.
-        if task != Task::ReducedGrobnerBasis {
-            return Support::No(Unsupported::Task { task });
+        // The three tasks the driver has entry points for. Everything else is refused rather than
+        // approximated: answering `UnivariateEliminant` with the last element of a lex basis, or
+        // `LexBasis` with a degrevlex one, is precisely the substitution the task taxonomy forbids.
+        match task {
+            Task::ReducedGrobnerBasis | Task::LexBasisByConversion => {}
+            Task::LexBasis => {
+                if instance.order != MonomialOrder::Lexicographic {
+                    return Support::No(Unsupported::Order {
+                        order: instance.order,
+                    });
+                }
+            }
+            Task::OneFiniteFieldSolution
+            | Task::AllFiniteFieldSolutions
+            | Task::UnivariateEliminant
+            | Task::CryptanalyticWitness => {
+                return Support::No(Unsupported::Task { task });
+            }
         }
-        if instance.order != MonomialOrder::GradedReverseLexicographic {
-            return Support::No(Unsupported::Order {
-                order: instance.order,
+
+        // The FGLM route's ceiling is its own and is checked before the basis route's, because the
+        // narrower bound is the one that applies and reporting the wider one would name a bound
+        // that is not the one in the way.
+        if task == Task::LexBasisByConversion
+            && instance.field.characteristic >= FGLM_MAX_CHARACTERISTIC
+        {
+            return Support::No(Unsupported::Characteristic {
+                characteristic: instance.field.characteristic,
+                supported_below: FGLM_MAX_CHARACTERISTIC,
+            });
+        }
+        // Homogenizing costs the direct lex route one variable's worth of packing.
+        if task == Task::LexBasis && instance.variables.len() > MAX_VARIABLES_LEX {
+            return Support::No(Unsupported::VariableCount {
+                variables: instance.variables.len(),
+                maximum: MAX_VARIABLES_LEX,
             });
         }
 
@@ -615,7 +777,7 @@ impl ExternalSolver for SagebrushSolver {
             );
         }
 
-        let invocation = self.invocation(&input_path, &output_path, limits);
+        let invocation = self.invocation(&input_path, &output_path, instance, task, limits);
         let command = Some(invocation.command_line());
         let process = match Supervisor::new(limits.wall).run(&invocation) {
             Ok(process) => process,
@@ -666,7 +828,7 @@ impl ExternalSolver for SagebrushSolver {
             measurement = measurement.with_stage("solve", solve);
         }
 
-        match self.answer(&output, instance) {
+        match self.answer(&output, instance, task) {
             // `Complete` and not `Verified`, and for Sagebrush that distinction carries more weight
             // than for any other comparand here: see the maturity note at the top of this file.
             Ok(answer) => finish(RunStatus::Complete(answer), measurement, command),
@@ -678,7 +840,10 @@ impl ExternalSolver for SagebrushSolver {
 
 #[cfg(test)]
 mod tests {
-    use super::{SagebrushSolver, MAX_CHARACTERISTIC, MAX_VARIABLES, PINNED_SWITCHES};
+    use super::{
+        SagebrushSolver, FGLM_MAX_CHARACTERISTIC, MAX_CHARACTERISTIC, MAX_VARIABLES,
+        MAX_VARIABLES_LEX, PINNED_SWITCHES,
+    };
     use crate::{
         grobner::external::{
             ExternalSolver, FieldSpec, Instance, Limits, RunFailure, RunStatus, Support, Task,
@@ -786,42 +951,132 @@ mod tests {
         }
     }
 
-    /// Every task but a reduced basis is refused: the driver exposes one entry point.
+    /// The three tasks the driver has entry points for are offered; the other four are refused.
+    ///
+    /// `UnivariateEliminant` is among the refusals deliberately: the eliminant is the last element
+    /// of the lex basis the driver *can* compute, and returning it would be answering a cheaper
+    /// question than the one asked.
     #[test]
-    fn test_only_the_reduced_basis_task_is_offered() {
+    fn test_the_three_tasks_with_entry_points_are_offered() {
         let solver = solver("sagebrush-gb-driver", "tasks");
-        let instance = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        let lex = instance(65521, MonomialOrder::Lexicographic);
         for task in Task::all() {
-            let support = solver.supports(&instance, task);
-            if task == Task::ReducedGrobnerBasis {
-                assert!(support.is_supported(), "{}", task);
-            } else {
-                assert!(
+            let support = solver.supports(&lex, task);
+            match task {
+                Task::ReducedGrobnerBasis | Task::LexBasis | Task::LexBasisByConversion => {
+                    assert!(support.is_supported(), "{}", task)
+                }
+                _ => assert!(
                     matches!(support, Support::No(Unsupported::Task { .. })),
                     "{}",
                     task
-                );
+                ),
             }
         }
     }
 
-    /// Any order but degrevlex is refused, because the driver hardcodes `Order::DegRevLex`.
+    /// Every order Zeebra can express is offered for a reduced basis, each by its Sagebrush name.
     #[test]
-    fn test_only_degrevlex_is_offered() {
+    fn test_every_order_is_offered_for_a_reduced_basis() {
         let solver = solver("sagebrush-gb-driver", "order");
+        for (order, tag) in [
+            (MonomialOrder::Lexicographic, "lex"),
+            (MonomialOrder::GradedLexicographic, "deglex"),
+            (MonomialOrder::GradedReverseLexicographic, "degrevlex"),
+        ] {
+            assert!(
+                solver
+                    .supports(&instance(65521, order), Task::ReducedGrobnerBasis)
+                    .is_supported(),
+                "{:?}",
+                order
+            );
+            assert_eq!(super::sagebrush_order(order), tag);
+        }
+    }
+
+    /// `LexBasis` is refused for an instance that does not declare lex order.
+    ///
+    /// Computing a lex basis for an instance declaring degrevlex would answer under an order the
+    /// instance did not ask for, which is the substitution the task taxonomy forbids.
+    #[test]
+    fn test_the_lex_basis_task_needs_an_instance_that_declares_lex() {
+        let solver = solver("sagebrush-gb-driver", "lex-order");
         for order in [
-            MonomialOrder::Lexicographic,
+            MonomialOrder::GradedReverseLexicographic,
             MonomialOrder::GradedLexicographic,
         ] {
             assert!(
                 matches!(
-                    solver.supports(&instance(65521, order), Task::ReducedGrobnerBasis),
+                    solver.supports(&instance(65521, order), Task::LexBasis),
                     Support::No(Unsupported::Order { .. })
                 ),
                 "{:?}",
                 order
             );
         }
+        assert!(solver
+            .supports(
+                &instance(65521, MonomialOrder::Lexicographic),
+                Task::LexBasis
+            )
+            .is_supported());
+    }
+
+    /// The conversion task carries FGLM's own 2^31 ceiling, not the basis route's 2^62.
+    ///
+    /// Declaring the wider bound would send a sweep into its wall limit and record a timing-shaped
+    /// `LimitStop` for what is a capability gap — and past the bound Sagebrush's `Ok(None)` cannot
+    /// be told from "not zero-dimensional", so there is nothing to discover it from either.
+    #[test]
+    fn test_the_conversion_task_carries_fglms_narrower_characteristic_bound() {
+        let solver = solver("sagebrush-gb-driver", "fglm-char");
+        assert_eq!(FGLM_MAX_CHARACTERISTIC, 1 << 31);
+        const { assert!(FGLM_MAX_CHARACTERISTIC < MAX_CHARACTERISTIC) };
+        // 2^31 - 1, the largest prime FGLM accepts.
+        let inside = instance(2_147_483_647, MonomialOrder::GradedReverseLexicographic);
+        assert!(solver
+            .supports(&inside, Task::LexBasisByConversion)
+            .is_supported());
+        // 2^61 - 1 is inside the basis route's bound and outside FGLM's.
+        let outside = instance(
+            2_305_843_009_213_693_951,
+            MonomialOrder::GradedReverseLexicographic,
+        );
+        assert!(solver
+            .supports(&outside, Task::ReducedGrobnerBasis)
+            .is_supported());
+        match solver.supports(&outside, Task::LexBasisByConversion) {
+            Support::No(Unsupported::Characteristic {
+                supported_below, ..
+            }) => assert_eq!(supported_below, FGLM_MAX_CHARACTERISTIC),
+            other => panic!("expected FGLM's own bound, got {:?}", other),
+        }
+    }
+
+    /// The direct lex route declares one variable fewer, because it homogenizes.
+    #[test]
+    fn test_the_direct_lex_route_declares_one_variable_fewer() {
+        let solver = solver("sagebrush-gb-driver", "lex-vars");
+        assert_eq!(MAX_VARIABLES_LEX, MAX_VARIABLES - 1);
+        let mut wide = instance(65521, MonomialOrder::Lexicographic);
+        wide.variables = (0..MAX_VARIABLES).map(|i| format!("x{}", i)).collect();
+        wide.system = vec![wide.variables.join("*")];
+        // Inside the basis route's bound.
+        assert!(solver
+            .supports(&wide, Task::ReducedGrobnerBasis)
+            .is_supported());
+        match solver.supports(&wide, Task::LexBasis) {
+            Support::No(Unsupported::VariableCount { variables, maximum }) => {
+                assert_eq!(variables, MAX_VARIABLES);
+                assert_eq!(maximum, MAX_VARIABLES_LEX);
+            }
+            other => panic!("expected the lex packing bound, got {:?}", other),
+        }
+        // FGLM converts over exponent vectors, so it does not pay the homogenizing variable.
+        assert!(solver
+            .supports(&wide, Task::LexBasisByConversion)
+            .is_supported());
     }
 
     /// An extension field is unsupported rather than silently computed over the prime subfield.
@@ -859,13 +1114,59 @@ mod tests {
             .invocation(
                 std::path::Path::new("in.ms"),
                 std::path::Path::new("out"),
+                &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis,
                 &Limits::wall(Duration::from_secs(5)).with_workers(8),
             )
             .command_line();
         assert!(command.starts_with("SAGEBRUSH_THREADS=8"), "{}", command);
     }
 
-    /// A complete driver output parses into leading monomials and a basis cardinality.
+    /// Each task is asked for by the order and route the driver takes flags for.
+    ///
+    /// The conversion task's target is lex **whatever the instance declares**, because the
+    /// conversion is what is being measured — the same convention Singular's adapter follows.
+    #[test]
+    fn test_each_task_selects_its_own_order_and_route() {
+        let solver = solver("sagebrush-gb-driver", "route-flags");
+        let grevlex = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        let lex = instance(65521, MonomialOrder::Lexicographic);
+        let grlex = instance(65521, MonomialOrder::GradedLexicographic);
+        for (instance, task, order, route) in [
+            (&grevlex, Task::ReducedGrobnerBasis, "degrevlex", "f4"),
+            (&grlex, Task::ReducedGrobnerBasis, "deglex", "f4"),
+            (&lex, Task::ReducedGrobnerBasis, "lex", "f4"),
+            (&lex, Task::LexBasis, "lex", "f4"),
+            // The instance is degrevlex and the conversion target is still lex.
+            (&grevlex, Task::LexBasisByConversion, "lex", "fglm"),
+        ] {
+            let command = solver
+                .invocation(
+                    std::path::Path::new("in.ms"),
+                    std::path::Path::new("out"),
+                    instance,
+                    task,
+                    &Limits::wall(Duration::from_secs(5)),
+                )
+                .command_line();
+            assert!(
+                command.contains(&format!("--order {}", order)),
+                "{} wants --order {}: {}",
+                task,
+                order,
+                command
+            );
+            assert!(
+                command.contains(&format!("--route {}", route)),
+                "{} wants --route {}: {}",
+                task,
+                route,
+                command
+            );
+        }
+    }
+
+    /// A complete driver output parses into leading monomials, a cardinality and a dimension.
     #[test]
     fn test_the_driver_output_parses_into_invariants() {
         let solver = solver("sagebrush-gb-driver", "parse");
@@ -873,6 +1174,8 @@ mod tests {
                       #field characteristic: 65521\n\
                       #variable order:       x1, x2\n\
                       #monomial order:       degrevlex (Order::DegRevLex)\n\
+                      #route:                f4 (direct)\n\
+                      #quotient dimension:   4\n\
                       #length of basis:      2 elements sorted by increasing leading monomials\n\
                       #seconds:              0.000250\n\
                       1*x2^2 + 65520\n\
@@ -884,6 +1187,7 @@ mod tests {
             .answer(
                 output,
                 &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis,
             )
             .expect("a complete run parses");
         assert_eq!(answer.invariants.basis_cardinality, Some(2));
@@ -897,9 +1201,91 @@ mod tests {
             SagebrushSolver::solve_stage(output),
             Some(Duration::from_secs_f64(0.000250))
         );
-        // No quotient dimension: the driver exposes none, and absent is "not reported" rather than
-        // zero. A verification against Zeebra therefore overlaps on two invariants, not three.
-        assert_eq!(answer.invariants.quotient_dimension, None);
+        // The third shared invariant, which is what takes `overlap()` against Zeebra from 2 to 3.
+        assert_eq!(answer.invariants.quotient_dimension, Some(4));
+    }
+
+    /// A negative or absent quotient dimension is "not reported" and never a dimension of zero.
+    ///
+    /// `-1` is a positive-dimensional ideal and `-2` a staircase the driver abandoned; a missing
+    /// header is a driver built before the marker existed. All three must leave the invariant
+    /// absent, because `Invariants::agree` treats absent as "not reported" and a spurious `0`
+    /// would be a disagreement with every correct answer.
+    #[test]
+    fn test_a_negative_or_absent_quotient_dimension_is_not_reported() {
+        for value in ["-1", "-2"] {
+            let output = format!(
+                "#field characteristic: 65521\n#variable order:       x1, x2\n\
+                 #monomial order:       degrevlex\n#route:                f4\n\
+                 #quotient dimension:   {}\n#length of basis:      1 elements\n\
+                 1*x1\n--- leading monomials ---\nx1\n",
+                value
+            );
+            assert_eq!(
+                SagebrushSolver::quotient_dimension(&output),
+                Ok(None),
+                "{}",
+                value
+            );
+        }
+        assert_eq!(
+            SagebrushSolver::quotient_dimension("#length of basis:      1 elements\n"),
+            Ok(None),
+            "an absent marker parses as not reported"
+        );
+        assert_eq!(
+            SagebrushSolver::quotient_dimension("#quotient dimension:   12\n"),
+            Ok(Some(12))
+        );
+        // Present but not an integer is a driver defect, and reading it as absent would hide one.
+        assert!(matches!(
+            SagebrushSolver::quotient_dimension("#quotient dimension:   lots\n"),
+            Err(RunFailure::Unparsable { .. })
+        ));
+    }
+
+    /// A driver that took the direct F4 route is not an answer to the conversion task.
+    ///
+    /// The two routes return the *same* lex basis, so this header is the only thing in the output
+    /// that distinguishes them — and a column that mixed a direct lex F4 with an FGLM conversion
+    /// would compare two different complexities under one heading.
+    #[test]
+    fn test_an_echoed_route_mismatch_is_self_inconsistent() {
+        let solver = solver("sagebrush-gb-driver", "echo-route");
+        let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       lex\n#route:                f4 (direct)\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::LexBasisByConversion,
+        ) {
+            Err(RunFailure::SelfInconsistent { detail }) => {
+                assert!(detail.contains("fglm"), "{}", detail)
+            }
+            other => panic!("expected SelfInconsistent, got {:?}", other),
+        }
+    }
+
+    /// An echoed order mismatch names the order that was asked for, in Sagebrush's vocabulary.
+    #[test]
+    fn test_an_echoed_order_mismatch_names_the_requested_order() {
+        let solver = solver("sagebrush-gb-driver", "echo-order");
+        let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #length of basis:      1 elements\n\
+                      1*x1\n--- leading monomials ---\nx1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::Lexicographic),
+            Task::LexBasis,
+        ) {
+            Err(RunFailure::SelfInconsistent { detail }) => {
+                assert!(detail.contains("not lex"), "{}", detail)
+            }
+            other => panic!("expected SelfInconsistent, got {:?}", other),
+        }
     }
 
     /// A driver that echoed a different variable order is self-inconsistent, not a disagreement.
@@ -912,11 +1298,13 @@ mod tests {
         let output = "#field characteristic: 65521\n\
                       #variable order:       x2, x1\n\
                       #monomial order:       degrevlex\n\
+                      #route:                f4\n\
                       #length of basis:      1 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
         match solver.answer(
             output,
             &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
         ) {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("x2, x1"), "{}", detail)
@@ -930,12 +1318,14 @@ mod tests {
     fn test_an_echoed_characteristic_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo-char");
         let output = "#field characteristic: 65519\n#variable order:       x1, x2\n\
-                      #monomial order:       degrevlex\n#length of basis:      1 elements\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #length of basis:      1 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
         assert!(matches!(
             solver.answer(
                 output,
-                &instance(65521, MonomialOrder::GradedReverseLexicographic)
+                &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis
             ),
             Err(RunFailure::SelfInconsistent { .. })
         ));
@@ -946,11 +1336,13 @@ mod tests {
     fn test_a_truncated_basis_is_unparsable_rather_than_short() {
         let solver = solver("sagebrush-gb-driver", "truncated");
         let output = "#field characteristic: 65521\n#variable order:       x1, x2\n\
-                      #monomial order:       degrevlex\n#length of basis:      2 elements\n\
+                      #monomial order:       degrevlex\n#route:                f4\n\
+                      #length of basis:      2 elements\n\
                       1*x1\n--- leading monomials ---\nx1\n";
         match solver.answer(
             output,
             &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
         ) {
             Err(RunFailure::Unparsable { marker, .. }) => {
                 assert_eq!(marker, "#length of basis:")

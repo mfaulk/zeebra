@@ -2493,6 +2493,17 @@ the full eighteen-rung ladder it has **disagreed with nothing**. Both halves bel
 quotes it: report its rows with the pinned SHA, and do not make it the denominator of a headline
 speedup. The verdict is `docs/research/sagebrush-implementation.md` §6.3.
 
+**It is also the only comparand that offers both routes to a lex basis.** The driver takes
+`--order lex|deglex|degrevlex` and `--route f4|fglm`, so `SagebrushSolver` covers
+`ReducedGrobnerBasis` under any of Zeebra's three orders, `LexBasis` by the engine's direct lex F4,
+and `LexBasisByConversion` by `fglm::groebner_fglm` — which gives that last task a second comparand
+beside Singular, Groebner.jl 0.10.11 having no FGLM at all. The two routes are deliberately
+separate tasks: they return the same basis by different algorithms, so a column that mixed them
+would compare two complexities under one heading, and the adapter checks the driver's echoed
+`#route:` line on every run for exactly that reason. FGLM carries its **own** field ceiling of
+`2^31`, an eighth of the basis route's `2^62`, and the adapter declares it per task rather than
+letting a sweep discover it as a wall-clock stop.
+
 Neither tool confuses `x1` with `x10`, which matters because the corpus has fourteen-variable
 rungs and **cross-engine agreement cannot catch a tokenizer bug** — every engine is handed the same
 bytes, so all of them would agree on the same wrong ideal. The Groebner.jl adapter checks its
