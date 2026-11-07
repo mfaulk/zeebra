@@ -958,6 +958,8 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md`](docs/MILESTONE-CRYPTANALYSIS-SCOREBOARD.md),
 [`docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md), and
 [`docs/MILESTONE-COMPETITIVE-ALGEBRA.md`](docs/MILESTONE-COMPETITIVE-ALGEBRA.md).
+[`docs/MILESTONE-ALGORITHMIC-ELIMINATION.md`](docs/MILESTONE-ALGORITHMIC-ELIMINATION.md) is the
+current plan rather than a record of measurements taken.
 
 The last of those reproduced a published cryptanalytic attack end to end, extended the verified resultant
 frontier from four rounds to **six** with a witness checked through the permutation, and calibrated
