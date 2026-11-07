@@ -42,8 +42,9 @@ pub use reorder::{ReorderError, RoundLayout, VariableOrder};
 pub use resultant::{
     bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
     bivariate_resultant_predicted, bivariate_resultant_reference,
-    bivariate_resultant_reference_with, cico_bivariate, interpolation_route,
-    predicted_resultant_degree, sylvester_determinant_at, DegreeSource, ResultantError,
+    bivariate_resultant_reference_with, cico_bivariate, fit_power_law, interpolation_route,
+    predicted_resultant_degree, random_bivariate, sylvester_determinant_at,
+    time_sylvester_determinants, DegreeSource, DeterminantBatch, PowerLawFit, ResultantError,
     ResultantOptions, ResultantRoute, ResultantStages,
 };
 pub use scoreboard::{

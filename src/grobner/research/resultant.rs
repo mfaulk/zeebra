@@ -849,6 +849,184 @@ fn sylvester_determinant<F: FiniteField>(
         .expect("a square matrix has a determinant")
 }
 
+/// A bivariate polynomial with the given degree in each variable and random coefficients.
+///
+/// The top coefficient in both variables is forced nonzero so that the Sylvester matrix really has
+/// the order the degrees claim — which is the whole point when the pair exists to put a determinant
+/// of a *named* order under a timer.
+pub fn random_bivariate<F: FiniteField, R: rand::RngCore + rand::CryptoRng>(
+    degree_x: u32,
+    degree_y: u32,
+    rng: &mut R,
+) -> MultivariatePolynomial<2, F> {
+    let mut terms: Vec<(Monomial<2>, F)> = Vec::new();
+    for i in 0..=degree_x {
+        for j in 0..=degree_y {
+            let mut c = F::random(rng);
+            if i == degree_x && j == degree_y && c.is_zero() {
+                c = F::one();
+            }
+            if !c.is_zero() {
+                terms.push((Monomial::new(&[i, j]), c));
+            }
+        }
+    }
+    MultivariatePolynomial::new(&terms)
+}
+
+/// What one batch of Sylvester determinants cost.
+///
+/// The unit a cost model is calibrated in. `examples/determinant_sweep.rs` takes one of these per
+/// matrix order and fits [`fit_power_law`] to the per-determinant cost; the matrix footprint is
+/// carried alongside the time because the deviation from a single power law is a cache effect and
+/// the footprint is what decides which level of the hierarchy a given order lands in.
+#[derive(Clone, Copy, Debug)]
+pub struct DeterminantBatch {
+    /// Order of the Sylvester matrix, `deg_y(f) + deg_y(g)`.
+    pub matrix_order: usize,
+    /// Determinants evaluated.
+    pub determinants: usize,
+    /// Worker threads they were spread over.
+    pub concurrency: usize,
+    /// Bytes one dense `(m+n)²` matrix of field elements occupies.
+    ///
+    /// The *matrix*, not the live set: `crout_lu_pivoting` allocates `L`, `U` and `P` beside a
+    /// clone of it, so a worker's working set is about four times this.
+    pub matrix_bytes: usize,
+    /// Wall clock for the whole batch, excluding the one-off coefficient extraction.
+    pub elapsed: Duration,
+}
+
+impl DeterminantBatch {
+    /// Wall clock per determinant: what a batch of this width costs an operator.
+    pub fn wall_per_determinant(&self) -> f64 {
+        self.elapsed.as_secs_f64() / self.determinants.max(1) as f64
+    }
+
+    /// Core-time per determinant: wall clock times workers, which is the figure that extrapolates.
+    ///
+    /// Comparing *this* across worker counts is what separates a parallel-efficiency loss from a
+    /// per-determinant cost that genuinely grew — see `resultant-elimination.md` §6.6.
+    pub fn core_per_determinant(&self) -> f64 {
+        self.wall_per_determinant() * self.concurrency as f64
+    }
+}
+
+/// `at.len()` Sylvester determinants of `f` and `g`, timed, over `concurrency` workers.
+///
+/// The measurement entry point for the determinant kernel, sharing the sample loop
+/// [`sample_determinants`] with every resultant route so that what is timed here is what a row
+/// pays. The coefficient extraction is done once and is **not** inside the timer: it is per-row
+/// work, not per-determinant work.
+///
+/// # Errors
+/// [`ResultantError::NoDegreeInEliminatedVariable`].
+pub fn time_sylvester_determinants<F: FiniteField + Send + Sync>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+    at: &[F],
+    concurrency: usize,
+) -> Result<(Vec<F>, DeterminantBatch), ResultantError> {
+    let (fc, gc, _) = sylvester_setup(f, g, eliminate)?;
+    let matrix_order = fc.len() + gc.len() - 2;
+
+    let started = Instant::now();
+    let values = sample_determinants(&fc, &gc, at, concurrency);
+    let elapsed = started.elapsed();
+
+    Ok((
+        values,
+        DeterminantBatch {
+            matrix_order,
+            determinants: at.len(),
+            concurrency,
+            matrix_bytes: matrix_order * matrix_order * std::mem::size_of::<F>(),
+            elapsed,
+        },
+    ))
+}
+
+/// A least-squares power law `y = a · x^b`, fitted in log–log space.
+///
+/// Reported with its residuals rather than with a correlation coefficient: a cost model is used to
+/// *refuse runs*, so what matters is how wrong it is at the largest order measured and not how well
+/// it describes the cloud on average.
+#[derive(Clone, Debug)]
+pub struct PowerLawFit {
+    /// The exponent `b`.
+    pub exponent: f64,
+    /// The prefactor `a`.
+    pub prefactor: f64,
+    /// Relative residual `fitted / measured − 1` at each input point, in input order.
+    pub residuals: Vec<f64>,
+    /// Standard error of `exponent`. Zero when there are too few points to estimate one.
+    pub exponent_stderr: f64,
+}
+
+impl PowerLawFit {
+    /// The fitted value at `x`.
+    pub fn at(&self, x: f64) -> f64 {
+        self.prefactor * x.powf(self.exponent)
+    }
+
+    /// The largest relative residual in absolute value: the fit's worst case over its own data.
+    pub fn worst_residual(&self) -> f64 {
+        self.residuals.iter().fold(0.0f64, |w, r| w.max(r.abs()))
+    }
+}
+
+/// Ordinary least squares on `(ln x, ln y)`.
+///
+/// `None` unless there are at least two points with positive coordinates and at least two distinct
+/// abscissae — a single point admits any exponent, and an exponent that the data does not constrain
+/// must not be returned as if it were measured.
+pub fn fit_power_law(points: &[(f64, f64)]) -> Option<PowerLawFit> {
+    if points.iter().any(|(x, y)| !(*x > 0.0) || !(*y > 0.0)) {
+        return None;
+    }
+    let n = points.len();
+    if n < 2 {
+        return None;
+    }
+    let logs: Vec<(f64, f64)> = points.iter().map(|(x, y)| (x.ln(), y.ln())).collect();
+    let mean_x = logs.iter().map(|(x, _)| *x).sum::<f64>() / n as f64;
+    let mean_y = logs.iter().map(|(_, y)| *y).sum::<f64>() / n as f64;
+    let sxx: f64 = logs.iter().map(|(x, _)| (x - mean_x).powi(2)).sum();
+    if sxx <= 0.0 {
+        return None;
+    }
+    let sxy: f64 = logs
+        .iter()
+        .map(|(x, y)| (x - mean_x) * (y - mean_y))
+        .sum::<f64>();
+    let exponent = sxy / sxx;
+    let prefactor = (mean_y - exponent * mean_x).exp();
+
+    let residuals: Vec<f64> = points
+        .iter()
+        .map(|(x, y)| prefactor * x.powf(exponent) / y - 1.0)
+        .collect();
+    // The slope's standard error from the log–log residuals. Two points fit a line exactly, so
+    // there is no spread to estimate from and the honest answer is zero rather than a NaN.
+    let exponent_stderr = if n > 2 {
+        let sse: f64 = logs
+            .iter()
+            .map(|(x, y)| (y - (mean_y + exponent * (x - mean_x))).powi(2))
+            .sum();
+        (sse / (n - 2) as f64 / sxx).sqrt()
+    } else {
+        0.0
+    };
+
+    Some(PowerLawFit {
+        exponent,
+        prefactor,
+        residuals,
+        exponent_stderr,
+    })
+}
+
 /// The two polynomials `f` and `g` evaluated at `(keep, eliminate) = (a, b)`.
 ///
 /// A convenience for checking a candidate: the resultant's roots are necessary conditions, so
@@ -870,7 +1048,7 @@ mod tests {
         grobner::research::KOALABEAR_PRIME,
         identities::One,
         poly::{Polynomial, UnivariatePolynomial},
-        FiniteField, Monomial, MultivariatePolynomial, Zero,
+        FiniteField, MultivariatePolynomial, Zero,
     };
 
     type F = Zp13;
@@ -881,28 +1059,13 @@ mod tests {
         MultivariatePolynomial::parse(text, VARS).expect("a bivariate polynomial")
     }
 
-    /// A bivariate polynomial with the given degree in each variable and random coefficients.
-    ///
-    /// The top coefficient in the eliminated variable is forced nonzero so that the Sylvester
-    /// matrix really has the order the degrees claim.
+    /// A bivariate pair over KoalaBear, at the degrees the caller names.
     fn random_bivariate<R: rand::RngCore + rand::CryptoRng>(
         degree_x: u32,
         degree_y: u32,
         rng: &mut R,
     ) -> MultivariatePolynomial<2, Koala> {
-        let mut terms: Vec<(Monomial<2>, Koala)> = Vec::new();
-        for i in 0..=degree_x {
-            for j in 0..=degree_y {
-                let mut c = Koala::random(rng);
-                if i == degree_x && j == degree_y && c.is_zero() {
-                    c = Koala::one();
-                }
-                if !c.is_zero() {
-                    terms.push((Monomial::new(&[i, j]), c));
-                }
-            }
-        }
-        MultivariatePolynomial::new(&terms)
+        super::random_bivariate::<Koala, R>(degree_x, degree_y, rng)
     }
 
     /// `Res_y(y - a, y - b) = a - b` up to sign: the textbook case, checked against a hand value.
@@ -1892,5 +2055,100 @@ mod tests {
             }
         }
         assert_eq!(verified, 1, "one base-field witness at four rounds");
+    }
+
+    /// A fit to exact cubic data recovers exponent 3 with zero residuals.
+    #[test]
+    fn test_the_power_law_fit_recovers_an_exact_cubic() {
+        let points: Vec<(f64, f64)> = [18.0, 162.0, 486.0, 1458.0]
+            .into_iter()
+            .map(|order: f64| (order, 7.0 * order.powi(3)))
+            .collect();
+        let fit = super::fit_power_law(&points).expect("four positive points");
+        assert!((fit.exponent - 3.0).abs() < 1e-9, "{}", fit.exponent);
+        assert!((fit.prefactor - 7.0).abs() < 1e-6, "{}", fit.prefactor);
+        assert!(fit.worst_residual() < 1e-9, "{}", fit.worst_residual());
+        assert_eq!(fit.residuals.len(), 4, "one residual per input point");
+    }
+
+    /// Curved log-log data is reported with a per-point residual rather than as a clean fit.
+    #[test]
+    fn test_the_power_law_fit_reports_residuals_on_curved_data() {
+        // Sub-cubic at the bottom, super-cubic at the top: the shape the three determinant timings
+        // on record have. A rising local slope is *convex* in log-log, so a single straight line
+        // through it over-predicts the middle and under-predicts both ends — and no single
+        // exponent can describe it.
+        let points = [(18.0, 8.5e-6), (162.0, 2.868e-3), (1458.0, 2.70)];
+        let fit = super::fit_power_law(&points).expect("three positive points");
+        assert!(fit.worst_residual() > 0.05, "{}", fit.worst_residual());
+        assert!(fit.exponent_stderr > 0.0, "three points estimate a spread");
+        assert!(fit.residuals[1] > 0.0, "the middle is over-predicted: {:?}", fit.residuals);
+        assert!(
+            fit.residuals[0] < 0.0 && fit.residuals[2] < 0.0,
+            "and both ends under-predicted: {:?}",
+            fit.residuals
+        );
+    }
+
+    /// A fit needs two distinct positive abscissae, and refuses rather than inventing an exponent.
+    #[test]
+    fn test_the_power_law_fit_refuses_data_it_cannot_constrain() {
+        assert!(super::fit_power_law(&[]).is_none(), "no points");
+        assert!(super::fit_power_law(&[(162.0, 1.0)]).is_none(), "one point");
+        assert!(
+            super::fit_power_law(&[(162.0, 1.0), (162.0, 2.0)]).is_none(),
+            "one distinct abscissa"
+        );
+        assert!(
+            super::fit_power_law(&[(0.0, 1.0), (162.0, 2.0)]).is_none(),
+            "a logarithm of zero"
+        );
+    }
+
+    /// A timed batch reports the order, the count, the footprint, and the values themselves.
+    #[test]
+    fn test_a_timed_determinant_batch_reports_its_shape() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0xd00d);
+        let f = random_bivariate(1, 9, &mut rng);
+        let g = random_bivariate(1, 9, &mut rng);
+        let at: Vec<Koala> = (1..=12u64).map(Koala::new).collect();
+        let (values, batch) =
+            super::time_sylvester_determinants(&f, &g, 1, &at, 1).expect("both involve y");
+        assert_eq!(batch.matrix_order, 18, "9 + 9");
+        assert_eq!(batch.determinants, 12);
+        assert_eq!(batch.concurrency, 1);
+        assert_eq!(
+            batch.matrix_bytes,
+            18 * 18 * std::mem::size_of::<Koala>(),
+            "the dense matrix one worker builds"
+        );
+        assert!(batch.core_per_determinant() >= batch.wall_per_determinant());
+        for (value, x) in values.iter().zip(&at) {
+            assert_eq!(
+                *value,
+                sylvester_determinant_at(&f, &g, 1, *x).expect("both involve y"),
+                "the batch evaluates the same determinant the single-point entry does"
+            );
+        }
+    }
+
+    /// The timed batch gives the same determinants at every concurrency, in the same index order.
+    #[test]
+    fn test_a_timed_determinant_batch_does_not_depend_on_the_concurrency() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0xd00e);
+        let f = random_bivariate(1, 5, &mut rng);
+        let g = random_bivariate(1, 5, &mut rng);
+        let at: Vec<Koala> = (1..=40u64).map(Koala::new).collect();
+        let (serial, _) = super::time_sylvester_determinants(&f, &g, 1, &at, 1).expect("ok");
+        for workers in [8usize, 32] {
+            let (parallel, batch) =
+                super::time_sylvester_determinants(&f, &g, 1, &at, workers).expect("ok");
+            assert_eq!(parallel, serial, "{workers} workers");
+            assert_eq!(batch.concurrency, workers);
+        }
     }
 }

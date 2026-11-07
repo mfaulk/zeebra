@@ -137,16 +137,68 @@ const DEFAULT_MAX_SAMPLES: usize = 16_384;
 /// Predicted determinant wall clock a row may take before it is costed and skipped, in seconds.
 const DEFAULT_WALL_BUDGET_SECONDS: usize = 1_800;
 
-/// One order-162 Sylvester determinant through the generic dense LU path, measured.
+/// One order-162 Sylvester determinant at **one** worker, measured.
 ///
-/// 37 634.3 ms over 13 123 samples on the four-round reference route —
-/// `docs/research/resultant-elimination.md` §6.5. Every predicted wall clock below scales this by
-/// the dense-LU `(order/162)³` law, which is an **extrapolation** past order 162 and is labelled
-/// as one wherever it is printed.
-const DETERMINANT_MS_AT_162: f64 = 2.868;
+/// `examples/determinant_sweep`, five orders, three draws each, under `tools/benchlock.sh` —
+/// `docs/research/resultant-elimination.md` §6.9. It replaces the 2.868 ms §6.5 derived from
+/// 37 634.3 ms over 13 123 samples, because **that figure no longer reproduces on this machine**:
+/// the same 13 123-determinant reference route measured 45 131.0 ms (3.439 ms each) in M25, and the
+/// synthetic sweep 3.624 ms. A cost model whose job is to refuse runs must not be anchored to the
+/// fastest figure ever recorded, so the anchor is the larger, current one and §6.9 records the
+/// unexplained 1.2x gap as a finding.
+const DETERMINANT_MS_AT_162: f64 = 3.624;
 
 /// The matrix order that cost was measured at.
 const MEASURED_ORDER: f64 = 162.0;
+
+/// The exponent measured above the L2 footprint: `core(order) ∝ order^2.9953`, ±0.0285.
+///
+/// §6.9's sweep, fitted over orders 486, 1 458 and 4 374 — every order whose matrix exceeds this
+/// machine's 512 kB L2 — with a worst residual of 3.7%. The kernel is **cubic** up there to within
+/// the measurement, and the 3.116 exponent #289 was opened with is not reproduced: it came from
+/// dividing a 32-worker core-time at order 1 458 by a single-worker one at order 162, and the
+/// width is what the excess was.
+///
+/// Below L2 the sweep measures 2.79 — fixed per-determinant overhead that the small orders cannot
+/// amortize — and that is *sub*-cubic, so a model using it would predict less work than cubic.
+/// [`determinant_core_ms`] therefore takes the larger of the two laws rather than this one.
+const ABOVE_L2_EXPONENT: f64 = 2.9953;
+
+/// How much core-time one determinant gains per doubling of the worker count, measured.
+///
+/// Core-time per determinant — wall clock times workers — is not flat in the worker count on this
+/// box: §6.9 measures 2.404 s, 2.821 s and 3.148 s at order 1 458 on 1, 8 and 32 workers, which is
+/// about 6.5% a doubling and is the all-core clock rather than bandwidth. A budget guard that
+/// costed a 32-worker run at the single-worker figure would under-predict it by 30%, and a guard
+/// that under-predicts refuses nothing.
+const CORE_TIME_PER_DOUBLING: f64 = 0.065;
+
+/// Core-time of one Sylvester determinant at `matrix_order` on `workers` workers, in milliseconds.
+///
+/// The **larger** of the measured above-L2 law and the cubic, both anchored at order 162, times the
+/// measured width penalty. Taking the larger is deliberate and is the whole point of the
+/// calibration: the fitted exponent 2.9953 is *below* 3, so using the fit alone would predict less
+/// work than the cubic this guard has always used, and a cost model that under-predicts is a budget
+/// that authorizes a run nobody costed. If a future sweep measures an exponent above 3, this picks
+/// it up with no further change.
+///
+/// Measured at orders 18 to 4 374 and at 1, 8 and 32 workers. Above 4 374 — which is every row past
+/// seven rounds — it is an **extrapolation**, and every caller labels it as one.
+fn determinant_core_ms(matrix_order: usize, workers: usize) -> f64 {
+    let ratio = matrix_order as f64 / MEASURED_ORDER;
+    let cubic = DETERMINANT_MS_AT_162 * ratio.powi(3);
+    let fitted = DETERMINANT_MS_AT_162 * ratio.powf(ABOVE_L2_EXPONENT);
+    cubic.max(fitted) * width_penalty(workers)
+}
+
+/// The measured core-time penalty for running at `workers` workers, as a factor.
+///
+/// Linear in `log2(workers)` through the three widths §6.9 measured, and extrapolated at the same
+/// slope beyond 32 rather than held flat: nothing wider has been measured, and flattening it would
+/// make the guard optimistic exactly where it has no evidence.
+fn width_penalty(workers: usize) -> f64 {
+    1.0 + CORE_TIME_PER_DOUBLING * (workers.max(1) as f64).log2()
+}
 
 /// The value of a `--flag <value>` argument, if it was given and parses.
 fn flag_value(flag: &str) -> Option<usize> {
@@ -215,8 +267,9 @@ impl RowCost {
             predicted_resultant_degree(parameters.alpha, parameters.r_f, parameters.r_p)
                 .expect("the predicted degree fits a usize");
         let matrix_order = 2 * degree;
-        let each = DETERMINANT_MS_AT_162 / 1e3 * (matrix_order as f64 / MEASURED_ORDER).powi(3)
-            / workers.max(1) as f64;
+        // Core-time per determinant, divided by the workers that share it. `determinant_core_ms`
+        // carries both the cost law and the measured penalty for running wide.
+        let each = determinant_core_ms(matrix_order, workers) / 1e3 / workers.max(1) as f64;
         let samples = predicted_degree + 1;
         let proven_samples = 2 * degree * degree + 1;
         Self {
@@ -346,12 +399,21 @@ fn main() {
             cost.proven_samples
         );
         println!(
-            "- predicted determinant wall clock **{}** on {} worker{}, from the {:.3} ms measured \
-             at order 162 scaled by the dense-LU `(order/162)³` law — an extrapolation",
+            "- predicted determinant wall clock **{}** on {} worker{}, from {:.3} ms per \
+             determinant measured at order 162 and one worker, scaled by the measured \
+             `order^{:.4}` law and a {:.2}x penalty for running at this width — **{}** at order {}",
             human_seconds(cost.predicted_seconds),
             workers,
             plural(workers),
-            DETERMINANT_MS_AT_162
+            DETERMINANT_MS_AT_162,
+            ABOVE_L2_EXPONENT,
+            width_penalty(workers),
+            if cost.matrix_order <= 4_374 {
+                "measured"
+            } else {
+                "an extrapolation"
+            },
+            cost.matrix_order
         );
 
         // Before the budget, because the budget is on the determinants and this runs none of
