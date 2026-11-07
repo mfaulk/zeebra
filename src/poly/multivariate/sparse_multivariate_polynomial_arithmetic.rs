@@ -370,6 +370,38 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// Sortedness survives the merge because monomial orders are multiplicative: multiplying a
     /// sorted sequence of terms by a monomial preserves their order.
     pub fn normal_form(&self, divisors: &[Self], order: MonomialOrder) -> Self {
+        let mut counts = NormalFormCounts::default();
+        self.normal_form_counting::<false>(divisors, order, &mut counts)
+    }
+
+    /// [`normal_form`](Self::normal_form), also returning what it cost in operations.
+    ///
+    /// Same code, same result — the counting is a const-generic parameter, so the uncounted path
+    /// compiles the increments away and the counted path cannot drift from it.
+    ///
+    /// # Why this exists
+    ///
+    /// `docs/research/groebner-jl-gap.md` §4 attributes final interreduction's 13 871x against
+    /// Groebner.jl to intermediate expression swell and then says the attribution is **inferred,
+    /// not measured**: nothing counted terms popped or divisor tests. These counters settle it.
+    /// `terms_popped` far exceeding the remainder's term count is swell; `terms_popped` close to
+    /// it with `divisor_tests` large is scan cost. They point at different fixes.
+    pub fn normal_form_counted(
+        &self,
+        divisors: &[Self],
+        order: MonomialOrder,
+    ) -> (Self, NormalFormCounts) {
+        let mut counts = NormalFormCounts::default();
+        let remainder = self.normal_form_counting::<true>(divisors, order, &mut counts);
+        (remainder, counts)
+    }
+
+    fn normal_form_counting<const COUNT: bool>(
+        &self,
+        divisors: &[Self],
+        order: MonomialOrder,
+        counts: &mut NormalFormCounts,
+    ) -> Self {
         // A zero divisor can never reduce anything, so drop them here rather than testing in the
         // inner loop. `multi_div_rem` reaches the same conclusion by failing to divide.
         let reducers: Vec<Reducer<N, F>> = divisors
@@ -386,8 +418,26 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         let mut remainder: Vec<(Monomial<N>, F)> = Vec::new();
         let mut scratch: Vec<(Monomial<N>, F)> = Vec::new();
 
+        if COUNT {
+            counts.calls += 1;
+            counts.reducers += reducers.len();
+            counts.dividend_terms += working.len();
+        }
+
         while let Some((lead_monomial, lead_coefficient)) = working.pop() {
+            if COUNT {
+                counts.terms_popped += 1;
+                counts.max_working_terms = counts.max_working_terms.max(working.len() + 1);
+            }
+            // The counter increments inside the scan, because a scan that stops early tested
+            // fewer reducers than the basis holds and the mean scan length is the thing worth
+            // knowing. `COUNT` is a const generic, so the uncounted path compiles this to the
+            // bare `find_map` — which it has to, since this closure runs once per reducer per
+            // term popped and is the innermost loop in the stage.
             let applicable = reducers.iter().find_map(|reducer| {
+                if COUNT {
+                    counts.divisor_tests += 1;
+                }
                 lead_monomial
                     .checked_div(&reducer.lead_monomial)
                     .map(|quotient| (reducer, quotient))
@@ -401,6 +451,11 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                         Some(inverse) => lead_coefficient * inverse,
                         None => lead_coefficient,
                     };
+                    if COUNT {
+                        counts.reduction_steps += 1;
+                        counts.tail_terms_merged += reducer.tail.len();
+                        counts.terms_rewritten += working.len();
+                    }
                     subtract_shifted(
                         &mut working,
                         &mut scratch,
@@ -412,6 +467,10 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                 }
                 None => remainder.push((lead_monomial, lead_coefficient)),
             }
+        }
+
+        if COUNT {
+            counts.remainder_terms += remainder.len();
         }
 
         Self::new(&remainder)
@@ -452,6 +511,101 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         }
 
         (quotients, r)
+    }
+}
+
+/// What a [`normal_form`](SparseMultiPoly::normal_form) reduction cost, in operations.
+///
+/// Durations say a reduction was slow. These say *why*, and the two candidate answers need
+/// different fixes:
+///
+/// - **Swell.** `terms_popped` far exceeding `remainder_terms` means the working polynomial grew
+///   through intermediates the answer does not contain. The fix is not a faster inner loop; it is
+///   not building the intermediates, which is what a matrix formulation does.
+/// - **Scan cost.** `terms_popped` close to `remainder_terms` with `divisor_tests` large means the
+///   reducer search dominates. The fix is an index over leading monomials.
+/// - **Rewrite cost.** `terms_rewritten` far exceeding `tail_terms_merged` means `subtract_shifted`
+///   is copying terms no divisor tail touches, which is what windowing the merge removes.
+///
+/// Accumulates across calls, so one value can describe a whole interreduction.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct NormalFormCounts {
+    /// Reductions performed, i.e. calls that got past the empty-divisor-set shortcut.
+    pub calls: usize,
+    /// Nonzero divisors seen, summed over calls. Divided by `calls`, the mean basis size reduced
+    /// against.
+    pub reducers: usize,
+    /// Terms in the dividends, summed over calls — the input size, for comparison with
+    /// `terms_popped`.
+    pub dividend_terms: usize,
+    /// Terms taken off the working polynomial. **The swell measure**: every term the reduction
+    /// ever had to look at, including ones created by substituting divisor tails.
+    pub terms_popped: usize,
+    /// `Monomial::checked_div` calls in the reducer search. With a linear scan this is on the
+    /// order of `terms_popped` times `reducers / calls`.
+    pub divisor_tests: usize,
+    /// Terms popped that a divisor applied to, as opposed to being set aside as irreducible.
+    pub reduction_steps: usize,
+    /// Divisor-tail terms merged in, summed over reduction steps — the work a reduction step
+    /// genuinely owes.
+    pub tail_terms_merged: usize,
+    /// Terms of the working polynomial that `subtract_shifted` rewrote, summed over reduction
+    /// steps. Against `tail_terms_merged` this is the ratio #440 is about: the merge is linear in
+    /// the whole dividend whether or not the tail touches it.
+    pub terms_rewritten: usize,
+    /// The largest working polynomial seen, in terms. Swell's peak rather than its total.
+    pub max_working_terms: usize,
+    /// Terms in the remainders, summed over calls — the answer size.
+    pub remainder_terms: usize,
+}
+
+impl NormalFormCounts {
+    /// Fold another reduction's counts into these.
+    pub fn add(&mut self, other: &Self) {
+        self.calls += other.calls;
+        self.reducers += other.reducers;
+        self.dividend_terms += other.dividend_terms;
+        self.terms_popped += other.terms_popped;
+        self.divisor_tests += other.divisor_tests;
+        self.reduction_steps += other.reduction_steps;
+        self.tail_terms_merged += other.tail_terms_merged;
+        self.terms_rewritten += other.terms_rewritten;
+        self.max_working_terms = self.max_working_terms.max(other.max_working_terms);
+        self.remainder_terms += other.remainder_terms;
+    }
+
+    /// Terms popped per term of the answer.
+    ///
+    /// The swell factor. One means every term looked at survived; a hundred means the reduction
+    /// built and destroyed ninety-nine terms for every one it kept.
+    pub fn swell_factor(&self) -> f64 {
+        if self.remainder_terms == 0 {
+            0.0
+        } else {
+            self.terms_popped as f64 / self.remainder_terms as f64
+        }
+    }
+
+    /// Divisor tests per term popped — the mean length of the reducer scan.
+    pub fn divisor_tests_per_term(&self) -> f64 {
+        if self.terms_popped == 0 {
+            0.0
+        } else {
+            self.divisor_tests as f64 / self.terms_popped as f64
+        }
+    }
+
+    /// Terms rewritten per divisor-tail term merged.
+    ///
+    /// One would mean the merge touched only what the tail reached. Large means
+    /// `subtract_shifted` is paying for the whole working polynomial on every step, which is the
+    /// cost #440's windowed merge removes.
+    pub fn rewrite_amplification(&self) -> f64 {
+        if self.tail_terms_merged == 0 {
+            0.0
+        } else {
+            self.terms_rewritten as f64 / self.tail_terms_merged as f64
+        }
     }
 }
 
@@ -1401,4 +1555,124 @@ mod tests {
             assert_in_place_add_agrees::<3, F>();
         }
     );
+
+    /// Counting cannot change the answer: the two entry points agree on random inputs over
+    /// several fields and arities, which is what makes the counted path usable as evidence about
+    /// the uncounted one.
+    #[test]
+    fn test_counting_does_not_change_the_normal_form() {
+        fn case<const N: usize, F: FiniteField>() {
+            let mut runner = TestRunner::default();
+            runner
+                .run(
+                    &(
+                        poly_strategy::<N, F>(8),
+                        vec(poly_strategy::<N, F>(4), 1..4),
+                    ),
+                    |(dividend, divisors)| {
+                        let divisors: Vec<_> =
+                            divisors.into_iter().filter(|d| !d.is_zero()).collect();
+                        if divisors.is_empty() {
+                            return Ok(());
+                        }
+                        for order in [
+                            MonomialOrder::Lexicographic,
+                            MonomialOrder::GradedLexicographic,
+                            MonomialOrder::GradedReverseLexicographic,
+                        ] {
+                            let plain = dividend.normal_form(&divisors, order);
+                            let (counted, _) = dividend.normal_form_counted(&divisors, order);
+                            prop_assert_eq!(&plain, &counted);
+                        }
+                        Ok(())
+                    },
+                )
+                .expect("counted and uncounted normal forms agree");
+        }
+        case::<2, PrimeFieldElement64<13>>();
+        case::<3, PrimeFieldElement64<7>>();
+        case::<4, PrimeFieldElement64<2147483647>>();
+    }
+
+    /// The counters describe a reduction that does no work: an irreducible dividend pops its own
+    /// terms once, keeps all of them, and takes no reduction step.
+    #[test]
+    fn test_an_irreducible_dividend_shows_no_swell() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let dividend =
+            MultivariatePolynomial::<2, F>::parse("x + y", ["x", "y"]).expect("a polynomial");
+        let divisor =
+            MultivariatePolynomial::<2, F>::parse("x^5*y^5", ["x", "y"]).expect("a polynomial");
+
+        let (remainder, counts) = dividend.normal_form_counted(&[divisor], order);
+
+        assert_eq!(remainder, dividend, "nothing divides, so nothing reduces");
+        assert_eq!(counts.calls, 1);
+        assert_eq!(counts.reduction_steps, 0);
+        assert_eq!(counts.terms_popped, 2);
+        assert_eq!(counts.remainder_terms, 2);
+        assert_eq!(counts.terms_rewritten, 0);
+        assert_eq!(counts.swell_factor(), 1.0, "every term looked at survived");
+        // One divisor, so one test per term popped.
+        assert_eq!(counts.divisor_tests, 2);
+        assert_eq!(counts.divisor_tests_per_term(), 1.0);
+    }
+
+    /// And the counters separate the two costs they exist to separate. Reducing `x^n` by `x - 1`
+    /// pops one term per degree step and keeps exactly one, so the swell factor grows with `n`
+    /// while the scan length stays at one divisor.
+    #[test]
+    fn test_the_counters_separate_swell_from_scan_length() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::Lexicographic;
+        let divisor = MultivariatePolynomial::<1, F>::parse("x - 1", ["x"]).expect("a polynomial");
+
+        let mut previous_swell = 0.0;
+        for degree in [4u32, 8, 16] {
+            let dividend = MultivariatePolynomial::<1, F>::parse(&format!("x^{degree}"), ["x"])
+                .expect("a polynomial");
+            let (remainder, counts) =
+                dividend.normal_form_counted(std::slice::from_ref(&divisor), order);
+
+            assert_eq!(remainder, MultivariatePolynomial::<1, F>::one());
+            // `x^d -> x^{d-1} -> ... -> 1`: one reduction step per degree, one surviving term.
+            assert_eq!(counts.reduction_steps, degree as usize);
+            assert_eq!(counts.remainder_terms, 1);
+            assert_eq!(counts.terms_popped, degree as usize + 1);
+            // Swell grows with the degree; the scan never does, because there is one divisor.
+            assert!(counts.swell_factor() > previous_swell);
+            previous_swell = counts.swell_factor();
+            assert_eq!(counts.divisor_tests_per_term(), 1.0);
+        }
+    }
+
+    /// Accumulating counts across reductions adds the totals and takes the maximum of the peak,
+    /// which is what lets one value describe a whole interreduction.
+    #[test]
+    fn test_counts_accumulate_totals_and_peaks() {
+        use crate::poly::NormalFormCounts;
+        let mut total = NormalFormCounts::default();
+        let a = NormalFormCounts {
+            calls: 1,
+            terms_popped: 10,
+            max_working_terms: 7,
+            remainder_terms: 2,
+            ..Default::default()
+        };
+        let b = NormalFormCounts {
+            calls: 1,
+            terms_popped: 30,
+            max_working_terms: 4,
+            remainder_terms: 3,
+            ..Default::default()
+        };
+        total.add(&a);
+        total.add(&b);
+        assert_eq!(total.calls, 2);
+        assert_eq!(total.terms_popped, 40);
+        assert_eq!(total.max_working_terms, 7, "a peak is a maximum, not a sum");
+        assert_eq!(total.remainder_terms, 5);
+        assert_eq!(total.swell_factor(), 8.0);
+    }
 }

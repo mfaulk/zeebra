@@ -17,7 +17,8 @@ mod solve;
 mod solve_zero_dimensional;
 
 pub use buchberger::{
-    buchberger, buchberger_with_criteria, buchberger_with_statistics, Statistics,
+    buchberger, buchberger_with_criteria, buchberger_with_statistics, interreduce_for_benchmark,
+    Statistics,
 };
 pub use f4::{
     certify_f4_output, certify_submitted_basis, f4, f4_observed, f4_observed_reported, f4_reported,

@@ -332,6 +332,21 @@ pub struct F4Options {
     /// distort what it measures.
     pub measure_stages: bool,
 
+    /// Count the operations final interreduction's reductions perform, into
+    /// [`super::F4Statistics::interreduction`].
+    ///
+    /// Separate from [`Self::measure_stages`] because the two have incomparable costs. That flag
+    /// reads a clock four times a batch; this one increments a counter **once per reducer per term
+    /// popped**, which is the innermost loop in F4, and it was measured at **36%** on
+    /// `mq-random-10` where `measure_stages` costs 3.8%–11.5%.
+    ///
+    /// So a run cannot report both a trustworthy stage split and these counters, and the two are
+    /// taken by separate runs. The counters are exact and machine-independent, which is what makes
+    /// a slower run an acceptable price for them; the durations from such a run are not quotable.
+    ///
+    /// Setting this implies the split that `measure_stages` records, so it does not need both.
+    pub count_interreduction: bool,
+
     /// Break the work down by the degree it was done at, into
     /// [`super::F4Statistics::degrees`].
     ///
@@ -368,6 +383,7 @@ impl F4Options {
             certify: false,
             reducer_cache: CacheMode::Off,
             measure_stages: false,
+            count_interreduction: false,
             profile_degrees: false,
         }
     }

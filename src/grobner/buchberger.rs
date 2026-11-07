@@ -11,14 +11,17 @@
 //!
 //! See Sec 2.7 of Ideals, Varieties, and Algorithms by Cox, Little, and O'Shea.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use crate::{
     grobner::{
         pairs::{divides, CriterionCounts, PairCriteria, PairQueue},
         s_polynomial::s_polynomial,
     },
-    poly::MonomialOrder,
+    poly::{MonomialOrder, NormalFormCounts},
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -262,6 +265,85 @@ pub(crate) struct InterreductionStopped {
     pub elements: usize,
 }
 
+/// [`reduce_grobner_basis`] over a basis F4 produced, for benchmarking the stage in isolation.
+///
+/// # Why this is public
+///
+/// `benches/f4_stages.rs`'s header records that "pair selection, basis bookkeeping, and
+/// interreduction are outside every stage", and that was true: there was no interreduction
+/// benchmark, so the stage `docs/research/groebner-jl-gap.md` §3 measures at **80.69%** of
+/// `mq-random-10` was the one stage with no Criterion coverage. A whole-computation benchmark
+/// cannot isolate it, and a microbenchmark over synthetic polynomials cannot reproduce the shape
+/// that makes it expensive — a basis of a few hundred elements whose entire monomial support is a
+/// few hundred monomials.
+///
+/// Exposed on the same terms as [`f4::macaulay`](crate::grobner::f4::macaulay) and
+/// [`reduce_batch`](crate::grobner::f4::reduce_batch): a benchmark target is an external crate and
+/// cannot reach `pub(crate)`.
+#[doc(hidden)]
+pub fn interreduce_for_benchmark<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    reduce_grobner_basis(g, order)
+}
+
+/// What final interreduction cost, split by the two things it does.
+///
+/// # Why the split, and why these counters
+///
+/// `docs/research/groebner-jl-gap.md` §3 measures this stage at **13 871x** Groebner.jl's, where
+/// the next worst stage is 97.1x — and §4 attributes the difference to the stage computing the
+/// right thing the wrong way, by iterated division where Groebner.jl uses one Macaulay matrix.
+/// That attribution rested on an inference about intermediate swell, with the note recording that
+/// nothing counted terms popped or divisor tests. This is those counters.
+///
+/// The minimize/reduce split is here because #436 measured it at **0.06% / 99.94%** and that
+/// figure existed only in a commit message: `StageTimings::interreduction` is one `Duration`, so
+/// nothing in the tree could re-derive which half the stage was in.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct InterreductionReport {
+    /// Elements in the minimized basis.
+    pub elements: usize,
+    /// [`minimize_grobner_basis`]: monic scaling, deduplication, and the divisibility prune.
+    pub minimize: Duration,
+    /// The reduction loop — one [`MultivariatePolynomial::normal_form`] per element.
+    pub reduce: Duration,
+    /// What those reductions cost in operations, summed over elements.
+    ///
+    /// Populated only by [`reduce_grobner_basis_counted`], whose run is about a third slower for
+    /// collecting them — so a report carrying counts carries durations that must not be quoted,
+    /// and vice versa. The counts themselves are exact and machine-independent, which is why they
+    /// are worth a separate run.
+    pub counts: NormalFormCounts,
+}
+
+impl InterreductionReport {
+    /// `minimize + reduce`.
+    ///
+    /// The two halves are the only split of the stage, so this is the stage as the report measures
+    /// it — a second reading of what `StageTimings::interreduction`'s own clock records, taken by
+    /// a different instrument over the same code. They agree to clock granularity, and
+    /// `f4::tests::test_the_interreduction_split_accounts_for_the_stage` is what checks it.
+    pub fn total(&self) -> Duration {
+        self.minimize + self.reduce
+    }
+
+    /// The reduction loop's share of the stage, as a fraction in `[0, 1]`.
+    ///
+    /// #436 measured this at **0.9994** on `mq-random-10`, against `minimize_grobner_basis`'s
+    /// 0.0006 — which is why the stage's cost is a statement about `normal_form` and not about the
+    /// duplicated storage #304 removed.
+    pub fn reduce_share(&self) -> f64 {
+        let total = self.total().as_secs_f64();
+        if total == 0.0 {
+            0.0
+        } else {
+            self.reduce.as_secs_f64() / total
+        }
+    }
+}
+
 /// [`reduce_grobner_basis`], asking `should_stop` before each element.
 ///
 /// # Why this stage needs a stop at all
@@ -287,8 +369,56 @@ pub(crate) struct InterreductionStopped {
 pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
     g: Vec<MultivariatePolynomial<N, F>>,
     order: MonomialOrder,
-    mut should_stop: impl FnMut() -> bool,
+    should_stop: impl FnMut() -> bool,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
+    let mut report = InterreductionReport::default();
+    reduce_grobner_basis_reporting::<N, F, false, false>(g, order, should_stop, &mut report)
+}
+
+/// [`reduce_grobner_basis_until`], filling in a [`InterreductionReport`].
+///
+/// Same code, same result — the reporting is a const-generic parameter, so the unmeasured path
+/// compiles the clocks and counters away and the measured path cannot drift from it.
+pub(crate) fn reduce_grobner_basis_measured<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    should_stop: impl FnMut() -> bool,
+    report: &mut InterreductionReport,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
+    reduce_grobner_basis_reporting::<N, F, true, false>(g, order, should_stop, report)
+}
+
+/// [`reduce_grobner_basis_measured`], also counting operations.
+///
+/// # Why this is a third entry point rather than a flag on the second
+///
+/// The clocks are two `Instant::now` calls for the whole stage. The counters are an increment per
+/// reducer per term popped, which is the innermost loop in F4 — measured at **36%** on
+/// `mq-random-10`, where `measure_stages`' own overhead is 3.8%–11.5%. Tying the two together
+/// would mean the stage split could only ever be read off a run that was a third slower than the
+/// one being described. So timings and counts are taken by separate runs, and
+/// `InterreductionReport` from a counting run carries durations that **must not** be quoted.
+pub(crate) fn reduce_grobner_basis_counted<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    should_stop: impl FnMut() -> bool,
+    report: &mut InterreductionReport,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
+    reduce_grobner_basis_reporting::<N, F, true, true>(g, order, should_stop, report)
+}
+
+fn reduce_grobner_basis_reporting<
+    const N: usize,
+    F: FiniteField,
+    const MEASURE: bool,
+    const COUNT: bool,
+>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    mut should_stop: impl FnMut() -> bool,
+    report: &mut InterreductionReport,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
+    let minimize_started = MEASURE.then(Instant::now);
     let mut minimal = minimize_grobner_basis(g, order);
 
     // Ascending by leading monomial, which is the whole optimization.
@@ -316,6 +446,15 @@ pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
     let mut reduced: Vec<MultivariatePolynomial<N, F>> =
         minimal.into_iter().map(|(_, p)| p).collect();
 
+    // The sort is counted in minimization rather than in the reduction loop: it is `O(n log n)`
+    // comparisons over the element count, not over the terms the loop walks, and attributing it to
+    // the loop would overstate the thing the loop is being blamed for.
+    if let Some(started) = minimize_started {
+        report.minimize = started.elapsed();
+        report.elements = reduced.len();
+    }
+    let reduce_started = MEASURE.then(Instant::now);
+
     // The element being reduced is swapped to the end so that the others are a contiguous slice,
     // which is what `normal_form` takes. The alternative, and what this replaced, is to clone all
     // `n - 1` of them once per element before computing anything.
@@ -326,6 +465,12 @@ pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
             // Before the element, not after: a stop that has already paid for the reduction it
             // was meant to prevent is not a stop.
             if should_stop() {
+                // Recorded before returning, so a stopped stage still accounts for where it spent
+                // the budget — the same reason `F4Statistics` records the stage clock on the
+                // error path.
+                if let Some(started) = reduce_started {
+                    report.reduce = started.elapsed();
+                }
                 return Err(InterreductionStopped {
                     elements_reduced: i,
                     elements,
@@ -333,7 +478,13 @@ pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
             }
             reduced.swap(i, last);
             let p = std::mem::take(&mut reduced[last]);
-            let remainder = p.normal_form(&reduced[..last], order);
+            let remainder = if COUNT {
+                let (remainder, counts) = p.normal_form_counted(&reduced[..last], order);
+                report.counts.add(&counts);
+                remainder
+            } else {
+                p.normal_form(&reduced[..last], order)
+            };
             debug_assert!(
                 !remainder.is_zero(),
                 "reducing a minimal basis element cannot cancel its leading term"
@@ -348,12 +499,18 @@ pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
     // result, and a reduced Gröbner basis is unique as a set — which makes the sequence unique
     // too. Without this the order came from `HashSet` iteration and varied between runs.
     reduced.reverse();
+    if let Some(started) = reduce_started {
+        report.reduce = started.elapsed();
+    }
     Ok(reduced)
 }
 
 #[cfg(test)]
 mod interreduction_stop_tests {
-    use super::{reduce_grobner_basis, reduce_grobner_basis_until};
+    use super::{
+        reduce_grobner_basis, reduce_grobner_basis_counted, reduce_grobner_basis_measured,
+        reduce_grobner_basis_until, InterreductionReport,
+    };
     use crate::{fields::Zp13, poly::MonomialOrder, MultivariatePolynomial};
 
     const VARS: [&str; 2] = ["x", "y"];
@@ -399,6 +556,103 @@ mod interreduction_stop_tests {
             .expect_err("stops on the second element");
         assert_eq!(stopped.elements_reduced, 1, "the first element was reduced");
         assert_eq!(calls, 2, "asked once per element, not once per basis");
+    }
+
+    /// The measured route returns exactly the basis the unmeasured one does.
+    #[test]
+    fn test_measuring_does_not_change_the_reduced_basis() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let plain = reduce_grobner_basis(basis(), order);
+        let mut report = InterreductionReport::default();
+        let measured = reduce_grobner_basis_measured(basis(), order, || false, &mut report)
+            .expect("a never-stopping predicate cannot stop");
+        assert_eq!(plain, measured);
+    }
+
+    /// The minimize/reduce split sums to the report's own total, and counts the elements it reduced.
+    #[test]
+    fn test_the_interreduction_split_sums_to_its_total() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let mut report = InterreductionReport::default();
+        let reduced = reduce_grobner_basis_measured(basis(), order, || false, &mut report)
+            .expect("a never-stopping predicate cannot stop");
+        assert_eq!(report.total(), report.minimize + report.reduce);
+        assert_eq!(report.elements, reduced.len());
+        assert!((0.0..=1.0).contains(&report.reduce_share()));
+    }
+
+    /// The operation counters are populated, and relate to each other the way the stage's cost
+    /// model says they should: every element is one call, reducers are the other elements, and no
+    /// reduction can pop fewer terms than it keeps.
+    #[test]
+    fn test_the_interreduction_counters_are_internally_consistent() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let mut report = InterreductionReport::default();
+        let reduced = reduce_grobner_basis_counted(basis(), order, || false, &mut report)
+            .expect("a never-stopping predicate cannot stop");
+        let counts = report.counts;
+        assert_eq!(counts.calls, reduced.len(), "one reduction per element");
+        assert_eq!(
+            counts.reducers,
+            reduced.len() * (reduced.len() - 1),
+            "each element is reduced against the others"
+        );
+        assert!(counts.terms_popped >= counts.remainder_terms);
+        assert!(
+            counts.divisor_tests >= counts.terms_popped,
+            "at least one test per term"
+        );
+        assert!(counts.max_working_terms > 0);
+    }
+
+    /// Timing and counting are separate entry points, and the timing one does not pay for the
+    /// counters. This is the invariant that lets a stage split and an operation count be read off
+    /// two different runs without either being wrong.
+    #[test]
+    fn test_measuring_times_the_stage_without_counting_operations() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+
+        let mut timed = InterreductionReport::default();
+        let _ = reduce_grobner_basis_measured(basis(), order, || false, &mut timed)
+            .expect("cannot stop");
+        assert!(timed.elements > 0, "the split is recorded");
+        assert_eq!(
+            timed.counts,
+            crate::poly::NormalFormCounts::default(),
+            "but no operation is counted"
+        );
+
+        let mut counted = InterreductionReport::default();
+        let _ = reduce_grobner_basis_counted(basis(), order, || false, &mut counted)
+            .expect("cannot stop");
+        assert_eq!(counted.elements, timed.elements);
+        assert!(counted.counts.calls > 0, "the counted route counts");
+    }
+
+    /// The measured and counted routes return the same basis the plain one does, which is what
+    /// makes either of them evidence about it.
+    #[test]
+    fn test_all_three_routes_agree_on_the_basis() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let plain = reduce_grobner_basis(basis(), order);
+        let mut report = InterreductionReport::default();
+        let measured = reduce_grobner_basis_measured(basis(), order, || false, &mut report)
+            .expect("cannot stop");
+        let mut report = InterreductionReport::default();
+        let counted = reduce_grobner_basis_counted(basis(), order, || false, &mut report)
+            .expect("cannot stop");
+        assert_eq!(plain, measured);
+        assert_eq!(plain, counted);
+    }
+
+    /// Nothing is measured unless the measured entry point is used, so the ordinary path pays
+    /// nothing and reports nothing.
+    #[test]
+    fn test_the_unmeasured_route_reports_nothing() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let report = InterreductionReport::default();
+        let _ = reduce_grobner_basis_until(basis(), order, || false).expect("cannot stop");
+        assert_eq!(report, InterreductionReport::default());
     }
 }
 

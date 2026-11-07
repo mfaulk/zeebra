@@ -15,6 +15,7 @@
 //! cargo run --release --example f4_profile -- baseline     # the same, named
 //! cargo run --release --example f4_profile -- list         # the configurations available
 //! cargo run --release --example f4_profile -- mq           # #349: the competitive MQ split
+//! cargo run --release --example f4_profile -- mq-counts    # that stage's operation counts
 //! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
 //! ```
 //!
@@ -395,6 +396,81 @@ fn print_mq_instance() {
     print!("{}", built.canonical());
 }
 
+/// The inside of the interreduction stage: which half, and what the reductions cost.
+///
+/// # Why this is a separate report
+///
+/// `docs/research/groebner-jl-gap.md` §3 measures final interreduction at **13 871x**
+/// Groebner.jl's, where the next worst stage is 97.1x, and §4 attributes the difference to
+/// intermediate expression swell — then records that the attribution is **inferred, not
+/// measured**, because nothing counted terms popped or divisor tests. This prints the counters
+/// that settle it, and the three ratios point at three different fixes:
+///
+/// - **swell** (`popped/ans` large) — the stage is building intermediates the answer does not
+///   contain, and the fix is not building them: one Macaulay matrix instead of `n` divisions.
+/// - **scan** (`tests/pop` large) — the reducer search dominates, and the fix is an index.
+/// - **rewrite** (`rw/tail` large) — `subtract_shifted` is copying terms no divisor tail reaches,
+///   and the fix is windowing the merge.
+fn interreduction<const N: usize>(
+    name: &str,
+    system: &[MultivariatePolynomial<N, F>],
+    orders: &[(&str, MonomialOrder)],
+    options: &F4Options,
+) {
+    println!(
+        "{:<12} {:<8} {:>6} {:>7} {:>10} {:>9} {:>12} {:>13} {:>7} {:>5} {:>8} {:>8} {:>8}",
+        "system",
+        "order",
+        "elts",
+        "red/%",
+        "popped",
+        "ans",
+        "tails",
+        "rewritten",
+        "maxwrk",
+        "steps",
+        "swell",
+        "scan",
+        "rw/tail"
+    );
+    for &(order_name, order) in orders {
+        let Ok((_, s)) = f4_with_options(system, order, options) else {
+            println!("{:<12} {:<8} refused", name, order_name);
+            continue;
+        };
+        let c = s.interreduction;
+        println!(
+            "{:<12} {:<8} {:>6} {:>7.2} {:>10} {:>9} {:>12} {:>13} {:>7} {:>5} {:>8.1} {:>8.1} {:>8.1}",
+            name,
+            order_name,
+            s.interreduction_elements,
+            100.0 * s.interreduction_reduce_share(),
+            c.terms_popped,
+            c.remainder_terms,
+            c.tail_terms_merged,
+            c.terms_rewritten,
+            c.max_working_terms,
+            c.reduction_steps,
+            c.swell_factor(),
+            c.divisor_tests_per_term(),
+            c.rewrite_amplification(),
+        );
+        println!();
+        println!(
+            "    divisor tests {} over {} terms popped against {} reducers a call",
+            c.divisor_tests,
+            c.terms_popped,
+            c.reducers.checked_div(c.calls).unwrap_or(0)
+        );
+        println!(
+            "    the verdict: swell {:.1}x, scan {:.1} tests a term, rewrite {:.1}x amplification",
+            c.swell_factor(),
+            c.divisor_tests_per_term(),
+            c.rewrite_amplification()
+        );
+    }
+}
+
 /// The competitive-board MQ instance, profiled per stage — #349.
 ///
 /// `mq-random-10` is the instance M25 measured Zeebra **4.11x slower than Singular** on, and it is
@@ -461,6 +537,23 @@ fn competitive_mq(options: &F4Options) {
         &[("grevlex", MonomialOrder::GradedReverseLexicographic)],
         options,
     );
+
+    if options.count_interreduction {
+        println!();
+        println!("### Inside the interreduction stage — #436's split, and #447 §4's loose end");
+        println!();
+        println!(
+            "Counts only. This run pays ~36% for the per-reducer counter, so its durations above"
+        );
+        println!("are not comparable with a `mq` run's. The counts are exact either way.");
+        println!();
+        interreduction::<10>(
+            "mq-random-10",
+            &system,
+            &[("grevlex", MonomialOrder::GradedReverseLexicographic)],
+            options,
+        );
+    }
 }
 
 fn main() {
@@ -474,7 +567,7 @@ fn main() {
     if argument == "list" {
         println!("configurations: {}", CONFIGURATIONS.join(", "));
         println!(
-            "modes: mq (the #349 competitive MQ stage split), mq-instance (its canonical text)"
+            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation\n             counts), mq-instance (its canonical text)"
         );
         return;
     }
@@ -488,6 +581,18 @@ fn main() {
         // a computation no record describes.
         let options = F4Options {
             measure_stages: true,
+            ..F4Options::default()
+        };
+        competitive_mq(&options);
+        return;
+    }
+
+    if argument == "mq-counts" {
+        // Operation counts rather than durations. Separate from `mq` because the per-reducer
+        // counter costs about a third of the stage, so one run cannot report both a trustworthy
+        // stage split and these counters — see `F4Options::count_interreduction`.
+        let options = F4Options {
+            count_interreduction: true,
             ..F4Options::default()
         };
         competitive_mq(&options);
