@@ -38,6 +38,12 @@ As the saying goes, you can either make software so simple that it obviously has
       scoreboard and a cross-concurrency comparison refused rather than quoted
 - [x] The whole solving pipeline in characteristic two, over GF(2) and GF(2^8), and field equations
       `x^q - x` that make a quotient dimension count base-field points
+- [x] A contract for driving external Gröbner engines as subprocesses, which separates "this tool
+      cannot represent the input" from "this tool was slower", and refuses to quote a ratio against
+      a comparand that could not accept the problem
+- [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
+      is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
+      resolved against msolve's own distributed input files
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -429,6 +435,8 @@ cargo run --release --example batch_inversion -- f4   # and the F4 headroom left
 cargo run --release --example scoreboard           # registered problems, one record each, staged
 tools/scoreboard.sh stable --write                 # the same, pinned, updating research/scoreboard
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
+cargo run --release --example competitive          # render research/competitive/ from its history
+cargo run --release --example competitive -- --write   # and update COMPETITIVE.md in place
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
