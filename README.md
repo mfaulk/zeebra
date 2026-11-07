@@ -779,6 +779,7 @@ cargo run --release --example determinant_sweep    # the Sylvester determinant c
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
 cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
+cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 

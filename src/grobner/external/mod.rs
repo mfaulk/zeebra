@@ -83,7 +83,9 @@ pub use contract::{
     Support, Task, ToolVersion, Unsupported, Verification,
 };
 #[cfg(feature = "external-runners")]
-pub use corpus::{cyclic_instance, katsura_instance, CorpusEntry, Rung, REFERENCE_CHARACTERISTIC};
+pub use corpus::{
+    cyclic_instance, instance, katsura_instance, CorpusEntry, Rung, REFERENCE_CHARACTERISTIC,
+};
 #[cfg(feature = "external-runners")]
 pub use groebner_jl::GroebnerJlSolver;
 #[cfg(feature = "external-runners")]

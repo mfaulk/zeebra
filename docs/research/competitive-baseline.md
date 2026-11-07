@@ -494,6 +494,79 @@ against #269 and #271, where even the free case is unmeasurable, and only permis
 where the achievable depends on a per-term factor nobody has measured. #268's acceptance test is
 therefore a before/after on a corpus rung, not a forecast from this table.
 
+## 6b. #349: the losing instance's own stage split, which decides the screen
+
+Everything in §5, §6 and §6a shares one weakness, and §6 states it: ranks 3–5 are internal profile
+shares taken on **katsura and cyclic**, with "no external comparand at all", while the gap they are
+being used to explain was measured on **`mq-random-10`**. #349 took the missing measurement.
+
+**The instance is pinned by digest, not by name.** `examples/f4_profile -- mq` builds
+`mq-random-10` through `grobner::external::instance` at `REFERENCE_CHARACTERISTIC` under grevlex and
+asserts its identity digest is `72d0ad315fc25409…`, the digest carried by **both** the zeebra and
+singular `reduced-grobner-basis` records. A stage split of a different instance would answer a
+different question while looking like an answer to this one.
+
+It is also profiled under `F4Options::default()` rather than `F4Options::baseline()`, because
+`examples/competitive_sweep.rs` builds its solver from `default()`. **That difference is not
+cosmetic: under `baseline()` this instance does not finish at all**, refusing at 20 000 277 live
+nonzero entries against the 20 000 000 budget the two configurations share — one part in 72 000
+over, and the same failure mode #323 found at Anemoi `N = 6`. See §6b.2.
+
+### 6b.1 Three runs, one worker set, on the lock
+
+| run | total/ms | symbolic | construction | elimination | extraction | **interreduction** | other |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 32 025.8 | 459.9 | 1 167.3 | 4 304.5 | 115.1 | **25 892.3** | 86.7 |
+| 2 | 30 595.3 | 424.8 | 1 079.8 | 4 158.9 | 106.8 | **24 742.1** | 83.1 |
+| 3 | 29 811.9 | 410.4 | 1 058.2 | 4 188.0 | 109.5 | **23 960.4** | 85.5 |
+| **share** | — | **1.4%** | **3.5%** | **13.9%** | **0.4%** | **80.4%** | **0.3%** |
+
+Pairs (1 777), batches (10) and basis size (247) are **identical across all three runs**, so the
+computation is deterministic and the spread is timing alone. The totals run 3.8–11.5% above the
+record's 28.709 s, which is `measure_stages` reading a clock four times a batch plus shared-box
+load; it does not move any share.
+
+### 6b.2 The screen, re-applied where it belongs
+
+| candidate | stage share here | ceiling if free | against the measured **4.13×** |
+|---|---:|---:|---|
+| **#268** compact monomial/polynomial representations | symbolic + construction, **4.9%** | **1.05×** | **cannot explain it** |
+| **#269** elimination kernels | **13.9%** | **1.16×** | **cannot explain it** |
+| **#304** duplicated basis storage in final interreduction | **80.4%** | **5.10×** | **spans it** |
+
+**This is the first stage-level candidate in this document whose ceiling exceeds a measured
+cross-library deficit**, and it is the only one. Three consequences, and the first is a reversal:
+
+1. **#268 is ruled out as an explanation of §4a's gap, on external evidence.** §5's hope was that
+   its two target stages — with katsura/cyclic ceilings of 2.59× and 1.92×, "the right order to span
+   4.11× if both contribute" — would be implicated once the losing instance was profiled. They are
+   not: on `mq-random-10` they are **4.9% together**, a ceiling of 1.05×, inside the noise band.
+   M25's §13.9 framed #349 as able to give #268 "the first external evidence any H-series item has
+   had." The measurement came back and it is evidence **against**.
+2. **#269 stays deprioritized, now on the right instance.** 13.9% here against the 7–22% measured on
+   the classical corpus — the same conclusion, no longer dependent on extrapolating from a family
+   that is not where the deficit is.
+3. **#304 is promoted from a memory issue to the F4 priority.** It was filed as a *memory* finding —
+   the basis held three times over during final interreduction, which after #305 became the next
+   major peak allocation. The stage it describes is **80.4% of the wall clock** on the losing
+   instance. A single issue is now both the memory finding and the time finding, and nothing else in
+   the backlog is within a factor of four of it.
+
+**What this does not establish.** That removing the duplication delivers 5.10×, or any part of it.
+5.10× is the ceiling if the stage became *free*, and it will not: interreduction has real work to do.
+The screen bounds a candidate from above and cannot promise anything from below — that is the whole
+discipline of §6a, and it applies to the candidate it favours exactly as it applied to the ones it
+killed. What has changed is that the work is now aimed at the stage the deficit is actually in.
+
+**And one finding that is not about priorities at all.** The `baseline()` refusal above means the
+ablation's starting configuration cannot run the instance the competitive board runs, over a budget
+whose effective limit is `min(max_live_nonzeros, max_live_bytes / 16)` (#322). Two unrelated
+instances — Anemoi `N = 6` and `mq-random-10` — now cross the same budget by one part in 72 000 to
+180 000. A budget that two independent workloads land that close to is not a safety margin; it is a
+cliff that happens to be near where the problems are.
+
+---
+
 ## 7. The six-axis ranking
 
 Per the plan's §7.4, candidates are ranked on **six axes, not raw ratios**: absolute cost, measured
