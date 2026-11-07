@@ -4013,10 +4013,12 @@ assert_eq!(partial.unfactored, vec![(hard, 1)]);
 assert_eq!(partial.product(), BigUInt::new_from_u64(12) * &partial.unfactored[0].0);
 ```
 
-That budget is the point of the API shape. `prime_field_256`'s `primitive_element` refuses to run
-because finding a generator means factoring a 254-bit `q - 1`, and the comment there is right that
-this should not happen by accident — so the entry point a caller reaches for has to make the effort
-explicit and has to be able to say "I did not finish".
+That budget is the point of the API shape. `prime_field_256`'s `try_primitive_element` returns
+`Err(RootOfUnityError::NoKnownGenerator)` rather than searching, because finding a generator means
+factoring a 254-bit `q - 1` and that should not start by accident. ECM does not change that: a
+factorization of a 254-bit `q - 1` is still something a caller has to ask for, which is why the
+entry point makes the effort explicit and can say "I did not finish". Wiring the two together is
+tracked separately (#405); nothing in the crate calls it yet.
 
 ### How it works
 Stage 1 multiplies a point on a **Montgomery curve** `B y^2 = x^3 + A x^2 + x` by every prime power
