@@ -285,8 +285,26 @@ means anything about the engines (§0).
 | mq-planted-6 | basis | 0.08 ms | 36.0 ms | 450x | 100% | **not an engine comparison** |
 | mq-random-14 | both | entry cap | 60 s wall | — | — | **different limits; no ratio** |
 
-All quotient dimensions agreed on every completed row — 9, 25, 57, 64, 81, 156, 354, 1024, 16 384 —
-which is the invariant check that licenses the timings at all (§5 of the protocol).
+Quotient dimensions agreed on every row where **both** engines reported one — 9, 25, 57, 64, 81,
+156, 354, 1024 — which is the invariant check that licenses those timings at all (§5 of the
+protocol).
+
+> **One row was an exception, and finding it is the reason `Invariants::overlap` exists.** On
+> `mq-planted-14`'s basis row Zeebra reported **no dimension**, against Singular's 16 384. The
+> basis itself finished in 0.28 ms; the *dimension* was being obtained by running a full
+> `fglm_to_lex`, which tripped the 4 096 conversion cap — so a **basis** row's verifiability was
+> hostage to a **conversion** budget.
+>
+> `Invariants::agree` compares only fields both sides carry, so this produced **no disagreement
+> and no agreement**: the row sat in a table of agreeing rows while being silently unverified.
+> That is precisely the "nothing shared is not a verification" trap the API was built to catch,
+> and an earlier draft of this sentence claimed all dimensions agreed — the prose walked into the
+> trap the code was designed to prevent.
+>
+> Fixed: a dimension now comes from `QuotientBasis::new`, which enumerates standard monomials and
+> needs neither operators nor dense blocks, under its own far higher ceiling. `mq-planted-14`'s
+> basis row now reports 16 384 and agrees with Singular, and the conversion on the same rung is
+> still correctly refused by the conversion's own budget.
 
 ### The new result: a basis-stage loss on random MQ
 
@@ -320,9 +338,11 @@ Zeebra's refusal is a self-imposed bound rather than an inability. The refusal i
 behaviour** — a refused budget is not a wrong answer — and raising the cap to 32 768 lets the rung
 through (`test_raising_the_budget_lets_the_same_rung_through`, `#[ignore]`d for cost).
 
-Two separate actions fall out, and only the first is a defect:
+Three separate actions fall out, and only the first two are defects:
 
-1. **The row was being recorded as `Failed`.** A declared budget is a **limit stop**, and putting
+0. **The basis row on the same rung lost its quotient dimension**, because the dimension was being
+   computed through a full conversion. See the note in §4a above. Fixed.
+1. **The conversion row was being recorded as `Failed`.** A declared budget is a **limit stop**, and putting
    it in the bucket reserved for an engine that broke is the exact confusion this contract exists
    to prevent — it also makes the row eligible for a ratio, which a limit stop never is. Fixed;
    every `FglmError` resource variant now maps to `StoppedByLimit`, `PositiveDimensional` to
