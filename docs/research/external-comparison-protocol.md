@@ -158,6 +158,44 @@ The five outcomes, and what each licenses:
   adapter must establish its own positive evidence of completion — a terminal marker plus the
   absence of an error line — before any number it printed is trusted.
 
+### Two measured capability gaps, which are results and not apologies
+
+Both come from #308's provisioning survey, and both are findings the competitive report should
+lead with rather than footnote. They are the concrete shape of the milestone's requirement not to
+fabricate comparisons.
+
+**The solution tasks have no external comparand at all.** `Task::OneFiniteFieldSolution` and
+`Task::AllFiniteFieldSolutions` are **unsupported by all four comparands**: msolve returns a
+rational parametrization rather than explicit finite-field points, and Groebner.jl, Sagebrush and
+Singular ship no finite-field solver to drive. So those two columns are empty at *every* field
+size, for every engine, and no amount of tuning changes it. This is the cleanest possible
+illustration of why `Unsupported` has to be a separate outcome: were it folded into "failed" or
+left as a missing row, the table would read as though Zeebra's solver had never been compared
+because nobody got round to it, when in fact there is nothing to compare it against.
+
+**The field ceiling, stated once.** msolve caps at **p ≤ 2^31 − 1** (`iofiles.c:563-564`, confirmed
+by running it) and Singular is identical. Therefore:
+
+| Zeebra field width | Engines that can accept it |
+|---|---|
+| ≤ 2^31 − 1 | msolve, Singular, Groebner.jl, Sagebrush |
+| 32–64 bit (Goldilocks, KoalaBear-derived) | Groebner.jl and Sagebrush only — **and they cannot corroborate each other against a third** |
+| 254/255-bit (BN254, BLS12-381 scalar fields) | **none, at any size** |
+
+The second row is the uncomfortable one: a two-engine agreement is weaker evidence than it looks,
+because the differential harness's whole argument for Singular as an oracle is that its `std` is
+Buchberger/slimgb lineage and therefore *algorithmically* independent. Two engines that agree prove
+less than two engines that agree for different reasons. Where only Groebner.jl and Sagebrush are
+available, the row says so.
+
+The third row means Zeebra's widest fields are validated by its own cross-field agreement and by
+`ark-ff` on the arithmetic, not by any Gröbner comparand. That is a statement about the state of
+the available tools, and the report makes it rather than quietly omitting those rows.
+
+This is also why the corpus's reference characteristic is `2^31 − 1` and not something wider: see
+`docs/research/cross-library-corpus.md`. A corpus on a 64-bit prime would render most of the table
+`Unsupported` and measure nothing.
+
 ### Capability bounds are declared, not discovered
 
 A tool's limits are stated as constants in its adapter and checked by `supports()` **before
