@@ -689,6 +689,7 @@ cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
+cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
