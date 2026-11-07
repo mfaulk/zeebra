@@ -44,9 +44,9 @@ pub use poly::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
     is_permutation_polynomial, lagrange_interpolate, lcm, permutation_exponents, pow_mod,
-    resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, GraeffeError,
-    GraeffeStats, Monomial, MonomialOrder, MultivariatePolynomial, Polynomial, PolynomialParams,
-    PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
+    resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, GcdRoute,
+    GraeffeError, GraeffeStats, Monomial, MonomialOrder, MultivariatePolynomial, Polynomial,
+    PolynomialParams, PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
 };
 #[doc(hidden)]
 pub use poly::{
