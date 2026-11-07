@@ -766,6 +766,17 @@ impl SagebrushSolver {
                     .to_string()
             })
     }
+
+    /// The error line the driver prints for a positive-dimensional ideal, as [`Unsupported`].
+    ///
+    /// The driver exits non-zero for it, so without this the message — which states the capability
+    /// fact correctly — arrives as [`RunFailure::Reported`] and the row reads as a tool that broke.
+    fn capability_refusal(output: &str, task: Task) -> Option<Unsupported> {
+        let message = Self::error_line(output)?;
+        message
+            .contains("not zero-dimensional")
+            .then_some(Unsupported::PositiveDimensional { task })
+    }
 }
 
 impl ExternalSolver for SagebrushSolver {
@@ -979,6 +990,18 @@ impl ExternalSolver for SagebrushSolver {
 
         let output = read_output(&output_path);
         if !process.succeeded() {
+            // Checked before the failure bucket, because the driver exits non-zero for a
+            // positive-dimensional ideal and that is a fact about the ideal rather than about
+            // Sagebrush. Measurement is deliberately dropped: a capability statement must carry
+            // no timing, so it cannot be read as "slower" or enter a ratio.
+            if let Some(reason) = Self::capability_refusal(&output, task) {
+                return finish(
+                    RunStatus::Unsupported(reason),
+                    Measurement::unmeasured(),
+                    command,
+                )
+                .with_log_path(output_path);
+            }
             let failure = match Self::error_line(&output) {
                 Some(message) => RunFailure::Reported { message },
                 None => RunFailure::NonZeroExit {
@@ -1031,6 +1054,27 @@ mod tests {
             vec!["x1^2+x2".to_string(), "x2^2-1".to_string()],
             order,
         )
+    }
+
+    /// The provisioned driver, or `None` with a loud note that the live checks did not run.
+    fn installed_driver() -> Option<String> {
+        let path = std::path::Path::new(env!("HOME"))
+            .join(".local/opt/zeebra-ext/bin/sagebrush-gb-driver")
+            .to_string_lossy()
+            .into_owned();
+        let found = std::path::Path::new(&path).is_file().then_some(path);
+        if found.is_none() {
+            eprintln!(
+                "sagebrush NOT CHECKED: no driver at \
+                 $HOME/.local/opt/zeebra-ext/bin/sagebrush-gb-driver"
+            );
+            assert!(
+                std::env::var_os("ZEEBRA_REQUIRE_SAGEBRUSH").is_none(),
+                "ZEEBRA_REQUIRE_SAGEBRUSH is set and the driver is absent: coverage was \
+                 asserted, not obtained"
+            );
+        }
+        found
     }
 
     fn solver(binary: &str, tag: &str) -> SagebrushSolver {
@@ -1687,6 +1731,68 @@ mod tests {
             Some("exponents too large to pack")
         );
         assert_eq!(SagebrushSolver::error_line("#engine: x\n"), None);
+    }
+
+    /// The driver's zero-dimensionality refusal is a capability statement, not a failed run.
+    #[test]
+    fn test_the_zero_dimensionality_refusal_is_a_capability_and_not_a_failure() {
+        let output = "Error: \"the ideal is not zero-dimensional, so FGLM does not apply\"\n";
+        assert_eq!(
+            SagebrushSolver::capability_refusal(output, Task::LexBasisByConversion),
+            Some(Unsupported::PositiveDimensional {
+                task: Task::LexBasisByConversion
+            })
+        );
+    }
+
+    /// Against the real driver, `cyclic-4`'s conversion row is unsupported and carries no time.
+    ///
+    /// Skipped where the driver is absent, as CI's is. Three outcomes and not two: absence says so
+    /// on stderr, and `ZEEBRA_REQUIRE_SAGEBRUSH=1` turns it into a failure for an environment that
+    /// means to assert this coverage rather than hope for it.
+    #[test]
+    fn test_a_real_driver_reports_cyclic_fours_conversion_as_unsupported() {
+        let Some(driver) = installed_driver() else {
+            return;
+        };
+        let cyclic = crate::grobner::external::corpus::instance(
+            "cyclic-4",
+            crate::grobner::external::corpus::REFERENCE_CHARACTERISTIC,
+            MonomialOrder::Lexicographic,
+        )
+        .expect("cyclic-4 builds");
+        let mut solver = solver(&driver, "positive-dimensional");
+        let report = solver.run(
+            &cyclic,
+            Task::LexBasisByConversion,
+            &Limits::wall(Duration::from_secs(120)),
+        );
+        match &report.status {
+            RunStatus::Unsupported(Unsupported::PositiveDimensional { task }) => {
+                assert_eq!(*task, Task::LexBasisByConversion)
+            }
+            other => panic!("expected PositiveDimensional, got {:?}", other),
+        }
+        assert!(
+            report.measurement.is_unmeasured(),
+            "a capability statement must carry no timing"
+        );
+    }
+
+    /// Any other error line stays in the failure bucket, where a tool that broke belongs.
+    #[test]
+    fn test_an_unrelated_error_line_is_not_reclassified_as_unsupported() {
+        assert_eq!(
+            SagebrushSolver::capability_refusal(
+                "Error: \"exponents too large to pack\"\n",
+                Task::LexBasisByConversion
+            ),
+            None
+        );
+        assert_eq!(
+            SagebrushSolver::capability_refusal("#engine: x\n", Task::LexBasisByConversion),
+            None
+        );
     }
 
     /// An inherited engine switch is detected at the value `0`, because presence is what counts.

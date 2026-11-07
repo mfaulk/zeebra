@@ -399,10 +399,7 @@ impl ExternalSolver for SingularSolver {
             if let Some(vdim) = marker(&output, "@vdim").and_then(|v| v.parse::<i64>().ok()) {
                 if vdim < 0 {
                     return finish(
-                        RunStatus::Unsupported(Unsupported::Representation {
-                            detail: "order conversion needs a finite quotient algebra, and this                                      ideal is positive-dimensional"
-                                .to_string(),
-                        }),
+                        RunStatus::Unsupported(Unsupported::PositiveDimensional { task }),
                         Measurement::unmeasured(),
                     );
                 }

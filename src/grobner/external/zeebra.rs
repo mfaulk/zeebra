@@ -279,11 +279,7 @@ fn solve<const N: usize, F: FiniteField>(
         Task::LexBasisByConversion => {
             if classify_ideal(&basis, order) != IdealClass::ZeroDimensional {
                 return Solved {
-                    status: RunStatus::Unsupported(Unsupported::Representation {
-                        detail: "order conversion needs a finite quotient algebra, and this ideal \
-                                 is positive-dimensional"
-                            .to_string(),
-                    }),
+                    status: RunStatus::Unsupported(Unsupported::PositiveDimensional { task }),
                     wall: started.elapsed(),
                     stages,
                 };
@@ -347,11 +343,7 @@ fn solve<const N: usize, F: FiniteField>(
                         // Not a budget: no limit would make this possible, so it is a statement
                         // about the input rather than about the resources.
                         PositiveDimensional => {
-                            RunStatus::Unsupported(Unsupported::Representation {
-                                detail: "order conversion needs a finite quotient algebra, and \
-                                         this ideal is positive-dimensional"
-                                    .to_string(),
-                            })
+                            RunStatus::Unsupported(Unsupported::PositiveDimensional { task })
                         }
                         other => RunStatus::Failed(RunFailure::Reported {
                             message: other.to_string(),
@@ -829,7 +821,9 @@ mod tests {
         assert!(
             matches!(
                 report.status,
-                RunStatus::Unsupported(Unsupported::Representation { .. })
+                RunStatus::Unsupported(Unsupported::PositiveDimensional {
+                    task: Task::LexBasisByConversion
+                })
             ),
             "{:?}",
             report.status
