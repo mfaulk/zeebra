@@ -818,6 +818,24 @@ impl Speedup {
     /// two engines are level on that row, and counting it with the wins would overstate both.
     pub const NOISE_BAND: f64 = 1.2;
 
+    /// Comparands whose rows are worth recording but may never be a speedup denominator.
+    ///
+    /// Sagebrush agreed term-for-term with every other engine on every family tried, including at
+    /// a 62-bit prime — and is still five weeks old, every crate `0.1.0`, nothing on crates.io,
+    /// six F4 tests, and no oracle run in its own repository exercising the elimination. A ratio
+    /// against it measures something real about one unreviewed implementation and nothing about
+    /// the state of the art, so it is reportable **with its SHA** and is not a conclusion.
+    ///
+    /// Enforced here rather than left to the prose that first recorded the judgement: now that
+    /// these rows are on the board, a reader of the board alone would see a Sagebrush ratio
+    /// rendered exactly like a Singular one.
+    pub const NOT_AUTHORITATIVE: [&str; 1] = ["sagebrush"];
+
+    /// Whether a conclusion may rest on this ratio's comparand.
+    pub fn has_authoritative_comparand(&self) -> bool {
+        !Self::NOT_AUTHORITATIVE.contains(&self.subject.as_str())
+    }
+
     /// Whether this ratio says anything about the **engines** rather than about process startup.
     ///
     /// `false` when **either** operand's wall is within [`Self::FLOOR_MULTIPLE_REQUIRED`] of its
@@ -1095,17 +1113,26 @@ impl CompetitiveBoard {
                 .iter()
                 .filter(|s| s.ratio > 1.0 / Speedup::NOISE_BAND && s.ratio < Speedup::NOISE_BAND)
                 .count();
+            let unauthoritative = publishable
+                .iter()
+                .filter(|s| !s.has_authoritative_comparand())
+                .count();
             let _ = writeln!(
                 out,
                 "**{} pairs**: {} disqualified by the startup floor, {} with no checked \
-                 invariant, {} publishable — of which {} inside the 20% noise band and {} \
-                 outside it.\n",
+                 invariant, {} publishable — of which {} inside the 20% noise band, {} against a \
+                 comparand that is not authoritative, and {} that a conclusion may rest on.\n",
                 speedups.len(),
                 disqualified,
                 unchecked,
                 publishable.len(),
                 in_band,
-                publishable.len() - in_band
+                unauthoritative,
+                publishable
+                    .iter()
+                    .filter(|s| s.has_authoritative_comparand()
+                        && !(s.ratio > 1.0 / Speedup::NOISE_BAND && s.ratio < Speedup::NOISE_BAND))
+                    .count()
             );
 
             let _ = writeln!(out, "| problem | task | library | ratio | checked |");
@@ -1125,6 +1152,12 @@ impl CompetitiveBoard {
                         )
                     } else if speedup.shared_invariants == 0 {
                         "**NOT PUBLISHABLE: no invariant was checked**".to_string()
+                    } else if !speedup.has_authoritative_comparand() {
+                        format!(
+                            "{} invariants agreed, but **NOT AUTHORITATIVE: {} may not be a \
+                             speedup denominator**",
+                            speedup.shared_invariants, speedup.subject
+                        )
                     } else {
                         format!("{} invariants agreed", speedup.shared_invariants)
                     }
@@ -1794,6 +1827,41 @@ mod tests {
         let markdown = CompetitiveBoard::new().to_markdown();
         assert!(markdown.contains("No rows yet"));
         assert!(!markdown.contains("| problem |"));
+    }
+
+    /// A ratio against a comparand that is recorded but not authoritative says so in the cell and
+    /// is counted apart from the conclusions, so the board cannot be read as if it were one.
+    #[test]
+    fn test_a_non_authoritative_comparand_is_marked_and_counted() {
+        let mut board = CompetitiveBoard::new();
+        // Each library needs four answered rows before it has a floor at all, and the compared
+        // rows must sit far above it or the floor gate is what marks them instead.
+        for problem in ["w-1", "x-1", "y-1", "z-1"] {
+            board.add(named_row(problem, "zeebra", answered(64), 0.1));
+            board.add(named_row(problem, "singular", answered(64), 0.1));
+            board.add(named_row(problem, "sagebrush", answered(64), 0.1));
+        }
+        for problem in ["a-1", "b-1", "c-1", "d-1"] {
+            board.add(named_row(problem, "zeebra", answered(64), 5_000.0));
+            board.add(named_row(problem, "singular", answered(64), 1_000.0));
+            board.add(named_row(problem, "sagebrush", answered(64), 1_000.0));
+        }
+
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("NOT AUTHORITATIVE"),
+            "a sagebrush ratio is marked in its own cell\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("4 against a comparand that is not authoritative"),
+            "and counted in the summary\n{}",
+            markdown
+        );
+        assert!(
+            !markdown.contains("| singular | 4 | 4 |\n| singular"),
+            "the singular rows are untouched"
+        );
     }
 
     /// Two rows taken under different measurement policies are not comparable, so a row measured

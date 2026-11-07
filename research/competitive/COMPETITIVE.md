@@ -300,7 +300,7 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 Computed only for rows agreeing on problem digest, task, limits, machine and build, with **both** outcomes answered. A ratio whose two answers share no checked invariant is marked: the protocol does not permit publishing it.
 
-**116 pairs**: 89 disqualified by the startup floor, 0 with no checked invariant, 27 publishable — of which 3 inside the 20% noise band and 24 outside it.
+**116 pairs**: 89 disqualified by the startup floor, 0 with no checked invariant, 27 publishable — of which 3 inside the 20% noise band, 6 against a comparand that is not authoritative, and 18 that a conclusion may rest on.
 
 | problem | task | library | ratio | checked |
 |---|---|---|---:|---|
@@ -381,9 +381,9 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 | `mq-random-10` | reduced-grobner-basis | singular | 4.16x | 3 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | msolve | 109.32x | 2 invariants agreed |
 | `mq-random-10` | reduced-grobner-basis | groebner.jl | 366.42x | 3 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | sagebrush | 89.67x | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 89.67x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-random-10` | lex-basis-by-conversion | singular | 3.49x | 3 invariants agreed |
-| `mq-random-10` | lex-basis-by-conversion | sagebrush | 69.93x | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 69.93x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
@@ -395,11 +395,11 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 | `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.12x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-10` | lex-basis-by-conversion | singular | 0.18x | 3 invariants agreed |
-| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.73x | 3 invariants agreed |
+| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.73x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `mq-planted-14` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.20x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | 3 invariants agreed |
+| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | msolve | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | groebner.jl | 0.68x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
@@ -415,9 +415,9 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 | `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 1.48x | 3 invariants agreed |
 | `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | msolve | 14.73x | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
 | `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | groebner.jl | 38.83x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | sagebrush | 9.84x | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | sagebrush | 9.84x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 1.43x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | sagebrush | 10.47x | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | sagebrush | 10.47x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 | `anemoi64-cico-n1-fcico` | reduced-grobner-basis | groebner.jl | 0.07x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `anemoi64-cico-n2-fcico` | reduced-grobner-basis | groebner.jl | 0.67x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
 
