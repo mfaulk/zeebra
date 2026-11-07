@@ -1221,7 +1221,7 @@ Scored against the criteria as written before the work, including where they wer
 | criterion | | evidence |
 |---|---|---|
 | a demonstrated improvement to an important core operation, end to end | **met** | #243 — the six-round build 175–179x lower peak **and 7.5x faster**; #305 — F4's peak **9.06x** lower and **10% faster**, both under the lock with the before column reproducing the recorded ladder to 0.013% |
-| a completed, resource-attributed Anemoi `N = 6` attempt | **met**, narrowly | FCICO refused in 3.8 s on a **named** budget, with the Magma row-count observation attached; `D = 15 625` witnessed three independent ways; the rung demonstrated reachable at 340.66 s by msolve. **No Zeebra conversion time was obtained**, and PCICO is recorded as *not a result* |
+| a completed, resource-attributed Anemoi `N = 6` attempt | **met** | **PCICO solved with a verified witness** — `D = 15 625`, conversion 4 226.518 s, total 1.180 h inside its backstop, `Anemoi(0, 34600)` checked through the permutation, reproducing Magma's published 11 775.430 s. The `D³` model held at a third rung: 115.2x predicted against 110.7x observed, from predictions recorded before the run. FCICO's earlier refusal on a **named** budget produced the Magma row-count observation and stands as the resource-attributed half. *(This row read "narrowly met, no Zeebra conversion time was obtained" until PCICO completed — §13.2.)* |
 | an explicit explanation of the published-conversion discrepancy | **met** | #283 — candidate (2) ruled out; the ratio flat to 12% across a 47-bit prime range against Magma's 7.3x, the 507x collapsing to 2.85x, and msolve settling it at 1.81 s against 63.7 s |
 | a validated, updated Poseidon resultant cost model | **met** | #289 — five orders, 2.9953 ± 0.0285, residuals published, no cache cliff, and `RowCost::of` deliberately keeping the **larger** of fitted and cubic |
 | one clear recommendation on the next algorithmic investment, from new measurement | **met**, and **contested** | §13.9 — order conversion, with the contest named and **#349** as the one run that decides it |
@@ -1231,7 +1231,7 @@ not, and the first is inverted:
 
 | criterion | | |
 |---|---|---|
-| a same-machine performance lead over a credible established implementation | **not met — the opposite** | Two measured deficits: ~30x on conversion against msolve, 4.11x on the basis against Singular. Four apparent wins were **disqualified by our own startup-floor rule**, including a 450x |
+| a same-machine performance lead over a credible established implementation | **not met — the opposite** | Two measured deficits: ~30x on conversion against msolve, 4.11x on the basis against Singular. And on the populated board, **21 of 28 answered pairs were disqualified by our own startup-floor rule** — every one of them reading as a Zeebra win, up to **501x**. Of the seven that qualify: four losses, two inside the noise band, one win |
 | a verified cryptanalytic instance beyond M24's measured frontier | **met** | **Anemoi `N = 6` PCICO at `p = 65537`, solved with a verified witness** — `Anemoi(0, 34600)`, first output word zero, checked through the permutation. `D = 15 625`, 4 248.571 s total, inside its backstop. Zeebra's registered Anemoi ladder stopped at `N = 5` before this, so it is beyond the earlier measured frontier, and it **reproduces** Magma's published 11 775.430 s conversion. Separately, `rf4-rp2` is now **inside** the ~2 h ceiling at 1.70–1.88 h after #243's 9.0x build speedup and is unlaunched only because root finding at degree 59 049 is unpriced (§8.4.2) |
 | an improvement to a published attack surviving an equivalent comparison | **not met** | Griffin is a **no-go for M25** on worth; the capability it needs is costed as #306 |
 | an algorithmic change materially raising the maximum reachable problem size | **not met**, and a claim withdrawn | #305 took 9.06x off F4's working set but the stop reason is **unchanged** — `max_live_nonzeros` at degree 5, so M24's "out of reach, not out of budget" stands. And axis 4's round-count claim was **withdrawn** in §13.5 |
@@ -1268,8 +1268,10 @@ board exists for. Tracked rather than asserted away.
 success by choosing an easier benchmark, changing its mathematical identity, or comparing incompatible
 computational objectives." The 450x row was available, arithmetically correct, and would have read as
 a stretch result. It was disqualified by a rule this milestone wrote against itself — a comparand's
-wall within ~2x of its own 36.0 ms floor is not an engine comparison. That rule cost four wins and
-kept none.
+wall within ~2x of its own measured 35.91 ms floor is not an engine comparison. On the populated board
+that rule disqualified **21 of 28** answered pairs — every one of them a Zeebra win — and kept none.
+The first version of the screen was wrong in the direction that flattered us, disqualifying one row
+where it should have disqualified 21, and only the rendered board revealed it.
 
 ### 13.9 M26 recommendation
 
