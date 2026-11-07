@@ -2404,6 +2404,18 @@ let report = solver.run(&instance, Task::ReducedGrobnerBasis, &Limits::wall(Dura
 assert!(report.status.answered() || report.was_skipped());
 ```
 
+`RunReport::was_skipped()` is true for the three outcomes that mean **the tool did not run**:
+`Unsupported` (the input is unrepresentable), `RunFailure::Unavailable` (the tool is absent) and
+`RunFailure::Environment` (the harness's own environment would have invalidated the measurement).
+The last is why it exists: an adapter can set a child's environment but cannot *clear* it, so an
+inherited switch that selects a different algorithm — or writes a trace into the stream the basis
+is parsed from — cannot be undone from inside the run, and the honest answer is to refuse rather
+than to measure something no user of the tool gets. It is deliberately not `Reported`, which means
+"the tool printed an error"; there was no execution to print one. The variant names the variable so
+an operator knows what to unset and the effect so the refusal can be judged. Sagebrush has seven
+such switches (`sagebrush::PINNED_SWITCHES`), every one read with `env::var(..).is_ok()` — truthy
+if set, so `SB_SIGF4=0` *enables* the experimental signature path.
+
 Two msolve-specific facts the adapter encodes as named constants, because both are capability
 bounds rather than slow paths and both are narrower than they look:
 
@@ -2432,6 +2444,21 @@ same wrong ideal — which is why that check is against the input rather than ag
 All three, the mapping from msolve's F4 stage names onto Zeebra's, and what of its design is worth
 reimplementing are in `docs/research/msolve-implementation.md`.
 
+The msolve adapter's corpus agreement test builds **Zeebra's side by parsing the rung's own text**
+and dispatching on **variable count**, so a corpus family added at a width already present — 4, 5,
+6, 7, 10 or 14 — gets an oracle with no edit. It is also the stronger check: the bytes parsed are
+the bytes every engine is handed, so a round-trip failure in either direction shows up as a
+disagreement rather than as a silently different problem. The rungs with no oracle are only the
+Poseidon and Anemoi ones, which carry their own fields (KoalaBear and `2^64 - 353`) and so need a
+second field *type* rather than a second match arm.
+
+That test is not `#[ignore]`d — it runs whenever msolve is installed — so by default it builds
+oracles only up to seven variables, which is 1.4 s for nine rungs where `mq-random-10` alone did
+not finish in ten minutes. **`ZEEBRA_FULL_CORPUS_ORACLE=1` lifts that ceiling** for a machine that
+wants the ten- and fourteen-variable rungs covered. Rungs left out are printed with the remedy,
+never silently dropped. (`F4Options::max_wall_time` does not substitute for the ceiling: it is
+checked once per batch, so one long matrix reduction overruns it.)
+
 `GroebnerJlSolver` and `SagebrushSolver` are built the same way, and both read what
 `tools/external/env.sh` exports: `GroebnerJlSolver::from_env(work_dir)` and
 `SagebrushSolver::from_env(work_dir)`. Two things about them are worth knowing before reading
@@ -2454,12 +2481,32 @@ the full eighteen-rung ladder it has **disagreed with nothing**. Both halves bel
 quotes it: report its rows with the pinned SHA, and do not make it the denominator of a headline
 speedup. The verdict is `docs/research/sagebrush-implementation.md` §6.3.
 
+**It is also the only comparand that offers both routes to a lex basis.** The driver takes
+`--order lex|deglex|degrevlex` and `--route f4|fglm`, so `SagebrushSolver` covers
+`ReducedGrobnerBasis` under any of Zeebra's three orders, `LexBasis` by the engine's direct lex F4,
+and `LexBasisByConversion` by `fglm::groebner_fglm` — which gives that last task a second comparand
+beside Singular, Groebner.jl 0.10.11 having no FGLM at all. The two routes are deliberately
+separate tasks: they return the same basis by different algorithms, so a column that mixed them
+would compare two complexities under one heading, and the adapter checks the driver's echoed
+`#route:` line on every run for exactly that reason. FGLM carries its **own** field ceiling of
+`2^31`, an eighth of the basis route's `2^62`, and the adapter declares it per task rather than
+letting a sweep discover it as a wall-clock stop.
+
 Neither tool confuses `x1` with `x10`, which matters because the corpus has fourteen-variable
 rungs and **cross-engine agreement cannot catch a tokenizer bug** — every engine is handed the same
-bytes, so all of them would agree on the same wrong ideal. The Groebner.jl adapter checks its
-echoed generators against the sent system on every run, so a `Complete` status on a fourteen-
-variable rung is itself the proof; the Sagebrush driver prints no such echo, so there it is pinned
-by a behavioural test instead.
+bytes, so all of them would agree on the same wrong ideal. **Both adapters now check their echoed
+generators against the sent system on every run**, comparing canonical term multisets so that
+`x1*x10-1` and `1*x1*x10 + 1073741826` count as the same polynomial, and reporting a mismatch as
+`RunFailure::SelfInconsistent`. So a `Complete` status on a fourteen-variable rung is itself the
+proof, for Groebner.jl's `@gen` echo and for the Sagebrush driver's `#gen` echo alike. The
+behavioural test remains, because it checks the *consequence* in the computed basis and would still
+fail if a parser read the system correctly and then packed it wrongly.
+
+Because the Sagebrush driver lives in the provisioning prefix rather than in this repository, it
+prints a `#driver contract:` version that the adapter **requires**: an adapter that checked the echo
+only when it happened to be present would silently stop checking against an older installed binary,
+which is worse than not checking at all. A driver predating the marker fails with
+`RunFailure::Incomplete` naming `tools/external/provision.sh`, so the remedy is in the error.
 
 The agreement checks are live tests, `#[ignore]`d because CI has neither tool installed and a test
 that silently passed when the tool is absent would be worse than no test:

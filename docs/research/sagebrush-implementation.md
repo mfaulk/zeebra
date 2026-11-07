@@ -263,8 +263,9 @@ bound on Sagebrush's behalf.** `p = 2^61 - 1` is comfortably inside it and sound
 ### 5.1.1 There are two ceilings, not one, and the second is a trap for whoever extends the driver
 
 `MAX_CHARACTERISTIC` is the **basis** bound. `fglm.rs:329` caps the FGLM route at **`p < 2^31`** —
-an eighth of it. That narrower bound is unreachable today because the driver exposes no FGLM, and
-it becomes live the moment #315 lands.
+an eighth of it. That narrower bound went live with #315, which gave the driver an FGLM route, and
+the adapter declares it as `sagebrush::FGLM_MAX_CHARACTERISTIC` against
+`Task::LexBasisByConversion` alone.
 
 **And it declines softly, which is the part that will bite.** `fglm.rs:329` is
 
@@ -276,9 +277,11 @@ if n == 0 || (p > 0 && p >= 1 << 31) {
 
 `Ok(None)` — not an `Err`. A caller that reads `None` as "there is no lex basis" rather than "I
 declined to compute one" has turned a capability gap into a mathematical claim. The same `None` is
-returned for `n == 0`, so the signal does not even distinguish *why*. Anyone extending the driver
-has to check the characteristic themselves before calling, exactly as the adapter already checks
-the basis bound on Sagebrush's behalf (§5.1).
+returned for `n == 0`, so the signal does not even distinguish *why* — and it is also what
+`fglm_p` returns for an ideal that is genuinely **not zero-dimensional**, which is a real answer.
+The driver therefore checks the characteristic itself before calling, exactly as the adapter checks
+the basis bound on Sagebrush's behalf (§5.1); only once that check has passed can `None` be read as
+the zero-dimensionality condition, which is what the driver reports it as.
 
 Declaring only the basis bound then would be worse than a build error. A sweep would accept a
 `LexBasisByConversion` at, say `2^40`, hand it to a route that cannot represent it, and record
@@ -318,9 +321,9 @@ So the Rust engine is a **Gröbner engine plus an FGLM order change**, and every
 dimension, elimination, varieties, radicals — is a ~5000-line Python layer.
 
 **Two consequences for the task taxonomy.** First, `LexBasis`, `LexBasisByConversion` and a
-quotient dimension are things *Sagebrush* can do and the *driver* cannot, so the adapter's refusals
-are the driver's limits and not the engine's — worth a follow-up (§9), because `LexBasisByConversion`
-would otherwise have only Singular in the column. Second, **Sagebrush confirms that no M25 comparand
+quotient dimension were things *Sagebrush* could do and the *driver* could not, so the adapter's
+refusals were the driver's limits and not the engine's; #315 closed that gap, and
+`LexBasisByConversion` now has a second comparand beside Singular. Second, **Sagebrush confirms that no M25 comparand
 enumerates finite-field solutions**: msolve returns a parametrization
 (`external-comparands.md` §3.5), Singular's `solve` is numerical, Groebner.jl has no solver
 (`groebner-jl-implementation.md` §5.4), and Sagebrush has no variety in Rust.
@@ -569,26 +572,38 @@ confirms it.
 ### 8.6 `fglm.rs` — the FGLM order change (622 lines)
 
 Zeebra already has FGLM (`src/grobner/fglm/`). The transferable observation is not the code but a
-capability gap in the *driver*: Sagebrush's FGLM is reachable only through `call()`
-(`lib.rs:1661`), so `LexBasisByConversion` currently has only Singular in its column (§9).
+capability gap in the *driver*: Sagebrush's FGLM is the default lex route through `call()`
+(`lib.rs:1661`), which the driver bypasses — so until #315 the driver called `groebner_fglm`
+nowhere and `LexBasisByConversion` had only Singular in its column. The driver now calls it
+directly, under `--route fglm`.
 
 ---
 
 ## 9. Follow-ups this study identified
 
-1. **#315 — extend `tools/external/sagebrush-driver` to the orders and tasks the engine already has.**
-   `fglm::groebner_fglm` (`fglm.rs:325`) and the lex route in `f4_p_opt` (`f4.rs:491-547`) exist;
-   the driver exposes neither, so the adapter refuses `LexBasis`, `LexBasisByConversion` and every
-   non-degrevlex order. With it, `LexBasisByConversion` would have a second comparand instead of
-   only Singular — and it is the one task where a second opinion is most valuable, because the two
-   routes to a lex basis have different complexity. The driver would also expose the quotient
-   dimension that `fglm.rs:97` already computes, which would raise the `Invariants` overlap against
-   Zeebra from two to three.
-2. **#316 — add a `RunFailure` variant for a hostile environment.** `src/grobner/external/sagebrush.rs`
-   must refuse to run when an `SB_*` switch is inherited, because `Invocation` can set a child's
-   variable but not clear one, and those switches are truthy-if-set. The closest existing variant is
-   `Reported`, which `contract.rs` explicitly asks an adapter not to overload — so this is the
-   "say so rather than overloading" case, said.
+1. **#315 — extend `tools/external/sagebrush-driver` to the orders and tasks the engine already has.
+   Done.** `fglm::groebner_fglm` (`fglm.rs:325`) and the lex route in `f4_p_opt` (`f4.rs:491-547`)
+   both existed and the driver exposed neither, so the adapter refused `LexBasis`,
+   `LexBasisByConversion` and every non-degrevlex order. The driver now takes `--order` and
+   `--route`, so `LexBasisByConversion` has a second comparand beside Singular — the one task where
+   a second opinion is most valuable, because the two routes to a lex basis have different
+   complexity. It also reports a `#quotient dimension:`, which raises the `Invariants` overlap
+   against Zeebra from two to three; that number is the driver's own count of the standard
+   monomials rather than Sagebrush's internal `stair.len()`, which stays unexposed, and being an
+   independent computation it is a real third invariant rather than a restatement.
+2. **#316 — add a `RunFailure` variant for a hostile environment. Done.**
+   `src/grobner/external/sagebrush.rs` refuses to run when an `SB_*` switch is inherited, because
+   `Invocation` can set a child's variable but not clear one, and those switches are truthy-if-set.
+   The closest existing variant was `Reported`, which `contract.rs` explicitly asks an adapter not
+   to overload — so this was the "say so rather than overloading" case, said, and the answer was
+   `RunFailure::Environment { variable, detail }`.
+
+   Three details worth recording. `RunReport::was_skipped()` counts it, alongside `Unavailable` and
+   `Unsupported`, because all three mean the tool did not run — the issue left that open and the
+   answer is yes. Its `Display` begins `not run:`, so the board cell a reader actually sees says
+   so rather than implying a tool error. And `PINNED_SWITCHES` now carries each switch's *effect*
+   next to its name, so `detail` is specific: a refusal that named only the variable would tell an
+   operator to unset it without letting them judge whether it should have been set.
 3. **#269 — correct its premise.** Its title cites M16's obsolete 65–88% elimination figure;
    `MILESTONE-F4-OPTIMIZATION.md` §8.5 measures 7–22%, with interreduction at 61% and matrix
    construction at 48%. Whatever #269 becomes, it should be aimed at those.
@@ -596,15 +611,25 @@ capability gap in the *driver*: Sagebrush's FGLM is reachable only through `call
    `groebner-jl-implementation.md` §6.2–6.3 are the same idea reached from two independent
    codebases; they should be one experiment, and the microbenchmark of `MonomialOrder::cmp` should
    gate it.
-5. **#329 — echo the generators from the driver**, so the adapter can check what it read on every
-   run rather than relying on one behavioural test. The driver already self-documents the
-   characteristic, the variable order and the monomial order, and the adapter already checks all
-   three as `SelfInconsistent`; the generators are the one input fact not covered. This is the
-   `x1`/`x10` class of hazard, which **cross-engine agreement cannot detect** — every engine is
-   handed the same bytes, so a misread is identical everywhere and four engines agree on the same
-   wrong ideal. The driver is verified clean at fourteen variables (it splits on the explicit `*`
-   and `^` separators and matches each name whole), and the corpus's `mq-random-14` and
-   `mq-planted-14` rungs make the hazard live rather than hypothetical.
+5. **#329 — echo the generators from the driver. Done.** The adapter now checks what the driver
+   read on every run rather than relying on one behavioural test. The driver already
+   self-documented the characteristic, the variable order and the monomial order, and the adapter
+   already checked all three as `SelfInconsistent`; the generators were the one input fact not
+   covered. This is the `x1`/`x10` class of hazard, which **cross-engine agreement cannot detect** —
+   every engine is handed the same bytes, so a misread is identical everywhere and four engines
+   agree on the same wrong ideal. The driver is verified clean at fourteen variables (it splits on
+   the explicit `*` and `^` separators and matches each name whole, and its echo reads
+   `1*x1*x10 + 1073741826`), and the corpus's `mq-random-14` and `mq-planted-14` rungs make the
+   hazard live rather than hypothetical.
+
+   Two choices worth recording. The echo is rendered from the **packed** polynomials rather than
+   from the input text, so it is a round trip through the driver's own parser and packer and would
+   also catch a truncated exponent. And the driver carries a `#driver contract:` version the
+   adapter *requires*: the alternative — checking only when `#gen` is present — is a check that
+   silently stops checking against an older installed binary, and silence is the one outcome worse
+   than a loud refusal. `contract::canonical_generator` is now shared with the Groebner.jl adapter,
+   since the normalization reconciling `-1` against `p-1` is the subtle part and two copies of it
+   would drift.
 6. **#337 — the msolve adapter's corpus agreement test panics on a rung it has no instantiation
    for**, and CI cannot see it because the test returns early when msolve is absent. Not this
    study's subject, but found by it: a test whose skip is indistinguishable from its pass will

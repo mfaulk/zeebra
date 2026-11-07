@@ -458,6 +458,60 @@ fn test_sagebrush_reproduces_zeebras_basis_term_for_term() {
     );
 }
 
+/// Sagebrush's two routes to a lex basis agree with Zeebra, and with each other, term for term.
+///
+/// The point of running both: `LexBasis` is the engine's direct lex F4 and `LexBasisByConversion`
+/// is `fglm::groebner_fglm`, two different algorithms whose reduced bases must be *identical*
+/// because a reduced Gröbner basis is unique given the ideal and the order. So this is a check on
+/// Sagebrush against Zeebra and a check of Sagebrush against itself at the same time, and it is the
+/// only place in this module where a tool's two independent routes can be compared at all —
+/// Groebner.jl 0.10.11 has no FGLM.
+///
+/// The quotient dimension is asserted explicitly because it is the invariant #315 added: the driver
+/// counts the standard monomials itself, Sagebrush exposing only a boolean, so agreeing with
+/// Zeebra on it is a genuine third overlap rather than a restatement of the leading monomials.
+#[test]
+#[ignore = "needs the provisioned sagebrush-gb-driver"]
+fn test_sagebrushs_two_lex_routes_agree_with_zeebra_and_with_each_other() {
+    let Some(mut solver) = sagebrush("sb-lex") else {
+        panic!("the Sagebrush driver is not installed; see the module documentation")
+    };
+    let variables = ["x", "y", "z"];
+    let system = smoke_system();
+    let order = MonomialOrder::Lexicographic;
+    let (ours, our_basis) = zeebra_invariants(&system, &variables, order);
+    let instance = instance("smoke-3-lex", "smoke", &system, &variables, order);
+
+    let mut bases = Vec::new();
+    for task in [Task::LexBasis, Task::LexBasisByConversion] {
+        assert!(
+            solver.supports(&instance, task).is_supported(),
+            "{} is offered at the reference characteristic",
+            task
+        );
+        let report = solver.run(&instance, task, &Limits::wall(Duration::from_secs(120)));
+        let answer = answered(&report);
+        assert_agrees("sagebrush", &instance.name, &ours, &answer.invariants);
+        assert_eq!(
+            answer.invariants.quotient_dimension,
+            Some(12),
+            "{}: the reference system's quotient algebra has dimension 12",
+            task
+        );
+        let basis = canonical_basis(answer.basis.as_ref().expect("a basis"));
+        assert_eq!(
+            basis, our_basis,
+            "{}: term-for-term agreement with Zeebra, every coefficient included",
+            task
+        );
+        bases.push(basis);
+    }
+    assert_eq!(
+        bases[0], bases[1],
+        "a direct lex F4 and an FGLM conversion must return the same reduced basis"
+    );
+}
+
 /// Every corpus rung either agrees with Zeebra or is cleanly unsupported — no rung is skipped.
 ///
 /// Driven from `grobner::external::corpus::ladder()`, so a family added to the corpus is covered
@@ -738,6 +792,13 @@ fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it()
 /// The corpus tops out at seven variables, so this rung is deliberately hand-rolled: it is testing
 /// the two parsers rather than the ladder, and it is here so the hazard is pinned **before** a
 /// ten-or-more-variable rung is added rather than after.
+///
+/// **Both adapters now also check their own generator echo on every run** — Groebner.jl's `@gen`
+/// since #260, Sagebrush's `#gen` since #329 — so a `Complete` status on this rung is *itself* the
+/// proof that the two names were read apart, for both tools. This test keeps its own assertions
+/// anyway: it checks the *consequence* in the computed basis rather than the echo, so it would
+/// still fail if a parser read the system correctly and then packed or reduced it wrongly, which
+/// the echo cannot see.
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
 fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
@@ -782,6 +843,10 @@ fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
             Task::ReducedGrobnerBasis,
             &Limits::wall(Duration::from_secs(120)),
         );
+        // `answered` requires `Complete`, and for both tools reaching `Complete` on this instance
+        // means the adapter already compared the echoed generators against the fourteen-variable
+        // system it sent. That is the per-run half of this hazard's coverage; the assertions below
+        // are the behavioural half.
         let answer = answered(&report);
         let leading = answer
             .invariants
@@ -808,6 +873,56 @@ fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
             name,
             basis
         );
+    }
+}
+
+/// The Sagebrush driver's echoed generators are the system that was sent, on a live run.
+///
+/// The unit tests cover the adapter's half against fixtures. This covers the half that cannot be
+/// faked: that the **real** driver's `#gen` rendering, after its own parse and pack, canonicalizes
+/// to the same thing as Zeebra's renderer did on the way in. A disagreement between the two
+/// spellings would make the check reject every honest run, which is the way a check like this
+/// usually fails.
+///
+/// Run on a fourteen-variable system because that is where `x1` is a prefix of `x10`, and the
+/// generator `x1*x10-1` is the one a greedy tokenizer annihilates.
+#[test]
+#[ignore = "needs the provisioned sagebrush-gb-driver"]
+fn test_the_sagebrush_driver_echoes_the_system_it_was_sent() {
+    let Some(mut solver) = sagebrush("sb-echo") else {
+        panic!("the Sagebrush driver is not installed; see the module documentation")
+    };
+    let variables: Vec<String> = (1..=14).map(|i| format!("x{}", i)).collect();
+    let names: Vec<&str> = variables.iter().map(String::as_str).collect();
+    let mut system = vec!["x1*x10-1".to_string(), "x1^2-x10".to_string()];
+    system.extend(
+        (1..=14)
+            .filter(|i| *i != 1 && *i != 10)
+            .map(|i| format!("x{}^2-x1", i)),
+    );
+    let instance = Instance::new(
+        "echo-14",
+        "prefix",
+        FieldSpec::prime(P),
+        names.iter().map(|v| v.to_string()).collect(),
+        system,
+        MonomialOrder::GradedReverseLexicographic,
+    );
+
+    let report = solver.run(
+        &instance,
+        Task::ReducedGrobnerBasis,
+        &Limits::wall(Duration::from_secs(120)),
+    );
+    // Reaching `Complete` *is* the assertion: the adapter refuses the run with
+    // `SelfInconsistent` if the echo and the sent system disagree, and with `Incomplete` if the
+    // installed driver is too old to echo at all.
+    match &report.status {
+        RunStatus::Complete(_) => {}
+        RunStatus::Failed(RunFailure::Incomplete { detail }) => {
+            panic!("the installed driver is too old: {detail}")
+        }
+        other => panic!("the driver did not echo the system it was sent: {other:?}"),
     }
 }
 
