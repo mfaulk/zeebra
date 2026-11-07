@@ -23,6 +23,7 @@ because the arithmetic now says the comparand was the wrong one.
 | date | change |
 |---|---|
 | 2026-11-07 | Written at `d9121c0` from M26's landed work, #447's cross-engine screen, and `f4-resource-scaling.md` §10.4. M26's §13 report does not exist yet; §0 records what that costs this plan. |
+| 2026-11-07 | **#447 answered** (`a1867a7`, `docs/research/groebner-jl-gap.md`) **and M27-A's shape changed with it.** The counts agree — both engines reach 10 batches, 11 matrices, 247 basis elements and quotient dimension 354 — so gate 0's "Zeebra does asymptotically more work" branch is **dead**, and the 344x decomposes into **4.89x** randomized linear algebra (declined by policy), **5.03x** interreduction done as 247 divisions where Groebner.jl uses one Macaulay matrix, and **14.0x** a per-operation constant uniform to 11.6x-25.5x across every other stage. Final interreduction is **13 871x** behind; the next worst stage is 97.1x. So M27-A's first item is no longer a faster `normal_form` but **matrix-based interreduction** (§5.2a), and the JIT caveat is settled at ~2%. |
 | 2026-11-07 | **#435 merged during planning** (`25e10fe`), so §1.1's figures were re-read from `main`'s five-library board at cohort `7adb29e` rather than from #447's issue body. Three consequences: Singular's wall on that cohort is 7 001.1 ms, not the 7 291 ms M25 recorded, which moves the Singular-parity requirement from 14.5x to **17.7x** on interreduction; Sagebrush's ratio is marked **non-authoritative by the board** and is demoted to context; and the board stores `process-wall 7.35 s` beside Groebner.jl's `solve 83.4 ms`, an 88x gap against which Zeebra is **3.95x faster** — which sharpens #447's first question rather than softening it. Also records #448's resolution (`a062b59`), which explains the board-membership discrepancy the first draft hedged against. |
 
 ---
@@ -139,6 +140,40 @@ So, precisely:
 evidence in this repository that the F4 problem is not a stage, and it is why M27-A opens with a
 question about *how much work Zeebra does* rather than about how fast it does it.
 
+### 1.1a Answered: the gap is three factors, and only one of them is a stage to speed up
+
+**#447 is closed and `docs/research/groebner-jl-gap.md` is the finding.** It changes this section's
+conclusion in the direction that matters, so the arithmetic above is kept for the record and
+superseded here.
+
+**The counts agree.** Same digest, grevlex: **10 matrix batches**, **11 matrices**, **1 777 against
+1 787 selected pairs** (0.6% apart), **247 basis elements**, **quotient dimension 354**. The only
+material difference is reducer rows — 84 645 against 47 464, a factor of 1.78, of which Groebner.jl's
+own trace says 41.5% were ever used. **Zeebra does the same work and takes 344x longer**, so gate 0's
+leading candidate — "asymptotically more work, and no data-structure change closes it" — is dead.
+
+| factor | size | what it is | M27's disposition |
+|---|---:|---|---|
+| **A** | **4.89x** | Groebner.jl's default *randomized* linear algebra | **Declined by policy.** Zeebra commits to a deterministic kernel; #269/§6.6's verdict stands and its magnitude was understated ~20x |
+| **B** | **5.03x** | final interreduction by **247 iterated divisions** where Groebner.jl does **one Macaulay matrix** | **M27-A's first item.** §5.2a |
+| **C** | **14.0x** | a per-operation constant, uniform at **11.6x–25.5x** across every other stage | #317's, and only #317's. §5.2 |
+
+`4.89 × 5.03 × 14.0 = 344x`, against a measured 344x.
+
+**The per-stage split is what makes B unmistakable:**
+
+| stage | Zeebra | Groebner.jl | ratio |
+|---|---:|---:|---:|
+| symbolic preprocessing | 403.16 ms | 15.8 ms | 25.5x |
+| construction + elimination + extraction | 5 292.44 ms | 54.5 ms | 97.1x |
+| pair selection + bookkeeping | 81.07 ms | 6.96 ms | 11.6x |
+| **final interreduction** | **24 136.08 ms** | **1.74 ms** | **13 871x** |
+| F4 total | 29 912.76 ms | 79.0 ms | 379x |
+
+Three stages between 11.6x and 97.1x is an implementation constant. One at nearly fourteen thousand
+is **not an implementation of the same thing at all** — and the stage split is now measured four
+times, unmoved, at 80.4%/80.69%.
+
 Three caveats travel with every figure in that table.
 
 **The Groebner.jl figure is an inner time, and the board stores what it excludes.** The same row
@@ -146,10 +181,11 @@ records `process-wall 7.35 s` and `process-cpu 8.16 s` beside `solve 83.4 ms` �
 against that process wall Zeebra at 29.01 s is **3.95x faster**. The adapter measures `@solve_ns`
 around the `groebner` call after a discarded proxy solve in the same ring, with residual compilation
 measured at ~0.17 ms absolute and signed so as to *overstate* Groebner.jl's time; its 726.3 MB peak
-is the Julia process's, a cost of deployment rather than the algorithm's working set. Whether the JIT
-lands inside the inner timer is **not established**, so **direction and order of magnitude only**
-until #447 settles it — but note that no plausible JIT correction closes 348x, and the 88x
-inner-versus-process gap is itself the thing #447 must explain.
+is the Julia process's, a cost of deployment rather than the algorithm's working set. **#447 settled the JIT question**: three
+successive timed calls span **2.2%** and the sign inflates Groebner.jl, so ratios at this size are
+good to ~2%. Separately, Groebner.jl's 9.33 ms of AbstractAlgebra conversion sits inside the board's
+`@solve_ns` and outside `f4!`, which makes the board's 348x the **conservative** reading — stripping
+it gives ~386x.
 
 **Sagebrush is not a speedup denominator**, by the board's own marking and by
 `external-comparands.md`'s maturity gate. Its row is context.
@@ -300,6 +336,7 @@ any of it be believed.
 | **#454** | M27-B | `SUPPORTED_DIMENSIONS` is `[10, 15, 20]` — the toy sizes. The smallest *real* importable challenge is type VI m=16 → n=24, so no challenge instance can be imported at all |
 | **#456** | M27-C | `one-finite-field-solution` is refused by **all four** comparands, verified per engine from source. The second task has to be `univariate-eliminant`, which needs a field below msolve's eliminant ceiling — §5.4 |
 | **#457** | M27-D | #74, #76, #272 and #273 are candidates; #77 owns the metric; nothing owns *choosing between them and recording the refusal* |
+| **#471** | M27-A | #447's answer named it and §6 of the Groebner.jl study never proposed it: the stage needs replacing, not speeding up |
 | **#458** | M27-I | The integration-and-report role, mirroring #299 and #370 |
 
 Thirty-six issues are attached as sub-issues of #450. **Eight are not, and the reason is mechanical
@@ -418,7 +455,9 @@ falsified hypothesis** with its mechanism still unmeasured.
 
 ### 5.2 M27-A — the `normal_form` loop, and the question of how much work Zeebra does
 
-**Issues:** #447 (gate 0), #440, #436, #452 (the instrumentation it all rests on), #331, #317, #268.
+**Issues:** #447 (**answered** — `docs/research/groebner-jl-gap.md`), #452 (the instrumentation it all
+rests on), **#471's matrix interreduction (factor B, 5.03x)**, #317 (factor C, 14.0x), #440, #436,
+#331, #268.
 **Primary files:** `src/poly/multivariate/sparse_multivariate_polynomial_arithmetic.rs`,
 `src/grobner/buchberger.rs`, the monomial type, `benches/sparse_polynomial.rs`.
 
@@ -486,6 +525,54 @@ A separate question is noted and **not** scheduled: whether solution-oriented wo
 final reduced-basis construction. It is attractive precisely because the stage is 80.4%, and it is
 excluded because such a route is not task-equivalent to computing a reduced basis and must never be
 compared as though it were. It is an M28 candidate with a protocol prerequisite.
+
+### 5.2a M27-A's first item — final interreduction as one Macaulay matrix (#471)
+
+**This is the largest implementable lever in the repository, and #447 is what found it.** It is not
+in §6 of the Groebner.jl study, because §6 was looking for stages to speed up and this stage needs
+*replacing*.
+
+**What Groebner.jl does** (`src/f4/f4.jl:106-171`, `f4_autoreduce!`): `matrix_reinitialize!` to
+`basis.n_nonredundant` rows; each non-redundant basis element becomes an **upper row** at multiplier
+1; `f4_symbolic_preprocessing!` supplies the reducers those rows need; **every** column is marked
+`UNKNOWN_PIVOT_COLUMN` so all of them are eliminated against rather than treated as already reduced;
+`linalg_autoreduce!`; `matrix_convert_rows_to_basis_elements!`; then the leading-monomial
+divisibility sweep that drops subsumed elements. One matrix, the same hashtable, the same sparse
+kernels as every other batch. Measured: **250 x 604, 1.74 ms, 2.0% of `f4!`.**
+
+**What Zeebra does** (`src/grobner/buchberger.rs:287-352`): `minimize_grobner_basis`, sort ascending
+by leading monomial, then for each of the 247 elements in turn `p.normal_form(&others, order)`,
+writing each remainder back in place. `normal_form` pops the working polynomial's leading term,
+**linearly scans all 246 reducers calling `checked_div`**, and `subtract_shifted` merges the chosen
+tail back. **247 sequential divisions, each with its own intermediate growth.**
+
+24 136 ms over 247 elements is **97.7 ms per element**, against a final basis whose entire monomial
+support is **604 monomials**. That is intermediate expression swell — precisely what F4's matrix
+formulation exists to avoid, and which Zeebra avoids everywhere in F4's main loop and then pays once,
+at the end, for four fifths of the run.
+
+**Zeebra already owns every component.** `src/grobner/f4/macaulay.rs` builds Macaulay matrices,
+`src/grobner/f4/symbolic.rs` finds reducers, `src/linalg` eliminates them, and
+`minimize_grobner_basis` already produces the row set. **What is missing is the assembly.**
+
+**The correctness argument is already written in the tree**, at `buchberger.rs:306-314`: a reduced
+Gröbner basis is determined by its leading monomials, so the route to it cannot change the answer.
+That makes the acceptance criterion exact equality rather than a tolerance.
+
+**The ceiling, and the one honest caveat.** 5.03x is a ceiling on *interreduction*, and a matrix pass
+is not free. Groebner.jl's 1.74 ms is an engine 11.6x–97x faster per operation, so Zeebra should
+expect to pay of order **170 ms** and keep about **5.0x of the 5.18x available** — 29 913 ms to
+roughly **5 946 ms**, which is **ahead of Singular's 7 001 ms on this row.** This is the first
+stage-level estimate in this repository where the comparand's own cost for the same stage is known
+rather than a share divided into one. It remains an estimate.
+
+**The division route is retained, not replaced.** `normal_form` is on the critical path of FGLM
+border reduction, the differential oracles and `multi_div_rem`; and its divisor-selection order is
+observable through the pinned border fixtures (§4.4). The matrix route is selected for *final
+interreduction* behind an explicit option, with the division route as the fallback and as the
+differential oracle for the new one.
+
+---
 
 ### 5.3 M27-B — the Fukuoka frontier, and the GF(2^8) path
 
@@ -761,23 +848,28 @@ No M27 figure is published against an M26 figure until M27-0 records both with t
 and #319 resolve or are **explicitly bounded as a ~20% systematic** before any cross-boundary ratio
 is quoted. The `rf4-rp2` row resolves to the retained record.
 
-### 6.2 Gate M27-A — the counts come before the data structures
+### 6.2 Gate M27-A — **answered**, and the answer reorders the workstream
 
-**Branch on the issue the measurement implicates, never on a stage name.** This is M26 §8.1.1's own
-lesson, learned there by writing a gate that bundled two stages.
+The gate as written asked whether Zeebra does asymptotically more work. **#447 measured it and the
+answer is no** — the counts agree to 0.6% on pairs and exactly on batches, matrices, basis
+cardinality and quotient dimension. The branch that would have capped M27-A at the Singular gap is
+dead, and the one that survives is "the counts agree and the per-step cost differs", with the cost
+decomposed into factors B and C.
 
-| #447's measured outcome | consequence |
-|---|---|
-| Zeebra reaches materially **more** pairs, batches or matrices on the same ideal | the gap is algorithmic. #440 and #317 are capped at the Singular gap, which is still 2x and still worth taking. M27-D's gate acquires its strongest instance, and a new issue owns the work-count question |
-| the counts **agree** and the per-step cost differs | #440 is the whole story. Stages 1–3 proceed, and the 5.10x ceiling is the real ceiling |
-| the counts agree and neither cost explains the gap | **neither #440 nor #317 can reach parity**, recorded as such, and M27-A delivers the 2x without a parity claim |
+So the order is now:
 
-Then, within #440: **stage 1 decides stages 2 and 3, and the four verdicts are not three.** Stage 2
-pays only if compare-bound; stage 3 only if copy-bound after stage 2; #436 candidate 1 and #331 only
-if search-bound; and *none of them* is a legitimate fourth answer that closes the issue cheaply.
+| rank | item | ceiling | status |
+|---|---|---:|---|
+| 1 | **matrix-based final interreduction** (#471, §5.2a, factor B) | **5.03x** | unconditional. The comparand's own cost for the same stage is known |
+| 2 | **the monomial representation** at two words (#317, factor C) | *not a stage; the screen cannot bound it* | gated on #317's own `MonomialOrder::cmp` microbenchmark **before** touching the type, because `Monomial` is serialized and a new field is a format change. The `HashMap<Monomial<N>, F>` term store belongs in the same screen, and nothing has measured the two apart |
+| 3 | #440's window-the-merge, #436's candidates 1–3, #331 | bounded by what remains of the division route after item 1 | these now serve FGLM border reduction, the differential oracles and `multi_div_rem` rather than F4's hot stage. Still worth taking, no longer the headline |
+| — | #268 §6.1-style interning, divmask, delayed reduction | **1.014x–1.16x** on the losing column | won't-do, now on measured evidence rather than inference |
 
-**#317 is unfunded until stage 1 returns compare-bound**, and then gated again on its own `cmp`
-microbenchmark.
+**#440's stage 1 is still worth running and its scope narrows to a loose end #447 named:** intermediate
+swell in `normal_form` is **inferred, not measured** — nothing counts terms popped or `checked_div`
+calls. Two counters settle it and distinguish swell (terms popped ≫ terms in the answer) from scan
+cost. #452 adds them. The replacement is the same either way, which is why item 1 does not block on
+it.
 
 ### 6.3 Gate M27-B — the diagnosis authorizes the run, not the other way round
 
@@ -980,9 +1072,11 @@ machine); any type VI n=15 campaign past the diagnostic; `rf6-rp0` (16.15 h); ev
 
 1. M27-0's baseline frozen with commits, affinity and machine, and the `rf4-rp2` row resolved to one
    authoritative table.
-2. #447's work counts measured, so it is known whether the gap is algorithmic — and the
-   Groebner.jl JIT question settled or explicitly bounded.
-3. #440 stage 1's instrumented split on record, with one of its four verdicts stated.
+2. ~~#447's work counts measured~~ — **met before implementation began** (`a1867a7`): the counts
+   agree, the 344x decomposes into 4.89x / 5.03x / 14.0x, and the JIT question is settled at ~2%.
+3. §5.2a's matrix interreduction landed with a bit-identical reduced basis and the stage share
+   re-measured, **or** a recorded verdict naming what refused it; and #440 stage 1's counters on
+   record settling whether `normal_form`'s cost is swell or scan.
 4. The Fukuoka III n=20 barrier re-diagnosed at current `main`, with #322 landed, and what binds it
    named with its attribution.
 5. The Fukuoka GF(2^8) path complete: #414's two halves, #415's error channel, and #421's arm with
@@ -995,7 +1089,9 @@ machine); any type VI n=15 campaign past the diagnostic; `rf6-rp0` (16.15 h); ev
 
 - **At least 2x end to end on `mq-random-10`** against the M27-0 baseline, bit-identical reduced
   basis, with the stage share re-measured rather than a microbenchmark — **or** a recorded verdict
-  from #440 stage 1 naming the measured term that refuses it.
+  naming the measured term that refuses it. §5.2a's estimate is **~5.0x**, which would land ahead of
+  Singular on this row; 2x is the criterion because a ceiling bounds the conceivable, not the
+  achievable.
 - **One previously uncompleted published Fukuoka instance verified**, ideally
   `fukuoka-mq-III-n20-seed0`, independently verified against the published coefficient vectors —
   **or** a costed, authorized attempt whose stop reason is measured and attributed.
@@ -1024,8 +1120,11 @@ parity is reachable by implementation at all.
 
 ## 11. What M27 will not claim
 
-- That closing the interreduction gap closes the competitive gap. It closes Singular's and leaves
-  **68x against Groebner.jl, 23x against msolve and 17x against Sagebrush** standing.
+- That closing the interreduction gap closes the competitive gap. #447 decomposed the 344x and
+  interreduction is **factor B of three**: removing it entirely leaves **4.89x** of randomized linear
+  algebra Zeebra declines by policy and **14.0x** of per-operation constant, so ~70x is what items 1
+  and 2 together could reach and **4.89x behind Groebner.jl's randomized figure is the floor** this
+  milestone can aim at without changing its correctness regime.
 - That an Amdahl ceiling computed against one comparand bounds the gap against another.
 - That Groebner.jl's ratios are precise, while whether Julia's JIT lands inside its inner timer is
   unestablished. Direction and order of magnitude only.
@@ -1050,7 +1149,8 @@ parity is reachable by implementation at all.
 | risk | likelihood | what it costs | mitigation |
 |---|---|---|---|
 | ~~PR #435 does not merge~~ — **resolved during planning** | — | — | #435 merged at `25e10fe`; the board holds 252 rows across five libraries and §1.1 reads from `main` |
-| **Groebner.jl's 348x is substantially a timer artefact** | **moderate** | M27-A's gate 0 premise, and Rule 4's sharpest example | The board already stores `process-wall 7.35 s` beside `solve 83.4 ms`; #447 must settle where the JIT lands before the ratio's precision is quoted. Note the direction survives either way: 348x against the inner time, 3.95x *in Zeebra's favour* against the process wall, and the plan quotes only orders of magnitude |
+| ~~Groebner.jl's 348x is a timer artefact~~ — **settled** | — | — | #447: three successive timed calls span **2.2%** and the sign inflates Groebner.jl. The board's 348x is also the conservative reading, since 9.33 ms of AbstractAlgebra conversion is inside `@solve_ns` and outside `f4!` |
+| **The matrix interreduction pass costs more than the 170 ms estimated** | **moderate** | part of factor B's 5.03x | The estimate is Groebner.jl's 1.74 ms scaled by Zeebra's own 97.1x per-operation constant, which is the best-grounded stage estimate in the repository — but it is an estimate. The division route is retained, so a loss is recorded and reverted rather than shipped |
 | **#440 stage 1 returns "none of them"** | moderate | M27-A's 2x target | That is a complete result and closes the issue cheaply. The 80.4% then needs #436's candidates 2–3 or an algorithmic answer, which routes to M27-D |
 | **#447 shows Zeebra does asymptotically more work** | **moderate-to-high** | the parity half of M27-A, permanently | Stated in advance in §6.2 so it cannot be re-interpreted afterwards. It *strengthens* M27-D and hands it an instance |
 | III n=20 is still entry-bound after #322 | moderate | the frontier target | The diagnosis is itself a deliverable, and it names the barrier for M27-D and for M28 |
