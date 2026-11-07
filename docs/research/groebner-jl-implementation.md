@@ -710,6 +710,6 @@ until a measurement says otherwise.
 >   outside every window `Zp.jl:363-381` selects delayed arithmetic for.
 >
 > And the item that now ranks first is **not in §6**: Groebner.jl's final interreduction is one
-> Macaulay matrix (`src/f4/f4.jl:106-170`, measured at 250 × 604 and **1.74 ms**) where Zeebra runs
+> Macaulay matrix (`src/f4/f4.jl:106-171`, measured at 250 × 604 and **1.74 ms**) where Zeebra runs
 > 247 sequential polynomial divisions and spends **24.1 s**. §6 looked for stages to speed up; that
 > stage needs replacing.

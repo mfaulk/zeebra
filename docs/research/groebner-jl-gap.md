@@ -6,9 +6,11 @@ Measurement record for #447, following #265's source study
 Groebner.jl for ideas**; what is new is a *comparand* for the counters §6's hypotheses were ranked
 against, and the counters say the ranking was aimed at the wrong column.
 
-Pinned: Zeebra at `25e10fe`, Groebner.jl **0.10.11** on **Julia 1.11.7** with AbstractAlgebra
-0.50.5, from `tools/external/provision.sh`'s prefix. Groebner.jl `path:line` citations are relative
-to the package root `julia-depot/packages/Groebner/Aqs1M`.
+Pinned: Zeebra at `25e10fe` (this branch's original base; the later rebase onto `74cb43a` touched no
+file cited here), Groebner.jl **0.10.11** on **Julia 1.11.7** with AbstractAlgebra 0.50.5, from
+`tools/external/provision.sh`'s prefix. Groebner.jl `path:line` citations are relative to the
+package root `julia-depot/packages/Groebner/Aqs1M`. Machine: AMD Ryzen Threadripper PRO 5995WX,
+128 hardware threads.
 
 **Licensing, restated because this note quotes its mechanisms.** Groebner.jl is GPL-2.0, is
 self-declaredly adapted from GPL-2.0-or-later msolve, and embeds GPL-3.0-or-later code
@@ -84,13 +86,13 @@ Two small additions make the two sides comparable rather than merely adjacent:
 Two Groebner.jl facilities do the reporting, and neither needed a patched build:
 
 1. **`groebner_learn` records the counts.** `f4_learn!` (`src/f4/learn_apply.jl:156-199`) is
-   `f4!` (`src/f4/f4.jl:415-452`) with a recorder attached — same `f4_update!`, same
+   `f4!` (`src/f4/f4.jl:415-453`) with a recorder attached — same `f4_update!`, same
    `f4_select_critical_pairs!`, same `f4_symbolic_preprocessing!`, same termination, plus
    `push!(trace.critical_pair_sequence, (degree_i, npairs_i))` at `:174`. Its `Trace` carries
    `matrix_infos` as `(nup, nlow, ncols)` per iteration and `Base.show` prints an "F4 statistics"
-   block (`src/f4/trace.jl:24`, `:225-258`). **`matrix_infos` has one entry more than the loop has
-   iterations**, the last being the final-interreduction matrix — which is how `:487` recovers the
-   iteration count by subtracting one.
+   block (`src/f4/trace.jl:24`, `:225-261`). **`matrix_infos` has one entry more than the loop has
+   iterations**, the last being the final-interreduction matrix — which is how
+   `learn_apply.jl:487` recovers the iteration count by subtracting one.
 2. **`Groebner._TIMER` gives a per-stage split, and ships disabled.**
    `TimerOutputs.disable_timer!(_TIMER)` at `src/Groebner.jl:82`, with `@timeit _TIMER` on
    `f4!`, `f4_reduction!`, `f4_symbolic_preprocessing!`, `f4_select_critical_pairs!`, `f4_update!`
@@ -214,14 +216,15 @@ about those representations.
 
 It is not a faster interreduction. **It is linear algebra where Zeebra does division.**
 
-**Groebner.jl.** `f4_autoreduce!` (`src/f4/f4.jl:106-170`): `matrix_reinitialize!` to
-`basis.n_nonredundant` rows; each non-redundant basis element becomes an **upper row** of one
-Macaulay matrix at multiplier 1 (`:120-133`); `f4_symbolic_preprocessing!` supplies whatever
-reducers those rows need (`:135`); every column is marked `UNKNOWN_PIVOT_COLUMN` so that *all* of
-them are eliminated against rather than treated as already-reduced (`:137-139`);
-`linalg_autoreduce!`; `matrix_convert_rows_to_basis_elements!`; then the leading-monomial
-divisibility sweep that drops subsumed elements (`:151-169`). One matrix, the same hashtable, the
-same sparse kernels as every other batch. Measured here: **250 × 604, 1.74 ms, 2.0% of `f4!`.**
+**Groebner.jl.** `f4_autoreduce!` (`src/f4/f4.jl:106-171`): `matrix_reinitialize!` to
+`basis.n_nonredundant` rows (`:116`); each non-redundant basis element becomes an **upper row** of
+one Macaulay matrix at multiplier 1 (`:120-134`); `f4_symbolic_preprocessing!` supplies whatever
+reducers those rows need (`:136`); every column is then marked `UNKNOWN_PIVOT_COLUMN` so that *all*
+of them are eliminated against rather than treated as already-reduced (`:138-140`);
+`linalg_autoreduce!` (`:144`); `matrix_convert_rows_to_basis_elements!` (`:146`); then the
+leading-monomial divisibility sweep that drops subsumed elements (`:150-170`). One matrix, the same
+hashtable, the same sparse kernels as every other batch. Measured here: **250 × 604, 1.74 ms, 2.0%
+of `f4!`.**
 
 **Zeebra.** `reduce_grobner_basis_until` (`src/grobner/buchberger.rs:287-352`):
 `minimize_grobner_basis`, sort ascending by leading monomial, then **for each of the 247 elements in
@@ -407,7 +410,7 @@ Not §6's order, and the first item is not in §6 at all.
 
 1. **Final interreduction as one Macaulay matrix, not 247 divisions.** Ceiling **5.03x** on the
    losing instance — the largest in this repository and the only one whose comparand's cost for the
-   same stage is known (1.74 ms, a 250 × 604 matrix). Mechanism at `src/f4/f4.jl:106-170`; Zeebra's
+   same stage is known (1.74 ms, a 250 × 604 matrix). Mechanism at `src/f4/f4.jl:106-171`; Zeebra's
    current mechanism at `src/grobner/buchberger.rs:287-352`; every component already exists in
    `src/grobner/f4/`. This is #304's stage, promoted again and for a different reason: #304 was a
    *memory* finding about holding the basis three times, and #349 promoted it on an 80.4% share.
