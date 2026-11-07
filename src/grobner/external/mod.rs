@@ -56,6 +56,8 @@ pub mod board;
 pub mod contract;
 #[cfg(feature = "external-runners")]
 pub mod corpus;
+#[cfg(feature = "external-runners")]
+pub mod msolve;
 pub mod process;
 #[cfg(feature = "external-runners")]
 pub mod singular;
