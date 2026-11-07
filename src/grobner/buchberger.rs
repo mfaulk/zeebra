@@ -156,7 +156,7 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
 
     statistics.criteria = counts;
 
-    (reduce_grobner_basis(&basis, order), statistics)
+    (reduce_grobner_basis(basis, order), statistics)
 }
 
 /// Finds a minimal Grobner basis, paired with the leading monomial of each element kept.
@@ -172,7 +172,7 @@ pub fn buchberger_with_criteria<const N: usize, F: FiniteField>(
 /// The leading monomials are returned rather than recomputed because taking one is a scan of a
 /// polynomial's whole term map, and both this function and its caller need all of them.
 fn minimize_grobner_basis<const N: usize, F: FiniteField>(
-    g: &[MultivariatePolynomial<N, F>],
+    g: Vec<MultivariatePolynomial<N, F>>,
     order: MonomialOrder,
 ) -> Vec<(Monomial<N>, MultivariatePolynomial<N, F>)> {
     // Scale each polynomial to have leading coefficient 1, dropping zeros and duplicates.
@@ -183,9 +183,14 @@ fn minimize_grobner_basis<const N: usize, F: FiniteField>(
     // kept so far. The full scan was a polynomial equality per element per element.
     let mut monic: Vec<(Monomial<N>, MultivariatePolynomial<N, F>)> = Vec::with_capacity(g.len());
     let mut by_shape: HashMap<(Monomial<N>, usize), Vec<usize>> = HashMap::new();
-    for p in g.iter().filter(|p| !p.is_zero()) {
+    // `g` is consumed and each element scaled **in place**. `scale` allocated a fresh term map per
+    // element, which was a third full copy of the basis live beside the caller's two — #304. At
+    // twenty variables a term is ~88 bytes of payload before hashbrown's slack, none of it covered
+    // by `max_live_nonzeros` or `max_live_bytes`.
+    for mut p in g.into_iter().filter(|p| !p.is_zero()) {
         let lead = p.leading_monomial(order);
-        let scaled = p.scale(&p.leading_coefficient(order).inverse());
+        p.scale_assign(&p.leading_coefficient(order).inverse());
+        let scaled = p;
         let shape = (lead, scaled.terms().len());
         let same_shape = by_shape.entry(shape).or_default();
         if same_shape.iter().any(|&i| monic[i].1 == scaled) {
@@ -231,7 +236,7 @@ fn minimize_grobner_basis<const N: usize, F: FiniteField>(
 /// 1. The leading coefficient of each polynomial is 1.
 /// 2. For all p in G,no monomial of p lies in <LT(G \ {p})>.
 pub(crate) fn reduce_grobner_basis<const N: usize, F: FiniteField>(
-    g: &[MultivariatePolynomial<N, F>],
+    g: Vec<MultivariatePolynomial<N, F>>,
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
     match reduce_grobner_basis_until(g, order, || false) {
@@ -280,7 +285,7 @@ pub(crate) struct InterreductionStopped {
 /// always a complete reduced Gröbner basis, and a half-interreduced basis handed back as success
 /// is exactly the confusion that contract exists to prevent.
 pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
-    g: &[MultivariatePolynomial<N, F>],
+    g: Vec<MultivariatePolynomial<N, F>>,
     order: MonomialOrder,
     mut should_stop: impl FnMut() -> bool,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
@@ -366,8 +371,8 @@ mod interreduction_stop_tests {
     fn a_never_stopping_predicate_is_the_unbounded_result() {
         let g = basis();
         let order = MonomialOrder::GradedReverseLexicographic;
-        let bounded = reduce_grobner_basis_until(&g, order, || false).expect("never stops");
-        assert_eq!(bounded, reduce_grobner_basis(&g, order));
+        let bounded = reduce_grobner_basis_until(g.clone(), order, || false).expect("never stops");
+        assert_eq!(bounded, reduce_grobner_basis(g, order));
     }
 
     /// An always-stopping predicate stops before reducing any element.
@@ -375,7 +380,7 @@ mod interreduction_stop_tests {
     fn an_always_stopping_predicate_stops_before_the_first_element() {
         let g = basis();
         let stopped =
-            reduce_grobner_basis_until(&g, MonomialOrder::GradedReverseLexicographic, || true)
+            reduce_grobner_basis_until(g, MonomialOrder::GradedReverseLexicographic, || true)
                 .expect_err("an always-true predicate must stop");
         assert_eq!(stopped.elements_reduced, 0, "nothing was paid for");
         assert_eq!(stopped.elements, 2, "and it reports the work it had to do");
@@ -387,7 +392,7 @@ mod interreduction_stop_tests {
         let g = basis();
         let mut calls = 0usize;
         let stopped =
-            reduce_grobner_basis_until(&g, MonomialOrder::GradedReverseLexicographic, || {
+            reduce_grobner_basis_until(g, MonomialOrder::GradedReverseLexicographic, || {
                 calls += 1;
                 calls > 1
             })
@@ -1410,7 +1415,7 @@ mod tests {
             for f in &corpus {
                 let raw = raw_basis(f, order);
                 assert_eq!(
-                    reduce_grobner_basis(&raw, order),
+                    reduce_grobner_basis(raw.clone(), order),
                     reduce_grobner_basis_reference(&raw, order),
                     "{} on a {}-element pre-interreduction basis",
                     order.name(),
@@ -1435,7 +1440,7 @@ mod tests {
                 ],
             ] {
                 assert_eq!(
-                    reduce_grobner_basis(&raw, order),
+                    reduce_grobner_basis(raw.clone(), order),
                     reduce_grobner_basis_reference(&raw, order),
                     "{} on {:?}",
                     order.name(),
@@ -1462,7 +1467,7 @@ mod tests {
             inputs.push(buchberger(&katsura::<3, F>(), order));
 
             for input in &inputs {
-                let basis = reduce_grobner_basis(input, order);
+                let basis = reduce_grobner_basis(input.to_vec(), order);
 
                 for p in &basis {
                     assert_eq!(p.leading_coefficient(order), F::ONE, "{} is not monic", p);
@@ -1518,7 +1523,7 @@ mod tests {
 
                 // Idempotent, which is what makes the output canonical rather than merely tidy.
                 assert_eq!(
-                    reduce_grobner_basis(&basis, order),
+                    reduce_grobner_basis(basis.clone(), order),
                     basis,
                     "{}: reducing a reduced basis changed it",
                     order.name()

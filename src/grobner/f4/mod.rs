@@ -508,8 +508,18 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // The wall clock is checked **inside** this stage, not only in the batch loop above. #349
     // measured interreduction at 80.4% of `mq-random-10`, so a budget honored at every batch could
     // previously be overrun by four fifths of the computation (#395).
+    // Everything the loop needed is dead here, and interreduction is where the basis peaks. Until
+    // #304 the basis was live in **three** forms at this point: `basis`, `monic`, and the scaled
+    // copy `minimize_grobner_basis` built. `monic`, `leads` and `pending` are dropped explicitly
+    // rather than left to the end of the function, and `basis` is **moved** into the stage, so one
+    // copy reaches it instead of three.
+    drop(pending);
+    drop(monic);
+    drop(leads);
+    drop(term_counts);
+
     let mut interreduction_clock = StageClock::new(options.measure_stages);
-    let interreduction = reduce_grobner_basis_until(&basis, order, || {
+    let interreduction = reduce_grobner_basis_until(basis, order, || {
         match (wall_clock.as_ref(), options.max_wall_time) {
             (Some(clock), Some(budget)) => clock.elapsed() >= budget,
             _ => false,

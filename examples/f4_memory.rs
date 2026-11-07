@@ -348,11 +348,19 @@ fn attribution<const N: usize>(
             pair_key_bytes
         ),
     });
+    // Two copies, which is the peak and is reached **during the loop**: `Vec<Multivariate>` and
+    // `MonicBasis`. It is worth saying where the peak is not, because this site used to be read as
+    // covering interreduction and it undercounted that window rather than describing it: before
+    // #304 `minimize_grobner_basis` scaled into a third full copy while both of these were still
+    // live, so the real figure there was 3x this per-copy cost and nothing reported it. #304 drops
+    // `monic` and moves `basis` into the stage, so interreduction now holds **one** copy and the
+    // peak is unambiguously the loop's two.
     sites.push(Site {
         name: "basis, stored twice",
         bytes: statistics.peak_basis_terms * (monomial_bytes + 8) * 2,
         method: format!(
-            "{} terms x ({} + 8) B x 2 copies (Vec<Multivariate> and MonicBasis)",
+            "{} terms x ({} + 8) B x 2 copies (Vec<Multivariate> and MonicBasis), during the \
+             loop; interreduction holds 1 since #304",
             statistics.peak_basis_terms, monomial_bytes
         ),
     });
