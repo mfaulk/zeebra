@@ -1113,6 +1113,30 @@ fn scaling(passes: &[Pass]) {
 }
 
 /// The scoreboard record for one pass.
+/// The non-default flags in force, as a command-line fragment.
+///
+/// A record's `reproduce` line has to name them. The default budgets admit the rows that were
+/// affordable before #350, so the bare command did reproduce those records — but `rf4-rp2` needs
+/// `--max-samples 59050` to get past the sample cap at all, and it needs the kernel and root
+/// finder it actually ran with, since the dense route on that row is 1.61 h rather than 6.6 s. A
+/// `reproduce` line that reproduces a *different* computation is worse than none.
+fn flags_in_force() -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if kernel_flag() != DeterminantKernel::Dense {
+        parts.push(format!("--kernel {}", kernel_flag()));
+    }
+    if deflation_root_finder() {
+        parts.push("--root-finder deflation".to_string());
+    }
+    if let Some(samples) = flag_value("--max-samples") {
+        parts.push(format!("--max-samples {samples}"));
+    }
+    if let Some(budget) = flag_value("--wall-budget") {
+        parts.push(format!("--wall-budget {budget}"));
+    }
+    parts.join(" ")
+}
+
 fn record(
     manifest: &ChallengeManifest,
     seed: u64,
@@ -1199,18 +1223,36 @@ fn record(
         concurrency: pass.concurrency,
         build: "release, RUSTFLAGS from .cargo/config.toml".to_string(),
         policy: format!(
-            "straight-line evaluation, one Sylvester resultant by interpolation, {} determinant \
-             worker{}, no budget",
+            "straight-line evaluation, one Sylvester resultant by interpolation, {} kernel, {} \
+             root finder, {} determinant worker{}{}",
+            kernel_flag(),
+            if deflation_root_finder() {
+                "deflation"
+            } else {
+                "gcd"
+            },
             pass.concurrency,
-            plural(pass.concurrency)
+            plural(pass.concurrency),
+            match (flag_value("--max-samples"), flag_value("--wall-budget")) {
+                (None, None) => ", no budget".to_string(),
+                (samples, budget) => format!(
+                    ", sample cap {}, wall budget {}",
+                    samples.map_or("default".to_string(), |s| s.to_string()),
+                    budget.map_or("default".to_string(), |b| format!("{b} s"))
+                ),
+            }
         ),
     };
-    // Name the row. The default budgets admit it, so the bare command does reproduce this record
-    // — but it also runs every other row on the way, which for a 60-minute six-round row is an
-    // hour of unrelated work to re-derive one line.
+    // Name the row and every non-default flag it ran under. Naming the row alone was enough while
+    // the default budgets admitted every affordable row; `rf4-rp2` is refused by the default
+    // sample cap, so a bare command would reproduce a *skip* rather than this record.
+    let flags = flags_in_force();
     record.reproduce = format!(
-        "cargo run --release --example resultant_cico -- --row {} --concurrency {} --write",
-        record.challenge, pass.concurrency
+        "cargo run --release --example resultant_cico -- --row {} --concurrency {}{}{} --write",
+        record.challenge,
+        pass.concurrency,
+        if flags.is_empty() { "" } else { " " },
+        flags
     );
     // Measured process RSS, kept apart from any `peak_estimated_bytes`: this route builds no
     // Macaulay matrix, and on the six-round row the two would differ by four orders of magnitude.
