@@ -1638,6 +1638,15 @@ rational param(cpu)             0.75 sec
     /// `x1`/`x10` prefix hazard in it. Zeebra's side is computed here and now by `f4`, so an
     /// agreement test is live Zeebra against recorded msolve rather than two recordings.
     fn corpus_pair(name: &str, characteristic: u64) -> (Instance, Invariants) {
+        try_corpus_pair(name, characteristic)
+            .unwrap_or_else(|| panic!("no compiled instantiation for {}", name))
+    }
+
+    /// [`corpus_pair`], returning `None` where Zeebra's side has no compiled instantiation.
+    ///
+    /// Only the ladder-wide test needs this: every other caller names its rung as a literal, so
+    /// a missing instantiation there is a programming error and should panic.
+    fn try_corpus_pair(name: &str, characteristic: u64) -> Option<(Instance, Invariants)> {
         let instance = corpus::instance(name, characteristic, GREVLEX)
             .unwrap_or_else(|| panic!("{} is a corpus rung", name));
         let refs: Vec<&str> = instance.variable_refs();
@@ -1649,10 +1658,31 @@ rational param(cpu)             0.75 sec
             "cyclic-4" => zeebra_leading(&cyclic::<4, Reference>(), &refs),
             "cyclic-5" => zeebra_leading(&cyclic::<5, Reference>(), &refs),
             "cyclic-6" => zeebra_leading(&cyclic::<6, Reference>(), &refs),
-            other => panic!("no compiled instantiation for {}", other),
+            _ => return None,
         };
-        (instance, Invariants::none().with_leading_monomials(leading))
+        Some((instance, Invariants::none().with_leading_monomials(leading)))
     }
+
+    /// The corpus rungs `corpus_pair` cannot yet build Zeebra's side for, and why.
+    ///
+    /// `corpus::instance` hands out rendered text; computing Zeebra's own invariants needs the
+    /// typed system, which is a per-family `const`-generic instantiation. The seven katsura and
+    /// cyclic rungs have one; the twelve families #324 added do not. Listing them here rather
+    /// than skipping silently keeps the coverage gap visible and makes a newly added rung fail
+    /// at an assertion that names it — #333 is the issue for closing the gap.
+    const WITHOUT_A_COMPILED_PAIR: &[&str] = &[
+        "mq-random-6",
+        "mq-random-10",
+        "mq-random-14",
+        "mq-planted-6",
+        "mq-planted-10",
+        "mq-planted-14",
+        "poseidon-t2-rf2-rp0-planted",
+        "poseidon-t2-rf2-rp2-planted",
+        "poseidon-t2-rf4-rp0-planted",
+        "anemoi64-cico-n1-fcico",
+        "anemoi64-cico-n2-fcico",
+    ];
 
     /// The leading monomials of Zeebra's grevlex basis, rendered with `variables`.
     fn zeebra_leading<const N: usize, F: FiniteField>(
@@ -1675,7 +1705,25 @@ rational param(cpu)             0.75 sec
             .join(".local/opt/zeebra-ext/bin/msolve")
             .to_string_lossy()
             .into_owned();
-        std::path::Path::new(&path).is_file().then_some(path)
+        let found = std::path::Path::new(&path).is_file().then_some(path);
+        if found.is_none() {
+            // Three outcomes, not two. A test that returns early on an absent tool is
+            // indistinguishable in the harness's output from one that ran and agreed, which is
+            // how a panic on the mq/poseidon rungs reached `main` with CI green: CI has no
+            // msolve, so the only machine that runs these for real is the one no automated
+            // check covers (#333). The line below makes "not checked" say so, and
+            // `ZEEBRA_REQUIRE_MSOLVE=1` turns absence into a failure for any environment that
+            // does have the binary and wants to assert coverage rather than hope for it.
+            // This is the same discipline `zb-claim.sh` applies to a board read and
+            // `Outcome::instead_of_a_time` applies to a row that carries no wall time.
+            eprintln!("msolve NOT CHECKED: no binary at $HOME/.local/opt/zeebra-ext/bin/msolve");
+            assert!(
+                std::env::var_os("ZEEBRA_REQUIRE_MSOLVE").is_none(),
+                "ZEEBRA_REQUIRE_MSOLVE is set and msolve is absent: coverage was asserted, \
+                 not obtained"
+            );
+        }
+        found
     }
 
     // ---------------------------------------------------------------------------------------
@@ -2646,8 +2694,15 @@ rational param(cpu)             0.75 sec
         let limits = Limits::wall(Duration::from_secs(60));
 
         // Every rung on the corpus ladder, so a rung added there is covered here without an edit.
+        // A rung with no compiled Zeebra side is skipped, and the skipped set is asserted below
+        // rather than left implicit: a loop that silently covers less than it appears to is the
+        // failure this milestone keeps finding.
+        let mut skipped: Vec<&str> = Vec::new();
         for entry in corpus::ladder() {
-            let (instance, ours) = corpus_pair(entry.name, P31);
+            let Some((instance, ours)) = try_corpus_pair(entry.name, P31) else {
+                skipped.push(entry.name);
+                continue;
+            };
             assert_eq!(
                 instance.digest(),
                 entry.digest,
@@ -2682,6 +2737,14 @@ rational param(cpu)             0.75 sec
                 instance.name
             );
         }
+
+        skipped.sort_unstable();
+        let mut expected = WITHOUT_A_COMPILED_PAIR.to_vec();
+        expected.sort_unstable();
+        assert_eq!(
+            skipped, expected,
+            "a corpus rung gained or lost a compiled Zeebra side; see #333"
+        );
     }
 
     /// Against a real msolve, a fourteen-variable monomial ideal round-trips as a **set**.
