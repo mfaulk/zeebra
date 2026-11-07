@@ -487,6 +487,42 @@ fn marker<'a>(output: &'a str, name: &str) -> Option<&'a str> {
     markers(output, name).into_iter().next()
 }
 
+/// The first identifier in `instance`'s generators that is not a declared variable.
+///
+/// A generator naming a variable the ring does not declare is an **input the tool cannot
+/// represent**, and it is knowable before anything runs — so it belongs in `supports` as
+/// [`Unsupported::Representation`] rather than arriving as a failed run.
+///
+/// The check exists because of how badly the neighbouring tool handles it: msolve **silently drops
+/// the factor** (`iofiles.c:57-62` has no `else`), so `x*z-1` with only `x,y` declared reads as
+/// `x-1`, exits 0, and reports `#invalid equations 0` — a well-formed basis of a different ideal.
+/// Measured here, neither of this module's two tools shares that behaviour: the Sagebrush driver
+/// exits 1 with `not a variable or integer: "z"`, and an unbound name in the generated Julia is an
+/// `UndefVarError`. Both are loud. The check is still worth making, because a capability gap
+/// reported as a capability gap costs nothing and a loud failure is still a failure.
+fn undeclared_identifier(instance: &Instance) -> Option<String> {
+    for generator in &instance.system {
+        let mut name = String::new();
+        // One pass, accumulating identifier characters and flushing at every separator. An
+        // identifier is matched whole, which is the same discipline that keeps `x1` and `x10`
+        // apart.
+        for character in generator.chars().chain(std::iter::once('+')) {
+            if character.is_ascii_alphanumeric() || character == '_' {
+                name.push(character);
+                continue;
+            }
+            if !name.is_empty() {
+                let token = std::mem::take(&mut name);
+                // A numeric literal is a coefficient or an exponent, not a variable.
+                if token.parse::<u128>().is_err() && !instance.variables.contains(&token) {
+                    return Some(token);
+                }
+            }
+        }
+    }
+    None
+}
+
 /// A polynomial as a canonical, sorted multiset of `coefficient*factors` terms over `GF(p)`.
 ///
 /// For [`GroebnerJlSolver::check_echoed_generators`]: both sides print a flat signed sum of terms,
@@ -714,6 +750,14 @@ impl ExternalSolver for GroebnerJlSolver {
             return Support::No(Unsupported::Representation {
                 detail: format!(
                     "{:?} cannot be bound as a Julia identifier by the generated script",
+                    name
+                ),
+            });
+        }
+        if let Some(name) = undeclared_identifier(instance) {
+            return Support::No(Unsupported::Representation {
+                detail: format!(
+                    "the generators name {:?}, which is not a declared variable",
                     name
                 ),
             });
@@ -1304,5 +1348,29 @@ mod tests {
             "{}",
             command
         );
+    }
+
+    /// A generator naming an undeclared variable is a capability gap, not a failed run.
+    ///
+    /// msolve silently drops such a factor and returns a well-formed basis of a different ideal.
+    /// Both of this module's tools fail loudly instead, but the gap is knowable before running, so
+    /// it is reported as `Unsupported` rather than discovered.
+    #[test]
+    fn test_a_generator_naming_an_undeclared_variable_is_unsupported() {
+        let solver = solver("julia", "undeclared");
+        let mut bad = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        bad.system = vec!["x1*z-1".to_string(), "x2-1".to_string()];
+        match solver.supports(&bad, Task::ReducedGrobnerBasis) {
+            Support::No(Unsupported::Representation { detail }) => {
+                assert!(detail.contains("\"z\""), "{}", detail)
+            }
+            other => panic!("expected an unsupported representation, got {:?}", other),
+        }
+        // Coefficients and exponents are not identifiers, so a plain system still passes.
+        let mut fine = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        fine.system = vec!["2*x1^3+65520*x2-1".to_string()];
+        assert!(solver
+            .supports(&fine, Task::ReducedGrobnerBasis)
+            .is_supported());
     }
 }

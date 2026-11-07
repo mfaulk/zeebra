@@ -47,6 +47,18 @@
 //! (`fglm.rs:97`) without exposing it. None of that is reachable here, so [`Self::supports`]
 //! refuses every other task and order outright rather than approximating one with another.
 //!
+//! **A warning for whoever extends the driver: Sagebrush has a task-specific field ceiling.**
+//! [`MAX_CHARACTERISTIC`] is the *basis* bound. `fglm.rs:329` caps the FGLM route at `p < 2^31` —
+//! an eighth of it. That narrower bound is unreachable today because the driver exposes no FGLM,
+//! but the moment it does, declaring only the basis bound would let a sweep run a worker into its
+//! wall limit and record [`LimitStop`] where the truth is [`Unsupported`] — a timing-adjacent
+//! outcome for what is actually a capability gap, which is the one confusion this contract exists
+//! to prevent. msolve has the same shape and worse consequences: its eliminant ceiling is
+//! `p < 1515531529` and above it the sparse-FGLM failure is laundered into a retry loop with no
+//! exit. Groebner.jl, measured, has **no** task-specific ceiling: its lex route is the same F4
+//! under a different ordering and returns the same quotient dimension at every prime the basis
+//! route accepts, up to `2^64 - 59`.
+//!
 //! # The leading-monomial trap, handled in the driver
 //!
 //! Sagebrush keeps a polynomial's terms in decreasing **lex** order of the packed exponent word
@@ -194,6 +206,42 @@ const THREADS_VARIABLE: &str = "SAGEBRUSH_THREADS";
 
 /// The separator the driver prints between the basis and its leading monomials.
 const LEADING_SEPARATOR: &str = "--- leading monomials ---";
+
+/// The first identifier in `instance`'s generators that is not a declared variable.
+///
+/// A generator naming a variable the ring does not declare is an **input the tool cannot
+/// represent**, and it is knowable before anything runs — so it belongs in `supports` as
+/// [`Unsupported::Representation`] rather than arriving as a failed run.
+///
+/// The check exists because of how badly the neighbouring tool handles it: msolve **silently drops
+/// the factor** (`iofiles.c:57-62` has no `else`), so `x*z-1` with only `x,y` declared reads as
+/// `x-1`, exits 0, and reports `#invalid equations 0` — a well-formed basis of a different ideal.
+/// Measured here, neither of this module's two tools shares that behaviour: the Sagebrush driver
+/// exits 1 with `not a variable or integer: "z"`, and an unbound name in the generated Julia is an
+/// `UndefVarError`. Both are loud. The check is still worth making, because a capability gap
+/// reported as a capability gap costs nothing and a loud failure is still a failure.
+fn undeclared_identifier(instance: &Instance) -> Option<String> {
+    for generator in &instance.system {
+        let mut name = String::new();
+        // One pass, accumulating identifier characters and flushing at every separator. An
+        // identifier is matched whole, which is the same discipline that keeps `x1` and `x10`
+        // apart.
+        for character in generator.chars().chain(std::iter::once('+')) {
+            if character.is_ascii_alphanumeric() || character == '_' {
+                name.push(character);
+                continue;
+            }
+            if !name.is_empty() {
+                let token = std::mem::take(&mut name);
+                // A numeric literal is a coefficient or an exponent, not a variable.
+                if token.parse::<u128>().is_err() && !instance.variables.contains(&token) {
+                    return Some(token);
+                }
+            }
+        }
+    }
+    None
+}
 
 /// Sagebrush driven as a competitive solver, through the provisioned driver binary.
 #[derive(Clone, Debug)]
@@ -499,6 +547,14 @@ impl ExternalSolver for SagebrushSolver {
             return Support::No(Unsupported::Representation {
                 detail: format!(
                     "{:?} is not distinguishable from an operator in the driver's input syntax",
+                    name
+                ),
+            });
+        }
+        if let Some(name) = undeclared_identifier(instance) {
+            return Support::No(Unsupported::Representation {
+                detail: format!(
+                    "the generators name {:?}, which is not a declared variable",
                     name
                 ),
             });
@@ -928,5 +984,29 @@ mod tests {
             Some(name),
             "a truthy-if-set switch must be detected even at the value 0"
         );
+    }
+
+    /// A generator naming an undeclared variable is a capability gap, not a failed run.
+    ///
+    /// msolve silently drops such a factor and returns a well-formed basis of a different ideal.
+    /// Both of this module's tools fail loudly instead, but the gap is knowable before running, so
+    /// it is reported as `Unsupported` rather than discovered.
+    #[test]
+    fn test_a_generator_naming_an_undeclared_variable_is_unsupported() {
+        let solver = solver("sagebrush-gb-driver", "undeclared");
+        let mut bad = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        bad.system = vec!["x1*z-1".to_string(), "x2-1".to_string()];
+        match solver.supports(&bad, Task::ReducedGrobnerBasis) {
+            Support::No(Unsupported::Representation { detail }) => {
+                assert!(detail.contains("\"z\""), "{}", detail)
+            }
+            other => panic!("expected an unsupported representation, got {:?}", other),
+        }
+        // Coefficients and exponents are not identifiers, so a plain system still passes.
+        let mut fine = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        fine.system = vec!["2*x1^3+65520*x2-1".to_string()];
+        assert!(solver
+            .supports(&fine, Task::ReducedGrobnerBasis)
+            .is_supported());
     }
 }

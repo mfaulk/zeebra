@@ -401,22 +401,28 @@ fn test_sagebrush_reproduces_zeebras_basis_term_for_term() {
     );
 }
 
-/// Both comparands agree with Zeebra on every rung of the shared corpus.
+/// Every corpus rung either agrees with Zeebra or is cleanly unsupported — no rung is skipped.
 ///
-/// Driven from `grobner::external::corpus::ladder()` rather than from hand-rolled systems, so the
-/// instances are the ones whose identity digests the corpus freezes and whose `Instance` every
-/// other adapter is handed. The Zeebra side is rebuilt from the same generator functions at the
-/// corpus's own `REFERENCE_CHARACTERISTIC`, which is `2^31 − 1` because that is the widest prime
-/// *every* engine accepts — msolve and Singular both stop below it.
+/// Driven from `grobner::external::corpus::ladder()`, so a family added to the corpus is covered
+/// here without an edit. **That property is the point of the shape**: the msolve adapter's
+/// equivalent test matches rung names against compiled instantiations and panics on one it does
+/// not know, which broke the moment the corpus grew from seven rungs to eighteen. This test
+/// instead splits the ladder into the rungs it can hold Zeebra's own answer for and the rest, and
+/// asserts a floor on the first group so growth can never silently empty it.
 ///
-/// Two conventions the corpus settles and this test therefore inherits. `katsura-N` is **N
-/// variables**, i.e. the literature's Katsura-(N−1) (`src/grobner/benchmark_systems.rs:66`), so no
-/// row here can be paired with a published katsura-N figure without translating. And **cyclic-4 is
-/// positive-dimensional**, so it carries no quotient dimension and the check is on the basis alone
-/// — an adapter that assumed a finite quotient would break exactly there.
+/// Three things are checked for every rung, including the ones with no Zeebra side:
+///
+/// 1. **The identity digest matches the frozen one**, so a row is the problem the corpus pinned.
+/// 2. **`supports()` and the run agree.** A rung the tool cannot represent must come back
+///    `Unsupported` with no measurement — never a slow row, and never a wall-clock stop, which
+///    would be timing-adjacent for what is a capability gap.
+/// 3. **A rung that runs comes back `Complete`** and, for Groebner.jl, has therefore already had
+///    its echoed generators checked against the sent system inside the adapter. On the fourteen-
+///    variable MQ rungs that makes a `Complete` status *itself* the proof that `x1` and `x10` were
+///    read apart.
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
-fn test_both_comparands_agree_with_zeebra_on_every_corpus_rung() {
+fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() {
     let mut julia = groebner_jl("jl-corpus");
     let mut sage = sagebrush("sb-corpus");
     assert!(
@@ -425,39 +431,43 @@ fn test_both_comparands_agree_with_zeebra_on_every_corpus_rung() {
     );
     let order = MonomialOrder::GradedReverseLexicographic;
     let limits = Limits::wall(Duration::from_secs(600));
-    let mut checked = 0;
+    let mut compared_against_zeebra = 0;
+    let mut ran = 0;
+    let mut unsupported = 0;
 
     for entry in corpus::ladder() {
-        // The Zeebra side, at the same characteristic and in the corpus's own `x1..xN` names.
-        let (ours, our_basis) = match entry.name {
-            "katsura-4" => corpus_reference::<4>(&katsura::<4, Ref>(), order),
-            "katsura-5" => corpus_reference::<5>(&katsura::<5, Ref>(), order),
-            "katsura-6" => corpus_reference::<6>(&katsura::<6, Ref>(), order),
-            "katsura-7" => corpus_reference::<7>(&katsura::<7, Ref>(), order),
-            "cyclic-4" => corpus_reference::<4>(&cyclic::<4, Ref>(), order),
-            "cyclic-5" => corpus_reference::<5>(&cyclic::<5, Ref>(), order),
-            "cyclic-6" => corpus_reference::<6>(&cyclic::<6, Ref>(), order),
-            other => panic!(
-                "the corpus grew a rung this test has no Zeebra side for: {}",
-                other
-            ),
-        };
+        // Katsura and Cyclic use the corpus reference characteristic; Poseidon and Anemoi carry
+        // their own published fields, which `corpus::instance` supplies and this argument does not
+        // override.
         let instance = corpus::instance(entry.name, corpus::REFERENCE_CHARACTERISTIC, order)
-            .expect("every ladder name builds");
+            .unwrap_or_else(|| panic!("{} is on the ladder and must build", entry.name));
         assert_eq!(
             instance.digest(),
             entry.digest,
             "{} is not the problem the corpus froze",
             entry.name
         );
-        // The corpus records whether the ideal is zero-dimensional; Zeebra's own answer must agree,
-        // or the two sides disagree about the problem before any tool is consulted.
-        assert_eq!(
-            ours.quotient_dimension.is_some(),
-            entry.zero_dimensional,
-            "{}: Zeebra and the corpus disagree about zero-dimensionality",
-            entry.name
-        );
+
+        // Zeebra's own answer, where this test has a compiled instantiation for the family. A
+        // rung without one is still run below; it is the agreement that needs the oracle.
+        let ours = match entry.name {
+            "katsura-4" => Some(corpus_reference::<4>(&katsura::<4, Ref>(), order)),
+            "katsura-5" => Some(corpus_reference::<5>(&katsura::<5, Ref>(), order)),
+            "katsura-6" => Some(corpus_reference::<6>(&katsura::<6, Ref>(), order)),
+            "katsura-7" => Some(corpus_reference::<7>(&katsura::<7, Ref>(), order)),
+            "cyclic-4" => Some(corpus_reference::<4>(&cyclic::<4, Ref>(), order)),
+            "cyclic-5" => Some(corpus_reference::<5>(&cyclic::<5, Ref>(), order)),
+            "cyclic-6" => Some(corpus_reference::<6>(&cyclic::<6, Ref>(), order)),
+            _ => None,
+        };
+        if let Some((ours, _)) = &ours {
+            assert_eq!(
+                ours.quotient_dimension.is_some(),
+                entry.zero_dimensional,
+                "{}: Zeebra and the corpus disagree about zero-dimensionality",
+                entry.name
+            );
+        }
 
         for (name, solver) in [
             (
@@ -470,22 +480,114 @@ fn test_both_comparands_agree_with_zeebra_on_every_corpus_rung() {
             ),
         ] {
             let Some(solver) = solver else { continue };
+            let declared = solver.supports(&instance, Task::ReducedGrobnerBasis);
             let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
+
+            if !declared.is_supported() {
+                // The capability path. `Unsupported` and not `StoppedByLimit`, and no measurement
+                // at all — a zero wall time here would read as an instantaneous success to
+                // anything that did not check the status.
+                assert!(
+                    matches!(report.status, RunStatus::Unsupported(_)),
+                    "{} on {}: supports() said no but run() returned {:?}",
+                    name,
+                    entry.name,
+                    report.status
+                );
+                assert!(!report.status.is_timing_evidence());
+                assert!(report.measurement.is_unmeasured());
+                assert!(report.was_skipped());
+                unsupported += 1;
+                continue;
+            }
+
             let answer = answered(&report);
-            assert_agrees(name, &instance.name, &ours, &answer.invariants);
-            assert_eq!(
-                canonical_basis(answer.basis.as_ref().expect("a basis")),
-                our_basis,
-                "{} on {} differs from Zeebra term for term",
-                name,
-                instance.name
+            assert!(
+                !report.status.is_verified(),
+                "{} must stay Complete: an adapter never promotes its own answer",
+                name
             );
-            checked += 1;
+            ran += 1;
+            if let Some((ours, our_basis)) = &ours {
+                assert_agrees(name, &instance.name, ours, &answer.invariants);
+                assert_eq!(
+                    canonical_basis(answer.basis.as_ref().expect("a basis")),
+                    *our_basis,
+                    "{} on {} differs from Zeebra term for term",
+                    name,
+                    entry.name
+                );
+                compared_against_zeebra += 1;
+            }
         }
     }
+
+    // Floors rather than exact counts, so the corpus can grow without editing this test — but it
+    // cannot grow into covering nothing.
     assert!(
-        checked >= corpus::ladder().len(),
-        "every rung must be checked at least once"
+        compared_against_zeebra >= 7,
+        "only {} rungs were checked against Zeebra; the Katsura and Cyclic families are seven",
+        compared_against_zeebra
+    );
+    assert!(ran > 0 && unsupported > 0, "ran {}, unsupported {} — a ladder that is all one or all the other is not exercising both paths", ran, unsupported);
+}
+
+/// Sagebrush refuses Anemoi's field; **Groebner.jl does not**, which the corpus's reason understates.
+///
+/// `corpus::anemoi_instance` is over `2^64 − 353` and the ladder records
+/// `Equivalence::NoComparand { reason: "msolve and Singular both stop below 2^31" }`. That reason
+/// is true and incomplete: Groebner.jl's native range is every prime below `typemax(UInt64)`
+/// (`src/groebner/parameters.jl:175`), so it **can** represent the field, and measured directly it
+/// returns a correct basis there — six leading monomials and `vdim = 12` on the reference system,
+/// identical to the same system at `2^30 + 3`.
+///
+/// So `supports()` says yes, because [`ExternalSolver::supports`] is a statement about the tool's
+/// declared capability and nothing else. Whether a *cross-library timing* may be published is a
+/// different question, and `Equivalence::licenses_timing()` is where it belongs — claiming a
+/// capability gap that does not exist would be the "cannot versus slower" confusion run backwards.
+#[test]
+#[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
+fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let anemoi = corpus::instance(
+        "anemoi64-cico-n1-fcico",
+        corpus::REFERENCE_CHARACTERISTIC,
+        order,
+    )
+    .expect("the Anemoi rung builds");
+    assert_eq!(
+        anemoi.field.characteristic, 18_446_744_073_709_551_263,
+        "2^64 - 353, the published Anemoi parameter"
+    );
+
+    if let Some(solver) = sagebrush("sb-anemoi") {
+        // Above Sagebrush's own 2^62 modulus gate, so this is a real capability gap.
+        match solver.supports(&anemoi, Task::ReducedGrobnerBasis) {
+            zeebra::grobner::external::Support::No(
+                zeebra::grobner::external::Unsupported::Characteristic {
+                    supported_below, ..
+                },
+            ) => assert_eq!(supported_below, 1 << 62),
+            other => panic!("Sagebrush cannot represent 2^64 - 353, got {:?}", other),
+        }
+    }
+    if let Some(solver) = groebner_jl("jl-anemoi") {
+        assert!(
+            solver
+                .supports(&anemoi, Task::ReducedGrobnerBasis)
+                .is_supported(),
+            "Groebner.jl's native range covers every prime below typemax(UInt64)"
+        );
+    }
+
+    // The corpus's own gate is the thing that stops a timing being published, not `supports()`.
+    let entry = corpus::ladder()
+        .into_iter()
+        .find(|e| e.name == "anemoi64-cico-n1-fcico")
+        .expect("the rung is on the ladder");
+    assert!(
+        !entry.equivalence.licenses_timing(),
+        "Anemoi must remain unpublishable as a cross-library timing"
     );
 }
 
