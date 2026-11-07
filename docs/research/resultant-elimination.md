@@ -996,7 +996,13 @@ as well as smaller, at every size measured.**
 
 `src/poly/multivariate/sparse_multivariate_multiply.rs` now holds four routes, and
 `examples/multivariate_mul.rs` measures all four against the same operands with a tracking
-`#[global_allocator]`:
+`#[global_allocator]`. Two memory quantities appear below and they are not interchangeable: **live
+heap** is the allocator's peak of `sum(alloc) - sum(dealloc)` during one product, so it attributes
+bytes to a route; **peak RSS** is `VmHWM` for the whole process, so it bounds a run and attributes
+nothing. #237 measured the two differing by 55% on an F4 row. Every per-route figure here is live
+heap.
+
+
 
 | route | inner loop | live set |
 |---|---|---|
@@ -1030,8 +1036,12 @@ from the tracking allocator.
 | 4 186 | `p²·p` | 68 947 606 | 36 856 | 2.051 s / 1.5 GiB | 1.179 s / 832 KiB | 1.592 s / 3.9 MiB | **212 ms / 976 KiB** |
 | 29 890 | `p·p` | 893 412 100 | 118 828 | *skipped* | 18.65 s / 3.3 MiB | 24.45 s / 25.1 MiB | **2.85 s / 3.7 MiB** |
 | 29 890 | `p²·p` | 3 551 768 920 | 266 815 | *skipped* | 84.85 s / 6.5 MiB | 103.39 s / 28.4 MiB | **11.25 s / 7.5 MiB** |
+| 1 653 | `p·term` | 1 653 | 1 653 | 94.6 µs / 63.0 KiB | 39.0 µs / 26.0 KiB | 63.5 µs / 26.8 KiB | **26.8 µs / 33.2 KiB** |
 
-The last two rows are the six-round-relevant ones: 29 890 is the dense triangle of degree 243,
+The last row is one term against 1 653 — the inner operation of every Gröbner reduction step, and
+the case that decided the dispatch predicate below.
+
+The two rows above it are the six-round-relevant ones: 29 890 is the dense triangle of degree 243,
 against the 29 768 terms §6.8's words actually carry, and 266 815 output terms is exactly the figure
 §6.8 measured. The materialising arm is **skipped** above 2^28 products rather than run: its cost
 there is 56.6 GB in closed form, which is the measurement §6.8 already took once and which the
@@ -1061,26 +1071,43 @@ Not having a threshold is worth something on its own: the operand size does not 
 answer comes from, so the small `mul/{arity}` Criterion arms and the six-round build exercise the
 same code.
 
-**The predicate, and its failure mode.** `DenseTriangle` is selected on a *dense-output* test, not
-on `N == 2`:
+**The predicate.** `DenseTriangle` is selected on a *dense-output* test, not on `N == 2`:
 
 * `N == 2`, because the index is bivariate — `triangle_index(i, j) = t(t+1)/2 + j` for `t = i + j`;
-* the triangle of the summed degree must fit in 64 MiB of coefficients, which is a bound on the
-  worst case rather than a performance threshold;
-* **and both operands must each fill at least a quarter of their own total-degree triangle**, since
-  the sumset of two dense triangles is the dense triangle of the summed degree. A dense pair's
-  product therefore fills the accumulator, and the accumulator is the output.
+* the triangle of the summed degree must fit in 64 MiB of coefficients;
+* **and the triangle must be within 4x the output's upper bound**, `|a|·|b|`. The product has at
+  most `|a|·|b|` distinct monomials, so a triangle within a constant factor of `|a|·|b|` is within
+  that factor of being exactly the output.
 
 The third clause is what keeps a sparse bivariate pair out. `(x^20000 + 1) · (y^20000 + 1)` is
-bivariate, far past any size threshold, and would want 800 million slots for four output terms;
-`is_dense` rejects it on two terms against 200 million, and the pair goes to `Accumulate`. A
-regression test (`test_route_selects_by_density_not_by_arity`) pins exactly that, and pins that
-arity alone does not select the route either.
+bivariate, dense in nothing, and would want 800 million slots for four output terms; the ratio
+rejects it on **four products**, and the pair goes to `Accumulate`.
 
-The failure mode the predicate does **not** catch: a pair dense on both sides whose product cancels
-nearly everything. The flat accumulator is then triangle-sized for a tiny output. Over a field that
-takes engineered coefficients rather than bad luck, and the 64 MiB cap bounds what it costs when it
-happens — so the worst case is bounded waste, not unbounded.
+That clause replaced a first cut that tested *each operand* for being dense in its own triangle.
+Sufficient but not necessary, and it rejected the case Gröbner reduction runs most — **one term
+against many**, where the output is exactly `|a|` terms and the triangle is 20 910 slots for 20 301
+of them, the right accumulator by any measure, yet a single term is dense in nothing. Measured in
+the table above at 26.8 µs on the triangle against 39.0 µs accumulating: the operand test was
+giving away 1.5x on the inner operation of every reduction step. A regression test
+(`test_route_selects_by_density_not_by_arity`) pins the sparse pair out, the one-term case in, two
+lone terms out, and that arity alone selects nothing.
+
+**What happens when the estimate is wrong, in each direction.** A dispatch predicate's failure
+modes are more interesting than its happy path, and these two are deliberately asymmetric:
+
+* *Too pessimistic* — a pair whose product really is dense goes to `Accumulate` anyway. It costs
+  **time**: the triangle is 3x to 6x faster at every bivariate size in the table, and that is what
+  is forfeited. Memory is unaffected, because both routes are output-bounded, which is the property
+  §6.8 was about.
+* *Too optimistic* — a pair that passes the ratio but whose product cancels nearly everything
+  allocates a triangle far larger than its output. It costs **memory**, capped at 64 MiB however
+  wrong the estimate was. Over a field this takes engineered coefficients rather than bad luck.
+
+So the pessimistic direction costs unbounded time and the optimistic one costs bounded memory.
+After 57 GB, that is the right way round — and it is the same lesson #237 drew from F4's symbolic
+preprocessing, where 88.4% of a 14 GB peak was one `VecDeque<Monomial<20>>` grown to `2^28` slots
+with ~60% never written. A growable buffer sized by the *work* rather than by the *output* is the
+shared failure mode; what differs is only which structure wears it.
 
 #### The chunked route is a negative result
 
