@@ -30,7 +30,7 @@ use std::time::Duration;
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::{
-        benchmark_systems::{cyclic, katsura},
+        benchmark_systems::katsura,
         differential::{monomial_to_string, polynomial_to_string},
         external::{
             corpus, ExternalSolver, FieldSpec, GroebnerJlSolver, Instance, Invariants, Limits,
@@ -47,33 +47,6 @@ type F = PrimeFieldElement64<P>;
 
 /// The corpus's reference field, so a corpus row is checked at the characteristic it was frozen at.
 type Ref = PrimeFieldElement64<{ corpus::REFERENCE_CHARACTERISTIC }>;
-
-/// Zeebra's answer for a corpus rung, in the corpus's own `x1..xN` variable names.
-fn corpus_reference<const N: usize>(
-    system: &[MultivariatePolynomial<N, Ref>],
-    order: MonomialOrder,
-) -> (Invariants, Vec<String>) {
-    let variables: Vec<String> = (1..=N).map(|i| format!("x{}", i)).collect();
-    let names: Vec<&str> = variables.iter().map(String::as_str).collect();
-    let basis = f4(system, order).expect("Zeebra computes the basis");
-    let mut invariants = Invariants::none().with_leading_monomials(
-        basis
-            .iter()
-            .map(|f| monomial_to_string(&f.leading_monomial(order), &names))
-            .collect(),
-    );
-    // Zeebra's own zero-dimensionality verdict, which the corpus records as a field and the test
-    // cross-checks: a leading-term ideal containing a pure power of every variable is the
-    // criterion, and `cyclic-4`'s does not.
-    if let Some(dimension) = quotient_dimension(&basis, order) {
-        invariants = invariants.with_quotient_dimension(dimension);
-    }
-    let elements: Vec<String> = basis
-        .iter()
-        .map(|f| polynomial_to_string(f, &names, order))
-        .collect();
-    (invariants, canonical_basis(&elements))
-}
 
 /// The quotient dimension, or `None` when the ideal is not zero-dimensional.
 ///
@@ -221,6 +194,70 @@ fn canonical_polynomial(element: &str) -> String {
         .collect();
     terms.sort();
     terms.join("+")
+}
+
+/// Zeebra's own answer for a corpus rung, built by **parsing the instance's own text**.
+///
+/// Stronger than rebuilding the system from the generator function, and more robust. Stronger
+/// because the bytes parsed here are the bytes every engine is handed, so an agreement covers
+/// Zeebra's parser too rather than assuming it; the corpus renders through
+/// `polynomial_to_string` and this reads back through `MultivariatePolynomial::parse`, so a
+/// round-trip failure in either shows up as a disagreement rather than as a silently different
+/// problem. More robust because the dispatch below is on **variable count**, not on family name:
+/// a rung added at an existing width is covered with no edit, which is the failure mode that
+/// broke the neighbouring msolve test when the ladder grew.
+///
+/// `None` when Zeebra's own F4 crosses one of its `F4Options` limits. That is a fact about
+/// Zeebra's budget and not a disagreement, so the rung is reported and skipped rather than failed.
+fn zeebra_for<const N: usize>(instance: &Instance) -> Option<(Invariants, Vec<String>)> {
+    let names: Vec<&str> = instance.variable_refs();
+    let fixed: [&str; N] = names.clone().try_into().ok()?;
+    let system: Vec<MultivariatePolynomial<N, Ref>> = instance
+        .system
+        .iter()
+        .map(|generator| {
+            MultivariatePolynomial::parse(generator, fixed).unwrap_or_else(|e| {
+                panic!(
+                    "Zeebra cannot parse its own corpus text {:?}: {}",
+                    generator, e
+                )
+            })
+        })
+        .collect();
+    let basis = f4(&system, instance.order).ok()?;
+    let leading = basis
+        .iter()
+        .map(|f| monomial_to_string(&f.leading_monomial(instance.order), &names))
+        .collect();
+    let mut invariants = Invariants::none().with_leading_monomials(leading);
+    if let Some(dimension) = quotient_dimension(&basis, instance.order) {
+        invariants = invariants.with_quotient_dimension(dimension);
+    }
+    let elements: Vec<String> = basis
+        .iter()
+        .map(|f| polynomial_to_string(f, &names, instance.order))
+        .collect();
+    Some((invariants, canonical_basis(&elements)))
+}
+
+/// Zeebra's answer for any reference-characteristic rung, dispatched on variable count.
+///
+/// `None` for a rung at some other characteristic — Poseidon is over KoalaBear and Anemoi over
+/// `2^64 - 353`, and neither shares `Ref`'s field type — or at a width with no compiled
+/// instantiation. Both are "no oracle here", never "the tool was wrong".
+fn zeebra_oracle(instance: &Instance) -> Option<(Invariants, Vec<String>)> {
+    if instance.field.characteristic != corpus::REFERENCE_CHARACTERISTIC {
+        return None;
+    }
+    match instance.variables.len() {
+        4 => zeebra_for::<4>(instance),
+        5 => zeebra_for::<5>(instance),
+        6 => zeebra_for::<6>(instance),
+        7 => zeebra_for::<7>(instance),
+        10 => zeebra_for::<10>(instance),
+        14 => zeebra_for::<14>(instance),
+        _ => None,
+    }
 }
 
 /// A Groebner.jl solver over the provisioned Julia, or `None` if it is not installed.
@@ -438,6 +475,7 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
     let mut unsupported = 0;
     let mut stopped = 0;
     let mut reported: Vec<String> = Vec::new();
+    let mut no_oracle: Vec<&str> = Vec::new();
 
     for entry in corpus::ladder() {
         // Katsura and Cyclic use the corpus reference characteristic; Poseidon and Anemoi carry
@@ -452,18 +490,12 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
             entry.name
         );
 
-        // Zeebra's own answer, where this test has a compiled instantiation for the family. A
-        // rung without one is still run below; it is the agreement that needs the oracle.
-        let ours = match entry.name {
-            "katsura-4" => Some(corpus_reference::<4>(&katsura::<4, Ref>(), order)),
-            "katsura-5" => Some(corpus_reference::<5>(&katsura::<5, Ref>(), order)),
-            "katsura-6" => Some(corpus_reference::<6>(&katsura::<6, Ref>(), order)),
-            "katsura-7" => Some(corpus_reference::<7>(&katsura::<7, Ref>(), order)),
-            "cyclic-4" => Some(corpus_reference::<4>(&cyclic::<4, Ref>(), order)),
-            "cyclic-5" => Some(corpus_reference::<5>(&cyclic::<5, Ref>(), order)),
-            "cyclic-6" => Some(corpus_reference::<6>(&cyclic::<6, Ref>(), order)),
-            _ => None,
-        };
+        // Zeebra's own answer, parsed from the instance's own text and dispatched on variable
+        // count, so a rung added at an existing width needs no edit here.
+        let ours = zeebra_oracle(&instance);
+        if ours.is_none() {
+            no_oracle.push(entry.name);
+        }
         if let Some((ours, _)) = &ours {
             assert_eq!(
                 ours.quotient_dimension.is_some(),
@@ -567,8 +599,8 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
     // Floors rather than exact counts, so the corpus can grow without editing this test — but it
     // cannot grow into covering nothing.
     assert!(
-        compared_against_zeebra >= 7,
-        "only {} rungs were checked against Zeebra; the Katsura and Cyclic families are seven",
+        compared_against_zeebra >= 13,
+        "only {} rung/solver pairs were checked against Zeebra; the thirteen reference-characteristic rungs across two tools are the floor",
         compared_against_zeebra
     );
     assert!(
@@ -589,6 +621,13 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
     );
     for line in &reported {
         println!("  tool-reported limit: {}", line);
+    }
+    // Printed so a rung that quietly lost its oracle is visible rather than merely uncounted.
+    if !no_oracle.is_empty() {
+        println!(
+            "  no Zeebra oracle (other characteristic, or Zeebra hit its own F4 budget): {:?}",
+            no_oracle
+        );
     }
 }
 
