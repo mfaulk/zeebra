@@ -458,6 +458,60 @@ fn test_sagebrush_reproduces_zeebras_basis_term_for_term() {
     );
 }
 
+/// Sagebrush's two routes to a lex basis agree with Zeebra, and with each other, term for term.
+///
+/// The point of running both: `LexBasis` is the engine's direct lex F4 and `LexBasisByConversion`
+/// is `fglm::groebner_fglm`, two different algorithms whose reduced bases must be *identical*
+/// because a reduced Gröbner basis is unique given the ideal and the order. So this is a check on
+/// Sagebrush against Zeebra and a check of Sagebrush against itself at the same time, and it is the
+/// only place in this module where a tool's two independent routes can be compared at all —
+/// Groebner.jl 0.10.11 has no FGLM.
+///
+/// The quotient dimension is asserted explicitly because it is the invariant #315 added: the driver
+/// counts the standard monomials itself, Sagebrush exposing only a boolean, so agreeing with
+/// Zeebra on it is a genuine third overlap rather than a restatement of the leading monomials.
+#[test]
+#[ignore = "needs the provisioned sagebrush-gb-driver"]
+fn test_sagebrushs_two_lex_routes_agree_with_zeebra_and_with_each_other() {
+    let Some(mut solver) = sagebrush("sb-lex") else {
+        panic!("the Sagebrush driver is not installed; see the module documentation")
+    };
+    let variables = ["x", "y", "z"];
+    let system = smoke_system();
+    let order = MonomialOrder::Lexicographic;
+    let (ours, our_basis) = zeebra_invariants(&system, &variables, order);
+    let instance = instance("smoke-3-lex", "smoke", &system, &variables, order);
+
+    let mut bases = Vec::new();
+    for task in [Task::LexBasis, Task::LexBasisByConversion] {
+        assert!(
+            solver.supports(&instance, task).is_supported(),
+            "{} is offered at the reference characteristic",
+            task
+        );
+        let report = solver.run(&instance, task, &Limits::wall(Duration::from_secs(120)));
+        let answer = answered(&report);
+        assert_agrees("sagebrush", &instance.name, &ours, &answer.invariants);
+        assert_eq!(
+            answer.invariants.quotient_dimension,
+            Some(12),
+            "{}: the reference system's quotient algebra has dimension 12",
+            task
+        );
+        let basis = canonical_basis(answer.basis.as_ref().expect("a basis"));
+        assert_eq!(
+            basis, our_basis,
+            "{}: term-for-term agreement with Zeebra, every coefficient included",
+            task
+        );
+        bases.push(basis);
+    }
+    assert_eq!(
+        bases[0], bases[1],
+        "a direct lex F4 and an FGLM conversion must return the same reduced basis"
+    );
+}
+
 /// Every corpus rung either agrees with Zeebra or is cleanly unsupported — no rung is skipped.
 ///
 /// Driven from `grobner::external::corpus::ladder()`, so a family added to the corpus is covered
