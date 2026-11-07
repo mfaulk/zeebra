@@ -750,6 +750,7 @@ cargo run --release --example multivariate_mul     # multivariate multiply: time
 cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
 cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
+cargo run --release --example graeffe_root -- deflate   # all roots by deflation, #351
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay
 cargo run --release --example graeffe_cico         # the univariate CICO route, and the family economics
@@ -773,6 +774,7 @@ cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
+cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -3219,10 +3221,27 @@ visible.
 the determinant of their Sylvester matrix recovered by interpolating scalar determinants;
 `bivariate_resultant_ntt` computes the same resultant with the samples taken on a power-of-two
 subgroup, so the recovery is an inverse NTT rather than a cubic solve. The
-determinant construction rather than a Euclidean algorithm on purpose: evaluating a matrix and
-taking its determinant commutes with evaluation *always*, so there is no case to analyse — where
-specializing `f` at a point that kills its leading coefficient in `y` drops its degree, and the
-specialized resultant is then not the specialization of the resultant.
+determinant construction needs no case analysis: evaluating a matrix and taking its determinant
+commutes with evaluation *always*, where specializing `f` at a point that kills its leading
+coefficient in `y` drops its degree, and the specialized resultant is then not the specialization of
+the resultant.
+
+**Which per-sample kernel evaluates that scalar is now a choice**, `ResultantOptions::kernel`:
+
+- `DeterminantKernel::Dense` — dense LU on the `(m + n)`-square matrix, `O(n³)`. The **default**, so
+  a figure taken before the alternative existed reproduces unchanged.
+- `DeterminantKernel::Euclidean` — `poly::resultant_from_coefficients`, driving `f mod g` down the
+  polynomial remainder sequence in `O(n²)`.
+
+Both return the same scalar, including at the specialization points, where the fixed Sylvester order
+and the fallen true degrees differ by a correcting power of a leading coefficient — the case analysis
+the dense route avoids, closed in `O(1)` per sample by `poly::resultant_at_formal_degrees` and
+asserted against an explicitly built determinant over all 15 625 degree-drop combinations. Measured
+same-binary on one pinned core, the Euclidean kernel is **137× faster at order 162 and 2 094× at
+order 1 458**, with fitted exponents of **2.94** and **1.85** — the ratio grows with the order
+because the kernels differ by a power of it. It does **not** raise the reachable round count: the
+six-round route becomes 78% root finding, so the row gains ~3×. See
+`docs/research/structured-sylvester.md` §5.6.
 
 It exists to answer one question, and the answer is worth knowing. On a registered `t = 16` CICO
 slice — twelve of the fourteen free inputs fixed, two unknowns left — the S-box variables can be

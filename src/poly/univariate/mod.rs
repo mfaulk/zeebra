@@ -18,6 +18,8 @@ mod lagrange_interpolation;
 mod polynomial_trait;
 mod pow_mod;
 mod power_permutation;
+mod resultant;
+pub use resultant::{resultant, resultant_at_formal_degrees, resultant_from_coefficients};
 mod roots;
 mod univariate_parser;
 
@@ -28,8 +30,8 @@ pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
 pub use gcd::{gcd, lcm};
 pub use graeffe::{
-    graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root, graeffe_root_with_stats,
-    GraeffeError, GraeffeStats, SubgroupRoute,
+    graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
+    graeffe_root_with_stats, GraeffeError, GraeffeStats, SubgroupRoute,
 };
 // The schoolbook-or-Karatsuba route, which `fft::multiply` dispatches to below its own crossover.
 // Crate-internal: it is reached publicly through `fft::multiply`, and `Mul` is the operator a
