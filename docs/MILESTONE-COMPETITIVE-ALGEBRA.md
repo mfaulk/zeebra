@@ -1013,6 +1013,37 @@ run, and cost #263 its cross-library basis-stage row — recorded as partially m
 Both halves are real. The trade was worth making, and §13.6a item 7 is the repair the log still
 needed.
 
+### 13.6c The coordination cost of nine agents, measured
+
+Recorded because the plan's §4.7 predicted the shape and not the size, and because one instance
+produced an instruction from the integration owner that was **wrong**.
+
+- **`README.md`'s Status list conflicted on four of nine branches.** §4.7 named it as this
+  repository's most frequent conflict and assigned it to the integration owner; what it did not
+  anticipate is that every agent earning a measured result also earns a Status line, so the conflict
+  rate scales with the number of agents doing work worth reporting.
+- **"Keep both sides" is right for an additive conflict and wrong for a reworded neighbour**, and the
+  integration owner gave the wrong instruction on the one branch where it mattered. `main` had
+  *reworded* the #305 entry — replacing "from 13 996 MB to 1 497 MB" with "peak RSS 9.1x lower and
+  its runtime 10% shorter" once the locked A/B landed — so keeping both sides would have carried a
+  stale copy of that figure alongside the new bullet and **silently reverted a correction**. The
+  agent diagnosed it independently and resolved it correctly: take upstream's wording, append only
+  your own line. **A reverted figure passes every check**, which is what makes the frequency of the
+  additive case dangerous rather than reassuring. The method that caught it — diffing the Status list
+  against `origin/main`'s rather than reading it — is the one to specify next time.
+- **`main` moved under one branch three times during close-out alone**, and that branch rebased four
+  times. The benchmark lock queued fourteen jobs behind one hour-long frontier run and cost #263 its
+  cross-library basis-stage row until the queue drained — recorded as partially met for that reason,
+  which is the serialization protocol working rather than failing.
+- **Two PRs were auto-closed or false-merged by GitHub** on the strength of a pushed head becoming an
+  ancestor of `main`, one of them closing three issues with no code merged (§13.6a item 2).
+
+None of this argues against the fan-out: five workstreams ran concurrently and the two most
+consequential findings — the H-series being scoped before its own measurement, and the second deficit
+in F4 — came from agents that would not have existed in a serial plan. But the integration overhead is
+real, it scales with agent count, and two of its instances were failures that a green CI could not
+see.
+
 ### 13.7 Cost-model accuracy
 
 Now a durable artifact rather than prose: **#294's register**, 20 sourced rows, with prediction error
