@@ -771,8 +771,8 @@ cache transition at the top as the mechanism, and order 4 374 was swept precisel
 
 The remaining candidate mechanisms are ruled out or bounded rather than left open. Field arithmetic:
 the only non-multiply-add in the kernel is one inverse per pivot, `order` of them against
-`order³/3` multiply-subtracts — 0.7% at order 162 and 0.02% at 4 374, so it cannot bend the curve
-and it would bend it the other way. Implementation: the matrix build is `O(order²)` against
+`order³/3` multiply-subtracts — well under 1% of the work at order 162 and four orders of magnitude
+smaller again at 4 374, so it cannot bend the curve and it would bend it the other way. Implementation: the matrix build is `O(order²)` against
 `O(order³)`, which again shrinks with the order. What is left is the fixed overhead at the bottom,
 and that is what the sub-cubic lower piece is.
 
@@ -863,7 +863,7 @@ build (§6.8: 48.4 min and 57 GB at six rounds), the recovery and the solve are 
 | `rf4-rp2` | 6 | 59 050 | 1 458 | 43.33 h | **1.79 h** | measured |
 | `rf6-rp0` | 6 | 531 442 | 1 458 | 16.25 d | **16.15 h** | measured |
 | `rf4-rp4` | 8 | 531 442 | 13 122 | 11 846 d | **490.5 d** | extrapolated |
-| `rf6-rp2` | 8 | 4 782 969 | 13 122 | 106 617 d | **4 415 d** | extrapolated |
+| `rf6-rp2` | 8 | 4 782 970 | 13 122 | 106 617 d | **4 415 d** | extrapolated |
 
 From the measured core-times alone, without the model's conservatism: `rf4-rp2` is
 59 050 × 2.404 s = **39.4 single-core hours**, and at 32 workers 59 050 × 3.148 s / 32 =
