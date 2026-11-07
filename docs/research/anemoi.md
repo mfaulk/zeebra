@@ -603,9 +603,17 @@ measurement that silently also changed strategy would not be a measurement of th
 - **`PCICO`: GO.** 1.2 h against a 2 h budget and ≈ 5.1 GiB against a 64 GB ceiling. Wall budget set
   to **5 400 s**, RSS ceiling **16 GiB** — four times the model, so a trip means something
   unmodelled rather than a slightly pessimistic estimate.
-- **`FCICO`: NO-GO without authorization.** 1.6 h of conversion plus ≈ 16 minutes of basis is
-  1.9–2.2 h, which straddles the 2 h gate rather than sitting inside it. The brief's instruction is
-  to stop and ask in exactly this case, so it is not launched here.
+- **`FCICO`: NO-GO without authorization, then authorized.** 1.6 h of conversion plus ≈ 16 minutes
+  of basis is 1.9–2.2 h, which straddles the 2 h gate rather than sitting inside it, so it was not
+  launched on this agent's own authority. It was subsequently authorized on three recorded
+  conditions: a **hard external watchdog at 2.5 h** (`timeout --signal=INT --kill-after=60s 9000`),
+  killed rather than extended if it reaches the backstop and **not** raised mid-run on the strength
+  of apparent progress; the same **16 GiB** RSS ceiling, enforced by a polling guard that signals
+  the run rather than by inspection afterwards; and the result recorded whatever it is. The
+  authorizing reason was that §9's ~2 h figure guards against *unbounded* computation rather than
+  against a costed and supervised one, and that §8a.6 moves this row from a produced figure to a
+  **reproduction** against 23 340.220 s — the highest-value category here, and not one the cost
+  would have bought otherwise.
 
 Taking `PCICO` first inverts the brief's stated order, and the reason is that the measurement says
 so: both models reach the **same** `D = 15 625` conversion, which is the quantity #286 is about, and
@@ -721,12 +729,32 @@ msolve on **one core** (`taskset --cpu-list 0`, `-t` defaulting to 1), Zeebra on
 msolve independently confirms the quotient dimension at every rung — 125, 625, 3 125 — which is a
 third witness to §5's invariant beside this crate and the reference.
 
-**This settles §8a.3's candidate (2) against this crate.** There is no algorithmic advantage in this
-crate's conversion to be found: the apparent 507x advantage over the published Magma figure was the
-reference's arithmetic path, and against an implementation whose arithmetic is not the bottleneck
-the direction reverses by more than an order of magnitude. §8a.1's favourable reading was an
-artefact of having exactly one comparand, measured at exactly one characteristic, on hardware a
-decade removed.
+**This settles §8a.3's candidate (2) against this crate, and it should be read as a competitive
+result rather than only as an attribution.** There is no algorithmic advantage in this crate's
+conversion to be found. The apparent 507x advantage over the published Magma figure was the
+reference's arithmetic path; against an implementation whose arithmetic is not the bottleneck the
+direction reverses hard. §8a.1's favourable reading was an artefact of having exactly one comparand,
+measured at exactly one characteristic, on hardware a decade removed — which is to say it was an
+artefact of not having run the control.
+
+Stated as plainly as it deserves, because the temptation with a result like this is to soften it:
+
+> **Zeebra's order conversion is roughly one and a half orders of magnitude slower than msolve's on
+> this family, and uses ten times the memory, on the same machine at the same characteristic with
+> byte-identical generators. This is a row where this crate loses, and it is the cleanest
+> comparable measurement M25 has produced.** It is recorded in #263's competitive report as such.
+
+The bound is deliberately an order-of-magnitude one. Six rows at one prime and three round counts do
+not support a tighter claim than "~21–35x end to end, ~30x on the conversion stage", and the ~280x
+per-core figure that follows from msolve using one core against this crate's eight is only
+defensible for the conversion stage, which is single-threaded here — about one CPU-second per wall
+second during the `N = 6` run. Quoting the per-core number without that caveat would overstate it.
+
+**What is measured and what is not.** msolve refuses `p = 2^64 − 353` outright, so every figure here
+is at the 17-bit control prime. Whether the same deficit holds at 64-bit characteristic is
+**unmeasured**. This crate's conversion being characteristic-flat to 12% is weak evidence that it
+would, and that is an inference rather than a measurement. Verified at `N = 4`, `N = 5`, and `N = 6`
+`PCICO` for msolve; nothing extrapolates to `N = 7` or to `α ≠ 3`.
 
 The reason is visible in where each engine spends its conversion, and the three do not agree:
 
@@ -751,9 +779,14 @@ between any two of them is not a measurement of FGLM**, and that is the most tra
 - **`α ∈ {5, 7, 11}`.** Reference data exists for all of them in the same logs, at every prime.
   The registry records `α = 3` only. `p ∈ {65537, 2^32 − 209}` **is** now registered — see §8a.3,
   which is what #283 used them for.
-- **`FCICO` at `N = 6`.** Measured as 1.9–2.2 h of wall against a 2 h gate in §8a.5, so not
-  launched; it needs authorization rather than a better estimate. `PCICO` at `N = 6` was the
-  in-budget half and is recorded in §8a.5 and §8a.7.
+- **`N = 7`.** The published basis figures say the basis step is where the cost goes above `N = 6` —
+  1 623 s `FCICO` and 26 402 s `PCICO` at `p = 2^64 − 353` — so the conversion stops being the
+  interesting half. And #323 records that the binding constraint at `N = 6` was already F4 rather
+  than FGLM, which is the ordering `N = 7` inherits.
+- **The 64-bit `N = 6` rows.** `anemoi64-cico-n6-{fcico,pcico}` and the `2^32 − 209` pair are
+  registered and gated at `D = 15 625`, but only the `p = 65537` rows were timed, because only they
+  have a published conversion to reproduce. A measurement at the other two primes would be a
+  produced figure; see §8a.6 for why that is a weaker category and §8a.8 for what was run.
 - **`ACICO`.** A third model of the same primitive (`additional-benchmarks.md` §3.4). Cheap once the
   permutation exists, and a separate issue.
 - **The reference's own `check_polynomial_verification` has not been executed.** It needs Sage. §4
