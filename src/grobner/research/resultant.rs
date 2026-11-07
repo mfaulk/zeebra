@@ -241,7 +241,9 @@ pub struct ResultantOptions {
     /// Points outside the sample set checked against a direct Sylvester determinant. At least 1.
     ///
     /// Only [`bivariate_resultant_predicted`] reads this: the other routes sample against a
-    /// *proven* bound and have nothing to validate.
+    /// *proven* bound and have nothing to validate. The checks are spread over the same
+    /// `concurrency` workers as the interpolation's samples, so raising the worker count shortens
+    /// them too — at six rounds a serial check was 3% of the row.
     pub off_domain_checks: usize,
 }
 
@@ -443,7 +445,23 @@ pub struct ResultantStages {
     /// Points outside the sample set checked against a direct Sylvester determinant.
     pub off_domain_checks: usize,
     /// Time spent on those checks, and on a predicted attempt the checks refused.
+    ///
+    /// Disjoint from [`Self::sampling`] and [`Self::interpolation`], and the three together are the
+    /// elimination's wall clock — [`Self::elapsed`]. Anything that also charges this to a later
+    /// stage counts it twice, which is what inflated the six-round totals before M25.
     pub validation: Duration,
+}
+
+impl ResultantStages {
+    /// The elimination's wall clock: determinants, recovery and validation, each counted **once**.
+    ///
+    /// The single definition of what one elimination cost, so that a caller filing a stage cost and
+    /// a caller printing a total cannot disagree. The three fields are measured in disjoint windows
+    /// inside the route, so this is a lower bound on the route's own elapsed time and never an
+    /// over-count — `tests` pins both halves of that against an outer timer.
+    pub fn elapsed(&self) -> Duration {
+        self.sampling + self.interpolation + self.validation
+    }
 }
 
 /// Which degree the sample count was sized against, and whether a prediction survived validation.
@@ -640,7 +658,14 @@ pub fn bivariate_resultant_predicted<F: FiniteField + Send + Sync>(
     let interpolation = at.elapsed();
 
     let at = Instant::now();
-    let held = agrees_off_domain(&fc, &gc, &candidate, points, options.off_domain_checks)?;
+    let held = agrees_off_domain(
+        &fc,
+        &gc,
+        &candidate,
+        points,
+        options.off_domain_checks,
+        options.concurrency,
+    )?;
     let validation = at.elapsed();
 
     if held {
@@ -673,29 +698,31 @@ pub fn bivariate_resultant_predicted<F: FiniteField + Send + Sync>(
     Ok((resultant, stages))
 }
 
-/// Whether `candidate` agrees with `det Syl(f, g)` at `checks` points outside the sample set.
+/// `checks` distinct abscissae outside the sample set `0, 1, …, points − 1`.
 ///
-/// The samples are `0, 1, …, points − 1`; a point drawn from outside that set was never
-/// interpolated through, so agreement there is evidence about the construction rather than a
-/// restatement of it. The draws are from a fixed seed, which keeps a run reproducible, and are
-/// rejected if they land in the sample set.
+/// Pure in `(points, checks)` and in the fixed seed, and in particular **independent of the
+/// candidate and of the concurrency**: the points can therefore be drawn before any determinant is
+/// evaluated, which is what lets the validation ride the same parallel sample loop as the
+/// interpolation instead of a serial loop of its own.
+///
+/// Distinctness is explicit rather than left to the field's size. Over KoalaBear a repeat among
+/// eight draws has probability about `8²/2^32`, so this changes no run on record — but the
+/// probability bound in `resultant-elimination.md` is an argument about `checks` *independent*
+/// points, and a silently repeated point would weaken the bound without changing the count.
 ///
 /// # Errors
 /// [`ResultantError::FieldTooSmall`] if the field cannot supply `checks` points outside the sample
 /// set.
-fn agrees_off_domain<F: FiniteField>(
-    fc: &[UnivariatePolynomial<F>],
-    gc: &[UnivariatePolynomial<F>],
-    candidate: &UnivariatePolynomial<F>,
+fn off_domain_abscissae<F: FiniteField>(
     points: usize,
     checks: usize,
-) -> Result<bool, ResultantError> {
+) -> Result<Vec<F>, ResultantError> {
     let mut rng = StdRng::seed_from_u64(0x00ff_d01a);
     let in_sample_set = |x: &F| (0..points as u64).any(|i| *x == F::new(i));
 
-    let mut agreed = 0usize;
+    let mut at: Vec<F> = Vec::with_capacity(checks);
     let mut drawn = 0usize;
-    while agreed < checks {
+    while at.len() < checks {
         if drawn > 8 * checks + 64 {
             return Err(ResultantError::FieldTooSmall {
                 needed: points + checks,
@@ -703,15 +730,51 @@ fn agrees_off_domain<F: FiniteField>(
         }
         let x = F::random(&mut rng);
         drawn += 1;
-        if in_sample_set(&x) {
+        if in_sample_set(&x) || at.contains(&x) {
             continue;
         }
-        if candidate.eval(&x) != sylvester_determinant(fc, gc, x) {
-            return Ok(false);
-        }
-        agreed += 1;
+        at.push(x);
     }
-    Ok(true)
+    Ok(at)
+}
+
+/// Whether `candidate` agrees with `det Syl(f, g)` at `checks` points outside the sample set.
+///
+/// The samples are `0, 1, …, points − 1`; a point drawn from outside that set was never
+/// interpolated through, so agreement there is evidence about the construction rather than a
+/// restatement of it. The draws are from a fixed seed, which keeps a run reproducible.
+///
+/// **This is a probabilistic consistency check and not a proof of a polynomial identity.** What it
+/// establishes is that a candidate of degree below `points` agreeing with the determinant at
+/// `checks` further points is wrong with probability at most `(2d²/p)^checks` over the draws — see
+/// `resultant-elimination.md` §6.9. The *proven*-bound routes need no such argument, because there
+/// a polynomial of degree at most the bound agreeing on `bound + 1` points is the resultant
+/// outright; the predicted count buys its sample saving at the price of this being evidence rather
+/// than a certificate.
+///
+/// The determinants go through [`sample_determinants`] at `concurrency` workers, the same indexed
+/// path the interpolation's samples take, and **every** check is evaluated before any is compared.
+/// A short-circuit on the first disagreement would make the verdict depend on which worker got
+/// there first in a falsifying case; evaluating all of them costs `checks` determinants on the path
+/// that is about to pay for a whole proven-bound fallback anyway.
+///
+/// # Errors
+/// [`ResultantError::FieldTooSmall`] if the field cannot supply `checks` points outside the sample
+/// set.
+fn agrees_off_domain<F: FiniteField + Send + Sync>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    candidate: &UnivariatePolynomial<F>,
+    points: usize,
+    checks: usize,
+    concurrency: usize,
+) -> Result<bool, ResultantError> {
+    let at = off_domain_abscissae::<F>(points, checks)?;
+    let direct = sample_determinants(fc, gc, &at, concurrency);
+    Ok(at
+        .iter()
+        .zip(&direct)
+        .all(|(x, determinant)| candidate.eval(x) == *determinant))
 }
 
 /// `Res_{x_eliminate}(f, g)`, interpolated on a power-of-two subgroup, with stage costs.
@@ -849,6 +912,186 @@ fn sylvester_determinant<F: FiniteField>(
         .expect("a square matrix has a determinant")
 }
 
+/// A bivariate polynomial with the given degree in each variable and random coefficients.
+///
+/// The top coefficient in both variables is forced nonzero so that the Sylvester matrix really has
+/// the order the degrees claim — which is the whole point when the pair exists to put a determinant
+/// of a *named* order under a timer.
+pub fn random_bivariate<F: FiniteField, R: rand::RngCore + rand::CryptoRng>(
+    degree_x: u32,
+    degree_y: u32,
+    rng: &mut R,
+) -> MultivariatePolynomial<2, F> {
+    let mut terms: Vec<(Monomial<2>, F)> = Vec::new();
+    for i in 0..=degree_x {
+        for j in 0..=degree_y {
+            let mut c = F::random(rng);
+            if i == degree_x && j == degree_y && c.is_zero() {
+                c = F::one();
+            }
+            if !c.is_zero() {
+                terms.push((Monomial::new(&[i, j]), c));
+            }
+        }
+    }
+    MultivariatePolynomial::new(&terms)
+}
+
+/// What one batch of Sylvester determinants cost.
+///
+/// The unit a cost model is calibrated in. `examples/determinant_sweep.rs` takes one of these per
+/// matrix order and fits [`fit_power_law`] to the per-determinant cost; the matrix footprint is
+/// carried alongside the time because the deviation from a single power law is a cache effect and
+/// the footprint is what decides which level of the hierarchy a given order lands in.
+#[derive(Clone, Copy, Debug)]
+pub struct DeterminantBatch {
+    /// Order of the Sylvester matrix, `deg_y(f) + deg_y(g)`.
+    pub matrix_order: usize,
+    /// Determinants evaluated.
+    pub determinants: usize,
+    /// Worker threads they were spread over.
+    pub concurrency: usize,
+    /// Bytes one dense `(m+n)²` matrix of field elements occupies.
+    ///
+    /// The *matrix*, not the live set: `crout_lu_pivoting` allocates `L`, `U` and `P` beside a
+    /// clone of it, so a worker's working set is about four times this.
+    pub matrix_bytes: usize,
+    /// Wall clock for the whole batch, excluding the one-off coefficient extraction.
+    pub elapsed: Duration,
+}
+
+impl DeterminantBatch {
+    /// Wall clock per determinant: what a batch of this width costs an operator.
+    pub fn wall_per_determinant(&self) -> f64 {
+        self.elapsed.as_secs_f64() / self.determinants.max(1) as f64
+    }
+
+    /// Core-time per determinant: wall clock times workers, which is the figure that extrapolates.
+    ///
+    /// Comparing *this* across worker counts is what separates a parallel-efficiency loss from a
+    /// per-determinant cost that genuinely grew — see `resultant-elimination.md` §6.6.
+    pub fn core_per_determinant(&self) -> f64 {
+        self.wall_per_determinant() * self.concurrency as f64
+    }
+}
+
+/// `at.len()` Sylvester determinants of `f` and `g`, timed, over `concurrency` workers.
+///
+/// The measurement entry point for the determinant kernel, sharing the sample loop
+/// [`sample_determinants`] with every resultant route so that what is timed here is what a row
+/// pays. The coefficient extraction is done once and is **not** inside the timer: it is per-row
+/// work, not per-determinant work.
+///
+/// # Errors
+/// [`ResultantError::NoDegreeInEliminatedVariable`].
+pub fn time_sylvester_determinants<F: FiniteField + Send + Sync>(
+    f: &MultivariatePolynomial<2, F>,
+    g: &MultivariatePolynomial<2, F>,
+    eliminate: usize,
+    at: &[F],
+    concurrency: usize,
+) -> Result<(Vec<F>, DeterminantBatch), ResultantError> {
+    let (fc, gc, _) = sylvester_setup(f, g, eliminate)?;
+    let matrix_order = fc.len() + gc.len() - 2;
+
+    let started = Instant::now();
+    let values = sample_determinants(&fc, &gc, at, concurrency);
+    let elapsed = started.elapsed();
+
+    Ok((
+        values,
+        DeterminantBatch {
+            matrix_order,
+            determinants: at.len(),
+            concurrency,
+            matrix_bytes: matrix_order * matrix_order * std::mem::size_of::<F>(),
+            elapsed,
+        },
+    ))
+}
+
+/// A least-squares power law `y = a · x^b`, fitted in log–log space.
+///
+/// Reported with its residuals rather than with a correlation coefficient: a cost model is used to
+/// *refuse runs*, so what matters is how wrong it is at the largest order measured and not how well
+/// it describes the cloud on average.
+#[derive(Clone, Debug)]
+pub struct PowerLawFit {
+    /// The exponent `b`.
+    pub exponent: f64,
+    /// The prefactor `a`.
+    pub prefactor: f64,
+    /// Relative residual `fitted / measured − 1` at each input point, in input order.
+    pub residuals: Vec<f64>,
+    /// Standard error of `exponent`. Zero when there are too few points to estimate one.
+    pub exponent_stderr: f64,
+}
+
+impl PowerLawFit {
+    /// The fitted value at `x`.
+    pub fn at(&self, x: f64) -> f64 {
+        self.prefactor * x.powf(self.exponent)
+    }
+
+    /// The largest relative residual in absolute value: the fit's worst case over its own data.
+    pub fn worst_residual(&self) -> f64 {
+        self.residuals.iter().fold(0.0f64, |w, r| w.max(r.abs()))
+    }
+}
+
+/// Ordinary least squares on `(ln x, ln y)`.
+///
+/// `None` unless there are at least two points with finite positive coordinates and at least two
+/// distinct abscissae — a single point admits any exponent, and an exponent that the data does not
+/// constrain must not be returned as if it were measured. A non-finite coordinate is refused rather
+/// than propagated, since a NaN exponent would be printed as a fit.
+pub fn fit_power_law(points: &[(f64, f64)]) -> Option<PowerLawFit> {
+    let usable = |v: f64| v.is_finite() && v > 0.0;
+    if points.iter().any(|(x, y)| !usable(*x) || !usable(*y)) {
+        return None;
+    }
+    let n = points.len();
+    if n < 2 {
+        return None;
+    }
+    let logs: Vec<(f64, f64)> = points.iter().map(|(x, y)| (x.ln(), y.ln())).collect();
+    let mean_x = logs.iter().map(|(x, _)| *x).sum::<f64>() / n as f64;
+    let mean_y = logs.iter().map(|(_, y)| *y).sum::<f64>() / n as f64;
+    let sxx: f64 = logs.iter().map(|(x, _)| (x - mean_x).powi(2)).sum();
+    if sxx <= 0.0 {
+        return None;
+    }
+    let sxy: f64 = logs
+        .iter()
+        .map(|(x, y)| (x - mean_x) * (y - mean_y))
+        .sum::<f64>();
+    let exponent = sxy / sxx;
+    let prefactor = (mean_y - exponent * mean_x).exp();
+
+    let residuals: Vec<f64> = points
+        .iter()
+        .map(|(x, y)| prefactor * x.powf(exponent) / y - 1.0)
+        .collect();
+    // The slope's standard error from the log–log residuals. Two points fit a line exactly, so
+    // there is no spread to estimate from and the honest answer is zero rather than a NaN.
+    let exponent_stderr = if n > 2 {
+        let sse: f64 = logs
+            .iter()
+            .map(|(x, y)| (y - (mean_y + exponent * (x - mean_x))).powi(2))
+            .sum();
+        (sse / (n - 2) as f64 / sxx).sqrt()
+    } else {
+        0.0
+    };
+
+    Some(PowerLawFit {
+        exponent,
+        prefactor,
+        residuals,
+        exponent_stderr,
+    })
+}
+
 /// The two polynomials `f` and `g` evaluated at `(keep, eliminate) = (a, b)`.
 ///
 /// A convenience for checking a candidate: the resultant's roots are necessary conditions, so
@@ -870,7 +1113,7 @@ mod tests {
         grobner::research::KOALABEAR_PRIME,
         identities::One,
         poly::{Polynomial, UnivariatePolynomial},
-        FiniteField, Monomial, MultivariatePolynomial, Zero,
+        FiniteField, MultivariatePolynomial, Zero,
     };
 
     type F = Zp13;
@@ -881,28 +1124,13 @@ mod tests {
         MultivariatePolynomial::parse(text, VARS).expect("a bivariate polynomial")
     }
 
-    /// A bivariate polynomial with the given degree in each variable and random coefficients.
-    ///
-    /// The top coefficient in the eliminated variable is forced nonzero so that the Sylvester
-    /// matrix really has the order the degrees claim.
+    /// A bivariate pair over KoalaBear, at the degrees the caller names.
     fn random_bivariate<R: rand::RngCore + rand::CryptoRng>(
         degree_x: u32,
         degree_y: u32,
         rng: &mut R,
     ) -> MultivariatePolynomial<2, Koala> {
-        let mut terms: Vec<(Monomial<2>, Koala)> = Vec::new();
-        for i in 0..=degree_x {
-            for j in 0..=degree_y {
-                let mut c = Koala::random(rng);
-                if i == degree_x && j == degree_y && c.is_zero() {
-                    c = Koala::one();
-                }
-                if !c.is_zero() {
-                    terms.push((Monomial::new(&[i, j]), c));
-                }
-            }
-        }
-        MultivariatePolynomial::new(&terms)
+        super::random_bivariate::<Koala, R>(degree_x, degree_y, rng)
     }
 
     /// `Res_y(y - a, y - b) = a - b` up to sign: the textbook case, checked against a hand value.
@@ -1218,7 +1446,10 @@ mod tests {
     ///
     /// The hazard of composing a guard with a rewritten loop is that it stops executing silently.
     /// `PredictionHeld` is only reachable after the check passes and `PredictionFalsified` only
-    /// after it fails, so observing both at concurrency 8 and 32 shows the guard still decides.
+    /// after it fails, so observing both at concurrency 1, 8 and 32 shows the guard still decides
+    /// after the checks themselves were spread over workers — and the recovered polynomial is
+    /// compared across the three, because a verdict that agreed while the answer drifted would be
+    /// worse than a verdict that flipped.
     #[test]
     fn test_the_off_domain_validation_runs_on_the_parallel_path() {
         use rand::{prelude::StdRng, SeedableRng};
@@ -1226,8 +1457,9 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0x0ffd);
         let f = random_bivariate(4, 4, &mut rng);
         let g = random_bivariate(4, 4, &mut rng);
+        let truth = bivariate_resultant(&f, &g, 1).expect("ok");
         // The true resultant has degree 4·4 + 4·4 = 32.
-        for workers in [8usize, 32] {
+        for workers in [1usize, 8, 32] {
             let options = ResultantOptions::with_concurrency(workers);
             let (_, held) =
                 bivariate_resultant_predicted(&f, &g, 1, 32, options).expect("both involve y");
@@ -1250,11 +1482,146 @@ mod tests {
                 "and must have taken its checks"
             );
             assert_eq!(
-                recovered,
-                bivariate_resultant(&f, &g, 1).expect("ok"),
+                recovered, truth,
                 "the fallback is the real resultant at {workers} workers"
             );
         }
+    }
+
+    /// A held prediction gives the identical verdict and the identical resultant at 1, 8 and 32.
+    ///
+    /// The validation's determinants now go through the same indexed parallel loop as the
+    /// interpolation's, so the thing to pin is that spreading them changed neither the decision nor
+    /// the polynomial the decision was made about.
+    #[test]
+    fn test_a_held_verdict_and_its_resultant_are_identical_at_every_concurrency() {
+        use crate::grobner::research::{challenge, Specialization};
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let mut expected: Option<UnivariatePolynomial<Koala>> = None;
+        for workers in [1usize, 8, 32] {
+            let (resultant, stages) = bivariate_resultant_predicted(
+                &outputs[0],
+                &outputs[1],
+                1,
+                81,
+                ResultantOptions::with_concurrency(workers),
+            )
+            .expect("both involve the second");
+            assert_eq!(
+                stages.degree_source,
+                DegreeSource::PredictionHeld { degree: 81 },
+                "the same verdict at {workers} workers"
+            );
+            assert_eq!(
+                stages.off_domain_checks,
+                ResultantOptions::DEFAULT_OFF_DOMAIN_CHECKS,
+                "all eight checks at {workers} workers"
+            );
+            match &expected {
+                None => expected = Some(resultant),
+                Some(first) => assert_eq!(&resultant, first, "{workers} workers"),
+            }
+        }
+    }
+
+    /// The off-domain points are deterministic, distinct, and outside the sample set.
+    #[test]
+    fn test_the_off_domain_points_are_distinct_and_outside_the_sample_set() {
+        let at = super::off_domain_abscissae::<Koala>(82, 8).expect("a 31-bit field has room");
+        assert_eq!(at.len(), 8, "exactly the checks asked for");
+        for x in &at {
+            assert!(
+                !(0..82u64).any(|i| *x == Koala::new(i)),
+                "{x} is in the sample set"
+            );
+        }
+        for (i, x) in at.iter().enumerate() {
+            assert!(
+                !at[i + 1..].contains(x),
+                "{x} was drawn twice, which is not eight independent points"
+            );
+        }
+        assert_eq!(
+            at,
+            super::off_domain_abscissae::<Koala>(82, 8).expect("again"),
+            "the fixed seed makes the draw reproducible"
+        );
+    }
+
+    /// A field with no room outside the sample set is reported, not looped on forever.
+    #[test]
+    fn test_the_off_domain_draw_refuses_a_field_with_no_room() {
+        // Zp13's thirteen elements are all inside a sample set of twelve points but one.
+        let error = super::off_domain_abscissae::<F>(12, 8).expect_err("no room for eight");
+        assert_eq!(error, ResultantError::FieldTooSmall { needed: 20 });
+    }
+
+    /// The elimination's three stage durations sum to the route's measured wall clock, once each.
+    ///
+    /// The regression test for a double-counted stage: a duration charged to two stages makes the
+    /// sum exceed the outer timer, and a duration charged to none makes it fall well short.
+    #[test]
+    fn test_the_stage_durations_sum_to_the_measured_elapsed() {
+        use std::time::Instant;
+
+        use crate::grobner::research::{challenge, Specialization};
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let started = Instant::now();
+        let (_, stages) = bivariate_resultant_predicted(
+            &outputs[0],
+            &outputs[1],
+            1,
+            81,
+            ResultantOptions::default(),
+        )
+        .expect("both involve the second");
+        let measured = started.elapsed();
+
+        assert_eq!(
+            stages.degree_source,
+            DegreeSource::PredictionHeld { degree: 81 },
+            "the held path is the one that reports a validation cost"
+        );
+        assert!(
+            stages.validation > std::time::Duration::ZERO,
+            "the validation is its own reported stage, not folded into the sampling"
+        );
+        assert!(
+            stages.elapsed() <= measured,
+            "the stages sum to {:?}, more than the {:?} the route took — something is counted \
+             twice",
+            stages.elapsed(),
+            measured
+        );
+        assert!(
+            stages.elapsed().as_secs_f64() >= 0.5 * measured.as_secs_f64(),
+            "the stages sum to {:?} against {:?} measured — more than half the route is \
+             unattributed",
+            stages.elapsed(),
+            measured
+        );
     }
 
     /// A held prediction on the parallel path records that it was validated.
@@ -1892,5 +2259,104 @@ mod tests {
             }
         }
         assert_eq!(verified, 1, "one base-field witness at four rounds");
+    }
+
+    /// A fit to exact cubic data recovers exponent 3 with zero residuals.
+    #[test]
+    fn test_the_power_law_fit_recovers_an_exact_cubic() {
+        let points: Vec<(f64, f64)> = [18.0, 162.0, 486.0, 1458.0]
+            .into_iter()
+            .map(|order: f64| (order, 7.0 * order.powi(3)))
+            .collect();
+        let fit = super::fit_power_law(&points).expect("four positive points");
+        assert!((fit.exponent - 3.0).abs() < 1e-9, "{}", fit.exponent);
+        assert!((fit.prefactor - 7.0).abs() < 1e-6, "{}", fit.prefactor);
+        assert!(fit.worst_residual() < 1e-9, "{}", fit.worst_residual());
+        assert_eq!(fit.residuals.len(), 4, "one residual per input point");
+    }
+
+    /// Curved log-log data is reported with a per-point residual rather than as a clean fit.
+    #[test]
+    fn test_the_power_law_fit_reports_residuals_on_curved_data() {
+        // Sub-cubic at the bottom, super-cubic at the top: the shape the three determinant timings
+        // on record have. A rising local slope is *convex* in log-log, so a single straight line
+        // through it over-predicts the middle and under-predicts both ends — and no single
+        // exponent can describe it.
+        let points = [(18.0, 8.5e-6), (162.0, 2.868e-3), (1458.0, 2.70)];
+        let fit = super::fit_power_law(&points).expect("three positive points");
+        assert!(fit.worst_residual() > 0.05, "{}", fit.worst_residual());
+        assert!(fit.exponent_stderr > 0.0, "three points estimate a spread");
+        assert!(
+            fit.residuals[1] > 0.0,
+            "the middle is over-predicted: {:?}",
+            fit.residuals
+        );
+        assert!(
+            fit.residuals[0] < 0.0 && fit.residuals[2] < 0.0,
+            "and both ends under-predicted: {:?}",
+            fit.residuals
+        );
+    }
+
+    /// A fit needs two distinct positive abscissae, and refuses rather than inventing an exponent.
+    #[test]
+    fn test_the_power_law_fit_refuses_data_it_cannot_constrain() {
+        assert!(super::fit_power_law(&[]).is_none(), "no points");
+        assert!(super::fit_power_law(&[(162.0, 1.0)]).is_none(), "one point");
+        assert!(
+            super::fit_power_law(&[(162.0, 1.0), (162.0, 2.0)]).is_none(),
+            "one distinct abscissa"
+        );
+        assert!(
+            super::fit_power_law(&[(0.0, 1.0), (162.0, 2.0)]).is_none(),
+            "a logarithm of zero"
+        );
+    }
+
+    /// A timed batch reports the order, the count, the footprint, and the values themselves.
+    #[test]
+    fn test_a_timed_determinant_batch_reports_its_shape() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0xd00d);
+        let f = random_bivariate(1, 9, &mut rng);
+        let g = random_bivariate(1, 9, &mut rng);
+        let at: Vec<Koala> = (1..=12u64).map(Koala::new).collect();
+        let (values, batch) =
+            super::time_sylvester_determinants(&f, &g, 1, &at, 1).expect("both involve y");
+        assert_eq!(batch.matrix_order, 18, "9 + 9");
+        assert_eq!(batch.determinants, 12);
+        assert_eq!(batch.concurrency, 1);
+        assert_eq!(
+            batch.matrix_bytes,
+            18 * 18 * std::mem::size_of::<Koala>(),
+            "the dense matrix one worker builds"
+        );
+        assert!(batch.core_per_determinant() >= batch.wall_per_determinant());
+        for (value, x) in values.iter().zip(&at) {
+            assert_eq!(
+                *value,
+                sylvester_determinant_at(&f, &g, 1, *x).expect("both involve y"),
+                "the batch evaluates the same determinant the single-point entry does"
+            );
+        }
+    }
+
+    /// The timed batch gives the same determinants at every concurrency, in the same index order.
+    #[test]
+    fn test_a_timed_determinant_batch_does_not_depend_on_the_concurrency() {
+        use rand::{prelude::StdRng, SeedableRng};
+
+        let mut rng = StdRng::seed_from_u64(0xd00e);
+        let f = random_bivariate(1, 5, &mut rng);
+        let g = random_bivariate(1, 5, &mut rng);
+        let at: Vec<Koala> = (1..=40u64).map(Koala::new).collect();
+        let (serial, _) = super::time_sylvester_determinants(&f, &g, 1, &at, 1).expect("ok");
+        for workers in [8usize, 32] {
+            let (parallel, batch) =
+                super::time_sylvester_determinants(&f, &g, 1, &at, workers).expect("ok");
+            assert_eq!(parallel, serial, "{workers} workers");
+            assert_eq!(batch.concurrency, workers);
+        }
     }
 }

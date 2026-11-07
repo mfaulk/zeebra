@@ -675,6 +675,319 @@ reported as *prediction falsified, generic bound unaffordable* rather than retri
 `examples/resultant_cico` now prints that consequence before it starts a row instead of discovering
 it mid-run.
 
+### 6.9 The determinant cost law, calibrated at five orders
+
+Everything above extrapolated the determinant cost from **one** point — 2.868 ms at order 162,
+§6.5 — by a cubic law nothing had checked above that order. #289 asked for the law to be measured.
+`examples/determinant_sweep` does it: random bivariate pairs of named degree, three independent
+draws per order, the same `sample_determinants` loop every resultant route uses, under
+`tools/benchlock.sh` on one pinned core.
+
+Random pairs rather than a registered row **on purpose**. A row's matrix order is tied to its round
+count, so a sweep over rows would vary the order and the row's internal structure together and
+could not separate them; and the orders worth knowing about — 4 374 — belong to no row that is
+affordable to run. The pairs are degree 1 in the surviving variable and `order / 2` in the
+eliminated one, so the matrix order is the only thing that changes. Building the matrix is then
+`O(order)` polynomial evaluations and `O(order²)` writes against the LU's `O(order³)`, under 2% by
+operation count at order 162 and falling, which is what makes this a measurement of the determinant
+kernel rather than of the setup around it.
+
+| order | matrix | live set/worker | determinants × draws | wall = core-time per determinant | spread |
+|---:|---:|---:|---:|---:|---:|
+| 18 | 3 kB | 10 kB | 20 000 × 3 | **7.88 µs** | 7.0% |
+| 162 | 210 kB | 840 kB | 500 × 3 | **3.624 ms** | 2.8% |
+| 486 | 1.9 MB | 7.6 MB | 100 × 3 | **94.494 ms** | 4.6% |
+| 1 458 | 17.0 MB | 68.0 MB | 8 × 3 | **2.404 s** | 1.3% |
+| 4 374 | 153.1 MB | 612.2 MB | 3 × 3 | **68.182 s** | 5.2% |
+
+All five at one worker, so wall clock and core-time coincide. The live set is four times the matrix:
+`crout_lu_pivoting` returns `L`, `U` and `P` beside a clone of `A`. The spread is
+`(max − min) / median` over the draws, and the reported figure is the **median** — a draw that
+collided with another agent's work on a shared L3 is slow and never fast, so the contamination is
+one-sided and a mean would carry it.
+
+#### A single power law does not describe it; above L2 it is cubic
+
+| from → to | order ratio | cost ratio | local exponent |
+|---|---:|---:|---:|
+| 18 → 162 | 9.00x | 459.8x | **2.790** |
+| 162 → 486 | 3.00x | 26.1x | **2.968** |
+| 486 → 1 458 | 3.00x | 25.4x | **2.946** |
+| 1 458 → 4 374 | 3.00x | 28.4x | **3.045** |
+
+Ordinary least squares on `(ln order, ln core-time)` — `fit_power_law`, which is unit-tested against
+exact cubic data and against curved data — over all five orders:
+
+**single law, every order: `1.5710e-9 · order^2.9071`, exponent ±0.0318, worst residual +14.9%**
+
+| order | measured | fitted | residual |
+|---:|---:|---:|---:|
+| 18 | 7.88 µs | 7.01 µs | −11.12% |
+| 162 | 3.624 ms | 4.164 ms | **+14.91%** |
+| 486 | 94.494 ms | 101.527 ms | +7.44% |
+| 1 458 | 2.404 s | 2.475 s | +2.96% |
+| 4 374 | 68.182 s | 60.352 s | **−11.48%** |
+
+**Reject it.** The residual signs run −, +, +, +, − : the fit sits above the middle of the range and
+below both ends, which is curvature and not noise — the draws' own spread is 1.3–7.0%, five to ten
+times smaller than the 14.9% miss. Splitting at the order whose matrix stops fitting this machine's
+512 kB L2 (`lscpu -C`: 32 kB L1d and 512 kB L2 a core, 32 MB L3 × 8 instances = 256 MB) gives:
+
+**above L2 — orders 486, 1 458, 4 374: `8.3216e-10 · order^2.9953`, exponent ±0.0285, worst residual 3.7%**
+
+| order | measured | fitted | residual |
+|---:|---:|---:|---:|
+| 486 | 94.494 ms | 92.801 ms | −1.79% |
+| 1 458 | 2.404 s | 2.493 s | +3.68% |
+| 4 374 | 68.182 s | 66.960 s | −1.79% |
+
+**below L2 — orders 18 and 162: `2.4783e-9 · order^2.7902`**, exact through two points, so no
+residual and no standard error: two points fit a line, and the exponent is reported with that
+caveat rather than with a fabricated uncertainty.
+
+So the law is **piecewise, and the upper piece is cubic to within the measurement**: 2.9953 ± 0.0285
+brackets 3.0, and 3.7% is inside the run-to-run spread at the top of the range. The lower piece is
+genuinely sub-cubic at 2.79 — fixed per-determinant cost (the coefficient-row evaluations, the
+`(m+n)²` matrix build, the allocation of four `(m+n)²` arrays, the `Matrix::new` copy) that an
+order-18 determinant's 2 000 multiply-subtract steps cannot amortize and an order-162 determinant's
+1.4 million already can.
+
+#### The cache hierarchy is not the mechanism, which was the surprise
+
+#289 was opened on the reading that the law is **super**-cubic above order 162 — 3.116 — with a
+cache transition at the top as the mechanism, and order 4 374 was swept precisely because its
+153 MB matrix is the point that separates L3 from main memory. It is not what the data say:
+
+- order 4 374's local exponent is **3.045**, no different from 486 → 1 458's 2.946 and
+  1 458 → 4 374 being the pair that crosses out of L3 entirely. There is no cliff there to model.
+- the reason is arithmetic rather than lucky: Crout LU does `O(n³)` work on `O(n²)` data, so its
+  compute-to-traffic ratio *grows* with the order. At 4 374 that is 2.8 × 10¹⁰ multiply-subtracts
+  against 153 MB of matrix — about 180 operations per byte touched. A kernel at that ratio is
+  compute-bound at every level of the hierarchy, and the inner loop walks rows contiguously.
+- the 3.116 that looked super-cubic came of dividing a **32-worker** core-time at order 1 458
+  (2.70 s, from the six-round run records) by a **single-worker** one at order 162 (2.868 ms, §6.5).
+  Those are two different widths and two different sessions. The width is what the excess was —
+  see the next heading. Measured at one width throughout, the same interval gives 2.96.
+
+The remaining candidate mechanisms are ruled out or bounded rather than left open. Field arithmetic:
+the only non-multiply-add in the kernel is one inverse per pivot, `order` of them against
+`order³/3` multiply-subtracts — 0.7% at order 162 and 0.02% at 4 374, so it cannot bend the curve
+and it would bend it the other way. Implementation: the matrix build is `O(order²)` against
+`O(order³)`, which again shrinks with the order. What is left is the fixed overhead at the bottom,
+and that is what the sub-cubic lower piece is.
+
+#### Core-time per determinant rises with the worker count, by more than §6.6 recorded
+
+The same sweep at three widths, orders 162, 486 and 1 458, `--repeats 3`–`5`:
+
+| order | 1 worker | 8 workers | 32 workers | 32 workers, 4 determinants a worker |
+|---:|---:|---:|---:|---:|
+| 162 | 3.624 ms | 4.037 ms (1.11x) | 5.236 ms (1.44x) | — |
+| 486 | 94.494 ms | 106.982 ms (1.13x) | 135.865 ms (1.44x) | — |
+| 1 458 | 2.404 s | 2.821 s (1.17x) | 3.643 s (1.52x) | **3.148 s (1.31x)** |
+
+Two things in that table. First, at order 1 458 and 32 workers the default sweep gives each worker a
+single determinant, so each one first-touches its own 68 MB live set and pays the page faults
+alone; raising the count to four a worker amortizes them and the penalty falls from 1.52x to
+**1.31x**. The 1.31x is the figure to use, and the 1.52x is what a *row* would see only in its last,
+ragged block.
+
+Second, and less comfortably: **§6.6 measured this penalty as 4–9% out to 32 workers and it
+reproduces here as 31–44%.** §6.6's own argument — that the limit is the all-core clock rather than
+memory bandwidth — is if anything strengthened by the larger number, and the shape still supports
+it: the penalty is the same 1.44x at order 162 and at order 486, whose matrices differ by 9x, which
+a bandwidth limit would not do. But the size of it disagrees with what is on record and this
+milestone did not resolve why. Treated as a finding, not repaired — #319.
+
+#### The figures on record are ~1.2x faster than the same measurements today
+
+Worth stating plainly, because every ratio in §6 is quoted against one of them:
+
+| measurement | on record | re-measured in M25 | ratio |
+|---|---:|---:|---:|
+| order-162 determinant, 1 worker, 13 123-sample reference route on `rf2-rp2` | 37 634.3 ms / 13 123 = **2.868 ms** (§6.5) | 45 131.0 ms / 13 123 = **3.439 ms** | 1.199x |
+| order-162 determinant, 1 worker, synthetic pair | — | **3.624 ms** | 1.264x vs §6.5 |
+| order-18 determinant, 1 worker | 8.45–8.6 µs | **7.88 µs** | 0.92x |
+| order-1 458 determinant, 32 workers, core-time | **2.70 s** (six-round records) | 3.148 s | 1.166x |
+
+The first row is the same measurement, on the same registered row, through the same code path, under
+the same lock — only months and a commit range apart. Three of the four point the same way by about
+1.2x and the smallest order points the other way. **This is unexplained**, and until it is, a factor
+computed between a figure from §6.5 and a figure taken now carries a ~20% systematic that is not a
+property of either implementation. Filed as #318 rather than guessed at here. Two unrelated
+single-core processes were resident during part of the M25 sweep — `tools/benchlock.sh` serializes
+benchmarks and not builds — which inflates a measurement rather than deflating it, and so cannot
+explain a figure on record being *faster*.
+
+#### What `RowCost::of` now does, and why it is not the fitted law
+
+The budget guard's purpose is to **refuse** runs, so the asymmetry matters: over-predicting costs an
+operator a flag, and under-predicting authorizes a multi-day run nobody costed.
+`determinant_core_ms` therefore takes
+
+```text
+core_ms(order, workers) = max( 3.624 · (order/162)³ , 3.624 · (order/162)^2.9953 )
+                        × (1 + 0.065 · log2(workers))
+```
+
+Three deliberate choices in that line:
+
+1. **The larger of the two laws, not the fit.** The measured exponent 2.9953 is *below* 3, so
+   anchored at order 162 the fitted law predicts **less** work than the cubic at every order above
+   it. Adopting the fit alone would have made the guard weaker than it was before it was calibrated.
+   The `max` keeps the conservative figure and picks a future re-fit up automatically if one comes
+   out above 3.
+2. **The anchor is 3.624 ms, not 2.868 ms.** A guard anchored to the fastest figure ever recorded on
+   a machine that no longer delivers it is a guard that does not bind. The current, reproducible
+   figure is the one to refuse runs with, and the 1.2x gap is documented above rather than averaged
+   away.
+3. **A measured width penalty.** 6.5% a doubling, linear in `log2(workers)` through the measured
+   1.00 / 1.17 / 1.31 at 1 / 8 / 32 workers, and **extrapolated at the same slope beyond 32** rather
+   than held flat: nothing wider has been measured, and flattening it would make the guard
+   optimistic exactly where it has no evidence.
+
+At order 1 458 the model gives 2.642 s a determinant against 2.404 s measured — 10% conservative,
+which is the intended direction. Above order 4 374 it is an extrapolation and the example says so on
+the line it prints.
+
+#### The rows restated
+
+Sample counts are **exact**: `alpha^(2 R_F + R_P) + 1` from each row's own parameters. The
+per-determinant cost at order 1 458 is **measured**; at order 13 122 it is **extrapolated** from the
+above-L2 law, three times past the largest order measured. Determinant time only — the symbolic
+build (§6.8: 48.4 min and 57 GB at six rounds), the recovery and the solve are not in these numbers.
+
+| row | rounds | samples | order | 1 worker | 32 workers | basis |
+|---|---:|---:|---:|---:|---:|---|
+| `rf2-rp4` | 6 | 6 562 | 1 458 | 4.82 h | **12.0 min** | measured |
+| `rf4-rp2` | 6 | 59 050 | 1 458 | 43.33 h | **1.79 h** | measured |
+| `rf6-rp0` | 6 | 531 442 | 1 458 | 16.25 d | **16.15 h** | measured |
+| `rf4-rp4` | 8 | 531 442 | 13 122 | 11 846 d | **490.5 d** | extrapolated |
+| `rf6-rp2` | 8 | 4 782 969 | 13 122 | 106 617 d | **4 415 d** | extrapolated |
+
+From the measured core-times alone, without the model's conservatism: `rf4-rp2` is
+59 050 × 2.404 s = **39.4 single-core hours**, and at 32 workers 59 050 × 3.148 s / 32 =
+**1.61 h**; `rf6-rp0` is 531 442 × 2.404 s = **354.9 single-core hours** and **14.5 h** at 32
+workers. The reconnaissance figures of 44.3 single-core hours and 1.38 h for `rf4-rp2`, and 398
+single-core hours and 12.5 h for `rf6-rp0`, are arithmetically correct for the 2.70 s core-time they
+assumed; the difference is entirely that input, which M25 measures as 2.404 s at one worker and
+3.148 s at 32.
+
+**The eight-round rows are out of reach by three orders of magnitude and no exponent in the
+plausible range changes that.** At 490 days on 32 workers, `rf4-rp4` would need the per-determinant
+cost to fall by 500x, not the sample count to be sized better. That is the useful negative result of
+the calibration: the question for eight rounds is not the cost model but whether an order-13 122
+determinant is the right object at all.
+
+#### A note on #289's own arithmetic
+
+The issue tabulates order 13 122 as "cubic 1 524 s vs 2 294 s (1.50x)" against a stated 3.116 fit.
+The cubic column is right — 2.868 ms × 81³ = 1 524 s — but 2.868 ms × 81^3.116 = **2 541 s**, not
+2 294 s. 2 294 s corresponds to an exponent of 3.093. So the issue's super-cubic column is
+inconsistent with the exponent it states by about 10%. Recorded here because the figure it is
+inconsistent with is also the figure this section does not reproduce: measured, one order-13 122
+determinant is 1 833–1 926 s at one worker — *below* the issue's super-cubic column, because the
+exponent is 3.00 and not 3.09–3.12, and *above* its cubic column, because the anchor is 3.624 ms and
+not 2.868 ms.
+
+### 6.10 The off-domain validation, on the parallel path
+
+`agrees_off_domain` was a serial `while` loop of Sylvester determinants while the interpolation's
+samples went over the worker pool, so the guard's cost did not fall with the worker count at all:
+22–25 ms on a four-round row, **17.4 s at six rounds — about 3% of the row** — and the eight-round
+projection scales that by `(13 122/1 458)³ = 729`, which is three and a half hours of serial work
+hung off a parallel run.
+
+The fix is that the points do not depend on the thing being checked. `off_domain_abscissae(points,
+checks)` is pure in its arguments and the fixed seed — not in the candidate, not in the concurrency
+— so the draws can happen *before* any determinant is evaluated, and the checks then go through the
+same indexed `sample_determinants` loop as the samples, partitioned over the same workers.
+
+| 8 off-domain checks at order 1 458 | workers | wall clock |
+|---|---:|---:|
+| serial, as before | 1 | **19.97 s** (8 × 2.496 s measured) |
+| on the parallel path | 8 | **2.82 s** |
+
+Substituted into the six-round `rf2-rp4` record — 551.37 s of sampling, 0.41 s of interpolation,
+17.749 s of validation at 32 workers — the validation's share of the elimination goes from
+**3.12% to 0.51%**. Eight checks cannot use more than eight workers however many are asked for, so
+32 workers buys nothing further here; the residual is one determinant, which is the floor for a
+guard that must evaluate at least one point it did not interpolate through.
+
+Two properties the rewrite had to keep, and now keeps by construction rather than by accident:
+
+- **the verdict is order-independent.** All `checks` determinants are evaluated before any is
+  compared, so a falsifying case cannot depend on which worker reached it first. The old loop
+  returned on the first disagreement, which was fine serially and would not have been fine spread.
+  Evaluating all eight costs eight determinants on the one path — falsification — that is about to
+  pay for a whole proven-bound fallback anyway.
+- **the draws are distinct, not merely outside the sample set.** Over KoalaBear a repeat among eight
+  draws has probability about `8²/2³²`, so this changes no run on record; but the probability bound
+  below is an argument about `checks` *independent* points, and a silently repeated point would
+  weaken the bound without changing the count that is reported.
+
+`with_off_domain_checks(0)` still panics, the count still defaults to 8, and `validation` is still
+its own reported stage — which is why the checks are a second call to `sample_determinants` rather
+than being fused into the samples' batch as #285 suggested. Fusing them would have made the guard's
+cost unmeasurable, and §6.11 needs that field to be disjoint from the others. The price is `checks`
+thread spawns, about 35 µs, against determinants of seconds.
+
+#### What the check establishes, and what it does not
+
+**It is a probabilistic consistency check, not a proof of a polynomial identity**, and the two
+routes through this module differ exactly there:
+
+- the **proven**-bound routes need no argument of this kind. A polynomial of degree at most
+  `n·deg_x(f) + m·deg_x(g)` agreeing with the determinant at `bound + 1` points *is* the resultant,
+  by uniqueness of interpolation — §6.3's first bullet, and it is a certificate.
+- the **predicted** route interpolates through `alpha^(2R_F+R_P) + 1` points, far fewer than the
+  bound, so uniqueness says nothing. If the prediction is wrong, the recovered `C` and the true
+  resultant `R` differ, `C − R` is a nonzero polynomial of degree at most the proven bound `D`, and
+  a point drawn uniformly is a root of it with probability at most `D/p`. Eight independent
+  agreements therefore bound the failure probability by `(D/p)^8`: at four rounds
+  `(13 122/2 130 706 433)^8 ≈ 2 × 10⁻⁴²`, at six rounds `(1 062 882/2 130 706 433)^8 ≈ 4 × 10⁻²⁷`.
+
+Overwhelming, and still evidence rather than a certificate. One caveat is worth stating because the
+reproducibility requirement creates it: the seed is **fixed**, so the bound is over the choice of
+seed and not over a fresh draw each run. Re-running the same row reuses the same eight points and
+accumulates no new evidence. For a measurement that is the right trade — a figure that cannot be
+reproduced is not a figure — but it does mean the guard is strong against a *generic* failure of
+slide 22's formula and not against an input built to pass these eight points.
+
+### 6.11 The off-domain validation was counted twice, and the six-round totals carry it
+
+`examples/resultant_cico` charged the validation to `Stage::Elimination`, through
+`Pass::elimination`, and again to `Stage::Verification` as `pass.off_domain.1`. `RunRecord::elapsed`
+is the sum of the stages, so **the recorded row total was inflated by the cost of the check.** It is
+visible in the six-round record without any recomputation: elimination 569.53 s = 551.37 sampling +
+0.41 interpolation + 17.75 validation, and the verification stage is 17.749 s — the same 17.4 s in
+two places.
+
+Validation now belongs to the elimination and to nothing else. The reasoning, since it is a judgement
+and not a mechanical fix: `Stage::Verification` is defined as the independent check of a
+*candidate*, which here means a recovered input pair run through `permutation_plus_linear`, whereas
+the off-domain check is what decides **which polynomial the elimination returns at all** — and on a
+falsified row `stages.validation` already contains the refused attempt's own sampling and
+interpolation, which is unambiguously elimination work. Its *count* stays on the verification stage
+as description; its duration moves, and a new `validation_us` detail on the elimination stage keeps
+it visible rather than buried in a sum.
+
+Two things keep it fixed rather than fixed once. `ResultantStages::elapsed` is now the single
+definition of what one elimination cost, so a caller filing a stage cost and a caller printing a
+total cannot drift apart; and `record` **asserts** that the recorded stage durations sum to the total
+the row printed, which fails the run rather than filing an inflated record. A unit test pins both
+halves of the invariant against an outer timer: the three stage fields sum to no more than the
+route's measured elapsed — which a double count violates — and to no less than half of it, which a
+dropped stage violates.
+
+**The records already written are not edited.** A historical measurement is not rewritten because a
+later implementation accounts for it better; what it says about the machine on the day is what it
+says. So the six-round run records, and `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md` §7.8's total of
+59.71 min, continue to carry **17.75 s of double-counted validation** — 0.5% of that row, and the
+inflation is in `elapsed_nanos` and the verification stage, not in `sampling` or `interpolation`,
+which were never wrong. Any row recorded from this commit onwards does not carry it, and a total
+compared across the boundary should subtract the verification stage from the older one.
+
 ## 7. The deeper consequence
 
 It is about the **formulation**, not the algorithm. Three orders of magnitude separate two ways of
