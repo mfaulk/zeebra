@@ -81,6 +81,10 @@ As the saying goes, you can either make software so simple that it obviously has
       read as wins for this crate, up to 501x, and settle nothing. Of the seven that qualify: four
       losses, two inside the noise band, one win — on a corpus whose raw numbers show this crate
       ahead on every pair
+- [x] Multivariate composition: `x_i -> g_i(x_i)` for univariate `g_i`, and the general form that
+      substitutes a polynomial in all `N` variables for each one — so a permutation round can be
+      written the way it is defined, with the substituted powers memoized and formed by repeated
+      squaring
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -2059,6 +2063,49 @@ against **594 944** for the form that materialized every term, because every mer
 monomial already present and the table never grows — the live set is the output. Folding eight
 scaled words into one accumulator peaks at **43 312 bytes** against **84 448**; there the output
 has to be allocated, so the 2x is all there is to win.
+
+### Composition
+
+`compose_univariate` substitutes one univariate polynomial per variable, `x_i -> g_i(x_i)`, and
+`compose` is the general form, replacing each `x_i` by a polynomial in all `N` variables at once.
+Both are simultaneous rather than sequential: a substitution's own variables are not themselves
+substituted. `from_univariate(i, &g)` is the lift the univariate form is built on — the same `g`
+read as a polynomial in variable `i` alone.
+
+A round of a sponge permutation is exactly this shape: an S-box `x -> x^d` per state word followed
+by an affine layer.
+
+```rust
+use zeebra::{fields::Zp13, FiniteField, MultivariatePolynomial, Polynomial, UnivariatePolynomial};
+
+let vars = ["x", "y"];
+let p: MultivariatePolynomial<2, Zp13> =
+    MultivariatePolynomial::parse("x^2*y + 3*x + 2", vars).unwrap();
+
+// x -> x + 1, y -> y^2, written as coefficients in ascending order.
+let shift = UnivariatePolynomial::new(&[Zp13::new(1), Zp13::new(1)]);
+let square = UnivariatePolynomial::new(&[Zp13::new(0), Zp13::new(0), Zp13::new(1)]);
+assert_eq!(
+    p.compose_univariate(&[shift, square]),
+    MultivariatePolynomial::parse("x^2*y^2 + 2*x*y^2 + y^2 + 3*x + 5", vars).unwrap()
+);
+
+// The general form can mix variables: x*y under x -> x + y, y -> x - y is x^2 - y^2.
+let product: MultivariatePolynomial<2, Zp13> = MultivariatePolynomial::parse("x*y", vars).unwrap();
+let sum = MultivariatePolynomial::parse("x + y", vars).unwrap();
+let difference = MultivariatePolynomial::parse("x - y", vars).unwrap();
+assert_eq!(
+    product.compose(&[sum, difference]),
+    MultivariatePolynomial::parse("x^2 - y^2", vars).unwrap()
+);
+```
+
+Degree grows multiplicatively — `deg(p(g_0, ..., g_{N-1}))` is bounded by the largest
+`sum_i e_i * deg(g_i)` over the monomials `x^e` of `p` — so forming the powers `g_i^(e_i)` is where
+the work is. They are memoized per variable and built by repeated squaring, which makes a distinct
+exponent `e` cost `O(log e)` multiplications and a repeated one cost none. Cancellation is handled
+by the same canonical invariant as everything else: a composition that collapses returns the zero
+polynomial as no terms at all.
 
 ## Gröbner Bases
 
