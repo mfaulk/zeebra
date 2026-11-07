@@ -34,7 +34,8 @@ use zeebra::grobner::{
     external::{
         corpus::{instance, ladder},
         CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance, Limits,
-        MsolveSolver, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
+        Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
+        SingularSolver, Task, ZeebraSolver,
     },
     research::{Environment, Json},
     F4Options,
@@ -255,7 +256,9 @@ fn run_one(
     if wanted("singular") {
         match SingularSolver::with_binary("Singular", scratch.join("singular"), limits.wall) {
             Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
-            Err(failure) => eprintln!("- Singular unavailable: {}", failure),
+            Err(failure) => {
+                unreachable_engine(board, "singular", built, task, limits, environment, failure)
+            }
         }
     }
 
@@ -270,18 +273,63 @@ fn run_one(
     if wanted("groebner.jl") {
         match GroebnerJlSolver::from_env(scratch.join("groebner-jl")) {
             Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
-            Err(failure) => eprintln!("- Groebner.jl unavailable: {}", failure),
+            Err(failure) => unreachable_engine(
+                board,
+                "groebner.jl",
+                built,
+                task,
+                limits,
+                environment,
+                failure,
+            ),
         }
     }
 
     if wanted("sagebrush") {
         match SagebrushSolver::from_env(scratch.join("sagebrush")) {
             Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
-            Err(failure) => eprintln!("- Sagebrush unavailable: {}", failure),
+            Err(failure) => unreachable_engine(
+                board,
+                "sagebrush",
+                built,
+                task,
+                limits,
+                environment,
+                failure,
+            ),
         }
     }
 
     let _ = fs::remove_dir_all(&scratch);
+}
+
+/// Record an engine that could not be started, instead of only mentioning it on stderr.
+///
+/// `RunFailure::Unavailable`'s own contract is that "a sweep must continue, the board must show
+/// the row as not attempted, and nothing about Zeebra may be concluded from it". Printing and
+/// dropping the row satisfied the first clause and broke the second: a board taken where an engine
+/// was unreachable rendered identically to a board taken where it was never asked for, and the
+/// generated artifact is what a reader has a year later.
+#[allow(clippy::too_many_arguments)]
+fn unreachable_engine(
+    board: &mut CompetitiveBoard,
+    id: &str,
+    built: &Instance,
+    task: Task,
+    limits: &Limits,
+    environment: &Environment,
+    failure: RunFailure,
+) {
+    eprintln!("- {} unavailable: {}", id, failure);
+    let report = RunReport::new(
+        id,
+        built,
+        task,
+        limits,
+        RunStatus::Failed(failure),
+        Measurement::unmeasured(),
+    );
+    board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
 /// Probe one engine, run it, and record whatever came back.

@@ -306,13 +306,33 @@ impl CompetitiveRecord {
 
     /// True if `other` measured the same thing under the same conditions.
     ///
-    /// Problem, task, limits, machine and build. The precondition of a ratio, minus the invariant
-    /// agreement, which is checked separately because it is a property of the *answers*.
+    /// Problem, task, limits, machine, build, **commit and policy**. The precondition of a ratio,
+    /// minus the invariant agreement, which is checked separately because it is a property of the
+    /// *answers*.
+    ///
+    /// `Environment::comparable` covers machine, cpu and build and **not** `commit` or `policy`,
+    /// and both omissions let the board compare two different things.
+    ///
+    /// **Commit.** `build` is `release, rustc <version>`, which is identical across every source
+    /// change, so without this a re-measure taken after an engine change pairs against the rows the
+    /// change superseded — a ratio between two versions of this crate, rendered as a ratio against
+    /// a competitor. Caught when a rebase picked up an F4 change and the stale rows were still on
+    /// the board.
+    ///
+    /// **Policy** is where the measurement discipline lives — `many rows per process (no memory
+    /// figure)` against `one row per process`. Two different measurements of the same row: one is cold in a fresh
+    /// process, the other inherits the allocator and cache state of every row that ran before it in
+    /// the same one. Left to `Environment::comparable` alone the board paired them, which doubled
+    /// its own pair count and ratioed a cold row against a warm one. Checked here rather than in
+    /// `Environment` because that type is shared with the cryptanalysis scoreboard, whose own
+    /// comparability rules are #77's to change.
     pub fn comparable_with(&self, other: &CompetitiveRecord) -> bool {
         self.problem_digest == other.problem_digest
             && self.task == other.task
             && self.limits.comparable_with(&other.limits)
             && self.environment.comparable(&other.environment)
+            && self.environment.commit == other.environment.commit
+            && self.environment.policy == other.environment.policy
     }
 
     /// The row as JSON.
@@ -801,6 +821,31 @@ impl Speedup {
     /// cannot carry a conclusion through the 20% noise band this project reads results against.
     pub const FLOOR_MULTIPLE_REQUIRED: f64 = 2.0;
 
+    /// The band around one inside which a ratio is not read as a win or a loss.
+    ///
+    /// 1.2, the 20% this project reads results against — the same band the constant above is
+    /// justified by. A publishable ratio inside it is a *result*, not a missing one: it says the
+    /// two engines are level on that row, and counting it with the wins would overstate both.
+    pub const NOISE_BAND: f64 = 1.2;
+
+    /// Comparands whose rows are worth recording but may never be a speedup denominator.
+    ///
+    /// Sagebrush agreed term-for-term with every other engine on every family tried, including at
+    /// a 62-bit prime — and is still five weeks old, every crate `0.1.0`, nothing on crates.io,
+    /// six F4 tests, and no oracle run in its own repository exercising the elimination. A ratio
+    /// against it measures something real about one unreviewed implementation and nothing about
+    /// the state of the art, so it is reportable **with its SHA** and is not a conclusion.
+    ///
+    /// Enforced here rather than left to the prose that first recorded the judgement: now that
+    /// these rows are on the board, a reader of the board alone would see a Sagebrush ratio
+    /// rendered exactly like a Singular one.
+    pub const NOT_AUTHORITATIVE: [&str; 1] = ["sagebrush"];
+
+    /// Whether a conclusion may rest on this ratio's comparand.
+    pub fn has_authoritative_comparand(&self) -> bool {
+        !Self::NOT_AUTHORITATIVE.contains(&self.subject.as_str())
+    }
+
     /// Whether this ratio says anything about the **engines** rather than about process startup.
     ///
     /// `false` when **either** operand's wall is within [`Self::FLOOR_MULTIPLE_REQUIRED`] of its
@@ -987,6 +1032,27 @@ impl CompetitiveBoard {
             return out;
         }
 
+        // The roster, before the tables. A board that holds two libraries and a board taken on a
+        // machine where only two were reachable render identically in the per-family tables, and
+        // the difference is the whole value of the comparison — so it is stated rather than left
+        // to be counted by hand. `RunFailure::Unavailable` is the row an unreachable engine
+        // leaves, which is why a library can appear here with no answers at all.
+        let mut roster: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
+        for row in &self.rows {
+            let entry = roster.entry(row.library.as_str()).or_insert((0, 0));
+            entry.0 += 1;
+            if row.outcome.is_timing_evidence() {
+                entry.1 += 1;
+            }
+        }
+        out.push_str("## Roster\n\n");
+        let _ = writeln!(out, "| library | rows | answered |");
+        let _ = writeln!(out, "|---|---:|---:|");
+        for (library, (rows, answered)) in &roster {
+            let _ = writeln!(out, "| {} | {} | {} |", library, rows, answered);
+        }
+        out.push('\n');
+
         let mut families: BTreeMap<&str, BTreeMap<&str, Vec<&CompetitiveRecord>>> = BTreeMap::new();
         for row in &self.rows {
             families
@@ -1035,6 +1101,50 @@ impl CompetitiveBoard {
                  build, with **both** outcomes answered. A ratio whose two answers share no \
                  checked invariant is marked: the protocol does not permit publishing it.\n\n",
             );
+
+            // The counts, before the table. Each gate already marks the rows it excludes, but a
+            // marked row is only visible to a reader who tallies the column — and the headline of
+            // this board is how *few* of its pairs survive both gates. Stated so the survivors
+            // cannot be mistaken for the whole comparison.
+            let disqualified = speedups
+                .iter()
+                .filter(|s| !s.is_engine_comparison())
+                .count();
+            let unchecked = speedups
+                .iter()
+                .filter(|s| s.is_engine_comparison() && s.shared_invariants == 0)
+                .count();
+            let publishable: Vec<&Speedup> =
+                speedups.iter().filter(|s| s.is_publishable()).collect();
+            // A ratio this close to one cannot carry a conclusion through the 20% band this
+            // project reads results against, so it is counted apart from the wins and losses
+            // rather than reported as either.
+            let in_band = publishable
+                .iter()
+                .filter(|s| s.ratio > 1.0 / Speedup::NOISE_BAND && s.ratio < Speedup::NOISE_BAND)
+                .count();
+            let unauthoritative = publishable
+                .iter()
+                .filter(|s| !s.has_authoritative_comparand())
+                .count();
+            let _ = writeln!(
+                out,
+                "**{} pairs**: {} disqualified by the startup floor, {} with no checked \
+                 invariant, {} publishable — of which {} inside the 20% noise band, {} against a \
+                 comparand that is not authoritative, and {} that a conclusion may rest on.\n",
+                speedups.len(),
+                disqualified,
+                unchecked,
+                publishable.len(),
+                in_band,
+                unauthoritative,
+                publishable
+                    .iter()
+                    .filter(|s| s.has_authoritative_comparand()
+                        && !(s.ratio > 1.0 / Speedup::NOISE_BAND && s.ratio < Speedup::NOISE_BAND))
+                    .count()
+            );
+
             let _ = writeln!(out, "| problem | task | library | ratio | checked |");
             let _ = writeln!(out, "|---|---|---|---:|---|");
             for speedup in &speedups {
@@ -1052,6 +1162,12 @@ impl CompetitiveBoard {
                         )
                     } else if speedup.shared_invariants == 0 {
                         "**NOT PUBLISHABLE: no invariant was checked**".to_string()
+                    } else if !speedup.has_authoritative_comparand() {
+                        format!(
+                            "{} invariants agreed, but **NOT AUTHORITATIVE: {} may not be a \
+                             speedup denominator**",
+                            speedup.shared_invariants, speedup.subject
+                        )
                     } else {
                         format!("{} invariants agreed", speedup.shared_invariants)
                     }
@@ -1192,8 +1308,11 @@ mod tests {
     ) -> CompetitiveRecord {
         let mut instance = instance();
         instance.name = problem.to_string();
-        // The digest covers the generators, so perturb one to make each problem distinct.
-        instance.system[0] = format!("x1^2+x2-{}", problem.len() + problem.as_bytes()[0] as usize);
+        // The digest covers the generators, so perturb one to make each problem distinct. The
+        // whole name goes in: a perturbation derived from the length and first byte collided for
+        // same-shaped names like `f1`/`f2`, which silently made four problems one and had the
+        // board cross-compare every pairing of their rows.
+        instance.system[0] = format!("x1^2+x2-{}", problem);
         let report = RunReport::new(
             library,
             &instance,
@@ -1718,6 +1837,184 @@ mod tests {
         let markdown = CompetitiveBoard::new().to_markdown();
         assert!(markdown.contains("No rows yet"));
         assert!(!markdown.contains("| problem |"));
+    }
+
+    /// Two rows built from different source commits are not comparable, so a re-measure after a
+    /// change to the engine never ratios the new build against the old one.
+    #[test]
+    fn test_a_different_commit_is_not_comparable() {
+        let before = named_row("p1", "zeebra", answered(64), 100.0);
+        let mut after = named_row("p1", "zeebra", answered(64), 50.0);
+        after.environment.commit = "cafef00d".to_string();
+
+        assert!(!before.comparable_with(&after), "different source commits");
+
+        // And the board does not pair across them: with one comparand at each commit, only the
+        // one sharing the baseline's commit produces a ratio.
+        let mut board = CompetitiveBoard::new();
+        board.add(before);
+        board.add(named_row("p1", "singular", answered(64), 400.0));
+        let mut other_commit = named_row("p1", "singular", answered(64), 400.0);
+        other_commit.environment.commit = "cafef00d".to_string();
+        board.add(other_commit);
+        assert_eq!(board.speedups("zeebra").len(), 1);
+    }
+
+    /// A ratio against a comparand that is recorded but not authoritative says so in the cell and
+    /// is counted apart from the conclusions, so the board cannot be read as if it were one.
+    #[test]
+    fn test_a_non_authoritative_comparand_is_marked_and_counted() {
+        let mut board = CompetitiveBoard::new();
+        // Each library needs four answered rows before it has a floor at all, and the compared
+        // rows must sit far above it or the floor gate is what marks them instead.
+        for problem in ["w-1", "x-1", "y-1", "z-1"] {
+            board.add(named_row(problem, "zeebra", answered(64), 0.1));
+            board.add(named_row(problem, "singular", answered(64), 0.1));
+            board.add(named_row(problem, "sagebrush", answered(64), 0.1));
+        }
+        for problem in ["a-1", "b-1", "c-1", "d-1"] {
+            board.add(named_row(problem, "zeebra", answered(64), 5_000.0));
+            board.add(named_row(problem, "singular", answered(64), 1_000.0));
+            board.add(named_row(problem, "sagebrush", answered(64), 1_000.0));
+        }
+
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("NOT AUTHORITATIVE"),
+            "a sagebrush ratio is marked in its own cell\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("4 against a comparand that is not authoritative"),
+            "and counted in the summary\n{}",
+            markdown
+        );
+        assert!(
+            !markdown.contains("| singular | 4 | 4 |\n| singular"),
+            "the singular rows are untouched"
+        );
+    }
+
+    /// Two rows taken under different measurement policies are not comparable, so a row measured
+    /// one-per-process is never ratioed against one measured many-per-process.
+    #[test]
+    fn test_a_different_measurement_policy_is_not_comparable() {
+        let warm = named_row("p1", "singular", answered(64), 40.0);
+        let mut cold = named_row("p1", "singular", answered(64), 40.0);
+        cold.environment.policy = "60 s wall, 1 worker, one row per process".to_string();
+
+        assert!(
+            warm.comparable_with(&warm.clone()),
+            "a row is comparable with itself"
+        );
+        assert!(
+            !warm.comparable_with(&cold),
+            "the policy differs, so these are two different measurements"
+        );
+
+        // And the board does not pair across the two, which is what doubled its pair count.
+        let mut board = CompetitiveBoard::new();
+        board.add(named_row("p1", "zeebra", answered(64), 1.0));
+        board.add(warm);
+        board.add(cold);
+        assert_eq!(
+            board.speedups("zeebra").len(),
+            1,
+            "only the row sharing zeebra's policy pairs with it"
+        );
+    }
+
+    /// The board names the libraries it holds and how many rows each answered, so a short roster
+    /// is visible rather than inferred from the table.
+    #[test]
+    fn test_the_markdown_states_its_roster() {
+        let mut board = CompetitiveBoard::new();
+        board.add(named_row("p1", "zeebra", answered(64), 1.0));
+        board.add(named_row("p1", "singular", answered(64), 40.0));
+        board.add(named_row("p2", "zeebra", answered(64), 2.0));
+        board.add(named_row(
+            "p2",
+            "singular",
+            RunStatus::Failed(RunFailure::Unavailable {
+                binary: "Singular".to_string(),
+                reason: "not on PATH".to_string(),
+            }),
+            0.0,
+        ));
+
+        let markdown = board.to_markdown();
+        assert!(markdown.contains("## Roster"), "{}", markdown);
+        assert!(
+            markdown.contains("| zeebra | 2 | 2 |"),
+            "zeebra answered both of its rows\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("| singular | 2 | 1 |"),
+            "singular answered one of two\n{}",
+            markdown
+        );
+    }
+
+    /// An engine that was never reachable is counted as a library with zero answers, so a run
+    /// that silently lost an engine cannot read as a run that never had it.
+    #[test]
+    fn test_an_unavailable_engine_is_a_roster_row_with_no_answers() {
+        let mut board = CompetitiveBoard::new();
+        board.add(named_row("p1", "zeebra", answered(64), 1.0));
+        board.add(named_row(
+            "p1",
+            "msolve",
+            RunStatus::Failed(RunFailure::Unavailable {
+                binary: "msolve".to_string(),
+                reason: "not on PATH".to_string(),
+            }),
+            0.0,
+        ));
+
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("| msolve | 1 | 0 |"),
+            "an unreachable engine is on the roster at zero answers\n{}",
+            markdown
+        );
+    }
+
+    /// The speedup section counts what its own gates excluded, so a reader sees how many ratios
+    /// the floor rule and the invariant rule removed rather than only the survivors.
+    #[test]
+    fn test_the_speedup_summary_counts_its_exclusions() {
+        let mut board = CompetitiveBoard::new();
+        // Four pairs where the comparand sits on its floor, which is what defines the floor.
+        // Distinct first letters at a common length, because `named_row`'s digest perturbation
+        // is a function of the name's length and first byte — same-shaped names collide into one
+        // problem and the board then cross-compares every pairing of them.
+        for problem in ["a-1", "b-1", "c-1", "d-1"] {
+            board.add(named_row(problem, "zeebra", answered(64), 0.05));
+            board.add(named_row(problem, "singular", answered(64), 36.0));
+        }
+        // One pair far above it, and one inside the noise band.
+        board.add(named_row("e-1", "zeebra", answered(64), 29_963.0));
+        board.add(named_row("e-1", "singular", answered(64), 7_291.0));
+        board.add(named_row("f-1", "zeebra", answered(64), 1_000.0));
+        board.add(named_row("f-1", "singular", answered(64), 1_050.0));
+
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("6 pairs"),
+            "every pair is counted\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("4 disqualified by the startup floor"),
+            "the floor exclusions are counted\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("1 inside the 20% noise band"),
+            "a ratio too close to 1 to carry a conclusion is counted\n{}",
+            markdown
+        );
     }
 
     /// A malformed row is refused by name rather than silently skipped.
