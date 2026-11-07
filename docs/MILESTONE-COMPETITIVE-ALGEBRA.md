@@ -457,7 +457,8 @@ Costed, each line labelled:
 | root finding at degree 59 049 | **not estimated** | §6.3 measured 70x for a 9x degree step (729 → 6 561); extrapolating that again is not defensible |
 | **total** | **≈ 2.6 h**, **≈ 0.3 GB** | build + determinants, root finding unpriced |
 
-**Against the §9 ceiling of ~2 h wall and ~64 GB peak RSS, this fails on time — and on time alone.**
+**Against the §9 ceiling of ~2 h wall and ~64 GB peak RSS, this fails on time — and on time alone.
+That verdict was correct when taken and §8.4.2 records that it no longer holds.**
 
 That last clause is a correction to this section's own first draft, which also called the row "close
 on memory, 57 GB against a 64 GB ceiling, 89% of it". **#243 landed between the costing and this
@@ -469,6 +470,38 @@ Which makes the point §13.7 draws from this harder to miss: **memory was never 
 row.** It only looked like a binding constraint while it was the quantity that had been mis-estimated
 by 838x, and the moment it was measured and then fixed, the constraint that remained was the one
 nobody had been arguing about.
+
+#### 8.4.2 Then the time term moved as well, and `rf4-rp2` is inside the ceiling
+
+#243 did not only bound the build's memory. The same change made the build **9.0x faster** — the
+recorded 48.37 min against **5.4 min**, taken **on the lock** after a 2 698 s wait, cross-checking a
+second run at 5.6 min. (It was the *peak* that was taken off-lock, which
+`f4-resource-scaling.md:277` authorizes for peaks and not for timings.) So this is a protocol figure,
+not an indication:
+
+| build figure | + 1.79 h (model) | + 1.61 h (measured core-times) |
+|---|---:|---:|
+| 48.37 min — the original costing | 2.60 h | 2.42 h |
+| **5.4 min — after #243, on-lock** | **1.88 h** | **1.70 h** |
+
+**Both are inside the ~2 h ceiling.** The refusal in §8.4.1 was right on the figures it had and is
+superseded by the figures it does not.
+
+**One term is still unpriced, and it is the whole of what stands between this row and a go.** Root
+finding at degree 59 049. §6.3 measured 4.07 s at degree 6 561 against 59.5 ms at 729 — **70x for a
+9x degree step** — and 6 561 → 59 049 is another 9x step, so the same scaling puts it near **285 s**,
+which would take the row to ≈1.78–1.96 h. Inside the ceiling, but inside it by minutes, on a term
+extrapolated from two points.
+
+**So the decision recorded here is: `rf4-rp2` is costed, bounded, realistic, and now within the
+standing ceiling — and the go/no-go is the owner's, pending one measurement of root finding at
+degree 59 049.** It is not launched by this milestone, and the reason is not caution for its own
+sake: §8.4 requires the cost to be stated and the decision taken *before* execution, and a row whose
+margin is minutes against a ceiling cannot be authorized on an extrapolated term. Pricing root
+finding is a single short run (#351 is the issue for exactly that measurement at a related degree).
+
+A verified witness there would be the **Stretch** criterion this milestone did not meet — which is
+precisely why it needs the measurement rather than the benefit of the doubt.
 
 So the decision is **no-go pending explicit owner authorization**, and that is a completed research
 decision rather than an unfinished attempt. Three things follow from recording it this way:
@@ -1148,7 +1181,7 @@ Scored against the criteria as written before the work, including where they wer
 | criterion | | |
 |---|---|---|
 | a same-machine performance lead over a credible established implementation | **not met — the opposite** | Two measured deficits: ~30x on conversion against msolve, 4.11x on the basis against Singular. Four apparent wins were **disqualified by our own startup-floor rule**, including a 450x |
-| a verified cryptanalytic instance beyond M24's measured frontier | **not met** | `rf4-rp2` costed at ≈2.6 h against a ~2 h ceiling and **refused**. §8.4.1 |
+| a verified cryptanalytic instance beyond M24's measured frontier | **not met — and now one measurement away** | `rf4-rp2` was costed at ≈2.6 h against a ~2 h ceiling and refused (§8.4.1). #243's 9.0x build speedup then took it to **1.70–1.88 h, inside the ceiling** (§8.4.2). It is unlaunched because root finding at degree 59 049 is unpriced and the margin is minutes, not because it is out of reach |
 | an improvement to a published attack surviving an equivalent comparison | **not met** | Griffin is a **no-go for M25** on worth; the capability it needs is costed as #306 |
 | an algorithmic change materially raising the maximum reachable problem size | **not met**, and a claim withdrawn | #305 took 9.06x off F4's working set but the stop reason is **unchanged** — `max_live_nonzeros` at degree 5, so M24's "out of reach, not out of budget" stands. And axis 4's round-count claim was **withdrawn** in §13.5 |
 
