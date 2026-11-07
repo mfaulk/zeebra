@@ -1550,6 +1550,17 @@ one twiddle multiplication per two outputs. `interpolate` is that kernel over th
 domain, scaled by `1/n`. Any other size is decomposed into coprime factors first; see
 [Sizes that are not a power of two](#sizes-that-are-not-a-power-of-two).
 
+**`1/n` is where the inverse transform can be ill-posed, and it is refused by name.** In
+characteristic `p` the scalar `n` is zero whenever `p | n`, so `1/n` does not exist and no inverse
+transform of that length is defined — over `GF(2^m)` that is every even size. A domain built from a
+primitive root never has this problem, since an `n`th root of unity needs `n | q - 1`; the
+unchecked `FFTDomain::new` is the route that reaches it. `try_interpolate` returns
+`InterpolateError::SizeNotInvertible` there and `interpolate` panics with the same message, rather
+than failing deeper down with "the zero element does not have a multiplicative inverse", which named
+the symptom and not the cause ([#396](https://github.com/mfaulk/zeebra/issues/396)). Over `GF(2^m)`
+an odd size works: `Gf256`'s group order is `255 = 3 * 5 * 17`, so it hosts 3-, 5-, 15-, 17-point
+transforms and no even one at all.
+
 **The transform zero-pads internally.** A polynomial of any degree below `n` is extended to the
 domain size inside `evaluate`, so a caller hands over unpadded operands and chooses only `n` — the
 domain size is the caller's because only the caller knows how large a result it needs. A polynomial

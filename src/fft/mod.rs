@@ -15,7 +15,7 @@ pub use bluestein::{
 };
 pub use domain::{DomainError, FFTDomain};
 pub use evaluate::evaluate;
-pub use interpolate::interpolate;
+pub use interpolate::{interpolate, try_interpolate, InterpolateError};
 pub use multiply::{
     fft_multiplication_crossover, multiply, multiply_above, multiply_over_domain,
     try_multiply_via_fft,

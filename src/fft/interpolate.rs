@@ -1,9 +1,32 @@
 //! Inverse Fast Fourier Transform (IFFT).
 
+use std::fmt::{Display, Formatter};
+
 use crate::{
     fft::{domain::FFTDomain, prime_factor::transform_any},
     FiniteField, UnivariatePolynomial,
 };
+
+/// Why an inverse transform is not defined over a field and size.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InterpolateError {
+    /// The characteristic divides `size`, so the scalar `size` is zero and `1/size` does not exist.
+    SizeNotInvertible { size: usize },
+}
+
+impl Display for InterpolateError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SizeNotInvertible { size } => write!(
+                f,
+                "a transform of size {size} is not invertible over a field whose characteristic \
+                 divides {size}: the scalar {size} is zero there, so 1/{size} does not exist"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for InterpolateError {}
 
 /// Interpolate the points (w_i, x_i) into a polynomial P.
 ///
@@ -17,16 +40,37 @@ use crate::{
 /// is no separate inverse pass: after batch inversion of the domain (#118) the two directions are
 /// within a few percent of each other, so a second kernel would be a second place for the
 /// butterfly to be wrong.
+///
+/// # Panics
+/// Panics on a length mismatch, and on a size the field's characteristic divides. See
+/// [`try_interpolate`], which returns the latter as an [`InterpolateError`].
 pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolynomial<F> {
+    try_interpolate(x, w).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// [`interpolate`], returning the ill-posed case rather than panicking on it.
+///
+/// The only such case is a transform size the characteristic divides, where `1/n` does not exist.
+/// A length mismatch stays a panic: that is a caller bug and not a fact about the field.
+pub fn try_interpolate<F: FiniteField>(
+    x: &[F],
+    w: &FFTDomain<F>,
+) -> Result<UnivariatePolynomial<F>, InterpolateError> {
     assert_eq!(x.len(), w.size());
 
     // `c / n` would invert n once per coefficient: `Div` on a field element is multiplication by
     // `inverse()`, and nothing memoizes it. One inversion for the whole vector instead.
     //
-    // n is invertible whenever the domain exists at all: a primitive nth root of unity requires
-    // n | q - 1, so n is coprime to the characteristic. `inverse` still panics if a caller built
-    // a domain by hand over a field where it is not.
-    let size_inverse = F::new(w.size() as u64).inverse();
+    // n is invertible whenever the domain was built from a primitive root: that needs n | q - 1,
+    // so n is coprime to the characteristic. The unchecked `FFTDomain::new` is the route that gets
+    // here otherwise, and over characteristic two it is every even size — `F::new(n)` is `n mod 2`
+    // there, so the scalar is zero and `inverse()` would panic about the zero element rather than
+    // about the transform. Refused here instead, where the reason can be stated (#396).
+    let size = F::new(w.size() as u64);
+    if size.is_zero() {
+        return Err(InterpolateError::SizeNotInvertible { size: w.size() });
+    }
+    let size_inverse = size.inverse();
 
     // The inverse domain is built before the coefficient buffer, not after: `batch_inverse` holds
     // a vector of prefix products alongside its result, and that transient is the peak. Taking it
@@ -38,7 +82,7 @@ pub fn interpolate<F: FiniteField>(x: &[F], w: &FFTDomain<F>) -> UnivariatePolyn
     for c in coefficients.iter_mut() {
         *c *= size_inverse;
     }
-    UnivariatePolynomial::from_coefficients(coefficients)
+    Ok(UnivariatePolynomial::from_coefficients(coefficients))
 }
 
 #[cfg(test)]
@@ -46,8 +90,9 @@ mod tests {
     use crate::{
         evaluate,
         fft::{domain::FFTDomain, tests::to_polynomial},
-        fields::PrimeFieldElement64,
-        interpolate, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
+        fields::{Gf256, PrimeFieldElement64},
+        interpolate, try_interpolate, FiniteField, InterpolateError, KnownOrder, One, Polynomial,
+        UnivariatePolynomial,
     };
     use rand::{prelude::StdRng, SeedableRng};
 
@@ -177,6 +222,36 @@ mod tests {
         let w = F::two_adic_root_of_unity(4, &mut rng);
         let domain = FFTDomain::from_generator(w, 16);
         let _p = interpolate(&[F::new(1), F::new(2)], &domain);
+    }
+
+    /// A size the characteristic divides is refused by name, not by a panic about a zero inverse.
+    #[test]
+    fn test_a_size_the_characteristic_divides_is_refused() {
+        type F = Gf256;
+        // Hand-built, because `try_from_generator` cannot produce this: a primitive n-th root of
+        // unity needs n | q - 1, and q - 1 = 255 is odd. The unchecked constructor is the only
+        // route to the condition, which is why it is a refusal and not an impossibility.
+        let domain = FFTDomain::new(vec![F::one(), F::one()]);
+        assert_eq!(
+            try_interpolate(&[F::one(), F::one()], &domain),
+            Err(InterpolateError::SizeNotInvertible { size: 2 })
+        );
+    }
+
+    /// A 15-point domain over `Gf256` round-trips: 15 | 255 and 15 is odd, so `1/15` exists.
+    #[test]
+    fn test_evaluate_then_interpolate_gf_256() {
+        type F = Gf256;
+        let mut rng = StdRng::seed_from_u64(0x396);
+        // 255 = 3 * 5 * 17, so the multiplicative group has elements of order 15 and no element
+        // of any even order at all.
+        let g = F::root_of_unity(15, &mut rng);
+        let domain = FFTDomain::from_generator(g, 15);
+        for _ in 0..16 {
+            let p = UnivariatePolynomial::<F>::rand(14, &mut rng);
+            let evaluations = evaluate(&p, &domain);
+            assert_eq!(interpolate(&evaluations, &domain), p);
+        }
     }
 
     #[test]

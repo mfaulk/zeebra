@@ -483,8 +483,7 @@ pub(crate) mod tests {
         UnivariatePolynomial::new(&elements)
     }
 
-    /// The largest FFT domain of at most 16 points that this field can host, or `None` where the
-    /// crate cannot yet run an inverse transform over the field at all.
+    /// The largest FFT domain of at most 16 points that this field can host.
     ///
     /// No single size works over every field in [`for_each_field!`]: `Gf256`'s multiplicative group
     /// has order 255 and `Zp65537`'s has order 2^16, so the only common domain size is one. Each
@@ -492,14 +491,15 @@ pub(crate) mod tests {
     /// two-adic root, which is the only route a 254-bit field has, otherwise any divisor of
     /// `q - 1`.
     ///
-    /// Characteristic 2 is `None` rather than a size: `interpolate` scales by `F::new(n)`, and
-    /// `FiniteField::new` is `todo!()` for `BinaryFieldElement`, so every decode over `Gf256`
-    /// panics inside the inverse transform. That is #396, in `src/fields/`, and removing this
-    /// guard is its acceptance check.
-    fn largest_small_domain<F: KnownOrder>(rng: &mut StdRng) -> Option<FFTDomain<F>> {
-        if F::characteristic_u128() == Some(2) {
-            return None;
-        }
+    /// Characteristic two needs no special case, and used to have one (#396). The search is over
+    /// *primitive* roots, which exist for `n` only when `n | q - 1`; over `GF(2^m)` that order is
+    /// odd, so every size this returns is odd and `1/n` exists. `Gf256` lands on 15.
+    ///
+    /// It returns a domain or panics, deliberately not an `Option`. While characteristic two was
+    /// `None` every caller opened with `let Some(..) else { return }`, so eleven decoder tests
+    /// reported `ok` over `Gf256` having executed nothing — the shape #339 is named for. Without
+    /// the `None` there is no early return to write.
+    fn largest_small_domain<F: KnownOrder>(rng: &mut StdRng) -> FFTDomain<F> {
         for size in (3..=16usize).rev() {
             let generator = if size.is_power_of_two() {
                 F::try_two_adic_root_of_unity(size.trailing_zeros(), rng).ok()
@@ -508,7 +508,7 @@ pub(crate) mod tests {
             };
             if let Some(generator) = generator {
                 if let Ok(domain) = FFTDomain::try_from_generator(generator, size) {
-                    return Some(domain);
+                    return domain;
                 }
             }
         }
@@ -542,9 +542,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn an_error_free_round_trip_recovers_the_message<F>() {
             let mut rng = StdRng::seed_from_u64(20261107);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 2).unwrap();
             let message = random_message(&code, &mut rng);
@@ -563,9 +561,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn systematic_encoding_leaves_the_message_in_place<F>() {
             let mut rng = StdRng::seed_from_u64(20261108);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 2).unwrap();
             let message = random_message(&code, &mut rng);
@@ -580,9 +576,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn systematic_layout_survives_correction<F>() {
             let mut rng = StdRng::seed_from_u64(20261109);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 4).unwrap();
             let message = random_message(&code, &mut rng);
@@ -599,9 +593,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn errors_up_to_the_distance_bound_are_corrected<F>() {
             let mut rng = StdRng::seed_from_u64(20261110);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 4).unwrap();
             assert_eq!(code.max_errors(), 2);
@@ -623,9 +615,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn one_error_beyond_the_bound_is_detected_not_mis_corrected<F>() {
             let mut rng = StdRng::seed_from_u64(20261111);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 4).unwrap();
             let message = random_message(&code, &mut rng);
@@ -655,9 +645,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn erasures_are_recovered_up_to_the_redundancy_and_no_further<F>() {
             let mut rng = StdRng::seed_from_u64(20261112);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 3).unwrap();
             assert_eq!(code.max_erasures(), 3);
@@ -690,9 +678,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn an_error_outside_the_erasures_is_detected<F>() {
             let mut rng = StdRng::seed_from_u64(20261113);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 3).unwrap();
             let message = random_message(&code, &mut rng);
@@ -717,9 +703,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn the_rate_one_code_corrects_nothing<F>() {
             let mut rng = StdRng::seed_from_u64(20261114);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n).unwrap();
             assert_eq!(code.max_errors(), 0);
@@ -746,9 +730,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn a_single_parity_symbol_detects_but_cannot_correct<F>() {
             let mut rng = StdRng::seed_from_u64(20261115);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 1).unwrap();
             assert_eq!(code.max_errors(), 0);
@@ -779,9 +761,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn the_empty_message_code_has_one_codeword<F>() {
             let mut rng = StdRng::seed_from_u64(20261116);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, 0).unwrap();
             assert_eq!(code.encode(&[]).unwrap(), vec![F::zero(); n]);
@@ -802,9 +782,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn odd_redundancy_detects_further_than_it_corrects<F>() {
             let mut rng = StdRng::seed_from_u64(20261117);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             let code = ReedSolomon::new(domain, n - 3).unwrap();
             assert_eq!(code.max_errors(), 1);
@@ -825,9 +803,7 @@ pub(crate) mod tests {
     for_each_field!(
         fn a_correction_the_spare_syndrome_contradicts_is_rejected<F>() {
             let mut rng = StdRng::seed_from_u64(20261118);
-            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
-                return;
-            };
+            let domain = largest_small_domain::<F>(&mut rng);
             let n = domain.size();
             // n - k = 3, so the key equation is solved over 2t = 2 syndromes and the third is
             // left over to check the answer against.
