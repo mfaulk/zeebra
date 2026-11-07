@@ -8,12 +8,12 @@ improvement in it". This document separates that into five distinct things, pric
 **Build axis 4, the Euclidean/subresultant route. Do not build axes 1, 2, 3 or 5.** The prototype
 that axis 4's analysis authorised exists, is tested, and is `src/poly/univariate/resultant.rs`.
 
-**And the headline is not the one the determinant stage suggests.** Axis 4 is a **measured 1 930×**
+**And the headline is not the one the determinant stage suggests.** Axis 4 is a **measured 1 692×**
 improvement to the determinant stage (§5.5) and only a **~3× improvement to the row**, because
 once the determinants go, root finding at degree `5.3 × 10^5` and a 57 GB symbolic build are what
 is left. §7 is that
 accounting and it is the most useful part of this document. The verdict in §8 is still *build* —
-1 930× on the largest stage for ~200 lines is not a close call — but the claim "this raises the
+1 692× on the largest stage for ~200 lines is not a close call — but the claim "this raises the
 reachable round count" **does not survive the accounting**, and saying so is the point.
 
 ## 0. The criterion, stated before the numbers
@@ -203,7 +203,7 @@ That is **correct, and explicitly scoped to its sizes.** The scope has changed, 
 |---|---|---|
 | Sylvester order | **18** (`R = 2`) | **1 458** (`R = 6`); 4 374 at `R = 7` |
 | operation-count gap `(16/3)·3^R` (**derived**, §5.2) | **48×** | **3 888×**; 11 664× at `R = 7` |
-| **measured** ratio at that order (§5.5) | — (not worth measuring) | **1 930×** |
+| **measured** ratio at that order (§5.5) | — (not worth measuring) | **1 692×** |
 | stage cost on the target row | milliseconds, on a row that finished in seconds | **14.5 h on 32 cores**, on a row that has not been run |
 | share of the row | not the bottleneck | **67%** of `rf6-rp0` (§7) |
 
@@ -280,53 +280,78 @@ milestone, and §5.3's check should gate integration anyway.
 
 ### 5.5 Measured, at the orders that matter
 
-Measured on one pinned core (`taskset --cpu-list 52`) under `tools/benchlock.sh`, three draws at
-the two largest orders and twenty at the others, **with agreement against `Matrix::determinant`
-asserted at every size**:
+Three kinds of number appear below and they are not interchangeable:
 
-| `n` | Sylvester order | `Matrix::determinant` | `resultant` | **measured ratio** | predicted `16n/3` | agree |
+- **operation count** — exact arithmetic about the *algorithms*, independent of machine and
+  implementation. `16n/3`.
+- **measured ratio** — a fact about *this machine, this implementation, this build*. Neither
+  predicts the other.
+- **bound** — a quantity constrained from a measurement taken elsewhere, not measured here.
+
+Measured on one pinned core (`taskset --cpu-list 52`) under `tools/benchlock.sh`, three draws at the
+two largest orders and twenty at the others, **with agreement against `Matrix::determinant` asserted
+at every size**. Built with `-C target-cpu=x86-64-v3`, `lto = "fat"`, `codegen-units = 1`, verified
+present with `cargo build -v | grep target-cpu`; `RUSTFLAGS` never set.
+
+| `n` | Sylvester order | `Matrix::determinant` | `resultant` | **measured ratio** | operation count `16n/3` | agree |
 |---:|---:|---:|---:|---:|---:|---|
-| 18 | 36 | 119.8 µs | 9.6 µs | **12×** | 96 | ✓ |
-| 81 | 162 | 9.14 ms | 74.9 µs | **122×** | 432 | ✓ |
-| 243 | 486 | 236 ms | 428 µs | **550×** | 1 296 | ✓ |
-| **729** | **1 458** | **6.36 s** | **3.30 ms** | **1 930×** | 3 888 | ✓ |
+| 18 | 36 | 47.9 µs | 4.2 µs | **11×** | 96 | ✓ |
+| 81 | 162 | 3.62 ms | 31.7 µs | **114×** | 432 | ✓ |
+| 243 | 486 | 91.7 ms | 177 µs | **519×** | 1 296 | ✓ |
+| **729** | **1 458** | **2.272 s** | **1.343 ms** | **1 692×** | 3 888 | ✓ |
 
-**1 930× at the order the six-round rows use** — half the operation count's 3 888×. Charging Euclid's
-`n` per-step inversions at the measured Mersenne-31 plateau in
-`docs/research/batch-inversion.md` (one inversion costs 35× three multiplications, so ~105
-multiplications pre-#160) accounts for only 29% of that gap, so there is a second constant. Per
-field operation it is visible directly:
+**The harness cross-checks against #312.** Its order-1 458 single-worker core-time is a **measured**
+2.404 s; this harness, a different binary on a different core, measures **2.272 s** — 5.5% apart. So
+the baseline column is not an artefact of a throwaway crate.
+
+**1 692× measured at the order the six-round rows use**, against an operation count of 3 888×. The
+factor of 2.3 is **not** the per-step inversion: charging Euclid's `n` inversions at the plateau
+`docs/research/batch-inversion.md` measured over Mersenne-31 — one inversion costs 35× three
+multiplications, so ~105 multiplications pre-#160 — accounts for only 29% of the gap. That is a
+**bound** carried from another document's measurement, not something measured here.
+
+What the gap actually is, **measured**, is per-operation efficiency:
 
 ```
-Matrix::determinant   6.36 s   / (1458³/3 = 1.03e9)  =  6.16 ns     (6.16 / 6.16 / 6.45 at n = 729 / 243 / 81)
-resultant             3.30 ms  / (729²/2  = 2.66e5)  = 12.4  ns     (12.4 / 14.5 / 22.8)
+Matrix::determinant   2.272 s  / (1458³/3 = 1.03e9)  =  2.20 ns per multiply-subtract
+resultant             1.343 ms / (729²/2  = 2.66e5)  =  5.05 ns per multiply-add
 ```
 
-So **LU runs at 6.2 ns per multiply-subtract and the remainder sequence at 12.4 ns per
-multiply-add** — Euclid's inner loop is about **2× less efficient per operation**, which is the whole
-discrepancy. That is credible rather than mysterious: LU's inner loop is a long fixed-stride axpy,
-while a division step is an axpy over a *shrinking* vector with a fresh scalar multiplier and an
-inversion each time. Euclid's per-operation cost is still *falling* with `n` (22.8 → 14.5 → 12.4 ns),
-so the ratio is still amortising upward: it grew **3.51×** from `n = 243` to `n = 729` against the
-predicted 3×, which extrapolates to roughly **6 800×** at `n = 2 187` (`R = 7`).
+**LU's inner loop is 2.3× more efficient per field operation than the remainder sequence's**, which
+is credible rather than mysterious: LU's is a long fixed-stride axpy, while a division step is an
+axpy over a *shrinking* vector with a fresh scalar multiplier and an inversion each time. Euclid's
+per-operation cost is still falling with `n` (`n = 81 / 243 / 729` gives 9.7 / 6.0 / 5.05 ns), so the
+ratio is still amortising upward: it grew **3.26×** from `n = 243` to `n = 729` against the
+operation count's 3×, which **extrapolates** to roughly **5 500×** at `n = 2 187` (`R = 7`).
 
-**Build caveat, and it is the exact hazard this repo warns about arriving by a new route.** These
-figures come from a throwaway crate outside the worktree, so that nothing was added to `src/` for a
-measurement — and `.cargo/config.toml` in this repository *is not inherited by a crate that merely
-depends on `zeebra`*, as its own comment says. The first run therefore **silently lost
-`-C target-cpu=x86-64-v3`**, and `lto = "fat"` and `codegen-units = 1` with it. `RUSTFLAGS` was never
-set; the flag was lost by *where* the build ran. Both columns lost it equally, so the ratio is
-meaningful, but LU's long contiguous axpy has more to gain from AVX2 than a division step does, so
-the honest reading is that **1 930× is an upper bound on the v3 ratio** — the vectorised gap is
-likely narrower. A v3 rebuild (config mirrored, profile matched, `target-cpu` verified present) was
-queued and did not reach the front of a six-deep bench queue within this session.
+#### 5.5.1 The build flag, which this measurement nearly lost
 
-**Does this change §8? No.** At 1 930× rather than 3 888×, `rf6-rp0`'s determinants go from 14.5 h to
-**~27 s** on 32 cores instead of ~10 s, and §7.1's row totals move by under a percent because they
-are dominated by root finding either way. Even at a further 2× haircut from vectorisation the
-conclusion is identical. What the measurement does change is the *reason to be careful*: the 3 888×
-operation count overstates the real gap by 2×, and anyone quoting it should quote 1 930× measured
-instead.
+The benchmark lives in a throwaway crate **outside** the worktree, deliberately, so that nothing had
+to be added to `src/` for a measurement. `.cargo/config.toml` in this repository says in its own
+comment that it "is not inherited by crates that depend on `zeebra`" — and that is exactly what
+happened: the **first** run silently lost `-C target-cpu=x86-64-v3`, `lto = "fat"` and
+`codegen-units = 1`. `RUSTFLAGS` was never set; the flag was lost by *where* the build ran.
+
+Both runs are kept, because the comparison is the useful part:
+
+| build | order-1 458 LU | order-1 458 Euclid | ratio |
+|---|---:|---:|---:|
+| no `target-cpu`, no LTO | 6.360 s | 3.295 ms | **1 930×** |
+| `x86-64-v3`, fat LTO, cgu 1 | **2.272 s** | **1.343 ms** | **1 692×** |
+| speedup from the flags | 2.80× | 2.45× | — |
+
+So the flags are worth **2.8× to LU and 2.45× to Euclid**, and the ratio fell 12% — LU gains more
+from AVX2 than a division step does, as predicted. **The v3 row is the figure to quote.** This
+repository has lost two sets of figures to `RUSTFLAGS`; this is a third route to the same failure,
+and the cross-check against #312 in the table above is what caught it.
+
+#### 5.5.2 Does this change §8? No.
+
+At 1 692× rather than 3 888×, `rf6-rp0`'s determinants go from 14.5 h to **~31 s** on 32 cores
+instead of ~10 s, and §7.1's row totals move by well under a percent because they are dominated by
+root finding either way. What the measurement changes is what should be quoted: **1 692× measured**,
+not 3 888× derived — the operation count overstates the real gap by 2.3× and has no business in a
+recommendation now that there is a measurement.
 
 ## 6. Axis 5 — polynomial-matrix determinant algorithms
 
@@ -348,9 +373,9 @@ axis 4 / axis 5  =  3^{0.19 R} / 14  >  1   ⟺   R > 12.7
 **Axis 5 overtakes axis 4 at about 13 rounds** on operation counts — six rungs past anything
 reachable.
 
-**Correcting for §5.5's measurement moves that, and it should be said.** Euclid runs at 12.4 ns per
-operation against LU's 6.16 ns, so axis 4's real cost is ~2× its count. Carrying that factor:
-`2·3^{0.19R}/14 > 1 ⟺ R > 9.3`. So the honest crossover is **about 9–10 rounds**, not 13 — still
+**Correcting for §5.5's measurement moves that, and it should be said.** Euclid runs at 5.05 ns per operation
+against LU's 2.20 ns, so axis 4's real cost is ~2.3× its count. Carrying that factor:
+`2.3·3^{0.19R}/14 > 1 ⟺ R > 8.7`. So the honest crossover is **about 9 rounds**, not 13 — still
 three rungs past `R = 7`, which costs 147 days of determinants today, and still before the `Õ`
 polylogarithms and the constants a polynomial-matrix multiplication carries (both of which push it
 back out). Worse for
@@ -371,7 +396,7 @@ gate 3.
 
 `docs/research/fast-univariate.md` §4.5 measured half-GCD as **slower** than plain Euclid at Zeebra's
 current multiplication, and `src/poly/univariate/gcd.rs:9-12` records the same. Nothing here
-contradicts that. Sequencing: **classical Euclid now** (1 930× measured, already written); half-GCD only if
+contradicts that. Sequencing: **classical Euclid now** (1 692× measured, already written); half-GCD only if
 determinants ever bind again, where that document's own model puts it at a further ~1.6× at
 `n = 729`. §8 does not depend on it.
 
@@ -411,11 +436,11 @@ All determinant and tail figures **extrapolated** from the anchors above; the bu
 | interpolation | 0.01 h | 0.75 h |
 | root finding | 0.08 h | **5.63 h** |
 | **total today** | **2.51 h** | **21.7 h** |
-| determinants, **axis 4** at the measured 1 930×, 32 cores | ~3 s | ~27 s |
+| determinants, **axis 4** at the measured 1 692×, 32 cores | ~3 s | ~31 s |
 | **total after axis 4** | **0.90 h** | **7.2 h** |
 | **row improvement** | **2.8×** | **3.0×** |
 
-So: **axis 4 is 1 930× measured on the stage and 3× on the row**, and after it `rf6-rp0` is
+So: **axis 4 is 1 692× measured on the stage and 3× on the row**, and after it `rf6-rp0` is
 **root-finding-bound** — 5.63 h of a 7.2 h row, 78%.
 
 ### 7.2 Seven rounds
@@ -424,7 +449,7 @@ So: **axis 4 is 1 930× measured on the stage and 3× on the row**, and after it
 |---|---|
 | symbolic build | **~1 TB transient — blocked** (§7.3) |
 | determinants, LU, 32 cores | ~147 days |
-| determinants, **axis 4**, 32 cores | **~30 min** |
+| determinants, **axis 4**, 32 cores | **~37 min** |
 | interpolation, `O(S²)` | ~2.5 days |
 | root finding, exponent 1.933 | **~16.4 days** |
 
@@ -484,15 +509,16 @@ natural successor to this document.
 | 1 — SIMD / threading constants | `O(n³)`, 3–5× (blocking half dead: #312 found no cache anomaly) | high; `src/linalg/` contention | implementation performance, near zero-sum against the sweep | **do not build**; axis 4 deletes the work |
 | 2 — reuse across evaluations | no improvement available | — | nothing | **nothing to build** |
 | 3 — displacement / Sylvester structure | `O(n²)` | high; generators + breakdown handling | same as axis 4 | **do not build**; identical complexity, strictly more work |
-| 4 — **subresultant / Euclidean** | **`O(n²)`; `3^R` saved** | **low; ~200 lines, written and tested** | **1 930× measured on the stage, 3× on the row** | **BUILD** |
-| 5 — polynomial-matrix determinant | `Õ(N^ω D)` | **new major subsystem** | overtakes axis 4 past `R ≈ 9.3` once Euclid's measured per-operation penalty is charged | **do not build; file with a trigger** |
+| 4 — **subresultant / Euclidean** | **`O(n²)`; `3^R` saved** | **low; ~200 lines, written and tested** | **1 692× measured on the stage, 3× on the row** | **BUILD** |
+| 5 — polynomial-matrix determinant | `Õ(N^ω D)` | **new major subsystem** | overtakes axis 4 past `R ≈ 8.7` once Euclid's measured per-operation penalty is charged | **do not build; file with a trigger** |
 
 **Build axis 4**, scored against §0:
 
-1. **Beats the measured baseline**: **1 930× measured** at order 1 458 against a baseline #312
+1. **Beats the measured baseline**: **1 692× measured** at order 1 458 against a baseline #312
    measured as cleanly cubic with no slack to recover, growing 3.5× per 3× in `n`. The operation
-   count predicts 3 888×; the factor of two is Euclid's measured 12.4 ns per operation against LU's
-   6.16 ns (§5.5), and the figures carry a `target-cpu` caveat that makes 1 930× an upper bound.
+   count predicts 3 888×; the factor of 2.3 is Euclid's **measured** 5.05 ns per operation
+   against LU's 2.20 ns (§5.5), and the harness cross-checks against #312's independent order-1 458
+   figure to 5.5%.
 2. **Honestly scored**: at six rounds it is **implementation performance** — a 3× row improvement
    (§7.1), not a new reachable size. At seven rounds it removes the largest of **four** walls and is
    **necessary but not sufficient** (§7.2). The claim "it raises the reachable round count" is
@@ -502,10 +528,10 @@ natural successor to this document.
    from milliseconds to 67% of a row that cannot be run — and the trap that motivated the rejection
    closed in `O(1)` per sample (§5.3), which the 2023 decision did not have.
 
-Three numbers decided it: **1 930× measured** at the order the six-round rows use (against an
-operation-count gap of **48×** at the order the 2023 rejection was scoped to); **14.5 h → ~27 s** for
+Three numbers decided it: **1 692× measured** at the order the six-round rows use (against an
+operation-count gap of **48×** at the order the 2023 rejection was scoped to); **14.5 h → ~31 s** for
 `rf6-rp0`'s determinants on 32 cores
-against a **5.63 h** root-finding tail that then dominates; and **`R > 9.3`** for axis 5's crossover
+against a **5.63 h** root-finding tail that then dominates; and **`R > 8.7`** for axis 5's crossover
 once Euclid's measured per-operation penalty is charged, which still rules out the subsystem by
 three rungs.
 
@@ -526,7 +552,7 @@ is the binding constraint at six rounds and a 1 TB wall at seven, and #237's ind
 F4 points the same way.
 
 **File as a future milestone, Low.** *"Polynomial-matrix determinant: Villard / Labahn–Neiger–Zhou
-over `F_p[x]`"* — axis 5, with the crossover at `R ≈ 9.3` (§6) recorded as the trigger, in the style of
+over `F_p[x]`"* — axis 5, with the crossover at `R ≈ 8.7` (§6) recorded as the trigger, in the style of
 #58's deferred Wiedemann/Krylov entry. The evidence that would change it is a target whose
 `N`-to-`D` ratio is not pinned at `N = 2D`.
 
@@ -535,14 +561,20 @@ blocking half is refuted by #312; axis 2 has no content; axis 3 is axis 4 with m
 
 ## 10. Marked unverified, and open
 
-- **The Euclid-versus-LU ratio is measured at 1 930×, but under a build that lost
-  `-C target-cpu=x86-64-v3`** (§5.5): `.cargo/config.toml` is not inherited by a crate that merely
-  depends on `zeebra`, and the benchmark deliberately lived outside the worktree so that nothing had
-  to be added to `src/` for a measurement. `RUSTFLAGS` was never set — the flag was lost by *where*
-  the build ran, which is the same hazard by a new route. Both columns lost it equally, and LU's long
-  contiguous axpy has more to gain from AVX2 than a division step does, so **1 930× is an upper bound
-  on the vectorised ratio**. The v3 rebuild was queued and did not reach the front of a six-deep
-  bench queue within this session. §8 survives a further 2× haircut unchanged.
+- **The 1 692× is a *measured ratio*, not a property of the algorithms.** It is a fact about one
+  core of this workstation, this implementation and this build. The machine-independent statement is
+  the operation count `16n/3` = 3 888× at `n = 729`, and it **overstates the measured gap by 2.3×**
+  (§5.5). Anything that quotes one of those two as if it were the other is wrong; the recommendation
+  in §8 rests on the measured one.
+- **The per-step inversion is a *bound*, not a measurement taken here.** §5.5 charges it from
+  `docs/research/batch-inversion.md`'s measured Mersenne-31 plateau (one inversion ≈ 105
+  multiplications pre-#160) and finds it accounts for 29% of the 2.3× gap. No inversion was timed in
+  this work.
+- **The first run of this benchmark silently lost `-C target-cpu=x86-64-v3`** (§5.5.1), because
+  `.cargo/config.toml` is not inherited by a crate that merely depends on `zeebra` and the harness
+  deliberately lives outside the worktree. `RUSTFLAGS` was never set — the flag was lost by *where*
+  the build ran. All quoted figures are from the corrected build, and the cross-check against #312's
+  independent order-1 458 figure (2.272 s against 2.404 s, 5.5%) is what makes that claim checkable.
 - **Whether the specialization trap fires at all on the registered rows is unchecked** (§5.3). It
   needs `lc_y` of `cico_bivariate`'s outputs, in a file another agent owns this milestone.
 - **The root-finding exponent 1.933 is fitted on two points** (§7). Every root-finding figure in §7.1
@@ -556,7 +588,7 @@ blocking half is refuted by #312; axis 2 has no content; axis 3 is axis 4 with m
   code and from the 2 800× working-set drop respectively. Nothing in §8 depends on either value.
 - **`ω = 2.81` is used for axis 5** because `resultant-elimination.md` and the FreeLunch paper both
   use it. Zeebra's dense linear algebra is `ω = 3`, which makes axis 5 *worse* than §6 computes.
-- **Axis 5's crossover moved from `R ≈ 13` to `R ≈ 9.3`** once §5.5's measured 2× per-operation
+- **Axis 5's crossover moved from `R ≈ 13` to `R ≈ 8.7`** once §5.5's measured 2.3× per-operation
   penalty for Euclid is charged (§6). That is the one place the measurement tightened a margin
   rather than leaving it alone, and it is still three rungs past `R = 7`. If a target ever lands at
   `R ≈ 9` with the build and tail stages solved, axis 5's deferral should be revisited — that is the
