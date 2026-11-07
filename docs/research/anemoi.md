@@ -588,6 +588,17 @@ projecting ≈ 11.6 M ≈ 0.19 GiB.
 The conversion walls use the **measured** per-rung growth rather than `D³`'s 125x: 101.8x for
 `FCICO` and 115.2x for `PCICO` from `N = 4` to `N = 5`.
 
+> **A correction to the basis figure in the row above, kept rather than quietly fixed.** The
+> `FCICO` basis estimate was first computed as "≈ 16 min" from a 57x-per-rung growth factor. The
+> **measured** `N = 4 → 5` growth is 54x (0.2966 s → 16.05 s), which gives **≈ 14.5 min**. The 57x
+> was not measured — it was carried over from a recollection of the figure.
+>
+> It does not move the go/no-go: 1.6 h of conversion plus 14.5 minutes is still 1.9–2.2 h and still
+> straddles the gate. It is recorded because it is **the same class of error this document charges
+> #286's premise with** — a number used in a cost model that nothing had measured. A milestone that
+> documents other people's unmeasured-quantity predictions has to document its own, and the fix is
+> cheap only because the estimate happened to be close.
+
 **Note what `FglmOptions::recommended()` would do here, and why it is not a surprise.** `D = 15 625`
 exceeds `max_quotient_dimension` of 4 096, and the dense blocks' 488 M cells exceed
 `max_span_entries` of 20 M by 24x. All four budgets are checked from `D` before any allocation, so
@@ -603,8 +614,8 @@ measurement that silently also changed strategy would not be a measurement of th
 - **`PCICO`: GO.** 1.2 h against a 2 h budget and ≈ 5.1 GiB against a 64 GB ceiling. Wall budget set
   to **5 400 s**, RSS ceiling **16 GiB** — four times the model, so a trip means something
   unmodelled rather than a slightly pessimistic estimate.
-- **`FCICO`: NO-GO without authorization, then authorized.** 1.6 h of conversion plus ≈ 16 minutes
-  of basis is 1.9–2.2 h, which straddles the 2 h gate rather than sitting inside it, so it was not
+- **`FCICO`: NO-GO without authorization, then authorized.** 1.6 h of conversion plus ≈ 14.5
+  minutes of basis is 1.9–2.2 h, which straddles the 2 h gate rather than sitting inside it, so it was not
   launched on this agent's own authority. It was subsequently authorized on three recorded
   conditions: a **hard external watchdog at 2.5 h** (`timeout --signal=INT --kill-after=60s 9000`),
   killed rather than extended if it reaches the backstop and **not** raised mid-run on the strength
@@ -721,13 +732,44 @@ msolve on **one core** (`taskset --cpu-list 0`, `-t` defaulting to 1), Zeebra on
 | `n4-pcico` | 0.03 s | 9 MB | 0.366 s | 0.332 s | 1.480 s |
 | `n5-fcico` | **1.81 s** | 32 MB | **63.71 s** | 47.53 s | 136.8 s |
 | `n5-pcico` | **1.85 s** | 34 MB | **39.0 s** | 38.19 s | 75.96 s |
+| `n6-pcico` | *withdrawn — see below* | 635 MB | §8a.8 | §8a.8 | 11 777.0 s |
 
 > **msolve solves `N = 5` end to end in 1.8 s on one core and 32 MB. Zeebra takes 63.7 s on eight
 > cores and 330 MB — 35x the wall for `FCICO` and 21x for `PCICO`, and 10x the memory. Same machine,
 > same prime, same generators.**
 
-msolve independently confirms the quotient dimension at every rung — 125, 625, 3 125 — which is a
-third witness to §5's invariant beside this crate and the reference.
+msolve independently confirms the quotient dimension at every rung — 125, 625, 3 125, and 15 625 at
+`N = 6` — which is a third witness to §5's invariant beside this crate and the reference. That
+confirmation is **not** affected by the withdrawal below: a quotient dimension is not a timing.
+
+#### One withdrawn figure, and why it was re-taken rather than caveated
+
+The first `n6-pcico` msolve measurement read **353.88 s** (scalar sequence 349.52 s of it). It was
+taken under `benchlock`, 18:58:50 → ~19:04:44 — but a **stray 32-worker job from another agent ran
+outside the lock, ~19:00–19:05**, overlapping nearly the whole measurement. A 32-worker neighbour
+takes cores, memory bandwidth and the all-core turbo budget simultaneously, which is the one
+contamination mode a wall-clock figure cannot be corrected for after the fact.
+
+So the figure is **withdrawn, not annotated**. It was a comparand for a reproduction of a published
+Magma number, and a contaminated comparand is worse than no comparand: it would have made the
+reproduction look validated against something that was not measured under the stated protocol. The
+re-take is queued under the lock and lands in §8a.8.
+
+**What the window does and does not touch.** The stray job was 19:00–19:05. From
+`$HOME/.zeebra/benchlock.log`:
+
+| measurement | lock window | contaminated? |
+|---|---|---|
+| the 18-row three-characteristic ladder (§8a.3) | 18:32:14 → 18:37:19 | **no** |
+| msolve at `N = 3, 4, 5`, both primes (§8a.7) | 18:48:26 → 18:48:57 | **no** |
+| msolve at `N = 6` `PCICO` | 18:58:50 → 19:08:50 | **yes — withdrawn** |
+| Zeebra `N = 6` `PCICO` (§8a.8) | started 19:08:50 | **no**, started after the stray ended |
+| Zeebra `N = 6` `FCICO` (§8a.8) | queued 19:17:34 | **no** |
+
+Every headline figure in §8a.3 and §8a.7 — including the 1.81 s and 1.85 s that carry the
+competitive finding — sits in windows that do not intersect the stray run. The 31-second window for
+the eight small msolve rows is the reason: they were cheap enough to be long finished before the
+stray job began.
 
 **This settles §8a.3's candidate (2) against this crate, and it should be read as a competitive
 result rather than only as an attribution.** There is no algorithmic advantage in this crate's
