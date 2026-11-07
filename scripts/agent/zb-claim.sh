@@ -20,6 +20,16 @@
 #    same second both see their own comment land; the tiebreak has to be a
 #    property of the data rather than of who looked last.
 #
+# 3. **A claim carries a token, because `worktree@branch` is mutable.** Renaming
+#    the branch changes the derived id, which used to orphan every marker the
+#    agent had already written: `verify` then found a claim by "someone else"
+#    inside a live window, applied the tiebreak, and reported LOST RACE against
+#    the agent itself (#325). The token is minted once per checkout, kept in the
+#    worktree's own git directory, and written into the marker, so ownership is
+#    *proved* rather than re-derived from git state that a rebase can change.
+#    The tiebreak itself is untouched: the token decides only whether the
+#    earliest live claim is ours.
+#
 # Sourceable as a library (the `zb_*` functions) or runnable as a CLI; see
 # CLAUDE.md § Multi-agent coordination for the protocol these implement.
 # Unit tests: scripts/agent/test/zb-claim-test.sh
@@ -48,8 +58,42 @@ zb_agent_id() {
 zb_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 zb_until() { date -u -d "+${ZB_LEASE_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ; }
 
-# Claim markers from a JSON array of comment bodies on stdin, as agent/at/until
-# TSV in document order.
+# Where this checkout's claim token lives: the worktree's own git directory, so
+# it is per-checkout, never committed, and unaffected by renaming the branch.
+zb_identity_file() {
+  if [ -n "${ZB_IDENTITY_FILE:-}" ]; then printf '%s\n' "$ZB_IDENTITY_FILE"; return 0; fi
+  local git_dir
+  if git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null)"; then
+    printf '%s/zb-claim-identity\n' "$git_dir"
+  else
+    printf '%s/.zeebra/zb-claim-identity\n' "$HOME"
+  fi
+}
+
+# This checkout's claim token, minted on first use. Stable across branch
+# renames, rebases and force-pushes — the mutations that change zb_agent_id and
+# used to orphan an agent's own markers.
+zb_agent_token() {
+  local file token
+  file="$(zb_identity_file)"
+  if [ -r "$file" ]; then
+    token="$(tr -d '[:space:]' <"$file")"
+    [ -n "$token" ] && { printf '%s\n' "$token"; return 0; }
+  fi
+  token="$(od -An -tx1 -N8 /dev/urandom 2>/dev/null | tr -d ' \n')"
+  [ -n "$token" ] || return 2
+  mkdir -p "$(dirname "$file")" 2>/dev/null
+  printf '%s\n' "$token" >"$file" 2>/dev/null || return 2
+  printf '%s\n' "$token"
+}
+
+# Claim markers from a JSON array of comment bodies on stdin, as
+# agent/at/until/token TSV in document order.
+#
+# `token=` is optional and reads as `-` when absent: markers written before #325
+# have no token, and they must keep resolving by id rather than becoming
+# unparseable — an unreadable marker is treated as stale, which would strand
+# issues claimed under the old format.
 #   0 — markers found   1 — no markers   2 — input unreadable
 zb_parse_claims() {
   local raw out
@@ -58,10 +102,69 @@ zb_parse_claims() {
   out="$(printf '%s' "$raw" | jq -r '
       if type == "array" then .[] else error("not a JSON array") end
       | tostring
-      | scan("<!-- zb-claim agent=\"([^\"]*)\" at=\"([^\"]*)\" until=\"([^\"]*)\" -->")
+      | scan("<!-- zb-claim agent=\"([^\"]*)\"(?: token=\"([^\"]*)\")? at=\"([^\"]*)\" until=\"([^\"]*)\" -->")
+      | [.[0], .[2], .[3], (.[1] // "-")]
       | @tsv' 2>/dev/null)" || return 2
   [ -n "$out" ] || return 1
   printf '%s\n' "$out"
+}
+
+# Whether one marker belongs to this agent.
+#
+# Three ways, in order of strength:
+#   token — the marker carries our token. Proof, and what survives a rename.
+#   id    — the marker's id is the one we have now. The pre-#325 rule, and still
+#           the only thing a tokenless marker can be matched on.
+#   alias — the marker's id appears in some other marker bearing our token, so
+#           that id was ours at some point. This is what rescues an issue
+#           claimed before #325 and heartbeaten after it: the earliest live
+#           marker is the tokenless one, and only a later marker can prove whose
+#           it was. Only we can write a marker carrying our token, so the alias
+#           set cannot be used to take someone else's claim.
+#   0 — ours (prints which of the three matched)   1 — not ours
+zb_claim_is_ours() { # <marker-agent> <marker-token> <our-id> <our-token> [alias-ids...]
+  local marker_agent="$1" marker_token="$2" our_id="$3" our_token="$4" alias
+  if [ -n "$marker_token" ] && [ "$marker_token" != "-" ] && [ "$marker_token" = "$our_token" ]; then
+    echo token
+    return 0
+  fi
+  if [ "$marker_agent" = "$our_id" ]; then echo id; return 0; fi
+  shift 4
+  for alias in "$@"; do
+    [ "$marker_agent" = "$alias" ] && { echo alias; return 0; }
+  done
+  return 1
+}
+
+# Who holds the claim, from an agent/at/until/token TSV on stdin.
+#
+# The resolution rule is untouched: among claims inside the current lease window
+# the earliest `at=` wins. The token only answers the separate question of
+# whether that winner is us.
+#   prints "<held|lost|none>\t<winner-id>\t<id|token|->"
+#   0 — held by us   1 — lost, or no claim inside the window
+zb_resolve_claim() { # <our-id> <our-token> <cutoff-iso>
+  local live winner winner_id winner_token how aliases
+  live="$(awk -F'\t' -v c="$3" '$2 >= c')"
+  if [ -z "$live" ]; then
+    printf 'none\t-\t-\n'
+    return 1
+  fi
+  # Ids this checkout has claimed under, read off the markers carrying our token.
+  aliases=""
+  if [ -n "$2" ] && [ "$2" != "-" ]; then
+    aliases="$(printf '%s\n' "$live" | awk -F'\t' -v t="$2" '$4 == t {print $1}' | sort -u)"
+  fi
+  winner="$(printf '%s\n' "$live" | zb_earliest_claim)"
+  winner_id="$(printf '%s' "$winner" | cut -f1)"
+  winner_token="$(printf '%s' "$winner" | cut -f4)"
+  # shellcheck disable=SC2086  # aliases is a deliberately word-split id list
+  if how="$(zb_claim_is_ours "$winner_id" "$winner_token" "$1" "$2" $aliases)"; then
+    printf 'held\t%s\t%s\n' "$winner_id" "$how"
+    return 0
+  fi
+  printf 'lost\t%s\t-\n' "$winner_id"
+  return 1
 }
 
 # ISO-8601 UTC sorts lexicographically, so these need no date parsing.
@@ -190,11 +293,12 @@ zb_set_status() { # <issue-number> <option-id>
 }
 
 zb_claim() { # <issue-number> <intent>
-  local n="$1" intent="${2:-unspecified}" id now until
+  local n="$1" intent="${2:-unspecified}" id token now until
   id="$(zb_agent_id)"; now="$(zb_now)"; until="$(zb_until)"
+  token="$(zb_agent_token)" || { echo "zb-claim: could not mint a claim token" >&2; return 2; }
   gh issue comment "$n" --repo "$ZB_REPO" --body \
 "🔒 Claimed by agent \`$id\`. Lease until $until (UTC). Intent: $intent.
-<!-- zb-claim agent=\"$id\" at=\"$now\" until=\"$until\" -->" >/dev/null || return 2
+<!-- zb-claim agent=\"$id\" token=\"$token\" at=\"$now\" until=\"$until\" -->" >/dev/null || return 2
   gh issue edit "$n" --repo "$ZB_REPO" --add-label "$ZB_CLAIM_LABEL" --add-assignee "@me" >/dev/null || return 2
   zb_set_status "$n" "$ZB_STATUS_IN_PROGRESS" || return 2
   echo "claimed #$n as $id until $until"
@@ -206,30 +310,43 @@ zb_claim() { # <issue-number> <intent>
 # previous, already-released rounds and must not win forever.
 #   0 — we hold it   1 — another agent won; back off   2 — UNREADABLE
 zb_verify() { # <issue-number>
-  local claims id cutoff live winner
+  local claims id token cutoff resolution verdict winner how
   id="$(zb_agent_id)"
+  token="$(zb_agent_token)" || token="-"
   claims="$(zb_issue_claims "$1")" || {
     [ $? -eq 1 ] && { echo "zb-claim: no claim markers on #$1" >&2; return 1; }
     return 2
   }
   cutoff="$(date -u -d "-${ZB_LEASE_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ)"
-  live="$(printf '%s\n' "$claims" | awk -F'\t' -v c="$cutoff" '$2 >= c')"
-  [ -n "$live" ] || { echo "zb-claim: no claim inside the current lease window on #$1" >&2; return 1; }
-  winner="$(printf '%s\n' "$live" | zb_earliest_claim | cut -f1)"
-  if [ "$winner" = "$id" ]; then
-    echo "verified: #$1 is held by $id"
-  else
-    echo "LOST RACE on #$1 — $winner claimed first. Release and pick other work." >&2
-    return 1
-  fi
+  resolution="$(printf '%s\n' "$claims" | zb_resolve_claim "$id" "$token" "$cutoff")"
+  verdict="$(printf '%s' "$resolution" | cut -f1)"
+  winner="$(printf '%s' "$resolution" | cut -f2)"
+  how="$(printf '%s' "$resolution" | cut -f3)"
+  case "$verdict" in
+    none)
+      echo "zb-claim: no claim inside the current lease window on #$1" >&2
+      return 1 ;;
+    held)
+      if [ "$winner" != "$id" ]; then
+        # The rename case. Saying so is the point: the operator should not have
+        # to guess why a claim under another name is theirs.
+        echo "verified: #$1 is held by this checkout, claimed as $winner (matched by $how; the id is now $id)"
+      else
+        echo "verified: #$1 is held by $id"
+      fi ;;
+    *)
+      echo "LOST RACE on #$1 — $winner claimed first. Release and pick other work." >&2
+      return 1 ;;
+  esac
 }
 
 zb_heartbeat() { # <issue-number>
-  local id now until
+  local id token now until
   id="$(zb_agent_id)"; now="$(zb_now)"; until="$(zb_until)"
+  token="$(zb_agent_token)" || { echo "zb-claim: could not read this checkout's claim token" >&2; return 2; }
   gh issue comment "$1" --repo "$ZB_REPO" --body \
 "⏱️ Lease refreshed by \`$id\` until $until (UTC).
-<!-- zb-claim agent=\"$id\" at=\"$now\" until=\"$until\" -->" >/dev/null || return 2
+<!-- zb-claim agent=\"$id\" token=\"$token\" at=\"$now\" until=\"$until\" -->" >/dev/null || return 2
   echo "refreshed #$1 until $until"
 }
 
@@ -293,6 +410,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     state)     zb_issue_lease_state "$@" ;;
     reap)      zb_reap; rc=$?; [ $rc -eq 1 ] && echo "no stale claims"; [ $rc -eq 2 ] && { echo "REAP READ FAILED" >&2; exit 2; }; exit 0 ;;
     id)        zb_agent_id ;;
+    token)     zb_agent_token ;;
     *)
       cat <<'USAGE'
 zb-claim.sh — issue claiming for parallel agents
@@ -307,9 +425,14 @@ zb-claim.sh — issue claiming for parallel agents
   release <N> --abandon      drop label + assignee and return the board to Todo
   reap                       every claimed issue whose lease has expired
   id                         this agent's id (worktree@branch)
+  token                      this checkout's claim token, minted on first use
 
 Exit statuses on reads: 0 = data, 1 = genuinely empty, 2 = READ FAILED.
 Never treat 2 as "nothing to do".
+
+A claim records both the id and the token. The id can change under you — a
+branch rename, a rebase onto a new base, a retargeted PR — and the token cannot,
+so `verify` still recognizes your own claim afterwards.
 USAGE
       ;;
   esac

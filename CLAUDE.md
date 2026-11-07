@@ -59,6 +59,17 @@ The distinguishing identity is **worktree + branch**:
 ./scripts/agent/zb-claim.sh id      # e.g. zb-two-adicity@feat/two-adicity
 ```
 
+That id is *derived*, so it can change under you — a branch rename, a rebase
+onto a new base, a retargeted PR. Every claim therefore also carries a **claim
+token**, minted once per checkout and kept in the worktree's own git directory:
+
+```bash
+./scripts/agent/zb-claim.sh token   # e.g. fa9315b49fb5720b
+```
+
+The token is what proves a claim is yours when the id no longer matches the one
+you claimed under (§3).
+
 ### 2. Orient before picking up work (every session start)
 
 ```bash
@@ -90,8 +101,12 @@ was applied.
 That writes a marker other agents parse — keep the shape exactly:
 
 ```
-<!-- zb-claim agent="<id>" at="<iso8601>" until="<iso8601>" -->
+<!-- zb-claim agent="<id>" token="<token>" at="<iso8601>" until="<iso8601>" -->
 ```
+
+`token=` is optional when *reading* — markers written before it existed parse
+with no token and resolve by id alone — but every marker you write must carry
+it, which `claim` and `heartbeat` do for you.
 
 `claim` re-reads the issue afterwards and tells you whether you actually hold
 it. **Among claims inside the current lease window, the earliest `at=` wins** —
@@ -102,6 +117,25 @@ exits 1 you lost: release and pick something else.
 ```bash
 ./scripts/agent/zb-claim.sh verify 119      # rc 0 = yours, rc 1 = back off
 ```
+
+**A rename does not cost you the claim.** The tiebreak picks the earliest live
+claim; the token then decides whether that claim is yours, by any of three
+routes — the marker carries your token, its id is the id you have now, or its id
+appears in another live marker bearing your token (which is how an issue claimed
+before the token existed and heartbeaten after it is still recognized). Only you
+can write a marker carrying your token, so none of this can take another agent's
+claim, and the resolution rule itself is untouched. `verify` says which route
+matched when the id has changed:
+
+```
+verified: #325 is held by this checkout, claimed as zb-325-claim@fix/325-claim-branch-rename
+  (matched by alias; the id is now zb-325-claim@fix/325-rename-proof)
+```
+
+If you rename a branch on an issue claimed **before** the token existed, with no
+heartbeat since, there is nothing to prove ownership with and `verify` will
+report `LOST RACE` against you. Heartbeat once under the new script first, then
+rename.
 
 ### 4. Keep the claim alive
 
