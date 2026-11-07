@@ -2402,6 +2402,18 @@ let report = solver.run(&instance, Task::ReducedGrobnerBasis, &Limits::wall(Dura
 assert!(report.status.answered() || report.was_skipped());
 ```
 
+`RunReport::was_skipped()` is true for the three outcomes that mean **the tool did not run**:
+`Unsupported` (the input is unrepresentable), `RunFailure::Unavailable` (the tool is absent) and
+`RunFailure::Environment` (the harness's own environment would have invalidated the measurement).
+The last is why it exists: an adapter can set a child's environment but cannot *clear* it, so an
+inherited switch that selects a different algorithm — or writes a trace into the stream the basis
+is parsed from — cannot be undone from inside the run, and the honest answer is to refuse rather
+than to measure something no user of the tool gets. It is deliberately not `Reported`, which means
+"the tool printed an error"; there was no execution to print one. The variant names the variable so
+an operator knows what to unset and the effect so the refusal can be judged. Sagebrush has seven
+such switches (`sagebrush::PINNED_SWITCHES`), every one read with `env::var(..).is_ok()` — truthy
+if set, so `SB_SIGF4=0` *enables* the experimental signature path.
+
 Two msolve-specific facts the adapter encodes as named constants, because both are capability
 bounds rather than slow paths and both are narrower than they look:
 
