@@ -1084,6 +1084,21 @@ Scored against the criteria as written before the work, including where they wer
 | an improvement to a published attack surviving an equivalent comparison | **not met** | Griffin is a **no-go for M25** on worth; the capability it needs is costed as #306 |
 | an algorithmic change materially raising the maximum reachable problem size | **not met**, and a claim withdrawn | #305 took 9.06x off F4's working set but the stop reason is **unchanged** — `max_live_nonzeros` at degree 5, so M24's "out of reach, not out of budget" stands. And axis 4's round-count claim was **withdrawn** in §13.5 |
 
+**One deliverable is partially met and it was found by this scoring pass, not reported.**
+`research/competitive/results/history.json` holds **zero rows**. Scoreboard A's schema, its
+`Outcome::instead_of_a_time` discipline, its `speedups()` single-ratio chokepoint and its renderer
+are all on `main` and tested — but the sweep's measurements live in
+`docs/research/competitive-baseline.md` as prose, and the board itself was never written to. So
+#293's "regenerable from the retained records" is satisfied by a board with nothing to regenerate,
+which is not the same thing.
+
+That is the state Scoreboard C was built to end for cost models, and the state M24 §10.1's table was
+in before #294 gave it a home — recurring one directory away, inside the milestone that diagnosed it.
+It does not change any measurement: the 4.11x, the ~30x, the four disqualified rows and the quotient
+dimensions that licensed them are all recorded and reproducible. What is missing is the artifact that
+would stop someone recomputing a 450x from the raw numbers next year, which is exactly the job the
+board exists for. Tracked rather than asserted away.
+
 **One §16 clause deserves naming because it was the hardest to honour.** "Do not manufacture a stretch
 success by choosing an easier benchmark, changing its mathematical identity, or comparing incompatible
 computational objectives." The 450x row was available, arithmetically correct, and would have read as
