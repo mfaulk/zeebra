@@ -1856,9 +1856,17 @@ pub fn registry() -> Vec<ChallengeManifest> {
         });
     }
 
-    // The Six Worlds Anemoi ladder: N = 1..5 at alpha = 3, l = 1, both models, at the three prime
+    // The Six Worlds Anemoi ladder: N = 1..6 at alpha = 3, l = 1, both models, at the three prime
     // fields the sweep covers that fit a u64. Frozen before anything is run, like the Poseidon
     // ladder above it.
+    //
+    // N = 6 is the rung the ladder originally stopped short of, and the three primes do not agree
+    // on what it is. At 2^64 - 353 and 2^32 - 209 the sweep publishes a basis figure and no
+    // conversion, so a measurement there is a PRODUCED number: there is nothing to reproduce and
+    // no comparable modern Magma run exists on this machine. At 65537 the logs publish both steps
+    // -- 45.93 s and 23 340.22 s for FCICO, 1.56 s and 11 775.43 s for PCICO -- at the quotient
+    // dimension 5^6 = 15 625 they also print, so that row is a reproduction target. Registering
+    // all six at once keeps the distinction in the data rather than in a reader's memory.
     //
     // Three characteristics because that is the experiment #283 needs. The published conversion
     // cost at N = 4 is 1.6 s at 65537, 63.2 s at 2^32 - 209 and 67.8 s at 2^64 - 353, and Magma's
@@ -1867,7 +1875,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
     // path at all three, so the within-implementation ratio is comparable down the column and the
     // reference's is not.
     for prime in [ANEMOI_64_PRIME, ANEMOI_32_PRIME, ANEMOI_17_PRIME] {
-        for rounds in 1..=5 {
+        for rounds in 1..=6 {
             for model in [AnemoiModel::Fcico, AnemoiModel::Pcico] {
                 challenges.push(ChallengeManifest {
                     id: anemoi_id(prime, rounds, model),
@@ -2018,8 +2026,9 @@ fn anemoi_notes(prime: u64) -> &'static str {
              separate field arithmetic from conversion algorithmics: the reference's published \
              conversion cost here is within 7% of its cost at 2^64 - 353 while its basis step is \
              comparable, so a within-implementation ratio that moves between these two primes is \
-             about arithmetic and not about N. The sweep stops after the basis step at N = 5. As \
-             at 2^64 - 353, a result here says nothing about full-round Anemoi."
+             about arithmetic and not about N. The sweep stops after the basis step at N = 5, so \
+             N = 6 here has no published figure for either step. As at 2^64 - 353, a result here \
+             says nothing about full-round Anemoi."
         }
         ANEMOI_17_PRIME => {
             "The same system over 65537, the smallest prime of the sweep and the control for #283. \
@@ -2050,6 +2059,8 @@ fn anemoi_id(prime: u64, rounds: usize, model: AnemoiModel) -> &'static str {
         (ANEMOI_64_PRIME, 4, AnemoiModel::Pcico) => "anemoi64-cico-n4-pcico",
         (ANEMOI_64_PRIME, 5, AnemoiModel::Fcico) => "anemoi64-cico-n5-fcico",
         (ANEMOI_64_PRIME, 5, AnemoiModel::Pcico) => "anemoi64-cico-n5-pcico",
+        (ANEMOI_64_PRIME, 6, AnemoiModel::Fcico) => "anemoi64-cico-n6-fcico",
+        (ANEMOI_64_PRIME, 6, AnemoiModel::Pcico) => "anemoi64-cico-n6-pcico",
         (ANEMOI_32_PRIME, 1, AnemoiModel::Fcico) => "anemoi32-cico-n1-fcico",
         (ANEMOI_32_PRIME, 1, AnemoiModel::Pcico) => "anemoi32-cico-n1-pcico",
         (ANEMOI_32_PRIME, 2, AnemoiModel::Fcico) => "anemoi32-cico-n2-fcico",
@@ -2060,6 +2071,8 @@ fn anemoi_id(prime: u64, rounds: usize, model: AnemoiModel) -> &'static str {
         (ANEMOI_32_PRIME, 4, AnemoiModel::Pcico) => "anemoi32-cico-n4-pcico",
         (ANEMOI_32_PRIME, 5, AnemoiModel::Fcico) => "anemoi32-cico-n5-fcico",
         (ANEMOI_32_PRIME, 5, AnemoiModel::Pcico) => "anemoi32-cico-n5-pcico",
+        (ANEMOI_32_PRIME, 6, AnemoiModel::Fcico) => "anemoi32-cico-n6-fcico",
+        (ANEMOI_32_PRIME, 6, AnemoiModel::Pcico) => "anemoi32-cico-n6-pcico",
         (ANEMOI_17_PRIME, 1, AnemoiModel::Fcico) => "anemoi17-cico-n1-fcico",
         (ANEMOI_17_PRIME, 1, AnemoiModel::Pcico) => "anemoi17-cico-n1-pcico",
         (ANEMOI_17_PRIME, 2, AnemoiModel::Fcico) => "anemoi17-cico-n2-fcico",
@@ -2070,7 +2083,9 @@ fn anemoi_id(prime: u64, rounds: usize, model: AnemoiModel) -> &'static str {
         (ANEMOI_17_PRIME, 4, AnemoiModel::Pcico) => "anemoi17-cico-n4-pcico",
         (ANEMOI_17_PRIME, 5, AnemoiModel::Fcico) => "anemoi17-cico-n5-fcico",
         (ANEMOI_17_PRIME, 5, AnemoiModel::Pcico) => "anemoi17-cico-n5-pcico",
-        _ => unreachable!("the ladder is N = 1..5 in both models at three primes"),
+        (ANEMOI_17_PRIME, 6, AnemoiModel::Fcico) => "anemoi17-cico-n6-fcico",
+        (ANEMOI_17_PRIME, 6, AnemoiModel::Pcico) => "anemoi17-cico-n6-pcico",
+        _ => unreachable!("the ladder is N = 1..6 in both models at three primes"),
     }
 }
 
@@ -2300,6 +2315,8 @@ mod tests {
             ("anemoi64-cico-n4-pcico", "b61cd0a62722"),
             ("anemoi64-cico-n5-fcico", "a56639921520"),
             ("anemoi64-cico-n5-pcico", "d285b0cf43aa"),
+            ("anemoi64-cico-n6-fcico", "981fd5554d29"),
+            ("anemoi64-cico-n6-pcico", "251e04c1ff09"),
             // #283's two added characteristics. Appended after the 2^64 - 353 ladder so the
             // frozen prefix above keeps both its order and its digests.
             ("anemoi32-cico-n1-fcico", "d80be905379a"),
@@ -2312,6 +2329,8 @@ mod tests {
             ("anemoi32-cico-n4-pcico", "3b63b01e4100"),
             ("anemoi32-cico-n5-fcico", "4d27b32c7ab0"),
             ("anemoi32-cico-n5-pcico", "98887225a4ed"),
+            ("anemoi32-cico-n6-fcico", "b84a0c55fcb7"),
+            ("anemoi32-cico-n6-pcico", "afce463aadb0"),
             ("anemoi17-cico-n1-fcico", "99d6301147c1"),
             ("anemoi17-cico-n1-pcico", "e1d49467499d"),
             ("anemoi17-cico-n2-fcico", "25033fe92545"),
@@ -2322,6 +2341,8 @@ mod tests {
             ("anemoi17-cico-n4-pcico", "5a8388253ebf"),
             ("anemoi17-cico-n5-fcico", "f7cf58903c69"),
             ("anemoi17-cico-n5-pcico", "204e51b602ae"),
+            ("anemoi17-cico-n6-fcico", "db25820df213"),
+            ("anemoi17-cico-n6-pcico", "35142599ae39"),
             ("fukuoka-mq-III-n10-seed0", "ae24edf8efc8"),
             ("fukuoka-mq-III-n15-seed0", "0552d3b51070"),
             ("fukuoka-mq-III-n20-seed0", "434135c809f6"),
@@ -2828,7 +2849,7 @@ mod tests {
             .into_iter()
             .filter(|c| c.parameters.family() == "anemoi-cico")
             .collect();
-        assert_eq!(rows.len(), 30, "N = 1..5 in both models at three primes");
+        assert_eq!(rows.len(), 36, "N = 1..6 in both models at three primes");
 
         for row in &rows {
             assert_eq!(row.reference_points.len(), 2, "{}", row.id);
@@ -2928,7 +2949,7 @@ mod tests {
             }
             seen += 1;
         }
-        assert_eq!(seen, 30, "every registered Anemoi row was checked");
+        assert_eq!(seen, 36, "every registered Anemoi row was checked");
     }
 
     /// An Anemoi row is refused by the Poseidon dispatcher, and told apart from a non-CICO row.

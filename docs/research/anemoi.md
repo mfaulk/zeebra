@@ -451,8 +451,8 @@ show it:
 | **total** | **23 340.22 s** | |
 
 Magma spends 97% of its conversion building a `D × D` representation matrix and running a dense
-Keller-Gehrig matrix-power spin. Zeebra spends 82.8% (`FCICO`) and 92.3% (`PCICO`) of its
-conversion in the **lex walk**, with `measure_stages` on. Those are two different algorithms for one specification, which is a more useful finding
+Keller-Gehrig matrix-power spin. Zeebra spends 84–94% of its conversion in the **lex walk**
+(§8a.4). Those are two different algorithms for one specification, which is a more useful finding
 than either being "faster": it says the two implementations are not on the same cost curve at all,
 and that a ratio between them is not a measurement of FGLM.
 
@@ -468,10 +468,239 @@ written:
 - **A currently maintained Magma on this machine.** None is installed, and until one is, no
   statement in this document is a claim about Magma-as-shipped-today. Magma V2.26-2 is from 2021.
 
-Until one of those is measured, the honest summary is the one in the verdict above: **the published
-2 400x conversion/basis ratio is mostly an artefact of the reference's generic finite-field
-arithmetic at `p ≥ 2^32`, this crate's conversion is characteristic-flat where the reference's is
-not, and no algorithmic advantage over a modern implementation has been demonstrated.**
+**The msolve run has since been done — see §8a.7, and it settles (2) against this crate.** The
+honest summary is now: the published 2 400x conversion/basis ratio is mostly an artefact of the
+reference's generic finite-field arithmetic at `p ≥ 2^32`; this crate's conversion is
+characteristic-flat where the reference's is not; and against a modern implementation on this
+machine at the control characteristic, **this crate's conversion is 21–35x slower, not faster**.
+
+### 8a.4 The `N = 5` footprint, measured
+
+#286 needs an extrapolation to `D = 15 625`, and an extrapolation from a *time* model is not enough
+when the question is memory. So the runner now reports what the conversion actually holds, counted
+the three ways `FglmMemory` distinguishes — entries are mathematical nonzeros, cells are allocated
+field-element slots, bytes are what the allocation takes — beside the process's own peak.
+
+`FCICO`, `p = 2^64 − 353`, `N = 5`, `D = 3 125`:
+
+| quantity | value |
+|---|---:|
+| operator entries | 12 602 286 |
+| operator cells | 12 602 286 |
+| operator bytes | 0.150 GiB |
+| dense columns, of `N·D = 31 250` | 3 444 (11.0%) |
+| span cells | 9 768 750 |
+| accepted-vector cells | 9 765 625 |
+| dense-block bytes | 0.146 GiB |
+| **estimated total** | **0.296 GiB** |
+| span row operations | 4 912 340 |
+| process peak RSS | 0.324 GiB |
+| F4 peak live nonzeros | 1 543 889 |
+
+The estimate and the process measurement are 0.296 GiB against 0.324 GiB, so at this rung the
+representations are essentially the whole footprint and `FglmMemory` is not missing anything large.
+They are **not** interchangeable in general and are reported side by side for that reason.
+
+Where the conversion's time goes, with `measure_stages` on:
+
+| stage | `FCICO` share | `PCICO` share |
+|---|---:|---:|
+| quotient basis | 0.0% | 0.0% |
+| border classification | 0.0% | 0.0% |
+| normal forms (scalar) | 0.0% | 0.0% |
+| border symbolic (batched) | 16.7% | 7.5% |
+| column assembly | 0.5% | 0.1% |
+| **lex walk / dependence** | **82.8%** | **92.3%** |
+
+> **On a cryptanalytic system the dominant conversion stage is the lex walk, not border reduction.**
+> `MILESTONE-FGLM-SCALABILITY.md` §9.4 found the dominant stage to be input-dependent — batch
+> closure on katsura/cyclic, the lex walk on the systems that scale, 69% on planted-10. Anemoi is
+> the first *cryptanalytic* system to go through that split, and it lands at the far end of it:
+> 82.8% and 92.3%, above planted-10's 69%. The share also rises monotonically with the rung
+> (56.7% → 74.2% → 82.8% for `FCICO` at `N = 3, 4, 5`), which is what an `O(D³)` dependence test
+> against an `O(D²)`-ish border does.
+
+This is also the measurement that settles §8.5's sparse-FGLM no-go for this family rather than
+overturning it. Sparse FGLM attacks the operator construction; here the operator construction is
+16.7% and falling. Nothing in §8.5's three measurements is contradicted.
+
+### 8a.5 `N = 6`: the budget, the ceiling, and the decision
+
+**The criterion, written before the numbers were computed.** Go if the extrapolated conversion wall
+is **≤ 2 h** and the extrapolated peak RSS is **≤ 64 GB** — the standing resource gate. No-go, and
+report back for authorization rather than launch, if either is exceeded. A run that trips its own
+`timeout` is reported as a resource-limited result and not as a failure of the method.
+
+**The extrapolation, from measured storage growth rather than from the `D³` time model.**
+`FglmMemory::dense_blocks_for::<F>(15625)` is exact, since both dense blocks are functions of `D`
+alone: 244 156 250 span cells + 244 140 625 accepted-vector cells = 488 296 875 cells, **3.64 GiB**
+at 8 bytes a cell. That is 25x the `N = 5` figure, as `D²` requires. The operators are the part that
+has to be extrapolated: entries went 590 943 → 12 602 286 from `N = 4` to `N = 5`, **21.3x**, so
+`N = 6` projects to ≈ 268 M entries, and at the measured 12.8 bytes an entry ≈ **3.4 GiB** for
+`FCICO`. `PCICO` is far lighter on the operators — 168 250 → 3 813 032, 22.7x, projecting ≈ 86 M
+entries ≈ **1.1 GiB** — and identical on the dense blocks, because `D` is the same 15 625 in both
+models. F4's own peak is not the constraint: peak live nonzeros grew 10.3x then 7.5x for `FCICO`,
+projecting ≈ 11.6 M ≈ 0.19 GiB.
+
+| model | dense blocks | operators | F4 | **projected total** | projected conversion wall |
+|---|---:|---:|---:|---:|---:|
+| `FCICO` | 3.64 GiB | ≈ 3.4 GiB | ≈ 0.19 GiB | **≈ 7.2 GiB** | ≈ 1.6 h, plus ≈ 16 min of basis |
+| `PCICO` | 3.64 GiB | ≈ 1.1 GiB | ≈ 0.31 GiB | **≈ 5.1 GiB** | ≈ 1.2 h, plus ≈ 16 s of basis |
+
+The conversion walls use the **measured** per-rung growth rather than `D³`'s 125x: 101.8x for
+`FCICO` and 115.2x for `PCICO` from `N = 4` to `N = 5`.
+
+**Note what `FglmOptions::recommended()` would do here, and why it is not a surprise.** `D = 15 625`
+exceeds `max_quotient_dimension` of 4 096, and the dense blocks' 488 M cells exceed
+`max_span_entries` of 20 M by 24x. All four budgets are checked from `D` before any allocation, so
+the default would return `SpanStorageExceeded` in milliseconds. `N = 5` fits with 465 625 cells of
+the 20 M to spare — it only just fits. So the runner now computes the dense-block figure from `D`
+before converting, prints it, and says explicitly when it has lifted the budgets and what it is
+betting it can hold. Lifting them uses `unbounded()` with `BatchedBorder` and `Adaptive` set back by
+hand, because `unbounded()` deliberately resets the strategies to the reference ones and a
+measurement that silently also changed strategy would not be a measurement of this configuration.
+
+**The decision, applying the criterion.**
+
+- **`PCICO`: GO.** 1.2 h against a 2 h budget and ≈ 5.1 GiB against a 64 GB ceiling. Wall budget set
+  to **5 400 s**, RSS ceiling **16 GiB** — four times the model, so a trip means something
+  unmodelled rather than a slightly pessimistic estimate.
+- **`FCICO`: NO-GO without authorization.** 1.6 h of conversion plus ≈ 16 minutes of basis is
+  1.9–2.2 h, which straddles the 2 h gate rather than sitting inside it. The brief's instruction is
+  to stop and ask in exactly this case, so it is not launched here.
+
+Taking `PCICO` first inverts the brief's stated order, and the reason is that the measurement says
+so: both models reach the **same** `D = 15 625` conversion, which is the quantity #286 is about, and
+`PCICO` reaches it for a third of the wall and two-thirds of the memory. `PCICO` at `p = 65537` is
+also the more valuable of the two rows, for a reason the issue did not know about — see §8a.6.
+
+#### The gate failed first, and the gate was wrong
+
+Before any of the above could be timed, §5's invariant had to be checked at `N = 6`. It **failed**:
+all three `PCICO` rows reported **positive-dimensional** against a published `D = 15 625`. Under
+§5's rule — "a disagreement stops the workstream" — that halted the timing.
+
+It was not a disagreement. The `Dimension` visitor read
+
+```rust
+let basis = basis.ok()?;                      // F4's Result<_, F4Error>
+let dimension = series.quotient_dimension(&leads).ok()??;
+```
+
+so an F4 **resource refusal** and a genuinely infinite quotient both arrived at the caller as
+`Ok(None)`, and the caller printed `Ok(None)` as `positive-dimensional`. **A budget being crossed
+was being reported as a mathematical property of the ideal** — on the one check in this document
+whose whole purpose is that a disagreement means a defect.
+
+Fixed by giving the outcome three cases instead of two, and by naming the evidence in each. The
+positive-dimensional branch now lists the variables with no pure power among the leading monomials,
+which is exactly the condition `socle_degree_bound` returns `None` on, because "positive-dimensional"
+on a row whose reference publishes a finite `D` does not say whether the generator is wrong or the
+basis is incomplete, and the missing pure powers point at which. With that in place the real message
+appeared:
+
+```
+F4 refused: 20000112 live nonzero entries were needed, over the limit of 20000000
+  -- after 41 batches at pair degree 13, peak live nonzeros 13455539
+```
+
+**`max_live_nonzeros` crossed by 112 entries in 20 million — one part in 180 000.** And lifting it
+alone would have changed nothing, because `F4Options::live_entry_limit` is the *minimum* of
+`max_live_nonzeros` and `max_live_bytes / 16`, and the default 320 MB divides to exactly the same
+20 M. Both are lifted from the caller, for `N >= 6` only, so §8a.3's `N <= 5` figures stay
+reproducible from the same binary: a budget that never binds does not change a result, but a run
+taken under different options is not the same measurement and should not look like one.
+
+With the budget lifted, the gate is green:
+
+| row | variables | observed `D` | published `D` | agrees |
+|---|---:|---:|---:|---|
+| `anemoi64-cico-n6-pcico` | 7 | **15 625** | 15 625 | yes |
+| `anemoi32-cico-n6-pcico` | 7 | **15 625** | 15 625 | yes |
+| `anemoi17-cico-n6-pcico` | 7 | **15 625** | 15 625 | yes |
+
+`5^6` exactly, in all three characteristics — and at `p = 65537` that is agreement with a number the
+reference *prints* (`unideg = 15625`, `Get rep mat (dim: 15625)`) rather than with a formula. 36 of
+36 registered rows now agree with `(α + 2)^N`.
+
+**So the binding constraint at `N = 6` is F4, not FGLM.** #286 was scoped on the expectation that
+the FGLM budgets were the gate; they are the *second* gate. The conversion pre-flight in §8a.5 was
+necessary and not sufficient, and an estimate that had only modelled the conversion would have been
+confidently wrong about why the rung was unreachable.
+
+### 8a.6 `N = 6` is a reproduction at `p = 65537`, not only a produced figure
+
+#286 was filed as "`N = 6`, the rung where the reference has no conversion figure", and §9 of this
+document said the logs "stop reporting it after `N = 5`". **That is true at `p = 2^64 − 353` and
+false at `p = 65537`.** The `65537` logs run `N = 6` to completion in both models:
+
+| `p = 65537`, `N = 6` | Magma basis | Magma conversion | `D` from the log |
+|---|---:|---:|---:|
+| `FCICO` | 45.930 s | **23 340.220 s** | `unideg = 15625` |
+| `PCICO` | 1.560 s | **11 775.430 s** | `unideg = 15625` |
+
+Two consequences. First, the quotient-dimension invariant has a published value to be gated
+against at `N = 6`: `5^6 = 15 625`, printed by the reference itself, so the gate is a comparison
+rather than a self-consistency check. Second, `N = 6` at `65537` is a **reproduction** target, which
+is a stronger kind of result than the produced figure #286 was scoped for — and it is the row where
+a same-machine msolve run is also possible.
+
+At `p = 2^64 − 353` and `p = 2^32 − 209` the position is as #286 described: a published basis figure
+and no conversion. A Zeebra conversion there is a **produced** number. It must not be presented as
+evidence that this crate outperforms a currently maintained Magma, because no such measurement
+exists on this machine and Magma V2.26-2 is from 2021. The registry records the distinction in the
+data: `NOT_REPORTED` is prose rather than a quantity, so a tool that parses `reported_time` as a
+time cannot read a missing figure as a zero.
+
+### 8a.7 The same-machine comparand: msolve 0.11.0, and it is 21–35x faster
+
+§8a.3 said a same-machine, same-field comparison was what would settle whether any of the residual
+belongs to the conversion algorithm. msolve 0.11.0 was provisioned on this workstation while #283
+was being measured, so it was done.
+
+**msolve cannot run at `p = 2^64 − 353`** — it refuses with `characteristic must be 0 or < 2^31`,
+which is why the control characteristic is the one that can carry a head-to-head at all, and is a
+second independent reason #283's design was the right one.
+
+`anemoi_ladder msolve <id>` emits a row in msolve's input format from the same
+`instance.system::<N>()` the timed runs use, so both engines are given byte-identical generators.
+msolve on **one core** (`taskset --cpu-list 0`, `-t` defaulting to 1), Zeebra on **eight**, both at
+`p = 65537`, both under `benchlock`:
+
+| row | msolve total | msolve peak RSS | Zeebra total | Zeebra conversion alone | Magma total (2014 Xeon) |
+|---|---:|---:|---:|---:|---:|
+| `n3-fcico` | 0.01 s | 7 MB | 17.2 ms | 6.1 ms | 0.067 s |
+| `n3-pcico` | < 0.01 s | 8 MB | 5.6 ms | 4.0 ms | 0.050 s |
+| `n4-fcico` | 0.04 s | 9 MB | 0.771 s | 0.467 s | 1.709 s |
+| `n4-pcico` | 0.03 s | 9 MB | 0.366 s | 0.332 s | 1.480 s |
+| `n5-fcico` | **1.81 s** | 32 MB | **63.71 s** | 47.53 s | 136.8 s |
+| `n5-pcico` | **1.85 s** | 34 MB | **39.0 s** | 38.19 s | 75.96 s |
+
+> **msolve solves `N = 5` end to end in 1.8 s on one core and 32 MB. Zeebra takes 63.7 s on eight
+> cores and 330 MB — 35x the wall for `FCICO` and 21x for `PCICO`, and 10x the memory. Same machine,
+> same prime, same generators.**
+
+msolve independently confirms the quotient dimension at every rung — 125, 625, 3 125 — which is a
+third witness to §5's invariant beside this crate and the reference.
+
+**This settles §8a.3's candidate (2) against this crate.** There is no algorithmic advantage in this
+crate's conversion to be found: the apparent 507x advantage over the published Magma figure was the
+reference's arithmetic path, and against an implementation whose arithmetic is not the bottleneck
+the direction reverses by more than an order of magnitude. §8a.1's favourable reading was an
+artefact of having exactly one comparand, measured at exactly one characteristic, on hardware a
+decade removed.
+
+The reason is visible in where each engine spends its conversion, and the three do not agree:
+
+| engine | dominant conversion stage | share |
+|---|---|---:|
+| Zeebra | lex walk / dependence test | 82.8% (`FCICO`, `N = 5`) |
+| Magma V2.26-2 | `Get rep mat` + Keller-Gehrig spin | 96.6% (`FCICO`, `N = 6`, `p = 65537`) |
+| msolve 0.11.0 | scalar sequence (Wiedemann) | 1.45 s of 1.6 s (`FCICO`, `N = 5`) |
+
+Three implementations, three different dominant stages, one specification. **A conversion ratio
+between any two of them is not a measurement of FGLM**, and that is the most transferable thing
+#283 produced.
 
 ## 9. Open
 
@@ -484,9 +713,9 @@ not, and no algorithmic advantage over a modern implementation has been demonstr
 - **`α ∈ {5, 7, 11}`.** Reference data exists for all of them in the same logs, at every prime.
   The registry records `α = 3` only. `p ∈ {65537, 2^32 − 209}` **is** now registered — see §8a.3,
   which is what #283 used them for.
-- **`N = 6`.** The reference has no conversion figure at `p = 2^64 − 353`, and — contrary to what
-  this section said before #283 read the other two logs — it **does** have one at `p = 65537`, in
-  both models, at the quotient dimension `5^6 = 15 625` the logs also print. Still open; #286.
+- **`FCICO` at `N = 6`.** Measured as 1.9–2.2 h of wall against a 2 h gate in §8a.5, so not
+  launched; it needs authorization rather than a better estimate. `PCICO` at `N = 6` was the
+  in-budget half and is recorded in §8a.5 and §8a.7.
 - **`ACICO`.** A third model of the same primitive (`additional-benchmarks.md` §3.4). Cheap once the
   permutation exists, and a separate issue.
 - **The reference's own `check_polynomial_verification` has not been executed.** It needs Sage. §4

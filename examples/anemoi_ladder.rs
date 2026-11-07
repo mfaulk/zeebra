@@ -42,7 +42,7 @@ use zeebra::{
         solve_from_lex_basis, F4Options, HilbertSeries, SolveOptions, SolveOutcome,
     },
     util::peak_resident_bytes,
-    KnownOrder, MonomialOrder, MultivariatePolynomial,
+    KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
 /// `2^64 - 353`, the characteristic the published ladder is over.
@@ -173,16 +173,37 @@ fn one_dimension<F: KnownOrder>(manifest: &ChallengeManifest) -> usize {
         .anemoi_cico_instance::<F>()
         .expect("the registered field");
     let published = *published_quotient_dimension(parameters.alpha, parameters.rounds).value();
-    let observed = match dispatch_anemoi_cico::<F, _>(&instance, Dimension) {
-        Ok(Some(dimension)) => dimension,
-        Ok(None) => {
+    let observed = match dispatch_anemoi_cico::<F, _>(&instance, Dimension(parameters.rounds)) {
+        Ok(DimensionOutcome::Finite(dimension)) => dimension,
+        Ok(DimensionOutcome::PositiveDimensional {
+            basis_elements,
+            without_pure_power,
+        }) => {
             println!(
                 "| `{}` | {} | positive-dimensional | {} | **no** |",
                 manifest.id,
                 instance.variables(),
                 published
             );
+            eprintln!(
+                "{}: positive-dimensional against a published D of {}. The degrevlex basis has {} \
+                 elements and no pure power of variable(s) {:?} appears among their leading \
+                 monomials, which is why socle_degree_bound has no bound. Either the generator is \
+                 wrong at this round count or the basis is incomplete; an independent engine on \
+                 the same system tells them apart.",
+                manifest.id, published, basis_elements, without_pure_power
+            );
             return 1;
+        }
+        Ok(DimensionOutcome::NoBasis(why)) => {
+            println!(
+                "| `{}` | {} | not reached ({}) | {} | — |",
+                manifest.id,
+                instance.variables(),
+                why,
+                published
+            );
+            return 0;
         }
         Err(e) => {
             println!(
@@ -259,8 +280,8 @@ fn run_row<F: KnownOrder>(manifest: &ChallengeManifest, machine: &str, affinity:
         println!("- published: {point}");
     }
 
-    let stages =
-        dispatch_anemoi_cico::<F, _>(&instance, Solve(&instance)).expect("a compiled dimension");
+    let stages = dispatch_anemoi_cico::<F, _>(&instance, Solve(&instance, parameters.rounds))
+        .expect("a compiled dimension");
     println!("\n| stage | elapsed | detail |");
     println!("|---|---:|---|");
     for (stage, elapsed, detail) in &stages.steps {
@@ -303,20 +324,80 @@ fn anemoi_rows() -> Vec<ChallengeManifest> {
 ///
 /// Combinatorial once F4 has finished, so it costs nothing beyond the basis — which is why this is
 /// the check that runs first.
-struct Dimension;
+struct Dimension(usize);
 
 impl<F: KnownOrder> AnemoiCicoVisitor<F> for Dimension {
-    type Output = Option<u128>;
+    type Output = DimensionOutcome;
 
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Option<u128> {
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> DimensionOutcome {
         let order = MonomialOrder::GradedReverseLexicographic;
-        let (basis, _) = f4_reported(system, order, &F4Options::default());
-        let basis = basis.ok()?;
+        let (basis, f4) = f4_reported(system, order, &basis_options(self.0));
+        let basis = match basis {
+            Ok(basis) => basis,
+            Err(e) => {
+                return DimensionOutcome::NoBasis(format!(
+                    "F4 refused: {e} -- after {} batches at pair degree {}, peak live nonzeros {}",
+                    f4.batches, f4.max_pair_degree, f4.max_live_nonzeros
+                ))
+            }
+        };
         let leads: Vec<_> = basis.iter().map(|p| p.leading_monomial(order)).collect();
-        let series = HilbertSeries::of_basis(&basis, order).ok()?;
-        let dimension = series.quotient_dimension(&leads).ok()??;
-        u128::try_from(dimension).ok()
+        let Ok(series) = HilbertSeries::of_basis(&basis, order) else {
+            return DimensionOutcome::NoBasis("the Hilbert series was refused".to_string());
+        };
+        match series.quotient_dimension(&leads) {
+            Ok(Some(dimension)) => match u128::try_from(dimension) {
+                Ok(dimension) => DimensionOutcome::Finite(dimension),
+                Err(_) => DimensionOutcome::NoBasis(format!("dimension {dimension} is negative")),
+            },
+            // `socle_degree_bound` returns `None` exactly when some variable has no pure power in
+            // the minimal leading ideal, which is the zero-dimensionality criterion. Naming those
+            // variables is the difference between a verdict and a lead: "positive-dimensional" on
+            // a row whose reference publishes a finite `D` does not say whether the generator is
+            // wrong or the basis is incomplete, and the missing pure powers point at which.
+            Ok(None) => DimensionOutcome::PositiveDimensional {
+                basis_elements: basis.len(),
+                without_pure_power: variables_without_a_pure_power(&leads),
+            },
+            Err(e) => DimensionOutcome::NoBasis(format!("the Hilbert series was refused: {e}")),
+        }
     }
+}
+
+/// What the dimension check found.
+enum DimensionOutcome {
+    /// `dim F_p[x]/I`, finite.
+    Finite(u128),
+
+    /// No pure power of these variables is in the leading ideal, so the quotient is infinite.
+    PositiveDimensional {
+        /// Elements of the degrevlex basis that was computed.
+        basis_elements: usize,
+        /// Variable indices with no pure power among the leading monomials.
+        without_pure_power: Vec<usize>,
+    },
+
+    /// The check did not get far enough to have an opinion.
+    NoBasis(String),
+}
+
+/// Variable indices with no pure power among `leads`.
+///
+/// A monomial is a pure power of variable `i` when every other exponent is zero and the `i`th is
+/// not. The quotient is finite-dimensional precisely when every variable has one.
+fn variables_without_a_pure_power<const N: usize>(leads: &[Monomial<N>]) -> Vec<usize> {
+    (0..N)
+        .filter(|variable| {
+            !leads.iter().any(|lead| {
+                lead.exponents()[*variable] > 0
+                    && lead
+                        .exponents()
+                        .iter()
+                        .enumerate()
+                        .all(|(other, exponent)| other == *variable || *exponent == 0)
+            })
+        })
+        .collect()
 }
 
 /// What one staged solve produced.
@@ -333,7 +414,7 @@ struct Stages<F> {
 /// Separately because the published finding is that the conversion costs 2 400x the basis at
 /// `N = 5`, and a combined figure would hide it. Which stage is the wall is the result; "it was
 /// slower" is not.
-struct Solve<'a, F: KnownOrder>(&'a AnemoiCico<F>);
+struct Solve<'a, F: KnownOrder>(&'a AnemoiCico<F>, usize);
 
 impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
     type Output = Stages<F>;
@@ -343,14 +424,17 @@ impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
         let mut steps = Vec::new();
 
         let start = Instant::now();
-        let (basis, f4) = f4_reported(system, order, &F4Options::default());
+        let (basis, f4) = f4_reported(system, order, &basis_options(self.1));
         let elapsed = start.elapsed();
-        let Ok(basis) = basis else {
-            steps.push(("grobner", elapsed, "did not complete".to_string()));
-            return Stages {
-                steps,
-                witness: None,
-            };
+        let basis = match basis {
+            Ok(basis) => basis,
+            Err(e) => {
+                steps.push(("grobner", elapsed, format!("did not complete: {e}")));
+                return Stages {
+                    steps,
+                    witness: None,
+                };
+            }
         };
         steps.push((
             "grobner",
@@ -388,7 +472,7 @@ impl<F: KnownOrder> AnemoiCicoVisitor<F> for Solve<'_, F> {
                 fglm.quotient_dimension, fglm.target_basis_elements, fglm.operator_entries
             ),
         ));
-        report_conversion_footprint::<F>(&fglm);
+        report_conversion_footprint(&fglm);
 
         let start = Instant::now();
         let mut rng = rand::rngs::StdRng::from_seed([7; 32]);
@@ -483,7 +567,7 @@ fn quotient_dimension<const N: usize, F: KnownOrder>(
 /// not confusing them; `FglmMemory`'s own docs make the distinction and this prints all three. The
 /// `peak` line is the process and is **not** attributable to the conversion — it covers F4's peak
 /// too, and this binary does one row per invocation so that it means something at all.
-fn report_conversion_footprint<F: KnownOrder>(fglm: &FglmStatistics) {
+fn report_conversion_footprint(fglm: &FglmStatistics) {
     let m = &fglm.memory;
     let gib = |bytes: usize| bytes as f64 / (1 << 30) as f64;
     println!("\n| conversion footprint | value |");
@@ -591,4 +675,41 @@ fn write_msolve<F: KnownOrder>(manifest: &ChallengeManifest) {
         .anemoi_cico_instance::<F>()
         .expect("the registered field");
     dispatch_anemoi_cico::<F, _>(&instance, Emit).expect("a compiled dimension");
+}
+
+/// The F4 options for a row at this round count, with the one budget that binds at `N = 6` lifted.
+///
+/// `F4Options::recommended`'s `max_live_nonzeros` of 20 M — 320 MB at 16 bytes an entry — is not a
+/// generous limit here and not a mistaken one either: `N = 5` peaks at 1.54 M live nonzeros, 7.7%
+/// of it, and `N = 6` `PCICO` crosses it at **20 000 112** entries during batch 41 at pair degree
+/// 13. One part in 180 000 over. The default is right for a library call and wrong for a run whose
+/// whole purpose is to reach the next rung, so this lifts it for `N >= 6` and leaves every other
+/// budget alone.
+///
+/// Lifted for `N >= 6` only, so the `N <= 5` figures in `docs/research/anemoi.md` section 8a.3 stay
+/// reproducible from this binary: a budget that never binds does not change a result, but a run
+/// taken under different options is not the same measurement and should not look like one.
+fn basis_options(rounds: usize) -> F4Options {
+    let recommended = F4Options::recommended();
+    if rounds < 6 {
+        return recommended;
+    }
+    // 200 M entries, 10x what N = 6 was refused for, and the byte budget raised to match. Both,
+    // because `live_entry_limit` is the *min* of the two: lifting only the entry count would leave
+    // `max_live_bytes / 16` binding at exactly the same 20 M and change nothing. 3.2 GB of live
+    // entries is well inside the standing gate. Printed rather than silent, for the same reason
+    // the conversion pre-flight is printed.
+    let lifted = 200_000_000;
+    let lifted_bytes = lifted * F4Options::bytes_per_entry::<A64>();
+    println!(
+        "- f4 budget: LIFTED to {lifted} live nonzeros ({lifted_bytes} bytes) from {} ({}) -- \
+         N = {rounds} crosses the default by 112 entries, and a refused basis is not a statement \
+         about the ideal.",
+        recommended.max_live_nonzeros, recommended.max_live_bytes
+    );
+    F4Options {
+        max_live_nonzeros: lifted,
+        max_live_bytes: lifted_bytes,
+        ..recommended
+    }
 }
