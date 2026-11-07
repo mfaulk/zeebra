@@ -680,6 +680,33 @@ With the budget lifted, the gate is green:
 reference *prints* (`unideg = 15625`, `Get rep mat (dim: 15625)`) rather than with a formula. 36 of
 36 registered rows now agree with `(α + 2)^N`.
 
+#### The RSS guard was watching the wrong process
+
+The `FCICO` authorization is conditional on an enforced memory ceiling, so it is worth recording
+that the first guard written for it **could not have enforced one**. It selected the process to
+watch with `pgrep -f "examples/anemoi_ladder row $id"`. A heredoc puts the whole launching script's
+text into the wrapper's `/proc/<pid>/cmdline`, so that pattern matches the *wrapper* on its own
+payload — two `bash` processes at ~4 MB — and does not match the binary at all:
+
+```console
+$ pgrep -f "examples/anemoi_ladder row anemoi17-cico-n6-fcico"
+  pid=3131927 rss=3992kB comm=bash
+  pid=3132014 rss=2492kB comm=bash      # and the real binary is absent
+
+$ pgrep -x anemoi_ladder
+  pid=2885645  ./target2/release/examples/anemoi_ladder row anemoi17-cico-n6-pcico
+```
+
+A guard reading those wrappers' `VmHWM` would never fire however much the binary allocated. It was
+safe only by accident — 4 MB cannot cross a 16 GiB ceiling — which means the run would have
+proceeded **unsupervised while looking supervised**. The same pattern also made this document's
+author report a queued run as started. Both are #328; the fix is to match the process *name* and
+then confirm identity from `cmdline`.
+
+Recorded here rather than only in the issue because §9's resource policy authorizes long runs *on
+the strength of* an enforced ceiling, and an authorization is only as good as the instrument behind
+it.
+
 **So the binding constraint at `N = 6` is F4, not FGLM.** #286 was scoped on the expectation that
 the FGLM budgets were the gate; they are the *second* gate. The conversion pre-flight in §8a.5 was
 necessary and not sufficient, and an estimate that had only modelled the conversion would have been
