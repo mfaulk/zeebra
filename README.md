@@ -145,6 +145,17 @@ cargo nextest run --profile ci
 Nextest cannot run doc examples — rustdoc owns that path — so `cargo test --doc` stays a separate
 step in every job that wants them.
 
+**A process per test is also why CI cannot see a test that mutates process-wide state.** Under
+`cargo test` the whole suite is threads of one process, so a `std::env::set_var` anywhere races
+every concurrent `getenv` and leaks its value into whatever else happens to be reading the
+environment; under nextest each test owns its environment and the same code is green. That
+asymmetry made `main` red locally and green in CI for the length of #418 — two adjacent tests, each
+setting its own variable, each believing itself the sole writer, and a lookup that returns the
+first variable set out of a list. `clippy.toml` therefore disallows `std::env::set_var`,
+`remove_var` and `set_current_dir`, which puts the ban on the one check that does run in CI. Code
+that needs to vary an environment-derived value takes it as a parameter instead — see
+`SagebrushSolver`'s switch probe.
+
 CI resolves its toolchain to `stable`, which moves. A clippy run that is clean on an older stable
 is therefore **not** evidence that CI is clean — new lints arrive with new releases, and one did
 during this project's history. `rustup update stable` before trusting a clean run, or name the
