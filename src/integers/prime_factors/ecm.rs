@@ -566,6 +566,7 @@ mod tests {
         big_integers::big_uint::{BigUInt, ZERO},
         prime_factors::miller_rabin::is_prime,
     };
+    use proptest::proptest;
     use rand::{prelude::StdRng, SeedableRng};
 
     fn big(value: u64) -> BigUInt {
@@ -808,6 +809,37 @@ mod tests {
             assert!(pair[1].b1 >= pair[0].b1);
             assert!(pair[1].b2 >= pair[0].b2);
             assert!(pair[1].curves >= pair[0].curves);
+        }
+    }
+
+    proptest! {
+        #[test]
+        /// Whatever `ecm_find_factor` returns for an arbitrary input is a proper non-trivial
+        /// divisor of it. The search may find nothing; it may never be wrong.
+        fn ecm_only_ever_returns_a_real_divisor(value in 0u64..200_000) {
+            let n = BigUInt::new_from_u64(value);
+            let budget = EcmBudget { b1: 50, b2: 0, curves: 2 };
+            let mut rng = StdRng::seed_from_u64(value);
+            if let Some(factor) = ecm_find_factor(&n, &budget, &mut rng) {
+                assert!(factor > BigUInt::one(), "{factor} is trivial");
+                assert!(factor < n, "{factor} is not a proper divisor of {n}");
+                assert_eq!(&n % &factor, *ZERO, "{factor} does not divide {n}");
+            }
+        }
+
+        #[test]
+        /// A partial factorization always multiplies back out to its input, and never reports a
+        /// composite among its primes — whatever the budget managed to split.
+        fn factor_with_budget_accounts_for_every_factor(value in 1u64..200_000) {
+            let n = BigUInt::new_from_u64(value);
+            let budget = EcmBudget { b1: 50, b2: 0, curves: 2 };
+            let mut rng = StdRng::seed_from_u64(value);
+            let factorization = factor_with_budget(&n, &budget, &mut rng);
+            assert_eq!(factorization.product(), n);
+            assert_eq!(factorization.primes.len(), factorization.powers.len());
+            for prime in &factorization.primes {
+                assert!(is_prime(prime, 10, &mut rng), "{prime} is not prime");
+            }
         }
     }
 
