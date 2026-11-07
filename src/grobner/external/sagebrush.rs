@@ -389,6 +389,20 @@ fn undeclared_identifier(instance: &Instance) -> Option<String> {
     None
 }
 
+/// How a [`SagebrushSolver`] reads one environment variable, as a value and not a verdict.
+///
+/// Indirection rather than a direct `env::var_os`, so that a test can exercise the refusal path
+/// without a `set_var` — which under `cargo test`'s one-process-many-threads suite races every
+/// concurrent reader of the environment and leaks the value into whichever test is looking at that
+/// moment (#418). The probe yields the *value* so that "truthy if set" stays decided in
+/// [`SagebrushSolver::inherited_switch`], which is the code that has to get it right.
+type SwitchProbe = fn(&str) -> Option<std::ffi::OsString>;
+
+/// The real probe: the harness's own environment.
+fn environment_switch(name: &str) -> Option<std::ffi::OsString> {
+    std::env::var_os(name)
+}
+
 /// Sagebrush driven as a competitive solver, through the provisioned driver binary.
 #[derive(Clone, Debug)]
 pub struct SagebrushSolver {
@@ -396,6 +410,7 @@ pub struct SagebrushSolver {
     work_dir: std::path::PathBuf,
     version: Option<ToolVersion>,
     runs: u64,
+    switches: SwitchProbe,
 }
 
 impl SagebrushSolver {
@@ -417,7 +432,15 @@ impl SagebrushSolver {
             work_dir,
             version: None,
             runs: 0,
+            switches: environment_switch,
         })
+    }
+
+    /// The same solver reading its [`PINNED_SWITCHES`] through `probe` instead of the environment.
+    #[cfg(test)]
+    fn with_switch_probe(mut self, probe: SwitchProbe) -> Self {
+        self.switches = probe;
+        self
     }
 
     /// A solver configured from the environment `tools/external/env.sh` exports.
@@ -480,15 +503,15 @@ impl SagebrushSolver {
             .env(THREADS_VARIABLE, limits.workers.max(1).to_string())
     }
 
-    /// The first [`PINNED_SWITCHES`] entry the harness's own environment sets, with its effect.
+    /// The first [`PINNED_SWITCHES`] entry `probe` reports set, with its effect.
     ///
     /// Presence and not value: every one of these but `SB_F4_FL` is read with
     /// `env::var(..).is_ok()`, so `SB_SIGF4=0` *enables* the signature path.
-    fn inherited_switch() -> Option<(&'static str, &'static str)> {
+    fn inherited_switch(probe: SwitchProbe) -> Option<(&'static str, &'static str)> {
         PINNED_SWITCHES
             .iter()
             .copied()
-            .find(|(name, _)| std::env::var_os(name).is_some())
+            .find(|(name, _)| probe(name).is_some())
     }
 
     /// Parse the driver's output into an answer, checking its echoed headers against the request.
@@ -895,7 +918,7 @@ impl ExternalSolver for SagebrushSolver {
                 None,
             );
         }
-        if let Some((variable, effect)) = Self::inherited_switch() {
+        if let Some((variable, effect)) = Self::inherited_switch(self.switches) {
             // Refusing beats measuring: an inherited switch selects a different algorithm or
             // interleaves a trace with the basis, and `Invocation` can set a child's variable but
             // not clear one — so the condition cannot be fixed from inside the run.
@@ -1666,21 +1689,31 @@ mod tests {
         assert_eq!(SagebrushSolver::error_line("#engine: x\n"), None);
     }
 
-    /// An inherited engine switch stops the run instead of producing a figure for another engine.
+    /// An inherited engine switch is detected at the value `0`, because presence is what counts.
     #[test]
-    fn test_an_inherited_engine_switch_refuses_the_run() {
-        // Serialized against the other tests only by being the sole writer of this variable.
+    fn test_an_inherited_engine_switch_is_detected_at_a_falsy_value() {
         let name = "SB_SIGF4";
         assert!(PINNED_SWITCHES.iter().any(|(switch, _)| *switch == name));
-        // SAFETY: a single-threaded section of one test; no other test reads this variable.
-        unsafe { std::env::set_var(name, "0") };
-        let switch = SagebrushSolver::inherited_switch();
-        unsafe { std::env::remove_var(name) };
+        let switch = SagebrushSolver::inherited_switch(|probed| {
+            (probed == "SB_SIGF4").then(|| std::ffi::OsString::from("0"))
+        });
         assert_eq!(
             switch.map(|(switch, _)| switch),
             Some(name),
             "a truthy-if-set switch must be detected even at the value 0"
         );
+    }
+
+    /// An environment setting none of the pinned switches leaves the run to proceed.
+    #[test]
+    fn test_an_unpinned_variable_is_not_an_inherited_switch() {
+        assert_eq!(
+            SagebrushSolver::inherited_switch(|_| Some(std::ffi::OsString::from("1")))
+                .map(|(switch, _)| switch),
+            Some(PINNED_SWITCHES[0].0),
+            "the first pinned entry wins when several are set"
+        );
+        assert!(SagebrushSolver::inherited_switch(|_| None).is_none());
     }
 
     /// An inherited switch is reported as `Environment`, naming the variable, and skips the row.
@@ -1693,15 +1726,13 @@ mod tests {
     fn test_an_inherited_switch_is_an_environment_failure_naming_the_variable() {
         let name = "SB_F4_SHAPE";
         assert!(PINNED_SWITCHES.iter().any(|(switch, _)| *switch == name));
-        let mut solver = solver("sagebrush-gb-driver", "env-refusal");
-        // SAFETY: a single-threaded section of one test; this is the sole writer of this variable.
-        unsafe { std::env::set_var(name, "1") };
+        let mut solver = solver("sagebrush-gb-driver", "env-refusal")
+            .with_switch_probe(|probed| (probed == "SB_F4_SHAPE").then(std::ffi::OsString::new));
         let report = solver.run(
             &instance(65521, MonomialOrder::GradedReverseLexicographic),
             Task::ReducedGrobnerBasis,
             &Limits::wall(Duration::from_secs(5)),
         );
-        unsafe { std::env::remove_var(name) };
 
         match &report.status {
             RunStatus::Failed(RunFailure::Environment { variable, detail }) => {
