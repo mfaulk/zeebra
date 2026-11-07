@@ -169,10 +169,15 @@ fn public_mq(records: &mut Vec<ExperimentRecord>) -> bool {
     let Ok(text) = std::fs::read_to_string(&stem) else {
         return false;
     };
-    let answer = std::fs::read_to_string(format!("{}-answer", stem.display()))
-        .map(|t| MqInstance::parse_answer(&t))
-        .unwrap_or_default();
     let instance = MqInstance::parse(&text).expect("a published instance parses");
+    // A present answer file that does not parse is loud: it is the check the import is verified
+    // against, so an empty vector in its place would check nothing (#415).
+    let answer = match std::fs::read_to_string(format!("{}-answer", stem.display())) {
+        Ok(text) => instance
+            .parse_answer(&text)
+            .expect("the published answer parses"),
+        Err(_) => Vec::new(),
+    };
     let system = instance.system::<10, G>().expect("GF(31) at n = 10");
     let published: Vec<G> = answer.iter().copied().map(G::new).collect();
 

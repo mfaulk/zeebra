@@ -88,6 +88,20 @@ impl MqField {
         }
     }
 
+    /// The base an answer file's elements are written in.
+    ///
+    /// GF(2^8) publishes its answer vectors as two-digit hex bytes — `[a3, 67, 64, ...]` — and the
+    /// prime-field types publish decimal. `format.html` and every `-answer` file agree; the hex is
+    /// not a rendering choice this crate makes, so it is not optional to read.
+    ///
+    /// GF(2) is 10 only because `0` and `1` are the same in every base.
+    pub fn answer_radix(&self) -> u32 {
+        match self {
+            Self::Gf2 | Self::Gf31 => 10,
+            Self::Gf256 => 16,
+        }
+    }
+
     /// The `Galois Field :` header value this parses from.
     fn parse(value: &str) -> Option<Self> {
         match value.trim() {
@@ -170,6 +184,19 @@ pub enum MqError {
 
     /// A system was requested at a dimension the instance is not in.
     DimensionMismatch { requested: usize, instance: usize },
+
+    /// An answer-file element is not a value of the declared field, read in the declared base.
+    ///
+    /// Carries the token verbatim, because the interesting failure is a GF(2^8) byte read as
+    /// decimal — which does not look wrong, it looks like a different element.
+    BadAnswerValue { position: usize, token: String },
+
+    /// The answer file carries a different number of coordinates than the instance has variables.
+    ///
+    /// The check that distinguishes a truncated download from a good one. Without it a short
+    /// vector is returned as an answer, and the solution check it exists to perform silently
+    /// compares the wrong number of coordinates.
+    WrongAnswerCount { found: usize, expected: usize },
 }
 
 impl Display for MqError {
@@ -228,6 +255,17 @@ impl Display for MqError {
                 f,
                 "the instance has {} variables and a system was requested at {}",
                 instance, requested
+            ),
+            Self::BadAnswerValue { position, token } => write!(
+                f,
+                "answer coordinate {} is {:?}, which is not an element of the declared field \
+                 written in the base that field publishes",
+                position, token
+            ),
+            Self::WrongAnswerCount { found, expected } => write!(
+                f,
+                "the answer file has {} coordinates and the instance has {} variables",
+                found, expected
             ),
         }
     }
@@ -398,13 +436,44 @@ impl MqInstance {
 
     /// Parse the companion `-answer` file: the published solution, if there is one.
     ///
-    /// `[22, 22, 28, ...]`. Returned as integers rather than field elements, so that the caller
-    /// chooses the coefficient type and the parse stays independent of it.
-    pub fn parse_answer(text: &str) -> Vec<u64> {
-        text.split(|c: char| !c.is_ascii_digit())
+    /// `[22, 22, 28, ...]` over GF(31), `[a3, 67, 64, ...]` over GF(2^8). Returned as integers
+    /// rather than field elements, so that the caller chooses the coefficient type and the parse
+    /// stays independent of it.
+    ///
+    /// **A method, and fallible, because the field decides the base.** This cannot be
+    /// field-agnostic: a GF(2^8) element is a hex byte and 100 of the 256 of them have an
+    /// all-decimal spelling, so a decimal read of one does not fail — it succeeds at a different
+    /// element (#415). Nor can it drop what it cannot read: the published answer is the cheapest
+    /// available check on an importer, one evaluation per polynomial, and a check that silently
+    /// shortened its own input would report a correct importer as broken or an incorrect one as
+    /// fine depending on which way the garbage fell.
+    pub fn parse_answer(&self, text: &str) -> Result<Vec<u64>, MqError> {
+        let radix = self.field.answer_radix();
+        let order = self.field.order();
+        let mut values = Vec::with_capacity(self.variables);
+        for token in text
+            .split(|c: char| !c.is_ascii_alphanumeric())
             .filter(|t| !t.is_empty())
-            .filter_map(|t| t.parse().ok())
-            .collect()
+        {
+            let value = u64::from_str_radix(token, radix).map_err(|_| MqError::BadAnswerValue {
+                position: values.len(),
+                token: token.to_string(),
+            })?;
+            if value >= order {
+                return Err(MqError::BadAnswerValue {
+                    position: values.len(),
+                    token: token.to_string(),
+                });
+            }
+            values.push(value);
+        }
+        if values.len() != self.variables {
+            return Err(MqError::WrongAnswerCount {
+                found: values.len(),
+                expected: self.variables,
+            });
+        }
+        Ok(values)
     }
 
     /// Whether `F` is the field the instance's header declares.
@@ -984,7 +1053,9 @@ Order : graded reverse lex order
         assert_eq!(instance.seed, Some(0));
         assert_eq!(instance.order, "graded reverse lex order");
 
-        let published: Vec<F> = MqInstance::parse_answer(&answer_text)
+        let published: Vec<F> = instance
+            .parse_answer(&answer_text)
+            .expect("the published answer parses")
             .into_iter()
             .map(F::new)
             .collect();
@@ -1030,14 +1101,91 @@ Order : graded reverse lex order
         assert_eq!(conversion.quotient_dimension, 1);
     }
 
+    /// An instance header with no coefficients, for the answer parser's sake.
+    fn header_only(field: MqField, variables: usize) -> MqInstance {
+        MqInstance {
+            field,
+            variables,
+            polynomials: 2 * variables,
+            seed: Some(0),
+            order: "graded reverse lex order".to_string(),
+            coefficients: Vec::new(),
+        }
+    }
+
     /// The published answer file parses to the coordinates it names.
     #[test]
     fn test_parsing_an_answer_file() {
         assert_eq!(
-            MqInstance::parse_answer("[22, 22, 28, 12, 9, 2, 1, 18, 11, 25]"),
-            vec![22, 22, 28, 12, 9, 2, 1, 18, 11, 25]
+            header_only(MqField::Gf31, 10).parse_answer("[22, 22, 28, 12, 9, 2, 1, 18, 11, 25]"),
+            Ok(vec![22, 22, 28, 12, 9, 2, 1, 18, 11, 25])
         );
         // Whitespace and line breaks are immaterial.
-        assert_eq!(MqInstance::parse_answer("[1,\n 2,\n 3]\n"), vec![1, 2, 3]);
+        assert_eq!(
+            header_only(MqField::Gf31, 3).parse_answer("[1,\n 2,\n 3]\n"),
+            Ok(vec![1, 2, 3])
+        );
+    }
+
+    /// A GF(2^8) answer is read base 16: ten bytes, not nine wrong decimal ones.
+    ///
+    /// `ToyExample-type2-n10-seed0-answer` verbatim. Under the old digits-only split this returned
+    /// `[3, 67, 64, 5, 81, 4, 6, 5, 8]` — nine values, every one wrong, with no error: `a3` gave
+    /// `3`, `ab` gave nothing, `4f` gave `4`. Note `67`, `64` and `81` are the tokens that parse
+    /// "successfully" as decimal and still denote different field elements.
+    #[test]
+    fn test_a_hex_answer_vector_is_read_base_sixteen() {
+        assert_eq!(
+            header_only(MqField::Gf256, 10)
+                .parse_answer("[a3, 67, 64, 5c, ab, 81, 4f, e6, f5, b8]"),
+            Ok(vec![
+                0xa3, 0x67, 0x64, 0x5c, 0xab, 0x81, 0x4f, 0xe6, 0xf5, 0xb8
+            ])
+        );
+    }
+
+    /// The parsed answer has exactly the instance's `n` coordinates, and a short file is an error.
+    #[test]
+    fn test_a_truncated_answer_file_is_an_error_and_not_a_shorter_vector() {
+        let instance = header_only(MqField::Gf31, 10);
+        assert_eq!(
+            instance.parse_answer("[22, 22, 28]"),
+            Err(MqError::WrongAnswerCount {
+                found: 3,
+                expected: 10
+            })
+        );
+        assert_eq!(
+            instance
+                .parse_answer("[22, 22, 28, 12, 9, 2, 1, 18, 11, 25]")
+                .map(|a| a.len()),
+            Ok(instance.variables)
+        );
+    }
+
+    /// A token that is not a field element is named rather than dropped.
+    #[test]
+    fn test_an_unreadable_answer_token_is_named() {
+        // Decimal over GF(31), so a hex letter is not a digit here.
+        assert_eq!(
+            header_only(MqField::Gf31, 3).parse_answer("[22, 1a, 28]"),
+            Err(MqError::BadAnswerValue {
+                position: 1,
+                token: "1a".to_string()
+            })
+        );
+        // Readable in the base, and still not an element of GF(31).
+        assert_eq!(
+            header_only(MqField::Gf31, 3).parse_answer("[22, 31, 28]"),
+            Err(MqError::BadAnswerValue {
+                position: 1,
+                token: "31".to_string()
+            })
+        );
+        // The field's whole range is admitted: 0xff is an element of GF(2^8), 256 would not be.
+        assert_eq!(
+            header_only(MqField::Gf256, 2).parse_answer("[ff, 00]"),
+            Ok(vec![255, 0])
+        );
     }
 }

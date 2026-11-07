@@ -541,10 +541,17 @@ fn mq_directory() -> PathBuf {
 
 fn load_mq(stem: &str) -> Option<(MqInstance, Vec<u64>)> {
     let text = std::fs::read_to_string(mq_directory().join(stem)).ok()?;
-    let answer = std::fs::read_to_string(mq_directory().join(format!("{}-answer", stem)))
-        .map(|t| MqInstance::parse_answer(&t))
-        .unwrap_or_default();
-    MqInstance::parse(&text).ok().map(|i| (i, answer))
+    let instance = MqInstance::parse(&text).ok()?;
+    // A missing answer file is ordinary: not every instance publishes one. A present one that does
+    // not parse is not ordinary at all — it is the check the import is verified against, so it is
+    // loud rather than an empty vector (#415).
+    let answer = match std::fs::read_to_string(mq_directory().join(format!("{}-answer", stem))) {
+        Ok(text) => instance
+            .parse_answer(&text)
+            .unwrap_or_else(|e| panic!("{}-answer: {}", stem, e)),
+        Err(_) => Vec::new(),
+    };
+    Some((instance, answer))
 }
 
 /// §4: Fukuoka MQ, with the published and specialized type VI instances kept apart.

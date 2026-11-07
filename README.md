@@ -3512,7 +3512,10 @@ path written, against `Zp2` (§8 of the same document decides that). GF(2^8) nee
 and three things in it: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, but it reads
 a **decimal** integer as a bit pattern and a challenge coefficient is a two-digit **hex** byte, the
 real header is `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1` and `MqField::parse` does not match it
-(#414), and `parse_answer` mis-parses a hex answer vector without erroring (#415). The challenge's
+(#414). The answer vectors are already handled: `MqInstance::parse_answer` is a method that takes
+its base from `MqField::answer_radix` — 16 over GF(2^8) — and returns `Result`, so a hex vector
+reads as the `n` bytes it names and a short or unreadable file is an error rather than a shorter
+`Vec` of wrong values (#415). The challenge's
 modulus, which is not the AES one, is `Gf256Mq`, and
 [`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §2.4 settles it against a published
 answer: all 20 polynomials of type II `n = 10` vanish under `0x11D` and none under `0x11B`.

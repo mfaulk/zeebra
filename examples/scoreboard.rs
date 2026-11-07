@@ -1117,10 +1117,11 @@ fn read_mq(kind: &str, n: usize) -> Option<(MqInstance, Vec<u64>)> {
     );
     let text = fs::read_to_string(Path::new(&directory).join(&name)).ok()?;
     let answer = fs::read_to_string(Path::new(&directory).join(format!("{}-answer", name))).ok()?;
-    Some((
-        MqInstance::parse(&text).expect("a published instance"),
-        MqInstance::parse_answer(&answer),
-    ))
+    let instance = MqInstance::parse(&text).expect("a published instance");
+    let published = instance
+        .parse_answer(&answer)
+        .expect("the published answer parses");
+    Some((instance, published))
 }
 
 /// One MQ instance, optionally sliced, under the supervisor.
@@ -1222,7 +1223,9 @@ fn run_mq(manifest: &ChallengeManifest, environment: &Environment) -> Option<Run
 
     let at = Instant::now();
     let instance = MqInstance::parse(&text).expect("a published instance");
-    let published = MqInstance::parse_answer(&answer);
+    let published = instance
+        .parse_answer(&answer)
+        .expect("the published answer parses");
     let generation = at.elapsed();
 
     let mut record = instance
