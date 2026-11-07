@@ -409,6 +409,32 @@ a correction to §5.5:
 #350's own framing and §7, none of this raises the reachable round count: after axis 4 the six-round
 route is 78% root finding, and the row gains ~3× against the stage's ~2 000×.
 
+#### 5.6.0 The parallel hypothesis, falsified
+
+§5.2 and #350 predicted that axis 4 would **recover** #319's width penalty as well as the exponent,
+because the per-sample working set falls from a 17 MB matrix to two ~6 kB coefficient vectors. The
+authorized `rf4-rp2` row (#367) measured the opposite:
+
+| quantity | Euclidean | dense |
+|---|---:|---:|
+| core-time per determinant, 1 worker | **1.109 ms** | 2.322 s |
+| core-time per determinant, 32 workers | **3.563 ms** | — |
+| **width penalty at 32 workers** | **3.21x** | **1.32x** modelled, 31-44% measured (#319) |
+
+So the kernel with the small working set contends **worse** than the one with the large one, and the
+bandwidth story §5.2 told cannot be what dominates. The budget guard had been given the dense
+penalty on the stated grounds that this was conservative; it was optimistic, and under-predicted the
+determinant stage by **2.43x**. Corrected to a measured two-point penalty.
+
+The candidate mechanism is **allocator contention** rather than bandwidth — `remainder` allocates a
+fresh vector per step, and the sequence is as long as the degree, so one order-1 458 determinant
+makes on the order of a thousand allocations and 32 threads do it at once. **Unmeasured**, and #412
+is the measurement; it also names the fix, which is two reusable buffers swapped per step.
+
+Nothing here argues against axis 4: it is 2 094x per determinant at this order and it is what made
+the `rf4-rp2` row affordable. What it argues against is quoting its parallel behaviour from a
+working-set argument.
+
 #### 5.6.1 The specialization trap, closed twice and cross-checked
 
 §5.3's correction was derived a second time, independently, while implementing #350 — and the two

@@ -768,6 +768,8 @@ cargo run --release --example resultant_cico       # a resultant against F4 on t
                                                    #   (two four-round rows, predicted sample count)
 cargo run --release --example resultant_cico -- --concurrency 1,8,32   # the determinant scaling study
 cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
+cargo run --release --example resultant_cico -- --kernel euclidean --root-finder deflation \
+    --row poseidon31-cico-t16-rf4-rp2 --max-samples 59050   # the six-round row, #367
 cargo run --release --example determinant_sweep    # the Sylvester determinant cost law,
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
