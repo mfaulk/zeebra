@@ -907,8 +907,10 @@ msolve is safe, by construction and by measurement:
   basis of the monomial ideal they generate *is* that set — and msolve returned all 53, identical
   as a set. Pinned as a live test in `src/grobner/external/msolve.rs`.
 
-So no corpus rung is at risk from this through msolve. The adapter's own identifier check (defect 3
-above) had to be whole-token for the same reason, or it would have rejected what msolve accepts.
+So no corpus rung is at risk from this through msolve — which matters because the corpus names its
+variables `x1..xN` (`corpus.rs`'s `text_instance`), i.e. **the naming with the hazard in it**, and
+its rungs go well past nine variables. The adapter's own identifier check (defect 3 above) had to
+be whole-token for the same reason, or it would have rejected what msolve accepts.
 
 ---
 
@@ -921,10 +923,21 @@ deliberately **not** in this document, for two reasons rather than one.
 The lesser reason is scheduling: the measurement was queued under `tools/benchlock.sh` behind other
 agents' long-running jobs and had not acquired the lock. The better reason is that it should be
 taken on **#261's corpus** rather than on the hand-rolled Katsura inputs this study's author
-generated to establish msolve's input format. A corpus rung carries a recorded `Equivalence` and a
-`licenses_timing()` gate, so whether a rung may be timed is a field a test asserts rather than a
-judgement made at the keyboard; a figure taken outside it has no such warrant. The queue slot was
-released rather than held.
+generated to establish msolve's input format. A corpus rung's identity is a frozen digest that a
+test asserts (`src/grobner/external/corpus.rs`, `ladder()`), so a figure taken outside it has no
+warrant that it is about the problem it claims to be. The queue slot was released rather than held.
+
+The adapter's own tests were moved onto the corpus for the same reason: `corpus_pair` in
+`msolve.rs`'s test module builds each rung through `corpus::instance` and asserts its digest
+against `ladder()`, so the recorded fixtures and the live agreement test run **the exact instances
+the sweep will**. One consequence worth noting: the corpus's `REFERENCE_CHARACTERISTIC` is
+`2^31 - 1`, which is **above** `MAX_CHARACTERISTIC_ELIMINANT` (§3.3) — so the corpus's reference
+field supports basis comparisons against msolve and **not** eliminant comparisons. An eliminant
+sweep needs a second characteristic below `1515531529`.
+
+The corpus also settles the naming question in §4.0's favour: it names rungs **by variable count**,
+never by the literature's family index, which is the same convention as msolve's `katN` (§4.0) —
+so `katsura-6` means the same six-variable system to both, and the digests confirm it.
 
 So the measurement is **filed, not estimated**. It is cheap — seconds of msolve per rung, three
 repeats — and it needs only two things this study already supplies: the adapter captures msolve's

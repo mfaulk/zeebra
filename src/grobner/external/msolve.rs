@@ -1384,13 +1384,13 @@ mod tests {
         MAX_CHARACTERISTIC_ELIMINANT, MAX_STAGES,
     };
     use crate::{
-        fields::{PrimeFieldElement64, Zp2147483647},
+        fields::PrimeFieldElement64,
         grobner::{
             benchmark_systems::{cyclic, katsura},
-            differential::{monomial_to_string, polynomial_to_string},
+            differential::monomial_to_string,
             external::{
-                ExternalSolver, FieldSpec, Instance, Invariants, Limits, RunFailure, RunStatus,
-                Support, Task, Unsupported,
+                corpus, ExternalSolver, FieldSpec, Instance, Invariants, Limits, RunFailure,
+                RunStatus, Support, Task, Unsupported, REFERENCE_CHARACTERISTIC,
             },
             f4,
         },
@@ -1399,9 +1399,12 @@ mod tests {
     use std::time::Duration;
 
     const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-    /// The prime the recorded `-g 2` fixtures were taken over: `2^31 - 1`, msolve's own ceiling
-    /// less one, so the basis fixtures also pin that the top of the supported range works.
-    const P31: u64 = 2147483647;
+    /// The corpus's reference field, `2^31 - 1`. Also msolve's own ceiling less one, so the basis
+    /// fixtures pin that the top of the supported range works — and it is **above** the eliminant
+    /// ceiling, which is why the eliminant rungs use `P30`.
+    const P31: u64 = REFERENCE_CHARACTERISTIC;
+    /// The corpus's reference field type, for recomputing a rung's basis in Zeebra.
+    type Reference = PrimeFieldElement64<REFERENCE_CHARACTERISTIC>;
     /// The prime the recorded parametrization fixtures were taken over. Below
     /// [`MAX_CHARACTERISTIC_ELIMINANT`], which `P31` is not.
     const P30: u64 = 1073741827;
@@ -1413,25 +1416,28 @@ mod tests {
     // tested in CI with no msolve installed.
     // ---------------------------------------------------------------------------------------
 
-    /// `msolve -f katsura-4.ms -g 2`, where the input is `katsura::<4, Zp2147483647>()`.
+    /// `msolve -g 2` on **the corpus's `katsura-4`** at [`REFERENCE_CHARACTERISTIC`], the exact
+    /// instance #263's sweep will run — digest `825a3aa54e15…`, matching `corpus::ladder`'s frozen
+    /// value. Captured from `input_file(corpus::instance("katsura-4", ..))`.
     const KATSURA_4_BASIS: &str = "\
 #Reduced Groebner basis data
 #---
 #field characteristic: 2147483647
-#variable order:       u0, u1, u2, u3
+#variable order:       x1, x2, x3, x4
 #monomial order:       graded reverse lexicographical
 #length of basis:      7 elements sorted by increasing leading monomials
 #---
-[1*u0^1+2*u1^1+2*u2^1+2*u3^1+2147483646,
-1*u2^2+2*u1^1*u3^1+920350139*u2^1*u3^1+306783382*u3^2+306783378*u1^1+1227133512*u2^1+613566755*u3^1,
-1*u1^1*u2^1+2147483645*u1^1*u3^1+613566753*u2^1*u3^1+920350131*u3^2+1994091958*u1^1+1533916891*u2^1+1840700270*u3^1,
-1*u1^2+2*u1^1*u3^1+1840700270*u2^1*u3^1+613566758*u3^2+613566756*u1^1+306783378*u2^1+1227133512*u3^1,
-1*u2^1*u3^2+1908874354*u3^3+119304647*u1^1*u3^1+2120971503*u2^1*u3^1+318145725*u3^2+1391887549*u1^1+888156817*u2^1+636291451*u3^1,
-1*u1^1*u3^2+715827882*u3^3+238609294*u1^1*u3^1+1391887549*u2^1*u3^1+1908874353*u3^2+1133394147*u1^1+1511192196*u2^1,
-1*u3^4+1349709138*u3^3+1819697142*u1^1*u3^1+1238170675*u2^1*u3^1+1345692147*u3^2+440061417*u1^1+755127449*u2^1+912660465*u3^1]:
+[1*x1^1+2*x2^1+2*x3^1+2*x4^1+2147483646,
+1*x3^2+2*x2^1*x4^1+920350139*x3^1*x4^1+306783382*x4^2+306783378*x2^1+1227133512*x3^1+613566755*x4^1,
+1*x2^1*x3^1+2147483645*x2^1*x4^1+613566753*x3^1*x4^1+920350131*x4^2+1994091958*x2^1+1533916891*x3^1+1840700270*x4^1,
+1*x2^2+2*x2^1*x4^1+1840700270*x3^1*x4^1+613566758*x4^2+613566756*x2^1+306783378*x3^1+1227133512*x4^1,
+1*x3^1*x4^2+1908874354*x4^3+119304647*x2^1*x4^1+2120971503*x3^1*x4^1+318145725*x4^2+1391887549*x2^1+888156817*x3^1+636291451*x4^1,
+1*x2^1*x4^2+715827882*x4^3+238609294*x2^1*x4^1+1391887549*x3^1*x4^1+1908874353*x4^2+1133394147*x2^1+1511192196*x3^1,
+1*x4^4+1349709138*x4^3+1819697142*x2^1*x4^1+1238170675*x3^1*x4^1+1345692147*x4^2+440061417*x2^1+755127449*x3^1+912660465*x4^1]:
 ";
 
-    /// `msolve -f cyclic-4.ms -g 2`, where the input is `cyclic::<4, Zp2147483647>()`.
+    /// `msolve -g 2` on **the corpus's `cyclic-4`** at [`REFERENCE_CHARACTERISTIC`], digest
+    /// `e1d8d59448b3…`.
     ///
     /// cyclic-4 is **positive-dimensional** (`benchmark_systems.rs:10-15`), which does not stop it
     /// having a perfectly good grevlex basis — it stops it having an eliminant, which is a
@@ -1440,17 +1446,17 @@ mod tests {
 #Reduced Groebner basis data
 #---
 #field characteristic: 2147483647
-#variable order:       x0, x1, x2, x3
+#variable order:       x1, x2, x3, x4
 #monomial order:       graded reverse lexicographical
 #length of basis:      7 elements sorted by increasing leading monomials
 #---
-[1*x0^1+1*x1^1+1*x2^1+1*x3^1,
-1*x1^2+2*x1^1*x3^1+1*x3^2,
-1*x1^1*x2^2+1*x2^2*x3^1+2147483646*x1^1*x3^2+2147483646*x3^3,
-1*x1^1*x2^1*x3^2+1*x2^2*x3^2+2147483646*x1^1*x3^3+1*x2^1*x3^3+2147483646*x3^4+2147483646,
-1*x1^1*x3^4+1*x3^5+2147483646*x1^1+2147483646*x3^1,
-1*x2^3*x3^2+1*x2^2*x3^3+2147483646*x2^1+2147483646*x3^1,
-1*x2^2*x3^4+1*x1^1*x2^1+2147483646*x1^1*x3^1+1*x2^1*x3^1+2147483645*x3^2]:
+[1*x1^1+1*x2^1+1*x3^1+1*x4^1,
+1*x2^2+2*x2^1*x4^1+1*x4^2,
+1*x2^1*x3^2+1*x3^2*x4^1+2147483646*x2^1*x4^2+2147483646*x4^3,
+1*x2^1*x3^1*x4^2+1*x3^2*x4^2+2147483646*x2^1*x4^3+1*x3^1*x4^3+2147483646*x4^4+2147483646,
+1*x2^1*x4^4+1*x4^5+2147483646*x2^1+2147483646*x4^1,
+1*x3^3*x4^2+1*x3^2*x4^3+2147483646*x3^1+2147483646*x4^1,
+1*x3^2*x4^4+1*x2^1*x3^1+2147483646*x2^1*x4^1+1*x3^1*x4^1+2147483645*x4^2]:
 ";
 
     /// `msolve -g 1` on `x^2*y+1, x*y^2+x+1` over `GF(1073741827)` with **`x,y`** on line 1.
@@ -1625,35 +1631,39 @@ rational param(cpu)             0.75 sec
         )
     }
 
-    /// Zeebra's own instance and invariants for a benchmark system, under grevlex.
-    fn zeebra<const N: usize, F: FiniteField>(
-        name: &str,
-        characteristic: u64,
-        system: Vec<MultivariatePolynomial<N, F>>,
-        prefix: &str,
-    ) -> (Instance, Invariants) {
-        let names: Vec<String> = (0..N).map(|i| format!("{}{}", prefix, i)).collect();
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-        let text: Vec<String> = system
+    /// A corpus instance, and Zeebra's own invariants for it under grevlex.
+    ///
+    /// The instance comes from [`corpus::instance`], so it is **digest-identical** to the one
+    /// #263's sweep will hand msolve — including the `x1..xN` naming, which is the naming with the
+    /// `x1`/`x10` prefix hazard in it. Zeebra's side is computed here and now by `f4`, so an
+    /// agreement test is live Zeebra against recorded msolve rather than two recordings.
+    fn corpus_pair(name: &str, characteristic: u64) -> (Instance, Invariants) {
+        let instance = corpus::instance(name, characteristic, GREVLEX)
+            .unwrap_or_else(|| panic!("{} is a corpus rung", name));
+        let refs: Vec<&str> = instance.variable_refs();
+        let leading = match name {
+            "katsura-4" => zeebra_leading(&katsura::<4, Reference>(), &refs),
+            "katsura-5" => zeebra_leading(&katsura::<5, Reference>(), &refs),
+            "katsura-6" => zeebra_leading(&katsura::<6, Reference>(), &refs),
+            "katsura-7" => zeebra_leading(&katsura::<7, Reference>(), &refs),
+            "cyclic-4" => zeebra_leading(&cyclic::<4, Reference>(), &refs),
+            "cyclic-5" => zeebra_leading(&cyclic::<5, Reference>(), &refs),
+            "cyclic-6" => zeebra_leading(&cyclic::<6, Reference>(), &refs),
+            other => panic!("no compiled instantiation for {}", other),
+        };
+        (instance, Invariants::none().with_leading_monomials(leading))
+    }
+
+    /// The leading monomials of Zeebra's grevlex basis, rendered with `variables`.
+    fn zeebra_leading<const N: usize, F: FiniteField>(
+        system: &[MultivariatePolynomial<N, F>],
+        variables: &[&str],
+    ) -> Vec<String> {
+        f4(system, GREVLEX)
+            .expect("Zeebra computes a basis for a corpus rung")
             .iter()
-            .map(|p| polynomial_to_string(p, &refs, GREVLEX))
-            .collect();
-        let basis = f4(&system, GREVLEX).expect("Zeebra computes a basis for a benchmark system");
-        let leading: Vec<String> = basis
-            .iter()
-            .map(|p| monomial_to_string(&p.leading_monomial(GREVLEX), &refs))
-            .collect();
-        (
-            Instance::new(
-                name,
-                "test",
-                FieldSpec::prime(characteristic),
-                names,
-                text,
-                GREVLEX,
-            ),
-            Invariants::none().with_leading_monomials(leading),
-        )
+            .map(|p| monomial_to_string(&p.leading_monomial(GREVLEX), variables))
+            .collect()
     }
 
     /// The msolve binary, when one is installed where the M25 provisioning puts it.
@@ -1789,7 +1799,7 @@ rational param(cpu)             0.75 sec
     /// non-zero overlap asserted so the agreement is not vacuous.
     #[test]
     fn test_the_recorded_katsura_4_basis_agrees_with_zeebras() {
-        let (instance, ours) = zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u");
+        let (instance, ours) = corpus_pair("katsura-4", P31);
         let theirs = parse_basis(KATSURA_4_BASIS, &instance, KATSURA_4_LOG)
             .expect("the recorded katsura-4 basis parses")
             .invariants;
@@ -1812,7 +1822,7 @@ rational param(cpu)             0.75 sec
     /// and not about its grevlex basis — both engines produce the same seven leading monomials.
     #[test]
     fn test_the_recorded_cyclic_4_basis_agrees_with_zeebras() {
-        let (instance, ours) = zeebra("cyclic-4", P31, cyclic::<4, Zp2147483647>(), "x");
+        let (instance, ours) = corpus_pair("cyclic-4", P31);
         let theirs = parse_basis(CYCLIC_4_BASIS, &instance, "")
             .expect("the recorded cyclic-4 basis parses")
             .invariants;
@@ -1835,14 +1845,18 @@ rational param(cpu)             0.75 sec
     /// count for a given label and a row named `katsura-6` means the same system to both.
     #[test]
     fn test_the_katsura_convention_is_the_variable_count() {
-        let system = katsura::<4, Zp2147483647>();
-        assert_eq!(system.len(), 4, "katsura::<4> is four equations");
-        let (instance, _) = zeebra("katsura-4", P31, system, "u");
+        assert_eq!(
+            katsura::<4, Reference>().len(),
+            4,
+            "katsura::<4> is four equations"
+        );
+        let (instance, _) = corpus_pair("katsura-4", P31);
         assert_eq!(instance.variables.len(), 4);
-        // And msolve's echo of that input agrees it read four variables.
+        // And msolve's echo of that input agrees it read four variables, under the corpus's own
+        // `x1..xN` naming.
         assert_eq!(
             super::header(KATSURA_4_BASIS, "variable order"),
-            Some("u0, u1, u2, u3".to_string())
+            Some("x1, x2, x3, x4".to_string())
         );
     }
 
@@ -1853,7 +1867,7 @@ rational param(cpu)             0.75 sec
     /// A header characteristic that disagrees with the input file is self-inconsistent.
     #[test]
     fn test_a_header_characteristic_that_disagrees_is_self_inconsistent() {
-        let wrong = instance("katsura-4", P30, &["u0", "u1", "u2", "u3"], &["u0"]);
+        let wrong = instance("katsura-4", P30, &["x1", "x2", "x3", "x4"], &["x1"]);
         match parse_basis(KATSURA_4_BASIS, &wrong, "") {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("characteristic"), "got {:?}", detail)
@@ -1872,7 +1886,7 @@ rational param(cpu)             0.75 sec
             "#monomial order:       graded reverse lexicographical",
             "#monomial order:       eliminating first variable, blocks: graded reverse lexicographical",
         );
-        let (instance, _) = zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u");
+        let (instance, _) = corpus_pair("katsura-4", P31);
         match parse_basis(&elimination, &instance, "") {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("monomial order"), "got {:?}", detail)
@@ -1885,7 +1899,7 @@ rational param(cpu)             0.75 sec
     #[test]
     fn test_a_declared_length_that_disagrees_with_the_list_is_rejected() {
         let lying = KATSURA_4_BASIS.replace("7 elements", "9 elements");
-        let (instance, _) = zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u");
+        let (instance, _) = corpus_pair("katsura-4", P31);
         match parse_basis(&lying, &instance, "") {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("declares 9"), "got {:?}", detail)
@@ -1902,7 +1916,7 @@ rational param(cpu)             0.75 sec
     #[test]
     fn test_a_verbose_basis_size_that_disagrees_is_self_inconsistent() {
         let lying = KATSURA_4_LOG.replace("size of basis                     7", "size of basis 9");
-        let (instance, _) = zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u");
+        let (instance, _) = corpus_pair("katsura-4", P31);
         match parse_basis(KATSURA_4_BASIS, &instance, &lying) {
             Err(RunFailure::SelfInconsistent { detail }) => {
                 assert!(detail.contains("verbose log"), "got {:?}", detail)
@@ -1914,10 +1928,13 @@ rational param(cpu)             0.75 sec
     /// A basis list without its closing `]:` is a truncated write, not a short basis.
     #[test]
     fn test_a_truncated_basis_list_is_a_missing_marker() {
+        // Drop the final element, and with it the closing `]:` — exactly what a process killed
+        // mid-write leaves behind.
         let truncated = KATSURA_4_BASIS
-            .split_once("1*u3^4")
+            .rsplit_once(",\n")
             .map(|(head, _)| head.to_string())
-            .expect("the fixture has a last element");
+            .expect("the fixture has more than one element");
+        assert!(!truncated.contains("]:"));
         assert!(matches!(
             parse_list(&truncated),
             Err(RunFailure::MissingMarker { .. })
@@ -1972,12 +1989,11 @@ rational param(cpu)             0.75 sec
     /// zero-dimensional — recorded rather than assumed from Zeebra's classification.
     #[test]
     fn test_cyclic_4_has_no_eliminant_and_says_why() {
-        let (instance, _) = zeebra(
-            "cyclic-4",
-            P30,
-            cyclic::<4, PrimeFieldElement64<1073741827>>(),
-            "x",
-        );
+        let (instance, _) = corpus_pair("cyclic-4", P30);
+        // The corpus agrees it is not zero-dimensional, which is why the rung is there.
+        assert!(corpus::ladder()
+            .iter()
+            .any(|e| e.name == "cyclic-4" && !e.zero_dimensional));
         let parsed = parse_parametrization(POSITIVE_DIMENSIONAL).expect("parses");
         match eliminant_answer(parsed, &instance, "") {
             Err(RunFailure::Reported { message }) => {
@@ -2579,7 +2595,7 @@ rational param(cpu)             0.75 sec
     /// msolve's own `#invalid equations` echo is checked, so a discarded generator is a failure.
     #[test]
     fn test_a_discarded_generator_is_self_inconsistent() {
-        let (instance, _) = zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u");
+        let (instance, _) = corpus_pair("katsura-4", P31);
         let discarded = KATSURA_4_LOG.replace(
             "size of basis                     7",
             "#invalid equations               1\nsize of basis                     7",
@@ -2629,15 +2645,15 @@ rational param(cpu)             0.75 sec
         );
         let limits = Limits::wall(Duration::from_secs(60));
 
-        let rungs: Vec<(Instance, Invariants)> = vec![
-            zeebra("katsura-4", P31, katsura::<4, Zp2147483647>(), "u"),
-            zeebra("katsura-5", P31, katsura::<5, Zp2147483647>(), "u"),
-            zeebra("katsura-6", P31, katsura::<6, Zp2147483647>(), "u"),
-            zeebra("cyclic-4", P31, cyclic::<4, Zp2147483647>(), "x"),
-            zeebra("cyclic-5", P31, cyclic::<5, Zp2147483647>(), "x"),
-        ];
-
-        for (instance, ours) in rungs {
+        // Every rung on the corpus ladder, so a rung added there is covered here without an edit.
+        for entry in corpus::ladder() {
+            let (instance, ours) = corpus_pair(entry.name, P31);
+            assert_eq!(
+                instance.digest(),
+                entry.digest,
+                "{}: the corpus digest must be frozen",
+                entry.name
+            );
             let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
             let answer = match &report.status {
                 RunStatus::Complete(answer) => answer,
@@ -2760,13 +2776,9 @@ rational param(cpu)             0.75 sec
         );
         let limits = Limits::wall(Duration::from_secs(60));
 
-        // Below `MAX_CHARACTERISTIC_ELIMINANT`, which `P31` is not.
-        let (katsura_5, _) = zeebra(
-            "katsura-5",
-            P30,
-            katsura::<5, PrimeFieldElement64<1073741827>>(),
-            "u",
-        );
+        // `P30`, not the corpus's reference field: `P31` is above
+        // `MAX_CHARACTERISTIC_ELIMINANT`, so an eliminant row over it is `Unsupported` by design.
+        let (katsura_5, _) = corpus_pair("katsura-5", P30);
         match &solver
             .run(&katsura_5, Task::UnivariateEliminant, &limits)
             .status
@@ -2774,20 +2786,16 @@ rational param(cpu)             0.75 sec
             RunStatus::Complete(answer) => {
                 assert_eq!(answer.invariants.quotient_dimension, Some(16));
                 assert_eq!(answer.invariants.eliminant_degree, Some(16));
+                // The eliminant is in the last variable of the corpus's order.
                 assert!(answer
                     .eliminant
                     .as_deref()
-                    .is_some_and(|e| e.contains("u4")));
+                    .is_some_and(|e| e.contains("x5")));
             }
             other => panic!("katsura-5's eliminant did not complete: {:?}", other),
         }
 
-        let (cyclic_4, _) = zeebra(
-            "cyclic-4",
-            P30,
-            cyclic::<4, PrimeFieldElement64<1073741827>>(),
-            "x",
-        );
+        let (cyclic_4, _) = corpus_pair("cyclic-4", P30);
         match &solver
             .run(&cyclic_4, Task::UnivariateEliminant, &limits)
             .status

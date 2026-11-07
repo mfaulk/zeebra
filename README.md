@@ -1785,12 +1785,22 @@ bounds rather than slow paths and both are narrower than they look:
   because primes between the two run with no accumulation guarantee. `Mersenne31` and
   `Zp2147483647` are both above it.
 
-msolve also has a failure mode that exits 0: on a staircase that is not generic enough it permutes
-the variables and appends a new one carrying a random linear form, then writes a well-formed
-parametrization of the ideal it substituted. The adapter compares the output's variable list
-against the instance's on every run and reports a mismatch as a failure. Both behaviours, the
-mapping from msolve's F4 stage names onto Zeebra's, and what of its design is worth reimplementing
-are in `docs/research/msolve-implementation.md`.
+msolve also has **three** failure modes that exit 0. On a staircase that is not generic enough it
+permutes the variables and appends a new one carrying a random linear form, then writes a
+well-formed parametrization of the ideal it substituted — so the adapter compares the output's
+variable list against the instance's on every run. Its sparse-FGLM refuses a too-large prime and
+then retries forever rather than failing. And a generator naming a variable that is not on line 1
+has that factor **silently dropped**, so `supports()` checks every identifier in every generator
+against the declared order before anything runs.
+
+That last one is also why msolve is safe at ten or more variables, where `x1` is a prefix of `x10`:
+it matches factor names with a full `strcmp` rather than greedily, verified by handing it 53
+distinct degree-2 monomials over `x1..x14` and getting the same set back. Cross-engine agreement
+cannot catch a tokenizer bug — every engine is handed the same bytes, so all of them agree on the
+same wrong ideal — which is why that check is against the input rather than against another tool.
+
+All three, the mapping from msolve's F4 stage names onto Zeebra's, and what of its design is worth
+reimplementing are in `docs/research/msolve-implementation.md`.
 
 ### Solving zero-dimensional systems
 
