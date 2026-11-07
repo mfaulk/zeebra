@@ -59,7 +59,10 @@ use std::fmt::{Display, Formatter};
 
 use crate::{
     grobner::research::{
-        anemoi::{Anemoi, AnemoiError, AnemoiParameters, ANEMOI_64_PRIME},
+        anemoi::{
+            Anemoi, AnemoiError, AnemoiParameters, ANEMOI_17_PRIME, ANEMOI_32_PRIME,
+            ANEMOI_64_PRIME,
+        },
         anemoi_cico::{AnemoiCico, AnemoiModel},
         manifest::Claim,
         poseidon::{CicoInstance, Poseidon, PoseidonError, PoseidonParameters, KOALABEAR_PRIME},
@@ -1349,45 +1352,192 @@ const SIX_WORLDS_HARDWARE: &str = "Intel Xeon E5-2630 v3 @ 2.40 GHz, 378 GB, Deb
 /// The software every Six Worlds figure was measured with.
 const SIX_WORLDS_SOFTWARE: &str = "Magma V2.26-2";
 
-/// The published Gröbner-basis and FGLM times for one registered Anemoi row.
+/// The published Gröbner-basis and FGLM times at `p = 2^64 - 353`, `N = 1..6`.
 ///
 /// Returns both steps, in that order, because the whole reason this family was chosen is that the
 /// two are 2 400x apart at `N = 5` — a single combined figure would hide the finding.
 ///
 /// `N = 1` and `N = 2` are recorded as below the log's resolution rather than as zero: the logs
 /// print `0.000` for both steps there, which is a statement about the timer and not about the work.
-static SIX_WORLDS_POINTS: [[ReferencePoint; 2]; 10] = [
-    six_worlds_row("N = 1, FCICO", BELOW_RESOLUTION, BELOW_RESOLUTION),
-    six_worlds_row("N = 1, PCICO", BELOW_RESOLUTION, BELOW_RESOLUTION),
-    six_worlds_row("N = 2, FCICO", BELOW_RESOLUTION, BELOW_RESOLUTION),
-    six_worlds_row("N = 2, PCICO", BELOW_RESOLUTION, BELOW_RESOLUTION),
-    six_worlds_row("N = 3, FCICO", "0.017 s", "0.199 s"),
-    six_worlds_row("N = 3, PCICO", "0.010 s", "0.320 s"),
-    six_worlds_row("N = 4, FCICO", "0.280 s", "67.760 s"),
-    six_worlds_row("N = 4, PCICO", "0.199 s", "56.439 s"),
-    six_worlds_row("N = 5, FCICO", "9.320 s", "22057.080 s"),
-    six_worlds_row("N = 5, PCICO", "5.700 s", "15569.549 s"),
+///
+/// The `N = 1..5` figures are the paper's own table; `N = 6` is read from the log, where the basis
+/// step is published and the conversion step is not. [`NOT_REPORTED`] is why that distinction
+/// survives into the registry.
+static ANEMOI_64_POINTS: [[ReferencePoint; 2]; 6] = [
+    six_worlds_row(
+        ANEMOI_64_SOURCE,
+        "N = 1, FCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_64_SOURCE,
+        "N = 1, PCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_64_SOURCE,
+        "N = 2, FCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_64_SOURCE,
+        "N = 2, PCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 3, FCICO", "0.017 s", "0.199 s"),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 3, PCICO", "0.010 s", "0.320 s"),
+];
+
+/// The second half of [`ANEMOI_64_POINTS`], split only because a `const fn` array initializer of
+/// twelve rows exceeds what one `static` reads comfortably.
+static ANEMOI_64_POINTS_HIGH: [[ReferencePoint; 2]; 6] = [
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 4, FCICO", "0.280 s", "67.760 s"),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 4, PCICO", "0.199 s", "56.439 s"),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 5, FCICO", "9.320 s", "22057.080 s"),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 5, PCICO", "5.700 s", "15569.549 s"),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 6, FCICO", "132.520 s", NOT_REPORTED),
+    six_worlds_row(ANEMOI_64_SOURCE, "N = 6, PCICO", "372.200 s", NOT_REPORTED),
+];
+
+/// The published figures at `p = 2^32 - 209`, `N = 1..6`.
+///
+/// The sweep stops after the basis step at `N = 5`, so four rows of this table are
+/// [`NOT_REPORTED`] on the conversion. That is the point of the row rather than a defect in it: the
+/// `N = 4` conversion here, 63.2 s, is within 7% of the 67.8 s at `2^64 - 353` and 39x the 1.6 s at
+/// `65537` — which is where the published gap actually comes from.
+static ANEMOI_32_POINTS: [[ReferencePoint; 2]; 6] = [
+    six_worlds_row(
+        ANEMOI_32_SOURCE,
+        "N = 1, FCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_32_SOURCE,
+        "N = 1, PCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_32_SOURCE,
+        "N = 2, FCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_32_SOURCE,
+        "N = 2, PCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 3, FCICO", "0.019 s", "0.390 s"),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 3, PCICO", "0.009 s", "0.300 s"),
+];
+
+/// The second half of [`ANEMOI_32_POINTS`].
+static ANEMOI_32_POINTS_HIGH: [[ReferencePoint; 2]; 6] = [
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 4, FCICO", "0.439 s", "63.229 s"),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 4, PCICO", "0.159 s", "50.279 s"),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 5, FCICO", "6.049 s", NOT_REPORTED),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 5, PCICO", "3.579 s", NOT_REPORTED),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 6, FCICO", NOT_REPORTED, NOT_REPORTED),
+    six_worlds_row(ANEMOI_32_SOURCE, "N = 6, PCICO", NOT_REPORTED, NOT_REPORTED),
+];
+
+/// The published figures at `p = 65537`, `N = 1..6`.
+///
+/// The only prime of the sweep whose logs carry an `N = 6` conversion figure, in **both** models —
+/// 23 340 s and 11 775 s, at the quotient dimension `5^6 = 15 625` the logs also print. That makes
+/// `N = 6` a reproduction target here and a produced figure at the other two primes; see
+/// `docs/research/anemoi.md` section 8a.3.
+static ANEMOI_17_POINTS: [[ReferencePoint; 2]; 6] = [
+    six_worlds_row(
+        ANEMOI_17_SOURCE,
+        "N = 1, FCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_17_SOURCE,
+        "N = 1, PCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_17_SOURCE,
+        "N = 2, FCICO",
+        "0.003 s",
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(
+        ANEMOI_17_SOURCE,
+        "N = 2, PCICO",
+        BELOW_RESOLUTION,
+        BELOW_RESOLUTION,
+    ),
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 3, FCICO", "0.007 s", "0.060 s"),
+    six_worlds_row(
+        ANEMOI_17_SOURCE,
+        "N = 3, PCICO",
+        BELOW_RESOLUTION,
+        "0.050 s",
+    ),
+];
+
+/// The second half of [`ANEMOI_17_POINTS`].
+static ANEMOI_17_POINTS_HIGH: [[ReferencePoint; 2]; 6] = [
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 4, FCICO", "0.049 s", "1.620 s"),
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 4, PCICO", "0.020 s", "1.420 s"),
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 5, FCICO", "1.089 s", "135.640 s"),
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 5, PCICO", "0.129 s", "75.750 s"),
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 6, FCICO", "45.930 s", "23340.220 s"),
+    six_worlds_row(ANEMOI_17_SOURCE, "N = 6, PCICO", "1.560 s", "11775.430 s"),
 ];
 
 /// What the logs print at `N = 1` and `N = 2`, which is a statement about the timer.
 const BELOW_RESOLUTION: &str = "0.000 s, below the log's resolution";
+
+/// What the registry records where the sweep ran the basis step and stopped.
+///
+/// Distinct from an empty `reference_points` list, which says "this registry has not looked". A row
+/// carrying this has been looked at and the reference does not have the figure, so a measurement
+/// against it is a **produced** number rather than a reproduced one — and
+/// [`ReferencePoint::reported_time`] being prose rather than a quantity is what stops a comparison
+/// tool from parsing it as a time. [`BELOW_RESOLUTION`] is the existing precedent for that.
+const NOT_REPORTED: &str = "not reported; the sweep ran this round's basis step and stopped";
+
+/// The results file at `p = 2^64 - 353`.
+const ANEMOI_64_SOURCE: &str =
+    "Six Worlds, results/anemoi_p18446744073709551263_n1_l1_a3_m<MODEL>_o1.txt";
+
+/// The results file at `p = 2^32 - 209`.
+const ANEMOI_32_SOURCE: &str = "Six Worlds, results/anemoi_p4294967087_n1_l1_a3_m<MODEL>_o1.txt";
+
+/// The results file at `p = 65537`.
+const ANEMOI_17_SOURCE: &str = "Six Worlds, results/anemoi_p65537_n1_l1_a3_m<MODEL>_o1.txt";
 
 /// One row's two figures, in the order the solve takes them.
 ///
 /// Both steps, never one combined figure: the whole reason this family was chosen is that they are
 /// 2 400x apart at `N = 5`, and a single number would hide the finding.
 const fn six_worlds_row(
+    source: &'static str,
     parameters: &'static str,
     basis: &'static str,
     conversion: &'static str,
 ) -> [ReferencePoint; 2] {
     const fn point(
+        source: &'static str,
         parameters: &'static str,
         step: &'static str,
         reported_time: &'static str,
     ) -> ReferencePoint {
         ReferencePoint {
-            source: "Six Worlds, results/anemoi_p18446744073709551263_n1_l1_a3_m<MODEL>_o1.txt",
+            source,
             parameters,
             step,
             reported_time,
@@ -1398,24 +1548,37 @@ const fn six_worlds_row(
         }
     }
     [
-        point(parameters, "Groebner basis (Magma F4)", basis),
-        point(parameters, "FGLM order change", conversion),
+        point(source, parameters, "Groebner basis (Magma F4)", basis),
+        point(source, parameters, "FGLM order change", conversion),
     ]
 }
 
 /// The published Groebner-basis and FGLM times for one registered Anemoi row.
 ///
-/// Empty past `N = 5`: the logs continue to `N = 8` for `FCICO` and `N = 7` for `PCICO` on the
-/// basis step alone, and the registry stops at the last row with a published FGLM figure.
-fn six_worlds_points(rounds: usize, model: AnemoiModel) -> &'static [ReferencePoint] {
-    if rounds == 0 || rounds > 5 {
+/// Empty for a prime the sweep covers but this registry does not register, and for `N > 6`: the
+/// logs continue to `N = 8` on the basis step alone. Inside `N = 1..6` the figure is always
+/// present, and a step the sweep did not run is [`NOT_REPORTED`] rather than missing — the
+/// distinction between "not published" and "not looked for" is the whole reason #286 exists.
+fn six_worlds_points(prime: u64, rounds: usize, model: AnemoiModel) -> &'static [ReferencePoint] {
+    if rounds == 0 || rounds > 6 {
         return &[];
     }
+    let (low, high) = match prime {
+        ANEMOI_64_PRIME => (&ANEMOI_64_POINTS, &ANEMOI_64_POINTS_HIGH),
+        ANEMOI_32_PRIME => (&ANEMOI_32_POINTS, &ANEMOI_32_POINTS_HIGH),
+        ANEMOI_17_PRIME => (&ANEMOI_17_POINTS, &ANEMOI_17_POINTS_HIGH),
+        _ => return &[],
+    };
     let column = match model {
         AnemoiModel::Fcico => 0,
         AnemoiModel::Pcico => 1,
     };
-    &SIX_WORLDS_POINTS[2 * (rounds - 1) + column]
+    let index = 2 * (rounds - 1) + column;
+    if index < low.len() {
+        &low[index]
+    } else {
+        &high[index - low.len()]
+    }
 }
 
 /// The published quotient dimension for `α = 3` at `N` rounds: `(α + 2)^N`, as measured.
@@ -1693,37 +1856,48 @@ pub fn registry() -> Vec<ChallengeManifest> {
         });
     }
 
-    // The Six Worlds Anemoi ladder: N = 1..5 at alpha = 3, l = 1, p = 2^64 - 353, both models.
-    // Frozen before anything is run, like the Poseidon ladder above it.
-    for rounds in 1..=5 {
-        for model in [AnemoiModel::Fcico, AnemoiModel::Pcico] {
-            challenges.push(ChallengeManifest {
-                id: anemoi_id(rounds, model),
-                schema: ChallengeManifest::SCHEMA,
-                // Official rather than FaithfulReduction: see the module docs.
-                class: BenchmarkClass::Official,
-                parameters: ChallengeParameters::AnemoiCico {
-                    prime: ANEMOI_64_PRIME,
-                    alpha: 3,
-                    l: 1,
-                    rounds,
-                    model,
-                },
-                objective: Objective::CicoExact,
-                program: SIX_WORLDS,
-                external: ExternalStatus::PublishedWithAnswer,
-                method: default_method(ExternalStatus::PublishedWithAnswer),
-                reference_points: six_worlds_points(rounds, model),
-                verifier: ANEMOI_VERIFIER,
-                notes: "Anemoi(0, y) = (0, *) over 2^64 - 353 with alpha = 3 and l = 1, at the \
-                        round count the Six Worlds experiments ran. The round constants are \
-                        derived from the digits of pi and depend on g, the smallest primitive \
-                        root, which the specification does not fix; \
-                        ChallengeManifest::anemoi_derived_digest pins them. A result here \
-                        reproduces a published measurement on a reduced-round primitive and says \
-                        nothing about full-round Anemoi, which is 21 rounds at 128-bit security \
-                        and is not registered anywhere.",
-            });
+    // The Six Worlds Anemoi ladder: N = 1..6 at alpha = 3, l = 1, both models, at the three prime
+    // fields the sweep covers that fit a u64. Frozen before anything is run, like the Poseidon
+    // ladder above it.
+    //
+    // N = 6 is the rung the ladder originally stopped short of, and the three primes do not agree
+    // on what it is. At 2^64 - 353 and 2^32 - 209 the sweep publishes a basis figure and no
+    // conversion, so a measurement there is a PRODUCED number: there is nothing to reproduce and
+    // no comparable modern Magma run exists on this machine. At 65537 the logs publish both steps
+    // -- 45.93 s and 23 340.22 s for FCICO, 1.56 s and 11 775.43 s for PCICO -- at the quotient
+    // dimension 5^6 = 15 625 they also print, so that row is a reproduction target. Registering
+    // all six at once keeps the distinction in the data rather than in a reader's memory.
+    //
+    // Three characteristics because that is the experiment #283 needs. The published conversion
+    // cost at N = 4 is 1.6 s at 65537, 63.2 s at 2^32 - 209 and 67.8 s at 2^64 - 353, and Magma's
+    // own logs name the mechanism: `Matrix kind: Modular FP` at the first prime and
+    // `Generic finite field` at the other two. Zeebra's `PrimeFieldElement64<P>` is one Montgomery
+    // path at all three, so the within-implementation ratio is comparable down the column and the
+    // reference's is not.
+    for prime in [ANEMOI_64_PRIME, ANEMOI_32_PRIME, ANEMOI_17_PRIME] {
+        for rounds in 1..=6 {
+            for model in [AnemoiModel::Fcico, AnemoiModel::Pcico] {
+                challenges.push(ChallengeManifest {
+                    id: anemoi_id(prime, rounds, model),
+                    schema: ChallengeManifest::SCHEMA,
+                    // Official rather than FaithfulReduction: see the module docs.
+                    class: BenchmarkClass::Official,
+                    parameters: ChallengeParameters::AnemoiCico {
+                        prime,
+                        alpha: 3,
+                        l: 1,
+                        rounds,
+                        model,
+                    },
+                    objective: Objective::CicoExact,
+                    program: SIX_WORLDS,
+                    external: ExternalStatus::PublishedWithAnswer,
+                    method: default_method(ExternalStatus::PublishedWithAnswer),
+                    reference_points: six_worlds_points(prime, rounds, model),
+                    verifier: ANEMOI_VERIFIER,
+                    notes: anemoi_notes(prime),
+                });
+            }
         }
     }
 
@@ -1832,20 +2006,86 @@ fn ladder_id(r_f: usize, r_p: usize) -> &'static str {
     }
 }
 
+/// What an Anemoi row at this prime is, and what a result on it does and does not say.
+///
+/// Per prime rather than one string because the characteristic is the only thing that differs
+/// between the three ladders, and because the two smaller primes exist for a stated purpose — #283
+/// — that a reader of the row should not have to reconstruct.
+fn anemoi_notes(prime: u64) -> &'static str {
+    match prime {
+        ANEMOI_64_PRIME => {
+            "Anemoi(0, y) = (0, *) over 2^64 - 353 with alpha = 3 and l = 1, at the round count \
+             the Six Worlds experiments ran. The round constants are derived from the digits of pi \
+             and depend on g, the smallest primitive root, which the specification does not fix; \
+             ChallengeManifest::anemoi_derived_digest pins them. A result here reproduces a \
+             published measurement on a reduced-round primitive and says nothing about full-round \
+             Anemoi, which is 21 rounds at 128-bit security and is not registered anywhere."
+        }
+        ANEMOI_32_PRIME => {
+            "The same system over 2^32 - 209, the sweep's 32-bit prime. Registered for #283, to \
+             separate field arithmetic from conversion algorithmics: the reference's published \
+             conversion cost here is within 7% of its cost at 2^64 - 353 while its basis step is \
+             comparable, so a within-implementation ratio that moves between these two primes is \
+             about arithmetic and not about N. The sweep stops after the basis step at N = 5, so \
+             N = 6 here has no published figure for either step. As at 2^64 - 353, a result here \
+             says nothing about full-round Anemoi."
+        }
+        ANEMOI_17_PRIME => {
+            "The same system over 65537, the smallest prime of the sweep and the control for #283. \
+             Magma takes its Modular FP matrix path here and its generic finite-field path at the \
+             two larger primes, which is the reference-side mechanism the published gap has to be \
+             read against. This is also the only prime whose logs publish an N = 6 conversion \
+             figure in both models. As at 2^64 - 353, a result here says nothing about full-round \
+             Anemoi."
+        }
+        _ => unreachable!("three primes are registered"),
+    }
+}
+
 /// An Anemoi row's id. `&'static str` because an id is part of a frozen registry, not a format.
-fn anemoi_id(rounds: usize, model: AnemoiModel) -> &'static str {
-    match (rounds, model) {
-        (1, AnemoiModel::Fcico) => "anemoi64-cico-n1-fcico",
-        (1, AnemoiModel::Pcico) => "anemoi64-cico-n1-pcico",
-        (2, AnemoiModel::Fcico) => "anemoi64-cico-n2-fcico",
-        (2, AnemoiModel::Pcico) => "anemoi64-cico-n2-pcico",
-        (3, AnemoiModel::Fcico) => "anemoi64-cico-n3-fcico",
-        (3, AnemoiModel::Pcico) => "anemoi64-cico-n3-pcico",
-        (4, AnemoiModel::Fcico) => "anemoi64-cico-n4-fcico",
-        (4, AnemoiModel::Pcico) => "anemoi64-cico-n4-pcico",
-        (5, AnemoiModel::Fcico) => "anemoi64-cico-n5-fcico",
-        (5, AnemoiModel::Pcico) => "anemoi64-cico-n5-pcico",
-        _ => unreachable!("the ladder is N = 1..5 in both models"),
+///
+/// The leading number is the prime's bit width, as `poseidon31` and `poseidon256` already use it.
+/// The `anemoi64` ids predate the other two characteristics and are kept byte-identical, so #283's
+/// additions are additions in `test_the_registry_is_frozen` rather than redefinitions.
+fn anemoi_id(prime: u64, rounds: usize, model: AnemoiModel) -> &'static str {
+    match (prime, rounds, model) {
+        (ANEMOI_64_PRIME, 1, AnemoiModel::Fcico) => "anemoi64-cico-n1-fcico",
+        (ANEMOI_64_PRIME, 1, AnemoiModel::Pcico) => "anemoi64-cico-n1-pcico",
+        (ANEMOI_64_PRIME, 2, AnemoiModel::Fcico) => "anemoi64-cico-n2-fcico",
+        (ANEMOI_64_PRIME, 2, AnemoiModel::Pcico) => "anemoi64-cico-n2-pcico",
+        (ANEMOI_64_PRIME, 3, AnemoiModel::Fcico) => "anemoi64-cico-n3-fcico",
+        (ANEMOI_64_PRIME, 3, AnemoiModel::Pcico) => "anemoi64-cico-n3-pcico",
+        (ANEMOI_64_PRIME, 4, AnemoiModel::Fcico) => "anemoi64-cico-n4-fcico",
+        (ANEMOI_64_PRIME, 4, AnemoiModel::Pcico) => "anemoi64-cico-n4-pcico",
+        (ANEMOI_64_PRIME, 5, AnemoiModel::Fcico) => "anemoi64-cico-n5-fcico",
+        (ANEMOI_64_PRIME, 5, AnemoiModel::Pcico) => "anemoi64-cico-n5-pcico",
+        (ANEMOI_64_PRIME, 6, AnemoiModel::Fcico) => "anemoi64-cico-n6-fcico",
+        (ANEMOI_64_PRIME, 6, AnemoiModel::Pcico) => "anemoi64-cico-n6-pcico",
+        (ANEMOI_32_PRIME, 1, AnemoiModel::Fcico) => "anemoi32-cico-n1-fcico",
+        (ANEMOI_32_PRIME, 1, AnemoiModel::Pcico) => "anemoi32-cico-n1-pcico",
+        (ANEMOI_32_PRIME, 2, AnemoiModel::Fcico) => "anemoi32-cico-n2-fcico",
+        (ANEMOI_32_PRIME, 2, AnemoiModel::Pcico) => "anemoi32-cico-n2-pcico",
+        (ANEMOI_32_PRIME, 3, AnemoiModel::Fcico) => "anemoi32-cico-n3-fcico",
+        (ANEMOI_32_PRIME, 3, AnemoiModel::Pcico) => "anemoi32-cico-n3-pcico",
+        (ANEMOI_32_PRIME, 4, AnemoiModel::Fcico) => "anemoi32-cico-n4-fcico",
+        (ANEMOI_32_PRIME, 4, AnemoiModel::Pcico) => "anemoi32-cico-n4-pcico",
+        (ANEMOI_32_PRIME, 5, AnemoiModel::Fcico) => "anemoi32-cico-n5-fcico",
+        (ANEMOI_32_PRIME, 5, AnemoiModel::Pcico) => "anemoi32-cico-n5-pcico",
+        (ANEMOI_32_PRIME, 6, AnemoiModel::Fcico) => "anemoi32-cico-n6-fcico",
+        (ANEMOI_32_PRIME, 6, AnemoiModel::Pcico) => "anemoi32-cico-n6-pcico",
+        (ANEMOI_17_PRIME, 1, AnemoiModel::Fcico) => "anemoi17-cico-n1-fcico",
+        (ANEMOI_17_PRIME, 1, AnemoiModel::Pcico) => "anemoi17-cico-n1-pcico",
+        (ANEMOI_17_PRIME, 2, AnemoiModel::Fcico) => "anemoi17-cico-n2-fcico",
+        (ANEMOI_17_PRIME, 2, AnemoiModel::Pcico) => "anemoi17-cico-n2-pcico",
+        (ANEMOI_17_PRIME, 3, AnemoiModel::Fcico) => "anemoi17-cico-n3-fcico",
+        (ANEMOI_17_PRIME, 3, AnemoiModel::Pcico) => "anemoi17-cico-n3-pcico",
+        (ANEMOI_17_PRIME, 4, AnemoiModel::Fcico) => "anemoi17-cico-n4-fcico",
+        (ANEMOI_17_PRIME, 4, AnemoiModel::Pcico) => "anemoi17-cico-n4-pcico",
+        (ANEMOI_17_PRIME, 5, AnemoiModel::Fcico) => "anemoi17-cico-n5-fcico",
+        (ANEMOI_17_PRIME, 5, AnemoiModel::Pcico) => "anemoi17-cico-n5-pcico",
+        (ANEMOI_17_PRIME, 6, AnemoiModel::Fcico) => "anemoi17-cico-n6-fcico",
+        (ANEMOI_17_PRIME, 6, AnemoiModel::Pcico) => "anemoi17-cico-n6-pcico",
+        _ => unreachable!("the ladder is N = 1..6 in both models at three primes"),
     }
 }
 
@@ -1870,13 +2110,20 @@ mod tests {
             anemoi_cico::{dispatch_anemoi_cico, verify_against_anemoi_trace, AnemoiCicoVisitor},
             verify_against_trace, KOALABEAR_PRIME,
         },
-        FiniteField, MultivariatePolynomial,
+        FiniteField, KnownOrder, MultivariatePolynomial,
     };
 
     type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 
-    /// `2^64 - 353`, the field every registered Anemoi row is over.
+    /// `2^64 - 353`, the field the published Anemoi ladder is over.
     type A = Zp18446744073709551263;
+
+    /// `2^32 - 209`. No alias in `fields`: `PrimeFieldElement64` is const-generic, so a prime of
+    /// this width needs no new code and the ladder at a third characteristic needs no new field.
+    type A32 = PrimeFieldElement64<{ super::ANEMOI_32_PRIME }>;
+
+    /// `65537`, the control characteristic for #283.
+    type A17 = PrimeFieldElement64<{ super::ANEMOI_17_PRIME }>;
 
     /// The disclosed method reaches the JSON record with `attributed_to_submission` as a boolean.
     ///
@@ -2068,6 +2315,34 @@ mod tests {
             ("anemoi64-cico-n4-pcico", "b61cd0a62722"),
             ("anemoi64-cico-n5-fcico", "a56639921520"),
             ("anemoi64-cico-n5-pcico", "d285b0cf43aa"),
+            ("anemoi64-cico-n6-fcico", "981fd5554d29"),
+            ("anemoi64-cico-n6-pcico", "251e04c1ff09"),
+            // #283's two added characteristics. Appended after the 2^64 - 353 ladder so the
+            // frozen prefix above keeps both its order and its digests.
+            ("anemoi32-cico-n1-fcico", "d80be905379a"),
+            ("anemoi32-cico-n1-pcico", "29d5929e63ef"),
+            ("anemoi32-cico-n2-fcico", "83b9ba3e22d1"),
+            ("anemoi32-cico-n2-pcico", "c2270ee63ae0"),
+            ("anemoi32-cico-n3-fcico", "89380648f042"),
+            ("anemoi32-cico-n3-pcico", "1f4b9bc83e29"),
+            ("anemoi32-cico-n4-fcico", "2fa7c1697b07"),
+            ("anemoi32-cico-n4-pcico", "3b63b01e4100"),
+            ("anemoi32-cico-n5-fcico", "4d27b32c7ab0"),
+            ("anemoi32-cico-n5-pcico", "98887225a4ed"),
+            ("anemoi32-cico-n6-fcico", "b84a0c55fcb7"),
+            ("anemoi32-cico-n6-pcico", "afce463aadb0"),
+            ("anemoi17-cico-n1-fcico", "99d6301147c1"),
+            ("anemoi17-cico-n1-pcico", "e1d49467499d"),
+            ("anemoi17-cico-n2-fcico", "25033fe92545"),
+            ("anemoi17-cico-n2-pcico", "a141ec7980da"),
+            ("anemoi17-cico-n3-fcico", "4a68dbe1e5ca"),
+            ("anemoi17-cico-n3-pcico", "6001cba36737"),
+            ("anemoi17-cico-n4-fcico", "518762ead134"),
+            ("anemoi17-cico-n4-pcico", "5a8388253ebf"),
+            ("anemoi17-cico-n5-fcico", "f7cf58903c69"),
+            ("anemoi17-cico-n5-pcico", "204e51b602ae"),
+            ("anemoi17-cico-n6-fcico", "db25820df213"),
+            ("anemoi17-cico-n6-pcico", "35142599ae39"),
             ("fukuoka-mq-III-n10-seed0", "ae24edf8efc8"),
             ("fukuoka-mq-III-n15-seed0", "0552d3b51070"),
             ("fukuoka-mq-III-n20-seed0", "434135c809f6"),
@@ -2574,7 +2849,7 @@ mod tests {
             .into_iter()
             .filter(|c| c.parameters.family() == "anemoi-cico")
             .collect();
-        assert_eq!(rows.len(), 10, "N = 1..5 in both models");
+        assert_eq!(rows.len(), 36, "N = 1..6 in both models at three primes");
 
         for row in &rows {
             assert_eq!(row.reference_points.len(), 2, "{}", row.id);
@@ -2593,25 +2868,47 @@ mod tests {
         let wall = challenge("anemoi64-cico-n5-fcico").expect("registered");
         assert_eq!(wall.reference_points[0].reported_time, "9.320 s");
         assert_eq!(wall.reference_points[1].reported_time, "22057.080 s");
+
+        // And the row that says what that 22 057 s is: the same system, the same machine, the same
+        // Magma, one round count, 17 bits of characteristic instead of 64 — 135.6 s. Within the
+        // reference the conversion step is 163x cheaper at the small prime while its basis step is
+        // only 8.6x cheaper, which is what #283's attribution rests on.
+        let control = challenge("anemoi17-cico-n5-fcico").expect("registered");
+        assert_eq!(control.reference_points[0].reported_time, "1.089 s");
+        assert_eq!(control.reference_points[1].reported_time, "135.640 s");
+
+        // A step the sweep did not run is prose rather than a quantity, so a tool that parses
+        // reported_time as a time cannot read it as zero.
+        let stopped = challenge("anemoi32-cico-n5-pcico").expect("registered");
+        assert_eq!(stopped.reference_points[0].reported_time, "3.579 s");
+        assert_eq!(
+            stopped.reference_points[1].reported_time,
+            super::NOT_REPORTED
+        );
+        assert!(stopped.reference_points[1]
+            .reported_time
+            .parse::<f64>()
+            .is_err());
     }
 
     /// Every Anemoi row builds, has the published size, and both models vanish at a trace.
+    ///
+    /// Over the field each row's own parameters name, which since #283 is three different types.
+    /// `anemoi_cico_instance` refuses a mismatch, so a row checked against the wrong field would
+    /// not be checked weakly — it would not build at all.
     #[test]
     fn test_every_anemoi_row_builds_and_is_faithful() {
-        struct Faithful<'a>(&'a AnemoiCico<A>, A);
-        impl AnemoiCicoVisitor<A> for Faithful<'_> {
+        struct Faithful<'a, F: KnownOrder>(&'a AnemoiCico<F>, F);
+        impl<F: KnownOrder> AnemoiCicoVisitor<F> for Faithful<'_, F> {
             type Output = Vec<usize>;
-            fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, A>]) -> Vec<usize> {
+            fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> Vec<usize> {
                 verify_against_anemoi_trace(self.0, system, self.1)
             }
         }
 
-        for manifest in registry() {
-            if manifest.parameters.family() != "anemoi-cico" {
-                continue;
-            }
+        fn check<F: KnownOrder>(manifest: &ChallengeManifest) {
             let instance = manifest
-                .anemoi_cico_instance::<A>()
+                .anemoi_cico_instance::<F>()
                 .unwrap_or_else(|e| panic!("{} should build: {}", manifest.id, e));
             assert_eq!(
                 instance.variables(),
@@ -2627,7 +2924,7 @@ mod tests {
             );
 
             let rounds = manifest.anemoi_parameters().expect("an Anemoi row").rounds;
-            let failures = dispatch_anemoi_cico::<A, _>(&instance, Faithful(&instance, A::new(31)))
+            let failures = dispatch_anemoi_cico::<F, _>(&instance, Faithful(&instance, F::new(31)))
                 .expect("a compiled dimension");
             // Both models express the output CICO condition in generators that an arbitrary input
             // does not satisfy, and only those: FCICO folds it into its last round's two
@@ -2638,6 +2935,21 @@ mod tests {
             };
             assert_eq!(failures, expected, "{}", manifest.id);
         }
+
+        let mut seen = 0;
+        for manifest in registry() {
+            let Some(parameters) = manifest.anemoi_parameters() else {
+                continue;
+            };
+            match parameters.prime {
+                super::ANEMOI_64_PRIME => check::<A>(&manifest),
+                super::ANEMOI_32_PRIME => check::<A32>(&manifest),
+                super::ANEMOI_17_PRIME => check::<A17>(&manifest),
+                prime => panic!("{} is over an unhandled prime {prime}", manifest.id),
+            }
+            seen += 1;
+        }
+        assert_eq!(seen, 36, "every registered Anemoi row was checked");
     }
 
     /// An Anemoi row is refused by the Poseidon dispatcher, and told apart from a non-CICO row.

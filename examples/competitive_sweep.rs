@@ -3,6 +3,8 @@
 //! ```text
 //! cargo run --release --example competitive_sweep                    # every rung, exploratory
 //! cargo run --release --example competitive_sweep -- --list          # what would run
+//! cargo run --release --example competitive_sweep -- \
+//!     --engines zeebra,singular --write                              # populate the board in parts
 //! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
 //!     --row katsura-6 --task reduced-grobner-basis --measure --write
 //! ```
@@ -31,8 +33,8 @@ use std::{fs, path::Path, time::Duration};
 use zeebra::grobner::{
     external::{
         corpus::{instance, ladder},
-        CompetitiveBoard, CompetitiveRecord, ExternalSolver, Instance, Limits, SingularSolver,
-        Task, ZeebraSolver,
+        CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance, Limits,
+        MsolveSolver, SagebrushSolver, SingularSolver, Task, ZeebraSolver,
     },
     research::{Environment, Json},
     F4Options,
@@ -82,6 +84,10 @@ fn main() {
     let measure = flag("--measure");
     let only_row = value("--row");
     let only_task = value("--task");
+    // Which engines to run, so a board can be populated incrementally. An empty board is worse
+    // than a two-library board, and a ten-minute lock hold is cheaper than a forty-minute one.
+    let only_engines: Option<Vec<String>> =
+        value("--engines").map(|list| list.split(',').map(|e| e.trim().to_string()).collect());
     let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(600));
 
     let rows: Vec<String> = match &only_row {
@@ -170,7 +176,15 @@ fn main() {
                 );
                 continue;
             }
-            run_one(&mut board, &built, *task, &limits, &environment, measure);
+            run_one(
+                &mut board,
+                &built,
+                *task,
+                &limits,
+                &environment,
+                measure,
+                only_engines.as_deref(),
+            );
         }
     }
 
@@ -200,6 +214,7 @@ fn main() {
 ///
 /// Engines are constructed per row so that a measured run's scratch state cannot leak between
 /// rows, and so an absent binary is reported once per row rather than aborting the sweep.
+#[allow(clippy::too_many_arguments)]
 fn run_one(
     board: &mut CompetitiveBoard,
     built: &Instance,
@@ -207,41 +222,86 @@ fn run_one(
     limits: &Limits,
     environment: &Environment,
     measure: bool,
+    only: Option<&[String]>,
 ) {
+    let wanted = |engine: &str| only.is_none_or(|list| list.iter().any(|e| e == engine));
+
     // Zeebra, with the wall limit pushed into F4's own cooperative budget so that a stop
     // *returns* and carries its statistics, rather than being abandoned.
-    let mut zeebra = ZeebraSolver::new().with_f4_options(F4Options {
-        max_wall_time: Some(limits.wall),
-        ..F4Options::default()
-    });
-    if measure {
-        zeebra = zeebra.measuring_one_row();
+    if wanted("zeebra") {
+        let mut zeebra = ZeebraSolver::new().with_f4_options(F4Options {
+            max_wall_time: Some(limits.wall),
+            ..F4Options::default()
+        });
+        if measure {
+            zeebra = zeebra.measuring_one_row();
+        }
+        let report = zeebra.run(built, task, limits);
+        board.add(CompetitiveRecord::of(&report, built, environment));
     }
-    let report = zeebra.run(built, task, limits);
-    board.add(CompetitiveRecord::of(&report, built, environment));
 
-    // Singular. The scratch directory is per process and per row, which is what keeps two
-    // concurrent sweeps from handing one filename to two processes.
+    // The four external engines. The scratch directory is per process and per row, which is what
+    // keeps two concurrent sweeps from handing one filename to two processes.
+    //
+    // Every engine is probed once per row rather than once per sweep. That costs a process per
+    // row and buys a version string on **every** record, including the rows of a sweep that was
+    // interrupted — and a figure without a version is not reproducible.
     let scratch = std::env::temp_dir().join(format!(
         "zeebra-competitive-{}-{}",
         std::process::id(),
         built.name.replace('/', "-")
     ));
-    match SingularSolver::with_binary("Singular", &scratch, limits.wall) {
-        Ok(mut singular) => {
-            // Probed once per row rather than once per sweep, which costs a process per row and
-            // buys a version string on every record even when the sweep is interrupted.
-            let _ = singular.probe_version();
-            let report = singular.run(built, task, limits);
-            board.add(CompetitiveRecord::of(&report, built, environment));
-        }
-        Err(failure) => eprintln!("- Singular unavailable: {}", failure),
-    }
-    let _ = fs::remove_dir_all(&scratch);
 
-    // msolve, Groebner.jl and Sagebrush plug in here through the same three lines as Singular
-    // once their adapters land (#259, #260). Nothing else in this file changes: that is what the
-    // contract was frozen for.
+    if wanted("singular") {
+        match SingularSolver::with_binary("Singular", scratch.join("singular"), limits.wall) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => eprintln!("- Singular unavailable: {}", failure),
+        }
+    }
+
+    if wanted("msolve") {
+        let mut msolve = MsolveSolver::new(
+            std::env::var("ZEEBRA_MSOLVE").unwrap_or_else(|_| "msolve".to_string()),
+            scratch.join("msolve"),
+        );
+        drive(board, &mut msolve, built, task, limits, environment);
+    }
+
+    if wanted("groebner.jl") {
+        match GroebnerJlSolver::from_env(scratch.join("groebner-jl")) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => eprintln!("- Groebner.jl unavailable: {}", failure),
+        }
+    }
+
+    if wanted("sagebrush") {
+        match SagebrushSolver::from_env(scratch.join("sagebrush")) {
+            Ok(mut solver) => drive(board, &mut solver, built, task, limits, environment),
+            Err(failure) => eprintln!("- Sagebrush unavailable: {}", failure),
+        }
+    }
+
+    let _ = fs::remove_dir_all(&scratch);
+}
+
+/// Probe one engine, run it, and record whatever came back.
+///
+/// Every outcome is recorded, including the ones with no answer: a board that kept only its
+/// successes would report each engine's best cases as its behaviour. **Sagebrush is recorded but
+/// must never be a speedup denominator** — five weeks old, nothing versioned, six F4 tests, and no
+/// oracle in its own repository exercising the elimination. That is a maturity judgement and it is
+/// enforced by the report rather than here, since the row itself is worth having.
+fn drive(
+    board: &mut CompetitiveBoard,
+    solver: &mut dyn ExternalSolver,
+    built: &Instance,
+    task: Task,
+    limits: &Limits,
+    environment: &Environment,
+) {
+    let _ = solver.probe_version();
+    let report = solver.run(built, task, limits);
+    board.add(CompetitiveRecord::of(&report, built, environment));
 }
 
 /// One line describing a row's outcome, with the figure or the reason there is none.

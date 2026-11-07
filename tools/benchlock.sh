@@ -32,6 +32,14 @@
 #   * `timeout --signal=INT --kill-after=60s` on anything long, and a budget-killed run reported as
 #     a resource-limited result rather than as a measurement. A run killed while holding the lock
 #     still releases it; one left running past its budget blocks every other agent.
+#   * Never `pgrep -f` to find the binary you are watching. A script created and run through a
+#     heredoc inside `bash -c` has its entire text in the wrapper's `/proc/<pid>/cmdline`, so
+#     `pgrep -f` matches the wrapper on its own payload: it returns `comm=bash` pids for a job that
+#     has not started and does not return the measured binary at all. A monitor reading those pids
+#     reports queued work as running, and an RSS guard reading them sees a ~4 MB high-water mark
+#     and silently never fires. Use `tools/rss-guard.sh`, which matches `comm` and confirms the
+#     identity from cmdline, or capture the pid from `$!` when the launcher and the guard are the
+#     same script.
 #
 # So a real invocation looks like
 #
