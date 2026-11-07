@@ -87,6 +87,9 @@ As the saying goes, you can either make software so simple that it obviously has
       substitutes a polynomial in all `N` variables for each one — so a permutation round can be
       written the way it is defined, with the substituted powers memoized and formed by repeated
       squaring
+- [x] Multivariate GCD by recursive primitive PRS, with content, primitive part, the formal partial
+      derivative and squarefree decomposition on top of it — the GCD's defining property checked by
+      exhaustive enumeration over a small ring rather than against a reference implementation
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -2106,6 +2109,83 @@ against **594 944** for the form that materialized every term, because every mer
 monomial already present and the table never grows — the live set is the output. Folding eight
 scaled words into one accumulator peaks at **43 312 bytes** against **84 448**; there the output
 has to be allocated, so the 2x is all there is to win.
+
+### GCD, content, and squarefree decomposition
+
+`F[x_0, ..., x_{N-1}]` is not Euclidean, so `gcd` is recursive: read both polynomials as univariate
+in their highest occurring variable, over the polynomial ring in the remaining ones. That
+coefficient ring is a UFD and not a field, so the Euclidean step is *pseudo*-division — scale the
+dividend by a power of the divisor's leading coefficient instead of dividing by it — and the
+content comes out of every remainder, which is what keeps those powers from accumulating. The
+classical primitive PRS. The recursion terminates because the coefficients of a polynomial read in
+`x_v` do not involve `x_v`, so each content is a GCD in a strictly smaller ring.
+
+| method | what it gives |
+|---|---|
+| `gcd(&other)` | the GCD, normalized so the lexicographic leading coefficient is one |
+| `content(i)` / `primitive_part(i)` | the GCD of the coefficients in `x_i`, and the quotient by it |
+| `degree_in(i)` / `coefficients_in(i)` | the univariate-in-`x_i` view the recursion is built on |
+| `exact_div(&divisor)` | the quotient, or `None` when the division leaves a remainder |
+| `derivative(i)` | the formal partial derivative |
+| `squarefree_part()` / `squarefree_decomposition()` | the radical, and the factors with multiplicities |
+
+```rust
+use zeebra::{fields::Zp13, MultivariatePolynomial};
+
+let vars = ["x", "y"];
+let parse = |s| MultivariatePolynomial::<2, Zp13>::parse(s, vars).unwrap();
+
+// Two products sharing one factor.
+let shared = parse("x + y");
+let f = &parse("x - y") * &shared;
+let g = &parse("x*y + 1") * &shared;
+assert_eq!(f.gcd(&g), shared);
+
+// Coprime inputs have GCD one, and a nonzero constant is a unit.
+assert!(parse("x + 1").gcd(&parse("y + 1")).is_one());
+
+// Read in y, x*y^2 + x is x*(y^2 + 1): the content is x and the primitive part y^2 + 1.
+let h = parse("x*y^2 + x");
+assert_eq!(h.content(1), parse("x"));
+assert_eq!(h.primitive_part(1), parse("y^2 + 1"));
+
+// (x + 1) * (y + 1)^2, decomposed by multiplicity.
+let repeated = &parse("x + 1") * &(&parse("y + 1") * &parse("y + 1"));
+let mut decomposition = repeated.squarefree_decomposition().unwrap();
+decomposition.sort_by_key(|(_, multiplicity)| *multiplicity);
+assert_eq!(decomposition, vec![(parse("x + 1"), 1), (parse("y + 1"), 2)]);
+```
+
+The squarefree part is `f / gcd(f, ∂f/∂x_0, ..., ∂f/∂x_{N-1})`, which for `f = ∏ g_i^(e_i)` is
+`∏ g_i`. Differentiation multiplies a factor of multiplicity `e` by `e`, and in characteristic `p`
+that is zero whenever `p` divides `e` — so these two **refuse** rather than answer when the
+characteristic does not exceed the total degree:
+
+```rust
+use zeebra::{fields::PrimeFieldElement64, MultivariatePolynomial, SquarefreeError};
+
+type F = PrimeFieldElement64<3>;
+let vars = ["x", "y"];
+let factor = MultivariatePolynomial::<2, F>::parse("x + y", vars).unwrap();
+let cube = &(&factor * &factor) * &factor;
+assert_eq!(
+    cube.squarefree_part(),
+    Err(SquarefreeError::CharacteristicTooSmall { characteristic: 3, degree: 3 })
+);
+```
+
+The GCD's correctness is pinned by an exhaustive check rather than by a reference implementation:
+over a two-variable ring on a three-element field, `multivariate_gcd.rs` enumerates every candidate
+divisor and asserts the defining property — the result divides both inputs, and *every* common
+divisor divides the result. That is the property to test, because a GCD is only unique up to a unit
+and several candidates share the maximal degree.
+
+Faster routes are deliberately not taken here. The subresultant PRS replaces the per-step content
+GCD with one exact division, over a prime field Brown's modular algorithm evaluates down to
+univariate GCDs and lifts, and Yun's algorithm computes the squarefree decomposition in one GCD per
+multiplicity where the repeated-radical form used here costs `N + 1`. No timings are published for
+any of this: the implementation is the one whose coefficient growth is bounded by construction, and
+it has not been measured.
 
 ### Composition
 

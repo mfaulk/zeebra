@@ -45,7 +45,7 @@ pub use poly::{
     is_permutation_polynomial, lagrange_interpolate, lcm, permutation_exponents, pow_mod,
     resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, GraeffeError,
     GraeffeStats, Monomial, MonomialOrder, MultivariatePolynomial, Polynomial, PolynomialParams,
-    PowerPermutation, SubgroupRoute, UnivariatePolynomial,
+    PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
 };
 #[doc(hidden)]
 pub use poly::{
