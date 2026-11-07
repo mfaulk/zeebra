@@ -53,5 +53,5 @@ pub fn buchberger_reference<const N: usize, F: FiniteField>(
     }
 
     // g is now a Grobner basis for I, but not necessarily reduced.
-    reduce_grobner_basis(&g, order)
+    reduce_grobner_basis(g, order)
 }
