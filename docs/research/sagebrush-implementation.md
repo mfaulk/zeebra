@@ -260,6 +260,39 @@ answer or a panic rather than that clean `Err`. That is why
 `sagebrush::MAX_CHARACTERISTIC = 1 << 62` is a constant in the adapter: **it enforces Sagebrush's
 bound on Sagebrush's behalf.** `p = 2^61 - 1` is comfortably inside it and sound.
 
+### 5.1.1 There are two ceilings, not one, and the second is a trap for whoever extends the driver
+
+`MAX_CHARACTERISTIC` is the **basis** bound. `fglm.rs:329` caps the FGLM route at **`p < 2^31`** —
+an eighth of it. That narrower bound is unreachable today because the driver exposes no FGLM, and
+it becomes live the moment #315 lands.
+
+**And it declines softly, which is the part that will bite.** `fglm.rs:329` is
+
+```rust
+if n == 0 || (p > 0 && p >= 1 << 31) {
+    return Ok(None);
+}
+```
+
+`Ok(None)` — not an `Err`. A caller that reads `None` as "there is no lex basis" rather than "I
+declined to compute one" has turned a capability gap into a mathematical claim. The same `None` is
+returned for `n == 0`, so the signal does not even distinguish *why*. Anyone extending the driver
+has to check the characteristic themselves before calling, exactly as the adapter already checks
+the basis bound on Sagebrush's behalf (§5.1).
+
+Declaring only the basis bound then would be worse than a build error. A sweep would accept a
+`LexBasisByConversion` at, say `2^40`, hand it to a route that cannot represent it, and record
+whatever the run did inside its wall limit — a [`LimitStop`] for what is a **capability gap**. A
+limit stop is timing-adjacent: it licenses "> 600 s" in a table. A capability gap licenses nothing.
+Conflating them is the single distinction `contract.rs` exists to maintain.
+
+msolve has the same shape with worse consequences — basis below `2^31`, eliminant below
+`1515531529`, and above the second its sparse-FGLM failure is laundered into the genericity signal
+and reaches a retry loop with no exit (`docs/research/msolve-implementation.md`). **Groebner.jl,
+measured, has no task-specific ceiling at all**: its lex route is the same F4 under a different
+ordering, and it returns the same basis and the same quotient dimension at every prime the basis
+route accepts, up to `2^64 - 59`. One constant is correct for it; two are needed here.
+
 ### 5.2 Nothing in Rust checks that the modulus is prime
 
 `Modulus::new` asserts only `n >= 2` (`nmod.rs:21`). A deterministic 64-bit Miller–Rabin exists
@@ -331,11 +364,21 @@ Gröbner basis is unique given the ideal and the order. It agrees on:
 | instance | note |
 |---|---|
 | the reference smoke system over GF(2^30+3) | the four-way agreement system; `vdim = 12` |
-| katsura-3, katsura-4, katsura-5 | Zeebra's convention, i.e. the literature's katsura-2/3/4 |
-| cyclic-3, cyclic-4, cyclic-5 | **cyclic-4 is positive-dimensional**, so no quotient dimension exists and the check is on the basis alone |
+| katsura-4, -5, -6, -7 | every Katsura rung on the corpus ladder, digests asserted against the frozen ones |
+| cyclic-4, -5, -6 | every Cyclic rung; **cyclic-4 is positive-dimensional**, so no quotient dimension exists and the check is on the basis alone |
 | katsura-4 over GF(4611624995532046337) | a 62-bit prime, where **neither msolve nor Singular can represent the input** |
+| a 14-variable system containing both `x1` and `x10` | the prefix-collision rung (§4 of the Groebner.jl study); a misread would collapse the ideal to `<1>` |
 
-Eight instances, three families, two characteristics, where the provisioning record had one.
+**Ten distinct instances compared term for term, three families, two characteristics**, where the
+provisioning record had one. Across the full eighteen-rung ladder the adapter additionally
+*completed* the six MQ rungs and three Poseidon rungs — including both fourteen-variable MQ rungs,
+with **no** `exponents too large to pack` — and cleanly refused both Anemoi rungs, whose field is
+above its 2^62 gate. One run in that sweep stopped at the wall limit, which is the expected
+outcome at the top of the ladder and not a result.
+
+The MQ and Poseidon completions are *not* agreement evidence: the live test has no compiled Zeebra
+oracle for those families, so what they establish is that the adapter drives them end to end and
+that the status taxonomy holds, not that the answers are right.
 
 ### 6.3 The verdict
 
@@ -356,7 +399,9 @@ So, concretely, for the M25 results table:
   2^31.
 * **Do not make it the denominator of a headline speedup.** A baseline should be something with a
   release and a regression suite; Singular and msolve are.
-* **Any instance where it disagrees is reported, not dropped.** It has not disagreed yet.
+* **Any instance where it disagrees is reported, not dropped.** Across every instance tried — ten
+  compared term for term, sixteen of eighteen ladder rungs driven end to end — **it has not
+  disagreed once.**
 * **Its 64-bit rows rest on two implementations agreeing** (it and Groebner.jl, with Zeebra as the
   third party) because msolve and Singular stop at 2^31. That is the weakest evidence this module
   produces and must be labelled.
@@ -531,7 +576,7 @@ capability gap in the *driver*: Sagebrush's FGLM is reachable only through `call
 
 ## 9. Follow-ups this study identified
 
-1. **Extend `tools/external/sagebrush-driver` to the orders and tasks the engine already has.**
+1. **#315 — extend `tools/external/sagebrush-driver` to the orders and tasks the engine already has.**
    `fglm::groebner_fglm` (`fglm.rs:325`) and the lex route in `f4_p_opt` (`f4.rs:491-547`) exist;
    the driver exposes neither, so the adapter refuses `LexBasis`, `LexBasisByConversion` and every
    non-degrevlex order. With it, `LexBasisByConversion` would have a second comparand instead of
@@ -539,15 +584,28 @@ capability gap in the *driver*: Sagebrush's FGLM is reachable only through `call
    routes to a lex basis have different complexity. The driver would also expose the quotient
    dimension that `fglm.rs:97` already computes, which would raise the `Invariants` overlap against
    Zeebra from two to three.
-2. **Add a `RunFailure` variant for a hostile environment.** `src/grobner/external/sagebrush.rs`
+2. **#316 — add a `RunFailure` variant for a hostile environment.** `src/grobner/external/sagebrush.rs`
    must refuse to run when an `SB_*` switch is inherited, because `Invocation` can set a child's
    variable but not clear one, and those switches are truthy-if-set. The closest existing variant is
    `Reported`, which `contract.rs` explicitly asks an adapter not to overload — so this is the
    "say so rather than overloading" case, said.
-3. **Correct #269's premise.** Its title cites M16's obsolete 65–88% elimination figure;
+3. **#269 — correct its premise.** Its title cites M16's obsolete 65–88% elimination figure;
    `MILESTONE-F4-OPTIMIZATION.md` §8.5 measures 7–22%, with interreduction at 61% and matrix
    construction at 48%. Whatever #269 becomes, it should be aimed at those.
-4. **Benchmark the two packed-monomial hypotheses together.** §8.1 here and
+4. **#317 — benchmark the two packed-monomial hypotheses together.** §8.1 here and
    `groebner-jl-implementation.md` §6.2–6.3 are the same idea reached from two independent
    codebases; they should be one experiment, and the microbenchmark of `MonomialOrder::cmp` should
    gate it.
+5. **#329 — echo the generators from the driver**, so the adapter can check what it read on every
+   run rather than relying on one behavioural test. The driver already self-documents the
+   characteristic, the variable order and the monomial order, and the adapter already checks all
+   three as `SelfInconsistent`; the generators are the one input fact not covered. This is the
+   `x1`/`x10` class of hazard, which **cross-engine agreement cannot detect** — every engine is
+   handed the same bytes, so a misread is identical everywhere and four engines agree on the same
+   wrong ideal. The driver is verified clean at fourteen variables (it splits on the explicit `*`
+   and `^` separators and matches each name whole), and the corpus's `mq-random-14` and
+   `mq-planted-14` rungs make the hazard live rather than hypothetical.
+6. **#337 — the msolve adapter's corpus agreement test panics on a rung it has no instantiation
+   for**, and CI cannot see it because the test returns early when msolve is absent. Not this
+   study's subject, but found by it: a test whose skip is indistinguishable from its pass will
+   drift again.

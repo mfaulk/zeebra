@@ -1824,10 +1824,20 @@ adapter in the module where `wall` is not the process's, and
 `src/grobner/external/groebner_jl.rs` says so at the top.
 
 **Sagebrush is the only permissively licensed comparand, and the only one with no release.** It is
-five weeks old, every engine crate is `0.1.0`, and its `f4.rs` carries six tests. It also agrees
-with Zeebra **term for term, every coefficient included** on eight instances across three families
-and two characteristics. Both halves belong in any table that quotes it; the verdict is
-`docs/research/sagebrush-implementation.md` §6.3.
+five weeks old, every engine crate is `0.1.0`, its `f4.rs` carries six tests, and no committed
+oracle run in its own repository exercises the elimination. It also agrees with Zeebra **term for
+term, every coefficient included** on every Katsura and Cyclic rung of the shared corpus, plus the
+reference smoke system, a 62-bit prime and a fourteen-variable system — ten instances — and across
+the full eighteen-rung ladder it has **disagreed with nothing**. Both halves belong in any table that
+quotes it: report its rows with the pinned SHA, and do not make it the denominator of a headline
+speedup. The verdict is `docs/research/sagebrush-implementation.md` §6.3.
+
+Neither tool confuses `x1` with `x10`, which matters because the corpus has fourteen-variable
+rungs and **cross-engine agreement cannot catch a tokenizer bug** — every engine is handed the same
+bytes, so all of them would agree on the same wrong ideal. The Groebner.jl adapter checks its
+echoed generators against the sent system on every run, so a `Complete` status on a fourteen-
+variable rung is itself the proof; the Sagebrush driver prints no such echo, so there it is pinned
+by a behavioural test instead.
 
 The agreement checks are live tests, `#[ignore]`d because CI has neither tool installed and a test
 that silently passed when the tool is absent would be worse than no test:

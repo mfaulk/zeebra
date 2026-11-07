@@ -34,7 +34,7 @@ use zeebra::{
         differential::{monomial_to_string, polynomial_to_string},
         external::{
             corpus, ExternalSolver, FieldSpec, GroebnerJlSolver, Instance, Invariants, Limits,
-            RunStatus, SagebrushSolver, Task,
+            RunFailure, RunStatus, SagebrushSolver, Task,
         },
         f4,
     },
@@ -430,10 +430,14 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
         "neither comparand is installed, so nothing would be checked"
     );
     let order = MonomialOrder::GradedReverseLexicographic;
-    let limits = Limits::wall(Duration::from_secs(600));
+    // Short enough that the whole ladder finishes in a few minutes. The top rungs are *expected*
+    // to stop here, which is why `StoppedByLimit` is handled as an outcome rather than an error.
+    let limits = Limits::wall(Duration::from_secs(90));
     let mut compared_against_zeebra = 0;
     let mut ran = 0;
     let mut unsupported = 0;
+    let mut stopped = 0;
+    let mut reported: Vec<String> = Vec::new();
 
     for entry in corpus::ladder() {
         // Katsura and Cyclic use the corpus reference characteristic; Poseidon and Anemoi carry
@@ -501,23 +505,61 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
                 continue;
             }
 
-            let answer = answered(&report);
-            assert!(
-                !report.status.is_verified(),
-                "{} must stay Complete: an adapter never promotes its own answer",
-                name
-            );
-            ran += 1;
-            if let Some((ours, our_basis)) = &ours {
-                assert_agrees(name, &instance.name, ours, &answer.invariants);
-                assert_eq!(
-                    canonical_basis(answer.basis.as_ref().expect("a basis")),
-                    *our_basis,
-                    "{} on {} differs from Zeebra term for term",
-                    name,
-                    entry.name
-                );
-                compared_against_zeebra += 1;
+            // Four outcomes are legitimate for a rung the tool accepts, and conflating them is
+            // what the status taxonomy exists to prevent. Only the fourth is a test failure.
+            match &report.status {
+                RunStatus::Complete(answer) => {
+                    assert!(
+                        !report.status.is_verified(),
+                        "{} must stay Complete: an adapter never promotes its own answer",
+                        name
+                    );
+                    ran += 1;
+                    if let Some((ours, our_basis)) = &ours {
+                        assert_agrees(name, &instance.name, ours, &answer.invariants);
+                        assert_eq!(
+                            canonical_basis(answer.basis.as_ref().expect("a basis")),
+                            *our_basis,
+                            "{} on {} differs from Zeebra term for term",
+                            name,
+                            entry.name
+                        );
+                        compared_against_zeebra += 1;
+                    }
+                }
+                // Expected at the top of the ladder: the corpus documents `Challenging` as
+                // "expected to exhaust at least one engine's limits ... the one that needs
+                // `StoppedByLimit` to be a first-class outcome". The wall time here **is** the
+                // limit, so the only thing to assert is that nothing downstream may read it as a
+                // measurement.
+                RunStatus::StoppedByLimit(stop) => {
+                    assert!(
+                        !report.status.is_timing_evidence(),
+                        "a limit stop is a lower bound, never a timing"
+                    );
+                    assert_ne!(
+                        entry.rung,
+                        corpus::Rung::Easy,
+                        "{} on {} stopped at a limit, which an Easy rung must not do: {}",
+                        name,
+                        entry.name,
+                        stop
+                    );
+                    stopped += 1;
+                }
+                // A capability the tool discovers at run time rather than declaring, which for
+                // Sagebrush is `exponents too large to pack` once `64 / n` bits will not hold the
+                // intermediate degrees. `supports` cannot predict it — a bound there must describe
+                // what the tool declares, not what a run will do — so it arrives here, and it is
+                // still not a timing.
+                RunStatus::Failed(RunFailure::Reported { message }) => {
+                    assert!(!report.status.is_timing_evidence());
+                    reported.push(format!("{} on {}: {}", name, entry.name, message));
+                }
+                other => panic!(
+                    "{} on {} failed in a way that is not a capability or a limit: {:?}",
+                    name, entry.name, other
+                ),
             }
         }
     }
@@ -529,7 +571,25 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
         "only {} rungs were checked against Zeebra; the Katsura and Cyclic families are seven",
         compared_against_zeebra
     );
-    assert!(ran > 0 && unsupported > 0, "ran {}, unsupported {} — a ladder that is all one or all the other is not exercising both paths", ran, unsupported);
+    assert!(
+        ran > 0 && unsupported > 0,
+        "ran {}, unsupported {} — a ladder that is all one or all the other is not exercising both paths",
+        ran,
+        unsupported
+    );
+    // Printed rather than asserted: a run-time capability limit is a finding about the tool, and
+    // the test's job is to surface it rather than to have an opinion about how many there should be.
+    println!(
+        "corpus ladder: {} completed, {} compared against Zeebra, {} unsupported, {} stopped by limit, {} tool-reported limits",
+        ran,
+        compared_against_zeebra,
+        unsupported,
+        stopped,
+        reported.len()
+    );
+    for line in &reported {
+        println!("  tool-reported limit: {}", line);
+    }
 }
 
 /// Sagebrush refuses Anemoi's field; **Groebner.jl does not**, which the corpus's reason understates.

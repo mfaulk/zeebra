@@ -472,11 +472,30 @@ Layered, and only partly enforced:
   (`src/groebner/modular.jl:3-8`).
 
 Measured, through the adapter's own script: a basis comes back at 2^31 − 1, 2^32 − 5,
-Goldilocks 2^64 − 2^32 + 1, and 2^64 − 59. Hence
+Goldilocks 2^64 − 2^32 + 1, 2^64 − 353 and 2^64 − 59. Hence
 `groebner_jl::MAX_CHARACTERISTIC = u64::MAX`, and hence the capability finding that matters most
 for M25: **Groebner.jl and Sagebrush are the only comparands that accept a prime above 2^31**
 (msolve and Singular both stop at 2^31 − 1), so above it there is no third party to check either of
 them.
+
+**And it is one ceiling, not two.** This is worth stating because the other two comparands have
+task-specific bounds that a single constant would misrepresent: msolve's eliminant stops at
+`1515531529` where its basis stops at `2^31`, and Sagebrush's FGLM stops at `2^31` where its basis
+stops at `2^62` (`docs/research/sagebrush-implementation.md` §5.1.1). Measured here, Groebner.jl's
+lex route returns the same basis and the same quotient dimension at every prime its basis route
+accepts, up to `2^64 − 59` — which follows from §5.4: `LexBasis` is the *identical* F4 under a
+different ordering, because there is no FGLM to have a narrower bound.
+
+**One consequence for the corpus.** The Anemoi rungs carry
+`Equivalence::NoComparand { reason: "msolve and Singular both stop below 2^31" }`, and their field
+is `2^64 − 353`. That reason is true and incomplete: Groebner.jl represents that field and returns
+a correct basis there — the same six leading monomials and `vdim = 12` as the reference system at
+`2^30 + 3`. So the adapter's `supports()` says **yes**, because
+[`ExternalSolver::supports`](../../src/grobner/external/contract.rs) is a statement about declared
+capability and nothing else, and `Equivalence::licenses_timing()` remains the gate on publishing a
+cross-library timing. The real constraint on an Anemoi row is not that no tool can represent it; it
+is that **nothing corroborates Groebner.jl above 2^31**, which is a different and weaker claim, and
+the corpus's recorded reason would be more accurate if it said so.
 
 ### 5.4 Capability surface, confirmed by running it
 
