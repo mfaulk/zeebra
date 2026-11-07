@@ -229,7 +229,7 @@ pub struct BatchStatistics {
     /// it did.
     pub divisor_scan_steps: usize,
 
-    /// Monomials symbolic preprocessing enqueued, before the deduplication test.
+    /// Monomials symbolic preprocessing offered to its queue, before the deduplication test.
     pub monomials_enqueued: usize,
 
     /// The largest the pending monomial queue grew, in monomials.
@@ -237,7 +237,9 @@ pub struct BatchStatistics {
     /// Reported beside [`Self::dense_buffer_bytes`] and for the same reason: it is memory this
     /// batch held and no budget counted. At twenty variables a monomial is 80 bytes, so this
     /// exceeds [`Self::peak_live_bytes`] whenever the queue holds more than a twentieth as many
-    /// monomials as the matrix holds entries.
+    /// monomials as the matrix holds entries. Since #305 it is at most [`Self::columns`], the
+    /// batch's distinct monomials, so `max_matrix_columns` bounds it even though no budget names
+    /// it.
     pub max_pending_monomials: usize,
 
     /// True if this batch was eliminated by the structured path rather than the one-pass echelon.
@@ -453,19 +455,23 @@ pub struct F4Statistics {
     /// Summed over every batch: basis elements examined across those tests.
     pub divisor_scan_steps: usize,
 
-    /// Summed over every batch: monomials enqueued by symbolic preprocessing before deduplication.
+    /// Summed over every batch: monomials symbolic preprocessing offered to its queue, before the
+    /// deduplication test.
     ///
-    /// See [`SymbolicCounts::monomials_enqueued`](super::SymbolicCounts::monomials_enqueued). Part
-    /// of the memory accounting rather than of the work accounting: no budget bounds this queue,
-    /// and on a system whose rows carry many terms it is the single largest allocation in the
-    /// computation.
+    /// See [`SymbolicCounts::monomials_enqueued`](super::SymbolicCounts::monomials_enqueued). The
+    /// repetition factor rather than a memory figure: since #305 only the distinct offers are
+    /// admitted, so the gap between this and
+    /// [`Self::max_pending_monomials`](Self::max_pending_monomials) is what the deduplication
+    /// saves rather than what the queue costs.
     pub monomials_enqueued: usize,
 
     /// The largest the pending monomial queue grew in any batch, in monomials.
     ///
-    /// Costs `size_of::<Monomial<N>>()` each — 80 bytes at twenty variables — and is **not**
-    /// covered by [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes). A maximum rather
-    /// than a sum: one batch's queue is dropped before the next one's is built.
+    /// Costs `size_of::<Monomial<N>>()` each — 80 bytes at twenty variables — and is still **not**
+    /// covered by [`F4Options::max_live_bytes`](super::F4Options::max_live_bytes), which bounds
+    /// matrix entries. It is nonetheless bounded, by `max_matrix_columns`: the queue holds only
+    /// distinct monomials, and a batch's distinct monomials are its columns. A maximum rather than
+    /// a sum: one batch's queue is dropped before the next one's is built.
     pub max_pending_monomials: usize,
 
     /// The pair queue at its largest, in entries, measured once per batch.
