@@ -3,6 +3,7 @@
 use crate::integers::{
     big_integers::big_uint::{BigUInt, ZERO},
     prime_factors::{pollard_rho::pollards_rho_factorize, SMALL_PRIMES},
+    roots::perfect_power,
 };
 use rand::{CryptoRng, RngCore};
 
@@ -35,10 +36,17 @@ pub fn factor<R: RngCore + CryptoRng>(x: &BigUInt, rng: &mut R) -> (Vec<BigUInt>
         }
     }
 
+    // A perfect power first: rho on n = m^k spends its whole budget on a number whose only
+    // factors are m's, and splitting the power off hands it the smaller base instead.
+    let (remaining, multiplicity) = match perfect_power(&x) {
+        Some((base, exponent)) => (base, exponent as u128),
+        None => (x, 1),
+    };
+
     // Use Pollard's rho method to find additional factors.
-    let (p, e) = pollards_rho_factorize(&x, rng);
+    let (p, e) = pollards_rho_factorize(&remaining, rng);
     prime_factors.extend_from_slice(&p);
-    powers.extend_from_slice(&e);
+    powers.extend(e.iter().map(|power| power * multiplicity));
 
     // TODO: Finally, apply a general-purpose algorithm (e.g. quadratic sieve, general number field sieve, etc).
 
@@ -105,6 +113,29 @@ mod tests {
             ]
         );
         assert_eq!(powers, vec![1, 1, 1, 1]);
+    }
+
+    /// A prime power beyond the trial-division table is factored through the perfect-power test,
+    /// which hands rho the base instead of a number whose factors are all the base's.
+    #[test]
+    fn test_factorization_of_a_large_prime_power() {
+        let mut rng = StdRng::seed_from_u64(7);
+        // 1000003 is prime and above the small-prime table, so trial division cannot reach it.
+        let p = BigUInt::new_from_u64(1000003);
+        let (primes, powers) = factor(&p.pow(&BigUInt::new_from_u64(5)), &mut rng);
+        assert_eq!(primes, vec![p]);
+        assert_eq!(powers, vec![5]);
+    }
+
+    /// p^3 for a 20-digit prime: rho needs ~p^(1/2) iterations to split it and does not return in
+    /// any practical time, while the perfect-power test reduces it to one primality check.
+    #[test]
+    fn test_factorization_of_a_prime_power_rho_cannot_reach() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let p = BigUInt::from_dec_str("10000000000000000051").unwrap();
+        let (primes, powers) = factor(&p.pow(&BigUInt::new_from_u64(3)), &mut rng);
+        assert_eq!(primes, vec![p]);
+        assert_eq!(powers, vec![3]);
     }
 
     #[test]

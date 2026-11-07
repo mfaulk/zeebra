@@ -3298,6 +3298,36 @@ division.
 Splitting is randomized, so this takes an rng and the order of the returned factors is
 unspecified.
 
+## Integer Roots and Perfect Powers
+`BigUInt::isqrt` and `BigUInt::nth_root` return the floor of the root, and `perfect_power` writes
+`n` as `m^k` with the largest `k` it can:
+
+```rust
+use zeebra::integers::{big_uint::BigUInt, perfect_power};
+
+assert_eq!(BigUInt::new_from_u64(26).nth_root(3), BigUInt::new_from_u64(2));
+assert_eq!(BigUInt::new_from_u64(17).isqrt(), BigUInt::new_from_u64(4));
+
+// 64 = 8^2 = 4^3 = 2^6, and only the last has a base that is not itself a perfect power.
+let (base, exponent) = perfect_power(&BigUInt::new_from_u64(64)).unwrap();
+assert_eq!((base, exponent), (BigUInt::new_from_u64(2), 6));
+
+assert_eq!(perfect_power(&BigUInt::new_from_u64(12)), None);
+```
+
+Both roots are Newton's iteration started at `2^ceil(bits/k)`, which is above the root — the side
+on which the iteration decreases monotonically, so it terminates at the floor with no correction
+step. Zero and one are not perfect powers: every exponent would answer for them.
+
+`perfect_power` tests only **prime** exponents, which loses nothing because `m^(ab)` is `(m^a)^b`,
+and recurses on the base to recover a composite exponent. That is why `64` is reported as `2^6`
+rather than as the `8^2` the `k = 2` pass finds.
+
+`factor` runs the test before Pollard rho, which is what the test is for: rho needs about
+`p^(1/2)` iterations to split `p^k`, so `p^3` for a 20-digit prime does not factor in any practical
+time without it and factors in a single primality check with it
+(`test_factorization_of_a_prime_power_rho_cannot_reach`).
+
 ## Permutation Polynomials
 An arithmetization-friendly hash is built from a **power permutation**: Poseidon's S-box is
 `x -> x^d`, and that map is a bijection of GF(q) exactly when `gcd(d, q - 1) = 1` — it fixes zero,
