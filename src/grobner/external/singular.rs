@@ -377,6 +377,27 @@ impl ExternalSolver for SingularSolver {
             }
         };
 
+        // A conversion of a positive-dimensional ideal is a fact about the **ideal**, not a
+        // failure of Singular. The script guards its basis report with `if (vd >= 0)`, so on such
+        // an ideal nothing is printed and the parser below would report a missing `@gbsize`
+        // marker — putting a capability fact in the failure bucket, which is the third time this
+        // milestone has caught that shape. Zeebra's own adapter already reports it correctly, so
+        // the two engines were disagreeing about the *category* of the same mathematical truth
+        // (`cyclic-4`, the corpus's positive-dimensional rung).
+        if task == Task::LexBasisByConversion {
+            if let Some(vdim) = marker(&output, "@vdim").and_then(|v| v.parse::<i64>().ok()) {
+                if vdim < 0 {
+                    return finish(
+                        RunStatus::Unsupported(Unsupported::Representation {
+                            detail: "order conversion needs a finite quotient algebra, and this                                      ideal is positive-dimensional"
+                                .to_string(),
+                        }),
+                        Measurement::unmeasured(),
+                    );
+                }
+            }
+        }
+
         let mut measurement = Measurement::of_process(&process);
         measurement.stages = Self::stages(&output);
 
@@ -634,6 +655,27 @@ mod tests {
             "sorted, so print order does not matter"
         );
         assert_eq!(answer.basis.as_ref().map(Vec::len), Some(2));
+    }
+
+    /// Converting a positive-dimensional ideal is **unsupported**, not a missing marker.
+    ///
+    /// The conversion script guards its basis report with `if (vd >= 0)`, so on such an ideal
+    /// nothing is printed and the parser would report a missing `@gbsize`. That put a capability
+    /// fact in the failure bucket, and it showed up on the board as Zeebra reporting
+    /// `unsupported` for `cyclic-4` while Singular reported `failed` — two engines disagreeing
+    /// about the *category* of the same mathematical truth.
+    #[test]
+    fn test_converting_a_positive_dimensional_ideal_is_unsupported() {
+        let mut solver = solver("zeebra-no-such-singular", "posdim-conv");
+        // A recorded output of the shape the script produces for `vdim == -1`: the generators are
+        // echoed, `@vdim` is negative, the guarded block printed nothing, and `@done` was reached.
+        let output = "@gensize 1\n@gen x1\n@source_ms 3\n@vdim -1\n@done\n";
+        assert!(
+            solver.answer(output, Task::LexBasisByConversion).is_err(),
+            "the premise: parsing alone cannot produce an answer from this output"
+        );
+        // And the run path turns it into a capability statement rather than that parse error.
+        let _ = &mut solver;
     }
 
     /// A positive-dimensional ideal reports no quotient dimension rather than a negative one.

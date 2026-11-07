@@ -8,6 +8,7 @@ mod big_integers;
 mod gcd;
 mod jacobi;
 mod prime_factors;
+mod roots;
 mod u256;
 pub mod utils;
 mod ux64;
@@ -25,6 +26,7 @@ pub use jacobi::jacobi_symbol;
 pub use prime_factors::{factor, find_generator, from_prime_factorization};
 #[cfg(test)]
 use rand::{CryptoRng, RngCore};
+pub use roots::perfect_power;
 pub use u256::U256;
 
 /// Bit `index` of `limbs`, counted from the least significant bit of the least significant limb.
