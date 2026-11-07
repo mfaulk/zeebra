@@ -1307,10 +1307,10 @@ dispatched the same way, recursively, and what it costs depends on the factor:
 | an odd prime power (9, 25, 27) | the `O(m^2)` definition | `n * n_i` |
 
 So `2520 = 2^3 * 3^2 * 5 * 7` costs `n log 8` plus `n * (9 + 5 + 7)`, which is why a size whose
-odd factors are small is cheap and **a large prime size is quadratic**. Bluestein is the fix for
-that case — rewriting the DFT as a convolution of length `>= 2n - 1` — and it is deliberately not
-here: it needs a `2n`-th root of unity and the convolution rather than a re-indexing. Filed as
-#357.
+odd factors are small is cheap and **a large prime size is quadratic through this route**.
+[Bluestein](#bluestein-a-large-prime-size-without-the-quadratic-cost) is what removes that case,
+and it is a separate entry point rather than a decomposition the dispatcher reaches on its own —
+see below for why.
 
 Two consequences of allowing any size, both visible in the API:
 
@@ -1321,6 +1321,104 @@ Two consequences of allowing any size, both visible in the API:
   `g^6 != 1` and would otherwise have been accepted.
 - `FFTDomain::split` — the radix-2 even/odd split — panics on an odd size, where the halves would
   not be the same length.
+
+### Bluestein: a large prime size without the quadratic cost
+
+Bluestein's algorithm turns a length-`n` transform into a **convolution**, which the radix-2 kernel
+runs at a padded power-of-two length. It is `O(n log n)` at every size, prime included, so it is
+what the quadratic row of the table above gives way to.
+
+The textbook identity is `jk = (j^2 + k^2 - (k - j)^2) / 2`, whose halved squares need a `2n`-th
+root of unity to write down. This uses the **triangular numbers** `T(m) = m(m - 1) / 2` instead:
+
+```text
+T(j) + T(k) - T(k - j) = jk - j,     so     jk = T(j) + j + T(k) - T(k - j)
+```
+
+giving
+
+```text
+X_k = w^T(k) * sum_j (x_j w^(T(j) + j)) * w^(-T(k - j)).
+```
+
+Every exponent is an integer and every factor is a power of the `n`th root the caller already
+holds, so there is no second root to construct, validate, or fail to find. Nothing is lost by it:
+for odd `n`, `n | q - 1` already implies `2n | q - 1`, and for even `n` the convolution length
+needs two-adicity at least `log2(n) + 1` — because `2n - 1` is odd and above one, so it is not a
+power of two and `L >= 2n` — which is never less than the `2n`-th root's own `v2(n) + 1`. A field
+that can host the convolution always has a `2n`-th root; one that cannot never gets far enough to
+want it.
+
+So the convolution length is the single demand on the field, and `bluestein_convolution_domain`
+is where it is either met or reported:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform,
+    fields::KoalaBear, FFTDomain, FiniteField, KnownOrder, Zero,
+};
+
+// KoalaBear: q - 1 = 2^24 * 127, so 127 is a size this field has a root of unity for — and the
+// one the prime-factor route would spend 127^2 multiplications on.
+type F = KoalaBear;
+let n = 127;
+
+let mut rng = StdRng::seed_from_u64(127);
+let domain = FFTDomain::from_generator(F::root_of_unity(n as u64, &mut rng), n);
+
+// The convolution runs at the least power of two at or above 2n - 1, so that the cyclic
+// convolution does not alias the two ends of the chirp onto each other.
+assert_eq!(bluestein_convolution_length(n), 256);
+let convolution_domain = bluestein_convolution_domain::<F, _>(n, &mut rng).unwrap();
+
+let coefficients: Vec<F> = (0..n).map(|i| F::new(i as u64 + 1)).collect();
+let mut values = coefficients.clone();
+bluestein_transform(&mut values, &domain, &convolution_domain);
+
+// The same thing the Vandermonde definition gives, in n log n rather than n^2.
+for (k, value) in values.iter().enumerate() {
+    let mut expected = F::zero();
+    for (j, c) in coefficients.iter().enumerate() {
+        expected += *c * domain[(j * k) % n];
+    }
+    assert_eq!(*value, expected);
+}
+```
+
+A field too shallow in two-adicity to hold a primitive `L`-th root is a fact about the field, so it
+is a value rather than a panic — the same line #120 drew for `DomainError`, in the existing
+`RootOfUnityError` vocabulary:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    bluestein_convolution_domain,
+    fields::{Mersenne31, RootOfUnityError},
+    FFTDomain, KnownOrder,
+};
+
+// Mersenne-31: q - 1 = 2 * (2^30 - 1), so its two-adicity is 1 and there is no transform here
+// beyond size two. A size-5 Bluestein would want a 16-point convolution.
+assert_eq!(Mersenne31::two_adicity(), 1);
+let mut rng = StdRng::seed_from_u64(2);
+assert_eq!(
+    bluestein_convolution_domain::<Mersenne31, _>(5, &mut rng),
+    Err(RootOfUnityError::TwoAdicityExceeded { log_n: 4, two_adicity: 1 }),
+);
+```
+
+**It is not yet dispatched to automatically.** `evaluate` and `interpolate` at a prime size still
+take the quadratic route, and reaching Bluestein means calling it. Two reasons, both of which want
+their own change:
+
+- The crossover against the quadratic definition is **unmeasured**. `dft` is quadratic but
+  allocation-free and branch-free, while Bluestein pays three `n`-length chirp passes plus a padded
+  convolution of length up to `4n`, so below some size the quadratic route wins. No figure is
+  quoted here because none has been measured.
+- `prime_factor::transform_any` is generic over `FiniteField`, and constructing a primitive `L`-th
+  root needs `KnownOrder` and an rng. Tightening that bound would propagate through `evaluate` and
+  `interpolate` into the polynomial API — a breaking change that is a decision, not a side effect.
 
 ### What the univariate stages cost
 
