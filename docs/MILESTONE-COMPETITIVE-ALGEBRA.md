@@ -764,9 +764,25 @@ it would have been a very attractive number to publish.
 **Correctness, which is the precondition for any of the above.** Four engines produce a term-for-term
 identical basis — every coefficient, not only leading monomials — on a shared system over
 GF(1073741827), corroborated by `vdim` / `quotient_basis` / parametrization degree all equal to 12.
-Across the corpus, all seven Katsura and Cyclic rungs agree **exactly** with Zeebra's own F4 through
-msolve, with each rung's digest asserted frozen. Sagebrush disagreed with nothing on any family
-tried, including a 62-bit prime.
+Across the corpus, **24 rung/solver pairs agree with Zeebra term for term, every coefficient
+included, and not one disagreed** — 12 oracle-bearing reference-characteristic rungs across Groebner.jl
+and Sagebrush, with each rung's digest asserted frozen, plus all seven Katsura and Cyclic rungs
+through msolve. Neither tool disagreed with Zeebra on any instance at any point in the milestone.
+
+The oracle is built by **parsing the instance's own rendered text** rather than rebuilding from
+generator functions, which is what makes that number mean something: the bytes parsed are the bytes
+every engine is handed, so a render/parse round-trip failure in either direction surfaces as a
+disagreement instead of as a silently different problem. That is the one hazard cross-engine
+agreement **structurally cannot catch** — the `x1`/`x10` prefix class, where every engine agrees
+because all of them were handed the same malformed text. `mq-planted-14` carrying an oracle makes
+the fourteen-variable prefix case a **full basis agreement** rather than "it completed and the echo
+matched", and a named assertion refuses to let that specific rung vanish into the oracle budget
+while the total stays above its floor.
+
+Six rungs have no oracle for two different reasons, and only one of them is a gap: three Poseidon and
+two Anemoi carry other characteristics (KoalaBear, 2^64−353), which is correct; `mq-random-14` crossed
+Zeebra's own 120 s oracle budget, which is a fact about Zeebra's F4 and is printed rather than merely
+uncounted.
 
 ### 13.2 Cryptanalytic position
 
