@@ -5,6 +5,7 @@ mod monomial;
 mod monomial_arithmetic;
 mod monomial_order;
 mod multi_poly_parser;
+mod multivariate_gcd;
 mod sparse_multivariate_multiply;
 mod sparse_multivariate_polynomial;
 mod sparse_multivariate_polynomial_arithmetic;
@@ -14,6 +15,7 @@ mod term_arithmetic;
 
 pub use monomial::Monomial;
 pub use monomial_order::MonomialOrder;
+pub use multivariate_gcd::SquarefreeError;
 pub use sparse_multivariate_multiply::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
 };

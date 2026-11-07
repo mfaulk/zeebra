@@ -44,7 +44,7 @@ pub use poly::{
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
     is_permutation_polynomial, lagrange_interpolate, lcm, permutation_exponents, pow_mod, roots,
     GraeffeError, GraeffeStats, Monomial, MonomialOrder, MultivariatePolynomial, Polynomial,
-    PolynomialParams, PowerPermutation, SubgroupRoute, UnivariatePolynomial,
+    PolynomialParams, PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
 };
 #[doc(hidden)]
 pub use poly::{

@@ -7,7 +7,7 @@ mod univariate;
 pub use multivariate::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
 };
-pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial};
+pub use multivariate::{Monomial, MonomialOrder, MultivariatePolynomial, SquarefreeError};
 pub(crate) use univariate::multiply_dense;
 pub use univariate::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_l, graeffe_root,
