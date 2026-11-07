@@ -9,6 +9,7 @@
 pub mod anemoi;
 pub mod anemoi_cico;
 pub mod challenge;
+pub mod cost_model;
 pub mod linear;
 pub mod manifest;
 pub mod mq;
@@ -29,6 +30,10 @@ pub use challenge::{
     challenge, dispatch_cico, published_quotient_dimension, registry, BenchmarkClass,
     ChallengeError, ChallengeManifest, ChallengeParameters, ChallengeProgram, CicoTarget,
     CicoVisitor, DisclosedMethod, ExternalStatus, Objective, ReferencePoint, Significance,
+};
+pub use cost_model::{
+    Attribution, CostModelBoard, CostRow, Figure, FigureBasis, Intermediate, LimitingStage,
+    NextSizeProjection, PredictionError, Quantity, SchemaError, COST_MODEL_HISTORY_CONTRACT,
 };
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};
