@@ -44,6 +44,10 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Multivariate multiplication that collects as it multiplies, so the live set is bounded by the
       product's size and not by the term-product count: the six-round symbolic build from 57.0 GB
       peak resident to 0.32 GB, 179x, for byte-identical output
+- [x] That dense accumulator generalized past two variables, which turned out to pay: 1.3x–5.4x
+      over the hashing route at three, four and five variables and 8.4x on a trivariate pair dense
+      in two variables and linear in the third, with the box-versus-simplex crossover measured
+      rather than argued — and one shape where generalizing the layout *loses*, found the same way
 - [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
       resolved against msolve's own distributed input files
@@ -1592,6 +1596,63 @@ implementation against itself, so they were re-based onto an independent oracle 
 small-product regression the issue predicted — which turned out to be `schoolbook_into` iterating
 the longer operand outside; swapping that made the same shape **2.5x** instead. The transform still
 cannot live on `Mul`, because choosing a domain needs `KnownOrder` and randomness.
+
+## Multivariate Polynomials
+
+`MultivariatePolynomial<N, F>` is sparse: a monomial-to-coefficient map over `N` variables. No
+coefficient is ever zero, so the zero polynomial is the empty set of terms and a monomial whose
+coefficients cancel is dropped rather than kept at zero. Equality and `Hash` are over that set,
+which is why the invariant is not cosmetic — a surviving zero term would make a polynomial unequal
+to its own canonical form.
+
+### Multiplication dispatches over four dense layouts and one hash route
+
+Multiplication collects as the products are formed, so the live set is bounded by the output rather
+than by the term-product count. *How* it collects is chosen per operand pair, because the choice is
+worth 3x–5x and no single answer covers every arity:
+
+| route | index | cells | selected when |
+|---|---|---|---|
+| `Accumulate` | one hash lookup per product | — | the general case |
+| `DenseTriangle` | three integer operations | `(d+1)(d+2)/2` | `N == 2`, dense output |
+| `DenseBox` | one add — the index is separable | `∏(d_i + 1)` | dense output, box within 24x the simplex |
+| `DenseSimplex` | `2(N-1)` table lookups | `C(d + N, N)` | dense output, otherwise |
+
+The dense routes do no hashing at all: `slots[index(a) + index(b)] += ca * cb` needs no monomial
+key. What distinguishes them is that `DenseBox`'s mixed-radix index is **separable** —
+`index(a·b) = index(a) + index(b)`, so the left operand's index hoists out of the inner loop and the
+per-product cost is one add at any arity — while `DenseSimplex` ranks the monomials of total degree
+at most `d` and so allocates the tightest dense array there is, at a non-separable index. The box
+pays up to about `N!` in cells for that separability, which is why the crossover between them sits
+near five variables rather than being an asymptotic argument.
+
+Measured on one pinned core under `tools/benchlock.sh`, dense `p * p` against the hashing route:
+
+| arity | terms | products | `Accumulate` | `DenseSimplex` | `DenseBox` |
+|---:|---:|---:|---:|---:|---:|
+| 3 | 2 925 | 8.56e6 | 127.23 ms | 40.95 ms | **23.58 ms** |
+| 4 | 715 | 5.11e5 | 7.37 ms | 3.56 ms | **2.35 ms** |
+| 5 | 462 | 2.13e5 | 5.66 ms | **1.55 ms** | 1.76 ms |
+| 3, degrees (40, 40, 1) | 3 362 | 1.13e7 | 278.83 ms / 17.0 MiB | 61.48 ms / 3.3 MiB | **33.28 ms / 620.9 KiB** |
+
+So there is no arity in this range where the dense accumulator stops being worth it, and the lopsided
+trivariate row is where it is worth most: its bounding box is 5 043 cells where its total-degree
+simplex is 317 750, so the box is both 8.4x faster and 28x smaller than hashing.
+
+The one shape where generalizing the layout **loses** is one term against many — the Gröbner
+reduction inner step. There the products do not collide at all, so there is nothing for a dense
+accumulator to merge, and at `N = 3` it costs 55.4 µs against the hash route's 48.6 µs. At `N = 2`
+the same shape *wins* (29.1 µs against 44.1 µs) because the triangle's index is three operations, so
+this is not a conclusion that transfers between arities. The predicate therefore requires the
+product count to be at least twice an upper bound on the output's monomial count before taking a
+dense route above `N = 2`, and that threshold is not applied at `N = 2`.
+
+Re-measure any of this with
+
+```sh
+cargo run --release --example multivariate_mul                  # every route, per arity and size
+cargo run --release --example multivariate_mul -- max_degree=90  # stop short of the six-round size
+```
 
 ## Gröbner Bases
 
