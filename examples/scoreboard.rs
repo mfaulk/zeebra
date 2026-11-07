@@ -44,14 +44,16 @@ use zeebra::{
         f4::symbolic::MonicBasis,
         f4_observed_reported, f4_reported, fglm_to_lex_with_options,
         research::{
-            challenge, dispatch_cico, eliminate_affine, registry, Campaign, ChallengeManifest,
-            ChallengeParameters, CicoVisitor, Comparison, Environment, GrobnerFrontier, Json,
-            Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome, RunRecord, Scoreboard,
-            Specialization, Stage, StageCost, KOALABEAR_PRIME,
+            challenge, colliding_run_file, dispatch_cico, eliminate_affine, registry, Campaign,
+            ChallengeManifest, ChallengeParameters, CicoVisitor, Comparison, Environment,
+            GrobnerFrontier, Json, Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome,
+            RunRecord, Scoreboard, Specialization, Stage, StageCost, BEST_CONTRACT,
+            HISTORY_CONTRACT, KOALABEAR_PRIME, SOLVED_CONTRACT,
         },
         solve_from_lex_basis, BatchObserver, CriticalPair, F4Options, FglmOptions, IdealClass,
         SolveOptions, SolveOutcome,
     },
+    util::peak_resident_bytes,
     FiniteField, MonomialOrder, MultivariatePolynomial, Zero,
 };
 
@@ -74,6 +76,34 @@ fn f4_options() -> F4Options {
 fn policy() -> String {
     "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
         .to_string()
+}
+
+/// How many rows this process has recorded, so that a measured peak says what it covers.
+///
+/// `VmHWM` is a **process** high-water mark. The `row`, `mq` and `campaign` tiers run one row per
+/// process — `tools/scoreboard.sh`'s ladder does so deliberately — and only there is the figure
+/// attributable to the row it is recorded against. The multi-row tiers get the same figure on
+/// every row, and it is a ceiling over all of them; the count is what lets a reader tell the two
+/// apart instead of having to know which tier produced the file.
+static ROWS_RECORDED: AtomicUsize = AtomicUsize::new(0);
+
+/// Attach the measured process peak to `record`, then add it to `board`.
+///
+/// Called at every point a row is recorded, so that no tier can acquire a row without a
+/// measurement or without the count that qualifies it. The estimate it is read against is already
+/// in `record.frontier.peak_estimated_bytes`, which is what makes
+/// `RunRecord::measured_to_estimated_ratio` recoverable from one record — the whole point of
+/// populating both.
+fn add_measured(board: &mut Scoreboard, mut record: RunRecord, registry: &[ChallengeManifest]) {
+    let rows = ROWS_RECORDED.fetch_add(1, Ordering::Relaxed) + 1;
+    // Both fields or neither: the count is a property of the measurement, and a count without one
+    // would qualify nothing.
+    record.measured_peak_resident_bytes = peak_resident_bytes().map(|bytes| bytes as usize);
+    record.measured_peak_rows_in_process = record
+        .measured_peak_resident_bytes
+        .is_some()
+        .then_some(rows);
+    board.add(record, registry).expect("a registered problem");
 }
 
 fn main() {
@@ -117,7 +147,7 @@ fn main() {
         println!("- policy: {}\n", frontier_policy());
         let record = run_frontier_formulation(&manifest, &environment, slice, wall, formulation);
         report(&record);
-        board.add(record, &registry).expect("a registered problem");
+        add_measured(&mut board, record, &registry);
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
             println!("appended to research/scoreboard/");
@@ -150,7 +180,7 @@ fn main() {
         }
         for record in records {
             report(&record);
-            board.add(record, &registry).expect("a registered problem");
+            add_measured(&mut board, record, &registry);
         }
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
@@ -204,7 +234,7 @@ fn main() {
         }
 
         for record in records {
-            board.add(record, &registry).expect("a registered problem");
+            add_measured(&mut board, record, &registry);
         }
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
@@ -244,7 +274,7 @@ fn main() {
             let record = run_frontier_row(&manifest, &environment, Some(seed), wall);
             report(&record);
             tally(&mut campaign, seed, &record.outcome);
-            board.add(record, &registry).expect("a registered problem");
+            add_measured(&mut board, record, &registry);
         }
         campaign.total = at.elapsed();
 
@@ -274,7 +304,7 @@ fn main() {
         report_campaign(&campaign);
         summary.campaign = Some(campaign);
         report(&summary);
-        board.add(summary, &registry).expect("a registered problem");
+        add_measured(&mut board, summary, &registry);
 
         if write {
             write_tree(&PathBuf::from("research/scoreboard"), &board, &registry);
@@ -299,7 +329,7 @@ fn main() {
         let manifest = challenge(id).expect("registered");
         let record = run_cico(&manifest, &environment);
         report(&record);
-        board.add(record, &registry).expect("a registered problem");
+        add_measured(&mut board, record, &registry);
     }
 
     if tier == "stable" || tier == "frontier" {
@@ -310,14 +340,14 @@ fn main() {
         let manifest = challenge("poseidon-t3-rf2-rp1-planted").expect("registered");
         let record = run_cico(&manifest, &environment);
         report(&record);
-        board.add(record, &registry).expect("a registered problem");
+        add_measured(&mut board, record, &registry);
 
         for id in ["fukuoka-mq-III-n10-seed0", "fukuoka-mq-III-n15-seed0"] {
             let manifest = challenge(id).expect("registered");
             match run_mq(&manifest, &environment) {
                 Some(record) => {
                     report(&record);
-                    board.add(record, &registry).expect("a registered problem");
+                    add_measured(&mut board, record, &registry);
                 }
                 None => println!(
                     "- {} skipped: run tools/fetch-mq-challenge.sh for the instance files",
@@ -423,6 +453,17 @@ impl CicoVisitor<K> for Solve<'_> {
 fn frontier_options() -> F4Options {
     F4Options {
         profile_degrees: true,
+        // The cooperative time budget, set from `ZEEBRA_WALL_SECONDS` like the supervisor's
+        // backstop but deliberately **shorter**, so the cooperative check wins the race. Losing it
+        // costs the whole frontier: the `recv_timeout` arm cannot reach the `(Result,
+        // F4Statistics)` tuple the abandoned thread still owns, so it emits an empty frontier with
+        // every group-B counter zeroed. The cooperative stop *returns*, and a return carries the
+        // statistics.
+        //
+        // One batch of margin is what the gap buys. The check runs between batches, so a stop
+        // overshoots by however much the batch in progress still needed; the backstop has to allow
+        // for that or it fires first and the statistics are lost anyway.
+        max_wall_time: Some(cooperative_budget()),
         max_matrix_columns: 200_000,
         // `ZEEBRA_MAX_ENTRIES` raises the bound that binds, for the one question a fixed budget
         // cannot answer: whether a row is out of reach or merely out of *this* budget. The default
@@ -437,7 +478,14 @@ fn frontier_options() -> F4Options {
     }
 }
 
-/// The per-row wall clock, from the environment. A backstop, not the budget.
+/// The per-row wall clock, from the environment. The supervisor's **backstop**, not the budget.
+///
+/// Two clocks govern a frontier row and the order they fire in matters. [`cooperative_budget`] is
+/// F4's own `max_wall_time`, which **returns** and so carries its statistics out; this is the
+/// `recv_timeout` that abandons the worker thread, which cannot. The cooperative one is set
+/// shorter so that it is the one that normally fires, and this stays what it should always have
+/// been: the thing that catches a single batch running long enough that the cooperative check
+/// never gets a turn.
 fn wall_clock() -> Duration {
     Duration::from_secs(
         std::env::var("ZEEBRA_WALL_SECONDS")
@@ -447,12 +495,23 @@ fn wall_clock() -> Duration {
     )
 }
 
+/// How much of [`wall_clock`] F4's own cooperative check is given.
+///
+/// Nine tenths, with a floor of one second. A fraction rather than a fixed subtraction so the
+/// margin scales: a 60 s row and a 6 h row need different slack for the batch in progress, and the
+/// overshoot is roughly proportional to how large the matrices have grown by then.
+fn cooperative_budget() -> Duration {
+    let wall = wall_clock();
+    (wall * 9 / 10).max(Duration::from_secs(1)).min(wall)
+}
+
 fn frontier_policy() -> String {
     format!(
         "grevlex F4 only; 200000 columns, {} live entries (the binding bound), 10000 batches, \
-         wall clock {} s as a backstop",
+         F4 max_wall_time {} s cooperative, supervisor wall clock {} s as a backstop",
         std::env::var("ZEEBRA_MAX_ENTRIES").unwrap_or_else(|_| "20000000".to_string()),
-        std::env::var("ZEEBRA_WALL_SECONDS").unwrap_or_else(|_| "600".to_string())
+        cooperative_budget().as_secs(),
+        wall_clock().as_secs()
     )
 }
 
@@ -760,9 +819,12 @@ impl CicoVisitor<K> for Frontier<'_> {
 
 /// F4 under a wall-clock supervisor, then the rest of the pipeline if a basis came back.
 ///
-/// The supervisor is why this takes the system by value: F4 has no cooperative time check, so a
-/// run that outlasts its clock is abandoned in a worker thread and the process exits after the
-/// record is written. A thread that owns its data can be abandoned safely.
+/// Two clocks, and which one fires decides whether the row has a frontier. F4's own
+/// `max_wall_time` is set shorter (see [`cooperative_budget`]) and **returns**, so its stop
+/// carries the matrix statistics out through the channel. This `recv_timeout` is the backstop for
+/// the case the cooperative check cannot cover — a single batch running past the margin — and it
+/// can only abandon the worker thread, which is why the system is taken by value: a thread that
+/// owns its data can be abandoned safely, and the process exits after the record is written.
 fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
     system: Vec<MultivariatePolynomial<D, F>>,
     wall: Duration,
@@ -812,6 +874,19 @@ fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
                     }
                     (outcome, stages, frontier)
                 }
+                // A stop that **returned**, so `statistics` and therefore `frontier` are real.
+                // This now includes the cooperative time stop, which is the whole point of #284:
+                // before it, a run that ran long could only be abandoned, and an abandoned run
+                // reports nothing.
+                //
+                // `resource` is `F4Error::limit_name()`, which separates the kinds without a
+                // second field: `max_wall_time` is a `StopKind::Time` and every other name here
+                // is a `StopKind::Resource`. The distinction has to survive into the record
+                // because a wall clock is a fact about one machine and an entry count is not, so
+                // the two must never be ranked against each other. Nothing ranks them today —
+                // `Scoreboard::best` and `verified_somehow` both admit only verified witnesses,
+                // and `unfinished` preserves insertion order without comparing — and a renderer
+                // that starts ranking stops has to read this field first.
                 Err(error) => (
                     RunOutcome::StoppedAtLimit(Limit {
                         resource: resource_of(&error),
@@ -825,9 +900,12 @@ fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
             }
         }
         Err(_) => {
-            // Nothing from the worker: no statistics exist, and the only account of the state is
-            // the observer's. Reported as a wall-clock stop rather than as a budget, because it is
-            // a fact about this supervisor and not about the system.
+            // The backstop fired, which means F4's own cooperative check never got a turn — a
+            // single batch ran longer than the margin between the two clocks. Nothing came back
+            // from the worker, so no statistics exist and the only account of the state is the
+            // observer's. Reported as `wall_clock` and not as `max_wall_time`, because those are
+            // two different stops: one is a fact about this supervisor, the other a fact about the
+            // budget F4 was given.
             let batches = progress.batches.load(Ordering::Relaxed);
             let degree = progress.degree.load(Ordering::Relaxed);
             stages.push(
@@ -843,10 +921,12 @@ fn supervised_solve<const D: usize, F: zeebra::KnownOrder + Send + 'static>(
                 RunOutcome::StoppedAtLimit(Limit {
                     resource: "wall_clock".to_string(),
                     detail: format!(
-                        "stopped after {} s with {} batches started; F4 has no cooperative time \
-                         check, so no matrix statistics exist for a run killed this way",
+                        "the supervisor's backstop fired after {} s with {} batches started, so \
+                         F4's cooperative {} s budget never reached a batch boundary; the worker \
+                         was abandoned and no matrix statistics exist for a run stopped this way",
                         wall.as_secs(),
-                        batches
+                        batches,
+                        cooperative_budget().as_secs()
                     ),
                     degree: (degree > 0).then_some(degree),
                     last_completed_stage: Stage::Generation,
@@ -1314,19 +1394,14 @@ fn finish_from_basis<const N: usize, F: zeebra::KnownOrder>(
 }
 
 /// Which bound bound, as a stable name a consumer can key on.
+/// The stable name of whatever limit stopped a run.
+///
+/// Delegated to `F4Error::limit_name` rather than matched here. The hand-rolled match this
+/// replaces ended in a `_ => "other"` catch-all, so `max_wall_time` would have been recorded as
+/// `other` — a new stop reason silently losing its name is exactly what a catch-all buys. The
+/// library's version is exhaustive, so a variant added there stops compiling until it is named.
 fn resource_of(error: &zeebra::grobner::F4Error) -> String {
-    use zeebra::grobner::F4Error::*;
-    match error {
-        TooManyRows { .. } => "max_matrix_rows",
-        TooManyColumns { .. } => "max_matrix_columns",
-        TooManyNonzeros { .. } => "max_live_nonzeros",
-        TooManyLiveBytes { .. } => "max_live_bytes",
-        TooManyBatches { .. } => "max_batches",
-        TooManyBasisElements { .. } => "max_basis_elements",
-        InvalidOptions { .. } => "invalid_options",
-        _ => "other",
-    }
-    .to_string()
+    error.limit_name().to_string()
 }
 
 /// The machine and build this measurement came from.
@@ -1392,13 +1467,16 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     }
 
     let runs = board.to_json(registry).expect("every run is registered");
+    // Checked before anything is written. The per-run filename's uniqueness rests on the
+    // formulation string — nothing in the name carries the slice or the seed — so two runs can
+    // silently map to one file and the directory ends up with fewer records than there were runs,
+    // with nothing to notice. Stopping is the right response: a lost record is worse than a
+    // failed write, and the message names both formulations so the fix is obvious.
+    if let Some(collision) = colliding_run_file(board.runs()) {
+        panic!("two runs would share a per-run filename: {}", collision);
+    }
     for run in board.runs() {
-        let name = format!(
-            "{}--{}--{}.json",
-            run.challenge,
-            run.formulation.replace(' ', "-"),
-            run.environment.commit
-        );
+        let name = format!("{}.json", run.run_file_stem());
         let manifest = registry
             .iter()
             .find(|c| c.id == run.challenge)
@@ -1412,6 +1490,14 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
 
     // History accumulates: read what is there, append, write it back. A writer with no reader
     // would mean losing every earlier milestone's results on each run.
+    //
+    // **Append-only, and that is load-bearing rather than incidental.** Position in the `runs`
+    // array is the only record of *when* a run was recorded, and
+    // `Scoreboard::verified_somehow`'s tie-break reads it: among witnesses tied on worker count
+    // it keeps the last one, because the later record is the one later code wrote and therefore
+    // the more complete. Sorting, deduplicating or regenerating this file would leave every
+    // record present and make that choice arbitrary. The contract is written into the file
+    // below, because a consumer cannot read a Rust doc comment.
     let history_path = root.join("results").join("history.json");
     let mut entries: Vec<Json> = match fs::read_to_string(&history_path) {
         Ok(text) => Json::parse(&text)
@@ -1431,6 +1517,7 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
         &history_path,
         Json::object([
             ("schema", Json::int(RunRecord::SCHEMA)),
+            ("contract", Json::string(HISTORY_CONTRACT)),
             ("run_count", Json::size(entries_for_history.len())),
             ("runs", Json::Array(entries_for_history)),
         ])
@@ -1467,14 +1554,7 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     fs::write(
         root.join("results").join("best.json"),
         Json::object([
-            (
-                "contract",
-                Json::string(
-                    "the fastest verified witness per problem AMONG SINGLE-THREADED RUNS. A \
-                     problem solved only on multiple workers is deliberately absent; ask \
-                     solved.json for solved status.",
-                ),
-            ),
+            ("contract", Json::string(BEST_CONTRACT)),
             (
                 "best",
                 Json::Array(all.best().values().map(|run| json_for(run)).collect()),
@@ -1488,16 +1568,7 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     fs::write(
         root.join("results").join("solved.json"),
         Json::object([
-            (
-                "contract",
-                Json::string(
-                    "one verified witness per problem at ANY concurrency -- an existence claim, \
-                     not a ranking. The representative is the one using the fewest workers, ties \
-                     to the first recorded; no runtimes are compared across worker counts. Every \
-                     entry carries environment.concurrency, and an entry with concurrency > 1 is \
-                     not comparable with a figure in best.json.",
-                ),
-            ),
+            ("contract", Json::string(SOLVED_CONTRACT)),
             (
                 "solved",
                 Json::Array(

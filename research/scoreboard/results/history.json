@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "contract": "every run ever recorded, APPEND-ONLY and in the order recorded. Array position is the only record of when a run was taken, and results/solved.json's tie-break reads it: among verified witnesses tied on environment.concurrency it keeps the LAST, because the later record is the one later code wrote and so carries at least as many fields. Appending is safe; sorting, deduplicating or regenerating this file is not, and would silently change what solved.json claims. run_count must equal runs.length.",
   "run_count": 93,
   "runs": [
     {

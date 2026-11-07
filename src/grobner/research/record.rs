@@ -715,8 +715,14 @@ impl ExperimentRecord {
     }
 
     /// The record as JSON.
+    ///
+    /// `measured_peak_resident_bytes` is **omitted** when there is no measurement, rather than
+    /// emitted as `null`. `RunRecord` already omitted it, and two records of the same quantity
+    /// encoding absence two ways is how a consumer acquires a special case per type. `null` is
+    /// also the worse of the two: it invites being coerced to zero, and "not measured" is not
+    /// zero bytes.
     pub fn to_json(&self) -> Json {
-        Json::object([
+        let mut fields = vec![
             ("schema", Json::int(self.schema)),
             ("instance", Json::string(&self.instance)),
             (
@@ -766,15 +772,12 @@ impl ExperimentRecord {
                 "estimated_peak_bytes",
                 Json::size(self.estimated_peak_bytes),
             ),
-            (
-                "measured_peak_resident_bytes",
-                match self.peak_resident_bytes {
-                    Some(b) => Json::int(b),
-                    None => Json::Null,
-                },
-            ),
-            ("reproduce", Json::string(&self.reproduce)),
-        ])
+        ];
+        if let Some(bytes) = self.peak_resident_bytes {
+            fields.push(("measured_peak_resident_bytes", Json::int(bytes)));
+        }
+        fields.push(("reproduce", Json::string(&self.reproduce)));
+        Json::object(fields)
     }
 }
 
@@ -784,6 +787,51 @@ mod tests {
 
     use super::{AttemptRecord, ExperimentRecord, Json};
     use crate::grobner::OutcomeClass;
+
+    /// An absent measured peak omits the key rather than emitting `null`.
+    ///
+    /// Unified with `RunRecord`, which already omitted it. Two records of the same quantity
+    /// encoding absence two ways is how a consumer ends up with a special case per type; and
+    /// `null` for "not measured" invites being read as a zero by anything that coerces.
+    #[test]
+    fn test_an_absent_measured_peak_omits_its_key() {
+        let record = ExperimentRecord::new("katsura-7", "baseline");
+        assert_eq!(record.peak_resident_bytes, None);
+
+        let text = record.to_json().to_json();
+        assert!(
+            !text.contains("measured_peak_resident_bytes"),
+            "an absent measurement must be omitted, not null: {}",
+            text
+        );
+        // The estimate is unconditional and stays, so a reader can still tell the two apart.
+        assert!(text.contains("estimated_peak_bytes"));
+
+        let parsed = Json::parse(&text).expect("the record this type wrote");
+        assert!(parsed.get("measured_peak_resident_bytes").is_none());
+    }
+
+    /// A present measured peak is emitted as an integer and parses back to the same value.
+    #[test]
+    fn test_a_present_measured_peak_round_trips_as_an_integer() {
+        let mut record = ExperimentRecord::new("katsura-7", "baseline");
+        record.estimated_peak_bytes = 195_000_000;
+        record.peak_resident_bytes = Some(14_750_000_000);
+
+        let text = record.to_json().to_json();
+        let parsed = Json::parse(&text).expect("the record this type wrote");
+        assert_eq!(
+            parsed
+                .get("measured_peak_resident_bytes")
+                .and_then(Json::as_int),
+            Some(14_750_000_000)
+        );
+        assert_eq!(
+            parsed.get("estimated_peak_bytes").and_then(Json::as_int),
+            Some(195_000_000),
+            "the estimate sits beside the measurement so the ratio is recoverable"
+        );
+    }
 
     /// Scalars and containers serialize to the forms a consumer expects.
     #[test]

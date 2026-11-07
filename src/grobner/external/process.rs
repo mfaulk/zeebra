@@ -74,6 +74,20 @@ pub enum RssBasis {
     /// be avoided.
     ProcessTreeSampled { interval: Duration, samples: u64 },
 
+    /// Peak bytes **allocated**, from a tracking allocator inside the measured process.
+    ///
+    /// **Not resident memory, and not comparable with either variant above.** A reservation the
+    /// process never writes to is counted here and is absent from `VmHWM`, and the gap is not
+    /// slack spread thinly: on the Fukuoka III `n = 20` row (#237) F4's pair queue reached 2^28
+    /// slots in a **single** 20 480 MiB allocation of which about 60% was never written, giving
+    /// 21 674 MB allocated against 13 996 MB resident. One allocation larger than the whole
+    /// resident peak is why no amount of care in reading "peak memory" distinguishes the two
+    /// quantities — only recording which one it is does.
+    ///
+    /// Available only for Zeebra's own rows, since it needs a `#[global_allocator]` in the
+    /// measured process. No external solver can report it.
+    AllocatorTracked,
+
     /// No figure: not Linux, `/proc` unreadable, measurement disabled, or the child exited before
     /// the first poll.
     Unavailable,
@@ -88,6 +102,12 @@ impl Display for RssBasis {
                 "process-tree VmRSS sampled every {:?} over {} polls (lower bound)",
                 interval, samples
             ),
+            Self::AllocatorTracked => {
+                write!(
+                    f,
+                    "peak bytes allocated by a tracking allocator (not resident)"
+                )
+            }
             Self::Unavailable => write!(f, "unavailable"),
         }
     }
@@ -472,6 +492,8 @@ impl Watcher {
 
     /// The peak RSS figure and the basis that describes it.
     fn rss(&self) -> (Option<u64>, RssBasis) {
+        // `AllocatorTracked` is deliberately unreachable here: it comes from inside the measured
+        // process, and nothing this supervisor can observe from outside produces it.
         match self.policy {
             RssPolicy::None => (None, RssBasis::Unavailable),
             RssPolicy::DirectChild => match self.direct_high_water {

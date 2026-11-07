@@ -1,5 +1,5 @@
 {
-  "contract": "one verified witness per problem at ANY concurrency -- an existence claim, not a ranking. The representative is the one using the fewest workers, ties to the first recorded; no runtimes are compared across worker counts. Every entry carries environment.concurrency, and an entry with concurrency > 1 is not comparable with a figure in best.json.",
+  "contract": "one verified witness per problem at ANY concurrency -- an existence claim, not a ranking. The representative is the one using the fewest workers, ties to the LAST recorded in history.json; no runtimes are compared across worker counts. That tie-break reads the order of history.json, which is append-only -- see its contract field. Every entry carries environment.concurrency, and an entry with concurrency > 1 is not comparable with a figure in best.json.",
   "solved": [
     {
       "schema": 1,

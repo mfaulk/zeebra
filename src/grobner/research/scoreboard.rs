@@ -618,6 +618,21 @@ pub struct RunRecord {
     /// would otherwise carry no memory figure.
     pub measured_peak_resident_bytes: Option<usize>,
 
+    /// How many scoreboard rows the process that produced
+    /// `measured_peak_resident_bytes` had recorded, including this one.
+    ///
+    /// **`VmHWM` is a process high-water mark, so attribution is not free.** A process that runs
+    /// seven rows reports one figure covering all seven, and that figure is a *ceiling* over them
+    /// rather than a measurement of any one — the row with the largest footprint sets it and the
+    /// other six inherit it. `Some(1)` says the process ran this row and nothing else, which is
+    /// the only case where the figure is this row's;
+    /// [`Self::measured_peak_is_attributable`] is that check.
+    ///
+    /// `None` exactly when `measured_peak_resident_bytes` is `None`: the count is a property of
+    /// the measurement and there is nothing to qualify without one. Absent in every record
+    /// written before this field existed, where it must not be read as an attributable `1`.
+    pub measured_peak_rows_in_process: Option<usize>,
+
     /// The command that reproduces this run.
     pub reproduce: String,
 }
@@ -650,8 +665,59 @@ impl RunRecord {
             },
             experiment: None,
             measured_peak_resident_bytes: None,
+            measured_peak_rows_in_process: None,
             reproduce: String::new(),
         }
+    }
+
+    /// The filename stem this run's own record is written under, without the extension.
+    ///
+    /// `<challenge>--<formulation with spaces hyphenated>--<commit>`.
+    ///
+    /// **Its uniqueness comes entirely from the formulation string.** Nothing in the name carries
+    /// the slice index or the seed, so two runs of one problem are distinguishable only because
+    /// every slice formulation happens to spell its seed out — `slice(3 fixed, seed 1)`. That is a
+    /// property of prose, not of the scheme, and `"a b"` against `"a-b"` already breaks it. The
+    /// dependency is checked rather than trusted: see [`colliding_run_file`], which the writer
+    /// calls before writing anything.
+    pub fn run_file_stem(&self) -> String {
+        format!(
+            "{}--{}--{}",
+            self.challenge,
+            self.formulation.replace(' ', "-"),
+            self.environment.commit
+        )
+    }
+
+    /// True if the measured peak is this row's and not a ceiling over several.
+    ///
+    /// Requires both a measurement and a row count of exactly one. An absent count is **not**
+    /// attributable: every record written before the count existed has one, and treating those as
+    /// single-row would be asserting something nobody recorded.
+    pub fn measured_peak_is_attributable(&self) -> bool {
+        self.measured_peak_resident_bytes.is_some() && self.measured_peak_rows_in_process == Some(1)
+    }
+
+    /// The measured process peak as a multiple of the accounted entry estimate.
+    ///
+    /// `measured / estimated`, and the interesting quantity rather than either figure alone: it is
+    /// what says the 16-byte-per-entry estimate is an accounting of the Macaulay matrices and not
+    /// a model of the process. 195 MB accounted inside a 14.75 GB process is a factor of 75.
+    ///
+    /// `None` unless the record carries both — a route with no Macaulay matrix, like the
+    /// resultant, has no frontier and so no estimate, and a run on a platform with no `/proc` has
+    /// no measurement. Also `None` for a zero estimate, which no ratio can use.
+    ///
+    /// Note that the ratio is only *about this row* when
+    /// [`Self::measured_peak_is_attributable`]; otherwise the numerator is a ceiling over several
+    /// rows and the ratio is an upper bound.
+    pub fn measured_to_estimated_ratio(&self) -> Option<f64> {
+        let measured = self.measured_peak_resident_bytes? as f64;
+        let estimated = self.frontier.as_ref()?.peak_estimated_bytes as f64;
+        if estimated <= 0.0 {
+            return None;
+        }
+        Some(measured / estimated)
     }
 
     /// Total wall clock across the stages.
@@ -884,6 +950,13 @@ impl RunRecord {
                 .get("measured_peak_resident_bytes")
                 .and_then(Json::as_int)
                 .map(|b| b as usize),
+            // Absent in every record written before the count existed, and absent must not read
+            // as an attributable `1` — those runs' figures cover however many rows their process
+            // ran, which is not recorded and cannot be recovered.
+            measured_peak_rows_in_process: value
+                .get("measured_peak_rows_in_process")
+                .and_then(Json::as_int)
+                .map(|rows| rows as usize),
             reproduce: value
                 .get("reproduce")
                 .and_then(Json::as_str)
@@ -950,8 +1023,13 @@ impl RunRecord {
                 None => Json::Null,
             },
         ));
+        // Omitted rather than `null` when absent, matching `ExperimentRecord`: "not measured" is
+        // the fact about those runs, and a key holding `null` invites being coerced to zero.
         if let Some(bytes) = self.measured_peak_resident_bytes {
             fields.push(("measured_peak_resident_bytes", Json::Int(bytes as i128)));
+            if let Some(rows) = self.measured_peak_rows_in_process {
+                fields.push(("measured_peak_rows_in_process", Json::size(rows)));
+            }
         }
         fields.push(("environment", self.environment.to_json()));
         fields.push((
@@ -1220,6 +1298,102 @@ impl Display for Comparison {
     }
 }
 
+/// What `research/scoreboard/results/history.json` promises a consumer, written into the file.
+///
+/// **The append-only property is load-bearing, not housekeeping.** [`Scoreboard`] keeps its runs
+/// in insertion order and [`Scoreboard::load`] preserves the order of the file, so array position
+/// is the only record of *when* a run was taken — and [`Scoreboard::verified_somehow`] reads it to
+/// break a tie on worker count. A rewrite that sorted, deduplicated or regenerated the array would
+/// leave every record present and make the rendered representative arbitrary, which is the kind of
+/// change that does not look like a change.
+///
+/// Lives here rather than in the writer because it describes an assumption of *this* module's
+/// code, and because `test_the_committed_history_declares_its_append_only_contract` compares the
+/// committed file against it character for character.
+pub const HISTORY_CONTRACT: &str = "every run ever recorded, APPEND-ONLY and in the order \
+     recorded. Array position is the only record of when a run was taken, and \
+     results/solved.json's tie-break reads it: among verified witnesses tied on \
+     environment.concurrency it keeps the LAST, because the later record is the one later code \
+     wrote and so carries at least as many fields. Appending is safe; sorting, deduplicating or \
+     regenerating this file is not, and would silently change what solved.json claims. run_count \
+     must equal runs.length.";
+
+/// What `research/scoreboard/results/best.json` promises a consumer.
+///
+/// [`Scoreboard::best`] is [`Scoreboard::best_at`] at one worker, so this file is a **like-for-like
+/// serial ranking** and a problem solved only on multiple workers is absent from it by design. Ask
+/// `solved.json` for solved status.
+pub const BEST_CONTRACT: &str = "the fastest verified witness per problem AMONG SINGLE-THREADED \
+     RUNS. A problem solved only on multiple workers is deliberately absent; ask solved.json for \
+     solved status.";
+
+/// What `research/scoreboard/results/solved.json` promises a consumer.
+///
+/// Describes [`Scoreboard::verified_somehow`], **including its dependency on the order of
+/// `history.json`** — see that method and [`HISTORY_CONTRACT`]. The string committed before M25
+/// said the tie went "to the first recorded" while the code kept the last; a contract a consumer
+/// cannot check is a contract that drifts, which is why it is a constant here and asserted against
+/// the committed file.
+pub const SOLVED_CONTRACT: &str = "one verified witness per problem at ANY concurrency -- an \
+     existence claim, not a ranking. The representative is the one using the fewest workers, ties \
+     to the LAST recorded in history.json; no runtimes are compared across worker counts. That \
+     tie-break reads the order of history.json, which is append-only -- see its contract field. \
+     Every entry carries environment.concurrency, and an entry with concurrency > 1 is not \
+     comparable with a figure in best.json.";
+
+/// Two runs that differ but whose per-run filenames would not.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RunFileCollision {
+    /// The filename stem both runs map to.
+    pub stem: String,
+
+    /// The formulation of the run that would be overwritten.
+    pub first: String,
+
+    /// The formulation of the run that would overwrite it.
+    pub second: String,
+}
+
+impl Display for RunFileCollision {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?} and {:?} would both be written to {}.json",
+            self.first, self.second, self.stem
+        )
+    }
+}
+
+/// The first pair of runs in `runs` that differ but would share a per-run filename.
+///
+/// The failure this detects is **silent**: one record overwrites another and the directory simply
+/// has one fewer file than there were runs, with nothing to notice. `RunRecord::run_file_stem`
+/// explains why the scheme is vulnerable; this is the check that keeps it honest, and the writer
+/// calls it before writing anything so a collision stops the run instead of losing a record.
+///
+/// Two records with the **same** formulation are not a collision: that is one row rerun, and the
+/// later record legitimately replaces the earlier file.
+pub fn colliding_run_file(runs: &[RunRecord]) -> Option<RunFileCollision> {
+    let mut seen: BTreeMap<String, &str> = BTreeMap::new();
+    for run in runs {
+        let stem = run.run_file_stem();
+        match seen.get(&stem) {
+            Some(first) if *first != run.formulation.as_str() => {
+                return Some(RunFileCollision {
+                    stem,
+                    first: first.to_string(),
+                    second: run.formulation.clone(),
+                })
+            }
+            Some(_) => {}
+            None => {
+                seen.insert(stem, run.formulation.as_str());
+            }
+        }
+    }
+    None
+}
+
 /// Every run, with the registry's problems, rendered.
 #[derive(Clone, Debug, Default)]
 pub struct Scoreboard {
@@ -1352,6 +1526,29 @@ impl Scoreboard {
     /// later one is written by later code. Preferring the earlier one made the rendered row drop a
     /// `measured_peak_resident_bytes` that the newer record carried — a tie-break silently
     /// choosing the less complete record. Neither candidate's runtime is read either way.
+    ///
+    /// # The precondition: insertion order must be chronological
+    ///
+    /// **"Later" is read off the position in `self.runs` and nowhere else.** No record carries a
+    /// timestamp, so the tie-break is sound only while position is chronology, which rests on two
+    /// properties that are easy to break without noticing:
+    ///
+    /// * [`Self::load`] preserves the order of the `runs` array it is given, and
+    /// * `research/scoreboard/results/history.json` is **append-only** — see [`HISTORY_CONTRACT`],
+    ///   which is written into the file so that a consumer sees it too.
+    ///
+    /// Sorting, deduplicating or regenerating that history would leave every record present and
+    /// make this choice arbitrary. Both properties are pinned by tests:
+    /// `test_loading_a_history_preserves_its_recorded_order`,
+    /// `test_the_tie_break_depends_on_the_recorded_order`, and
+    /// `test_the_committed_history_declares_its_append_only_contract`.
+    ///
+    /// The cheaper alternative considered and not taken was a per-run timestamp. It would remove
+    /// the dependency, but it would also add a field to every record for the sake of a tie that
+    /// arises once in ninety-three runs, and it would not make the *rendering* of a tie any more
+    /// meaningful — the two candidates still differ only in completeness, which is what "latest"
+    /// is a proxy for. Worth revisiting if history ever stops being append-only for some other
+    /// reason.
     ///
     /// Use [`Self::best_at`] to compare runtimes within a fixed worker count.
     pub fn verified_somehow(&self) -> BTreeMap<&str, &RunRecord> {
@@ -1794,6 +1991,281 @@ mod tests {
         );
     }
 
+    /// Two formulations that differ, but whose filenames would not, are reported as a collision.
+    ///
+    /// The per-run filename is `<challenge>--<formulation>--<commit>.json`, and its uniqueness
+    /// comes entirely from the formulation string — nothing in the name carries the slice or the
+    /// seed. That works today only because every slice formulation happens to spell its seed out.
+    /// `"a b"` and `"a-b"` are enough to break it, and the failure mode is a silent overwrite: one
+    /// run's record replaces another's and the directory simply has one fewer file than runs.
+    #[test]
+    fn test_two_runs_that_would_share_a_filename_are_reported() {
+        let one = witness("poseidon31-cico-t16-rf2-rp4", "slice 3", 1_000, 1 << 20);
+        let other = witness("poseidon31-cico-t16-rf2-rp4", "slice-3", 2_000, 1 << 20);
+        assert_eq!(
+            one.run_file_stem(),
+            other.run_file_stem(),
+            "the premise of this test: the two stems are the same"
+        );
+
+        let collision = super::colliding_run_file(&[one, other]).expect("a collision");
+        assert!(collision.stem.contains("slice-3"), "{}", collision.stem);
+        assert_eq!(collision.first, "slice 3");
+        assert_eq!(collision.second, "slice-3");
+    }
+
+    /// Runs whose filenames differ are not reported, and nor is the same run recorded twice.
+    ///
+    /// The second case matters: two records with the same formulation *are* the same row rerun,
+    /// and the later one legitimately replaces the earlier file.
+    #[test]
+    fn test_distinct_filenames_and_an_honest_rerun_are_not_collisions() {
+        let runs = vec![
+            witness(
+                "poseidon31-cico-t16-rf2-rp4",
+                "slice(3 fixed, seed 0)",
+                1,
+                0,
+            ),
+            witness(
+                "poseidon31-cico-t16-rf2-rp4",
+                "slice(3 fixed, seed 1)",
+                1,
+                0,
+            ),
+            witness("poseidon31-cico-t16-rf2-rp4", "as generated", 1, 0),
+        ];
+        assert_eq!(super::colliding_run_file(&runs), None);
+
+        let rerun = vec![
+            witness("poseidon31-cico-t16-rf2-rp4", "as generated", 1, 0),
+            witness("poseidon31-cico-t16-rf2-rp4", "as generated", 2, 0),
+        ];
+        assert_eq!(
+            super::colliding_run_file(&rerun),
+            None,
+            "the same formulation twice is a rerun, not a collision"
+        );
+    }
+
+    /// The committed run files are exactly the stems the writer would produce, with none lost.
+    ///
+    /// Checks the property as *files*: a silent overwrite shows up here as a directory with fewer
+    /// entries than the history has distinct rows.
+    #[test]
+    fn test_the_committed_run_files_have_no_collisions() {
+        let history = Json::parse(include_str!(
+            "../../../research/scoreboard/results/history.json"
+        ))
+        .expect("committed history.json parses");
+        let registry = registry();
+        let board = Scoreboard::load(&history, &registry).expect("the committed history");
+        assert_eq!(
+            super::colliding_run_file(board.runs()),
+            None,
+            "two committed runs would share a per-run filename"
+        );
+    }
+
+    /// A measured peak carries the number of rows the measuring process ran, and round-trips.
+    ///
+    /// `VmHWM` is a **process** high-water mark, so a figure from a process that ran seven rows is
+    /// a ceiling over all seven and not a measurement of any one of them. One row means the figure
+    /// is attributable; more means it is not, and the record has to say which — a resource bound
+    /// read as a resource measurement is the error the whole memory vocabulary here exists to
+    /// prevent.
+    #[test]
+    fn test_a_measured_peak_records_how_many_rows_the_process_covered() {
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+
+        let mut sole = witness("poseidon31-cico-t16-rf2-rp4", "row", 1_000, 1 << 20);
+        sole.measured_peak_resident_bytes = Some(14_750_000_000);
+        sole.measured_peak_rows_in_process = Some(1);
+        assert!(sole.measured_peak_is_attributable());
+
+        let text = sole.to_json(&manifest).to_json();
+        let back = RunRecord::from_json(&Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_resident_bytes, Some(14_750_000_000));
+        assert_eq!(back.measured_peak_rows_in_process, Some(1));
+        assert!(back.measured_peak_is_attributable());
+
+        let mut shared = witness("poseidon31-cico-t16-rf2-rp4", "smoke", 1_000, 1 << 20);
+        shared.measured_peak_resident_bytes = Some(14_750_000_000);
+        shared.measured_peak_rows_in_process = Some(7);
+        assert!(
+            !shared.measured_peak_is_attributable(),
+            "a seven-row process reports a ceiling, not this row's peak"
+        );
+        let text = shared.to_json(&manifest).to_json();
+        let back = RunRecord::from_json(&Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_rows_in_process, Some(7));
+        assert!(!back.measured_peak_is_attributable());
+    }
+
+    /// With no measurement both memory keys are omitted, and absence parses as not-measured.
+    ///
+    /// Omission rather than `null`, matching `ExperimentRecord`, and the property every record
+    /// written before these fields existed depends on: absent must never read as zero, and an
+    /// absent row count must never read as an attributable figure.
+    #[test]
+    fn test_an_unmeasured_peak_omits_both_keys_and_is_not_attributable() {
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+        let mut run = witness("poseidon31-cico-t16-rf2-rp4", "row", 1_000, 1 << 20);
+        run.measured_peak_resident_bytes = None;
+        run.measured_peak_rows_in_process = None;
+
+        let text = run.to_json(&manifest).to_json();
+        assert!(!text.contains("measured_peak_resident_bytes"));
+        assert!(!text.contains("measured_peak_rows_in_process"));
+
+        let back = RunRecord::from_json(&Json::parse(&text).expect("valid"), &manifest)
+            .expect("round trips");
+        assert_eq!(back.measured_peak_resident_bytes, None);
+        assert_eq!(back.measured_peak_rows_in_process, None);
+        assert!(!back.measured_peak_is_attributable());
+        assert_eq!(back.measured_to_estimated_ratio(), None);
+    }
+
+    /// For an F4 row the estimated-to-measured ratio is recoverable from the record alone.
+    ///
+    /// The point of populating both figures. 195 MB of accounted matrix entries inside a 14.75 GB
+    /// process is a factor of 75, and that factor is the interesting quantity — it is what says
+    /// the entry estimate is not a model of the process.
+    #[test]
+    fn test_the_estimated_to_measured_ratio_is_recoverable_from_one_record() {
+        let mut run = witness("poseidon31-cico-t16-rf2-rp4", "row", 1_000, 195_000_000);
+        run.measured_peak_resident_bytes = Some(14_750_000_000);
+        run.measured_peak_rows_in_process = Some(1);
+
+        let ratio = run
+            .measured_to_estimated_ratio()
+            .expect("both figures are present");
+        assert!(
+            (ratio - 75.64).abs() < 0.01,
+            "{} is not the 14.75 GB / 195 MB ratio",
+            ratio
+        );
+
+        // A route with no Macaulay matrix has no estimate, so there is no ratio to report.
+        run.frontier = None;
+        assert_eq!(run.measured_to_estimated_ratio(), None);
+    }
+
+    /// Loading a history preserves the order the file recorded, record for record.
+    ///
+    /// The precondition `verified_somehow`'s tie-break rests on. If `load` ever sorted, deduped or
+    /// reordered, insertion order would stop meaning "when it was recorded" and the tie-break
+    /// would start choosing arbitrarily — silently, because every record would still be present.
+    #[test]
+    fn test_loading_a_history_preserves_its_recorded_order() {
+        let registry = registry();
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+        let formulations = ["first", "second", "third"];
+
+        let entries: Vec<Json> = formulations
+            .iter()
+            .map(|formulation| {
+                witness("poseidon31-cico-t16-rf2-rp4", formulation, 1_000, 1 << 20)
+                    .to_json(&manifest)
+            })
+            .collect();
+        let history = Json::object([("runs", Json::Array(entries))]);
+
+        let board = Scoreboard::load(&history, &registry).expect("a history this program wrote");
+        let order: Vec<&str> = board
+            .runs()
+            .iter()
+            .map(|run| run.formulation.as_str())
+            .collect();
+        assert_eq!(
+            order, formulations,
+            "load must preserve the recorded order; the tie-break depends on it"
+        );
+    }
+
+    /// The tie-break's answer depends on the recorded order, and the later record wins.
+    ///
+    /// The assumption stated as a test rather than as a comment: the **same two records** in the
+    /// **other order** give the other representative. That is not a defect — it is the documented
+    /// behaviour, and it is only sound because `results/history.json` is append-only, so position
+    /// in the array *is* chronology. This test fails if that stops being true in either direction:
+    /// if the ordering is lost, or if the tie-break stops reading it.
+    #[test]
+    fn test_the_tie_break_depends_on_the_recorded_order() {
+        let registry = registry();
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp4").expect("registered");
+
+        let at_32 = |formulation: &str, millis: u64| {
+            let mut run = witness("poseidon31-cico-t16-rf2-rp4", formulation, millis, 1 << 20);
+            run.environment.concurrency = 32;
+            run.to_json(&manifest)
+        };
+        // Deliberately the *faster* run first, so that a tie-break reading runtimes rather than
+        // order would pick it and fail this test.
+        let faster = at_32("faster, recorded first", 1_000);
+        let slower = at_32("slower, recorded second", 9_000);
+
+        for (order, expected) in [
+            (
+                vec![faster.clone(), slower.clone()],
+                "slower, recorded second",
+            ),
+            (vec![slower, faster], "faster, recorded first"),
+        ] {
+            let history = Json::object([("runs", Json::Array(order))]);
+            let board = Scoreboard::load(&history, &registry).expect("a valid history");
+            let solved = board.verified_somehow();
+            let chosen = solved
+                .get("poseidon31-cico-t16-rf2-rp4")
+                .expect("a witness exists");
+            assert_eq!(
+                chosen.formulation, expected,
+                "the representative must be the last-recorded of the tied pair"
+            );
+        }
+    }
+
+    /// The committed history declares, in the file, that it is append-only.
+    ///
+    /// The dependency is load-bearing for `solved.json`, and a consumer of the file cannot read a
+    /// Rust doc comment. `run_count` is checked against the array for the same reason: a rewrite
+    /// that dropped or reordered records is exactly what the contract forbids, and a mismatch is
+    /// the cheapest evidence of one.
+    #[test]
+    fn test_the_committed_history_declares_its_append_only_contract() {
+        let history = Json::parse(include_str!(
+            "../../../research/scoreboard/results/history.json"
+        ))
+        .expect("committed history.json parses");
+
+        let contract = history
+            .get("contract")
+            .and_then(Json::as_str)
+            .expect("history.json carries a contract string");
+        assert_eq!(
+            contract,
+            super::HISTORY_CONTRACT,
+            "the committed contract must be the one the writer emits, character for character"
+        );
+        assert!(
+            contract.contains("APPEND-ONLY"),
+            "the contract must state the append-only dependency"
+        );
+
+        let runs = history.get("runs").expect("a runs array").items();
+        let count = history
+            .get("run_count")
+            .and_then(Json::as_int)
+            .expect("a run_count");
+        assert_eq!(
+            count as usize,
+            runs.len(),
+            "run_count disagrees with the array, so the file was rewritten rather than appended to"
+        );
+    }
+
     /// The **committed** result files honour their contracts, checked as files and not as renderer output.
     ///
     /// `best.json` and `solved.json` are what a machine consumer reads, and a renderer test says
@@ -1810,6 +2282,25 @@ mod tests {
             "../../../research/scoreboard/results/solved.json"
         ))
         .expect("committed solved.json parses");
+
+        // The contract strings are the writer's own constants, character for character. The
+        // committed solved.json said the tie went "to the first recorded" while
+        // `verified_somehow` kept the last — a contract nothing checked, so it drifted. This is
+        // the check.
+        assert_eq!(
+            best.get("contract").and_then(Json::as_str),
+            Some(super::BEST_CONTRACT),
+            "best.json's contract has drifted from the writer's"
+        );
+        assert_eq!(
+            solved.get("contract").and_then(Json::as_str),
+            Some(super::SOLVED_CONTRACT),
+            "solved.json's contract has drifted from the writer's"
+        );
+        assert!(
+            super::SOLVED_CONTRACT.contains("LAST recorded"),
+            "solved.json must describe the tie-break the code actually implements"
+        );
 
         // Each states its own contract, so neither can be read as the other.
         for file in [&best, &solved] {
