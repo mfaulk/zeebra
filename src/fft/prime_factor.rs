@@ -18,8 +18,11 @@
 //! kernel, a composite factor recurses, and an odd prime power — 9, 25, 27 — has no coprime split
 //! and falls back to the `O(m^2)` definition. So a size like `2520 = 2^3 * 3^2 * 5 * 7` costs
 //! `n log 8` for the 2-adic part plus `n * (9 + 5 + 7)` for the rest, while a large *prime* size is
-//! quadratic. Bluestein is what fixes that case, and it is out of scope here (#125): it needs a
-//! `2n`-th root of unity and a convolution, not a re-indexing.
+//! quadratic through this route. [`bluestein`](super::bluestein) removes that case with a
+//! convolution rather than a re-indexing, but is not dispatched to from here: it needs a
+//! power-of-two root of unity for the convolution length, which `KnownOrder` can supply and the
+//! `FiniteField` bound on this function cannot, and the crossover against `dft` is unmeasured
+//! (#357).
 
 use crate::{fft::transform::transform_in_place, integers::mod_inverse_u128, FiniteField};
 

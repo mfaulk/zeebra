@@ -221,3 +221,4 @@ jobs:
         run: |
           bash scripts/agent/test/zb-claim-test.sh
           bash tools/test/rss-guard-test.sh
+          bash tools/test/benchlock-test.sh

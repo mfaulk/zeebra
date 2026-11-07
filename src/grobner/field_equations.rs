@@ -39,6 +39,21 @@ pub enum FieldEquationError {
         /// The order, where it is known at all. `None` for a field too wide for a `u128`.
         order: Option<u128>,
     },
+
+    /// The field's elements cannot be reached by `FiniteField::new` over `0..q`.
+    ///
+    /// Only [`rational_points_by_enumeration`] raises this; constructing the equations themselves
+    /// needs `q` as an exponent and nothing more. `new` maps an integer into the field, and over
+    /// an extension of degree above one it lands in the prime subfield — `p` of the `q` elements
+    /// — rather than ranging over the field. `BinaryFieldElement`'s implementation is `todo!()`
+    /// and panics instead. Either way an enumeration driven by `new` is not an oracle: it would
+    /// return a point count that is wrong rather than one that failed.
+    NotIndexableByInteger {
+        /// The field order, where it fits a `u128`.
+        order: Option<u128>,
+        /// The characteristic, where it fits a `u128`. Equal to `order` exactly for a prime field.
+        characteristic: Option<u128>,
+    },
 }
 
 impl Display for FieldEquationError {
@@ -51,6 +66,14 @@ impl Display for FieldEquationError {
             Self::OrderNotRepresentable { order: None } => write!(
                 f,
                 "the field order does not fit a u128, so x^q is not a representable monomial"
+            ),
+            Self::NotIndexableByInteger {
+                order,
+                characteristic,
+            } => write!(
+                f,
+                "a field of order {order:?} and characteristic {characteristic:?} is an extension, \
+                 whose elements FiniteField::new cannot enumerate"
             ),
         }
     }
@@ -102,8 +125,12 @@ pub fn with_field_equations<const N: usize, F: KnownOrder>(
 ///
 /// Exponential and deliberately so: this is an oracle, not an algorithm. It exists to check a
 /// quotient dimension against a count that cannot be wrong, which is only possible while `q^N` is
-/// small. `KnownOrder::enumerate`-style iteration is not available, so the field is enumerated
-/// through `F::new` over `0..q`.
+/// small.
+///
+/// **Prime fields only.** `KnownOrder` offers no element iterator, so the field is walked through
+/// `F::new` over `0..q`, which covers the field exactly when `q` is prime; see
+/// [`FieldEquationError::NotIndexableByInteger`] for what happens otherwise and why refusing beats
+/// enumerating a subfield.
 pub fn rational_points_by_enumeration<const N: usize, F: KnownOrder>(
     system: &[MultivariatePolynomial<N, F>],
 ) -> Result<Vec<[F; N]>, FieldEquationError> {
@@ -112,6 +139,17 @@ pub fn rational_points_by_enumeration<const N: usize, F: KnownOrder>(
         Some(q) if q <= u32::MAX as u128 => q as u64,
         _ => return Err(FieldEquationError::OrderNotRepresentable { order }),
     };
+
+    // `new` ranges over the field only when there is no proper subfield to land in. Checked
+    // against the characteristic rather than by primality testing `q`, since `KnownOrder` already
+    // reports it and the two agree exactly on prime fields.
+    let characteristic = F::characteristic_u128();
+    if characteristic != order {
+        return Err(FieldEquationError::NotIndexableByInteger {
+            order,
+            characteristic,
+        });
+    }
 
     let total = q
         .checked_pow(N as u32)
@@ -166,6 +204,27 @@ mod tests {
 
         let gf256 = field_equations::<1, Gf256>().expect("representable");
         assert_eq!(gf256[0].degree(), 256);
+    }
+
+    /// Enumeration refuses a field that integer indexing cannot cover, rather than panicking.
+    ///
+    /// `FiniteField::new` is not a bijection from `0..q` onto an extension field:
+    /// `ExtensionFieldElement::new` embeds the prime subfield, and `BinaryFieldElement`'s is
+    /// `todo!()`. Enumerating through it would therefore either panic or silently cover `0..p` of
+    /// `q` elements and report a point count that is wrong rather than failing.
+    #[test]
+    fn enumeration_refuses_a_field_it_cannot_index() {
+        let system: Vec<MultivariatePolynomial<2, Gf256>> = vec![MultivariatePolynomial::new(&[(
+            Monomial::new(&[1, 0]),
+            Gf256::one(),
+        )])];
+        assert_eq!(
+            rational_points_by_enumeration(&system),
+            Err(FieldEquationError::NotIndexableByInteger {
+                order: Some(256),
+                characteristic: Some(2),
+            }),
+        );
     }
 
     /// A field whose order exceeds a monomial exponent is refused as a value, not a panic.

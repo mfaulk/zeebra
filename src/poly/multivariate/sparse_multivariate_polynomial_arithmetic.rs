@@ -1,8 +1,19 @@
 //! Arithmetic operations for sparse multivariate polynomials.
+//!
+//! `Add`, `Sub` and `Neg` collect into one of their operands' maps rather than materialising a
+//! `Vec` of `|a| + |b|` terms and rebuilding a third map through [`SparseMultiPoly::new`] — the
+//! same change #243 made to `Mul`, one operator over. #243 left `Add` as the binding term in the
+//! six-round `cico_bivariate` build, whose MDS layer folds sixteen 266 815-term state words
+//! through it once per round and so allocated the sum two to three times over.
+//!
+//! Which map is merged into is chosen per ownership spelling, and that is the whole of the
+//! optimisation: an owned operand is mutated, so `p + q` and `p += &q` allocate nothing beyond the
+//! growth the sum's own support needs. Addition being commutative, the borrowed/borrowed spelling
+//! clones the *larger* side and hashes the smaller.
 
-use std::{cmp::Ordering, ops, ops::Neg};
+use std::{cmp::Ordering, collections::HashMap, ops, ops::Neg};
 
-use crate::{impl_add_variants, impl_mul_variants, impl_sub_variants};
+use crate::impl_mul_variants;
 
 use crate::{
     poly::{
@@ -14,18 +25,61 @@ use crate::{
     FiniteField, Monomial,
 };
 
+/// Merge `terms` into `accumulator`, dropping any monomial whose coefficient cancels to zero.
+///
+/// The canonical invariant is maintained entry by entry rather than by a `retain` pass afterwards.
+/// A `retain` is linear in the accumulator, which would make `div_rem`'s `quotient += q` — one
+/// term against the quotient built so far — linear in the quotient on every reduction step.
+///
+/// # Why there is no `reserve`
+///
+/// `|a| + |b|` is an upper bound on the sum's support and pre-sizing to it would save a handful of
+/// rehashes, but it is the *wrong* bound to allocate: it is exactly the quantity the materialising
+/// form was criticised for holding. Measured on the cancelling shape in
+/// `tests/multivariate_add_memory.rs` — two 11 476-term triangles summing to one term — a
+/// `reserve(|b|)` grew the accumulator's table to hold 22 952 entries and peaked at **426 KB** to
+/// produce one term, against **594 KB** for materialising: a 1.4x improvement and no bound at all.
+/// Letting the table grow geometrically instead only ever grows it when it is full of *live*
+/// entries, so the live set is bounded by the output; the same case then peaks at under a
+/// kilobyte. The amortised insert cost is unchanged, which is why this is not a trade.
+fn merge_terms<const N: usize, F: FiniteField>(
+    accumulator: &mut HashMap<Monomial<N>, F>,
+    terms: impl Iterator<Item = (Monomial<N>, F)>,
+) {
+    for (monomial, coefficient) in terms {
+        let cancelled = match accumulator.get_mut(&monomial) {
+            Some(c) => {
+                *c += coefficient;
+                c.is_zero()
+            }
+            None => {
+                // A zero coefficient is not a term of the polynomial, so it is never inserted.
+                if !coefficient.is_zero() {
+                    accumulator.insert(monomial, coefficient);
+                }
+                false
+            }
+        };
+        if cancelled {
+            accumulator.remove(&monomial);
+        }
+    }
+}
+
 /// Neg: -p
 impl<const N: usize, F: FiniteField> Neg for SparseMultiPoly<N, F> {
     type Output = SparseMultiPoly<N, F>;
 
-    fn neg(self) -> Self::Output {
-        let terms: Vec<(Monomial<N>, F)> = self
-            .terms
-            .iter()
-            .map(|(monomial, c)| (*monomial, c.neg()))
-            .collect();
-
-        SparseMultiPoly::new(&terms)
+    fn neg(mut self) -> Self::Output {
+        // One pass: `retain`'s closure holds the coefficient by mutable reference, so negating and
+        // dropping the zeros happen together. The drop is not dead — `terms` admits the
+        // non-canonical `0 * 1` spelling of the zero polynomial, and `-p` has always returned the
+        // canonical form of it.
+        self.terms.retain(|_monomial, c| {
+            *c = -*c;
+            !c.is_zero()
+        });
+        self
     }
 }
 
@@ -34,18 +88,85 @@ impl<const N: usize, F: FiniteField> ops::Add<&SparseMultiPoly<N, F>> for &Spars
     type Output = SparseMultiPoly<N, F>;
 
     fn add(self, other: &SparseMultiPoly<N, F>) -> Self::Output {
-        let terms: Vec<(Monomial<N>, F)> = self
-            .terms
-            .iter()
-            .chain(other.terms.iter())
-            .map(|(monomial, c)| (*monomial, *c))
-            .collect();
-
-        SparseMultiPoly::new(&terms)
+        // Clone the larger operand and merge the smaller into it. Addition is commutative, so the
+        // choice is free, and it is the cheaper split: the clone copies a map, while the merge
+        // hashes once per term of whichever side is merged.
+        let (mut sum, addend) = if self.terms.len() >= other.terms.len() {
+            (self.clone(), other)
+        } else {
+            (other.clone(), self)
+        };
+        sum += addend;
+        sum
     }
 }
 
-impl_add_variants!([const N: usize, F: FiniteField], SparseMultiPoly<N, F>);
+/// Add: p + &q, accumulated into `p`'s map.
+impl<const N: usize, F: FiniteField> ops::Add<&SparseMultiPoly<N, F>> for SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn add(mut self, other: &SparseMultiPoly<N, F>) -> Self::Output {
+        self += other;
+        self
+    }
+}
+
+/// Add: &p + q, accumulated into `q`'s map — equivalent, since addition commutes.
+impl<const N: usize, F: FiniteField> ops::Add<SparseMultiPoly<N, F>> for &SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn add(self, mut other: SparseMultiPoly<N, F>) -> Self::Output {
+        other += self;
+        other
+    }
+}
+
+/// Add: p + q, accumulated into whichever map is larger.
+impl<const N: usize, F: FiniteField> ops::Add for SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn add(self, other: Self) -> Self::Output {
+        let (mut sum, addend) = if self.terms.len() >= other.terms.len() {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        sum += addend;
+        sum
+    }
+}
+
+/// Add: &mut p + &mut q
+impl<const N: usize, F: FiniteField> ops::Add<&mut SparseMultiPoly<N, F>>
+    for &mut SparseMultiPoly<N, F>
+{
+    type Output = SparseMultiPoly<N, F>;
+
+    fn add(self, other: &mut SparseMultiPoly<N, F>) -> Self::Output {
+        &*self + &*other
+    }
+}
+
+/// AddAssign: p += &q, merging `q`'s terms into `p`'s map.
+impl<const N: usize, F: FiniteField> ops::AddAssign<&SparseMultiPoly<N, F>>
+    for SparseMultiPoly<N, F>
+{
+    fn add_assign(&mut self, other: &SparseMultiPoly<N, F>) {
+        merge_terms(
+            &mut self.terms,
+            other.terms.iter().map(|(monomial, c)| (*monomial, *c)),
+        );
+    }
+}
+
+/// AddAssign: p += q
+impl<const N: usize, F: FiniteField> ops::AddAssign for SparseMultiPoly<N, F> {
+    fn add_assign(&mut self, other: Self) {
+        // Consuming `other`'s map rather than borrowing it, so its allocation is released here
+        // instead of surviving until the end of the statement.
+        merge_terms(&mut self.terms, other.terms.into_iter());
+    }
+}
 
 /// Mul: &p * &q
 impl<const N: usize, F: FiniteField> ops::Mul<&SparseMultiPoly<N, F>> for &SparseMultiPoly<N, F> {
@@ -71,18 +192,77 @@ impl<const N: usize, F: FiniteField> ops::Sub<&SparseMultiPoly<N, F>> for &Spars
     type Output = SparseMultiPoly<N, F>;
 
     fn sub(self, other: &SparseMultiPoly<N, F>) -> Self::Output {
-        let terms: Vec<(Monomial<N>, F)> = self
-            .terms
-            .iter()
-            .map(|(monomial, c)| (*monomial, *c))
-            .chain(other.terms.iter().map(|(monomial, c)| (*monomial, c.neg())))
-            .collect();
-
-        SparseMultiPoly::new(&terms)
+        // Subtraction does not commute, so unlike addition this is the one spelling with no owned
+        // map to accumulate into and no choice about which side to clone.
+        let mut difference = self.clone();
+        difference -= other;
+        difference
     }
 }
 
-impl_sub_variants!([const N: usize, F: FiniteField], SparseMultiPoly<N, F>);
+/// Sub: p - &q, accumulated into `p`'s map.
+impl<const N: usize, F: FiniteField> ops::Sub<&SparseMultiPoly<N, F>> for SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn sub(mut self, other: &SparseMultiPoly<N, F>) -> Self::Output {
+        self -= other;
+        self
+    }
+}
+
+/// Sub: &p - q, as `(-q) + p`, so that `q`'s map is the one accumulated into.
+impl<const N: usize, F: FiniteField> ops::Sub<SparseMultiPoly<N, F>> for &SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn sub(self, other: SparseMultiPoly<N, F>) -> Self::Output {
+        let mut difference = -other;
+        difference += self;
+        difference
+    }
+}
+
+/// Sub: p - q
+impl<const N: usize, F: FiniteField> ops::Sub for SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn sub(mut self, other: Self) -> Self::Output {
+        self -= other;
+        self
+    }
+}
+
+/// Sub: &mut p - &mut q
+impl<const N: usize, F: FiniteField> ops::Sub<&mut SparseMultiPoly<N, F>>
+    for &mut SparseMultiPoly<N, F>
+{
+    type Output = SparseMultiPoly<N, F>;
+
+    fn sub(self, other: &mut SparseMultiPoly<N, F>) -> Self::Output {
+        &*self - &*other
+    }
+}
+
+/// SubAssign: p -= &q, merging `q`'s negated terms into `p`'s map.
+impl<const N: usize, F: FiniteField> ops::SubAssign<&SparseMultiPoly<N, F>>
+    for SparseMultiPoly<N, F>
+{
+    fn sub_assign(&mut self, other: &SparseMultiPoly<N, F>) {
+        merge_terms(
+            &mut self.terms,
+            other.terms.iter().map(|(monomial, c)| (*monomial, -*c)),
+        );
+    }
+}
+
+/// SubAssign: p -= q
+impl<const N: usize, F: FiniteField> ops::SubAssign for SparseMultiPoly<N, F> {
+    fn sub_assign(&mut self, other: Self) {
+        merge_terms(
+            &mut self.terms,
+            other.terms.into_iter().map(|(monomial, c)| (monomial, -c)),
+        );
+    }
+}
 
 impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// Divides `self` by `divisor` and returns the quotient and remainder.
@@ -345,7 +525,7 @@ mod tests {
     use crate::{
         fields::PrimeFieldElement64,
         poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
-        FiniteField, Monomial, MultivariatePolynomial,
+        FiniteField, Monomial, MultivariatePolynomial, One, Zero,
     };
     use proptest::{collection::vec, prelude::*, test_runner::TestRunner};
 
@@ -898,4 +1078,285 @@ mod tests {
         MonomialOrder::GradedLexicographic,
         MonomialOrder::GradedReverseLexicographic,
     ];
+
+    // === in-place Add, Sub and scale (#361) ===
+    //
+    // The collecting forms mutate one operand's map instead of building a third, so the risk they
+    // carry is not a wrong sum but a wrong *representation*: a coefficient that cancelled and was
+    // left in the map, or a term merged into the operand that was supposed to be read-only. Every
+    // test below pins one of those.
+    //
+    // `a += &a` and `a -= &a` are not spellable in safe Rust — `&mut a` and `&a` cannot coexist —
+    // so self-assignment is exercised through a clone, which is the aliasing the borrow checker
+    // does permit and the one `div_rem`'s `working -= &q * divisor` actually reaches.
+
+    /// Three polynomials with overlapping support, so merging them exercises hit, miss and cancel.
+    fn overlapping_triple<const N: usize, F: FiniteField>() -> (
+        SparseMultiPoly<N, F>,
+        SparseMultiPoly<N, F>,
+        SparseMultiPoly<N, F>,
+    ) {
+        let mut low = [0u32; N];
+        low[0] = 1;
+        let mut mid = [0u32; N];
+        mid[N - 1] = 2;
+        let mut high = [1u32; N];
+
+        let a = SparseMultiPoly::new(&[
+            (Monomial::new(&low), F::new(3)),
+            (Monomial::new(&mid), F::new(5)),
+        ]);
+        let b = SparseMultiPoly::new(&[
+            (Monomial::new(&mid), F::new(7)),
+            (Monomial::new(&high), F::new(11)),
+        ]);
+        high[0] += 1;
+        let c = SparseMultiPoly::new(&[(Monomial::new(&high), F::new(13))]);
+        (a, b, c)
+    }
+
+    /// `a += &b` leaves `a` equal to `&a + &b`, and leaves `b` untouched.
+    #[test]
+    fn test_add_assign_agrees_with_add_and_does_not_disturb_the_right_operand() {
+        type F = PrimeFieldElement64<541>;
+        let (a, b, _) = overlapping_triple::<3, F>();
+        let expected = &a + &b;
+        let b_before = b.clone();
+
+        let mut accumulator = a.clone();
+        accumulator += &b;
+        assert_eq!(accumulator, expected);
+        assert_eq!(b, b_before, "the right operand was mutated");
+    }
+
+    /// `a -= &b` leaves `a` equal to `&a - &b`, and leaves `b` untouched.
+    #[test]
+    fn test_sub_assign_agrees_with_sub_and_does_not_disturb_the_right_operand() {
+        type F = PrimeFieldElement64<541>;
+        let (a, b, _) = overlapping_triple::<3, F>();
+        let expected = &a - &b;
+        let b_before = b.clone();
+
+        let mut accumulator = a.clone();
+        accumulator -= &b;
+        assert_eq!(accumulator, expected);
+        assert_eq!(b, b_before, "the right operand was mutated");
+    }
+
+    /// Every ownership spelling of `+` and `-` returns the same polynomial.
+    #[test]
+    fn test_add_and_sub_agree_across_every_ownership_spelling() {
+        type F = PrimeFieldElement64<541>;
+        let (a, b, _) = overlapping_triple::<2, F>();
+        let sum = &a + &b;
+        let difference = &a - &b;
+
+        assert_eq!(a.clone() + &b, sum);
+        assert_eq!(&a + b.clone(), sum);
+        assert_eq!(a.clone() + b.clone(), sum);
+        assert_eq!(&mut a.clone() + &mut b.clone(), sum);
+        assert_eq!(
+            {
+                let mut t = a.clone();
+                t += b.clone();
+                t
+            },
+            sum
+        );
+        assert_eq!(
+            {
+                let mut t = a.clone();
+                t += &b;
+                t
+            },
+            sum
+        );
+
+        assert_eq!(a.clone() - &b, difference);
+        assert_eq!(&a - b.clone(), difference);
+        assert_eq!(a.clone() - b.clone(), difference);
+        assert_eq!(&mut a.clone() - &mut b.clone(), difference);
+        assert_eq!(
+            {
+                let mut t = a.clone();
+                t -= b.clone();
+                t
+            },
+            difference
+        );
+        assert_eq!(
+            {
+                let mut t = a.clone();
+                t -= &b;
+                t
+            },
+            difference
+        );
+    }
+
+    /// Adding a clone of a polynomial to itself doubles it rather than aliasing the accumulator.
+    #[test]
+    fn test_add_assign_of_a_clone_of_self_doubles() {
+        type F = PrimeFieldElement64<541>;
+        let (a, _, _) = overlapping_triple::<3, F>();
+        let doubled = a.scale(&F::new(2));
+
+        let mut owned = a.clone();
+        owned += a.clone();
+        assert_eq!(owned, doubled);
+
+        let mut borrowed = a.clone();
+        borrowed += &a.clone();
+        assert_eq!(borrowed, doubled);
+        assert_eq!(borrowed.terms().len(), a.terms().len(), "support changed");
+    }
+
+    /// Subtracting a clone of a polynomial from itself is the zero polynomial, with no terms left.
+    #[test]
+    fn test_sub_assign_of_a_clone_of_self_is_the_empty_polynomial() {
+        type F = PrimeFieldElement64<541>;
+        let (a, _, _) = overlapping_triple::<3, F>();
+
+        let mut owned = a.clone();
+        owned -= a.clone();
+        assert!(owned.is_zero());
+        assert!(
+            owned.terms().is_empty(),
+            "a cancelled monomial was kept with a zero coefficient: {:?}",
+            owned.terms()
+        );
+
+        let mut borrowed = a.clone();
+        borrowed -= &a.clone();
+        assert_eq!(borrowed, SparseMultiPoly::zero());
+        assert!(borrowed.terms().is_empty());
+    }
+
+    /// `+=` and `-=` drop a monomial whose coefficient cancels rather than storing a zero.
+    #[test]
+    fn test_in_place_add_and_sub_drop_cancelled_monomials() {
+        type F = PrimeFieldElement64<13>;
+        let x = Monomial::<2>::new(&[1, 0]);
+        let y = Monomial::<2>::new(&[0, 1]);
+
+        // 5x + y plus 8x is y: 5 + 8 = 13 = 0 mod 13.
+        let mut p: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[(x, F::new(5)), (y, F::new(1))]);
+        p += SparseMultiPoly::new(&[(x, F::new(8))]);
+        assert_eq!(p, SparseMultiPoly::new(&[(y, F::new(1))]));
+        assert!(!p.terms().contains_key(&x), "x survived its cancellation");
+        assert!(p.terms().values().all(|c| !c.is_zero()));
+
+        // And by subtraction, which cancels on equal coefficients.
+        let mut q: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[(x, F::new(5)), (y, F::new(1))]);
+        q -= SparseMultiPoly::new(&[(x, F::new(5))]);
+        assert_eq!(q, SparseMultiPoly::new(&[(y, F::new(1))]));
+        assert!(!q.terms().contains_key(&x));
+        assert!(q.terms().values().all(|c| !c.is_zero()));
+    }
+
+    /// Adding a monomial that cancels and then adding it back restores the term.
+    ///
+    /// A map entry removed on cancellation must be re-insertable; an implementation that left a
+    /// zero behind would pass the first half of this and fail nothing else.
+    #[test]
+    fn test_a_cancelled_monomial_can_be_added_back() {
+        type F = PrimeFieldElement64<13>;
+        let x = Monomial::<2>::new(&[1, 0]);
+        let p: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[(x, F::new(4))]);
+
+        let mut accumulator = p.clone();
+        accumulator -= &p;
+        assert!(accumulator.terms().is_empty());
+        accumulator += &p;
+        assert_eq!(accumulator, p);
+    }
+
+    /// `scale_assign` agrees with `scale`, including the zero and one factors.
+    #[test]
+    fn test_scale_assign_agrees_with_scale() {
+        type F = PrimeFieldElement64<541>;
+        let (a, _, _) = overlapping_triple::<3, F>();
+
+        for factor in [F::zero(), F::one(), F::new(7), F::new(540)] {
+            let mut scaled = a.clone();
+            scaled.scale_assign(&factor);
+            assert_eq!(scaled, a.scale(&factor), "factor {}", factor);
+            assert!(scaled.terms().values().all(|c| !c.is_zero()));
+        }
+
+        // Scaling by zero is the zero polynomial held as no terms at all, not as zero coefficients.
+        let mut zeroed = a.clone();
+        zeroed.scale_assign(&F::zero());
+        assert!(zeroed.terms().is_empty());
+
+        // Scaling by one is the identity, on the support as well as on the value.
+        let mut unchanged = a.clone();
+        unchanged.scale_assign(&F::one());
+        assert_eq!(unchanged, a);
+    }
+
+    /// Negation is the additive inverse and keeps no zero coefficient.
+    #[test]
+    fn test_neg_is_the_additive_inverse_in_place() {
+        type F = PrimeFieldElement64<541>;
+        let (a, _, _) = overlapping_triple::<3, F>();
+
+        let negated = -a.clone();
+        assert_eq!(negated.terms().len(), a.terms().len());
+        assert!(negated.terms().values().all(|c| !c.is_zero()));
+        assert_eq!(&a + &negated, SparseMultiPoly::zero());
+        assert_eq!(-negated, a);
+    }
+
+    /// `+=` agrees with `+`, `-=` with `-`, and addition associates, over `F` in `N` variables.
+    fn assert_in_place_add_agrees<const N: usize, F: FiniteField>() {
+        let strategy = (
+            poly_strategy::<N, F>(4),
+            poly_strategy::<N, F>(4),
+            poly_strategy::<N, F>(4),
+        );
+        TestRunner::deterministic()
+            .run(&strategy, |(a, b, c)| {
+                let mut accumulated = a.clone();
+                accumulated += &b;
+                prop_assert_eq!(&accumulated, &(&a + &b));
+
+                let mut subtracted = a.clone();
+                subtracted -= &b;
+                prop_assert_eq!(&subtracted, &(&a - &b));
+
+                // (a + b) + c = a + (b + c), folded in place on the left as the MDS layer does.
+                let mut folded = a.clone();
+                folded += &b;
+                folded += &c;
+                prop_assert_eq!(&folded, &(&a + &(&b + &c)));
+
+                // No operation leaves a zero coefficient in the map.
+                for p in [&accumulated, &subtracted, &folded] {
+                    prop_assert!(p.terms().values().all(|coefficient| !coefficient.is_zero()));
+                }
+
+                // Scaling in place agrees with scaling out of place, including by zero. The third
+                // factor is drawn rather than written as `F::new(3)`, which is unimplemented for
+                // the binary fields `for_each_field!` covers.
+                let drawn = b.leading_coefficient(MonomialOrder::Lexicographic);
+                for factor in [F::zero(), F::one(), drawn] {
+                    let mut scaled = a.clone();
+                    scaled.scale_assign(&factor);
+                    prop_assert_eq!(&scaled, &a.scale(&factor));
+                }
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    // In-place addition, subtraction and scaling agree with the allocating forms, over every field
+    // and at three arities.
+    for_each_field!(
+        fn in_place_arithmetic_agrees<F>() {
+            assert_in_place_add_agrees::<1, F>();
+            assert_in_place_add_agrees::<2, F>();
+            assert_in_place_add_agrees::<3, F>();
+        }
+    );
 }

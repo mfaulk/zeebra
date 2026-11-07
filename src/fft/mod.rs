@@ -1,5 +1,6 @@
 //! Finite Field Fast Fourier Transform (FFT) and Inverse Fast Fourier Transform (IFFT).
 
+mod bluestein;
 mod domain;
 mod evaluate;
 mod interpolate;
@@ -9,6 +10,9 @@ mod transform;
 
 use crate::FiniteField;
 
+pub use bluestein::{
+    bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform,
+};
 pub use domain::{DomainError, FFTDomain};
 pub use evaluate::evaluate;
 pub use interpolate::interpolate;
