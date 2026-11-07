@@ -15,7 +15,8 @@ on:
   # #311 and #324 were. Push runs on `main` catch most of that within minutes, but not a red `main`
   # that nobody pushes to afterwards, and not the drift that comes from resolving the toolchain to
   # `stable`, which moves. This bounds how long either can go unnoticed to a day, for one run of
-  # roughly 25 job-minutes. It is not a substitute for the merge-staleness notice below: this finds
+  # 20.7-25.9 job-minutes — measured over the last six successful push runs on `main`, which have
+  # the same job set a scheduled run gets. It is not a substitute for the notice below: this finds
   # a semantic conflict after the merge, that one warns before it.
   schedule:
     - cron: '17 9 * * *'

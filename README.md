@@ -308,8 +308,9 @@ What is used instead is two cheaper things, neither of which subsumes the gate:
 - **A daily run on `main`.** Push runs on `main` already test the merged result within minutes of a
   merge, so they catch the combination after the fact. What they do not catch is a red `main` that
   nobody pushes to afterwards, or drift from resolving the toolchain to `stable`, which moves and
-  has delivered a new clippy lint mid-project before. The `schedule` trigger bounds both to a day
-  for one run of roughly 25 job-minutes.
+  has delivered a new clippy lint mid-project before. The `schedule` trigger bounds both to a day,
+  for one run of **20.7 to 25.9 job-minutes** — measured across the last six successful push runs
+  on `main`, which have the same job set a scheduled run gets.
 
 Neither covers the second half of the failure, which is that CI skipped the broken test entirely.
 Provisioning the external comparands in ordinary CI is deliberately not done — building GMP, MPFR,
