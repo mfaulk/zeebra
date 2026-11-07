@@ -2,6 +2,7 @@
 
 mod batch_inverse;
 mod binary_field;
+mod budgeted_generator;
 mod extension_field;
 mod finite_field;
 mod irreducible_polynomials;
@@ -15,6 +16,7 @@ pub mod two_adic;
 
 pub use batch_inverse::{batch_inverse, batch_invert};
 pub use binary_field::BinaryFieldElement;
+pub use budgeted_generator::{try_primitive_element_with_budget, GeneratorSearchError};
 pub use extension_field::{ExtensionFieldElement, IrreduciblePolynomial};
 pub use finite_field::{
     trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, RootOfUnityError,
