@@ -45,8 +45,8 @@ As the saying goes, you can either make software so simple that it obviously has
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
       resolved against msolve's own distributed input files
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
-      `fukuoka-mq-III-n20-seed0`'s peak RSS from 13 996 MB to 1 497 MB, with the symbolic closure
-      checked unchanged batch by batch rather than inferred from the basis
+      `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
+      symbolic closure checked unchanged batch by batch rather than inferred from the basis
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.

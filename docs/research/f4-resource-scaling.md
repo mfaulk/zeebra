@@ -627,29 +627,44 @@ time-bound, and a cooperative per-batch check cannot interrupt a batch already i
 much longer budget and an external supervisor would finish that batch is a question this document
 cannot answer and did not previously have any reason to ask.
 
-### 10.5 Runtime
+### 10.5 Runtime, and it is faster rather than flat
 
-Moving the deduplication does not change how many hash operations happen — every term is still
-tested exactly once — so the expectation was a flat runtime, and the honest reason to measure was
-that an expectation is not a measurement. What it does remove is 162 million `push_back`/`pop_front`
-pairs and the page faults on 20 GB of `VecDeque` the allocator never needed.
+Moving the deduplication does not change how many hash operations happen — every term is tested
+exactly once either way — so the expectation was a flat runtime, and the honest reason to measure
+was that an expectation is not a measurement. It is **7% to 10% faster**, and the expectation was
+wrong for a reason worth recording: what the change removes is not hash work but 162 million
+`push_back`/`pop_front` pairs and the first-touch page faults on 20 GB of `VecDeque` the allocator
+reserved and never needed.
 
-| | before | after |
-|---|---:|---:|
-| `examples/f4_memory`, 20 000 000 cap, degree-5 refusal | 99.1 s (§9.2) | **83.1 s** |
-| `examples/f4_memory`, 10 000 000 cap, degree-4 refusal | not recorded | 5.1 s |
+`examples/scoreboard`, two interleaved repetitions, both variants built from this one tree into
+private target directories, pinned to cores 0-7, under `tools/benchlock.sh` so nothing else ran:
 
-A locked before-against-after A/B of `examples/scoreboard` at both rungs, two interleaved
-repetitions from binaries built out of this one tree, is queued under `tools/benchlock.sh` and will
-be recorded here when it lands. It is not needed for the direction, which both rows above agree on
-and which the mechanism predicts, but it is needed before a *ratio* is quoted: the figures above
-were taken without the lock, and §9.6 is explicit that elapsed times from `f4_memory` are not
-results.
+| rung | | rep 1 | rep 2 | mean | peak RSS, `/usr/bin/time -f %M` |
+|---|---|---:|---:|---:|---:|
+| 20 000 000, degree 5 | before | 69.57 s | 72.24 s | **70.9 s** | 14 407 956 / 14 407 396 kB |
+| | after | 64.47 s | 63.05 s | **63.8 s** | 1 589 768 / 1 590 272 kB |
+| | | | | **-10.0%** | **9.06x lower** |
+| 10 000 000, degree 4 | before | 4.34 s | 4.35 s | **4.35 s** | 629 568 / 630 052 kB |
+| | after | 4.04 s | 4.03 s | **4.04 s** | 225 040 / 223 664 kB |
+| | | | | **-7.1%** | **2.80x lower** |
 
-The `f4_memory` figures run both allocating stages twice per batch, once under the allocator and
-once for real, so they are not the uninstrumented cost; §9.1 put that at 71 s against the
-instrumented 99.1 s. They are quoted only because they are the two numbers taken on the same
-instrument.
+**The before column reproduces the recorded ladder, which is what makes the comparison a comparison
+rather than two unrelated runs.** Its 20 000 000 rung gives a mean of **70.9 s** against §3's
+quoted 70.9 s for the same rung, and a peak of 14 407 956 kB against §3's 14 406 056 kB — 0.013%
+apart. Its degree-4 rung gives 629 568 kB against §3's 617 MB. A binary built from the commit
+before the change therefore behaves as the recorded ladder did, so the after column's differences
+are the change and not the five weeks between the two sets of figures.
+
+The stop lines are byte-identical between the variants at both rungs, which is the equivalence check
+of §10.1 reappearing in the timing harness: same resource, same entry count, same degree, same last
+completed stage.
+
+Two instrument notes. `/usr/bin/time -f %M` reports 14 407 956 kB for a run launched through
+`timeout … taskset …`, so it is **not** subject to §2's pid hazard: `%M` comes from `wait4`'s
+`rusage`, which propagates a child's high-water up the chain, where reading `/proc/<pid>/status` of
+the `timeout` process does not. And these are `scoreboard` figures, uninstrumented, so they are
+directly comparable with §3 and not with §9's `f4_memory` elapsed times — the latter run both
+allocating stages twice per batch and §9.6 is explicit that they are not results.
 
 ### 10.6 Reproducing §10
 
@@ -664,8 +679,10 @@ ZEEBRA_MAX_ENTRIES=10000000 taskset --cpu-list 0-7 \
 ```
 
 As in §9.6, the example reads `VmHWM` itself so the pid hazard of §2 does not arise, and the
-peak-RSS runs do not need `tools/benchlock.sh`. A recorded timing does, which is why §10.5 reports
-the unlocked `f4_memory` elapsed times as indicative and leaves the ratio for the queued run.
+peak-RSS runs do not need `tools/benchlock.sh`. §10.5's timings do, and were taken under it with
+both variants built from one tree into private target directories — `tools/benchlock.sh`'s own
+header lists the companion hazards that the lock does not cover and each of which has cost a re-run
+here.
 
 The before column of §10.2 is §9.2 and §9.3 and was deliberately **not** re-measured: #237's
 attribution is the baseline, and re-deriving it would have produced a second set of numbers to
