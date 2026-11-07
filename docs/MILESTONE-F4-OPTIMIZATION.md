@@ -1790,6 +1790,26 @@ matrices entirely, taking the largest from 6810 rows to 1262 (§7.3). Neither su
 | katsura-7 | grlex | 46.72 | 2.58 | 6.21 | 8.00 | 0.63 | **28.71** |
 | katsura-7 | grevlex | 32.13 | 1.64 | 5.53 | 7.12 | 0.40 | **16.90** |
 
+#### The degree sequence, per step
+
+`F4Statistics::step_degrees` records the selection degree of every batch in the order the batches
+ran — Magma's `GroebnerBasis` second return value (V2.26, `relv226.pdf` §12.1), added here by #442.
+It is collected unconditionally, unlike `degrees`, and `step_degrees.len() == batches`.
+
+`examples/f4_profile -- mq` on the competitive-board instance at digest `72d0ad315fc25409`, the
+same instance and digest §8.6's stage split and #436's interreduction figure were taken on:
+
+| system | order | batches | `max_pair_degree` | sequence max | degrees per step |
+|---|---|---|---|---|---|
+| mq-random-10 | grevlex | 10 | 8 | 8 | 2, 3, 4, 5, 6x3, 7x2, 8 |
+
+`6x3` is three consecutive batches at degree six. **A strictly monotone climb with no degree-fall**,
+so the mutant mechanism had nothing to act on here — which the maximum alone does not say either
+way, and which is the reason the sequence is worth recording rather than just its maximum. The
+sequence's maximum can in principle fall *below* `max_pair_degree`, since that field is accumulated
+over the pairs as selected and a selection every criterion discards adds no step; on this instance
+and on every corpus system tested the two agree.
+
 **The bottleneck has moved twice, and is now in two places neither of which M16 targeted.**
 
 At M16-0, elimination was 65–88% of every instance above a millisecond. It is now 17% of

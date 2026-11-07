@@ -1146,6 +1146,23 @@ impl CostRow {
         self
     }
 
+    /// Set the solving degree from an F4 run, rather than by hand.
+    ///
+    /// [`Self::solving_degree`] is the field #334 is about: it exists, it is optional, and until
+    /// F4 recorded its step degrees the only callers that filled it in were tests passing a
+    /// literal. This reads
+    /// [`F4Statistics::observed_solving_degree`](crate::grobner::F4Statistics::observed_solving_degree),
+    /// so a row carries what the run did.
+    ///
+    /// Leaves the field `None` for a run that built no matrix, which is the honest reading: no
+    /// batch was selected, so no degree was reached.
+    pub fn with_solving_degree_from(mut self, statistics: &crate::grobner::F4Statistics) -> Self {
+        self.solving_degree = statistics
+            .observed_solving_degree()
+            .and_then(|degree| usize::try_from(degree).ok());
+        self
+    }
+
     /// Set the largest intermediate object.
     pub fn with_largest_intermediate(mut self, intermediate: Intermediate) -> Self {
         self.largest_intermediate = Some(intermediate);

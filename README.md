@@ -3967,16 +3967,57 @@ nothing asked for. That is asserted on a live queue, not inferred from the selec
 [`docs/research/mutants.md`](docs/research/mutants.md) for the measurement and for what the
 auxiliary-basis form of the idea would require.
 
-Two further quantities are kept apart deliberately:
+Three further quantities are kept apart deliberately:
 
 | Figure | What it is |
 |---|---|
 | `max_pair_degree` | the highest lcm degree any batch was *selected* at |
 | `max_monomial_degree` | the highest degree any monomial reached as a matrix *column* |
+| `step_degrees` | the selection degree of **every** batch, in the order the batches ran |
 
-The second is in general larger, because reducer multiples carry monomials above the lcm that
-produced them. **Neither is the solving degree or the degree of regularity**, which are properties
-of the ideal rather than of a run.
+The second is in general larger than the first, because reducer multiples carry monomials above the
+lcm that produced them. **None of the three is the solving degree or the degree of regularity**,
+which are properties of the ideal rather than of a run.
+
+`step_degrees` is the sequence Magma's `GroebnerBasis` added as a second return value in V2.26 —
+"the integer sequence of degrees encountered in each step of the F4 algorithm" — and a mature
+engine choosing the sequence over the maximum is the argument for having it: the degree a system
+stalls at, whether it climbed monotonically or jumped, and where a degree-fall happened are all
+invisible in a maximum. `degrees` is not a substitute, because it is keyed *by* degree, so a degree
+revisited after a drop appears once and the order is gone.
+
+It is collected **unconditionally** — one `u64` push per batch against batch counts in the hundreds
+— unlike `degrees`, which a measurement has to remember to enable. `step_degrees.len() == batches`
+by construction: a selection every pair criterion discarded built no matrix and is not a step,
+which is also the one way `observed_solving_degree()` — the sequence's maximum — can fall *below*
+`max_pair_degree`, since that field is accumulated over the pairs as selected, before the criteria
+run. On every system in the corpus the two agree; the inequality is the invariant.
+`CostRow::with_solving_degree_from` reads it, so a cost-model row's `solving_degree` comes from a
+run rather than from a hand-typed literal.
+
+`examples/f4_profile.rs` prints the sequence run-length encoded — `5x3` is three consecutive
+batches at degree five — as a third table beside the stage times and the diagnostics, and in its
+`mq` mode for the `mq-random-10` instance the competitive record was taken on:
+
+```text
+cargo run --release --example f4_profile            # all three tables, every system
+cargo run --release --example f4_profile -- mq      # the #349 instance, including its sequence
+```
+
+**The sequence for `mq-random-10`**, the competitive-board instance at digest
+`72d0ad315fc25409` — the same instance and the same digest #349's stage split and #436's
+interreduction figure were taken on:
+
+```text
+system       order    batches maxdeg obsdeg  degrees per step
+mq-random-10 grevlex       10      8      8  2, 3, 4, 5, 6x3, 7x2, 8
+```
+
+Ten batches, a strictly monotone climb from degree two to degree eight, with degree six split
+across three batches and degree seven across two. **No degree-fall anywhere**, so on this instance
+the mutant mechanism had nothing to act on — which a maximum of eight could not have told you
+either way. Taken at `F4Options::default()` with `measure_stages` on, affinity 0-7, which is the
+configuration the record was taken under.
 
 `profile_degrees` is off by default for the same reason `measure_stages` is: the shipping path
 should contain no profiling. When it is on, it costs a map insertion per batch and one scan of each

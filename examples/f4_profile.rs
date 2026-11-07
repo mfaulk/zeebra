@@ -257,18 +257,88 @@ fn diagnostics<const N: usize>(
     }
 }
 
+/// Which of the three tables [`each_system`] prints.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Report {
+    /// Per-stage times.
+    Stages,
+    /// The counters an optimization is judged on.
+    Diagnostics,
+    /// The per-step degree sequence.
+    Degrees,
+}
+
+/// `[4, 5, 5, 5, 6]` as `4, 5x3, 6`.
+///
+/// Run-length encoded because consecutive batches at one degree are the common case — a degree
+/// split across batches by the pair cap — and a few hundred bare integers per row would not be
+/// readable. The encoding is lossless: `5x3` is three steps at degree five, in order.
+fn render_degree_sequence(degrees: &[u64]) -> String {
+    let mut runs: Vec<String> = Vec::new();
+    let mut index = 0;
+    while index < degrees.len() {
+        let degree = degrees[index];
+        let length = degrees[index..]
+            .iter()
+            .take_while(|d| **d == degree)
+            .count();
+        runs.push(if length == 1 {
+            format!("{degree}")
+        } else {
+            format!("{degree}x{length}")
+        });
+        index += length;
+    }
+    runs.join(", ")
+}
+
+/// The per-step degree sequence — #442, and Magma's `GroebnerBasis` second return value.
+///
+/// The maximum is already in `max_pair_degree`; what only the sequence shows is the *shape* — a
+/// monotone climb, a jump, or a fall back to a lower degree after a mutant.
+fn degree_sequence<const N: usize>(
+    name: &str,
+    system: &[MultivariatePolynomial<N, F>],
+    orders: &[(&str, MonomialOrder)],
+    options: &F4Options,
+) {
+    for &(order_name, order) in orders {
+        let Ok((_, s)) = f4_with_options(system, order, options) else {
+            continue;
+        };
+        println!(
+            "{:<12} {:<8} {:>7} {:>6} {:>6}  {}",
+            name,
+            order_name,
+            s.batches,
+            s.max_pair_degree,
+            s.observed_solving_degree()
+                .map_or("—".to_string(), |d| d.to_string()),
+            render_degree_sequence(&s.step_degrees)
+        );
+    }
+}
+
+/// The header of [`degree_sequence`]'s table.
+fn degree_sequence_header() {
+    println!(
+        "{:<12} {:<8} {:>7} {:>6} {:>6}  degrees per step",
+        "system", "order", "batches", "maxdeg", "obsdeg"
+    );
+}
+
 /// Every system of the comparison corpus, under the configuration given.
 ///
 /// A system is labelled by its variable count, which is the convention the preceding milestone's
 /// tables use: "katsura-5" is `katsura::<5, F>()`, five variables.
-fn each_system(options: &F4Options, stage_times: bool) {
+fn each_system(options: &F4Options, report: Report) {
     macro_rules! go {
         ($n:literal, $label:expr, $system:expr, $orders:expr) => {{
             let system: Vec<MultivariatePolynomial<$n, F>> = $system;
-            if stage_times {
-                row::<$n>($label, &system, $orders, options);
-            } else {
-                diagnostics::<$n>($label, &system, $orders, options);
+            match report {
+                Report::Stages => row::<$n>($label, &system, $orders, options),
+                Report::Diagnostics => diagnostics::<$n>($label, &system, $orders, options),
+                Report::Degrees => degree_sequence::<$n>($label, &system, $orders, options),
             }
         }};
     }
@@ -383,6 +453,14 @@ fn competitive_mq(options: &F4Options) {
         &[("grevlex", MonomialOrder::GradedReverseLexicographic)],
         options,
     );
+    println!();
+    degree_sequence_header();
+    degree_sequence::<10>(
+        "mq-random-10",
+        &system,
+        &[("grevlex", MonomialOrder::GradedReverseLexicographic)],
+        options,
+    );
 }
 
 fn main() {
@@ -433,7 +511,7 @@ fn main() {
     println!("batch. `other` is the total less every stage: pair selection and basis bookkeeping.");
     println!();
     header();
-    each_system(&options, true);
+    each_system(&options, Report::Stages);
 
     println!();
     println!(
@@ -459,5 +537,14 @@ fn main() {
         "free_piv",
         "cov"
     );
-    each_system(&options, false);
+    each_system(&options, Report::Diagnostics);
+
+    println!();
+    println!("Degrees per step — #442, the sequence Magma's `GroebnerBasis` returns as `D`.");
+    println!("`maxdeg` is `max_pair_degree`, accumulated over the pairs as selected; `obsdeg` is");
+    println!("the maximum of the sequence, which omits any selection every criterion discarded.");
+    println!("`5x3` is three consecutive batches at degree five.");
+    println!();
+    degree_sequence_header();
+    each_system(&options, Report::Degrees);
 }

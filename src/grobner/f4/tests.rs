@@ -3454,3 +3454,183 @@ fn test_push_time_deduplication_preserves_the_closure_on_the_benchmark_systems()
         .iter()
         .all(|(_, rows, columns)| *rows > 0 && *columns > 0));
 }
+
+// === #442: the per-step degree sequence ===
+
+/// One entry per batch that built a matrix, on every system and order.
+#[test]
+fn test_the_degree_sequence_has_one_entry_per_batch() {
+    type G = Zp2147483647;
+    macro_rules! check {
+        ($name:expr, $system:expr) => {
+            for order in ALL_ORDERS {
+                let (_, statistics) =
+                    f4_with_options(&$system, order, &F4Options::default()).expect("within limits");
+                assert_eq!(
+                    statistics.step_degrees.len(),
+                    statistics.batches,
+                    "{} under {}: {} step degrees against {} batches",
+                    $name,
+                    order.name(),
+                    statistics.step_degrees.len(),
+                    statistics.batches
+                );
+            }
+        };
+    }
+
+    check!("katsura-4", katsura::<4, G>());
+    check!("katsura-5", katsura::<5, G>());
+    check!("cyclic-4", cyclic::<4, G>());
+    check!("cyclic-5", cyclic::<5, G>());
+}
+
+/// `max_pair_degree` bounds the sequence's maximum, and on the corpus the two are equal.
+///
+/// The inequality is the invariant — `max_pair_degree` is accumulated over pairs as selected,
+/// before the criteria run, so a selection every criterion discarded raises it without adding a
+/// step. The equality is an observation about these systems, asserted so that a change which
+/// starts producing fully-discarded top-degree selections is visible rather than silent.
+#[test]
+fn test_the_sequence_maximum_agrees_with_max_pair_degree() {
+    type G = Zp2147483647;
+    for order in ALL_ORDERS {
+        let (_, statistics) = f4_with_options(&katsura::<5, G>(), order, &F4Options::default())
+            .expect("within limits");
+        let observed = statistics
+            .observed_solving_degree()
+            .expect("matrices were built");
+        assert!(
+            observed <= statistics.max_pair_degree,
+            "{}: {observed} against {}",
+            order.name(),
+            statistics.max_pair_degree
+        );
+        assert_eq!(observed, statistics.max_pair_degree, "{}", order.name());
+    }
+}
+
+/// The sequence agrees batch for batch with the independent per-degree profile.
+///
+/// The first of the two checks the issue asks for: the sequence tested against something other
+/// than itself. [`DegreeProfile`](super::degrees::DegreeProfile) is a separate mechanism — keyed
+/// *by* degree rather than by step, recorded at a different point in the loop, and gated on
+/// `profile_degrees` — so the number of batches it files under each degree is a figure neither
+/// recording derives from the other.
+#[test]
+fn test_the_sequence_agrees_with_the_per_degree_profile() {
+    type G = Zp2147483647;
+    let options = F4Options {
+        profile_degrees: true,
+        ..F4Options::default()
+    };
+
+    for order in ALL_ORDERS {
+        let (_, statistics) =
+            f4_with_options(&katsura::<5, G>(), order, &options).expect("within limits");
+        for degree in statistics.degrees.iter() {
+            let steps = statistics
+                .step_degrees
+                .iter()
+                .filter(|d| **d == degree.degree)
+                .count();
+            assert_eq!(
+                steps,
+                degree.batches,
+                "{}: degree {} has {steps} steps against {} profiled batches",
+                order.name(),
+                degree.degree,
+                degree.batches
+            );
+        }
+    }
+}
+
+/// On a homogeneous ideal under a graded order every basis degree appears in the sequence.
+///
+/// The second check, and the one against mathematics rather than against another counter. Over a
+/// homogeneous ideal every reduced-basis element is homogeneous, and one of degree `d` that is not
+/// an input generator is the leading row of a matrix whose pairs had lcm degree `d` — so `d` must
+/// appear in the sequence. The basis is independently checked against `buchberger` by this
+/// module's other tests, which is what makes it an oracle here.
+///
+/// **The sequence may run past the basis's top degree, and does here.** F4 cannot know the basis
+/// is complete until a degree yields nothing, so grlex selects a batch at degree five and emits
+/// no element of degree five. That is why the relation asserted is containment and a bound, not
+/// equality: the overshoot is the termination argument, not a miscount.
+#[test]
+fn test_a_homogeneous_ideal_reaches_its_basis_degree() {
+    // x^2 + yz, y^2 + xz, z^2 + xy: homogeneous quadrics, so every basis element is homogeneous
+    // and the input contributes nothing above degree two.
+    let system = [parse("x^2 + y*z"), parse("y^2 + x*z"), parse("z^2 + x*y")];
+
+    for order in [
+        MonomialOrder::GradedLexicographic,
+        MonomialOrder::GradedReverseLexicographic,
+    ] {
+        let (basis, statistics) =
+            f4_with_options(&system, order, &F4Options::default()).expect("within limits");
+        let basis_degree = basis
+            .iter()
+            .map(|f| f.leading_monomial(order).degree())
+            .max()
+            .expect("a nonempty basis");
+        let observed = statistics
+            .observed_solving_degree()
+            .expect("matrices were built");
+        assert!(
+            basis_degree > 2,
+            "{}: the test is vacuous if the basis adds nothing above the input",
+            order.name()
+        );
+        assert!(
+            statistics.step_degrees.contains(&basis_degree),
+            "{}: a basis element of degree {basis_degree} with no step at that degree: {:?}",
+            order.name(),
+            statistics.step_degrees
+        );
+        assert!(
+            observed >= basis_degree,
+            "{}: the sequence stopped at {observed} with a basis element of degree {basis_degree}",
+            order.name()
+        );
+    }
+}
+
+/// Descents in the sequence are exactly what `degree_regressions` counts them as, or fewer.
+///
+/// A degree-fall is invisible in a maximum, which is the whole reason for recording the sequence.
+/// `degree_regressions` is counted per *selection*, so it can exceed the descents between steps —
+/// never the other way round, which is the direction a miscount would show up in.
+#[test]
+fn test_descents_in_the_sequence_are_within_the_regression_count() {
+    type G = Zp2147483647;
+    for order in ALL_ORDERS {
+        let (_, statistics) = f4_with_options(&cyclic::<5, G>(), order, &F4Options::default())
+            .expect("within limits");
+        let descents = statistics
+            .step_degrees
+            .windows(2)
+            .filter(|pair| pair[1] < pair[0])
+            .count();
+        assert!(
+            descents <= statistics.degree_regressions,
+            "{}: {descents} descents against {} regressions",
+            order.name(),
+            statistics.degree_regressions
+        );
+    }
+}
+
+/// A computation that runs out of room keeps the degrees it reached before the failure.
+#[test]
+fn test_a_failed_computation_retains_its_degree_sequence() {
+    type G = Zp2147483647;
+    let options = F4Options {
+        max_batches: Some(3),
+        ..F4Options::default()
+    };
+    let (_, statistics) = f4_reported(&katsura::<5, G>(), MonomialOrder::Lexicographic, &options);
+    assert_eq!(statistics.step_degrees.len(), statistics.batches);
+    assert!(!statistics.step_degrees.is_empty(), "three batches ran");
+}
