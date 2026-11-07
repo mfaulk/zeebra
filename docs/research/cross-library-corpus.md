@@ -122,6 +122,48 @@ This is a constraint on the comparison, not on Zeebra, and the protocol document
 it costs: Zeebra's 32–64-bit fields have only Groebner.jl and Sagebrush as comparands, and its
 254/255-bit fields have none at any size. Those rows say so rather than being omitted.
 
+### 4a. The declared field is the generated field
+
+A third hazard of the same shape as §2 and §3, and the one that was live rather than hypothetical.
+An `Instance` carries a `FieldSpec` and a system, and **nothing in the text ties them together**:
+coefficients render as residues, so `−1` over `2^31 − 1` is the numeral `2147483646`, which is a
+perfectly well-formed element of some smaller prime field — a *different* element of a *different*
+ring. So a `characteristic` argument that reached only the `FieldSpec` produced a valid input file
+describing a different ideal from the one named, with the digest and the name both claiming
+otherwise. That was #425, and `msolve.rs`'s eliminant tests were its live victims: they ask the
+corpus for rungs at `2^30 + 3`, below msolve's eliminant ceiling, and were handed systems reduced
+mod `2^31 − 1`.
+
+The const-generic families — Katsura, Cyclic, planted MQ — are now generated over the field they
+declare. They are const-generic in the field as well as the size, so a prime known only at run time
+cannot be turned into a type: `corpus::GENERATED_CHARACTERISTICS` is the list of compiled fields and
+`corpus::instance` returns `None` outside it, which is the same idiom it already used for a size
+nobody wrote down.
+
+| family | at a prime outside the compiled set | why |
+|---|---|---|
+| Katsura, Cyclic, planted MQ | `None` | const-generic in the field; a prime nobody compiled is a field nobody has |
+| random MQ | builds | its generator reduces at run time through `CaseField`, so every prime is available |
+| Poseidon, Anemoi | builds, at the **registry's** field | round constants are keyed on the prime, so the argument is ignored by design (§5) |
+
+`test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled` pins all three dispositions,
+and `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` asserts the
+property on the **rendered text** rather than on the polynomials in memory — which is the bytes
+every engine is handed.
+
+**The alternative was rejected for a stated reason.** Coefficients could be rendered from signed
+integers instead, making these families' text identical at every prime. That would also change
+every frozen digest in `ladder()`, retroactively re-identifying every published figure. Generating
+over the declared field leaves the reference-prime text byte-identical, which
+`test_the_manifest_is_frozen` confirms.
+
+`ALTERNATE_CHARACTERISTIC = 2^30 + 3 = 1073741827` is the second compiled prime. It is **not** a
+second corpus identity — the manifest, the frozen digests and every published row stay at the
+reference prime. It is that prime rather than an arbitrary one because it is the characteristic
+msolve's own `input_files/kat6-31.ms` declares, so it is the field the Katsura equivalence evidence
+was shipped over, and because it sits below `ceilings::MSOLVE_ELIMINANT` where the reference prime
+does not.
+
 ---
 
 ## 5. How equivalence is established, and what each family may claim
@@ -329,7 +371,10 @@ touching the constant, not after.
    renamed to suit a convention local to the corpus. `test_every_ladder_entry_builds_and_the_
    generated_families_are_named_by_variable_count` enforces both halves.
 3. Add a match arm to `corpus::instance` and an entry to `corpus::ladder`. The arm is deliberate
-   friction: a size nobody wrote down is a size nobody checked the equivalence of.
+   friction: a size nobody wrote down is a size nobody checked the equivalence of. If the family is
+   const-generic in the field, generate it through `over_prime!` so the declared characteristic is
+   the generated one (§4a) — never over a fixed field with the characteristic passed only to the
+   `FieldSpec`.
 4. Write an equivalence test against a second engine's own literal, as §2 and §3 do. If no second
    engine ships that family, verify against Singular live and record the invariants.
 5. Record its dimension. If it is positive-dimensional, say which tasks do not apply.

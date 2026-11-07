@@ -935,6 +935,14 @@ the sweep will**. One consequence worth noting: the corpus's `REFERENCE_CHARACTE
 field supports basis comparisons against msolve and **not** eliminant comparisons. An eliminant
 sweep needs a second characteristic below `1515531529`.
 
+That second characteristic now exists as a **generated** field rather than only as a label:
+`corpus::ALTERNATE_CHARACTERISTIC = 2^30 + 3 = 1073741827`, the prime msolve's own `kat6-31.ms`
+declares. Before #425 the corpus put the requested characteristic in the `FieldSpec` and generated
+over the reference field regardless, so these tests' `P30` rungs were systems reduced mod `2^31 − 1`
+labelled mod `2^30 + 3` — a well-formed input file for a different ideal. `P30` is now
+`corpus::ALTERNATE_CHARACTERISTIC` rather than a literal, so a prime the corpus has no compiled
+field for is a build error here instead of a silently mislabeled instance.
+
 The corpus also settles the naming question in §4.0's favour: it names rungs **by variable count**,
 never by the literature's family index, which is the same convention as msolve's `katN` (§4.0) —
 so `katsura-6` means the same six-variable system to both, and the digests confirm it.
