@@ -1,0 +1,107 @@
+# Fukuoka MQ Challenge: every recorded solve of types II, III, V and VI.
+#
+# THESE ARE PUBLISHED RESULTS, NOT INSTANCES. No challenge coefficient file and
+# no answer vector is committed here; the challenge data carries no licence
+# (see docs/research/fukuoka-mq.md section 3). Each row points at the page it
+# was read from, which is also where that solve's answer vector can be fetched.
+#
+# Source of record: the challenge's own "full list of all submission details",
+#   https://www.mqchallenge.org/submission/index.html
+#   sha256 of the HTML as fetched: see docs/research/fukuoka-mq.md section 0
+# plus, per row, the linked per-submission page named in the `details` column,
+#   https://www.mqchallenge.org/<details>
+# All pages accessed 2026-11-07.
+#
+# The hall of fame on the front page shows only the five highest positions per
+# type; this file is the complete list. Two of the site's own rules make it an
+# UNDERCOUNT of what has been solved rather than a census:
+#   Rule 2 - for a given n only the first five solves are recorded;
+#   Rule 3 - a participant may record at most one solve per n.
+# So the absence of a row for an (n, seed) pair is not evidence that the pair
+# is unsolved. See docs/research/fukuoka-mq.md section 6.
+#
+# Columns
+#   type                    II, III, V or VI as the site labels it. Types II and
+#                           III are the encryption families (m = 2n); V and VI
+#                           are the signature families (n = floor(1.5 m)).
+#   n, m                    variables and polynomials, as the detail page prints
+#                           them. The site indexes types II/III by n and types
+#                           V/VI by m.
+#   seed                    0-4, the generator seed (see section 4).
+#   date                    submission date, ISO 8601, from the detail page.
+#   contestants             the `Name` field, verbatim.
+#   algorithm               the `Algorithm` field, verbatim.
+#   hardware                the `Hardware` field, verbatim.
+#   figure_kind             WHAT runtime_seconds measures. The site mixes three
+#                           conventions and does not flag the difference:
+#                             wall-total           total wall clock
+#                             per-subsystem-cpu    CPU seconds for ONE subsystem
+#                                                  of a hybrid/guessing attack
+#                             per-subsystem-wall   wall clock for ONE subsystem
+#                           A per-subsystem figure is not comparable with a
+#                           total and must never be quoted as one.
+#   runtime_seconds         the `Running Time` figure converted to seconds.
+#   phases_seconds          sum of the per-phase times the `Notes` field
+#                           publishes (block Wiedemann BW1/BW2/BW3), or `-`.
+#                           Recorded so the total can be checked against its own
+#                           parts.
+#   peak_gb, peak_metric    peak memory and WHICH metric, where published. Only
+#                           two rows have one, and they use different metrics
+#                           (VmHWM and VmPeak), which are not the same number.
+#   subsystems              number of subsystems solved before a solution was
+#                           found, for the hybrid attacks that report it.
+#   avg_subsystem_seconds   average time per subsystem, as reported.
+#   processes               simultaneous processes, where the notes state it
+#                           AND the three figures reconcile. Deliberately left
+#                           `-` on three rows that state a count and an average
+#                           but whose totals do not follow from them: type VI
+#                           m=21 2023-10-23 (2.6% high, campaign overhead) and
+#                           the two 2025 type VI rows (implying 7.6-way and
+#                           15.8-way parallelism, neither an integer). See
+#                           docs/research/fukuoka-mq.md section 8.4.
+#   answer_published        whether the detail page prints the answer vector.
+#   details                 path under https://www.mqchallenge.org/ .
+#   runtime_printed         the `Running Time` field verbatim, so the conversion
+#                           in runtime_seconds can be rechecked by eye.
+#
+# Nothing in this file was measured, re-run or estimated here. Every figure is
+# transcribed from the page named in its `details` column.
+#
+#type	n	m	seed	date	contestants	algorithm	hardware	figure_kind	runtime_seconds	phases_seconds	peak_gb	peak_metric	subsystems	avg_subsystem_seconds	processes	answer_published	details	runtime_printed
+III	20	40	0	2015-03-20	Yun-Ju Huang	Magma V2.19-9, F4	Intel(R) Xeon(R) CPU E5-4617, 2.90GHz, 1T RAM	wall-total	259.27	-	-	-	-	-	-	yes	details/details_III_cs.html	259.27 seconds
+III	34	68	0	2015-08-04	Tung Chou, Ruben Niederhagen, Bo-Yin Yang	XL with block Wiedemann	4 x AMD Opteron 6282 SE	wall-total	2831160	2831160	-	-	-	-	-	yes	details/details_III_20150804.html	32 days 18 hours 26 minutes
+III	34	68	1	2016-08-13	Takuma Ito, Shigenori Uchiyama	modified F4 algorithm	Intel(R) Xeon(R) CPU E5-2620 v4, 2.10GHz, 256GB RAM	wall-total	324591	-	-	-	-	-	-	yes	details/details_III_20160813.html	324,591 seconds
+III	35	70	0	2015-09-30	Tung Chou, Ruben Niederhagen, Bo-Yin Yang	XL with block Wiedemann	4 x AMD Opteron 6282 SE	wall-total	4231920	4231980	-	-	-	-	-	yes	details/details_III_20150930.html	48 days 23 hours 32 minutes
+III	36	72	0	2016-07-13	Tung Chou, Ruben Niederhagen, Bo-Yin Yang	XL with block Wiedemann	4 x AMD Opteron 6282 SE	wall-total	6272220	6272200	29.77	VmHWM	-	-	-	yes	details/details_III_20160713.html	72 days 14 hours 17 minutes
+III	37	74	0	2020-07-03	Tung Chou, Ruben Niederhagen, Bo-Yin Yang	XL with block Wiedemann	2x AMD EPYC 7742	wall-total	1387584	-	-	-	-	-	-	yes	details/details_III_20200703.html	16.06 days
+III	37	74	1	2019-06-27	Takuma Ito, Naoyuki Shinohara, Shigenori Uchiyama	F4-style based algorithm to solve MQ problems	4 x Intel(R) Xeon(R) CPU E5-4669 v4, 2.20GHz, 1TB RAM	wall-total	4843980	-	-	-	-	-	-	yes	details/details_III_20190627.html	56 days 1 hour 33 minutes
+III	38	76	3	2020-08-03	Tung Chou, Ruben Niederhagen, Bo-Yin Yang	XL with block Wiedemann	2x AMD EPYC 7742	wall-total	2016576	2015787	49.45	VmPeak	-	-	-	yes	details/details_III_20200803.html	23.34 days
+II	20	40	0	2015-03-20	Yun-Ju Huang	Magma V2.19-9, F4	Intel(R) Xeon(R) CPU E5-4617, 2.90GHz, 1T RAM	wall-total	75.6	-	-	-	-	-	-	yes	details/details_II_cs.html	75.60 seconds
+II	35	70	0	2026-09-17	Javier Verbel	XL with Block-Wiedemann	2x AMD EPYC 7763, 16x Hynix DDR4 3200 64GB DIMM	wall-total	257266	257265.8	-	-	-	-	-	yes	details/details_II_20260917.html	257266 seconds
+II	35	70	2	2016-09-09	Takuma Ito, Shigenori Uchiyama	modified F4 algorithm	Intel(R) Xeon(R) CPU E5-2620 v4, 2.10GHz, 256GB RAM	wall-total	1440220	-	-	-	-	-	-	yes	details/details_II_20160909.html	1,440,220 seconds
+II	36	72	0	2019-04-10	Takuma Ito, Naoyuki Shinohara, Shigenori Uchiyama	F4-style based algorithm to solve MQ problems	4 x Intel(R) Xeon(R) CPU E5-4669 v4, 2.20GHz, 1TB RAM	wall-total	2173980	-	-	-	-	-	-	yes	details/details_II_20190410_1.html	25 days 3 hours 53 minutes
+II	37	74	2	2019-04-10	Takuma Ito, Naoyuki Shinohara, Shigenori Uchiyama	F4-style based algorithm to solve MQ problems	4 x Intel(R) Xeon(R) CPU E5-4669 v4, 2.20GHz, 1TB RAM	wall-total	6540240	-	-	-	-	-	-	yes	details/details_II_20190410_2.html	75 days 16 hours 44 minutes
+II	38	76	0	2026-09-28	Javier Verbel	XL with Block-Wiedemann	2x AMD EPYC 7763, 16x Hynix DDR4 3200 64GB DIMM	wall-total	811805	811803.47	-	-	-	-	-	yes	details/details_II_20260928.html	811805 seconds (9 days 9 hours 30 minutes)
+VI	15	10	0	2015-03-20	Yun-Ju Huang	Magma V2.19-9, F4	Intel(R) Xeon(R) CPU E5-4617, 2.90GHz, 1T RAM	wall-total	2764.41	-	-	-	-	-	-	yes	details/details_VI_cs.html	2764.41 seconds
+VI	24	16	0	2015-04-01	JC Faugere	F5 - FGb	Intel(R) Xeon(R) CPU E5-2670 v2 @ 2.50GHz	wall-total	5280	-	-	-	-	-	-	yes	details/details_VI_20150401.html	5280 seconds
+VI	24	16	1	2016-02-24	Rusydi Makarim, Marc Stevens	M4GB	1 x Intel(R) Core(TM) i7-2600K CPU @ 3.40GHz, 16GiB RAM	wall-total	4323	-	-	-	-	-	-	yes	details/details_VI_20160224.html	4323 seconds
+VI	25	17	0	2016-02-25	Rusydi Makarim, Marc Stevens	M4GB	1 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 128GiB RAM	wall-total	35545	-	-	-	-	-	-	yes	details/details_VI_20160225.html	35545 seconds
+VI	27	18	0	2016-02-29	Rusydi Makarim, Marc Stevens	M4GB	1 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 128GiB RAM	wall-total	113323	-	-	-	-	-	-	yes	details/details_VI_20160229.html	113,323 seconds (1 day, 7 hours, 28 minutes and 43 seconds)
+VI	28	19	0	2016-03-30	Rusydi Makarim, Marc Stevens	M4GB	2 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 256GiB RAM	wall-total	657843	-	-	-	-	-	-	yes	details/details_VI_20160330.html	657,843 seconds (7 days, 14 hours, 44 minutes, 3 seconds)
+VI	30	20	0	2017-07-10	Rusydi Makarim, Marc Stevens	M4GB	2 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 256GiB RAM	wall-total	978032	-	-	-	-	-	-	yes	details/details_VI_20170710.html	11 days 7 hours 40 minutes and 32 seconds (978,032 seconds)
+VI	31	21	0	2023-10-23	Kosuke Sakata, Tsuyoshi Takagi	F4 based on Hilbert-driven algorithm	AMD EPYC 7763, 2TB RAM	wall-total	31671	-	-	-	4	30864	-	yes	details/details_VI_20231023.html	31671 seconds (8 hours 47 minutes 51 seconds)
+VI	33	22	0	2023-11-14	Kosuke Sakata, Tsuyoshi Takagi	F4 based on Hilbert-driven algorithm	AMD EPYC 7763, 2TB RAM	wall-total	183307	-	-	-	3	61102	1	yes	details/details_VI_20231114.html	183307 seconds (2 days 2 hours 55 minutes 7 seconds)
+VI	34	23	0	2025-10-16	Kosuke Sakata, Tsuyoshi Takagi	HDF4 (F4 with the Hilbert-driven algorithm) and MF4 (F4 with the Mutant algorithm)	4 × AMD EPYC 7763	wall-total	1857440	-	-	-	707	19972	-	yes	details/details_VI_20251016_1.html	1,857,440 secconds (21 days 11 hours 57 minutes)
+VI	36	24	0	2025-10-16	Kosuke Sakata, Tsuyoshi Takagi	HDF4 (F4 with the Hilbert-driven algorithm) and MF4 (F4 with the Mutant algorithm)	4 × AMD EPYC 7763	wall-total	994320	-	-	-	2011	7830	-	yes	details/details_VI_20251016_2.html	994,320 secconds (11 days 12 hours 12 minutes)
+V	15	10	0	2015-03-20	Yun-Ju Huang	Magma V2.19-9, F4	Intel(R) Xeon(R) CPU E5-4617, 2.90GHz, 1T RAM	wall-total	2879.45	-	-	-	-	-	-	yes	details/details_V_cs.html	2879.450 seconds
+V	24	16	0	2015-04-03	JC Faugere	F5 - FGb	Intel(R) Xeon(R) CPU E5-2670 v2 @ 2.50GHz	wall-total	24648.2	-	-	-	-	-	-	yes	details/details_V_20150403.html	24648.2 seconds
+V	24	16	1	2016-02-24	Rusydi Makarim, Marc Stevens	M4GB	1 x Intel(R) Core(TM) i7-2600K CPU @ 3.40GHz, 16GiB RAM	wall-total	33467	-	-	-	-	-	-	yes	details/details_V_20160224.html	33467 seconds
+V	24	16	2	2023-07-09	Ziyu Zhao, Jintai Ding	M4GB1.2	Intel(R) Xeon(R) Silver 4208 CPU @ 2.10GHz	per-subsystem-cpu	370	-	-	-	-	-	-	yes	details/details_V_20230709.html	370 cpu seconds for each subsystem
+V	25	17	0	2016-02-28	Rusydi Makarim, Marc Stevens	M4GB	1 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 128GiB RAM	wall-total	166796	-	-	-	-	-	-	yes	details/details_V_20160228.html	166,796 seconds (1 day, 22 hours, 19 minutes and 56 seconds)
+V	25	17	1	2023-07-10	Ziyu Zhao, Jintai Ding	M4GB1.2	Intel(R) Xeon(R) Silver 4208 CPU @ 2.10GHz, 32GB RAM	per-subsystem-cpu	4390	-	-	-	-	-	2	yes	details/details_V_20230710.html	4390 cpu seconds for each subsystem
+V	27	18	0	2016-03-11	Rusydi Makarim, Marc Stevens	M4GB	2 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 256GiB RAM	wall-total	941980	-	-	-	-	-	-	yes	details/details_V_20160311.html	941,980 seconds (10 days, 21 hours, 39 minutes and 40 seconds)
+V	27	18	4	2016-05-06	Wen-Ding Li, Yun-An Chang, Ming-Shing Chen, Chen-Mou Cheng, Bo-Yin Yang	MiniGB-F4	Intel(R) Xeon(R) CPU E5620 x 8, Intel(R) Xeon(R) CPU E3-1230 v3, Intel(R) Xeon(R) CPU E3-1245 v3	per-subsystem-wall	12033	-	-	-	-	-	-	yes	details/details_V_20160506.html	12,033 seconds
+V	28	19	0	2017-10-25	Rusydi Makarim, Marc Stevens	M4GB	2 x Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz, 256GiB RAM	per-subsystem-cpu	478239	-	-	-	184	194400	6	yes	details/details_V_20171025.html	478,239 seconds (Average CPU time for one subsystem)
+V	28	19	4	2016-05-12	Wen-Ding Li, Yun-An Chang, Ming-Shing Chen, Chen-Mou Cheng, Bo-Yin Yang	MiniGB-F4	MiniGB-F4, AMD opteron 6376x4 512GB RAM, AMD opteron 6376x4 512GB RAM	per-subsystem-wall	83276	-	-	-	-	-	-	yes	details/details_V_20160512.html	83,276 seconds
+V	30	20	0	2023-08-22	Ting Li, Yao Sun	Improved F4 algorithm for similar polynomial systems	1 x AMD Ryzen Threadripper 3970X, 192GB RAM, 2 x GeForce RTX 3080Ti	wall-total	1876608	-	-	-	245	15319	2	yes	details/details_V_20230822.html	21.72 days (Total wall-clock time)
+V	31	21	0	2026-09-17	Ting Li, Yao Sun	Improved F4 via smaller matrices	2 x RTX 5090 (32 GB each), 16 CPU threads (Intel 6530, 2.1 GHz), 256 GB RAM	wall-total	722188	-	-	-	80	9027	1	yes	details/details_V_20260917.html	722,188 seconds (8 days 8 hours 36 minutes)

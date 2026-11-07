@@ -3371,9 +3371,13 @@ bytes — and the GF(2) and GF(2^8) families are refused by name, each for its o
 want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
 long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
 path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
-too, and no longer anything else: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, so
-a `Gf256` system reads from text with each coefficient as its bit pattern. The challenge's modulus,
-which is not the AES one, is `Gf256Mq`.
+and three things in it: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, but it reads
+a **decimal** integer as a bit pattern and a challenge coefficient is a two-digit **hex** byte, the
+real header is `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1` and `MqField::parse` does not match it
+(#414), and `parse_answer` mis-parses a hex answer vector without erroring (#415). The challenge's
+modulus, which is not the AES one, is `Gf256Mq`, and
+[`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §2.4 settles it against a published
+answer: all 20 polynomials of type II `n = 10` vanish under `0x11D` and none under `0x11B`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
@@ -3385,8 +3389,9 @@ has, and it is silent.
 On type III `n=10` seed 0 — 20 quadratics in 10 unknowns — zeebra reconstructs the system, confirms
 it vanishes at the published answer, and independently recovers that same point in **111 ms** with
 `D = 1`. Both directions matter: a wrong layout could vanish at one point by accident, but it could
-not also be solved to the same one. This is a *toy* example at 45 variables short of the smallest
-unsolved challenge, and is not a competitive result.
+not also be solved to the same one. This is a *toy* example 24 variables short of the smallest
+published type III challenge, which starts at `n = 34` — not `n = 55`, which is type I's range —
+and is not a competitive result.
 
 Under one stated budget — 200,000 columns and 20,000,000 live entries, the bound that binds —
 `n = 15` **recovers the published answer** in 7.9 s, checked coordinate by coordinate against the
@@ -3403,6 +3408,14 @@ verifies the SHA-256 that `Provenance` pins; the test against a genuine instance
 for the same reason the Singular one is. `docs/research/fukuoka-mq.md` records the format, the
 verification, and one quirk worth knowing: coefficients are uniform over `0..=31`, not `0..=30`, so
 **zero is twice as likely as any other coefficient** in the published GF(31) data.
+
+That quirk is no longer an inference. The challenge publishes its own **coefficient generator**, and
+every instance is reproducible from `(type, n, seed)` plus a 200 Mbit file of π it distributes —
+confirmed against all six types' toy examples, coefficient for coefficient
+([`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §7). So the redistribution problem has
+a cheaper answer than a download recipe, and `research/fukuoka-mq/solved-instances.tsv` records all
+37 published solves of types II, III, V and VI — parameters, dates, solvers, algorithms, hardware
+and figures, with no instance data — checked by `tests/fukuoka_mq_records.rs`.
 
 #### Candidate external instances, surveyed but not imported
 
