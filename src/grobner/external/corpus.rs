@@ -907,6 +907,52 @@ mod tests {
         assert_eq!(Task::LexBasisByConversion.tag(), "lex-basis-by-conversion");
     }
 
+    /// Every identifier in every rung's generators is a **declared** variable.
+    ///
+    /// Not a hypothetical. msolve's reader (`iofiles.c:57-62`) has no `else` branch for an
+    /// identifier it does not recognise, so a generator naming an undeclared variable has that
+    /// factor **silently dropped**: `x*z-1` with only `x,y` declared reads as `x-1`, msolve exits
+    /// 0, and reports `#invalid equations 0`. The result is a well-formed answer to a *different*
+    /// ideal, with nothing anywhere to indicate it.
+    ///
+    /// This corpus renders its variable list from the same `Instance`, so it is not at risk by
+    /// construction — which is exactly why the property is worth asserting rather than assuming.
+    /// Same family as the `x1`/`x10` collision above: a malformed render that produces a
+    /// well-formed different problem.
+    #[test]
+    fn test_every_identifier_in_every_rung_is_a_declared_variable() {
+        for entry in ladder() {
+            let built = instance(entry.name, REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+            let declared: BTreeSet<&str> = built.variables.iter().map(String::as_str).collect();
+            for generator in &built.system {
+                // Identifiers are maximal runs of letters, digits and underscores that start with
+                // a letter; everything else in the syntax is an operator or a numeral.
+                let mut identifier = String::new();
+                for character in generator.chars().chain(std::iter::once('+')) {
+                    if character.is_ascii_alphanumeric() || character == '_' {
+                        identifier.push(character);
+                        continue;
+                    }
+                    if identifier
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_ascii_alphabetic())
+                    {
+                        assert!(
+                            declared.contains(identifier.as_str()),
+                            "{} names undeclared {:?} in {:?}; declared are {:?}",
+                            entry.name,
+                            identifier,
+                            generator,
+                            declared
+                        );
+                    }
+                    identifier.clear();
+                }
+            }
+        }
+    }
+
     /// A rung with ten or more variables round-trips, so `x1` and `x10` are not confused.
     ///
     /// A genuine hazard of a text interface rather than a hypothetical one: `x1*x10` contains `x1`

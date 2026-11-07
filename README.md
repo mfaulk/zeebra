@@ -453,6 +453,9 @@ tools/scoreboard.sh stable --write                 # the same, pinned, updating 
 tools/scoreboard.sh ladder --write                 # the nine full-width t = 16 CICO rows
 cargo run --release --example competitive          # render research/competitive/ from its history
 cargo run --release --example competitive -- --write   # and update COMPETITIVE.md in place
+cargo run --release --example competitive_sweep -- --list   # corpus x engines x tasks, exploratory
+tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
+    --row katsura-6 --task reduced-grobner-basis --measure --write   # one measured row
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
