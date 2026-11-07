@@ -864,8 +864,14 @@ between any two of them is not a measurement of FGLM**, and that is the most tra
 Recorded in the order they happened, including the two that produced no figure, because a
 resource-attributed failure is a completed research decision and an infrastructure loss is not one.
 
-All figures in this subsection are on **`origin/main` including #305**, which is a different build
-from §8a.3's `N ≤ 5` column (commit `eb79e05`, pre-#305). #305 bounds symbolic preprocessing's
+All figures in this subsection are from a binary built from the tree at **`f4cb0da`**, which
+includes **#305**. That is a different build from §8a.3's `N ≤ 5` column (commit `eb79e05`,
+pre-#305). The branch was later rebased past `f4cb0da` to pick up an unrelated upstream test fix,
+and the binary was deliberately **not** rebuilt: nothing between `f4cb0da` and that point touches
+`grobner/f4/`, `grobner/fglm/` or `poly/`, so the build stays representative of the solver code and
+rebuilding would have swapped the binary under a queued measurement for no gain. Stated rather than
+left implicit, because "built at `f4cb0da`, source at a later commit" is exactly the kind of
+mismatch that is invisible afterwards. #305 bounds symbolic preprocessing's
 monomial queue by the symbolic closure, and the first `FCICO` refusal below was *on that structure*,
 so the two are not mixable and the `N ≤ 5` basis figures would need re-taking before any
 cross-rung basis comparison. The conversion figures are unaffected — #305 is an F4 change.
