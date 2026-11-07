@@ -327,10 +327,16 @@ determinants ever bind again, where that document's own model puts it at a furth
 
 ## 7. The accounting that changes the claim
 
-Determinants were **~99%** of the route in `resultant-elimination.md` §6.4 — at **four** rounds,
-where the resultant had degree 729 or 6 561 and root finding cost 59.5 ms or 4 156.5 ms against
-determinant stages of seconds. **That figure does not survive to six rounds**, and the reason is that
-the resultant degree `D = S − 1` grows as fast as the sample count.
+Determinants are often quoted as **~99%** of the route. That figure is explicitly a **four-round**
+one — `resultant-elimination.md` line 139 says so in as many words, "it was 99% of the four-round
+row (§6.4)" — where the resultant had degree 729 or 6 561 and root finding cost 59.5 ms or 4 156.5 ms
+against determinant stages of seconds.
+
+**It does not survive to six rounds**, and the reason is structural: the resultant degree `D = S − 1`
+grows as fast as the sample count, so root finding grows *quadratically in `S`* while the determinant
+stage grows only linearly. Carrying the 99% forward to a six-round row — which is easy to do, since
+it is the number in circulation — is what would make axis 4 look like a 4 000× row improvement
+instead of a 3× one.
 
 Three tail stages, each anchored on a measurement and extrapolated:
 
