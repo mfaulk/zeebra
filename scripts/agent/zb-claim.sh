@@ -43,6 +43,9 @@ ZB_STATUS_TODO="${ZB_STATUS_TODO:-f75ad846}"
 ZB_STATUS_IN_PROGRESS="${ZB_STATUS_IN_PROGRESS:-47fc9ee4}"
 ZB_CLAIM_LABEL="${ZB_CLAIM_LABEL:-agent:claimed}"
 ZB_LEASE_SECONDS="${ZB_LEASE_SECONDS:-14400}" # 4 hours
+# Page bound for the orient read. GraphQL caps `first:` at 100, so this is a
+# ceiling on open issues, not on the query. Exhausting it is a FAILED read.
+ZB_ORIENT_MAX_PAGES="${ZB_ORIENT_MAX_PAGES:-20}"
 
 # === pure functions (no network; covered by the unit tests) ================
 
@@ -196,6 +199,55 @@ zb_lease_state() { # <until_iso> <now_iso> <has_open_pr 0|1> <last_commit_epoch|
   echo stale
 }
 
+# The cursor to resume a paginated read from, given one GraphQL response.
+#
+# `hasNextPage: true` with no usable `endCursor` is status 2 and emphatically NOT
+# "the end of the list". A read that cannot be continued is a failed read; saying
+# otherwise is #448, where orient returned the first 100 of 112 open issues and
+# exited 0 with a queue that looked complete.
+#   0 — cursor printed   1 — that was the last page   2 — undecidable
+zb_page_cursor() {
+  local raw has cursor
+  raw="$(cat)"
+  [ -n "$raw" ] || return 2
+  has="$(printf '%s' "$raw" | jq -r '
+      .data.repository.issues.pageInfo.hasNextPage
+      | if type == "boolean" then tostring else error("hasNextPage is not a boolean") end' 2>/dev/null)" || return 2
+  [ "$has" = true ] || return 1
+  cursor="$(printf '%s' "$raw" | jq -r '.data.repository.issues.pageInfo.endCursor // empty' 2>/dev/null)" || return 2
+  [ -n "$cursor" ] || return 2
+  printf '%s\n' "$cursor"
+}
+
+# The ranked queue from a paginated read: one compact JSON array of issue nodes
+# per line on stdin, merged across pages and ranked High -> Medium -> Low ->
+# unset. Open, unclaimed, unblocked, not Done.
+#
+# Split out from the fetch loop because this half is pure and the fetch half is
+# not. Ranking has to span the merged pages rather than each page, and a page
+# that fails to parse has to fail the whole merge: dropping it would silently
+# lose 100 issues, which is the shape of the bug this replaces.
+#   0 — rows printed   1 — nothing qualifies   2 — a page was unreadable
+zb_merge_issue_pages() {
+  local raw out
+  raw="$(cat)"
+  [ -n "$raw" ] || return 2
+  out="$(printf '%s\n' "$raw" | jq -r -s --argjson pn "$ZB_PROJECT_NUMBER" --arg cl "$ZB_CLAIM_LABEL" '
+      def rank: {High: 0, Medium: 1, Low: 2}[.] // 3;
+      if length == 0 or (map(type) | any(. != "array")) then error("not a page of issue nodes") else . end
+      | add
+      | [ unique_by(.number)[]
+          | . as $i
+          | ($i.labels.nodes | map(.name)) as $L
+          | select(($L | index($cl)) == null and ($L | index("blocked")) == null)
+          | ($i.projectItems.nodes[] | select(.project.number == $pn)) as $it
+          | select(($it.s.name // "") != "Done")
+          | {n: $i.number, t: $i.title, p: ($it.fieldValueByName.name // "—")} ]
+      | sort_by([(.p | rank), .n]) | .[] | "\(.p)\t#\(.n)\t\(.t)"' 2>/dev/null)" || return 2
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
+}
+
 # === network reads =========================================================
 
 # Run a GraphQL query, failing loudly rather than returning an empty string.
@@ -216,31 +268,44 @@ _zb_gql() { # <query> [jq-filter]
 
 # Open, unclaimed, unblocked issues ranked High -> Medium -> Low -> unset.
 # Priority is a board field, not a label, so this joins issues to their row.
+#
+# Paginated, because `first:` is capped at 100 per page and the repo passed 100
+# open issues (#448). The pages it drops are always the newest — exactly the
+# follow-up issues agents file for each other — so an incomplete walk is a
+# status-2 failure and never a short queue.
 #   0 — work found   1 — nothing open and unclaimed   2 — UNREADABLE
 zb_orient() {
-  local owner="${ZB_REPO%%/*}" name="${ZB_REPO##*/}" raw out
-  raw="$(_zb_gql "
-    { repository(owner: \"$owner\", name: \"$name\") {
-        issues(first: 100, states: OPEN) { nodes {
-          number title
-          labels(first: 20) { nodes { name } }
-          projectItems(first: 5) { nodes {
-            project { number }
-            fieldValueByName(name: \"Priority\") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
-            s: fieldValueByName(name: \"Status\") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
-          } } } } } }")" || return 2
-  out="$(printf '%s' "$raw" | jq -r --argjson pn "$ZB_PROJECT_NUMBER" --arg cl "$ZB_CLAIM_LABEL" '
-      def rank: {High: 0, Medium: 1, Low: 2}[.] // 3;
-      [ .data.repository.issues.nodes[]
-        | . as $i
-        | ($i.labels.nodes | map(.name)) as $L
-        | select(($L | index($cl)) == null and ($L | index("blocked")) == null)
-        | ($i.projectItems.nodes[] | select(.project.number == $pn)) as $it
-        | select(($it.s.name // "") != "Done")
-        | {n: $i.number, t: $i.title, p: ($it.fieldValueByName.name // "—")} ]
-      | sort_by([(.p | rank), .n]) | .[] | "\(.p)\t#\(.n)\t\(.t)"' 2>/dev/null)" || return 2
-  [ -n "$out" ] || return 1
-  printf '%s\n' "$out"
+  local owner="${ZB_REPO%%/*}" name="${ZB_REPO##*/}"
+  local after="null" pages="" page nodes cursor rc n=0
+  while [ "$n" -lt "$ZB_ORIENT_MAX_PAGES" ]; do
+    n=$((n + 1))
+    page="$(_zb_gql "
+      { repository(owner: \"$owner\", name: \"$name\") {
+          issues(first: 100, states: OPEN, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              number title
+              labels(first: 20) { nodes { name } }
+              projectItems(first: 5) { nodes {
+                project { number }
+                fieldValueByName(name: \"Priority\") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                s: fieldValueByName(name: \"Status\") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+              } } } } } }")" || return 2
+    nodes="$(printf '%s' "$page" | jq -c '
+        .data.repository.issues.nodes
+        | if type == "array" then . else error("no issue nodes in the response") end' 2>/dev/null)" || return 2
+    pages="$pages$nodes
+"
+    rc=0; cursor="$(printf '%s' "$page" | zb_page_cursor)" || rc=$?
+    case $rc in
+      0) after="\"$cursor\"" ;;
+      1) printf '%s' "$pages" | zb_merge_issue_pages; return $? ;;
+      *) echo "zb-claim: the paginated issue read could not be continued after page $n — refusing to report a partial queue" >&2
+         return 2 ;;
+    esac
+  done
+  echo "zb-claim: the open-issue walk exceeded ZB_ORIENT_MAX_PAGES=$ZB_ORIENT_MAX_PAGES; raise it. Refusing to report a truncated queue" >&2
+  return 2
 }
 
 # Claim markers on one issue, as TSV. Statuses are zb_parse_claims's.

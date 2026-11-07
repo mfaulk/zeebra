@@ -266,6 +266,121 @@ check "parse: tokenless and token-bearing markers coexist" \
   "$(printf 'alpha@a\t2026-01-01T00:00:00Z\t2026-01-01T04:00:00Z\t-\nalpha@a\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-9')" \
   "$mixed"
 
+# --- pagination: zb_page_cursor --------------------------------------------
+
+# One GraphQL response in the shape zb_orient's query returns, carrying only the
+# pageInfo the cursor logic reads. $2 is JSON, so `null` and `"c1"` both work.
+gql_page() { # <hasNextPage-json> <endCursor-json>
+  jq -nc --argjson h "$1" --argjson c "$2" \
+    '{data: {repository: {issues: {pageInfo: {hasNextPage: $h, endCursor: $c}, nodes: []}}}}'
+}
+
+# A page that reports more to come hands back the cursor to continue from.
+cur="$(gql_page true '"c1"' | zb_page_cursor)"
+check_rc "cursor: hasNextPage with a cursor exits 0" 0 $?
+check "cursor: the endCursor is returned" c1 "$cur"
+
+# The last page has no successor, which is genuinely empty rather than a failure.
+gql_page false null | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: hasNextPage false is 1 (the end), not 2" 1 $?
+
+# The case #448 is about: more pages exist but nothing says where to resume, so
+# the read is undecidable. Reporting "the end" here is exactly the silent
+# truncation the issue reports, so this must be 2.
+gql_page true null | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: hasNextPage true with a null cursor is 2, not 1" 2 $?
+
+# An empty endCursor string is no more resumable than a null one.
+gql_page true '""' | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: hasNextPage true with an empty cursor is 2" 2 $?
+
+# A response with no pageInfo at all cannot be said to be complete.
+printf '{"data":{"repository":{"issues":{"nodes":[]}}}}' | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: a missing pageInfo is 2, not 1" 2 $?
+
+# hasNextPage present but not a boolean is likewise undecidable.
+gql_page '"yes"' '"c1"' | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: a non-boolean hasNextPage is 2" 2 $?
+
+# A read that produced nothing at exit 0 is the failure mode § 1 exists for.
+printf '' | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: empty input is 2" 2 $?
+
+# Non-JSON input is unreadable, not the end of the list.
+printf 'Bad credentials' | zb_page_cursor >/dev/null 2>&1
+check_rc "cursor: non-JSON input is 2" 2 $?
+
+# --- pagination: zb_merge_issue_pages --------------------------------------
+
+# One issue node in the shape the orient query returns. Priority and Status are
+# "-" for absent, which is how an issue on the board with no Priority set looks.
+issue_node() { # <number> <title> <priority|-> <status|-> [label...]
+  local n="$1" t="$2" p="$3" s="$4"
+  shift 4
+  jq -nc --argjson n "$n" --arg t "$t" --arg p "$p" --arg s "$s" \
+    --argjson pn "$ZB_PROJECT_NUMBER" --args '
+    { number: $n, title: $t,
+      labels: {nodes: ($ARGS.positional | map({name: .}))},
+      projectItems: {nodes: [
+        { project: {number: $pn},
+          fieldValueByName: (if $p == "-" then null else {name: $p} end),
+          s: (if $s == "-" then null else {name: $s} end) }]} }' "$@"
+}
+
+# One page of the paginated read: a compact JSON array of nodes on one line.
+page_of() { printf '%s\n' "$@" | jq -sc .; }
+
+p1="$(page_of "$(issue_node 58 'medium one' Medium Todo)" "$(issue_node 100 'low one' Low Todo)")"
+p2="$(page_of "$(issue_node 447 'high one' High Todo)" "$(issue_node 448 'unset one' - Todo)")"
+
+# The acceptance criterion of #448: issues that only exist on the second page
+# appear in the queue, and ranking is applied across the merged pages rather
+# than within each one — a High on page 2 outranks a Medium on page 1.
+check "merge: two pages rank as one list" \
+  "$(printf 'High\t#447\thigh one\nMedium\t#58\tmedium one\nLow\t#100\tlow one\n—\t#448\tunset one')" \
+  "$(printf '%s\n%s\n' "$p1" "$p2" | zb_merge_issue_pages)"
+printf '%s\n%s\n' "$p1" "$p2" | zb_merge_issue_pages >/dev/null
+check_rc "merge: pages with work exit 0" 0 $?
+
+# A single page still works, so the loop's last iteration needs no special case.
+check "merge: one page alone ranks correctly" \
+  "$(printf 'Medium\t#58\tmedium one\nLow\t#100\tlow one')" \
+  "$(printf '%s\n' "$p1" | zb_merge_issue_pages)"
+
+# The label filter spans pages: a claimed or blocked issue on any page is out.
+filtered="$(page_of \
+  "$(issue_node 200 'claimed' High Todo agent:claimed)" \
+  "$(issue_node 201 'blocked' High Todo blocked)" \
+  "$(issue_node 202 'done' High Done)")"
+printf '%s\n' "$filtered" | zb_merge_issue_pages >/dev/null 2>&1
+check_rc "merge: claimed, blocked and Done issues leave nothing (1)" 1 $?
+
+# Pages that are structurally fine but contain no issues are genuinely empty.
+printf '[]\n[]\n' | zb_merge_issue_pages >/dev/null 2>&1
+check_rc "merge: empty pages are 1, not 2" 1 $?
+
+# Cursor-paginated reads over a dataset that changes mid-walk can repeat a node;
+# the queue must not list the same issue twice.
+check "merge: a node repeated across pages is listed once" \
+  "$(printf 'High\t#447\thigh one')" \
+  "$(printf '%s\n%s\n' \
+      "$(page_of "$(issue_node 447 'high one' High Todo)")" \
+      "$(page_of "$(issue_node 447 'high one' High Todo)")" \
+    | zb_merge_issue_pages)"
+
+# No input at all is a failed read, never an empty queue.
+printf '' | zb_merge_issue_pages >/dev/null 2>&1
+check_rc "merge: no pages at all is 2" 2 $?
+
+# A page that is not a JSON array is unreadable: silently skipping it would drop
+# a whole page of issues, which is the defect being fixed.
+printf '%s\n{"message":"Bad credentials"}\n' "$p1" | zb_merge_issue_pages >/dev/null 2>&1
+check_rc "merge: a non-array page is 2, not a short list" 2 $?
+
+# And non-JSON on any line fails the whole merge rather than part of it.
+printf '%s\nnot json\n' "$p1" | zb_merge_issue_pages >/dev/null 2>&1
+check_rc "merge: non-JSON on any page is 2" 2 $?
+
 # ---------------------------------------------------------------------------
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
