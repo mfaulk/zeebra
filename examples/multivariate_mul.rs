@@ -27,6 +27,15 @@
 //! Every arm is checked against arm 1's answer — or against arm 2's where arm 1 is skipped —
 //! outside the timing. A route measured against a wrong answer is worthless.
 //!
+//! **Two different memory numbers, and they are not interchangeable.** The per-arm `live heap`
+//! column is the tracking allocator's peak of `sum(alloc) - sum(dealloc)` *during that one
+//! product*, so it attributes bytes to a route. The single `peak RSS` line at the end is `VmHWM`
+//! for the whole process — every arm, every operand, plus the allocator's unreturned arenas — so it
+//! is an upper bound on the run and attributes nothing. #237 found the two differing by 55% on an
+//! F4 row (21 674 MB tracked against 13 996 MB resident), in that direction, because an allocator
+//! that has not returned a freed arena is live to the tracker and resident to nobody. Read the
+//! columns for what each is.
+//!
 //! ```text
 //! cargo run --release --example multivariate_mul
 //! cargo run --release --example multivariate_mul -- chunk
@@ -205,7 +214,7 @@ fn report(label: &str, products: u64, cells: &[Cell], route: MultiplyRoute) {
     println!("    {products} term-products, dispatched route {route:?}");
     println!(
         "    {:<12} {:>12} {:>12} {:>12} {:>10} {:>14}",
-        "arm", "elapsed", "peak heap", "out terms", "B/out term", "vs materialize"
+        "arm", "elapsed", "live heap", "out terms", "B/out term", "vs materialize"
     );
 
     let baseline = cells
@@ -324,7 +333,7 @@ fn sweep_chunk(degree: u32) {
         println!("  {label} at degree {degree}: {products} term-products");
         println!(
             "    {:<12} {:>12} {:>12} {:>12}",
-            "rows", "elapsed", "peak heap", "out terms"
+            "rows", "elapsed", "live heap", "out terms"
         );
         let mut reference: Option<MultivariatePolynomial<2, F>> = None;
         for rows in CHUNK_ROWS {
@@ -413,8 +422,14 @@ fn main() {
         measure_arms("p * term", &p, &single);
     }
 
+    // The whole process, not one arm: `VmHWM` is monotonic and has no notion of which product was
+    // running. It is reported as a sanity bound on the per-arm `live heap` column above, never as a
+    // per-route figure.
     match peak_resident_bytes() {
-        Some(bytes) => println!("\npeak RSS for the whole run: {}", format_bytes(bytes)),
+        Some(bytes) => println!(
+            "\npeak RSS (VmHWM) for the whole process, all arms and operands: {}",
+            format_bytes(bytes)
+        ),
         None => println!("\npeak RSS unavailable on this platform"),
     }
 }

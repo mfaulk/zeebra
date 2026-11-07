@@ -50,13 +50,16 @@ pub enum MultiplyRoute {
 
 /// Bytes the flat triangle accumulator may reach before [`MultiplyRoute::DenseTriangle`] is refused.
 ///
-/// A bound on the route's worst case rather than a performance threshold: the guard that makes the
-/// route output-sized is a density test on the *operands*, and an operand pair that passes it can
-/// still cancel almost everything. This caps what that costs.
+/// A bound on the route's worst case rather than a performance threshold. The density test below is
+/// an estimate, and this is what the estimate being wrong costs: bounded waste, never unbounded.
 const DENSE_TRIANGLE_BYTE_CAP: u64 = 64 * 1024 * 1024;
 
-/// How sparse an operand may be and still be called dense, as a reciprocal: 4 is quarter-dense.
-const DENSE_TRIANGLE_SPARSITY_LIMIT: u64 = 4;
+/// How many triangle slots may be allocated per unit of the output's upper bound.
+///
+/// 4 rather than 1 because the bound is loose in the useful direction: a dense bivariate pair's
+/// product fills its triangle exactly, while `|a|·|b|` overcounts that by the number of monomial
+/// collisions — which for dense operands is almost all of them.
+const DENSE_TRIANGLE_SLOT_RATIO: u64 = 4;
 
 /// Entries the accumulating routes will pre-size their map to, at most.
 ///
@@ -114,16 +117,27 @@ pub(crate) fn route<const N: usize, F: FiniteField>(
 ///
 /// Applicable needs `N == 2`: the index is a bivariate total-degree one.
 ///
-/// Output-sized needs the *operands* to be dense in their own triangles, because the sumset of two
-/// dense triangles is the dense triangle of the summed degree — so a dense pair's product fills the
-/// accumulator and the accumulator is the output. This is a dense-**output** test, not an `N == 2`
-/// one: `(x^1000 + 1) * (y^1000 + 1)` is bivariate with four output terms and a 2 003 001-slot
-/// triangle, and the density test is what rejects it.
+/// Output-sized has to be estimated, and the estimate is **the triangle against the output's upper
+/// bound**: the product has at most `|a|·|b|` distinct monomials, so a triangle within a constant
+/// factor of `|a|·|b|` is within that factor of being exactly the output. This is a
+/// dense-**output** test, not an `N == 2` one, and not a test on the operands either —
+/// `(x^20000 + 1) * (y^20000 + 1)` is bivariate, wants 800 million slots for four output terms, and
+/// is rejected on four products.
 ///
-/// The failure mode it does not catch: a pair that is dense on both sides but whose product
-/// cancels nearly everything. The flat accumulator is then triangle-sized for a tiny output. Over
-/// a field that takes engineered coefficients rather than bad luck, and
-/// [`DENSE_TRIANGLE_BYTE_CAP`] bounds what it costs when it happens.
+/// # When the estimate is wrong, in each direction
+///
+/// *Too pessimistic* — a pair whose product really is dense goes to [`multiply_accumulate`] anyway.
+/// Measured cost: the triangle is 3x to 6x faster than accumulating at every bivariate size swept
+/// in `examples/multivariate_mul.rs`, so this direction loses time and nothing else. Both routes
+/// are output-bounded in memory, which is the property §6.8 was about.
+///
+/// *Too optimistic* — a pair that passes the ratio but whose product cancels nearly everything
+/// allocates a triangle far larger than its output. Over a field that takes engineered coefficients
+/// rather than bad luck, and [`DENSE_TRIANGLE_BYTE_CAP`] caps the damage at 64 MiB however wrong
+/// the estimate was.
+///
+/// The asymmetry is deliberate: the pessimistic direction costs unbounded *time*, the optimistic one
+/// bounded *memory*. After §6.8 that is the right way round.
 fn dense_triangle_profitable<const N: usize, F: FiniteField>(
     a: &SparseMultiPoly<N, F>,
     b: &SparseMultiPoly<N, F>,
@@ -135,13 +149,8 @@ fn dense_triangle_profitable<const N: usize, F: FiniteField>(
     if slots.saturating_mul(std::mem::size_of::<F>() as u64) > DENSE_TRIANGLE_BYTE_CAP {
         return false;
     }
-    is_dense(a) && is_dense(b)
-}
-
-/// Whether a bivariate polynomial fills at least `1 / DENSE_TRIANGLE_SPARSITY_LIMIT` of the
-/// total-degree triangle it spans.
-fn is_dense<const N: usize, F: FiniteField>(p: &SparseMultiPoly<N, F>) -> bool {
-    (p.terms.len() as u64).saturating_mul(DENSE_TRIANGLE_SPARSITY_LIMIT) >= triangle_len(p.degree())
+    let products = (a.terms.len() as u64).saturating_mul(b.terms.len() as u64);
+    slots <= products.saturating_mul(DENSE_TRIANGLE_SLOT_RATIO)
 }
 
 /// The pre-#243 route: one `Vec` of every product, collected by [`SparseMultiPoly::new`].
@@ -485,8 +494,8 @@ mod tests {
         let dense: SparseMultiPoly<2, F> = dense_triangle(200, 1);
         assert_eq!(route(&dense, &dense), MultiplyRoute::DenseTriangle);
 
-        // Bivariate, far past the materialising limit, and sparse: two terms spanning degree
-        // 20 000, whose triangle would be 200 million slots for four output terms.
+        // Bivariate and sparse: two terms spanning degree 20 000, whose triangle would be
+        // hundreds of millions of slots for a handful of output terms.
         let sparse: SparseMultiPoly<2, F> = SparseMultiPoly::new(&[
             (Monomial::<2>::new(&[20_000, 0]), F::one()),
             (Monomial::<2>::new(&[0, 20_000]), F::one()),
@@ -497,6 +506,23 @@ mod tests {
             MultiplyRoute::Accumulate,
             "a sparse bivariate pair must not be forced into a dense triangle"
         );
+
+        // One term against many — the reduction inner step. The output is exactly `|a|` terms and
+        // the triangle is 20 910 slots for 20 301 of them, so the triangle is the right accumulator
+        // even though the single term is dense in nothing. An earlier predicate tested each operand
+        // for density and sent this to the accumulator, at 1.5x the time.
+        let single: SparseMultiPoly<2, F> =
+            SparseMultiPoly::new(&[(Monomial::<2>::new(&[2, 1]), F::new(7))]);
+        assert_eq!(route(&dense, &single), MultiplyRoute::DenseTriangle);
+        assert_eq!(
+            multiply_by(&dense, &single, MultiplyRoute::DenseTriangle),
+            multiply_by(&dense, &single, MultiplyRoute::Materialize)
+        );
+
+        // Two lone terms, though, are not worth a triangle: 1 product against 66 slots.
+        let other: SparseMultiPoly<2, F> =
+            SparseMultiPoly::new(&[(Monomial::<2>::new(&[3, 4]), F::new(2))]);
+        assert_eq!(route(&single, &other), MultiplyRoute::Accumulate);
 
         // Arity alone does not select the triangle.
         let trivariate: SparseMultiPoly<3, F> = {
