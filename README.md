@@ -424,6 +424,9 @@ cargo run --release --example karatsuba_crossover  # Karatsuba against schoolboo
 cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example multiplication_dispatch  # schoolbook vs Karatsuba vs transform, and the crossings
 cargo run --release --example multiplication_dispatch -- koalabear max_log=17
+cargo run --release --example multivariate_mul     # multivariate multiply: time and live heap per route
+cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
+cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay

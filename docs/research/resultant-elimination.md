@@ -987,6 +987,160 @@ says. So the six-round run records, and `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION
 inflation is in `elapsed_nanos` and the verification stage, not in `sampling` or `interpolation`,
 which were never wrong. Any row recorded from this commit onwards does not carry it, and a total
 compared across the boundary should subtract the verification stage from the older one.
+### 6.12 The collecting multiply (#243): the memory, and the time with it
+
+§6.8 left the mechanism named and the fix unmeasured, with an explicit caveat — "a map insert per
+product may cost more time than `push` plus one sort, so it is a memory win that has to be measured
+for time". It was measured for time. **The caveat does not hold: the collecting routes are faster
+as well as smaller, at every size measured.**
+
+`src/poly/multivariate/sparse_multivariate_multiply.rs` now holds four routes, and
+`examples/multivariate_mul.rs` measures all four against the same operands with a tracking
+`#[global_allocator]`:
+
+| route | inner loop | live set |
+|---|---|---|
+| `Materialize` | `push` into one `Vec`, then `SparseMultiPoly::new` | `O(\|a\|·\|b\|)` |
+| `Accumulate` | merge into one `HashMap<Monomial<N>, F>` | `O(output)` |
+| `Chunked { rows }` | `push` into a reused block buffer, fold each block in | `O(rows·\|b\|)` |
+| `DenseTriangle` | `slots[triangle_index(x, y)] += a·b`, no hashing | `O(triangle)` |
+
+The operands are dense bivariate total-degree triangles, because that is the shape §6.8 found: 266
+815 terms at degree 729, exactly `(729+1)(729+2)/2`, with no cancellation anywhere in six rounds.
+Sparsity is not the lever here, so a sparse operand would measure a different problem.
+
+#### The measurement
+
+KoalaBear, one pinned core, under `tools/benchlock.sh`. `p * p` then `(p²) * p` at each degree, the
+pair `cico_bivariate`'s α = 3 S-box runs. Times are wall clock; "heap" is peak live heap added,
+from the tracking allocator.
+
+| terms | step | products | out terms | materialize | accumulate | chunked (64) | triangle |
+|---:|---|---:|---:|---|---|---|---|
+| 6 | `p·p` | 36 | 15 | 2.7 µs / 1.4 KiB | 1.3 µs / 432 B | 3.6 µs / 4.9 KiB | **0.8 µs / 492 B** |
+| 6 | `p²·p` | 90 | 28 | 3.4 µs / 2.1 KiB | 1.8 µs / 432 B | 2.7 µs / 4.9 KiB | **1.0 µs / 544 B** |
+| 15 | `p·p` | 225 | 45 | 7.0 µs / 4.2 KiB | 3.8 µs / 848 B | 9.4 µs / 12.1 KiB | **1.5 µs / 1.0 KiB** |
+| 28 | `p·p` | 784 | 91 | 26.1 µs / 14.5 KiB | 11.3 µs / 1.6 KiB | 26.7 µs / 22.6 KiB | **3.6 µs / 2.0 KiB** |
+| 45 | `p·p` | 2 025 | 153 | 47.2 µs / 28.9 KiB | 26.8 µs / 3.3 KiB | 46.6 µs / 37.0 KiB | **7.7 µs / 3.9 KiB** |
+| 325 | `p·p` | 105 625 | 1 225 | 2.70 ms / 1.5 MiB | 1.33 ms / 26.0 KiB | 2.07 ms / 269.8 KiB | **316 µs / 30.8 KiB** |
+| 325 | `p²·p` | 398 125 | 2 701 | 11.09 ms / 6.1 MiB | 5.13 ms / 52.0 KiB | 7.95 ms / 295.8 KiB | **1.77 ms / 62.6 KiB** |
+| 1 653 | `p·p` | 2 732 409 | 6 441 | 74.0 ms / 48.2 MiB | 35.3 ms / 104 KiB | 54.8 ms / 1.3 MiB | **7.68 ms / 129 KiB** |
+| 1 653 | `p²·p` | 10 646 973 | 14 365 | 294 ms / 192.6 MiB | 151 ms / 416 KiB | 230 ms / 1.6 MiB | **42.2 ms / 472 KiB** |
+| 4 186 | `p·p` | 17 522 596 | 16 471 | 486 ms / 384.6 MiB | 265 ms / 416 KiB | 374 ms / 3.5 MiB | **49.8 ms / 480 KiB** |
+| 4 186 | `p²·p` | 68 947 606 | 36 856 | 2.051 s / 1.5 GiB | 1.179 s / 832 KiB | 1.592 s / 3.9 MiB | **212 ms / 976 KiB** |
+| 29 890 | `p·p` | 893 412 100 | 118 828 | *skipped* | 18.65 s / 3.3 MiB | 24.45 s / 25.1 MiB | **2.85 s / 3.7 MiB** |
+| 29 890 | `p²·p` | 3 551 768 920 | 266 815 | *skipped* | 84.85 s / 6.5 MiB | 103.39 s / 28.4 MiB | **11.25 s / 7.5 MiB** |
+
+The last two rows are the six-round-relevant ones: 29 890 is the dense triangle of degree 243,
+against the 29 768 terms §6.8's words actually carry, and 266 815 output terms is exactly the figure
+§6.8 measured. The materialising arm is **skipped** above 2^28 products rather than run: its cost
+there is 56.6 GB in closed form, which is the measurement §6.8 already took once and which the
+example exists to avoid taking again. A skipped cell is marked, never reported as a result.
+
+Read the memory column at the bottom: materialising holds **24 484 bytes per output term** at 4 186
+terms, where every collecting route holds **23 to 33**. That ratio is the whole of §6.8's 838x.
+
+#### What the dispatch became, and why it has no size threshold
+
+`route` (`sparse_multivariate_multiply.rs`) is two tiers, not the three the first cut guessed:
+
+```text
+dense_triangle_profitable(a, b)  ->  DenseTriangle
+otherwise                        ->  Accumulate
+```
+
+**There is no small-operand tier, because there is no small-operand regime.** That was the expected
+result and the measurement refused it: `Accumulate` is 0.38x–0.66x `Materialize`'s time at every
+size down to 36 term-products, and holds 3x–1000x less. It is not a close call, and the reason is
+structural rather than empirical — `SparseMultiPoly::new`
+(`sparse_multivariate_polynomial.rs:47-74`) *is* a monomial-keyed hash accumulate, so materialising
+is accumulating with a `Vec` of every product in front of it. There is no size at which the extra
+`Vec` pays for itself.
+
+Not having a threshold is worth something on its own: the operand size does not change where the
+answer comes from, so the small `mul/{arity}` Criterion arms and the six-round build exercise the
+same code.
+
+**The predicate, and its failure mode.** `DenseTriangle` is selected on a *dense-output* test, not
+on `N == 2`:
+
+* `N == 2`, because the index is bivariate — `triangle_index(i, j) = t(t+1)/2 + j` for `t = i + j`;
+* the triangle of the summed degree must fit in 64 MiB of coefficients, which is a bound on the
+  worst case rather than a performance threshold;
+* **and both operands must each fill at least a quarter of their own total-degree triangle**, since
+  the sumset of two dense triangles is the dense triangle of the summed degree. A dense pair's
+  product therefore fills the accumulator, and the accumulator is the output.
+
+The third clause is what keeps a sparse bivariate pair out. `(x^20000 + 1) · (y^20000 + 1)` is
+bivariate, far past any size threshold, and would want 800 million slots for four output terms;
+`is_dense` rejects it on two terms against 200 million, and the pair goes to `Accumulate`. A
+regression test (`test_route_selects_by_density_not_by_arity`) pins exactly that, and pins that
+arity alone does not select the route either.
+
+The failure mode the predicate does **not** catch: a pair dense on both sides whose product cancels
+nearly everything. The flat accumulator is then triangle-sized for a tiny output. Over a field that
+takes engineered coefficients rather than bad luck, and the 64 MiB cap bounds what it costs when it
+happens — so the worst case is bounded waste, not unbounded.
+
+#### The chunked route is a negative result
+
+#243 named chunking as the smaller change, and it is: a block buffer bounds the transient without
+touching the combine. It is also the wrong trade, and the sweep says why. At 4 186 terms:
+
+| rows per block | `p·p` elapsed | `p·p` heap | `p²·p` elapsed | `p²·p` heap |
+|---:|---|---|---|---|
+| 1 | 371.6 ms | 465.1 KiB | 1.544 s | 881.1 KiB |
+| 4 | 367.9 ms | 612.2 KiB | 1.584 s | 1.0 MiB |
+| 16 | 377.9 ms | 1.2 MiB | 1.553 s | 1.6 MiB |
+| 64 | 362.0 ms | 3.5 MiB | 1.541 s | 3.9 MiB |
+| 256 | 353.4 ms | 12.7 MiB | 1.548 s | 13.1 MiB |
+| 1 024 | 381.4 ms | 49.5 MiB | 1.588 s | 49.9 MiB |
+| 4 096 | 457.3 ms | 196.6 MiB | 1.682 s | 197.0 MiB |
+
+**Time is flat and memory is linear**, across more than three orders of magnitude of block size. So
+the optimum is one row — which is direct accumulation with a redundant `Vec` round-trip, and
+measures 371.6 ms against `Accumulate`'s 265.4 ms on the same operands: **1.40x for nothing**. The
+sensitivity question has an answer and the answer is that the parameter should not exist. The route
+is kept reachable (`MultiplyRoute::Chunked`) so the negative result stays reproducible, and is never
+selected.
+
+#### The small-operation control
+
+The `mul/{arity}` Criterion arms are the regression control, and they top out at 256 × 256 = 65 536
+term-products — about a megabyte of transient, four orders below the regime this is about. Measured
+through Criterion's baseline mechanism, the `origin/main` bench binary against the branch's, same
+core, same lock: **PLACEHOLDER_CRITERION**
+
+Two arms were missing and are added in `benches/sparse_polynomial.rs`: an **`n2` arity**, which the
+file did not have although N = 2 is the arity the whole resultant route runs at, and a
+**`mul_dense`** arm two sizes past the existing ones. The second matters because `random_poly`
+draws monomials independently, which is sparse in the total-degree sense at every size — so the
+pre-existing arms never produce the dense-output shape `DenseTriangle` is selected for, and could
+not have caught a wrong predicate.
+
+#### End to end: the number that decides the issue
+
+`examples/resultant_cico --row poseidon31-cico-t16-rf2-rp4 --build-only`, single-threaded on one
+pinned core under `tools/benchlock.sh`, against §6.8's recorded before:
+
+**PLACEHOLDER_END_TO_END**
+
+#### #164 is left unmeasured, deliberately
+
+`Monomial<N>`'s `Hash` is derived (`monomial.rs:14-19`), so it is SipHash-1-3 over `N` `write_u32`
+calls, and #164 wants a monomial-keyed hasher instead. **#164 and #243 compound, and the order they
+land in changes what the second one measures.** A collecting multiply does a hash lookup per
+*product* rather than per output term — 3.54 × 10⁹ of them on the `(p²) · p` step — so #243 has made
+the `Accumulate` route hash-bound in a way the materialising route was not, and whichever of the two
+lands second will be measured on a workload the other created.
+
+Not implemented here, and the measurement that would decide it is stated rather than taken: the
+`Accumulate` row at 29 890 terms is **84.85 s for 3.55 × 10⁹ hash lookups**, about 24 ns a product
+on a 4-byte field, against `DenseTriangle`'s 11.25 s for the same products with no hashing at all.
+That 7.5x gap is an upper bound on what a faster hasher could recover on the bivariate path — and on
+the bivariate path the triangle route already takes it, so #164's value is in the arities the
+triangle does not cover. The trivariate arm of `examples/multivariate_mul.rs` is where that would be
+read.
 
 ## 7. The deeper consequence
 
