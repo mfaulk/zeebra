@@ -143,6 +143,61 @@ fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
         );
 
         group.bench_with_input(
+            BenchmarkId::new(format!("sub/{}", arity), terms),
+            &(&a, &b),
+            |bencher, (a, b)| bencher.iter(|| black_box(black_box(*a) - black_box(*b))),
+        );
+
+        // The in-place spellings, which #361 made genuinely mutate rather than assign a freshly
+        // built sum. Benchmarked beside `add` and `sub` rather than instead of them: the borrowed
+        // operator still has to clone one side, so the two are different operations and the gap
+        // between them is the whole of what the in-place form buys a caller that owns its
+        // accumulator — `div_rem`'s `working -= &q * divisor` and the symbolic MDS fold.
+        group.bench_with_input(
+            BenchmarkId::new(format!("add_assign/{}", arity), terms),
+            &(&a, &b),
+            |bencher, (a, b)| {
+                bencher.iter_batched_ref(
+                    || (*a).clone(),
+                    |accumulator| *accumulator += black_box(*b),
+                    criterion::BatchSize::SmallInput,
+                )
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new(format!("sub_assign/{}", arity), terms),
+            &(&a, &b),
+            |bencher, (a, b)| {
+                bencher.iter_batched_ref(
+                    || (*a).clone(),
+                    |accumulator| *accumulator -= black_box(*b),
+                    criterion::BatchSize::SmallInput,
+                )
+            },
+        );
+
+        // Scaling is the MDS layer's other operation, once per word per round.
+        let factor = F::new(7);
+        group.bench_with_input(
+            BenchmarkId::new(format!("scale/{}", arity), terms),
+            &(&a, &factor),
+            |bencher, (a, factor)| bencher.iter(|| black_box(black_box(*a).scale(factor))),
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new(format!("scale_assign/{}", arity), terms),
+            &(&a, &factor),
+            |bencher, (a, factor)| {
+                bencher.iter_batched_ref(
+                    || (*a).clone(),
+                    |scaled| scaled.scale_assign(factor),
+                    criterion::BatchSize::SmallInput,
+                )
+            },
+        );
+
+        group.bench_with_input(
             BenchmarkId::new(format!("mul/{}", arity), terms),
             &(&a, &b),
             |bencher, (a, b)| bencher.iter(|| black_box(black_box(*a) * black_box(*b))),
@@ -179,6 +234,37 @@ fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
             BenchmarkId::new(format!("mul_dense/{}", arity), products),
             &(&a, &b),
             |bencher, (a, b)| bencher.iter(|| black_box(black_box(*a) * black_box(*b))),
+        );
+    }
+
+    // The symbolic permutation's MDS layer: fold the scaled state words into one accumulator. The
+    // shape #361 is about, and the one where the in-place forms compound rather than each saving a
+    // constant — the allocating `Add` rebuilt the whole accumulator at every one of the steps, and
+    // `scale` round-tripped each word through a `Vec`.
+    {
+        const WORDS: usize = 8;
+        let mut rng = StdRng::seed_from_u64(37);
+        let degree = simplex_degree::<N>(512);
+        let state: Vec<MultivariatePolynomial<N, F>> = (0..WORDS)
+            .map(|_| dense_simplex::<N>(degree, &mut rng))
+            .collect();
+        let row: Vec<F> = (0..WORDS).map(|w| F::new(3 + w as u64)).collect();
+
+        group.sample_size(20);
+        group.bench_with_input(
+            BenchmarkId::new(format!("mds_fold/{}", arity), WORDS),
+            &(&row, &state),
+            |bencher, (row, state)| {
+                bencher.iter(|| {
+                    black_box(
+                        row.iter()
+                            .zip(state.iter())
+                            .fold(MultivariatePolynomial::<N, F>::zero(), |acc, (m, word)| {
+                                acc + word.scale(m)
+                            }),
+                    )
+                })
+            },
         );
     }
 

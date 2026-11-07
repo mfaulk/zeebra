@@ -44,6 +44,9 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Multivariate multiplication that collects as it multiplies, so the live set is bounded by the
       product's size and not by the term-product count: the six-round symbolic build from 57.0 GB
       peak resident to 0.32 GB, 179x, for byte-identical output
+- [x] Multivariate `Add`, `Sub` and `scale` collecting into an operand's own map, so a sum that
+      cancels to one term out of 11 476 a side allocates nothing at all where materializing held
+      594 KB, and an owned accumulator grows in place
 - [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
       resolved against msolve's own distributed input files
@@ -1592,6 +1595,70 @@ implementation against itself, so they were re-based onto an independent oracle 
 small-product regression the issue predicted — which turned out to be `schoolbook_into` iterating
 the longer operand outside; swapping that made the same shape **2.5x** instead. The transform still
 cannot live on `Mul`, because choosing a domain needs `KnownOrder` and randomness.
+
+## Multivariate Polynomials
+
+`MultivariatePolynomial<N, F>` is sparse: a monomial-to-coefficient map over `N` variables, held
+canonically. No coefficient is ever zero, so the zero polynomial is the empty set of terms and a
+monomial whose coefficients cancel is dropped rather than kept at zero. Equality and `Hash` are
+over that set, which is why the invariant is not cosmetic — a surviving zero term would make a
+polynomial unequal to its own canonical form.
+
+`Add`, `Sub`, `Neg` and `scale` **collect into one of their operands' maps** rather than building a
+`Vec` of `|a| + |b|` terms and rehashing it into a third map. Which operand is mutated follows the
+ownership of the spelling you write, and that is the whole of the optimization:
+
+| spelling | what it allocates |
+|---|---|
+| `&a + &b`, `&a - &b` | clones one side; for `+` the *larger*, since addition commutes |
+| `a + &b`, `a - &b`, `a + b`, `a - b` | nothing — the owned operand's map is merged into |
+| `a += &b`, `a -= &b`, `a += b`, `a -= b` | nothing |
+| `a.scale(&c)` | clones `a` |
+| `a.scale_assign(&c)` | nothing |
+
+So an accumulator you own grows in place:
+
+```rust
+use zeebra::{fields::Zp13, FiniteField, MultivariatePolynomial, Zero};
+
+let vars = ["x", "y"];
+let words: Vec<MultivariatePolynomial<2, Zp13>> = ["x^2 + y", "x*y - 1", "y^2 + x"]
+    .iter()
+    .map(|s| MultivariatePolynomial::parse(s, vars).unwrap())
+    .collect();
+let row = [Zp13::new(3), Zp13::new(5), Zp13::new(7)];
+
+// The linear layer of a symbolic permutation: no sum is ever built twice.
+let folded = row
+    .iter()
+    .zip(&words)
+    .fold(MultivariatePolynomial::zero(), |acc, (m, word)| acc + word.scale(m));
+
+assert_eq!(
+    folded,
+    MultivariatePolynomial::parse("3*x^2 + 5*x*y + 7*y^2 + 7*x + 3*y + 8", vars).unwrap()
+);
+
+// Scaling by zero is the zero polynomial held as no terms, not as zero coefficients.
+let mut vanishing = words[0].clone();
+vanishing.scale_assign(&Zp13::zero());
+assert!(vanishing.is_zero());
+assert!(vanishing.terms().is_empty());
+```
+
+### Aliasing
+
+The in-place forms mutate the left operand and never the right, and the borrow checker rules out
+the one case that would be ambiguous: `a += &a` does not compile, because `&mut a` and `&a` cannot
+coexist. Self-assignment is therefore spelled through a clone — `a += a.clone()` doubles, and
+`a -= a.clone()` is the empty polynomial, not a map full of zeros.
+
+What this buys is measured in `tests/multivariate_add_memory.rs`, which asserts it rather than
+quoting it. Summing two 11 476-term triangles that cancel to a single term allocates **0 bytes**
+against **594 944** for the form that materialized every term, because every merge lands on a
+monomial already present and the table never grows — the live set is the output. Folding eight
+scaled words into one accumulator peaks at **43 312 bytes** against **84 448**; there the output
+has to be allocated, so the 2x is all there is to win.
 
 ## Gröbner Bases
 
