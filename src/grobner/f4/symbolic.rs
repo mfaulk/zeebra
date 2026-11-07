@@ -159,21 +159,22 @@ pub struct SymbolicCounts {
     /// Reducer multiples whose built terms came from the cache rather than being recomputed.
     pub reducer_rows_reused: usize,
 
-    /// Monomials pushed onto the pending queue, counted **before** the deduplication test.
+    /// Monomials *offered* to the pending queue, counted **before** the deduplication test.
     ///
-    /// Every term of every row is enqueued and only then checked against `examined`, so this is
-    /// larger than [`Self::divisor_queries`] by the repetition factor. It is recorded because the
-    /// queue is the one structure in this stage that no [`F4Options`](super::F4Options) budget
-    /// bounds: the row budget stops the loop, and each surviving iteration has already enqueued a
-    /// row's worth of monomials.
+    /// Every term of every row is offered, so this is larger than [`Self::divisor_queries`] by the
+    /// repetition factor, and it stays the pre-deduplication total after #305 moved the test from
+    /// pop to push — the figures recorded against this counter before that change remain
+    /// comparable with the ones taken after it. What changed is how many of these offers are
+    /// *admitted*: now only the distinct ones, so [`Self::max_pending_monomials`] is bounded by
+    /// the batch's column count rather than by nothing.
     pub monomials_enqueued: usize,
 
     /// The largest the pending queue grew, in monomials.
     ///
     /// The queue's own high-water mark, which is what its allocation costs:
     /// `size_of::<Monomial<N>>()` each, and a `VecDeque` never shrinks below the capacity its peak
-    /// forced. Sampled once per loop iteration rather than once per push, so the measurement is
-    /// one comparison against work that already includes a hash insert.
+    /// forced. Sampled after each iteration's run of pushes, which is where the queue can only
+    /// have grown, so this is the exact maximum rather than an approximation to it.
     pub max_pending_monomials: usize,
 }
 
@@ -809,13 +810,167 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
 
     // Monomials that are the leading monomial of some row, so the invariant already holds there.
     let mut covered: MonomialSet<N> = MonomialSet::default();
-    // Monomials already tested for reducibility, so no monomial is handled twice.
+    // Monomials already offered to the queue, so no monomial is enqueued or handled twice. The
+    // one in `symbolic_preprocessing_pop_deduplicated` holds the monomials already *handled*,
+    // which is the difference between the two disciplines and the subject of the note below.
     let mut examined: MonomialSet<N> = MonomialSet::default();
     let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
 
     // Both halves of each pair. Their common leading monomial is the lcm, which is therefore
     // covered by the pair itself and must not acquire a reducer multiple of its own: that would
     // add the very row whose cancellation against its partner is the point of the pair.
+    for (position, pair) in pairs.iter().enumerate() {
+        for basis_index in [pair.left, pair.right] {
+            let multiplier = pair
+                .lcm
+                .checked_div(&basis.element(basis_index).leading_monomial)
+                .expect("a pair's lcm is divisible by each of its leading monomials");
+            if rows.len() == max_rows {
+                return Err(RowBudgetExceeded { limit: max_rows });
+            }
+            rows.push(PreprocessedRow {
+                multiplier,
+                basis_index,
+                kind: RowKind::PairComponent { pair: position },
+            });
+        }
+        covered.insert(pair.lcm);
+    }
+
+    // Deduplication happens on **push**, in `enqueue`, rather than when a monomial is popped.
+    // That is the whole of #305. Pushing first and testing later bounds the queue by
+    // `max_matrix_rows` times the terms per row — by nothing a caller sets — and on
+    // `fukuoka-mq-III-n20-seed0` that reached 162 188 194 monomials, a single `VecDeque` reserve of
+    // 2^28 slots and **88.4% of a 13 996 MB peak RSS**; see `docs/research/f4-resource-scaling.md`
+    // §9.2. Testing first bounds it by the *distinct* monomials in the closure, which is exactly
+    // the matrix's column count and therefore `max_matrix_columns`. The peak is reached before any
+    // matrix exists, so no entry or byte budget can see it; this is the only place that can.
+    //
+    // **Why this is the same algorithm and not merely a cheaper one.** Write `E_pop` for the
+    // pop-time `examined` set and `E_push` for this one. A monomial enters `E_push` when it is
+    // enqueued but enters `E_pop` only when it is processed, so the two sets differ at every
+    // intermediate moment and the claim cannot be that they agree pointwise. What has to be
+    // identical is the **sequence of processed monomials**, because everything downstream —
+    // `covered`, `rows`, the divisor queries, and where the row budget is crossed — is a function
+    // of it alone. It is identical, by induction over processing steps on two invariants:
+    //
+    // 1. `E_push` = (processed) u (queued). A monomial enters `E_push` exactly when it is enqueued
+    //    and leaves the queue exactly when it is processed, and `enqueue` admits it at most once,
+    //    so the queue holds precisely the examined-but-not-yet-processed monomials.
+    // 2. The push-time queue is the pop-time queue with every already-processed monomial and every
+    //    duplicate after the first surviving occurrence deleted.
+    //
+    // Both queues are FIFO, so under (2) the head of the push-time queue is the first element of
+    // the pop-time queue that pop-time deduplication would *not* discard: both algorithms process
+    // the same monomial next. They then run the same tests on it against an identical `covered` and
+    // an identical basis, so they append the same row and offer the same term sequence; (1) says
+    // the predicate `enqueue` filters by is exactly the already-seen predicate that defines (2), so
+    // (2) is restored. The base case is the initial fill, where nothing is processed yet and (2) is
+    // the definition of `enqueue`.
+    //
+    // The consequence worth stating, because #305 expected the opposite, is that the **row order
+    // does not move**. Deduplicating on push keeps a monomial at its first occurrence's position in
+    // the queue, and deduplicating on pop also processes it at its first occurrence's position, so
+    // the two agree on order and not merely on membership. At termination both queues are empty and
+    // `E_push` = `E_pop`; `rows`, `leading_monomials`, `divisor_queries` and `divisor_scan_steps`
+    // are equal element for element, which `test_push_time_deduplication_preserves_the_closure`
+    // checks batch by batch against `symbolic_preprocessing_pop_deduplicated`.
+    //
+    // `monomials_enqueued` still counts *offers* rather than admissions, so the figures recorded
+    // against it before this change stay comparable. `max_pending_monomials` is what moves.
+    for row in &rows {
+        for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
+            enqueue(monomial, &mut pending, &mut examined, &mut counts);
+        }
+    }
+    counts.max_pending_monomials = counts.max_pending_monomials.max(pending.len());
+
+    while let Some(monomial) = pending.pop_front() {
+        if covered.contains(&monomial) {
+            continue;
+        }
+        let Some((basis_index, multiplier)) =
+            basis.find_divisor_with(&monomial, selection, &mut counts)
+        else {
+            // Irreducible: nothing in the matrix can reduce it, and nothing needs to.
+            continue;
+        };
+
+        // Recorded unconditionally, so that the repetition rate of `(basis_index, multiplier)`
+        // across batches is measurable in a mode that serves nothing and changes nothing. That
+        // measurement is the precondition for building a cache, not a consequence of having
+        // built one.
+        if cache.record((basis_index, multiplier)) {
+            counts.reducer_rows_reused += 1;
+        }
+
+        if rows.len() == max_rows {
+            return Err(RowBudgetExceeded { limit: max_rows });
+        }
+
+        covered.insert(monomial);
+        for (shifted, _) in basis.shifted_terms(basis_index, &multiplier) {
+            enqueue(shifted, &mut pending, &mut examined, &mut counts);
+        }
+        // Sampled here rather than after a pop, because the queue grows only in `enqueue` and
+        // every push of an iteration happens in the run just above: this is the exact high-water
+        // mark rather than a figure one row's terms below it.
+        counts.max_pending_monomials = counts.max_pending_monomials.max(pending.len());
+
+        rows.push(PreprocessedRow {
+            multiplier,
+            basis_index,
+            kind: RowKind::Reducer,
+        });
+    }
+
+    Ok(Preprocessed {
+        rows,
+        leading_monomials: covered,
+        counts,
+    })
+}
+
+/// Offer `monomial` to the pending queue, admitting it only if `examined` had not seen it.
+///
+/// Counts the offer either way, so `monomials_enqueued` keeps the pre-deduplication meaning the
+/// recorded memory figures were taken against. See the argument at the call site in
+/// [`symbolic_preprocessing_with`] for why admitting here rather than on pop leaves the closure,
+/// the rows and their order unchanged.
+fn enqueue<const N: usize>(
+    monomial: Monomial<N>,
+    pending: &mut VecDeque<Monomial<N>>,
+    examined: &mut MonomialSet<N>,
+    counts: &mut SymbolicCounts,
+) {
+    counts.monomials_enqueued += 1;
+    if examined.insert(monomial) {
+        pending.push_back(monomial);
+    }
+}
+
+/// [`symbolic_preprocessing_with`]'s pre-#305 queue discipline: enqueue every term of every row,
+/// and deduplicate only when popping.
+///
+/// A reimplementation kept for one purpose, which is to let the test suite check the two
+/// disciplines against each other batch by batch — the empirical half of the closure-equivalence
+/// argument at the push site, and the half that matters, because two different closures can reach
+/// the same reduced basis by different matrices. A reimplementation rather than a runtime flag,
+/// because a flag would let the unbounded discipline reach a caller.
+#[cfg(test)]
+pub(crate) fn symbolic_preprocessing_pop_deduplicated<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    max_rows: usize,
+    selection: ReducerSelection,
+    cache: &mut ReducerCache<N>,
+) -> Result<Preprocessed<N>, RowBudgetExceeded> {
+    let mut counts = SymbolicCounts::default();
+    let mut rows: Vec<PreprocessedRow<N>> = Vec::with_capacity(2 * pairs.len());
+    let mut covered: MonomialSet<N> = MonomialSet::default();
+    let mut examined: MonomialSet<N> = MonomialSet::default();
+    let mut pending: VecDeque<Monomial<N>> = VecDeque::new();
+
     for (position, pair) in pairs.iter().enumerate() {
         for basis_index in [pair.left, pair.right] {
             let multiplier = pair
@@ -852,22 +1007,14 @@ pub fn symbolic_preprocessing_with<const N: usize, F: FiniteField>(
         let Some((basis_index, multiplier)) =
             basis.find_divisor_with(&monomial, selection, &mut counts)
         else {
-            // Irreducible: nothing in the matrix can reduce it, and nothing needs to.
             continue;
         };
-
-        // Recorded unconditionally, so that the repetition rate of `(basis_index, multiplier)`
-        // across batches is measurable in a mode that serves nothing and changes nothing. That
-        // measurement is the precondition for building a cache, not a consequence of having
-        // built one.
         if cache.record((basis_index, multiplier)) {
             counts.reducer_rows_reused += 1;
         }
-
         if rows.len() == max_rows {
             return Err(RowBudgetExceeded { limit: max_rows });
         }
-
         covered.insert(monomial);
         for (shifted, _) in basis.shifted_terms(basis_index, &multiplier) {
             pending.push_back(shifted);

@@ -195,11 +195,10 @@ pub struct F4Options {
     /// the one batch currently being reduced, at that batch's peak, and nothing else.** That is the
     /// whole scope. In particular it does **not** bound, and nothing in F4 bounds in bytes:
     ///
-    /// - **symbolic preprocessing's pending monomial queue**, one `Monomial<N>` per term of every
-    ///   row, pushed *before* the deduplication test and bounded by no option at all — the row
-    ///   budget stops the loop, and every surviving iteration has already enqueued a row's worth.
-    ///   At twenty variables a monomial is 80 bytes against an entry's 16, so a queue a twentieth
-    ///   the matrix's size already costs as much as the matrix. See
+    /// - **symbolic preprocessing's pending monomial queue**, which is bounded in *monomials* by
+    ///   [`Self::max_matrix_columns`] since #305 — it admits only distinct monomials, and a
+    ///   batch's distinct monomials are its columns — but by nothing stated in bytes. At twenty
+    ///   variables a monomial is 80 bytes against an entry's 16. See
     ///   [`F4Statistics::max_pending_monomials`](super::F4Statistics::max_pending_monomials).
     /// - the `examined` and `covered` monomial sets, and the preprocessed row vector;
     /// - the column vector, the monomial-to-column map, and the two temporaries construction

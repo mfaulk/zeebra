@@ -14,6 +14,12 @@ nothing, and — separately — **the budget is not what bounds the memory.**
 > and its refusal-path reading is withdrawn. §6a's argument for keeping the entry cap "because it is
 > the bound that yields a report" is retracted too, by #284's cooperative time check. Sections 1-8
 > are left as they were taken, with retraction markers where a claim no longer stands.
+>
+> **M25 (#305) added §10**, which bounds that `VecDeque` by deduplicating on push instead of on pop.
+> Peak RSS on the same instance falls from 13 996 MB to **1 496.5 MB**, the symbolic closure is proved
+> unchanged, and the site that binds is now **the basis, held twice** at the degree-5 rung and
+> **matrix construction** at the degree-4 one — so there is no single answer to what dominates F4's
+> memory. No stop reason and no default changed, so §§3-9 still reproduce.
 
 ## 1. What M23 left open
 
@@ -455,3 +461,221 @@ still read the binary's own pid. `ZEEBRA_WALL_SECONDS` sets `F4Options::max_wall
 **cooperative** per-batch budget rather than a supervisor, which is what makes an uncapped rung
 measurable at all: it stops between batches and returns, so the statistics survive. Peak-RSS runs
 do not need `tools/benchlock.sh`; the elapsed times quoted here are not results.
+
+## 10. The queue bounded (M25, #305)
+
+§9 attributed 88.4% of a 13 996 MB peak to one `VecDeque<Monomial<20>>`. This removes it. The
+interesting part is not the size of the win, which was predictable from §9.2 once the mechanism was
+known, but two things that were not: whether the algorithm survived, and **what the peak becomes
+afterwards**, since removing 88% of it promotes something else to the top.
+
+### 10.1 The change, and the argument that it is the same algorithm
+
+Symbolic preprocessing pushed every term of every row onto the queue and tested `examined` only
+when popping. It now tests on push. The same number of hash operations, one step earlier, and the
+queue is then bounded by the **distinct** monomials of the closure — which are exactly the matrix's
+columns, hence `max_matrix_columns`, hence a quantity a caller sets.
+
+The risk, and the only real risk in the change, is that moving the test changes *when* a monomial is
+marked examined relative to when its multiples are generated. A different symbolic closure would be
+a different algorithm, and its statistics would not be comparable with anything recorded here.
+
+**It is the same closure.** The induction is written at the push site in `src/grobner/f4/symbolic.rs`
+and turns on two invariants: the push-time `examined` set is exactly (processed) u (queued), and the
+push-time queue is the pop-time queue with the already-processed monomials and the duplicate
+occurrences deleted. Both queues are FIFO, so the head of one is the first element of the other that
+pop-time deduplication would not discard: the two process the same monomial next, run the same tests
+on it, and append the same row.
+
+The consequence worth stating is the one #305 expected to go the other way. #305 reasoned that
+deduplicating on push "does change the queue's *order* if a monomial is enqueued twice before either
+copy is popped, so the row order could move". **It does not.** Deduplicating on push keeps a
+monomial at its *first* occurrence's position in the queue; deduplicating on pop also *processes* it
+at its first occurrence's position, because the later copies are discarded. The two disciplines
+agree on order, not merely on membership.
+
+Three checks, in increasing strength:
+
+- `test_push_time_deduplication_preserves_the_closure` compares the two disciplines on **every batch
+  of the correctness corpus under all three orders**, and on katsura-5 and cyclic-5: rows element for
+  element and in order, the covered set, the column set, and the work counters. The two memory
+  counters are excluded, being what changed.
+- The comparison is against `symbolic_preprocessing_pop_deduplicated`, a `#[cfg(test)]`
+  reimplementation of the old discipline rather than a runtime flag, so the unbounded discipline
+  cannot reach a caller. A `push_front` mutation of the live code fails it on batch 2 of the corpus
+  and batch 0 of katsura-5, naming the row order — so the check has teeth on exactly the property
+  at issue.
+- On the instance itself, **every structural figure in §9.2 and §9.3 reproduces unchanged**: 3
+  batches, a peak basis of 1 318 elements / 5 389 241 terms, a 16 874-entry pair heap, 64 062 rows in
+  the refused degree-5 closure, 34 210 distinct monomials tested, 12 212 087 live matrix entries, and
+  the refusal at 20 001 424 entries against the 20 000 000 limit. That is a twenty-variable instance
+  agreeing to the unit on every number the closure determines, which no unit test could establish.
+
+### 10.2 Before and after, at both rungs
+
+`fukuoka-mq-III-n20-seed0`, grevlex, pinned to cores 0-7, release at `-C target-cpu=x86-64-v3`,
+`examples/f4_memory`. The "before" column is §9.2 and §9.3 and was not re-measured.
+
+| | 10 000 000 cap (degree 4) | | 20 000 000 cap (degree 5) | |
+|---|---:|---:|---:|---:|
+| | before | after | before | after |
+| **queue high-water, monomials** | 6 196 886 | **9 369** | 162 188 194 | **40 929** |
+| **queue payload** | 473 MB | **0.7 MB** | 12 374 MB | **3.1 MB** |
+| symbolic preprocessing, peak live heap | 644 MB | **5.0 MB** | 20 499 MB | **24.4 MB** |
+| matrix construction, added peak live heap | not recorded | 109.7 MB | 317 MB | 317.2 MB |
+| matrix entries — the budgeted quantity | 5.8 MB | 5.8 MB | 186 MB | 186.4 MB |
+| basis, held twice | 40.4 MB | 40.4 MB | 905 MB | 904.6 MB |
+| **`VmHWM`, in-process read** | **608 MB** | **211.2 MB** | **13 996 MB** | **1 496.5 MB** |
+| queue as a share of `VmHWM` | 78% | **0.33%** | 88.4% | **0.21%** |
+
+The queue falls by **661x** at the degree-4 rung and **3 962x** at the degree-5 rung, and peak RSS
+by **2.9x** and **9.4x**. The two reductions differ because the queue was a larger share of the
+larger rung, which is §9.3's observation read forwards.
+
+The queue's new size is what the closure's column count predicts and not an empirical surprise:
+there are `C(25, 5) = 53 130` monomials of degree at most 5 in twenty variables, so 40 929 distinct
+monomials is within a small factor of the arithmetic ceiling on this batch, and no instance of this
+shape can push the queue past it. That is the difference between a structure bounded by a budget and
+one bounded by nothing: the bound here is a property of the problem rather than of a setting.
+
+The `VecDeque` doubling slack of §9.2 goes with the payload. At 40 929 elements the capacity is
+`2^16 = 65 536` slots, 5.2 MB, so the allocator-against-resident gap that explained the 21 674 MB
+against 13 996 MB is now a few megabytes and not worth separating.
+
+**The benchmark systems, where the win is real and immaterial.** `examples/f4_memory` with no
+arguments, same binaries:
+
+| system | queue high-water before | after | factor | monomials offered | peak live heap before / after |
+|---|---:|---:|---:|---:|---:|
+| katsura-6 | 2 908 | **206** | 14.1x | 17 550 | 0.3 MB / 0.3 MB |
+| katsura-7 | 16 334 | **693** | 23.6x | 92 669 | 1.2 MB / 1.2 MB |
+| cyclic-6 | 5 684 | **293** | 19.4x | 62 216 | 0.7 MB / 0.7 MB |
+
+The factor is larger here than one might guess from the MQ rungs and the peak does not move at all,
+because at six and seven variables the whole computation fits in a megabyte and the queue was never
+what bound it. The queue's cost scales with rows times terms per row, which is what makes it a
+twenty-variable problem and not a general one. Reported because the issue asked for the benchmark
+systems, and a figure that shows a change mattering nowhere is worth as much as one that shows it
+mattering somewhere.
+
+The column that matters for equivalence is **monomials offered**, which is byte-identical before and
+after on all three — 17 550, 92 669, 62 216 — as are the batch counts, the stop lines and the peak
+basis sizes. Only the high-water moved, which is the whole intent: `monomials_enqueued` still counts
+offers rather than admissions precisely so that this comparison is possible.
+
+### 10.3 The new binding site, and that it is not the same one at both rungs
+
+Removing 88% of a peak promotes something else to the top, which is the whole reason to recompute
+the attribution rather than report a ratio. The sites are priced exactly as in §9.2 — the solver's
+own counters times `size_of`, every row a payload **lower bound** — so the two tables are
+comparable row by row.
+
+**The degree-5 rung, against the in-process `VmHWM` of 1 496.5 MB:**
+
+| site | measured MB | share | was (§9.2) |
+|---|---:|---:|---:|
+| **the basis, held twice** | **904.6** | **60.4%** | 6.5% |
+| matrix entries — the budgeted quantity | 186.4 | 12.5% | 1.3% |
+| preprocessed row vector | 5.9 | 0.39% | 0.04% |
+| `examined` + `covered` monomial sets | 5.3 | 0.35% | 0.04% |
+| pair heap | 4.5 | 0.30% | 0.03% |
+| **pending monomial queue** | **3.1** | **0.21%** | **88.4%** |
+| pair criteria sets | 0.3 | 0.02% | 0.00% |
+| unnamed remainder | ~386 | 25.8% | 3.7% |
+
+**The basis, held twice, is the new peak**, and the figure understates it. §9.2 established that this
+row is a floor by construction: of the two copies `MonicBasis`'s `Vec<(Monomial<20>, Zp31)>` costs
+exactly 88 B a term while `MultivariatePolynomial`'s `HashMap` costs 88 B of payload plus a control
+byte per slot in a power-of-two table, between 1.14x and 2.3x more, so the true figure is 1.0-1.5 GB.
+Against a 1 496.5 MB peak that is between 60% and essentially all of it, and it is where most of the
+unnamed remainder has to be. The remainder's *share* grew from 3.7% to 25.8% without growing in
+bytes — 515 MB to 386 MB — because the denominator fell 9.4x. Named sites account for 74%.
+
+Note that matrix construction's stage peak, 317.2 MB measured by the allocator, overlaps the 186.4 MB
+entry row rather than adding to it: the difference is the column vector, the monomial-to-column map
+and the temporaries construction builds them from, which §5 counted as four copies of the column
+monomials with three live at once.
+
+**The degree-4 rung is bound by something else.** Against its 211.2 MB `VmHWM`, matrix construction's
+stage peak is **109.7 MB, 51.9%**, and the basis only 40.4 MB, 19.1%; the queue is 0.7 MB, 0.33%.
+
+That difference is structural rather than noise, and it is the useful part of this subsection. **The
+basis grows with the whole computation; a batch's matrix grows with that batch.** So which site binds
+depends on how far the computation got before it stopped, and a single "what dominates F4's memory"
+answer does not exist. At the degree-5 rung the computation has run long enough for 5 389 241 basis
+terms to outweigh one batch's matrix; at the degree-4 rung it has not. Both are now in the hundreds of
+megabytes rather than the tens of gigabytes, which is the change that makes the question interesting
+again.
+
+### 10.4 The stop reason does not change, and what that leaves
+
+The instance still records `max_live_nonzeros` at degree 5 — 20 001 424 entries needed against the
+20 000 000 limit — and the degree-4 rung still stops at 10 000 178 against 10 000 000. **No stop
+reason moved, and no default changed**, so every figure in §3, §4, §6, §6a and §9 still reproduces
+and the recorded scoreboard ladder is untouched. No scoreboard record was written for §10.
+
+What *did* change is the character of the refusal. Before, the computation reached 14 GB of resident
+memory inside symbolic preprocessing and then refused on a 186 MB matrix. The refusal was honest but
+the resource it named was not the resource being consumed. Now the two agree: the run peaks at
+1 496.5 MB and refuses on the quantity its budget is written in.
+
+This bears on M24's negative result #3 — that `fukuoka-mq-III-n20-seed0` is "out of reach, not out of
+budget". The verdict **stands**, and §9.4a's evidence for it is untouched: the uncapped rung is
+time-bound, and a cooperative per-batch check cannot interrupt a batch already in progress. But the
+*shape* of what remains has changed. The obstacle to the degree-5 batch was previously time **and** a
+14 GB working set; it is now time alone, at a working set an order of magnitude smaller. Whether a
+much longer budget and an external supervisor would finish that batch is a question this document
+cannot answer and did not previously have any reason to ask.
+
+### 10.5 Runtime
+
+Moving the deduplication does not change how many hash operations happen — every term is still
+tested exactly once — so the expectation was a flat runtime, and the honest reason to measure was
+that an expectation is not a measurement. What it does remove is 162 million `push_back`/`pop_front`
+pairs and the page faults on 20 GB of `VecDeque` the allocator never needed.
+
+| | before | after |
+|---|---:|---:|
+| `examples/f4_memory`, 20 000 000 cap, degree-5 refusal | 99.1 s (§9.2) | **83.1 s** |
+| `examples/f4_memory`, 10 000 000 cap, degree-4 refusal | not recorded | 5.1 s |
+
+A locked before-against-after A/B of `examples/scoreboard` at both rungs, two interleaved
+repetitions from binaries built out of this one tree, is queued under `tools/benchlock.sh` and will
+be recorded here when it lands. It is not needed for the direction, which both rows above agree on
+and which the mechanism predicts, but it is needed before a *ratio* is quoted: the figures above
+were taken without the lock, and §9.6 is explicit that elapsed times from `f4_memory` are not
+results.
+
+The `f4_memory` figures run both allocating stages twice per batch, once under the allocator and
+once for real, so they are not the uninstrumented cost; §9.1 put that at 71 s against the
+instrumented 99.1 s. They are quoted only because they are the two numbers taken on the same
+instrument.
+
+### 10.6 Reproducing §10
+
+```sh
+tools/fetch-mq-challenge.sh
+cargo build --release --example f4_memory
+
+ZEEBRA_MAX_ENTRIES=20000000 taskset --cpu-list 0-7 \
+  ./target/release/examples/f4_memory mq fukuoka-mq-III-n20-seed0     # the degree-5 rung
+ZEEBRA_MAX_ENTRIES=10000000 taskset --cpu-list 0-7 \
+  ./target/release/examples/f4_memory mq fukuoka-mq-III-n20-seed0     # the degree-4 rung
+```
+
+As in §9.6, the example reads `VmHWM` itself so the pid hazard of §2 does not arise, and the
+peak-RSS runs do not need `tools/benchlock.sh`. A recorded timing does, which is why §10.5 reports
+the unlocked `f4_memory` elapsed times as indicative and leaves the ratio for the queued run.
+
+The before column of §10.2 is §9.2 and §9.3 and was deliberately **not** re-measured: #237's
+attribution is the baseline, and re-deriving it would have produced a second set of numbers to
+reconcile rather than a comparison. The after column's structural figures — batches, basis size,
+rows in the refused closure, distinct monomials tested, live entries, the refusal threshold — are
+what make that legitimate, because they are identical to §9.2's and §9.3's, which is only possible
+if the two runs did the same work.
+
+The closure-equivalence checks run in the ordinary test suite and need no instance data:
+
+```sh
+cargo nextest run -E 'test(push_time_deduplication) + test(the_monomial_queue)'
+```

@@ -9,18 +9,24 @@
 //! The properties are also checked against the definition, so systems nobody has a reference basis
 //! for are covered too.
 
+use std::collections::HashSet;
+
 use crate::{
     fields::{PrimeFieldElement64, Zp13, Zp2147483647, Zp541, Zp7},
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         buchberger,
-        f4::{f4, f4_reported, f4_with_options, F4Error, F4Options},
+        f4::{
+            f4, f4_observed_reported, f4_reported, f4_with_options,
+            symbolic::symbolic_preprocessing_pop_deduplicated, symbolic_preprocessing_with,
+            BatchObserver, F4Error, F4Options, MonicBasis, Preprocessed, ReducerCache,
+        },
         reference::buchberger_reference,
-        s_polynomial,
+        s_polynomial, CriticalPair,
     },
     poly::MonomialOrder,
     util::contains_duplicates,
-    FiniteField, MultivariatePolynomial, Zero,
+    FiniteField, Monomial, MultivariatePolynomial, Zero,
 };
 
 type F = Zp13;
@@ -3152,4 +3158,231 @@ fn test_the_unbudgeted_structures_are_reported() {
     // elements, so the peak is at least what came out.
     assert!(statistics.peak_basis_elements >= basis.len());
     assert!(statistics.peak_basis_terms >= statistics.peak_basis_elements);
+}
+
+/// The pending monomial queue never holds more monomials than the matrix has columns.
+///
+/// A batch's columns are the distinct monomials across its rows, which is exactly the set of
+/// monomials symbolic preprocessing ever offers to the queue. So a queue that holds only
+/// *distinct* monomials is bounded by the column count, and therefore by
+/// `F4Options::max_matrix_columns`; a queue that holds every term of every row is bounded by
+/// nothing a caller sets. This is the bound #305 is about, checked against the per-batch maxima
+/// — `max_pending_monomials <= columns(b) <= max_matrix_columns` for every batch `b`, so the
+/// maximum over batches obeys the same bound.
+#[test]
+fn test_the_monomial_queue_is_bounded_by_the_column_count() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+    for (name, statistics) in [
+        (
+            "katsura-5",
+            f4_with_options(&katsura::<5, Zp2147483647>(), order, &F4Options::default())
+                .expect("katsura-5 completes under the default")
+                .1,
+        ),
+        (
+            "cyclic-5",
+            f4_with_options(&cyclic::<5, Zp2147483647>(), order, &F4Options::default())
+                .expect("cyclic-5 completes under the default")
+                .1,
+        ),
+    ] {
+        assert!(statistics.max_pending_monomials > 0, "{name}: no queue");
+        assert!(
+            statistics.max_pending_monomials <= statistics.max_matrix_columns,
+            "{name}: the queue held {} monomials against {} columns — it is holding duplicates, \
+             so no column budget bounds it",
+            statistics.max_pending_monomials,
+            statistics.max_matrix_columns
+        );
+    }
+}
+
+/// Checks the two queue disciplines against each other on every batch F4 actually selects.
+///
+/// Batches are taken from a real run rather than reconstructed, because a reconstructed main loop
+/// would be a second algorithm to be wrong about. The observer sees the basis and the pairs with
+/// the same arguments `reduce_batch_in` is about to pass, runs both disciplines, and records the
+/// trajectory — selection degree, row count, column count — so that a mismatch names the batch.
+struct ClosureEquivalence<const N: usize> {
+    options: F4Options,
+    /// Selection degree, rows and columns per batch, in the order F4 reduced them.
+    trajectory: Vec<(u64, usize, usize)>,
+    /// What differed, by batch index. Empty is the whole assertion.
+    mismatches: Vec<String>,
+}
+
+impl<const N: usize> ClosureEquivalence<N> {
+    fn new(options: F4Options) -> Self {
+        Self {
+            options,
+            trajectory: Vec::new(),
+            mismatches: Vec::new(),
+        }
+    }
+}
+
+/// The distinct monomials across a closure's rows, which is what the Macaulay matrix columns are.
+fn column_set<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    preprocessed: &Preprocessed<N>,
+) -> HashSet<Monomial<N>> {
+    preprocessed
+        .rows
+        .iter()
+        .flat_map(|row| {
+            basis
+                .shifted_terms(row.basis_index, &row.multiplier)
+                .map(|(monomial, _)| monomial)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+impl<const N: usize, F: FiniteField> BatchObserver<N, F> for ClosureEquivalence<N> {
+    fn batch(&mut self, basis: &MonicBasis<N, F>, pairs: &[CriticalPair<N>]) {
+        let index = self.trajectory.len();
+        let degree = pairs.iter().map(|pair| pair.degree).max().unwrap_or(0);
+
+        let pushed = symbolic_preprocessing_with(
+            basis,
+            pairs,
+            self.options.max_matrix_rows,
+            self.options.reducer_selection,
+            &mut ReducerCache::new(self.options.reducer_cache),
+        );
+        let popped = symbolic_preprocessing_pop_deduplicated(
+            basis,
+            pairs,
+            self.options.max_matrix_rows,
+            self.options.reducer_selection,
+            &mut ReducerCache::new(self.options.reducer_cache),
+        );
+
+        let (pushed, popped) = match (pushed, popped) {
+            (Ok(pushed), Ok(popped)) => (pushed, popped),
+            (Err(left), Err(right)) if left == right => {
+                self.trajectory.push((degree, left.limit, 0));
+                return;
+            }
+            (left, right) => {
+                self.mismatches.push(format!(
+                    "batch {index} at degree {degree}: refusals differ, {left:?} against {right:?}"
+                ));
+                return;
+            }
+        };
+
+        // Rows, element for element and in order: the claim is that the closure is the same
+        // sequence, not merely the same set. Everything the matrix is made of follows from this.
+        if pushed.rows != popped.rows {
+            self.mismatches.push(format!(
+                "batch {index} at degree {degree}: {} rows against {}, or the same count in a \
+                 different order",
+                pushed.rows.len(),
+                popped.rows.len()
+            ));
+        }
+        if pushed.leading_monomials != popped.leading_monomials {
+            self.mismatches.push(format!(
+                "batch {index} at degree {degree}: the covered sets differ, {} against {}",
+                pushed.leading_monomials.len(),
+                popped.leading_monomials.len()
+            ));
+        }
+
+        let pushed_columns = column_set(basis, &pushed);
+        let popped_columns = column_set(basis, &popped);
+        if pushed_columns != popped_columns {
+            self.mismatches.push(format!(
+                "batch {index} at degree {degree}: the column sets differ, {} against {}",
+                pushed_columns.len(),
+                popped_columns.len()
+            ));
+        }
+
+        // The work counters too, so that an equal closure found by unequal searching would still
+        // be caught. The two memory counters are excluded on purpose: they are what changed.
+        if pushed.counts.divisor_queries != popped.counts.divisor_queries
+            || pushed.counts.divisor_scan_steps != popped.counts.divisor_scan_steps
+            || pushed.counts.reducer_rows_reused != popped.counts.reducer_rows_reused
+        {
+            self.mismatches.push(format!(
+                "batch {index} at degree {degree}: work counters differ, {:?} against {:?}",
+                pushed.counts, popped.counts
+            ));
+        }
+
+        // The bound #305 is about, per batch rather than over the run.
+        assert!(
+            pushed.counts.max_pending_monomials <= pushed_columns.len(),
+            "batch {index} at degree {degree}: the queue held {} monomials against {} columns",
+            pushed.counts.max_pending_monomials,
+            pushed_columns.len()
+        );
+
+        self.trajectory
+            .push((degree, pushed.rows.len(), pushed_columns.len()));
+    }
+}
+
+/// Run `system` under `observer`, returning the trajectory once the batches agree.
+fn closure_trajectory<const N: usize, F: FiniteField>(
+    name: &str,
+    system: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> Vec<(u64, usize, usize)> {
+    let options = F4Options::default();
+    let mut observer = ClosureEquivalence::<N>::new(options.clone());
+    let (basis, _) = f4_observed_reported(system, order, &options, &mut observer);
+    basis.unwrap_or_else(|error| panic!("{name} completes under the default: {error:?}"));
+    assert!(
+        observer.mismatches.is_empty(),
+        "{name}: push-time and pop-time deduplication disagree:\n{}",
+        observer.mismatches.join("\n")
+    );
+    observer.trajectory
+}
+
+/// Deduplicating on push rather than on pop leaves the symbolic closure identical, batch by batch.
+///
+/// The memory win in #305 is only a win if the algorithm did not change, and the final reduced
+/// basis is too weak a check: two different closures can reach the same basis by different
+/// matrices. So this compares the two disciplines on every batch of every corpus system — rows
+/// element for element and in order, the covered set, the column set, and the work counters —
+/// and the selection-degree sequence follows, since an identical closure yields an identical
+/// matrix, identical candidates and therefore an identical next selection.
+#[test]
+fn test_push_time_deduplication_preserves_the_closure() {
+    let mut batches = 0;
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let system = system(&strings);
+            batches +=
+                closure_trajectory(&format!("{strings:?} under {order:?}"), &system, order).len();
+        }
+    }
+    // A corpus whose systems all turned out to have no critical pairs would compare nothing and
+    // pass, so the count is asserted rather than assumed.
+    assert!(batches > 0, "no batch was observed across the corpus");
+}
+
+/// The same equivalence on the benchmark systems, whose batches are large enough to repeat
+/// monomials heavily — which is the case the push-time test could plausibly reorder.
+#[test]
+fn test_push_time_deduplication_preserves_the_closure_on_the_benchmark_systems() {
+    let order = MonomialOrder::GradedReverseLexicographic;
+
+    let katsura = closure_trajectory("katsura-5", &katsura::<5, Zp2147483647>(), order);
+    let cyclic = closure_trajectory("cyclic-5", &cyclic::<5, Zp2147483647>(), order);
+
+    // The selection-degree sequence, stated rather than merely compared, so a change to batch
+    // selection cannot pass by agreeing with itself.
+    let degrees: Vec<u64> = katsura.iter().map(|(degree, _, _)| *degree).collect();
+    assert!(
+        degrees.windows(2).all(|pair| pair[0] <= pair[1]),
+        "katsura-5's batches are selected by non-decreasing degree: {degrees:?}"
+    );
+    assert!(cyclic
+        .iter()
+        .all(|(_, rows, columns)| *rows > 0 && *columns > 0));
 }
