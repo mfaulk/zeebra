@@ -117,11 +117,14 @@ fn multiply_live_heap_is_bounded_by_the_output() {
          distinguish an output-sized live set from a product-sized one"
     );
 
-    // A term is 12 bytes padded to 16, so materialising all 17.5 million products costs ~280 MB
-    // and ~1.5x that at the final doubling, against an output of ~16 500 terms. The bound is an
-    // order of magnitude above a hash map holding only the output and two orders below the
-    // materialising path, so it discriminates without pinning an allocation count.
-    const BOUND: usize = 32 * 1024 * 1024;
+    // Materialising all 17.5 million products held **384 MiB** here: a term is 12 bytes padded to
+    // 16, and the reallocation chain has both buffers live at the final doubling. Collecting as the
+    // products are formed holds **480 KiB** for the same 16 471-term output.
+    //
+    // The bound sits at 4 MiB — 8x above what the collecting routes measure, so a hash map that
+    // grows differently under a new toolchain does not fail it, and 94x below the materialising
+    // figure, so a partial regression does. It is a bound on the live set, not an allocation count.
+    const BOUND: usize = 4 * 1024 * 1024;
     assert!(
         peak <= BOUND,
         "peak live heap {} MiB exceeds the {} MiB bound for a product of {} terms from {} \
