@@ -729,12 +729,42 @@ calibrated model and **not authorized** — §8.4.1. At ≈2.6 h against a ~2 h 
 `N = 1..5` in both models at **three characteristics** — 65537, 2^32−209, 2^64−353 — with the 29
 pre-existing digests byte-identical, so the freeze test reports additions rather than redefinitions.
 
-**Anemoi `N = 6` — running, not yet reported.** PCICO at `p = 65537` was in flight at ≈1 800 s of a
-5 400 s budget at 4.53 GB when this section was written; FCICO is authorized and queued. Both are
-**reproduction** targets rather than produced figures, because the `p = 65537` logs do publish an
-`N = 6` conversion in both models (23 340 s / 11 775 s) — which corrects #286's premise in the
-crate's favour. The authorization is recorded in `anemoi.md` §8a.5 as the **integration agent's**
-under §9's approximate threshold, **not** the repository owner's.
+**Anemoi `N = 6` — the rung is reached, and not by Zeebra.** #286 was filed to learn two things: is
+the published conversion wall real, and is the rung reachable. **Both are now answered yes by a
+same-machine measurement**, and neither answer came from this crate:
+
+| established | by |
+|---|---|
+| `D = 15 625 = 5^6` | Zeebra, all three characteristics, 36/36 rows |
+| `D = 15 625` | the reference's own log — a printed number, not a formula |
+| `D = 15 625` | **msolve, independently** — a third witness |
+| the rung is reachable | **msolve: 340.66 s, one core, 635 MB** |
+
+#286's premise is also corrected in the crate's favour: the `p = 65537` logs **do** publish an
+`N = 6` conversion in both models (23 340 s / 11 775 s), so this is a reproduction target rather
+than a produced figure.
+
+**No Zeebra `N = 6` conversion time was obtained**, and the attempt is recorded rather than retried
+into one:
+
+- **FCICO refused in 3.8 s on `max_matrix_rows`** — "symbolic preprocessing needed more than the
+  200000 rows allowed". Not memory. This is the **third** of F4's four relevant budgets discovered
+  by hitting a refusal rather than by reading the struct (#322).
+- **And the refusal produced a competitive result that outlives the fix.** The published Magma run
+  on this exact row peaks at **173 808 × 189 401 — inside the 200 000 default Zeebra refused on.**
+  So Zeebra's symbolic preprocessing enumerates **more rows than Magma's for the same system**. That
+  is a measured algorithmic difference, not a budget-tuning problem, and raising the constant would
+  hide it.
+- **PCICO is recorded as _not a result_.** It reached 3 177 s of its 5 400 s budget at a flat 4.53 GB
+  and was killed by **none of its guards** — see §13.6a item 7.
+
+The authorization is recorded in `anemoi.md` §8a.5 as the **integration agent's** under §9's
+approximate threshold, **not** the repository owner's, together with the note that the reproduction
+category was decisive and the same cost would not have been authorized for a produce-only run.
+
+Two build-split facts that must travel with any future comparison: `N = 6` figures are **post-#305**,
+§8a.3's `N ≤ 5` column is at `eb79e05`, and the two are **not mixable for basis comparisons**. The
+conversion figures are unaffected, because #305 is an F4 change.
 
 ### 13.3 Computational frontier against M24
 
@@ -840,7 +870,7 @@ so its acceptance test is a before/after on a corpus rung rather than a number r
 
 ### 13.6a Six measurement-integrity defects, and the pattern they share
 
-M25 found six places where a mechanism reported confidently about something other than what the
+M25 found seven places where a mechanism reported confidently about something other than what the
 caller meant. They are listed together because the pattern is the milestone's methodological result
 and it is more transferable than any single fix.
 
@@ -852,13 +882,34 @@ and it is more transferable than any single fix.
 | 4 | **F4's two memory knobs are numerically identical at the default**, and the error names the limit the caller **set** rather than the one that **bound** (#322) | `320_000_000 / 16` is exactly `20_000_000`, so raising one does nothing and the message confirms the wrong ceiling. |
 | 5 | **`pgrep -f` matched a heredoc wrapper on its own script text**, returning two matches for a job that had not started and **zero** for the binary that was running (#328) | Anti-correlated, not merely imprecise. The RSS guard built on it was safe only because a 4 MB wrapper cannot cross a 16 GiB ceiling — a guard correct by accident, in the instrument §9's policy depends on. |
 | 6 | **A test that returns early on an absent tool is indistinguishable from one that ran and agreed** (#333, class filed as #339) | `main` was red for ~40 minutes with every check green. #311 and #324 were each green against their own base and red only once combined: **CI tests a PR against its base, not against the merged result.** |
+| 7 | **A harness-killed run records a clean `END status=0` in `benchlock.log`**, so the lock cannot distinguish "the budget stopped it" from "something unrelated stopped it" | The Anemoi PCICO run was stopped at 3 177 s of its 5 400 s budget when the background shell that launched it was terminated, taking `benchlock`, `timeout`, `taskset` and the binary with it. The lock recorded success. Worse than the others, because it consumes an hour of a **serialized mutex** while reporting that a measurement completed — and it makes every historical `END status=0` retroactively ambiguous. Fixed with `setsid`, so the run is its own session leader. |
 
-The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the six
+The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the seven
 produced well-formed output. Three were caught only because an agent ran something locally for an
 unrelated reason, and that is not a detection strategy. The repository already applies the right
 discipline in two places — `zb-claim.sh`'s three outcomes for a board read, and
 `Outcome::instead_of_a_time` for a row carrying no wall time — and the lesson is that it belongs
 everywhere a mechanism can be silent.
+
+### 13.6b What the benchmark protocol actually bought
+
+One number settles whether `tools/benchlock.sh` is worth its throughput cost, and it is small.
+
+A stray 32-worker job ran for ~2 minutes outside the lock and overlapped an msolve `N = 6`
+measurement. Clean re-take: **340.66 s** against the contaminated **353.88 s** — the neighbour cost
+**3.9%**.
+
+3.9% is the point. It is far too small to notice by inspection, far too small for any plausibility
+check to catch, and comfortably inside the 20% noise band the competitive report works in. **The
+correction could only have come from the lock's overlapping-window record**, which is the one
+artifact that says *when* each figure was taken rather than what it was. A protocol that caught only
+gross contamination would have passed this through, and the figure would have entered the record
+beside a reproduction of a published Magma result.
+
+Against that: the lock serialized nine agents, queued fourteen jobs behind one hour-long frontier
+run, and cost #263 its cross-library basis-stage row — recorded as partially met for that reason.
+Both halves are real. The trade was worth making, and §13.6a item 7 is the repair the log still
+needed.
 
 ### 13.7 Cost-model accuracy
 
