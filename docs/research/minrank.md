@@ -432,8 +432,9 @@ on one CPU core and one GPU, and reported it at PASCO 2015.
 improved implementation". Its bibliography could not be read — the PDF 403s and Wayback still has
 no capture (§9) — so **[41] is identified by content, not by reading the entry**, and that is the
 one inferential step in this section. The identification is safe because the target is unique:
-Allan Steel has exactly one publication on MinRank, `Steel15`, it is dated 2015, and "an improved
-implementation" describes it precisely. Its bibliographic record is confirmed twice over, from
+searching both OpenAlex and Crossref for works by Allan Steel on MinRank returns **exactly one**,
+`Steel15`; it is dated 2015; and "an improved implementation" describes it precisely. Its
+bibliographic record is confirmed twice over, from
 Crossref's registration metadata and from the University of Sydney's own
 [2015 publication list](https://www.maths.usyd.edu.au/u/pubs/publist/pubs2015.html):
 
@@ -473,14 +474,21 @@ and, under "Update (July 2015)":
 the reason this is worth trusting: Steel's Wiedemann step computes the minimal polynomial of a
 **259545 × 259545** matrix, and `259545` is `FauSafSpa10`'s `deg(I)` for `(11, 9, 8)` from its
 Corollary 1 — the very number it cited as the reason FGLM "could be untractable" (§5.1). Steel did
-not make FGLM tractable; he replaced it, with block Wiedemann over a sparse-FGLM formulation. **Two
-independent computations, fifteen years and two codebases apart, agree on the degree of this ideal
-to the digit.** For F2 (§7) that is a checkable quantity of a quality the timing rows do not have.
+not make FGLM tractable; he replaced it. `Steel15`'s abstract says what with:
+
+> We show how some very large multivariate polynomial systems over finite fields can be solved by
+> Gröbner basis techniques coupled with the Block Wiedemann algorithm, thus extending the
+> Wiedemann-based 'Sparse FGLM' approach of Faugère and Mou.
+
+**Two independent computations, fifteen years and two codebases apart, agree on the degree of this
+ideal to the digit.** For F2 (§7) that is a checkable quantity of a quality the timing rows do not
+have. (`Steel14` writes "the Wiedemann algorithm" where the 2015 title and abstract say "Block
+Wiedemann"; whether the 2014 run used the block variant is not stated on the page.)
 
 **It is still a generated same-parameter instance, so §1 stands unchanged.** "A random instance over
 GF(65521) … where `(n,k,r)=(11,9,8)`" is the same kind of object `FauSafSpa10` and `MinRank2.0`
-used. `Steel14` publishes no instance file, no seed and no generator; probing the site for one
-(`densef4/magma/`, `densef4/minrank*`, and five other spellings) returns 404 throughout, and the
+used. `Steel14` publishes no instance file, no seed and no generator; probing the site for one under
+seven spellings (§9) returns 404 throughout, and the
 page's one offer of input files — "[Links for the actual input files will be added soon.]", about
 the HFE systems — was never redeemed. **There is still no downloadable MinRank object with challenge
 parameters other than the challenge-D file of §5.3.**
