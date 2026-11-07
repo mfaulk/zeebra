@@ -2724,6 +2724,27 @@ published witnesses decide the ambiguity — one reading reproduces 5 of 5 and t
 the instance is reconstructed rather than guessed. That is the argument the document makes for
 preferring candidates that publish a witness.
 
+#### Courtois MinRank A–F, where the challenge is a parameter set and not a file
+
+[`docs/research/minrank.md`](docs/research/minrank.md) is the provenance record for the six MinRank
+challenges Courtois proposed in 2001, read from the original publication rather than from the
+literature that cites it. The parameters are verified and are committed, machine-readable, in
+`research/minrank/courtois-challenges.tsv`; `tests/minrank_challenges.rs` re-derives the paper's own
+solution-probability column from them, so a transcription slip in any of `q`, `η`, `n`, `m` or `r`
+fails a test instead of propagating.
+
+The finding that matters is negative. The paper proposes "six **sets of parameters** A-F"; it
+publishes no matrices, offers no prize, and the scheme's official page — archived eight times
+between 2001 and 2003 — carries papers and slides only. **No authentic instance of any of A–F was
+ever published**, and the construction that would regenerate one needs a 160-bit seed and a
+generator the paper names neither of. Both published breaks, the 2010 one on C and the 2026 one on
+D, ran on instances their authors generated; the 2026 abstract says so in as many words ("**an**
+instance"). So a same-parameter instance here is not a degraded substitute — it is the same kind of
+object every published result used — but the published costs stay a **difficulty scale and not a
+comparand**, and nothing is in [the registry](#the-challenge-registry) until a generator exists to
+digest. The document also corrects the verifier: the condition is `rank(Σ αᵢ Mᵢ − M₀) ≤ r` over
+`1 + m` matrices, so challenge A is eleven `6 × 6` matrices over `GF(65521)`, not ten.
+
 #### Anemoi, the first candidate actually imported
 
 `grobner::research::anemoi` is the permutation half of candidate 1: Anemoi at `ℓ = 1` over
