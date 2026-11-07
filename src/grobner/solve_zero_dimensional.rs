@@ -38,7 +38,7 @@ use crate::{
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmError, FglmOptions, FglmStatistics},
         solve::{candidate_values, is_nonzero_constant},
-        F4Error, F4Options, F4Statistics,
+        F4Error, F4Options, F4Statistics, StopKind,
     },
     FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial,
 };
@@ -138,6 +138,15 @@ pub struct SolveStatistics {
 
     /// What the conversion did, or `None` under [`SolveStrategy::DirectLexF4`].
     pub fglm: Option<FglmStatistics>,
+
+    /// What the dimension diagnosis cost, or `None` if none was needed.
+    ///
+    /// Present only on a [`SolveStrategy::DirectLexF4`] attempt whose F4 run crossed a resource
+    /// limit: there is then no lex basis to classify, so the route computes a *grevlex* one to
+    /// find out whether the ideal was positive-dimensional all along (#376). Separate from
+    /// [`Self::f4`] rather than folded into it, because the two are different computations under
+    /// different orders and a sum would report a batch count no single basis ever had.
+    pub diagnosis: Option<F4Statistics>,
 }
 
 impl SolveStatistics {
@@ -156,7 +165,10 @@ impl SolveStatistics {
     pub fn estimated_peak_bytes(&self) -> usize {
         let grobner = self.f4.as_ref().map_or(0, |s| s.max_estimated_bytes);
         let conversion = self.fglm.as_ref().map_or(0, |s| s.estimated_bytes());
-        grobner.max(conversion)
+        // The diagnosis is a third stage under the same rule: it starts after the failed lex
+        // attempt's matrices are freed, so it enters the maximum and not a sum.
+        let diagnosis = self.diagnosis.as_ref().map_or(0, |s| s.max_estimated_bytes);
+        grobner.max(conversion).max(diagnosis)
     }
 }
 
@@ -204,6 +216,11 @@ impl<const N: usize, F: FiniteField> SolveOutcome<N, F> {
 pub enum SolveError {
     /// The system is not zero-dimensional. Use [`solve`](super::solve) for those, which enumerates
     /// the field and is bounded by the field's order rather than by the solution count.
+    ///
+    /// Reported by both strategies, and since #376 from a grevlex basis computed for the purpose
+    /// when the direct route's own lex basis never materialized — see [`explain_lex_failure`].
+    /// Nothing a budget can be raised to will help; for a system over a small field the usual
+    /// remedy is [`with_field_equations`](super::with_field_equations).
     PositiveDimensional,
 
     /// The Gröbner basis computation crossed one of its limits.
@@ -310,8 +327,9 @@ impl From<FglmError> for SolveError {
     ///
     /// There was one, and it was dead: `lex_basis` classifies the source basis itself before
     /// converting, so the conversion is never reached with a positive-dimensional ideal and never
-    /// reports one. Both strategies therefore produce `SolveError::PositiveDimensional` from the
-    /// same place.
+    /// reports one. The conversion is on the grevlex route only, and that route always has a basis
+    /// to classify; the direct route reaches the same variant through [`explain_lex_failure`] when
+    /// it has none.
     fn from(e: FglmError) -> Self {
         Self::Fglm(e)
     }
@@ -370,8 +388,10 @@ pub fn solve_one_with_outcome<const N: usize, F: KnownOrder, R: RngCore + Crypto
 /// work, and which work it did is the question a planner has to answer before it decides whether
 /// to try the other one:
 ///
-/// - a positive-dimensional system has a **complete** Gröbner basis behind the refusal, and
-///   `statistics.f4` describes it;
+/// - a positive-dimensional system has a **complete** Gröbner basis behind the refusal: under
+///   [`SolveStrategy::GrevlexF4ThenFglm`] it is `statistics.f4`, and under
+///   [`SolveStrategy::DirectLexF4`] whose lex attempt crossed a budget it is the grevlex basis in
+///   `statistics.diagnosis`, with `statistics.f4` describing the attempt that failed;
 /// - a conversion that crosses its span budget has a complete *source* basis behind it, so
 ///   `statistics.f4` is present and `statistics.fglm` is not;
 /// - an F4 computation that crosses a budget has no basis at all, and `statistics.f4` still says
@@ -511,7 +531,19 @@ fn lex_basis<const N: usize, F: FiniteField>(
     // batches it managed and how large the matrices became.
     let (basis, f4) = f4_reported(system, order, &options.f4);
     statistics.f4 = Some(f4);
-    let basis = basis?;
+    let basis = match basis {
+        Ok(basis) => basis,
+        Err(e) => {
+            // A crossed lex budget leaves nothing to classify, so the route cannot tell a system
+            // too large for the budget from one whose lex basis the search could never use. Only
+            // the direct route needs asking: the other one already has a grevlex basis or failed
+            // to get one.
+            let diagnose = options.strategy == SolveStrategy::DirectLexF4;
+            let (error, diagnosis) = explain_lex_failure(system, e, &options.f4, diagnose);
+            statistics.diagnosis = diagnosis;
+            return Err(error);
+        }
+    };
 
     // Classified from whichever basis the route computed first, which is the grevlex one where
     // there is a choice: classification is a question about leading monomials and costs the same
@@ -530,6 +562,55 @@ fn lex_basis<const N: usize, F: FiniteField>(
             Ok(lex)
         }
     }
+}
+
+/// What a crossed F4 budget under lex really means, and what finding out cost.
+///
+/// The fix for #376. A direct-lex attempt that crosses a resource limit has no basis to classify,
+/// so a positive-dimensional ideal and a system merely too large for the budget arrive as the same
+/// `F4Error` — and the resource reading is the actively harmful one, since raising
+/// `max_matrix_columns` cannot produce a lex basis the search can use. A **grevlex** basis settles
+/// it: classification is a question about leading monomials and is the same under any order, and
+/// degrevlex keeps the matrices small on much of what lex elimination blows up on.
+///
+/// # It cannot relabel a genuine resource failure
+///
+/// [`SolveError::PositiveDimensional`] is returned only from a **complete** grevlex basis whose
+/// leading monomials omit a pure power of some variable, which is a proof about the ideal and not
+/// an inference from the failure. A grevlex run that crosses the budget too, or one that completes
+/// and is zero-dimensional, leaves `error` exactly as it was.
+///
+/// # What it costs, and when it is declined
+///
+/// At most one more basis computation, under the same [`F4Options`] the caller already consented
+/// to, and only on a path that has already failed. Declined when `diagnose` is false, and when the
+/// crossed limit was not a resource one:
+///
+/// - [`StopKind::Time`] — a caller who bounded wall clock would have it silently doubled, and that
+///   budget is the one resource a second computation cannot help spending;
+/// - [`StopKind::Caller`] — unsatisfiable options would refuse the grevlex run identically;
+/// - [`StopKind::Certification`] — a basis that failed its own check is a defect, not a dimension.
+pub(crate) fn explain_lex_failure<const N: usize, F: FiniteField>(
+    system: &[MultivariatePolynomial<N, F>],
+    error: F4Error,
+    options: &F4Options,
+    diagnose: bool,
+) -> (SolveError, Option<F4Statistics>) {
+    if !diagnose || error.stop_kind() != StopKind::Resource {
+        return (SolveError::Grobner(error), None);
+    }
+
+    let grevlex = MonomialOrder::GradedReverseLexicographic;
+    let (basis, statistics) = f4_reported(system, grevlex, options);
+    let positive_dimensional =
+        basis.is_ok_and(|basis| !classify_ideal(&basis, grevlex).is_finite_dimensional());
+
+    let error = if positive_dimensional {
+        SolveError::PositiveDimensional
+    } else {
+        SolveError::Grobner(error)
+    };
+    (error, Some(statistics))
 }
 
 /// Whether the search stops at the first solution or collects them all.
@@ -701,24 +782,25 @@ fn extend<const N: usize, F: KnownOrder, R: RngCore + CryptoRng>(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, mem::size_of};
+    use std::{collections::HashSet, mem::size_of, time::Duration};
 
     use rand::{prelude::StdRng, SeedableRng};
 
     use rand::{CryptoRng, RngCore};
 
     use super::{
-        solve_one, solve_one_with_options, solve_zero_dimensional,
+        solve_one, solve_one_reported, solve_one_with_options, solve_zero_dimensional,
         solve_zero_dimensional_with_options, SolveError, SolveOptions, SolveStrategy,
     };
     use crate::{
         fields::{PrimeFieldElement64, Zp2147483647},
         grobner::{
             benchmark_systems::{cyclic, katsura, planted},
-            fglm::FglmError,
-            solve,
+            f4_with_options,
+            fglm::{classify_ideal, FglmError},
+            solve, F4Error, F4Options,
         },
-        FiniteField, KnownOrder, MultivariatePolynomial, One, Zero,
+        FiniteField, KnownOrder, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
 
     type F = Zp2147483647;
@@ -962,6 +1044,112 @@ mod tests {
                 SolveError::PositiveDimensional
             );
         }
+    }
+
+    /// A positive-dimensional ideal whose lex basis is out of budget is still named as such.
+    ///
+    /// #376: the direct route has no basis to classify when F4 under lex crosses a budget, so it
+    /// used to blame the budget for a property of the ideal. katsura-6 less one equation is the
+    /// small instance — its lex matrices pass 1000 columns, its grevlex basis does not.
+    #[test]
+    fn test_a_positive_dimensional_ideal_is_not_blamed_on_the_matrix_budget() {
+        let mut system = katsura::<6, F>();
+        system.pop();
+        let f4 = F4Options {
+            max_matrix_rows: 1000,
+            max_matrix_columns: 1000,
+            ..Default::default()
+        };
+
+        // The premise: lex is out of reach at this budget and grevlex is not.
+        assert!(f4_with_options(&system, MonomialOrder::Lexicographic, &f4).is_err());
+
+        for strategy in STRATEGIES {
+            let options = SolveOptions {
+                f4: f4.clone(),
+                ..SolveOptions::with_strategy(strategy)
+            };
+            let (outcome, statistics) =
+                solve_one_reported(&system, &mut StdRng::seed_from_u64(31), &options);
+            assert_eq!(
+                outcome.unwrap_err(),
+                SolveError::PositiveDimensional,
+                "{:?}",
+                strategy
+            );
+            // The grevlex route classifies its own basis; the direct one needs a diagnosis.
+            assert_eq!(
+                statistics.diagnosis.is_some(),
+                strategy == SolveStrategy::DirectLexF4,
+                "{:?}",
+                strategy
+            );
+        }
+    }
+
+    /// A zero-dimensional ideal that really is out of budget keeps its resource failure.
+    ///
+    /// The other direction of #376, and the one a wrong diagnosis would corrupt. cyclic-6 is
+    /// zero-dimensional and its grevlex basis fits where its lex basis does not, so the diagnosis
+    /// runs, completes, and must leave the original error standing.
+    #[test]
+    fn test_a_real_resource_failure_is_not_relabelled_as_positive_dimensional() {
+        let system = cyclic::<6, F>();
+        let f4 = F4Options {
+            max_matrix_rows: 1000,
+            max_matrix_columns: 1000,
+            ..Default::default()
+        };
+
+        // The premise: the diagnosis gets a complete grevlex basis, and it is zero-dimensional.
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        let (source, _) = f4_with_options(&system, grevlex, &f4).expect("grevlex fits this budget");
+        assert!(classify_ideal(&source, grevlex).is_finite_dimensional());
+
+        let options = SolveOptions {
+            f4,
+            ..SolveOptions::with_strategy(SolveStrategy::DirectLexF4)
+        };
+        let (outcome, statistics) =
+            solve_one_reported(&system, &mut StdRng::seed_from_u64(37), &options);
+        let error = outcome.unwrap_err();
+        assert!(
+            matches!(error, SolveError::Grobner(_)) && error.is_resource_failure(),
+            "{}",
+            error
+        );
+        assert!(statistics.diagnosis.is_some(), "the diagnosis still ran");
+    }
+
+    /// A route that ran out of *time* is not diagnosed, because diagnosing costs more time.
+    ///
+    /// The one resource whose budget a second basis computation would silently double. The system
+    /// is positive-dimensional, so the diagnosis would have fired on any other crossed limit.
+    #[test]
+    fn test_a_crossed_time_budget_is_not_spent_again_on_a_diagnosis() {
+        let mut system = katsura::<6, F>();
+        system.pop();
+        let options = SolveOptions {
+            f4: F4Options {
+                max_wall_time: Some(Duration::from_nanos(1)),
+                ..Default::default()
+            },
+            ..SolveOptions::with_strategy(SolveStrategy::DirectLexF4)
+        };
+
+        let (outcome, statistics) =
+            solve_one_reported(&system, &mut StdRng::seed_from_u64(41), &options);
+        assert!(
+            matches!(
+                outcome.unwrap_err(),
+                SolveError::Grobner(F4Error::TimeBudgetExceeded { .. })
+            ),
+            "one batch always overruns a nanosecond"
+        );
+        assert!(
+            statistics.diagnosis.is_none(),
+            "no second basis was started"
+        );
     }
 
     /// An empty system constrains nothing, so it is positive-dimensional and refused.

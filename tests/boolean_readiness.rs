@@ -12,9 +12,9 @@ use rand::{prelude::StdRng, Rng, SeedableRng};
 use zeebra::{
     fields::{BinaryFieldElement, Gf256, Zp2},
     grobner::{
-        classify_ideal, f4, fglm_to_lex, is_grobner_basis, rational_points_by_enumeration,
-        solve_one, solve_one_with_options, solve_zero_dimensional, with_field_equations, F4Options,
-        IdealClass, QuotientBasis, SolveOptions, SolveStrategy,
+        classify_ideal, f4, f4_with_options, fglm_to_lex, field_equations, is_grobner_basis,
+        rational_points_by_enumeration, solve_one, solve_one_with_options, solve_zero_dimensional,
+        with_field_equations, F4Options, IdealClass, QuotientBasis, SolveOptions, SolveStrategy,
     },
     roots, FiniteField, KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial, One,
     UnivariatePolynomial, Zero,
@@ -123,57 +123,85 @@ fn the_gf2_solver_finds_exactly_the_enumerated_points() {
     assert_eq!(found, expected);
 }
 
-/// Without field equations the grevlex route diagnoses the ideal correctly and the default
-/// `DirectLexF4` route reports a resource failure instead.
+/// Without field equations both routes name the ideal, rather than one blaming its own budget.
 ///
-/// #218's gap 2 was "nothing refuses to proceed without them". Something does, but not on the
-/// default path: `GrevlexF4ThenFglm` says "not zero-dimensional" at once, while `DirectLexF4`
-/// exhausts a Macaulay-matrix budget — an error that invites raising the limit when the fix is to
-/// adjoin the field equations. The lex half runs under a deliberately small budget so it fails
-/// quickly; at the default budget it does far more work and reports the same kind of error.
+/// #218's gap 2 was "nothing refuses to proceed without them". Something does, and since #376 it
+/// does so on the default path too: `GrevlexF4ThenFglm` classifies the grevlex basis it already
+/// has, and `DirectLexF4` — which crosses a Macaulay-matrix budget before it has any basis at all
+/// — computes a grevlex one to find out why. Both end at `PositiveDimensional`, whose remedy is to
+/// adjoin the field equations rather than to raise a limit.
 ///
-/// The misdiagnosis is #376, which owns the fix. Asserted rather than described so that closing
-/// #376 breaks this test and forces the write-up to be corrected with it.
+/// Both halves run under a deliberately small matrix budget, chosen so that lex fails on it and
+/// grevlex does not; at the default budget the lex attempt does far more work for the same answer.
 #[test]
-fn a_missing_field_equation_is_diagnosed_on_one_route_and_not_the_other() {
+fn a_missing_field_equation_is_diagnosed_on_both_routes() {
     let (_plant, system) = boolean_system::<8>(9, 6);
+    let f4_options = F4Options {
+        max_matrix_rows: 10_000,
+        max_matrix_columns: 10_000,
+        ..Default::default()
+    };
 
-    let bare = f4(&system, GREVLEX).expect("within the default budgets");
+    for strategy in [SolveStrategy::GrevlexF4ThenFglm, SolveStrategy::DirectLexF4] {
+        let mut rng = StdRng::seed_from_u64(5);
+        let error = solve_one_with_options(
+            &system,
+            &mut rng,
+            &SolveOptions {
+                f4: f4_options.clone(),
+                ..SolveOptions::with_strategy(strategy)
+            },
+        )
+        .expect_err("a positive-dimensional system has no finite solution set");
+        assert!(
+            !error.is_resource_failure(),
+            "{strategy:?} blames its budget rather than the ideal: {error}"
+        );
+    }
+}
+
+/// One missing field equation leaves this ideal zero-dimensional, so the budget really is to blame.
+///
+/// The direction #376's fix must not break. Seven of the eight field equations pin seven variables
+/// and the six quadratics pin the eighth, so a crossed lex budget here is a genuine resource
+/// failure — and the diagnosis, which gets a complete grevlex basis at this budget, has to agree
+/// rather than reach for the more dramatic explanation.
+#[test]
+fn one_missing_field_equation_is_still_a_resource_failure() {
+    let (_plant, system) = boolean_system::<8>(9, 6);
+    let mut incomplete = system.clone();
+    incomplete.extend(
+        field_equations::<8, Zp2>()
+            .expect("GF(2) has field equations")
+            .into_iter()
+            .take(7),
+    );
+    let f4_options = F4Options {
+        max_matrix_rows: 2000,
+        max_matrix_columns: 2000,
+        ..Default::default()
+    };
+
+    // The premise: the diagnosis gets a complete grevlex basis, and it is zero-dimensional.
+    let (source, _) = f4_with_options(&incomplete, GREVLEX, &f4_options).expect("grevlex fits");
     assert_eq!(
-        classify_ideal(&bare, GREVLEX),
-        IdealClass::PositiveDimensional,
-        "six quadratics in eight variables are underdetermined without the field equations"
+        classify_ideal(&source, GREVLEX),
+        IdealClass::ZeroDimensional
     );
 
     let mut rng = StdRng::seed_from_u64(5);
-    let diagnosed = solve_one_with_options(
-        &system,
-        &mut rng,
-        &SolveOptions::with_strategy(SolveStrategy::GrevlexF4ThenFglm),
-    )
-    .expect_err("a positive-dimensional system has no finite solution set");
-    assert!(
-        !diagnosed.is_resource_failure(),
-        "the grevlex route names the real problem: {diagnosed}"
-    );
-
-    let mut rng = StdRng::seed_from_u64(5);
-    let misdiagnosed = solve_one_with_options(
-        &system,
+    let error = solve_one_with_options(
+        &incomplete,
         &mut rng,
         &SolveOptions {
-            f4: F4Options {
-                max_matrix_columns: 2000,
-                max_matrix_rows: 2000,
-                ..Default::default()
-            },
+            f4: f4_options,
             ..SolveOptions::with_strategy(SolveStrategy::DirectLexF4)
         },
     )
-    .expect_err("the lex basis is out of reach");
+    .expect_err("the lex basis is out of reach at this budget");
     assert!(
-        misdiagnosed.is_resource_failure(),
-        "the default route blames its budget rather than the ideal: {misdiagnosed}"
+        error.is_resource_failure(),
+        "a zero-dimensional ideal out of budget must stay a resource failure: {error}"
     );
 }
 

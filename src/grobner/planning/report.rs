@@ -158,10 +158,14 @@ impl SolvePlan {
     ///
     /// Unlike a peak, batches are *spent*: they add across attempts and are therefore what a
     /// shared budget can meaningfully bound. See [`PlanBudget`](super::PlanBudget).
+    ///
+    /// A dimension diagnosis counts too — it is a real F4 run, and work the shared budget could
+    /// otherwise be escaped through.
     pub fn total_batches(&self) -> usize {
         self.attempts
             .iter()
-            .filter_map(|a| a.statistics.f4.as_ref())
+            .flat_map(|a| [a.statistics.f4.as_ref(), a.statistics.diagnosis.as_ref()])
+            .flatten()
             .map(|f| f.batches)
             .sum()
     }
@@ -244,6 +248,14 @@ impl Display for SolvePlan {
                     stats.max_matrix_columns,
                     stats.max_live_nonzeros,
                     stats.peak_live_bytes()
+                )?;
+            }
+            if let Some(stats) = attempt.statistics.diagnosis.as_ref() {
+                writeln!(
+                    f,
+                    "  Diagnosis: a grevlex basis in {} batches, to tell a crossed budget from a \
+                     positive-dimensional ideal",
+                    stats.batches
                 )?;
             }
             if let Some(stats) = attempt.statistics.fglm.as_ref() {

@@ -1131,10 +1131,12 @@ Three caveats a caller should know, each asserted rather than described:
   `from_str` inverts `Display` over every field, and over an extension it is deliberately not
   `FiniteField::new`, which only ever reaches the prime subfield. `KnownOrder::element_at` is the
   route that enumerates all `q` elements. #377.
-- **Omitting the field equations is diagnosed on only one route.** `SolveStrategy::GrevlexF4ThenFglm`
-  reports a positive-dimensional ideal immediately; the default `DirectLexF4` exhausts a
-  Macaulay-matrix budget and reports a *resource* failure, which invites raising a limit that cannot
-  help. #376.
+- **Omitting the field equations is diagnosed on both routes, but the default route pays to find
+  out.** `SolveStrategy::GrevlexF4ThenFglm` classifies the basis it already has; the default
+  `DirectLexF4` exhausts a Macaulay-matrix budget first, and only then computes a grevlex basis to
+  tell a crossed budget from a positive-dimensional ideal. Both report `PositiveDimensional`, whose
+  remedy is `with_field_equations` rather than a larger limit, and a zero-dimensional ideal that
+  really is out of budget still reports a *resource* failure. #376.
 
 [`docs/research/boolean-solving.md`](docs/research/boolean-solving.md) is the readiness write-up:
 what runs in characteristic two, what does not and why, and the Singular oracle's position (it has
