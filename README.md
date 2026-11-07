@@ -1837,6 +1837,32 @@ assert_eq!(&f / &g, quotient);
 assert_eq!(&f % &g, remainder);
 ```
 
+**The Bézout cofactors, and the middle of the sequence.** `xgcd(a, b)` returns `(g, u, v)` with
+`g = u*a + v*b`, and `partial_bezout(a, b, degree_bound)` returns the Euclidean sequence *halted*
+at the first remainder of degree below the bound, as the pair `(v, r)`. The halted form is the
+primitive: Reed-Solomon decoding solves the key equation `Λ(x)S(x) ≡ Ω(x) mod x^{2t}` by running it
+on `(x^{2t}, S(x))` with `degree_bound = t`, taking `Ω` as the remainder and `Λ` as the cofactor,
+and rational reconstruction and Padé approximation want the same thing. Only the cofactor of the
+second argument is carried through the loop, because that is the one those consumers read; `xgcd`
+recovers `u` from the identity with one exact division rather than paying for a second cofactor row
+at every step.
+
+```rust
+use zeebra::{fields::Zp13, gcd, partial_bezout, xgcd, Polynomial, UnivariatePolynomial};
+
+type P = UnivariatePolynomial<Zp13>;
+let a = P::try_from("2 + 3x + x^2").unwrap(); // (x + 1)(x + 2)
+let b = P::try_from("3 + 4x + x^2").unwrap(); // (x + 1)(x + 3)
+
+let (g, u, v) = xgcd(&a, &b);
+assert_eq!(g, gcd(&a, &b));
+assert_eq!(&(&u * &a) + &(&v * &b), g);
+
+// Halted at the first remainder of degree below 2, with its cofactor against `b`.
+let (v, r) = partial_bezout(&a, &b, 2);
+assert!(r.degree() < 2);
+```
+
 Both stay quadratic, and that is a decision rather than an omission. Newton-inversion division is
 `O(M(d))` and half-GCD is `O(M(d) log d)`, but `M(d)` *at the operator* is still schoolbook: `Mul`
 cannot choose an NTT domain from its signature, and Karatsuba is not wired into it either (§4.1 of

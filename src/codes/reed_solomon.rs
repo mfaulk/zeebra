@@ -24,8 +24,8 @@
 use std::fmt::{Display, Formatter};
 
 use crate::{
-    codes::euclidean::partial_bezout, evaluate, interpolate, lagrange_interpolate, FFTDomain,
-    FiniteField, Polynomial, UnivariatePolynomial,
+    evaluate, interpolate, lagrange_interpolate, partial_bezout, FFTDomain, FiniteField,
+    Polynomial, UnivariatePolynomial,
 };
 
 /// Why an encode or decode could not produce an answer.

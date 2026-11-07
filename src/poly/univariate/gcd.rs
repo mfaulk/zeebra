@@ -48,6 +48,119 @@ pub fn lcm<F: FiniteField>(
     make_monic(&(&(a * b) / &gcd(a, b)))
 }
 
+/// The Euclidean remainder sequence on `(a, b)`, halted at the first remainder of degree below
+/// `degree_bound`: the pair `(v, r)` with `r = u*a + v*b` for some `u` and `deg(r) <
+/// degree_bound`.
+///
+/// `a` is expected to have degree at least `degree_bound`, so that the sequence takes at least one
+/// step and `v` is nonzero. The Bézout cofactor `u` of `a` is not computed, because the consumers
+/// of the halted form do not read it; [`xgcd`] recovers it with one division when it is wanted.
+///
+/// A zero remainder ends the sequence early — `b` divides `a`, and there is nothing of lower
+/// degree to reach — so a zero `r` is a possible answer and callers must handle it.
+///
+/// Reed-Solomon decoding solves the key equation `Λ(x)S(x) ≡ Ω(x) mod x^{2t}` by running this on
+/// `(x^{2t}, S(x))` with `degree_bound = t`, which yields `Ω` as the remainder and `Λ` as the
+/// cofactor. Rational reconstruction and Padé approximation want the same primitive.
+pub fn partial_bezout<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    degree_bound: u32,
+) -> (UnivariatePolynomial<F>, UnivariatePolynomial<F>) {
+    let (_, current) = bezout_rows(a, b, degree_bound);
+    (current.cofactor, current.remainder)
+}
+
+/// The monic greatest common divisor of two polynomials together with cofactors witnessing it:
+/// `(g, u, v)` with `g = u*a + v*b`.
+///
+/// Running [`partial_bezout`]'s sequence to completion rather than halting it: the last nonzero
+/// remainder is the gcd, and `degree_bound = 0` is what "run to completion" means, since every
+/// nonzero remainder has degree at least zero.
+pub fn xgcd<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+) -> (
+    UnivariatePolynomial<F>,
+    UnivariatePolynomial<F>,
+    UnivariatePolynomial<F>,
+) {
+    // gcd(a, 0) = monic(a), and the sequence below cannot produce it: with b zero the loop takes
+    // no step, so the last nonzero remainder is `a` itself, sitting in a row that carries no
+    // cofactor. The normalization is the whole content of `u` here. gcd(0, 0) = 0 falls out with
+    // zero cofactors, which is also what keeps the `/ a` below away from a zero divisor.
+    if b.is_zero() {
+        if a.is_zero() {
+            let zero = UnivariatePolynomial::zero();
+            return (zero.clone(), zero.clone(), zero);
+        }
+        let scale = a.coefficients().last().unwrap().inverse();
+        return (
+            a.scale(&scale),
+            UnivariatePolynomial::new(&[scale]),
+            UnivariatePolynomial::zero(),
+        );
+    }
+
+    let (previous, _) = bezout_rows(a, b, 0);
+
+    // `previous` holds the last nonzero remainder, which is the gcd up to a constant. Scaling the
+    // row — remainder and cofactor together — preserves the identity r = u*a + v*b.
+    let scale = previous.remainder.coefficients().last().unwrap().inverse();
+    let g = previous.remainder.scale(&scale);
+    let v = previous.cofactor.scale(&scale);
+
+    // `u` was never tracked, so it is recovered from the identity: g - v*b is a multiple of `a`
+    // by construction, and one exact division is cheaper than carrying a second cofactor row
+    // through every step. `a` is zero only when b is too, which returned above.
+    if a.is_zero() {
+        // gcd(0, b) = monic(b), reached through the sequence: the single step leaves b as the last
+        // nonzero remainder with cofactor one. Nothing is a multiple of the zero polynomial, so
+        // `u` is read off as zero instead of divided out.
+        return (g, UnivariatePolynomial::zero(), v);
+    }
+    let u = &(&g - &(&v * b)) / a;
+
+    (g, u, v)
+}
+
+/// One row of the extended Euclidean sequence: a remainder and its Bézout cofactor against the
+/// sequence's second argument.
+struct BezoutRow<F: FiniteField> {
+    remainder: UnivariatePolynomial<F>,
+    cofactor: UnivariatePolynomial<F>,
+}
+
+/// The two rows the halt lands between: the last one of degree at least `degree_bound`, and the
+/// first one below it (or zero). Only the cofactor of `b` is carried; the invariant maintained is
+/// `remainder = u*a + cofactor*b` with `u` never materialized.
+fn bezout_rows<F: FiniteField>(
+    a: &UnivariatePolynomial<F>,
+    b: &UnivariatePolynomial<F>,
+    degree_bound: u32,
+) -> (BezoutRow<F>, BezoutRow<F>) {
+    let mut previous = BezoutRow {
+        remainder: a.clone(),
+        cofactor: UnivariatePolynomial::zero(),
+    };
+    let mut current = BezoutRow {
+        remainder: b.clone(),
+        cofactor: UnivariatePolynomial::one(),
+    };
+
+    while !current.remainder.is_zero() && current.remainder.degree() >= degree_bound {
+        let (quotient, remainder) = previous.remainder.div_with_remainder(&current.remainder);
+        let cofactor = &previous.cofactor - &(&quotient * &current.cofactor);
+        previous = current;
+        current = BezoutRow {
+            remainder,
+            cofactor,
+        };
+    }
+
+    (previous, current)
+}
+
 /// Scale a polynomial to be monic.
 fn make_monic<F: FiniteField>(f: &UnivariatePolynomial<F>) -> UnivariatePolynomial<F> {
     let leading_coefficient = f.coefficients().last().unwrap();
@@ -64,10 +177,96 @@ mod tests {
     use proptest::{prelude::*, proptest};
 
     use crate::{
-        fields::Zp1091,
-        poly::univariate::gcd::{gcd, lcm, make_monic},
-        One, Polynomial, UnivariatePolynomial,
+        fields::{Zp1091, Zp13},
+        poly::univariate::gcd::{gcd, lcm, make_monic, partial_bezout, xgcd},
+        FiniteField, One, Polynomial, UnivariatePolynomial, Zero,
     };
+
+    /// A polynomial from its coefficients in ascending degree order.
+    fn poly<F: FiniteField>(coefficients: &[u64]) -> UnivariatePolynomial<F> {
+        let elements: Vec<F> = coefficients.iter().map(|c| F::new(*c)).collect();
+        UnivariatePolynomial::new(&elements)
+    }
+
+    // The returned pair satisfies r = u*a + v*b for some u, verified as r - v*b being divisible
+    // by a, and r's degree is below the requested bound.
+    #[test]
+    fn test_the_halted_sequence_satisfies_the_bezout_identity() {
+        type F = Zp13;
+        // a = x^4, b = 1 + 2x + 3x^2 + 4x^3.
+        let a = poly::<F>(&[0, 0, 0, 0, 1]);
+        let b = poly::<F>(&[1, 2, 3, 4]);
+        let (v, r) = partial_bezout(&a, &b, 2);
+        assert!(r.degree() < 2);
+        let residue = &(&r - &(&v * &b)) % &a;
+        assert!(residue.is_zero(), "r - v*b is not a multiple of a");
+    }
+
+    // A `b` that already has degree below the bound is returned untouched, with cofactor one.
+    #[test]
+    fn test_a_remainder_already_below_the_bound_takes_no_steps() {
+        type F = Zp13;
+        let a = poly::<F>(&[0, 0, 0, 0, 1]);
+        let b = poly::<F>(&[7]);
+        let (v, r) = partial_bezout(&a, &b, 2);
+        assert_eq!(r, b);
+        assert_eq!(v, UnivariatePolynomial::<F>::one());
+    }
+
+    // A `b` dividing `a` drives the remainder to zero, which halts the loop rather than dividing
+    // by the zero polynomial.
+    #[test]
+    fn test_an_exact_division_halts_at_a_zero_remainder() {
+        type F = Zp13;
+        // a = x^4, b = x^2, so the first remainder is already zero.
+        let a = poly::<F>(&[0, 0, 0, 0, 1]);
+        let b = poly::<F>(&[0, 0, 1]);
+        let (_v, r) = partial_bezout(&a, &b, 1);
+        assert!(r.is_zero());
+    }
+
+    // xgcd returns the same monic gcd that `gcd` does, together with cofactors witnessing it.
+    #[test]
+    fn test_xgcd_agrees_with_gcd_and_witnesses_it() {
+        type F = Zp13;
+        // a = (x+1)(x+2) = 2 + 3x + x^2, b = (x+1)(x+3) = 3 + 4x + x^2; gcd is x + 1.
+        let a = poly::<F>(&[2, 3, 1]);
+        let b = poly::<F>(&[3, 4, 1]);
+        let (g, u, v) = xgcd(&a, &b);
+        assert_eq!(g, gcd(&a, &b));
+        assert_eq!(g, poly::<F>(&[1, 1]));
+        assert_eq!(&(&u * &a) + &(&v * &b), g);
+    }
+
+    // xgcd of a polynomial with zero is that polynomial made monic, with the scaling carried in
+    // the cofactor of the nonzero argument and a zero cofactor on the other side.
+    #[test]
+    fn test_xgcd_with_zero_on_either_side() {
+        type F = Zp13;
+        // 3 + 6x^2 is not monic, so the normalization is observable in the cofactor.
+        let a = poly::<F>(&[3, 0, 6]);
+        let zero = UnivariatePolynomial::<F>::zero();
+
+        let (g, u, v) = xgcd(&a, &zero);
+        assert_eq!(g, gcd(&a, &zero));
+        assert!(v.is_zero());
+        assert_eq!(&(&u * &a) + &(&v * &zero), g);
+
+        let (g, u, v) = xgcd(&zero, &a);
+        assert_eq!(g, gcd(&zero, &a));
+        assert!(u.is_zero());
+        assert_eq!(&(&u * &zero) + &(&v * &a), g);
+    }
+
+    // xgcd(0, 0) is the zero polynomial with zero cofactors, rather than a division by zero.
+    #[test]
+    fn test_xgcd_of_zero_and_zero() {
+        let zero = UnivariatePolynomial::<Zp13>::zero();
+        let (g, u, v) = xgcd(&zero, &zero);
+        assert!(g.is_zero());
+        assert!(u.is_zero());
+        assert!(v.is_zero());
+    }
 
     #[test]
     /// gcd(0, 0) = 0
@@ -195,6 +394,31 @@ mod tests {
             let zero = UnivariatePolynomial::<Zp1091>::zero();
             prop_assert_eq!(lcm(&zero, &a), zero.clone());
             prop_assert_eq!(lcm(&a, &zero), zero);
+        }
+
+        #[test]
+        /// xgcd(a, b) returns gcd(a, b) with cofactors satisfying u*a + v*b = gcd(a, b).
+        fn test_xgcd_cofactors_witness_the_gcd(
+            a in ((0..=50usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            b in ((0..=50usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>))) {
+            let (g, u, v) = xgcd(&a, &b);
+            prop_assert_eq!(&g, &gcd(&a, &b));
+            prop_assert_eq!(&(&u * &a) + &(&v * &b), g);
+        }
+
+        #[test]
+        /// The halted sequence's remainder is below the bound and lies in the ideal (a, b).
+        fn test_partial_bezout_halts_below_the_bound(
+            b in ((0..=20usize).prop_map(PolynomialParams::from).prop_flat_map(any_with::<UnivariatePolynomial<Zp1091>>)),
+            bound in 1..=10u32) {
+            // a = x^{2*bound}, the shape the key equation uses, so deg a >= bound holds.
+            let mut coefficients = vec![Zp1091::zero(); (2 * bound + 1) as usize];
+            coefficients[(2 * bound) as usize] = Zp1091::one();
+            let a = UnivariatePolynomial::new(&coefficients);
+
+            let (v, r) = partial_bezout(&a, &b, bound);
+            prop_assert!(r.is_zero() || r.degree() < bound);
+            prop_assert!((&(&r - &(&v * &b)) % &a).is_zero());
         }
 
         #[test]
