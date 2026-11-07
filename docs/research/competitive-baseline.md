@@ -383,6 +383,104 @@ This matters more than its size suggests:
 So there are now **two** measured cross-library deficits with different locations, and §6's gap map
 is revised accordingly.
 
+## 4b. The board populated to five libraries, and what the other three say (#369)
+
+§4a is Zeebra against one engine. The adapters for msolve (#259), Groebner.jl and Sagebrush (#260)
+have existed since M25 and retained no records, so every cross-library claim above rested on
+Singular alone. **180 measured records now exist** — the whole corpus ladder × both tasks × five
+libraries, one row per process, `taskset -c 0-7`, one worker, under `benchlock`, 60 s wall. All
+four externals pass `tools/external/smoke/smoke.sh` with identical leading-monomial sets before any
+timing was taken.
+
+### What each library could even attempt
+
+| library | rows | complete | unsupported | stopped by limit | failed |
+|---|---:|---:|---:|---:|---:|
+| zeebra | 36 | 32 | 1 | 3 | 0 |
+| singular | 36 | 29 | 5 | 2 | 0 |
+| sagebrush | 36 | 29 | 4 | 2 | 1 |
+| groebner.jl | 36 | 17 | 18 | 1 | 0 |
+| msolve | 36 | 15 | 20 | 1 | 0 |
+
+**msolve and Groebner.jl answer no conversion row at all.** Eighteen `unsupported` each, both
+reading "the tool does not offer lex-basis-by-conversion": Groebner.jl 0.10.11 ships no FGLM, and
+msolve's eliminant is refused *before being asked* because `corpus::REFERENCE_CHARACTERISTIC` is
+above its `1515531529` non-termination bound (§3.2). So on this corpus the conversion task has
+exactly **two** comparands, Singular and Sagebrush, and one of those is not authoritative.
+
+### The screen, and then the result
+
+> **116 pairs: 89 disqualified by the startup floor, 0 with no checked invariant, 27 publishable —
+> of which 3 inside the 20% noise band, 6 against a comparand that is not authoritative, and 18
+> that a conclusion may rest on.**
+
+The floor screen removes more than it did at two libraries, and for a new reason as well as the old:
+msolve's floor is **10.29 ms** and Sagebrush's **10.36 ms**, both observed from the board's own rows,
+and on katsura and cyclic both sit *exactly* there — 10.3 ms on `katsura-7`, 10.3 ms on `cyclic-6`,
+10.4 ms on instances three rungs apart. Three of the five libraries cannot be distinguished from
+their own startup on the classical families.
+
+Of the 20 publishable pairs in this cohort: **16 Zeebra losses, 1 level, 3 Zeebra wins** — the
+losses split Groebner.jl 6, Singular 5, Sagebrush 4, msolve 1. Dropping Sagebrush, which may not be
+a denominator: **12 losses, 1 level, 1 win.**
+
+### The headline, and it is not the one §4a reported
+
+| row | task | zeebra | groebner.jl | msolve | sagebrush | singular |
+|---|---|---:|---:|---:|---:|---:|
+| `mq-random-10` | basis | **29 919 ms** | **82 ms** | 274 ms | 334 ms | 7 199 ms |
+| `katsura-7` | basis | 27.3 ms | **1.8 ms** | 10.3 ms *(floor)* | 10.4 ms *(floor)* | 51.3 ms |
+| `cyclic-6` | basis | 12.9 ms | **2.0 ms** | 10.3 ms *(floor)* | 10.4 ms *(floor)* | 51.4 ms |
+
+**On `mq-random-10` Zeebra is the slowest of five engines**, and §4a's "4.13x slower than Singular"
+was the mildest of four losses on that row: 366x against Groebner.jl, 109x against msolve, 90x
+against Sagebrush. Every engine agreed on the answer — `D = 354`, 247 basis elements, 247 leading
+monomials, all five identical — so the gap is the implementation and not the problem.
+
+**And the classical families now decide something.** §4a's most useful finding was that katsura and
+cyclic "cannot distinguish these two engines at all at these sizes", because Singular was starting
+up through all of it. That conclusion was about *Singular*, not about the families. Groebner.jl
+reports an engine-internal time with no process floor to hide behind, and against it `katsura-7` is
+a **14.8x** loss and `cyclic-6` a **6.6x** loss, both well clear of the screen. The rungs a
+benchmark table would lead with are decisive after all; they were only ever mute against a comparand
+that could not be measured there.
+
+Zeebra's three wins are all on the planted family — `mq-planted-10` conversion at 5.5x over
+Singular, and two Sagebrush rows that are not conclusions. Planted systems are where Zeebra's
+strategy selection pays and they are the least cryptanalytically representative rung on the ladder,
+which is the same caveat §4a's single win carried.
+
+### One caveat that must travel with the Groebner.jl figures
+
+Groebner.jl's wall is the **inner** time its own harness reports, not the process wall — its floor
+of 0.747 ms against msolve's 10.29 ms is that difference, not a faster startup. Zeebra's figure is
+also engine-internal, which is what makes the pairing defensible in kind. What has **not** been
+established is whether Julia's JIT compilation lands inside or outside that inner timer. If any of
+it is outside, these ratios flatter Groebner.jl by an amount nobody here has measured. The figures
+are reported because the direction and the magnitude survive any plausible correction — a 366x gap
+does not come from JIT warmup — but the ratio's precision should not be quoted until that is
+checked.
+
+### Two defects, one closed and one opened
+
+**Closed.** §4a recorded `cyclic-4`'s Singular conversion row as "still wrong in the data, pending a
+re-measure" — stored `failed` where the truth is `unsupported`. The fix landed and **this sweep
+corrects it**: the row now reads `unsupported: order conversion needs a finite quotient algebra`.
+
+**Opened, and it is the same shape a fourth time.** Sagebrush's `cyclic-4` conversion row is stored
+as `failed` with "the tool reported an error: the ideal is not zero-dimensional, so FGLM does not
+apply". That is a capability statement in the failure bucket — the distinction §3 exists to enforce
+— and every other library on that row classifies the same mathematical truth as `unsupported`. It
+carries no timing, so no ratio is affected.
+
+**And a third, which the board caught about itself.** `Environment::comparable` checks machine, cpu
+and build and **not** `policy`, where the measurement discipline lives: `many rows per process (no
+memory figure)` against `one row per process`. The board was pairing the two cohorts, reporting
+**232 pairs where there are 116** — every one counted twice, half of them ratioing a row that ran
+cold in a fresh process against one that inherited the allocator and cache state of every row before
+it. Fixed in `CompetitiveRecord::comparable_with` rather than in `Environment`, which the
+cryptanalysis scoreboard shares.
+
 ## 5. Zeebra's own stage split, and the correction #269 was built on
 
 `examples/f4_profile recommended`, milliseconds, from `MILESTONE-F4-OPTIMIZATION.md` §8.5.
