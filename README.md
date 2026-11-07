@@ -54,6 +54,26 @@ As the saying goes, you can either make software so simple that it obviously has
       characteristics: this crate's conversion/basis ratio is flat to 12% across a 47-bit range of
       primes where the reference's moves 7.3x, so the gap is the reference's field arithmetic — and
       msolve on this machine is 35x faster than either
+- [x] Anemoi CICO at six rounds, `D = 15 625`: a witness verified through the permutation in
+      1.180 h, reproducing a published 11 775 s conversion, with the pre-recorded cost model landing
+      within 4% on the conversion and 1.5% on the operator count
+- [x] The Sylvester determinant's cost law measured over five matrix orders instead of two: cubic to
+      within the measurement above L2 — `2.9953 ± 0.0285`, worst residual 3.7% — and no cache
+      cliff, since order 4 374's 153 MB matrix exceeds L3 and still fits the law. The budget guard
+      takes the larger of the fitted and cubic laws, because a model that under-predicts authorizes
+      a run nobody costed
+- [x] A cost-and-resource-model register in which prediction error is *derived* from the predicted
+      and measured columns rather than authored, every figure labelled measured / fitted / predicted
+      / extrapolated, and rows append-only — so a re-measurement sits beside the estimate it
+      corrects instead of erasing how wrong it was
+- [x] Two measured same-machine losses in different subsystems, which is what the comparison was
+      for: order conversion ~30x behind msolve, and the basis stage 4.11x behind Singular on random
+      MQ — the corpus family closest in shape to a cryptanalytic system
+- [x] A competitive board that refuses a ratio against a comparand's own startup floor, measured at
+      35.91 ms from the board's own rows. Of 28 answered pairs only 7 clear 2x it; the other 21 all
+      read as wins for this crate, up to 501x, and settle nothing. Of the seven that qualify: four
+      losses, two inside the noise band, one win — on a corpus whose raw numbers show this crate
+      ahead on every pair
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.
@@ -1172,11 +1192,12 @@ that wants a `SquareMatrix<T>` type carrying the invariant rather than a runtime
 ## Number-Theoretic Transform
 
 `fft::evaluate` and `fft::interpolate` are the forward and inverse transforms over an `FFTDomain`
-of size `2^k`, built from a primitive `2^k`-th root of unity. Both are the same iterative in-place
-radix-2 kernel — a bit-reversal permutation followed by `log n` passes of butterflies over the
+of any size `n`, built from a primitive `n`th root of unity. At a power-of-two size — the common
+case, and the fast one — both are the same iterative in-place radix-2 kernel — a bit-reversal permutation followed by `log n` passes of butterflies over the
 domain's own powers, read with a stride — so there is no recursion, no per-level allocation, and
 one twiddle multiplication per two outputs. `interpolate` is that kernel over the batch-inverted
-domain, scaled by `1/n`.
+domain, scaled by `1/n`. Any other size is decomposed into coprime factors first; see
+[Sizes that are not a power of two](#sizes-that-are-not-a-power-of-two).
 
 **The transform zero-pads internally.** A polynomial of any degree below `n` is extended to the
 domain size inside `evaluate`, so a caller hands over unpadded operands and chooses only `n` — the
@@ -1231,13 +1252,75 @@ assert_eq!(interpolate(&values, &domain), p);
 254-bit backing; `Mersenne31` and `Zp2147483647` are the same field at two storage widths and
 report the same s.
 
-**Mersenne-31 admits no transform above size two**, which matters because it is the field most of
-this crate's F4 benchmarks use. `BabyBear` and `KoalaBear` — the latter being the prime the 2026
-Poseidon challenges are over — are NTT-friendly by construction and are what to reach for when a
-transform is wanted over a small field.
+**Mersenne-31 admits no power-of-two transform above size two**, which matters because it is the
+field most of this crate's F4 benchmarks use. `BabyBear` and `KoalaBear` — the latter being the
+prime the 2026 Poseidon challenges are over — are NTT-friendly by construction and are what to
+reach for when a transform is wanted over a small field. Sizes drawn from the *odd* part of `q - 1`
+are a separate matter and are available on Mersenne-31 too, as the next section shows.
 
 `FiniteField::pow_limbs` takes its exponent as little-endian limbs, which is what makes the above
 possible at all: the odd part of BN254's `q - 1` is 226 bits, so `pow`'s `u128` cannot hold it.
+
+### Sizes that are not a power of two
+
+A size `n` with `n | q - 1` needs no padding, whatever its factorization:
+
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::{
+    evaluate, fields::PrimeFieldElement64, interpolate, FFTDomain, KnownOrder, Polynomial,
+    UnivariatePolynomial,
+};
+
+// 65520 = 2^4 * 3^2 * 5 * 7 * 13, so this field hosts a domain of size 12, 105, 2520, ...
+type F = PrimeFieldElement64<65521>;
+
+let mut rng = StdRng::seed_from_u64(125);
+let w = F::root_of_unity(12, &mut rng);
+let domain = FFTDomain::from_generator(w, 12);
+
+let p = UnivariatePolynomial::<F>::rand(11, &mut rng);
+let values = evaluate(&p, &domain);
+for (i, value) in values.iter().enumerate() {
+    assert_eq!(*value, p.eval(&domain[i]));
+}
+assert_eq!(interpolate(&values, &domain), p);
+```
+
+The decomposition is **prime-factor (Good–Thomas)**: for `n = n1 * n2` with `gcd(n1, n2) = 1`,
+re-indexing the input by the Chinese remainder isomorphism `Z/n = Z/n1 x Z/n2` turns the length-`n`
+DFT into a 2-D transform of `n1`- and `n2`-point DFTs **with no twiddle factors between the
+stages** — the entire cost of the split is two permutations. Writing `i = i1 (mod n1)`,
+`i = i2 (mod n2)` and `k = k1*n2 + k2*n1 (mod n)`:
+
+```text
+w^(i k) = w^(n2 i k1) * w^(n1 i k2) = w_n1^(i1 k1) * w_n2^(i2 k2)
+```
+
+since `w_n1 = w^n2` has order `n1` and so only sees its exponent modulo `n1`. Each axis is then
+dispatched the same way, recursively, and what it costs depends on the factor:
+
+| factor | route | cost of that stage |
+|---|---|---|
+| a power of two | the radix-2 kernel | `n log n_i` |
+| composite with coprime parts | recurse | — |
+| an odd prime power (9, 25, 27) | the `O(m^2)` definition | `n * n_i` |
+
+So `2520 = 2^3 * 3^2 * 5 * 7` costs `n log 8` plus `n * (9 + 5 + 7)`, which is why a size whose
+odd factors are small is cheap and **a large prime size is quadratic**. Bluestein is the fix for
+that case — rewriting the DFT as a convolution of length `>= 2n - 1` — and it is deliberately not
+here: it needs a `2n`-th root of unity and the convolution rather than a re-indexing. Filed as
+#357.
+
+Two consequences of allowing any size, both visible in the API:
+
+- `DomainError::SizeNotPowerOfTwo` is gone, since the size is no longer a reason to refuse. A
+  domain is refused only when the generator does not have order exactly `n` (`NotAnNthRoot`,
+  `NotPrimitive`) or the size is zero (`SizeZero`). Primitivity now costs one `g^(n/p)` check per
+  distinct prime `p | n` rather than the single `g^(n/2)`; a root of order 6 at `n = 12` satisfies
+  `g^6 != 1` and would otherwise have been accepted.
+- `FFTDomain::split` — the radix-2 even/odd split — panics on an odd size, where the halves would
+  not be the same length.
 
 ### What the univariate stages cost
 

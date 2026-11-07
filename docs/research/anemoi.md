@@ -774,7 +774,7 @@ msolve on **one core** (`taskset --cpu-list 0`, `-t` defaulting to 1), Zeebra on
 | `n4-pcico` | 0.03 s | 9 MB | 0.366 s | 0.332 s | 1.480 s |
 | `n5-fcico` | **1.81 s** | 32 MB | **63.71 s** | 47.53 s | 136.8 s |
 | `n5-pcico` | **1.85 s** | 34 MB | **39.0 s** | 38.19 s | 75.96 s |
-| `n6-pcico` | **340.66 s** (re-taken) | 635 MB | §8a.8 | §8a.8 | 11 777.0 s |
+| `n6-pcico` | **340.66 s** (re-taken) | 635 MB | **4 248.6 s** | 4 226.5 s | 11 777.0 s |
 
 > **msolve solves `N = 5` end to end in 1.8 s on one core and 32 MB. Zeebra takes 63.7 s on eight
 > cores and 330 MB — 35x the wall for `FCICO` and 21x for `PCICO`, and 10x the memory. Same machine,
@@ -934,7 +934,91 @@ on `FCICO` and the corrected RSS guard. Ordering deliberately puts both behind t
 already waiting: a milestone's Minimum criteria are worth more than a Strong-criteria refinement,
 and `PCICO` alone already yields the reproduction, the `D = 15 625` check and the conversion figure.
 
-*Outcome pending; this subsection is completed with whatever it produces, including a backstop.*
+**`PCICO` completed, with a witness.** `p = 65537`, `N = 6`, `D = 15 625`, cores 0–7, 4 248.6 s —
+**1.180 hours** — and it did not reach its 5 400 s backstop.
+
+| stage | elapsed | detail |
+|---|---:|---|
+| basis (F4) | 20.438 s | 109 elements, 43 batches, highest pair degree 14, peak live nonzeros **28 435 493** |
+| **conversion (FGLM)** | **4 226.518 s** | `D = 15 625`, 7 relations, **84 669 823** operator entries |
+| univariate | 1.614 s | a point over the base field |
+| **total** | **4 248.571 s** | |
+
+> **`Anemoi(0, 34600)` has first output word zero, checked by running the permutation** —
+> `is_solution`, not the polynomial system that produced it. `D = 15 625` again at run time, so the
+> §5 invariant holds on the row that was actually solved rather than only on the gate.
+
+The peak live-nonzero count is worth noting against §8a.5: **28 435 493**, well above the 20 000 000
+default. The refusal that started all of this reported crossing by 112 entries, which made the
+default look like a near miss; the true peak is 1.42x it. So the lift was necessary rather than
+marginal, and the 112 figure was an artefact of F4 stopping the instant the budget was crossed —
+exactly as `F4Error`'s own documentation says it will.
+
+#### The cost model, which was recorded before the run
+
+§8a.5 wrote its predictions down first, so they can be scored rather than recalled:
+
+| quantity | predicted | measured | error |
+|---|---:|---:|---:|
+| conversion wall | 4 400 s (from the measured 115.2x per rung) | **4 226.5 s** | **−3.9%** |
+| operator entries | ≈ 86 M | **84 669 823** | **−1.5%** |
+| total wall | ≈ 1.25 h | **1.180 h** | **−5.6%** |
+| dense blocks | 3.64 GiB (exact from `D`) | — | by construction |
+| basis wall | ≈ 16.3 s | 20.4 s | **+25.4%** |
+| peak RSS | ≈ 5.1 GiB | 4.53 GiB observed | −11% |
+
+The conversion — the quantity the whole exercise was about — came in **within 4%** of a figure
+extrapolated from measured per-rung growth, and the operator count within 1.5%. The basis estimate
+was the worst of them at +25%, which is the same stage whose growth factor §8a.5 already had to
+correct from 57x to 54x, and a reminder that this document's F4 extrapolations are its weakest.
+
+**This is #286's actual deliverable.** The issue asked whether the validated `D³` model keeps
+holding or breaks at the next rung. It holds: 115.2x predicted against 110.7x observed for the
+conversion, against `D³`'s 125x.
+
+#### Against the two comparands
+
+| comparison | figure | what it is |
+|---|---:|---|
+| vs published Magma, conversion | **2.79x faster** | **cross-machine**, 2014 Xeon against 2022 Threadripper — not a solver comparison |
+| vs published Magma, basis | **13.1x slower** | same caveat, opposite direction |
+| conv/basis ratio | **206.8** against Magma's 7 548 | ratio-of-ratios **36.5x**, the machine-independent figure |
+| **vs msolve, same machine** | **12.5x slower** | 4 248.6 s against 340.66 s, byte-identical generators |
+
+So this **is** a reproduction of a published figure — 11 775.430 s of Magma conversion against
+4 226.5 s here — and it is still a row this crate loses on the only comparison that holds the
+machine fixed.
+
+**One finding that qualifies §8a.7, and it moves in this crate's favour.** The msolve deficit
+**narrowed** between rungs:
+
+| rung, `PCICO` | msolve | Zeebra | deficit |
+|---|---:|---:|---:|
+| `N = 5` | 1.85 s | 39.0 s | **21.1x** |
+| `N = 6` | 340.66 s | 4 248.6 s | **12.5x** |
+
+Because msolve's conversion grew **184.1x** per rung and this crate's grew **110.7x**. Two rungs is
+a trend and not a law, and the honest reading is narrow: **§8a.7's "one and a half orders of
+magnitude" is the `N = 5` figure and should not be quoted as rung-independent.** It would be equally
+wrong to project the narrowing forward — msolve's Wiedemann scalar sequence is asymptotically the
+better algorithm and one crossing point proves nothing about `N = 7`. What the two rungs do support
+is that the deficit is **rung-dependent**, which any competitive row quoting it must say.
+
+#### `FCICO`, still pending
+
+`FCICO` requested the lock at 21:43:17, immediately after `PCICO` released it, and is queued behind
+the other agents' work with its 2.5 h backstop and all four F4 budgets lifted. Its attempt-1 refusal
+(3.8 s, `max_matrix_rows`) stands as recorded above; whether #305 moves it is open.
+
+> **A caution about this subsection's own instrumentation.** The monitor watching for these results
+> reported `FCICO` as complete the moment `PCICO` finished — because it keyed on an `--- exit`
+> marker that **attempt 1 had left in the file**, and attempt 2 had not yet started. The figures it
+> reported were attempt 1's, byte-identical and entirely plausible. Caught only by comparing the
+> file's mtime (20:02:16) against `PCICO`'s completion (21:43:17). This is the third instrument in
+> this workstream to report confidently about the wrong object — after `pgrep -f` matching a wrapper
+> on its own payload (#328) and `benchlock` logging `END status=0` for a launcher-killed run (#344)
+> — and the general shape is now unmistakable: **a completion marker is not evidence of completion
+> unless something ties it to the run that was supposed to produce it.**
 
 #### What is already established at `N = 6`, independently of either run
 
@@ -949,9 +1033,10 @@ was filed to get:
 | conversion is reachable at this `D` | msolve, **340.66 s** on one core, 635 MB | the rung is not a wall for a modern implementation |
 
 So the question `N = 6` was filed to answer — *is the published conversion wall real, and is this
-rung reachable* — is already answered **yes, reachable**, by a same-machine measurement, before any
-Zeebra figure. What a Zeebra figure adds is this crate's position against it, which §8a.7 has
-already established is one and a half orders of magnitude behind.
+rung reachable* — was already answered **yes, reachable** by a same-machine msolve measurement
+before any Zeebra figure existed. The Zeebra figure, now in hand, adds this crate's position
+against it: **1.180 h end to end with a witness verified through the permutation**, a reproduction
+of the published 11 775.430 s conversion, and 12.5x behind msolve on the same machine.
 
 ## 9. Open
 
@@ -969,9 +1054,14 @@ already established is one and a half orders of magnitude behind.
   interesting half. And #323 records that the binding constraint at `N = 6` was already F4 rather
   than FGLM, which is the ordering `N = 7` inherits.
 - **The 64-bit `N = 6` rows.** `anemoi64-cico-n6-{fcico,pcico}` and the `2^32 − 209` pair are
-  registered and gated at `D = 15 625`, but only the `p = 65537` rows were timed, because only they
-  have a published conversion to reproduce. A measurement at the other two primes would be a
-  produced figure; see §8a.6 for why that is a weaker category and §8a.8 for what was run.
+  registered and gated at `D = 15 625`, but only `p = 65537` was timed, because only it has a
+  published conversion to reproduce. A measurement at the other two primes would be a produced
+  figure; see §8a.6 for why that is a weaker category. `PCICO` at `p = 65537` is done (§8a.8,
+  1.180 h, witness verified); `FCICO` there is queued.
+- **Whether the msolve deficit keeps narrowing.** It went 21.1x at `N = 5` to 12.5x at `N = 6` for
+  `PCICO`, because msolve's conversion grew 184.1x per rung against this crate's 110.7x. Two rungs
+  is not a trend worth extrapolating in either direction, and `N = 7` is the only thing that would
+  settle it. Noted rather than claimed.
 - **`ACICO`.** A third model of the same primitive (`additional-benchmarks.md` §3.4). Cheap once the
   permutation exists, and a separate issue.
 - **The reference's own `check_polynomial_verification` has not been executed.** It needs Sage. §4

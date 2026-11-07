@@ -30,7 +30,7 @@
 //!
 
 use crate::{
-    fft::{domain::FFTDomain, transform::transform_in_place},
+    fft::{domain::FFTDomain, prime_factor::transform_any},
     FiniteField, Polynomial,
 };
 
@@ -73,7 +73,7 @@ pub fn evaluate<F: FiniteField>(p: &impl Polynomial<F>, w: &FFTDomain<F>) -> Vec
     let coefficients = p.coefficients();
     let mut values = vec![F::zero(); n];
     values[..coefficients.len()].copy_from_slice(coefficients);
-    transform_in_place(&mut values, w.powers());
+    transform_any(&mut values, w.powers());
     values
 }
 
@@ -253,10 +253,60 @@ mod tests {
         check::<Bls12_381Fr>(0xb12);
     }
 
-    /// Mersenne-31 supports a transform of size 1 and 2 and nothing larger: its two-adicity is 1.
+    /// A size that is not a power of two agrees with Horner evaluation point by point.
+    ///
+    /// The sizes cover every shape the prime-factor decomposition distinguishes: an odd prime, an
+    /// odd prime power with no coprime split of its own, an even size with an odd factor, and a
+    /// size with four distinct prime factors.
+    #[test]
+    fn test_evaluate_at_a_size_that_is_not_a_power_of_two() {
+        // 65520 = 2^4 * 3^2 * 5 * 7 * 13.
+        type F = PrimeFieldElement64<65521>;
+        let mut rng = StdRng::seed_from_u64(0x125e);
+        for n in [3, 5, 6, 9, 12, 15, 45, 63, 105, 144, 2520] {
+            let g = F::root_of_unity(n as u64, &mut rng);
+            let domain = FFTDomain::from_generator(g, n);
+            let p = UnivariatePolynomial::<F>::rand(n as u64 - 1, &mut rng);
+
+            let transformed = evaluate(&p, &domain);
+            assert_eq!(transformed.len(), n);
+            for (i, value) in transformed.iter().enumerate() {
+                assert_eq!(*value, p.eval(&domain[i]), "n = {n}, point {i}");
+            }
+        }
+    }
+
+    /// A field with no two-adicity to spare still transforms, at the sizes dividing the odd part
+    /// of `q - 1`.
+    ///
+    /// This is what #125 unlocks: Mersenne-31 has two-adicity 1, so padding to a power of two was
+    /// only ever available up to size 2. `q - 1 = 2 * 3^2 * 7 * 11 * 31 * 151 * 331`, so sizes 9,
+    /// 63 and 99 are available and were unreachable before.
+    #[test]
+    fn test_mersenne31_transforms_beyond_its_two_adicity() {
+        use crate::fields::Mersenne31;
+
+        assert_eq!(Mersenne31::two_adicity(), 1);
+        let mut rng = StdRng::seed_from_u64(0x4d33);
+        for n in [9u64, 63, 99] {
+            let g = Mersenne31::root_of_unity(n, &mut rng);
+            let domain = FFTDomain::from_generator(g, n as usize);
+            let p = UnivariatePolynomial::<Mersenne31>::rand(n - 1, &mut rng);
+
+            let transformed = evaluate(&p, &domain);
+            for (i, value) in transformed.iter().enumerate() {
+                assert_eq!(*value, p.eval(&domain[i]), "n = {n}, point {i}");
+            }
+        }
+    }
+
+    /// Mersenne-31 supports a *power-of-two* transform of size 1 and 2 and nothing larger: its
+    /// two-adicity is 1.
     ///
     /// The unsupported case fails as a clear panic from `two_adic_root_of_unity`, which is where
-    /// the bound lives, rather than silently producing a wrong transform.
+    /// the bound lives, rather than silently producing a wrong transform. The bound is on the
+    /// two-adic construction only — see `test_mersenne31_transforms_beyond_its_two_adicity` for
+    /// the sizes the odd part of `q - 1` supplies.
     #[test]
     fn test_mersenne31_supports_only_sizes_one_and_two() {
         use crate::fields::Mersenne31;
