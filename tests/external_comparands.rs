@@ -550,7 +550,7 @@ fn test_both_comparands_agree_with_zeebra_above_the_two_to_the_thirty_first_ceil
         assert_eq!(
             canonical_basis(answer.basis.as_ref().expect("a basis")),
             our_basis,
-            "{} differs from Zeebra term for term at a 62-bit prime",
+            "{} differs from Zeebra term for term at the 62-bit prime 4611624995532046337",
             name
         );
         assert!(

@@ -220,10 +220,11 @@ impl GroebnerJlSolver {
         })
     }
 
-    /// A solver configured from the environment the provisioning script exports.
+    /// A solver configured from the environment `tools/external/env.sh` exports.
     ///
-    /// `ZEEBRA_JULIA` names the binary and defaults to `julia`; `ZEEBRA_JULIA_DEPOT` names the
-    /// depot and falls back to an already-set `JULIA_DEPOT_PATH`.
+    /// `ZEEBRA_JULIA` names the binary and defaults to `julia`, which `env.sh` puts on `PATH`;
+    /// `ZEEBRA_JULIA_DEPOT` names the depot and otherwise falls back to the `JULIA_DEPOT_PATH`
+    /// that `env.sh` sets to the provisioned depot.
     ///
     /// # Errors
     /// As [`Self::new`].

@@ -18,11 +18,20 @@
 //! * `engine/mpoly/src/sigf4.rs:28` claims validation "against Singular"; no such test, script or
 //!   recorded output exists in the tree.
 //!
-//! So: the F4 is real, literature-cited and free of stub markers, and its correctness is
-//! established on exactly one system in the provisioning smoke test. **A row from this adapter is
-//! `Complete`, never self-certified, and belongs in the results table marked unverified until it
-//! has agreed with Zeebra and Singular across the corpus.** A fast wrong answer is not a
-//! competitive result.
+//! Against that, the correctness evidence this adapter establishes. `tests/external_comparands.rs`
+//! checks Sagebrush against Zeebra **term for term, every coefficient included** — not merely on
+//! [`Invariants`] — and it agrees on the provisioning smoke system, on katsura-3/4/5, on
+//! cyclic-3/4/5 including positive-dimensional cyclic-4, and on katsura-4 at a 62-bit prime.
+//! Eight instances across three families and two characteristics, where the provisioning record
+//! had one.
+//!
+//! So: the F4 is real, literature-cited and free of stub markers, and it now agrees with an
+//! independent implementation wherever it has been asked to. What has *not* changed is the
+//! structural case above — five weeks of history, nothing versioned, six tests on the F4 path, no
+//! committed oracle run on a system large enough to exercise matrix elimination. **A row from this
+//! adapter is [`RunStatus::Complete`], never self-certified, and should carry the maturity caveat
+//! into the results table.** A fast wrong answer is not a competitive result, and eight agreeing
+//! instances is evidence rather than a guarantee.
 //!
 //! # What the driver exposes, and what Sagebrush has that it does not
 //!
@@ -217,9 +226,10 @@ impl SagebrushSolver {
         })
     }
 
-    /// A solver configured from the environment the provisioning script exports.
+    /// A solver configured from the environment `tools/external/env.sh` exports.
     ///
-    /// `ZEEBRA_SAGEBRUSH_DRIVER` names the binary and defaults to `sagebrush-gb-driver`.
+    /// `ZEEBRA_SAGEBRUSH_DRIVER` names the binary and defaults to `sagebrush-gb-driver`, which
+    /// `env.sh` puts on `PATH`.
     ///
     /// # Errors
     /// As [`Self::new`].
