@@ -293,6 +293,43 @@ That is the single most important structural fact in this report, and §9 is bui
 
 ---
 
+## 6a. The Amdahl screen, applied to every candidate
+
+An issue proposing to speed a stage can be bounded before any implementation question arises:
+if the stage became **free**, the end-to-end gain is `total / (total − stage)`. Where that ceiling
+sits at or inside the 20% noise band, **no implementation of any quality can produce a readable
+result**, and the issue is settled on arithmetic rather than on opinion.
+
+Applied to all five H-series items that target a stage, from §5's profile. The screen is only
+credible if it runs on the favoured candidate too, so #268 is in the table.
+
+| issue | target stage | best share | **ceiling** | verdict |
+|---|---|---:|---:|---|
+| **#268** H12 | interreduction | 61.5% | **2.59x** | **clears the band by 13x** |
+| **#268** H12 | matrix construction | 47.8% | **1.92x** | **clears by 4.6x** |
+| #269 H13 | elimination | 22.2% | 1.28x | **barely clears, 1.07x typical** |
+| #271 H15 | extraction (F4 half) | 5.1% | **1.053x** | **fails; 1.01x typical** |
+| #272 H16 | linear algebra in char 2 | — | **not computable** | **no char-2 profile exists** |
+| #273 H17 | — | — | **not applicable** | bounded by route spread, not stage share |
+
+Three things this screen produces that a discussion of implementations would not:
+
+- **#271 is settled, not merely unpromising.** An infinitely fast extraction stage is
+  unmeasurable on every instance in the profile. Its *univariate-factoring* half is a different
+  claim the screen does not reach, and §9 keeps the two apart.
+- **#272 is the one place the screen cannot run**, and that is the finding. Extrapolating from the
+  prime-field split would be the same error #269 is being deprioritized for. One `GF(2)` profile
+  decides it, and needs no comparand.
+- **#273 is bounded by the wrong quantity if a stage share is used at all.** Selection does not
+  make a stage faster; it picks a route. The measured route spread is **70x** — planted-8's lex
+  basis takes F4 0.04 ms directly against a 2.8 ms conversion
+  (`MILESTONE-FGLM-SCALABILITY.md` §8.5) — against the best stage ceiling anywhere of 2.59x.
+
+**A ceiling bounds the conceivable, not the achievable.** That asymmetry is why it is decisive
+against #269 and #271, where even the free case is unmeasurable, and only permissive for #268,
+where the achievable depends on a per-term factor nobody has measured. #268's acceptance test is
+therefore a before/after on a corpus rung, not a forecast from this table.
+
 ## 7. The six-axis ranking
 
 Per the plan's §7.4, candidates are ranked on **six axes, not raw ratios**: absolute cost, measured
@@ -369,13 +406,50 @@ report falsifies.
 
 | issue | recommendation | reason |
 |---|---|---|
-| **#58** (Krylov/Wiedemann) | **Reopen the FGLM half for measurement.** Highest-value candidate in the whole set. | It is the algorithm msolve uses for the stage where Zeebra's only measured cross-library deficit lies (~46 s on one row, ~30x). #58 deferred it on the strength of there being no measured need; there now is one. |
+| **#58** (Krylov/Wiedemann) | **Reopen the FGLM half for measurement**, as "the measured conversion gap is worth a Krylov route" and **not** as "sparse-FGLM would be 30x faster". Highest-value candidate in the set. | It is the algorithm msolve uses for the stage where Zeebra's only measured cross-library deficit lies (~46 s on one row, ~30x). #58 deferred it on a named trigger rather than a judgement that the idea was bad, and a measured gap against a maintained implementation is the trigger. **But see §9a: the 30x does not transfer to a prediction, and `MILESTONE-FGLM-SCALABILITY.md` §8.5's three measurements still stand.** |
 | **#268 H12** compact representations | **Raise to the top of the H-series.** | Addresses interreduction (61%) and matrix construction (48%) — the two largest *internal* stages, with ceilings of 2.59x and 1.92x. |
-| **#273 H17** adaptive strategy | **Keep, at low cost.** | Extends the existing planner, cheap, and §2 shows route choice matters more than kernel speed. |
-| **#271 H15** modular composition | **Defer.** | Extraction is 0.4–1.0 ms of 32–47 ms. There is no gap to close. |
+| **#273 H17** adaptive strategy | **Keep, at low cost.** | Extends the existing planner. §6a: its benefit is bounded by **route spread, 70x measured** on planted-8, not by any stage share — against a best stage ceiling of 2.59x. `fglm::shape` already ships a tested detector that is deliberately unwired, so this is connecting two existing pieces. |
+| **#271 H15** modular composition | **Defer** — the F4 half is **settled**. | Extraction's ceiling is **1.013x–1.053x** (§6a): an infinitely fast stage is unmeasurable on every profiled instance. The univariate-factoring half is a separate claim the screen does not reach, and the large univariate win was already taken — `graeffe-root-finding.md` has one root at degree `3^13` in 3.1 s against an extrapolated 57 hours. |
 | **#269 H13** elimination kernels | **Deprioritize, and correct the title.** | The 65–88% premise is false; the stage is 7–22%, giving an Amdahl ceiling of 1.07x–1.29x, at or inside the noise band. The cited `la_ff_small_prime.c` does not exist. |
 | **#270 H14** per-field-width arithmetic | **Deprioritize; close unless re-scoped.** | msolve's delayed reduction is inactive at the compared fields and all its kernels are `int64_t`. The advantage #270 is scoped to chase is not present in the comparand at these field sizes. |
-| **#272 H16** bit-packed `GF(2)`/`GF(2^e)` | **Hold, pending a char-2 rung.** | Not refuted — **unmeasured**. No corpus rung is in `GF(2^k)`, blocked on the defining-polynomial convention (§3.4). Measure before committing. |
+| **#272 H16** bit-packed `GF(2)`/`GF(2^e)` | **Hold, and take the `GF(2)` profile first.** | Not refuted — **unmeasurable**: §6a's screen needs a profile and there is no char-2 one. `GF(2)` is a prime field and could be profiled today; only the `GF(2^e)` half is blocked on the defining-polynomial convention (§3.4). One profile converts this from held to decided. |
+
+## 9a. The limit on the #58 recommendation
+
+The claim most likely to be misread, so it is stated separately rather than left in a table cell.
+
+**Reopen #58 as "the measured conversion gap is worth a Krylov route". Not as "sparse-FGLM would
+be 30x faster."** The second does not follow: §2's three engines use three different algorithms, so
+the ~30x is a measurement of *Zeebra's conversion against msolve's* on one family at one prime, and
+the comparand's cost curve is not one a Zeebra Krylov route would inherit.
+
+`MILESTONE-FGLM-SCALABILITY.md` §8.5's three measurements are why #58 said no the first time, and
+**nothing here refutes any of them**:
+
+1. Where conversion is the only route, the cost is not the dependence algorithm — **96% of
+   katsura-7's conversion is border reduction**, which sparse FGLM does not touch.
+2. Where the dense blocks dominate, the ideal is **not in shape position** — planted-10's blocks
+   are 54x its operators, and its last variable has a degree-4 minimal polynomial in a
+   1024-dimensional quotient.
+3. On those systems one should not be converting at all — planted-8's lex basis takes F4 **0.04 ms**
+   directly against a 2.8 ms conversion.
+
+What #263 adds is one new fact about **a family §8.5 did not measure**: on Anemoi CICO there is now
+a maintained implementation ~30x faster at this stage on the same machine, and its route is
+Wiedemann. That is why it does not contradict §8.5.
+
+**The cheap question a reopened scope should answer first.** §8.5 measured 96% border reduction on
+katsura-7, where a Krylov route would buy nothing; §1's split says **82.8% of the Anemoi `N = 5`
+conversion is the lex walk and dependence test** — the opposite split, and what makes the family
+different. Confirming that on a second Anemoi rung is one row, and it decides whether the rest of
+the work has a target.
+
+§8.5's answer 4 also still holds: a Wiedemann variant choosing a random linear form could reuse the
+existing `O(N D)` verification **unchanged**, so it could be exposed as certified rather than
+conjectural. That is the one unambiguously reusable result of the M18 spike and it lowers the cost
+of #58 more than anything else in it.
+
+**#58's won't-do for F4 is untouched** and rests on reasoning nothing here disturbs.
 
 ### Two follow-ups this report generates
 
