@@ -271,7 +271,11 @@ fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
     // Normal form against a set of reducers, which is what Gröbner reduction spends its time on.
     for reducer_count in [2usize, 4, 8] {
         let mut rng = StdRng::seed_from_u64(23);
-        let dividend = random_poly::<N>(48, 4, &mut rng);
+        // `exponent_bound` rather than a literal 4: at N = 2 only 5^2 = 25 monomials fit within
+        // that bound and this asks for 48, so the literal made `random_poly`'s own assert fire.
+        // The bound is unchanged at N = 3, where 5^3 = 125 already admits 48, so no recorded
+        // figure moves — N = 2 is the arity that had no figure because it panicked.
+        let dividend = random_poly::<N>(48, exponent_bound::<N>(48), &mut rng);
         let reducers: Vec<MultivariatePolynomial<N, F>> = (0..reducer_count)
             .map(|_| random_poly::<N>(8, 3, &mut rng))
             .filter(|p| !p.is_zero())
