@@ -17,6 +17,16 @@
 # The table was additionally read as a rendered image of page 7, because
 # pdftotext flattens the superscripts that carry every attack exponent.
 #
+# Confirmed against a second primary document (#382). Courtois's PhD thesis,
+# "La securite des primitives cryptographiques basees sur des problemes
+# algebriques multivariables : MQ, IP, MinRank, HFE", Universite Paris 6,
+# 2001, Table 24.7.1 on page 183, reproduces the Asiacrypt table cell for cell
+# across all eight columns and all twelve rows, including its bolding.
+#   http://www.minrank.org/phd.pdf
+#   sha256 b907bced0836298381e22dc025758296a40da57def87f50c7cb84e41e7a02e9d
+#   1490144 bytes, 221 pages (accessed 2026-11-07), also read as a rendered
+#   page image for the same superscript reason.
+#
 # Problem (section 3), verbatim in substance: given eta x n matrices
 # M_0; M_1, ..., M_m over GF(q), find alpha in GF(q)^m with
 #
