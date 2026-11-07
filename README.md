@@ -1752,6 +1752,64 @@ basis, for an eliminant and for solutions, what each one means by "degrevlex", t
 ceilings (msolve and Singular both stop at 2^31 − 1), and the smoke-test agreement are in
 `docs/research/external-comparands.md`.
 
+Each engine is driven through one trait, `grobner::external::ExternalSolver`, behind the
+`external-runners` feature — on by default, and adding no dependency, because the interface to
+every one of these tools is text. `SingularSolver` is the reference adapter and `MsolveSolver` the
+one with the most to say:
+
+```rust
+use std::time::Duration;
+use zeebra::grobner::external::{ExternalSolver, FieldSpec, Instance, Limits, MsolveSolver, Task};
+use zeebra::MonomialOrder;
+
+let mut solver = MsolveSolver::new("msolve", std::env::temp_dir().join("zb-msolve-doc"));
+let instance = Instance::new(
+    "pair",
+    "doc",
+    FieldSpec::prime(1073741827),
+    vec!["x".to_string(), "y".to_string()],
+    vec!["x^2-2".to_string(), "y-x-1".to_string()],
+    MonomialOrder::GradedReverseLexicographic,
+);
+
+// Capability is answered without running anything, and a `no` is never a timing.
+assert!(solver.supports(&instance, Task::ReducedGrobnerBasis).is_supported());
+// msolve has no lex order at all, so a lex basis is a capability gap rather than a slow row.
+assert!(!solver.supports(&instance, Task::LexBasis).is_supported());
+
+// An absent binary is reported, never fatal — so a sweep continues past it.
+let report = solver.run(&instance, Task::ReducedGrobnerBasis, &Limits::wall(Duration::from_secs(30)));
+assert!(report.status.answered() || report.was_skipped());
+```
+
+Two msolve-specific facts the adapter encodes as named constants, because both are capability
+bounds rather than slow paths and both are narrower than they look:
+
+* `msolve::MAX_CHARACTERISTIC` is `2^31` — a basis works for any `p` below it.
+* `msolve::MAX_CHARACTERISTIC_ELIMINANT` is `1515531529`. msolve's sparse-FGLM refuses primes at
+  or above `1518500213` and its genericity handler then retries **without bound** rather than
+  failing, so the eliminant task is refused instead of being allowed to burn a wall limit; the
+  constant is the tighter *documented-safe* accumulation bound rather than msolve's own guard,
+  because primes between the two run with no accumulation guarantee. `Mersenne31` and
+  `Zp2147483647` are both above it.
+
+msolve also has **three** failure modes that exit 0. On a staircase that is not generic enough it
+permutes the variables and appends a new one carrying a random linear form, then writes a
+well-formed parametrization of the ideal it substituted — so the adapter compares the output's
+variable list against the instance's on every run. Its sparse-FGLM refuses a too-large prime and
+then retries forever rather than failing. And a generator naming a variable that is not on line 1
+has that factor **silently dropped**, so `supports()` checks every identifier in every generator
+against the declared order before anything runs.
+
+That last one is also why msolve is safe at ten or more variables, where `x1` is a prefix of `x10`:
+it matches factor names with a full `strcmp` rather than greedily, verified by handing it 53
+distinct degree-2 monomials over `x1..x14` and getting the same set back. Cross-engine agreement
+cannot catch a tokenizer bug — every engine is handed the same bytes, so all of them agree on the
+same wrong ideal — which is why that check is against the input rather than against another tool.
+
+All three, the mapping from msolve's F4 stage names onto Zeebra's, and what of its design is worth
+reimplementing are in `docs/research/msolve-implementation.md`.
+
 ### Solving zero-dimensional systems
 
 `grobner::solve_one` finds one solution and stops; `grobner::solve_zero_dimensional` finds every
