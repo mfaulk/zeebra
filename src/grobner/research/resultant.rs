@@ -445,7 +445,23 @@ pub struct ResultantStages {
     /// Points outside the sample set checked against a direct Sylvester determinant.
     pub off_domain_checks: usize,
     /// Time spent on those checks, and on a predicted attempt the checks refused.
+    ///
+    /// Disjoint from [`Self::sampling`] and [`Self::interpolation`], and the three together are the
+    /// elimination's wall clock — [`Self::elapsed`]. Anything that also charges this to a later
+    /// stage counts it twice, which is what inflated the six-round totals before M25.
     pub validation: Duration,
+}
+
+impl ResultantStages {
+    /// The elimination's wall clock: determinants, recovery and validation, each counted **once**.
+    ///
+    /// The single definition of what one elimination cost, so that a caller filing a stage cost and
+    /// a caller printing a total cannot disagree. The three fields are measured in disjoint windows
+    /// inside the route, so this is a lower bound on the route's own elapsed time and never an
+    /// over-count — `tests` pins both halves of that against an outer timer.
+    pub fn elapsed(&self) -> Duration {
+        self.sampling + self.interpolation + self.validation
+    }
 }
 
 /// Which degree the sample count was sized against, and whether a prediction survived validation.
@@ -1547,6 +1563,63 @@ mod tests {
         // Zp13's thirteen elements are all inside a sample set of twelve points but one.
         let error = super::off_domain_abscissae::<F>(12, 8).expect_err("no room for eight");
         assert_eq!(error, ResultantError::FieldTooSmall { needed: 20 });
+    }
+
+    /// The elimination's three stage durations sum to the route's measured wall clock, once each.
+    ///
+    /// The regression test for a double-counted stage: a duration charged to two stages makes the
+    /// sum exceed the outer timer, and a duration charged to none makes it fall well short.
+    #[test]
+    fn test_the_stage_durations_sum_to_the_measured_elapsed() {
+        use std::time::Instant;
+
+        use crate::grobner::research::{challenge, Specialization};
+
+        let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+        let instance = manifest.cico_instance::<Koala>().expect("builds");
+        let free = instance.free_inputs();
+        let variables: Vec<usize> = (2..free).collect();
+        let specialization =
+            Specialization::<46, Koala>::seeded(&variables, 1).expect("distinct indices");
+        let fixed: Vec<Koala> = (2..free)
+            .map(|i| specialization.value_of(i).expect("fixed"))
+            .collect();
+        let outputs = cico_bivariate(&instance, &fixed).expect("two free inputs remain");
+
+        let started = Instant::now();
+        let (_, stages) = bivariate_resultant_predicted(
+            &outputs[0],
+            &outputs[1],
+            1,
+            81,
+            ResultantOptions::default(),
+        )
+        .expect("both involve the second");
+        let measured = started.elapsed();
+
+        assert_eq!(
+            stages.degree_source,
+            DegreeSource::PredictionHeld { degree: 81 },
+            "the held path is the one that reports a validation cost"
+        );
+        assert!(
+            stages.validation > std::time::Duration::ZERO,
+            "the validation is its own reported stage, not folded into the sampling"
+        );
+        assert!(
+            stages.elapsed() <= measured,
+            "the stages sum to {:?}, more than the {:?} the route took — something is counted \
+             twice",
+            stages.elapsed(),
+            measured
+        );
+        assert!(
+            stages.elapsed().as_secs_f64() >= 0.5 * measured.as_secs_f64(),
+            "the stages sum to {:?} against {:?} measured — more than half the route is \
+             unattributed",
+            stages.elapsed(),
+            measured
+        );
     }
 
     /// A held prediction on the parallel path records that it was validated.

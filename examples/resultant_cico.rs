@@ -650,8 +650,14 @@ struct Pass {
     stages: ResultantStages,
     /// The reference route's, when the A/B control ran.
     reference_stages: Option<ResultantStages>,
-    /// Points off the interpolation domain that agreed with a direct determinant, and the cost.
-    off_domain: (usize, Duration),
+    /// Points off the interpolation domain that agreed with a direct Sylvester determinant.
+    off_domain_checks: usize,
+    /// Off-domain validation this example took **itself**, which is zero on a held prediction.
+    ///
+    /// The route validates its own prediction and reports the cost in `stages.validation`, so on a
+    /// held row there is nothing left to pay. Keeping the two apart is what stops the check being
+    /// charged to a stage twice — see `Pass::validation`.
+    extra_validation: Duration,
     /// Roots of the resultant, and the cost of finding them.
     candidates: (usize, Duration),
     /// Candidate pairs lifted from those roots, and the cost.
@@ -661,12 +667,29 @@ struct Pass {
     witnesses: Vec<(K, K)>,
     /// Time spent in `is_solution`.
     verification: Duration,
+    /// The row's measured wall clock, which the recorded stages must sum to.
+    total: Duration,
 }
 
 impl Pass {
-    /// The elimination's wall clock: determinants plus recovery.
+    /// The off-domain validation's wall clock, counted **once**.
+    ///
+    /// On a held prediction this is the route's own check; otherwise the route took none and this
+    /// is the one this example took. The two are never both nonzero.
+    fn validation(&self) -> Duration {
+        self.stages.validation + self.extra_validation
+    }
+
+    /// The elimination's wall clock: determinants, recovery and validation.
+    ///
+    /// Validation is charged **here and nowhere else**. `Stage::Verification` is the independent
+    /// check of a *candidate* — a recovered input pair run through the permutation — whereas the
+    /// off-domain check is what decides which polynomial the elimination returns at all, and on a
+    /// falsified row `stages.validation` already contains the refused attempt's own determinants.
+    /// Charging it to both stages, as this example did before M25, inflated every recorded total by
+    /// the cost of the check: 17.4 s of a six-round row.
     fn elimination(&self) -> Duration {
-        self.stages.sampling + self.stages.interpolation + self.stages.validation
+        self.stages.elapsed() + self.extra_validation
     }
 }
 
@@ -704,7 +727,7 @@ fn solve(
                 return None;
             }
         };
-    let elimination = stages.sampling + stages.interpolation + stages.validation;
+    let elimination = stages.elapsed();
     let bezout = 3u64.pow(rounds as u32) * 3u64.pow(rounds as u32);
     println!(
         "- predicted degree {} from `alpha^(2 R_F + R_P)`, so {} samples against the proven \
@@ -814,8 +837,8 @@ fn solve(
     // The interpolated polynomial is checked against the definition at points the interpolation
     // never saw. A held prediction has already paid for that inside the route, so its count and
     // cost are reported from there rather than by taking a second set of determinants.
-    let (fresh, independent) = if held {
-        (stages.off_domain_checks, stages.validation)
+    let (fresh, extra_validation) = if held {
+        (stages.off_domain_checks, Duration::ZERO)
     } else {
         let at = Instant::now();
         let fresh = off_domain_check(f, g, &resultant, &stages.route, 8);
@@ -823,9 +846,14 @@ fn solve(
     };
     println!(
         "- {} points outside the interpolation domain agree with a direct Sylvester determinant, \
-         in {:.1} ms",
+         in {:.1} ms — {} consistency check, not a proof of a polynomial identity",
         fresh,
-        independent.as_secs_f64() * 1e3
+        (stages.validation + extra_validation).as_secs_f64() * 1e3,
+        if held {
+            "a probabilistic"
+        } else {
+            "an independent"
+        }
     );
 
     let at = Instant::now();
@@ -873,19 +901,23 @@ fn solve(
         witnesses.len(),
         verification.as_secs_f64() * 1e3
     );
-    let pass = Pass {
+    let mut pass = Pass {
         concurrency,
         resultant,
         stages,
         reference_stages,
-        off_domain: (fresh, independent),
+        off_domain_checks: fresh,
+        extra_validation,
         candidates: (candidates.len(), root_finding),
         pairs: (pairs.len(), lifting),
         witnesses,
         verification,
+        total: Duration::ZERO,
     };
-    let total = build + pass.elimination() + independent + root_finding + lifting + verification;
-    println!("- **total {:.1} ms**", total.as_secs_f64() * 1e3);
+    // Validation is inside `elimination()`, so it must not be added again here. The row total and
+    // the recorded stage durations come from this one expression, and `record` asserts they agree.
+    pass.total = build + pass.elimination() + root_finding + lifting + verification;
+    println!("- **total {:.1} ms**", pass.total.as_secs_f64() * 1e3);
     // The estimate is the live dense arrays: the sample vector, the domain and its inverse, and
     // the recovered coefficients, each of `samples` field elements.
     let estimated = 4 * pass.stages.samples * std::mem::size_of::<K>();
@@ -984,7 +1016,7 @@ fn record(
          the interpolation domain",
         pass.pairs.0,
         pass.witnesses.len(),
-        pass.off_domain.0
+        pass.off_domain_checks
     );
     let mut eliminated = StageCost::new(Stage::Elimination, pass.elimination())
         .with("resultant_degree", pass.resultant.degree() as i64)
@@ -997,7 +1029,9 @@ fn record(
         .with(
             "interpolation_us",
             pass.stages.interpolation.as_micros() as i64,
-        );
+        )
+        // Inside this stage's `elapsed`, and inside no other's.
+        .with("validation_us", pass.validation().as_micros() as i64);
     if let Some(rstages) = &pass.reference_stages {
         eliminated = eliminated
             .with("reference_samples", rstages.samples as i64)
@@ -1016,9 +1050,11 @@ fn record(
             .with("roots", pass.candidates.0 as i64)
             .with("lifted_pairs", pass.pairs.0 as i64)
             .with("lifting_us", pass.pairs.1.as_micros() as i64),
-        StageCost::new(Stage::Verification, pass.verification + pass.off_domain.1)
+        // Running the permutation on each candidate pair, and that alone. The off-domain check is
+        // elimination work and is charged there; only its *count* is descriptive here.
+        StageCost::new(Stage::Verification, pass.verification)
             .with("witnesses", pass.witnesses.len() as i64)
-            .with("off_domain_checks", pass.off_domain.0 as i64),
+            .with("off_domain_checks", pass.off_domain_checks as i64),
     ];
     record.environment = Environment {
         commit: commit(),
@@ -1049,6 +1085,14 @@ fn record(
     // Measured process RSS, kept apart from any `peak_estimated_bytes`: this route builds no
     // Macaulay matrix, and on the six-round row the two would differ by four orders of magnitude.
     record.measured_peak_resident_bytes = peak_resident_bytes().map(|b| b as usize);
+    // `RunRecord::elapsed` is the sum of the stages, so a duration charged to two stages inflates
+    // the recorded row total silently. Asserting the sum against the total this row actually
+    // printed is the check that catches it on every run rather than on review.
+    assert_eq!(
+        record.elapsed(),
+        pass.total,
+        "the recorded stage durations must sum to the row's measured total"
+    );
     record
 }
 
