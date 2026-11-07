@@ -243,13 +243,14 @@ impl<F: FiniteField> ReedSolomon<F> {
             return Err(CodeError::Uncorrectable);
         }
 
+        // `solve_key_equation` caps the locator's degree at t, so at most t positions are touched
+        // below. With the codeword check at the end, that is the whole correctness argument: a
+        // word verified to be a codeword and at distance at most t from the received word is the
+        // *only* such codeword, because two of them would be within 2t < d of each other. The
+        // locator having a repeated root or a root off the domain needs no separate test — it just
+        // produces a correction the final check rejects.
         let (locator, evaluator) = self.solve_key_equation(&syndromes[..2 * t], t)?;
         let error_positions = self.locate(&locator);
-        if error_positions.len() != locator.degree() as usize {
-            // The locator has a repeated root, or a root outside the domain. Either way it is not
-            // the locator of an error pattern this code can correct.
-            return Err(CodeError::Uncorrectable);
-        }
 
         let mut codeword = received.to_vec();
         let derivative = formal_derivative(&locator);
@@ -258,6 +259,8 @@ impl<F: FiniteField> ReedSolomon<F> {
             // X_i = w^{-i} and its inverse w^i is the domain point the locator vanished at.
             let x_inverse = self.domain[position];
             let x = self.domain[(self.block_length() - position) % self.block_length()];
+            // A zero slope means Λ has a repeated root here, so it is not the locator of any error
+            // pattern. Rejected rather than divided by.
             let slope = derivative.eval(&x_inverse);
             if slope.is_zero() {
                 return Err(CodeError::Uncorrectable);
@@ -368,18 +371,25 @@ impl<F: FiniteField> ReedSolomon<F> {
             t as u32,
         );
 
-        // Λ(0) = 0 would mean a root at infinity, i.e. no error pattern of weight at most t
-        // explains these syndromes.
+        // Λ(0) = 0 would mean a root at infinity, which no error pattern has. Rejected rather than
+        // normalized because the normalization below would invert zero.
         let constant_term = locator.coefficients()[0];
         if constant_term.is_zero() {
             return Err(CodeError::Uncorrectable);
         }
+
+        // deg Λ <= t is a property of the halt, not a check: the previous remainder had degree at
+        // least t and deg v = 2t - deg r_prev. It is asserted rather than branched on because
+        // `decode` corrects one position per root of Λ and relies on that count staying within t
+        // for its nearest-codeword argument.
+        debug_assert!(
+            locator.degree() as usize <= t,
+            "the halted Euclidean sequence returned a cofactor of degree {} above t = {t}",
+            locator.degree()
+        );
+
         let scale = constant_term.inverse();
-        let locator = locator.scale(&scale);
-        if locator.is_zero() || locator.degree() == 0 || locator.degree() as usize > t {
-            return Err(CodeError::Uncorrectable);
-        }
-        Ok((locator, evaluator.scale(&scale)))
+        Ok((locator.scale(&scale), evaluator.scale(&scale)))
     }
 
     /// The positions whose domain point is a root of the locator, ascending.
@@ -806,6 +816,41 @@ pub(crate) mod tests {
                 let mut received = codeword.clone();
                 corrupt(&mut received, weight, &mut rng);
                 assert!(!code.is_codeword(&received).unwrap(), "weight {weight}");
+            }
+        }
+    );
+
+    // The spare syndrome of an odd-redundancy code vetoes a correction that explains the 2t
+    // syndromes the key equation saw but not the one it did not.
+    for_each_field!(
+        fn a_correction_the_spare_syndrome_contradicts_is_rejected<F>() {
+            let mut rng = StdRng::seed_from_u64(20261118);
+            let Some(domain) = largest_small_domain::<F>(&mut rng) else {
+                return;
+            };
+            let n = domain.size();
+            // n - k = 3, so the key equation is solved over 2t = 2 syndromes and the third is
+            // left over to check the answer against.
+            let code = ReedSolomon::new(domain, n - 3).unwrap();
+            assert_eq!(code.max_errors(), 1);
+            let message = random_message(&code, &mut rng);
+            let codeword = code.encode(&message).unwrap();
+
+            // Two errors are one past the radius. Whatever weight-1 locator the Euclidean step
+            // produces reproduces S_0 and S_1 by construction, so only the final re-check can
+            // reject it — and it must, because a word that is not a codeword is neither the
+            // transmitted message nor any other legal one.
+            for _ in 0..50 {
+                let mut received = codeword.clone();
+                corrupt(&mut received, 2, &mut rng);
+                match code.decode(&received) {
+                    Err(CodeError::Uncorrectable) => {}
+                    Ok(decoded) => panic!(
+                        "a weight-2 error decoded at t = 1; a codeword: {}",
+                        code.is_codeword(&decoded.codeword).unwrap()
+                    ),
+                    Err(e) => panic!("unexpected error {e}"),
+                }
             }
         }
     );
