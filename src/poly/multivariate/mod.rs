@@ -16,7 +16,7 @@ mod term_arithmetic;
 
 pub use monomial::Monomial;
 pub use monomial_order::MonomialOrder;
-pub use multivariate_gcd::SquarefreeError;
+pub use multivariate_gcd::{GcdRoute, SquarefreeError};
 pub use sparse_multivariate_multiply::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
 };

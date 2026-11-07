@@ -12,15 +12,60 @@
 //! polynomial read in `x_v` do not involve `x_v`, so the GCDs that compute a content are taken in
 //! a smaller ring.
 //!
-//! Faster routes exist and are not taken here. The subresultant PRS replaces the per-step content
-//! GCD with one exact division, and over a prime field Brown's modular algorithm evaluates the
-//! problem down to univariate GCDs and lifts. Both are follow-ons; this is the form whose
-//! coefficient growth is bounded by construction rather than by an argument.
+//! Two routes do that Euclidean step, and [`GcdRoute`] chooses. The **primitive PRS** removes the
+//! content from every pseudo-remainder — nothing can grow, so the coefficient bound is by
+//! construction, and a content is itself a recursive GCD so it pays one per step. **Collins'
+//! subresultant PRS** divides each pseudo-remainder by `g * h^delta` instead, which the
+//! fundamental theorem of subresultants makes exact: one division per step and three content GCDs
+//! for the whole computation. Coefficients can then grow, but by a bound rather than unboundedly,
+//! since the sequence's entries are subresultants and so determinants of submatrices of the
+//! inputs' Sylvester matrix.
+//!
+//! The subresultant route is the default, on correctness evidence — the two are asserted to return
+//! the same value exhaustively and over every field — and **not on a measurement**. The operation
+//! count is asserted (`test_the_subresultant_route_takes_fewer_content_gcds`); the wall clock is
+//! not, and #407 is where that belongs.
+//!
+//! Brown's modular algorithm, which evaluates the problem down to univariate GCDs over a prime
+//! field and lifts, is the route that changes the asymptotics and is not here.
 
 use crate::{
     poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
     FiniteField, KnownOrder, Monomial,
 };
+
+/// Which polynomial-remainder sequence [`SparseMultiPoly::gcd`] runs.
+///
+/// Both routes are the same recursion — read the operands as univariate in their highest occurring
+/// variable, over the polynomial ring in the rest — and differ only in what they do to a
+/// pseudo-remainder before the next Euclidean step. The GCD they return is the same value; a
+/// reduced GCD is unique once normalized.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum GcdRoute {
+    /// Take the primitive part of every pseudo-remainder.
+    ///
+    /// #128's route. Nothing can grow, because a content is divided out at every step — so the
+    /// coefficient bound is by construction. A content is itself a recursive GCD in a smaller
+    /// ring, so this pays one such GCD per Euclidean step, which is the cost
+    /// [`Self::SubresultantPrs`] removes. Kept as the reference the other is differentially tested
+    /// against.
+    PrimitivePrs,
+
+    /// Divide every pseudo-remainder by `g * h^delta`, carrying `g` and `h` across steps.
+    ///
+    /// Collins' subresultant PRS, and the default. One *exact division* per step instead of a
+    /// recursive GCD: three content GCDs for the whole computation rather than one per step.
+    /// Coefficients can grow, but by a bound rather than unboundedly — the sequence's entries are
+    /// subresultants, determinants of submatrices of the inputs' Sylvester matrix, so Hadamard's
+    /// inequality bounds them in terms of the inputs alone.
+    ///
+    /// **Default on correctness evidence, not on a measurement.** The two routes are asserted to
+    /// return the same value by the exhaustive brute force, by `for_each_field!` at two arities,
+    /// and case by case; whether it is faster in wall clock on any particular machine is
+    /// unmeasured, and #407 is where that measurement belongs.
+    #[default]
+    SubresultantPrs,
+}
 
 /// Why a squarefree decomposition could not be computed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,9 +237,19 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// # Panics
     /// Panics if `index` is not a variable of this ring.
     pub fn content(&self, index: usize) -> Self {
+        self.content_by(index, GcdRoute::default())
+    }
+
+    /// [`Self::content`] with the GCD route chosen, since a content *is* a GCD.
+    ///
+    /// # Panics
+    /// As [`Self::content`].
+    pub fn content_by(&self, index: usize, route: GcdRoute) -> Self {
+        #[cfg(test)]
+        content_calls::record();
         let mut content = Self::zero();
         for coefficient in self.coefficients_in(index) {
-            content = content.gcd(&coefficient);
+            content = content.gcd_by(&coefficient, route);
             // Nothing below one is reachable, so the remaining coefficients cannot change it.
             if content.is_one() {
                 break;
@@ -208,10 +263,18 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// # Panics
     /// Panics if `index` is not a variable of this ring.
     pub fn primitive_part(&self, index: usize) -> Self {
+        self.primitive_part_by(index, GcdRoute::default())
+    }
+
+    /// [`Self::primitive_part`] with the GCD route chosen.
+    ///
+    /// # Panics
+    /// As [`Self::primitive_part`].
+    pub fn primitive_part_by(&self, index: usize, route: GcdRoute) -> Self {
         if self.is_zero() {
             return Self::zero();
         }
-        let content = self.content(index);
+        let content = self.content_by(index, route);
         self.exact_div(&content)
             .expect("the content divides every coefficient")
     }
@@ -224,6 +287,11 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// `degree_in(index)` of the remainder below the divisor's. The power of `lc` is why the
     /// caller must take primitive parts: it is the coefficient growth the pseudo-division trades
     /// for exactness.
+    ///
+    /// **`k` is the number of division steps and not `delta + 1`**, which is fine for the
+    /// primitive PRS — it divides the content out of every remainder, so the power is irrelevant —
+    /// and is exactly what the subresultant PRS cannot use. See
+    /// [`Self::pseudo_remainder_scaled`].
     ///
     /// Zero when the divisor has degree zero in `index`, since then the scaling alone clears the
     /// division.
@@ -253,6 +321,52 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         remainder
     }
 
+    /// The pseudo-remainder with **exactly** `delta + 1` powers of the divisor's leading
+    /// coefficient, where `delta` is the difference of the two degrees in `index`.
+    ///
+    /// `lc(divisor)^(delta + 1) * self = quotient * divisor + remainder`, with the remainder's
+    /// degree in `index` below the divisor's. That identity, not merely "some power", is what the
+    /// subresultant divisibility theorem is stated over — so [`Self::pseudo_remainder`] cannot be
+    /// used in its place: it multiplies once per division *step*, and a step that skips a degree
+    /// leaves the power short. A gapped dividend such as `x^6 + 1` against `x^2 + 1` takes three
+    /// steps where `delta + 1` is five.
+    ///
+    /// The shortfall is made up at the end rather than inside the loop, which is both cheaper and
+    /// the standard statement: each skipped degree contributes one unused factor of `lc`.
+    ///
+    /// # Panics
+    /// Panics if `divisor` is zero, if `index` is not a variable of this ring, or if the divisor
+    /// is constant in `index` while `self` is not — a caller in that position has no `delta` to
+    /// speak of and wants [`Self::pseudo_remainder`].
+    fn pseudo_remainder_scaled(&self, divisor: &Self, index: usize) -> Self {
+        assert!(
+            !divisor.is_zero(),
+            "cannot pseudo-divide by the zero polynomial"
+        );
+        let divisor_degree = divisor.degree_in(index);
+        assert!(
+            divisor_degree > 0,
+            "a divisor constant in x_{index} has no degree difference to scale by"
+        );
+        if self.is_zero() || self.degree_in(index) < divisor_degree {
+            return self.clone();
+        }
+
+        let leading = divisor.coefficient_in(index, divisor_degree);
+        let mut unused = self.degree_in(index) - divisor_degree + 1;
+        let mut remainder = self.clone();
+        while !remainder.is_zero() && remainder.degree_in(index) >= divisor_degree {
+            let degree = remainder.degree_in(index);
+            let shift: Self = Monomial::univariate(index, degree - divisor_degree).into();
+            let top = remainder.coefficient_in(index, degree);
+            remainder = &(&leading * &remainder) - &(&(&top * &shift) * divisor);
+            unused -= 1;
+        }
+        // One factor of `lc` per degree the loop skipped, so the identity holds with `delta + 1`
+        // exactly and not with however many steps the degrees happened to take.
+        (0..unused).fold(remainder, |remainder, _| &leading * &remainder)
+    }
+
     /// The greatest common divisor of `self` and `other`.
     ///
     /// Normalized so that the leading coefficient under [`MonomialOrder::Lexicographic`] is one,
@@ -260,9 +374,16 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// normalized and `gcd(0, 0)` is zero; the GCD of anything with a nonzero constant is one,
     /// since a nonzero constant is a unit.
     ///
-    /// Recursive primitive PRS — see the module documentation for the shape and for the faster
-    /// routes not taken.
+    /// [`GcdRoute::default`] — Collins' subresultant PRS. [`Self::gcd_by`] chooses.
     pub fn gcd(&self, other: &Self) -> Self {
+        self.gcd_by(other, GcdRoute::default())
+    }
+
+    /// [`Self::gcd`] by a chosen route.
+    ///
+    /// Both routes are recursive in the same way and differ only in what they do to a
+    /// pseudo-remainder before the next Euclidean step: see [`GcdRoute`].
+    pub fn gcd_by(&self, other: &Self, route: GcdRoute) -> Self {
         if self.is_zero() {
             return other.normalized();
         }
@@ -280,10 +401,10 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
             return Self::one();
         };
 
-        let self_content = self.content(variable);
-        let other_content = other.content(variable);
+        let self_content = self.content_by(variable, route);
+        let other_content = other.content_by(variable, route);
         // One ring down: the contents do not involve `variable`.
-        let content = self_content.gcd(&other_content);
+        let content = self_content.gcd_by(&other_content, route);
 
         let mut a = self
             .exact_div(&self_content)
@@ -291,21 +412,106 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         let mut b = other
             .exact_div(&other_content)
             .expect("the content divides every coefficient");
+        if a.degree_in(variable) < b.degree_in(variable) {
+            std::mem::swap(&mut a, &mut b);
+        }
 
-        // Euclid on the primitive parts. Each remainder is made primitive before the next step,
-        // which is what keeps the pseudo-division's powers of the leading coefficient from
-        // accumulating.
+        let primitive = match route {
+            GcdRoute::PrimitivePrs => Self::primitive_prs(a, b, variable),
+            GcdRoute::SubresultantPrs => Self::subresultant_prs(a, b, variable),
+        };
+        (&content * &primitive).normalized()
+    }
+
+    /// Euclid on the primitive parts, with the primitive part taken of every pseudo-remainder.
+    ///
+    /// #128's route, kept as the reference the subresultant one is differentially tested against.
+    /// `a` and `b` are primitive in `variable`; the result is their GCD, primitive in `variable`.
+    ///
+    /// Taking a primitive part is what keeps the pseudo-division's powers of the leading
+    /// coefficient from accumulating — and a content is itself a recursive GCD in a smaller ring,
+    /// so this pays one such GCD **per Euclidean step**. That is the cost the subresultant route
+    /// exists to remove.
+    ///
+    /// The inner content GCDs recurse through this same route explicitly rather than through the
+    /// default: a reference implementation that followed whatever the default happened to be would
+    /// stop being a reference the moment the default changed.
+    fn primitive_prs(mut a: Self, mut b: Self, variable: usize) -> Self {
         while !b.is_zero() {
             let remainder = a.pseudo_remainder(&b, variable);
             a = b;
             b = if remainder.is_zero() {
                 Self::zero()
             } else {
-                remainder.primitive_part(variable)
+                remainder.primitive_part_by(variable, GcdRoute::PrimitivePrs)
             };
         }
+        a
+    }
 
-        (&content * &a).normalized()
+    /// Collins' subresultant PRS: one exact division per step where the primitive PRS takes a
+    /// content.
+    ///
+    /// `a` and `b` are primitive in `variable`, nonzero, with `deg_v(a) >= deg_v(b)`; the result is
+    /// their GCD, primitive in `variable`.
+    ///
+    /// Carries `g = lc(a)` and `h` across steps, and divides each pseudo-remainder by
+    /// `g * h^delta` instead of by its content. The fundamental theorem of subresultants is what
+    /// makes that division exact, and it is also what bounds the coefficients: the entries of the
+    /// sequence *are* subresultants, which are determinants of submatrices of the Sylvester matrix
+    /// of the inputs, so their size is bounded by Hadamard's inequality on the inputs alone. The
+    /// primitive PRS bounds them by construction — nothing can grow, since every remainder is made
+    /// primitive — and pays a recursive GCD per step for it; this bounds them by a theorem and pays
+    /// one exact division. **Which is faster here is unmeasured**; what is structural is the GCD
+    /// count: `3` recursive GCDs in a smaller ring in total, against one per Euclidean step.
+    ///
+    /// # Panics
+    /// Panics if either division the subresultant theorem makes exact is not — which would be a
+    /// defect in this function or in `exact_div`, not an input it cannot handle.
+    fn subresultant_prs(mut a: Self, mut b: Self, variable: usize) -> Self {
+        // `b` is primitive and constant in `variable`, so its content is one and it is a unit.
+        if b.degree_in(variable) == 0 {
+            return Self::one();
+        }
+
+        let mut g = Self::one();
+        let mut h = Self::one();
+        loop {
+            let delta = a.degree_in(variable) - b.degree_in(variable);
+            let remainder = a.pseudo_remainder_scaled(&b, variable);
+            if remainder.is_zero() {
+                // `b` divides `a` up to content, and `b` is not primitive — the route does not
+                // make it so — which is why the primitive part is taken here and not at the top.
+                return b.primitive_part_by(variable, GcdRoute::SubresultantPrs);
+            }
+            if remainder.degree_in(variable) == 0 {
+                // A nonzero remainder of degree zero in `variable`. The GCD divides it and is
+                // primitive, so it has degree zero and content one: a unit. The primitive parts
+                // are coprime, and the whole GCD is the content the caller already has.
+                return Self::one();
+            }
+
+            let divisor = &g * &Self::power(&h, delta);
+            let next = remainder
+                .exact_div(&divisor)
+                .expect("the subresultant divisibility theorem makes this division exact");
+            a = b;
+            b = next;
+            g = a.coefficient_in(variable, a.degree_in(variable));
+            // `h <- h^(1 - delta) * g^delta`, which for `delta = 0` leaves `h` alone and otherwise
+            // is the exact division below. Written this way because a negative exponent is not a
+            // thing a polynomial ring has.
+            if delta > 0 {
+                h = Self::power(&g, delta)
+                    .exact_div(&Self::power(&h, delta - 1))
+                    .expect("the subresultant h-update is an exact division");
+            }
+        }
+    }
+
+    /// `base^exponent`, by repeated multiplication. `base^0` is one.
+    fn power(base: &Self, exponent: u32) -> Self {
+        (0..exponent).fold(Self::one(), |product, _| &product * base)
     }
 
     /// Scaled so the leading coefficient under [`MonomialOrder::Lexicographic`] is one.
@@ -593,6 +799,33 @@ impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
                 degree,
             }),
         }
+    }
+}
+
+/// A count of the recursive content GCDs a computation performed, for the test that asserts the
+/// subresultant route takes fewer of them.
+///
+/// `#[cfg(test)]` and thread-local: the claim it supports is **structural**, so it is asserted as a
+/// count of operations and not as a duration — a duration would be a measurement, which #407 still
+/// owes. Thread-local rather than global because `cargo test` runs tests in threads of one process.
+#[cfg(test)]
+pub(crate) mod content_calls {
+    use std::cell::Cell;
+
+    thread_local! {
+        static CALLS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// Note one call to `content_by`.
+    pub(crate) fn record() {
+        CALLS.with(|calls| calls.set(calls.get() + 1));
+    }
+
+    /// Run `body` and report how many content GCDs it took.
+    pub(crate) fn counting<T>(body: impl FnOnce() -> T) -> (T, usize) {
+        CALLS.with(|calls| calls.set(0));
+        let value = body();
+        (value, CALLS.with(Cell::get))
     }
 }
 
@@ -1031,6 +1264,173 @@ mod tests {
         }
     }
 
+    mod subresultant {
+        use super::*;
+        use crate::{fields::Gf256, poly::multivariate::multivariate_gcd::GcdRoute};
+
+        /// The two routes give the same GCD, which is an equality and not a containment test.
+        ///
+        /// A reduced GCD is unique once normalized, and both routes normalize the same way, so
+        /// "the same answer" is the right assertion rather than "each divides the other".
+        #[test]
+        fn test_the_two_routes_agree_on_shared_factors() {
+            let w = parse("x + y");
+            let u = parse("x - y");
+            let v = parse("x*y + 1");
+            let cases = [
+                (&u * &w, &v * &w),
+                (&(&u * &w) * &w, &(&v * &w) * &w),
+                (parse("x^2 - y^2"), parse("x^3 + y^3")),
+                (parse("x^4*y^2 + x^2"), parse("x^3*y^3 + x^3")),
+                (parse("x + 1"), parse("y + 1")),
+                (Poly::zero(), &u * &w),
+                (Poly::one(), &u * &w),
+            ];
+            for (f, g) in cases {
+                assert_eq!(
+                    f.gcd_by(&g, GcdRoute::SubresultantPrs),
+                    f.gcd_by(&g, GcdRoute::PrimitivePrs),
+                    "the two routes disagree about gcd({f}, {g})"
+                );
+            }
+        }
+
+        /// A degree gap of more than one is handled: that is where the subresultant scaling bites.
+        ///
+        /// `pseudo_remainder` as the primitive PRS uses it multiplies by the leading coefficient
+        /// once per *step*, which can be fewer times than `delta + 1` when a degree is skipped. The
+        /// subresultant divisibility theorem needs exactly `delta + 1`, so the two pseudo-remainders
+        /// are not interchangeable and a gap is the case that tells them apart.
+        #[test]
+        fn test_a_degree_gap_is_handled() {
+            // Read in x, `x^5 + 1` has nothing at x^4, x^3, x^2 or x^1.
+            let gapped = parse("x^5*y + x^5 + y^2 + 1");
+            let other = parse("x^2*y + x^2 + y + 1");
+            assert_eq!(
+                gapped.gcd_by(&other, GcdRoute::SubresultantPrs),
+                gapped.gcd_by(&other, GcdRoute::PrimitivePrs)
+            );
+
+            let f = parse("x^6 + 1");
+            let g = parse("x^2 + 1");
+            assert_eq!(
+                f.gcd_by(&g, GcdRoute::SubresultantPrs),
+                f.gcd_by(&g, GcdRoute::PrimitivePrs)
+            );
+        }
+
+        /// The scaled pseudo-remainder uses exactly `delta + 1` powers of the leading coefficient.
+        ///
+        /// The identity the subresultant route rests on: `lc(b)^(delta+1) * a = q*b + r`. Checked
+        /// by dividing, since the quotient has to come out exactly.
+        #[test]
+        fn test_the_scaled_pseudo_remainder_satisfies_its_identity() {
+            let cases = [
+                (parse("x^5*y + x^2 + 1"), parse("x^2*y + x + 3")),
+                (parse("x^6 + 1"), parse("x^2 + 1")),
+                (parse("x^3*y^2 + x"), parse("x*y + 1")),
+            ];
+            for (a, b) in cases {
+                let delta = a.degree_in(0) - b.degree_in(0);
+                let remainder = a.pseudo_remainder_scaled(&b, 0);
+                let leading = b.coefficient_in(0, b.degree_in(0));
+                let scale = (0..=delta).fold(Poly::one(), |acc, _| &acc * &leading);
+                let scaled = &scale * &a;
+                let difference = &scaled - &remainder;
+                assert!(
+                    difference.exact_div(&b).is_some(),
+                    "lc(b)^{} * a - r is not a multiple of b, for a = {a}, b = {b}",
+                    delta + 1
+                );
+                assert!(
+                    remainder.is_zero() || remainder.degree_in(0) < b.degree_in(0),
+                    "the remainder {remainder} did not reduce the degree"
+                );
+            }
+        }
+
+        /// The two routes agree over GF(2^8), where the coefficients are not integers.
+        #[test]
+        fn test_the_two_routes_agree_over_gf256() {
+            type P = SparseMultiPoly<2, Gf256>;
+            let p = |s| P::parse(s, VARS).unwrap();
+            let w = p("87*x + 131*y + 200");
+            let u = p("57*x*y + 3");
+            let f = &u * &w;
+            let g = &p("200*x + 1") * &w;
+            assert_eq!(
+                f.gcd_by(&g, GcdRoute::SubresultantPrs),
+                f.gcd_by(&g, GcdRoute::PrimitivePrs)
+            );
+            assert!(f.gcd(&g).exact_div(&w.normalized()).is_some());
+        }
+
+        /// `gcd` without a route is the subresultant one, so the default is what everything uses.
+        #[test]
+        fn test_the_default_route_is_the_subresultant_one() {
+            assert_eq!(GcdRoute::default(), GcdRoute::SubresultantPrs);
+            let f = parse("x^2 - y^2");
+            let g = parse("x^3 + y^3");
+            assert_eq!(f.gcd(&g), f.gcd_by(&g, GcdRoute::SubresultantPrs));
+        }
+
+        /// The subresultant route takes strictly fewer recursive content GCDs.
+        ///
+        /// The structural claim #407 rests on, asserted as a **count of operations** and not as a
+        /// duration: the primitive PRS divides the content out of every pseudo-remainder, and a
+        /// content is itself a recursive GCD, so it pays one per Euclidean step; the subresultant
+        /// route pays one exact division per step and takes contents only at the top and at the
+        /// end. Whether that is faster in wall clock on any machine is **unmeasured**, and this
+        /// test deliberately does not pretend otherwise.
+        #[test]
+        fn test_the_subresultant_route_takes_fewer_content_gcds() {
+            use crate::poly::multivariate::multivariate_gcd::content_calls;
+
+            // Enough Euclidean steps for the per-step cost to show: degree five against degree
+            // two in the main variable, with coefficients that are not constants.
+            let f = parse("x^5*y^2 + x^3*y + x^2 + y^3 + 1");
+            let g = parse("x^2*y + x*y^2 + x + 2");
+
+            let (primitive, primitive_calls) =
+                content_calls::counting(|| f.gcd_by(&g, GcdRoute::PrimitivePrs));
+            let (subresultant, subresultant_calls) =
+                content_calls::counting(|| f.gcd_by(&g, GcdRoute::SubresultantPrs));
+
+            assert_eq!(
+                primitive, subresultant,
+                "the comparison is only meaningful if the two agree"
+            );
+            assert!(
+                subresultant_calls < primitive_calls,
+                "the subresultant route took {subresultant_calls} content GCDs and the primitive \
+                 one took {primitive_calls}, so the per-step cost is not being removed"
+            );
+            assert!(
+                primitive_calls > 0,
+                "the counter recorded nothing, so this test is vacuous"
+            );
+            // Printed rather than pinned to exact numbers, which would turn a counting assertion
+            // into a snapshot of an implementation detail.
+            println!(
+                "content GCDs: primitive {primitive_calls}, subresultant {subresultant_calls}"
+            );
+        }
+
+        /// Three variables, where the recursion that computes a content is itself a GCD.
+        #[test]
+        fn test_the_two_routes_agree_in_three_variables() {
+            let vars = ["x", "y", "z"];
+            let p = |s| SparseMultiPoly::<3, F>::parse(s, vars).unwrap();
+            let w = p("x*z + y");
+            let f = &p("y*z + 1") * &w;
+            let g = &p("x + z^2") * &w;
+            assert_eq!(
+                f.gcd_by(&g, GcdRoute::SubresultantPrs),
+                f.gcd_by(&g, GcdRoute::PrimitivePrs)
+            );
+        }
+    }
+
     mod squarefree_contract {
         use crate::{
             fields::{Gf256, Zp2},
@@ -1295,6 +1695,7 @@ mod tests {
 
     mod brute_force {
         use super::*;
+        use crate::poly::multivariate::multivariate_gcd::GcdRoute;
 
         type Small = PrimeFieldElement64<3>;
         type SmallPoly = SparseMultiPoly<2, Small>;
@@ -1332,6 +1733,9 @@ mod tests {
         /// unique up to a unit, and several candidates share the maximal degree. The property
         /// checked is the one that characterizes it: the result divides both inputs, and every
         /// common divisor divides the result.
+        ///
+        /// Run against the **default** route, as #407 asks, and against each route by name beside
+        /// it — so neither route can pass by being the one nothing exercises.
         #[test]
         fn test_gcd_has_the_universal_property_over_a_small_field() {
             let linear = all_polynomials(&monomials(1));
@@ -1348,7 +1752,15 @@ mod tests {
                 let v = &linear[(i * 11 + 5) % linear.len()];
                 let f = u * w;
                 let g = v * w;
+                // The default route, which is what every caller gets, and both routes against each
+                // other: a reduced GCD is unique once normalized, so that is an equality.
                 let d = f.gcd(&g);
+                assert_eq!(
+                    d,
+                    f.gcd_by(&g, GcdRoute::PrimitivePrs),
+                    "the two routes disagree about gcd({f}, {g})"
+                );
+                assert_eq!(d, f.gcd_by(&g, GcdRoute::SubresultantPrs));
 
                 assert!(f.exact_div(&d).is_some(), "gcd {d} does not divide {f}");
                 assert!(g.exact_div(&d).is_some(), "gcd {d} does not divide {g}");
@@ -1373,7 +1785,12 @@ mod tests {
 
     mod over_every_field {
         use crate::{
-            poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
+            poly::{
+                multivariate::{
+                    multivariate_gcd::GcdRoute, sparse_multivariate_polynomial::SparseMultiPoly,
+                },
+                MonomialOrder,
+            },
             FiniteField, Monomial,
         };
         use rand::{prelude::StdRng, Rng, SeedableRng};
@@ -1412,6 +1829,14 @@ mod tests {
                 let f = &u * &w;
                 let g = &v * &w;
                 let d = f.gcd(&g);
+
+                // The two routes return the same value, over this field and at this arity.
+                assert_eq!(
+                    d,
+                    f.gcd_by(&g, GcdRoute::PrimitivePrs),
+                    "the two GCD routes disagree"
+                );
+                assert_eq!(d, f.gcd_by(&g, GcdRoute::SubresultantPrs));
 
                 // The GCD divides both inputs.
                 assert!(f.exact_div(&d).is_some(), "gcd does not divide f");
