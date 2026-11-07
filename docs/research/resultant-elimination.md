@@ -1136,19 +1136,45 @@ selected.
 The `mul/{arity}` Criterion arms are the regression control, and they top out at 256 × 256 = 65 536
 term-products — about a megabyte of transient, four orders below the regime this is about.
 
-The A/B is a timing measurement, so unlike the peak above it **does** need the lock, and it is
-queued behind several hours of other agents' work. It is set up and will be filed when it lands:
-Criterion's baseline mechanism, the `origin/main` bench binary against the branch's, the same
-pinned core and the same `CRITERION_HOME`, filtered to the arms both binaries have
-(`sparse_poly/mul(_by_term)?/n(3|6|10)`).
+The A/B is a timing measurement, so unlike the peak above it **does** need the lock. The
+`origin/main` baseline half is taken, on one pinned core under the lock, through Criterion's
+`--save-baseline`:
 
-What it is expected to show, stated in advance so the measurement can contradict it: **no
-regression anywhere, and a modest improvement throughout.** The claim is not a guess — the
-per-route table above measures the same operation at the same sizes and finds the selected route
-faster than the materialising one at every point, including 36 term-products, and the `n3` arms sit
-between the 100-product and 27 225-product trivariate rows where `Accumulate` measured 0.49x and
-0.59x. A Criterion result slower than `main` on any shared arm would contradict the sweep and would
-be reported as that.
+| arm | `origin/main` (1777c8e) |
+|---|---:|
+| `mul/n3/16` | 17.018 µs |
+| `mul/n3/64` | 148.63 µs |
+| `mul/n3/256` | 1.4037 ms |
+| `mul/n6/16` | 20.251 µs |
+| `mul/n6/64` | 344.22 µs |
+| `mul/n6/256` | 6.9636 ms |
+| `mul/n10/16` | 24.772 µs |
+| `mul/n10/64` | 395.43 µs |
+| `mul/n10/256` | 13.106 ms |
+
+**The branch half is still queued** and is the one measurement in this subsection not yet taken;
+the machine's lock has been held by other agents for the greater part of an hour at a time. To
+finish it, with the same `CRITERION_HOME` so the baseline above is the comparand:
+
+```sh
+tools/benchlock.sh <tag> env CRITERION_HOME=<dir> \
+  taskset --cpu-list <core> target/release/deps/sparse_polynomial-<hash> \
+  --bench --baseline before 'sparse_poly/mul(_by_term)?/n(3|6|10)'
+```
+
+What it is expected to show, stated in advance so that the measurement can contradict it: **no
+regression on any shared arm, and a modest improvement throughout.** That is not a guess. The
+per-route table above measures the same operation at the same sizes, on the same core, under the
+same lock, and finds the selected route faster than the materialising one at *every* point —
+including 36 term-products, two orders below the smallest Criterion arm. The `n3` arms sit between
+the trivariate 100-product and 27 225-product rows, where `Accumulate` measured **0.49x** and
+**0.59x** of materialising. A Criterion result slower than `main` on a shared arm would contradict
+that sweep, and would be filed as the contradiction it is rather than explained away.
+
+The reason to expect no small-operand regression at all is structural, not statistical, and is worth
+separating from the numbers: `SparseMultiPoly::new` is itself a monomial-keyed hash accumulate, so
+the route that replaced materialising does strictly less work than it — the same merge, without the
+`Vec` of every product in front. There is no size at which the removed `Vec` was paying for itself.
 
 Two arms were missing and are added in `benches/sparse_polynomial.rs`: an **`n2` arity**, which the
 file did not have although N = 2 is the arity the whole resultant route runs at, and a
