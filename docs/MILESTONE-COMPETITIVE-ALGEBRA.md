@@ -735,17 +735,35 @@ Two things make it more consequential than its size:
   quadratic, no exploitable structure. Loss 1 was on a structured CICO row at a 17-bit prime; this is
   a deficit on **the problems Zeebra exists for**.
 
-**A measurement-method result that disqualifies four of Zeebra's apparent wins, and it is the most
-reusable thing in this section. Singular's startup floor is 36.0 ms, measured.** Five rows cluster at
+**The measurement-method result that reshaped this whole section, and it cost Zeebra almost every
+apparent win it had. Singular's startup floor is 35.91 ms, observed from the board's own rows.** Five rows cluster at
 36.01, 36.04, 36.05, 36.07 and 36.08 ms across instances whose quotient dimensions differ by a factor
 of **2 000**. A figure that constant across that range is not a computation. The rule:
 
 > Where a comparand's wall is within ~2x of its own floor, the row is **not an engine comparison in
 > either direction**.
 
-That disqualifies apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x**. The 450x is the sharpest
-warning this milestone produced about reading a ratio without checking its denominator's floor — and
-it would have been a very attractive number to publish.
+Applied to the populated board — 72 rows, 19 rungs × 2 tasks × 2 engines — the consequence is not a
+caveat but the headline:
+
+> **Of the 28 pairs where both engines answered, only 7 clear 2x that floor. The other 21 all read as
+> Zeebra wins, from 1.78x to 501x — and settle nothing.**
+
+**Of the seven admissible comparisons: four Zeebra losses, two inside the noise band, one win.** On a
+corpus whose *raw* numbers show Zeebra ahead on every single pair. So the classical Katsura and
+Cyclic rungs, which are the families a reader would most expect to be decisive, decide **nothing**
+between these two engines at these sizes — and the apparent 501x is the sharpest warning this
+milestone produced about reading a ratio without checking its denominator's floor.
+
+Two things follow that are worth more than the figures. **A board is not a presentation layer.** All
+three defects in the paragraph below were found by reading the *generated* board rather than the
+code, and the board found them faster than its author found them in the source — which is the
+argument for building the artifact before trusting the prose, and the same argument item 9 makes from
+the other direction. And **the first version of this screen was wrong in the direction that
+flattered us**: it compared the baseline against the baseline's own floor, and Zeebra runs in-process
+with a floor of microseconds, so every ratio passed. It disqualified **one** row where it should have
+disqualified 21. The structural fix recorded above was itself the bug, and only the rendered output
+showed it.
 
 **The rule is enforced in code, not in prose, and it needed no new field.** The floor is *derived
 from the board's own rows*: `CompetitiveBoard::startup_floor(library)` is the shortest wall that
@@ -1041,7 +1059,7 @@ so its acceptance test is a before/after on a corpus rung rather than a number r
 
 ### 13.6a Six measurement-integrity defects, and the pattern they share
 
-M25 found ten places where a mechanism reported confidently about something other than what the
+M25 found eleven places where a mechanism reported confidently about something other than what the
 caller meant. They are listed together because the pattern is the milestone's methodological result
 and it is more transferable than any single fix.
 
@@ -1053,6 +1071,7 @@ and it is more transferable than any single fix.
 | 4 | **F4's two memory knobs are numerically identical at the default**, and the error names the limit the caller **set** rather than the one that **bound** (#322) | `320_000_000 / 16` is exactly `20_000_000`, so raising one does nothing and the message confirms the wrong ceiling. |
 | 5 | **`pgrep -f` matched a heredoc wrapper on its own script text**, returning two matches for a job that had not started and **zero** for the binary that was running (#328) | Anti-correlated, not merely imprecise. The RSS guard built on it was safe only because a 4 MB wrapper cannot cross a 16 GiB ceiling — a guard correct by accident, in the instrument §9's policy depends on. |
 | 6 | **A test that returns early on an absent tool is indistinguishable from one that ran and agreed** (#333, class filed as #339) | `main` was red for ~40 minutes with every check green. #311 and #324 were each green against their own base and red only once combined: **CI tests a PR against its base, not against the merged result.** |
+| 11 | **A regenerable artifact's regeneration mutated the records it existed to preserve** | `to_json` stored the *rendering* rather than the datum and `from_json` read it into a variant whose `Display` re-wrapped its payload, so **every `--write` added a layer**: six rows reached `unsupported: unsupported: …`, and a regeneration run while investigating made it worse. Invisible to any single inspection — it only appears on the second pass. The same family as item 9 and worse: there the prose contradicted a correct mechanism; **here the mechanism silently corrupted the thing whose entire claim is "regenerable from the retained records".** Fixed as a property rather than a patch: `load → to_json` is now a verified fixed point over three consecutive regenerations, asserted **from deliberately damaged input**, because healing the rows already on disk is what matters. |
 | 10 | **A monitor announced a run complete the instant a *different* run finished**, reporting byte-identical, entirely plausible figures from a run that had not started | It keyed on an `--- exit` marker a previous attempt had left in the output file. Caught only by comparing the file's mtime (20:02:16) against the other run's completion (21:43:17), and it was nearly reported as a result. After items 5 and 7 the shape is unmistakable: **a completion marker is not evidence of completion unless something ties it to the run meant to produce it.** |
 | 9 | **A row sat in a table of *agreeing* quotient dimensions while being silently unverified**, because only one engine reported one | `mq-planted-14`'s basis finishes in 0.28 ms, but its *dimension* was obtained by running a full `fglm_to_lex`, which trips the 4 096 **conversion** cap — so a **basis** row's verifiability was hostage to a **conversion** budget. `Invariants::agree` compares only fields both sides carry, so this produced **neither agreement nor disagreement**. That is precisely the "nothing shared is not a verification" trap `overlap()` was built to catch: **the mechanism worked and the prose summarising it did not.** Fixed at the root — a dimension now comes from `QuotientBasis::new`, which enumerates standard monomials and needs neither operators nor dense blocks — and a missing invariant is now recorded as a stage saying so, because a row with a missing invariant must say so or it reads as a row nobody checked. |
 | 8 | **A measurement crate outside the worktree does not inherit `.cargo/config.toml`**, so it silently loses `-C target-cpu=x86-64-v3` with **nobody setting `RUSTFLAGS` at all** | A third route to the failure that has already cost this repository two sets of figures — and the first with **no trigger to avoid**, since the other two are both "someone set `RUSTFLAGS`". Building a harness outside `src/` is good practice, which is what makes it dangerous. Caught only because the corrected build changed the headline: **1 930x → 1 692x**. Both runs kept. |
@@ -1074,7 +1093,7 @@ executes when the lock frees, so a queued run would have persisted rows from a *
 "the thing that runs is not the thing that was reviewed", which is #333's shape again at a different
 layer.
 
-The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the ten
+The common shape: **the dangerous reading is never the one that looks wrong.** Every one of the eleven
 produced well-formed output. Three were caught only because an agent ran something locally for an
 unrelated reason, and that is not a detection strategy. The repository already applies the right
 discipline in two places — `zb-claim.sh`'s three outcomes for a board read, and
@@ -1217,8 +1236,21 @@ not, and the first is inverted:
 | an improvement to a published attack surviving an equivalent comparison | **not met** | Griffin is a **no-go for M25** on worth; the capability it needs is costed as #306 |
 | an algorithmic change materially raising the maximum reachable problem size | **not met**, and a claim withdrawn | #305 took 9.06x off F4's working set but the stop reason is **unchanged** — `max_live_nonzeros` at degree 5, so M24's "out of reach, not out of budget" stands. And axis 4's round-count claim was **withdrawn** in §13.5 |
 
-**One deliverable is partially met and it was found by this scoring pass, not reported.**
-`research/competitive/results/history.json` holds **zero rows**. Scoreboard A's schema, its
+**One deliverable was partially met when this scoring pass found it, and was closed before the
+milestone did.** `research/competitive/results/history.json` held **zero rows** — it now holds
+**72** (36 Zeebra, 36 Singular, 19 rungs × 2 tasks, including 5 `unsupported`, 5 `stopped-by-limit`
+and 1 `failed`), §13.1's figures are read out of those records rather than out of a terminal
+scrollback, and `COMPETITIVE.md` is generated from the same source. #293 is **met for Zeebra and
+Singular**; the other three engines' rows are outstanding on lock contention rather than on
+engineering, and `--engines` lets the board fill in stages. One `cyclic-4` row is miscategorized and
+needs a re-measure rather than a hand edit; it carries no timing, so no ratio is affected.
+
+The paragraph that follows is kept because it was true when written and because **the board paid for
+itself before it was complete** — it found three defects, including one in the disqualification logic
+this report had just praised, by being read rather than by being reasoned about.
+
+Previously, and the reason this was worth recording at all:
+`research/competitive/results/history.json` held **zero rows**. Scoreboard A's schema, its
 `Outcome::instead_of_a_time` discipline, its `speedups()` single-ratio chokepoint and its renderer
 are all on `main` and tested — but the sweep's measurements live in
 `docs/research/competitive-baseline.md` as prose, and the board itself was never written to. So
