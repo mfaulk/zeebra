@@ -163,6 +163,40 @@ fn dense_simplex_3(degree: u32) -> MultivariatePolynomial<3, F> {
     MultivariatePolynomial::new(&terms)
 }
 
+/// A dense simplex of total degree `degree` in `N` variables, every coefficient nonzero.
+///
+/// Generic where [`dense_simplex_3`] is not, because #362's question is how the dense routes
+/// behave *in* `N` and one arity cannot answer it.
+fn dense_simplex<const N: usize>(degree: u32) -> MultivariatePolynomial<N, F> {
+    let mut exponents = [0u32; N];
+    let mut terms: Vec<(Monomial<N>, F)> = Vec::new();
+    fill_simplex::<N>(0, degree, &mut exponents, &mut terms);
+    MultivariatePolynomial::new(&terms)
+}
+
+/// Enumerate the exponent vectors of total degree at most `remaining` over variables `index..N`.
+fn fill_simplex<const N: usize>(
+    index: usize,
+    remaining: u32,
+    exponents: &mut [u32; N],
+    terms: &mut Vec<(Monomial<N>, F)>,
+) {
+    if index == N {
+        let seed: u64 = exponents
+            .iter()
+            .enumerate()
+            .map(|(i, e)| *e as u64 * (7 * i as u64 + 31))
+            .sum();
+        terms.push((Monomial::new(exponents), F::new(1 + seed % 1000)));
+        return;
+    }
+    for e in 0..=remaining {
+        exponents[index] = e;
+        fill_simplex::<N>(index + 1, remaining - e, exponents, terms);
+    }
+    exponents[index] = 0;
+}
+
 /// The number of monomials of total degree at most `degree` in two variables.
 fn triangle_len(degree: u64) -> u64 {
     (degree + 1) * (degree + 2) / 2
@@ -271,6 +305,11 @@ fn measure_arms<const N: usize>(
     if N == 2 {
         arms.push(("triangle", MultiplyRoute::DenseTriangle));
     }
+    // The generalisations of the triangle past N = 2 (#362). Named rather than dispatched, so the
+    // sweep measures them where the predicate would refuse them too — the pessimistic direction of
+    // a predicate is only visible against the route it declined.
+    arms.push(("simplex", MultiplyRoute::DenseSimplex));
+    arms.push(("box", MultiplyRoute::DenseBox));
 
     let mut cells: Vec<Cell> = Vec::new();
     let mut reference: Option<MultivariatePolynomial<N, F>> = None;
@@ -399,7 +438,7 @@ fn main() {
         // apply and the dispatcher must fall through to a general collecting route. Small sizes
         // included, because the `mul/{arity}` Criterion arms live there and they are the control
         // for a small-operation regression.
-        for degree in [2u32, 4, 8, 16] {
+        for degree in [2u32, 4, 8, 16, 24] {
             println!();
             let p3 = dense_simplex_3(degree);
             println!(
@@ -408,6 +447,61 @@ fn main() {
             );
             measure_arms("p * p", &p3, &p3);
         }
+
+        // #362's open question is where the crossover in `N` sits, so the sweep needs more than
+        // one arity above the triangle. Sized by term count rather than by degree: the simplex of
+        // a fixed degree is a wildly different size at each arity, and comparing arities at
+        // different sizes would attribute to `N` what belongs to the size.
+        for degree in [3u32, 6, 9] {
+            println!();
+            let p4 = dense_simplex::<4>(degree);
+            println!(
+                "=== quadrivariate degree {degree}, {} terms ===",
+                p4.terms().len()
+            );
+            measure_arms("p * p", &p4, &p4);
+        }
+        for degree in [2u32, 4, 6] {
+            println!();
+            let p5 = dense_simplex::<5>(degree);
+            println!(
+                "=== 5-variate degree {degree}, {} terms ===",
+                p5.terms().len()
+            );
+            measure_arms("p * p", &p5, &p5);
+        }
+
+        // One term against many at N = 3: the reduction inner step, where the simplex's cell count
+        // is tight and the box's is not.
+        println!();
+        let p3 = dense_simplex_3(20);
+        let term3 =
+            MultivariatePolynomial::<3, F>::new(&[(Monomial::<3>::new(&[1, 1, 1]), F::new(7))]);
+        println!(
+            "=== trivariate: one term against {} — the reduction inner step ===",
+            p3.terms().len()
+        );
+        measure_arms("p * term", &p3, &term3);
+
+        // Dense in two variables and linear in the third: the shape whose bounding box is the
+        // output and whose total-degree simplex is 28x larger.
+        println!();
+        let lopsided = {
+            let mut terms: Vec<(Monomial<3>, F)> = Vec::new();
+            for x in 0..=40u32 {
+                for y in 0..=40u32 {
+                    for z in 0..=1u32 {
+                        terms.push((Monomial::<3>::new(&[x, y, z]), F::new(1 + x as u64)));
+                    }
+                }
+            }
+            MultivariatePolynomial::<3, F>::new(&terms)
+        };
+        println!(
+            "=== trivariate, lopsided degrees (40, 40, 1), {} terms ===",
+            lopsided.terms().len()
+        );
+        measure_arms("p * p", &lopsided, &lopsided);
 
         // One term against many: the inner operation of every Groebner reduction step, and the
         // `mul_by_term/{arity}` Criterion arm.
