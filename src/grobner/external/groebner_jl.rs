@@ -370,7 +370,7 @@ impl GroebnerJlSolver {
     }
 
     /// Parse a completed run's output into an answer.
-    fn answer(&self, output: &str, task: Task) -> Result<Answer, RunFailure> {
+    fn answer(&self, output: &str, instance: &Instance, task: Task) -> Result<Answer, RunFailure> {
         if marker(output, "@unsupported").is_some() {
             return Err(RunFailure::Incomplete {
                 detail: format!("the adapter has no script for {}", task),
@@ -381,6 +381,7 @@ impl GroebnerJlSolver {
                 detail: "the script did not reach its @done marker".to_string(),
             });
         }
+        Self::check_echoed_generators(output, instance)?;
 
         let size = integer(output, "@gbsize")?;
         let basis = counted(output, "@gb", size)?;
@@ -395,6 +396,74 @@ impl GroebnerJlSolver {
         }
 
         Ok(Answer::from_invariants(invariants).with_basis(basis))
+    }
+
+    /// Check that the system Groebner.jl read back is the one that was sent, **as a set**.
+    ///
+    /// # Why this is a check and not a comment
+    ///
+    /// The script echoes `@gen` before computing anything, and until now the echo was only ever
+    /// read by a human. It has to be checked on every run because of one failure mode that
+    /// **cross-validation cannot catch**: every engine is handed the same bytes, so an input that
+    /// is misread is misread identically everywhere, and four engines then agree with each other
+    /// while all four answer a different question. Agreement is the instrument this milestone
+    /// relies on, and this is the case it is blind to.
+    ///
+    /// The concrete instance of it: **at ten or more variables `x1` is a prefix of `x10`**, so a
+    /// greedy tokenizer reads `x1*x10` as `x1*x1*0` and silently annihilates the term. Julia's
+    /// lexer is not greedy in that way — an identifier absorbs its trailing digits, so `x10` is one
+    /// token — and this check is what turns that from a belief into a per-run assertion. It also
+    /// catches anything else that would make the echo differ: a dropped generator, a variable the
+    /// script failed to bind, a renderer change on Zeebra's side.
+    ///
+    /// Compared as a **set of canonical term multisets**, because the two sides legitimately spell
+    /// the same polynomial differently — Zeebra writes `x1*x10-1`, Groebner.jl echoes
+    /// `x1*x10 + 1073741826` — and neither term order nor generator order is meaningful.
+    ///
+    /// # Errors
+    /// [`RunFailure::SelfInconsistent`], which is what a tool contradicting the input *is*: nothing
+    /// can be concluded about any other implementation from a run whose input was not the one
+    /// requested.
+    fn check_echoed_generators(output: &str, instance: &Instance) -> Result<(), RunFailure> {
+        let reported = integer(output, "@gensize")?;
+        let echoed = counted(output, "@gen", reported)?;
+        if echoed.len() != instance.system.len() {
+            return Err(RunFailure::SelfInconsistent {
+                detail: format!(
+                    "{} generators were echoed for a system of {}",
+                    echoed.len(),
+                    instance.system.len()
+                ),
+            });
+        }
+
+        let p = instance.field.characteristic;
+        let mut ours: Vec<String> = instance
+            .system
+            .iter()
+            .map(|generator| canonical_generator(generator, p))
+            .collect();
+        let mut theirs: Vec<String> = echoed
+            .iter()
+            .map(|generator| canonical_generator(generator, p))
+            .collect();
+        ours.sort();
+        theirs.sort();
+        if ours != theirs {
+            // Report the first generator that differs rather than both whole systems: at the
+            // variable counts where this fires, a full dump is unreadable and the first
+            // disagreement is the diagnostic.
+            let first = ours
+                .iter()
+                .zip(&theirs)
+                .find(|(a, b)| a != b)
+                .map(|(a, b)| format!("sent {}, read {}", a, b))
+                .unwrap_or_else(|| "the generator multisets differ".to_string());
+            return Err(RunFailure::SelfInconsistent {
+                detail: format!("Groebner.jl read a different system: {}", first),
+            });
+        }
+        Ok(())
     }
 
     /// The tool-reported solve time, which this adapter uses as the run's wall time.
@@ -416,6 +485,79 @@ impl GroebnerJlSolver {
 /// The value of the first `name` marker line.
 fn marker<'a>(output: &'a str, name: &str) -> Option<&'a str> {
     markers(output, name).into_iter().next()
+}
+
+/// A polynomial as a canonical, sorted multiset of `coefficient*factors` terms over `GF(p)`.
+///
+/// For [`GroebnerJlSolver::check_echoed_generators`]: both sides print a flat signed sum of terms,
+/// but Zeebra writes a negative coefficient as `-1` where Groebner.jl prints the residue `p-1`, and
+/// neither term order nor factor order within a monomial is meaningful. Reducing every coefficient
+/// mod `p` and sorting both levels makes the comparison about the polynomial.
+///
+/// Tokenizing is on the explicit `*` and `^` separators and variable names are then matched
+/// **whole**, which is the property that makes `x1` and `x10` distinguishable — the same property
+/// the Sagebrush driver's parser has, and the one a greedy longest-prefix scan would lack.
+fn canonical_generator(text: &str, characteristic: u64) -> String {
+    let p = characteristic.max(2) as i128;
+    let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+
+    // Split into signed chunks without losing a sign, as the driver's parser does.
+    let mut chunks: Vec<(i128, String)> = Vec::new();
+    let mut sign: i128 = 1;
+    let mut current = String::new();
+    for character in compact.chars() {
+        match character {
+            '+' | '-' if !current.is_empty() => {
+                chunks.push((sign, std::mem::take(&mut current)));
+                sign = if character == '-' { -1 } else { 1 };
+            }
+            '+' => {}
+            '-' => sign = -sign,
+            _ => current.push(character),
+        }
+    }
+    if !current.is_empty() {
+        chunks.push((sign, current));
+    }
+
+    let mut terms: Vec<String> = Vec::new();
+    for (sign, chunk) in chunks {
+        let mut coefficient: i128 = 1;
+        let mut factors: Vec<String> = Vec::new();
+        for factor in chunk.split('*').filter(|factor| !factor.is_empty()) {
+            let (base, exponent) = match factor.split_once('^') {
+                Some((base, exponent)) => (base, exponent.parse::<u32>().unwrap_or(0)),
+                None => (factor, 1),
+            };
+            match base.parse::<i128>() {
+                // A numeric factor folds into the coefficient.
+                Ok(value) => {
+                    for _ in 0..exponent {
+                        coefficient = coefficient * value % p;
+                    }
+                }
+                // A variable name, matched whole.
+                Err(_) => factors.push(if exponent == 1 {
+                    base.to_string()
+                } else {
+                    format!("{}^{}", base, exponent)
+                }),
+            }
+        }
+        let coefficient = (sign * coefficient).rem_euclid(p);
+        if coefficient == 0 {
+            continue;
+        }
+        factors.sort();
+        let monomial = if factors.is_empty() {
+            "1".to_string()
+        } else {
+            factors.join("*")
+        };
+        terms.push(format!("{}*{}", coefficient, monomial));
+    }
+    terms.sort();
+    terms.join("+")
 }
 
 /// An integer-valued marker.
@@ -694,7 +836,7 @@ impl ExternalSolver for GroebnerJlSolver {
             }
         };
 
-        match self.answer(&output, task) {
+        match self.answer(&output, instance, task) {
             // `Complete` and not `Verified`: Groebner.jl answered, and nothing independent has
             // checked it. Promotion is the harness's job against another implementation's
             // `Invariants`, and deliberately not something an adapter can do for itself.
@@ -708,8 +850,8 @@ impl ExternalSolver for GroebnerJlSolver {
 #[cfg(test)]
 mod tests {
     use super::{
-        error_line, groebner_ordering, internal_ordering, is_bindable_name, GroebnerJlSolver,
-        MAX_CHARACTERISTIC,
+        canonical_generator, error_line, groebner_ordering, internal_ordering, is_bindable_name,
+        GroebnerJlSolver, MAX_CHARACTERISTIC,
     };
     use crate::{
         grobner::external::{
@@ -965,7 +1107,11 @@ mod tests {
                       @gbsize 2\n@gb x2^2 + 65520\n@lead x2^2\n@gb x1^2 + x2\n@lead x1^2\n\
                       @dim 0\n@vdim 4\n@done 1\n";
         let answer = solver
-            .answer(output, Task::ReducedGrobnerBasis)
+            .answer(
+                output,
+                &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis,
+            )
             .expect("a complete run parses");
         assert_eq!(answer.invariants.quotient_dimension, Some(4));
         assert_eq!(answer.invariants.basis_cardinality, Some(2));
@@ -980,13 +1126,97 @@ mod tests {
         );
     }
 
+    /// `x1` and `x10` canonicalize apart, which is the prefix collision that agreement cannot catch.
+    ///
+    /// At ten or more variables a greedy tokenizer reads `x1*x10` as `x1*x1*0`. Every engine is
+    /// handed the same bytes, so such a misread is identical everywhere and four engines agree
+    /// while all four answer a different question.
+    #[test]
+    fn test_a_variable_that_is_a_prefix_of_another_canonicalizes_apart() {
+        let p = 1_073_741_827;
+        assert_ne!(
+            canonical_generator("x1*x10-1", p),
+            canonical_generator("x1*x1-1", p)
+        );
+        assert_ne!(
+            canonical_generator("x1*x10-1", p),
+            canonical_generator("x1-1", p),
+            "a dropped trailing digit must not collapse the term"
+        );
+        // And the term that a greedy scan would annihilate survives.
+        assert_eq!(canonical_generator("x1*x10-1", p), "1*x1*x10+1073741826*1");
+    }
+
+    /// A negative coefficient and its residue are the same polynomial.
+    ///
+    /// Zeebra writes `-1`; Groebner.jl echoes `p-1`. Without this the echo check would reject every
+    /// correct run.
+    #[test]
+    fn test_a_signed_coefficient_and_its_residue_canonicalize_together() {
+        let p = 1_073_741_827;
+        assert_eq!(
+            canonical_generator("x1^2+x2^2-1", p),
+            canonical_generator("x1^2 + x2^2 + 1073741826", p)
+        );
+        assert_eq!(
+            canonical_generator("-x1+2*x2", p),
+            canonical_generator("1073741826*x1 + 2*x2", p)
+        );
+    }
+
+    /// Term order, factor order and whitespace do not change the canonical form; a coefficient does.
+    #[test]
+    fn test_canonicalization_ignores_print_order_but_not_values() {
+        let p = 65521;
+        assert_eq!(
+            canonical_generator("x2*x1 + x3", p),
+            canonical_generator("x3+x1*x2", p)
+        );
+        assert_ne!(
+            canonical_generator("2*x1", p),
+            canonical_generator("3*x1", p)
+        );
+    }
+
+    /// An echo that differs from the sent system is self-inconsistent, not a disagreement.
+    #[test]
+    fn test_a_mismatched_generator_echo_is_self_inconsistent() {
+        let sent = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        let good = "@gensize 2\n@gen x1^2 + x2\n@gen x2^2 + 65520\n";
+        GroebnerJlSolver::check_echoed_generators(good, &sent).expect("the echo matches");
+
+        // `x2^2-1` read as `x2^2-2`: the kind of divergence agreement cannot see.
+        let bad = "@gensize 2\n@gen x1^2 + x2\n@gen x2^2 + 65519\n";
+        match GroebnerJlSolver::check_echoed_generators(bad, &sent) {
+            Err(RunFailure::SelfInconsistent { detail }) => {
+                assert!(detail.contains("read a different system"), "{}", detail)
+            }
+            other => panic!("expected SelfInconsistent, got {:?}", other),
+        }
+    }
+
+    /// A dropped generator is caught by the count before the multisets are compared.
+    #[test]
+    fn test_a_dropped_generator_is_caught_by_the_echo_check() {
+        let sent = instance(65521, MonomialOrder::GradedReverseLexicographic);
+        let short = "@gensize 1\n@gen x1^2 + x2\n";
+        assert!(matches!(
+            GroebnerJlSolver::check_echoed_generators(short, &sent),
+            Err(RunFailure::SelfInconsistent { .. })
+        ));
+    }
+
     /// A positive-dimensional ideal reports no quotient dimension rather than a wrong one.
     #[test]
     fn test_a_positive_dimensional_ideal_reports_no_quotient_dimension() {
         let solver = solver("julia", "posdim");
-        let output = "@gbsize 1\n@gb x1\n@lead x1\n@dim 1\n@done 1\n";
+        let output = "@gensize 2\n@gen x1^2 + x2\n@gen x2^2 + 65520\n@gbsize 1\n@gb x1\n@lead x1\n@dim 1\n@done 1\n";
         let answer = solver
-            .answer(output, Task::ReducedGrobnerBasis)
+            .answer(
+                output,
+                &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis,
+            )
             .expect("a complete run parses");
         assert_eq!(answer.invariants.quotient_dimension, None);
         assert_eq!(answer.invariants.basis_cardinality, Some(1));
@@ -996,8 +1226,12 @@ mod tests {
     #[test]
     fn test_a_truncated_basis_is_unparsable_rather_than_short() {
         let solver = solver("julia", "truncated");
-        let output = "@gbsize 2\n@gb x1\n@lead x1\n@dim 1\n@done 1\n";
-        match solver.answer(output, Task::ReducedGrobnerBasis) {
+        let output = "@gensize 2\n@gen x1^2 + x2\n@gen x2^2 + 65520\n@gbsize 2\n@gb x1\n@lead x1\n@dim 1\n@done 1\n";
+        match solver.answer(
+            output,
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+        ) {
             Err(RunFailure::Unparsable { marker, .. }) => assert_eq!(marker, "@gb"),
             other => panic!("expected Unparsable, got {:?}", other),
         }
@@ -1009,7 +1243,11 @@ mod tests {
         let solver = solver("julia", "nodone");
         let output = "@gbsize 1\n@gb x1\n@lead x1\n@dim 1\n";
         assert!(matches!(
-            solver.answer(output, Task::ReducedGrobnerBasis),
+            solver.answer(
+                output,
+                &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                Task::ReducedGrobnerBasis
+            ),
             Err(RunFailure::Incomplete { .. })
         ));
     }

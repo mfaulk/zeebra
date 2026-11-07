@@ -33,8 +33,8 @@ use zeebra::{
         benchmark_systems::{cyclic, katsura},
         differential::{monomial_to_string, polynomial_to_string},
         external::{
-            ExternalSolver, FieldSpec, GroebnerJlSolver, Instance, Invariants, Limits, RunStatus,
-            SagebrushSolver, Task,
+            corpus, ExternalSolver, FieldSpec, GroebnerJlSolver, Instance, Invariants, Limits,
+            RunStatus, SagebrushSolver, Task,
         },
         f4,
     },
@@ -44,6 +44,94 @@ use zeebra::{
 /// The prime the provisioning smoke test used: 2^30 + 3, inside every comparand's range.
 const P: u64 = 1_073_741_827;
 type F = PrimeFieldElement64<P>;
+
+/// The corpus's reference field, so a corpus row is checked at the characteristic it was frozen at.
+type Ref = PrimeFieldElement64<{ corpus::REFERENCE_CHARACTERISTIC }>;
+
+/// Zeebra's answer for a corpus rung, in the corpus's own `x1..xN` variable names.
+fn corpus_reference<const N: usize>(
+    system: &[MultivariatePolynomial<N, Ref>],
+    order: MonomialOrder,
+) -> (Invariants, Vec<String>) {
+    let variables: Vec<String> = (1..=N).map(|i| format!("x{}", i)).collect();
+    let names: Vec<&str> = variables.iter().map(String::as_str).collect();
+    let basis = f4(system, order).expect("Zeebra computes the basis");
+    let mut invariants = Invariants::none().with_leading_monomials(
+        basis
+            .iter()
+            .map(|f| monomial_to_string(&f.leading_monomial(order), &names))
+            .collect(),
+    );
+    // Zeebra's own zero-dimensionality verdict, which the corpus records as a field and the test
+    // cross-checks: a leading-term ideal containing a pure power of every variable is the
+    // criterion, and `cyclic-4`'s does not.
+    if let Some(dimension) = quotient_dimension(&basis, order) {
+        invariants = invariants.with_quotient_dimension(dimension);
+    }
+    let elements: Vec<String> = basis
+        .iter()
+        .map(|f| polynomial_to_string(f, &names, order))
+        .collect();
+    (invariants, canonical_basis(&elements))
+}
+
+/// The quotient dimension, or `None` when the ideal is not zero-dimensional.
+///
+/// Counts the standard monomials — those divisible by no leading monomial of the basis — and gives
+/// up as soon as the count shows the staircase is unbounded in some variable, which is the
+/// `cyclic-4` case.
+fn quotient_dimension<const N: usize>(
+    basis: &[MultivariatePolynomial<N, Ref>],
+    order: MonomialOrder,
+) -> Option<usize> {
+    let leads: Vec<Monomial<N>> = basis.iter().map(|f| f.leading_monomial(order)).collect();
+    // The staircase is finite exactly when every variable has a pure power in the leading ideal.
+    let bounds: Vec<u32> = (0..N)
+        .map(|i| {
+            leads
+                .iter()
+                .filter(|m| {
+                    m.exponents()
+                        .iter()
+                        .enumerate()
+                        .all(|(j, e)| j == i || *e == 0)
+                })
+                .map(|m| m.exponents()[i])
+                .min()
+                .unwrap_or(0)
+        })
+        .collect();
+    if bounds.contains(&0) {
+        return None;
+    }
+    let mut count = 0usize;
+    let mut exponents = vec![0u32; N];
+    loop {
+        let candidate = Monomial::<N>::new(&exponents);
+        let divisible = leads.iter().any(|lead| {
+            candidate
+                .exponents()
+                .iter()
+                .zip(lead.exponents())
+                .all(|(c, l)| c >= l)
+        });
+        if !divisible {
+            count += 1;
+        }
+        let mut position = 0;
+        while position < N {
+            exponents[position] += 1;
+            if exponents[position] < bounds[position] {
+                break;
+            }
+            exponents[position] = 0;
+            position += 1;
+        }
+        if position == N {
+            return Some(count);
+        }
+    }
+}
 
 /// A per-test scratch directory, so two tests never hand the same filename to two processes.
 fn scratch(tag: &str) -> std::path::PathBuf {
@@ -313,115 +401,179 @@ fn test_sagebrush_reproduces_zeebras_basis_term_for_term() {
     );
 }
 
-/// Both comparands agree with Zeebra on the Katsura rungs, under Zeebra's own convention.
+/// Both comparands agree with Zeebra on every rung of the shared corpus.
 ///
-/// `katsura::<N, F>()` is **N = n + 1 variables** (`src/grobner/benchmark_systems.rs:66`), so these
-/// are the literature's katsura-2, -3 and -4. The instance carries its generators as text, so no
-/// tool can apply a different convention — the hazard is in comparing a figure against a published
-/// one, not in the run.
+/// Driven from `grobner::external::corpus::ladder()` rather than from hand-rolled systems, so the
+/// instances are the ones whose identity digests the corpus freezes and whose `Instance` every
+/// other adapter is handed. The Zeebra side is rebuilt from the same generator functions at the
+/// corpus's own `REFERENCE_CHARACTERISTIC`, which is `2^31 − 1` because that is the widest prime
+/// *every* engine accepts — msolve and Singular both stop below it.
+///
+/// Two conventions the corpus settles and this test therefore inherits. `katsura-N` is **N
+/// variables**, i.e. the literature's Katsura-(N−1) (`src/grobner/benchmark_systems.rs:66`), so no
+/// row here can be paired with a published katsura-N figure without translating. And **cyclic-4 is
+/// positive-dimensional**, so it carries no quotient dimension and the check is on the basis alone
+/// — an adapter that assumed a finite quotient would break exactly there.
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
-fn test_both_comparands_agree_with_zeebra_on_katsura() {
-    let mut julia = groebner_jl("jl-katsura");
-    let mut sage = sagebrush("sb-katsura");
+fn test_both_comparands_agree_with_zeebra_on_every_corpus_rung() {
+    let mut julia = groebner_jl("jl-corpus");
+    let mut sage = sagebrush("sb-corpus");
     assert!(
         julia.is_some() || sage.is_some(),
         "neither comparand is installed, so nothing would be checked"
     );
     let order = MonomialOrder::GradedReverseLexicographic;
-    let limits = Limits::wall(Duration::from_secs(300));
+    let limits = Limits::wall(Duration::from_secs(600));
+    let mut checked = 0;
 
-    macro_rules! rung {
-        ($n:literal) => {{
-            let variables: Vec<String> = (0..$n).map(|i| format!("u{}", i)).collect();
-            let names: Vec<&str> = variables.iter().map(String::as_str).collect();
-            let system = katsura::<$n, F>();
-            let (ours, our_basis) = zeebra_invariants(&system, &names, order);
-            let instance = instance(concat!("katsura-", $n), "katsura", &system, &names, order);
-            if let Some(solver) = julia.as_mut() {
-                let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
-                let answer = answered(&report);
-                assert_agrees("groebner.jl", &instance.name, &ours, &answer.invariants);
-                assert_eq!(
-                    canonical_basis(answer.basis.as_ref().expect("a basis")),
-                    our_basis,
-                    "groebner.jl on {} differs from Zeebra term for term",
-                    instance.name
-                );
-            }
-            if let Some(solver) = sage.as_mut() {
-                let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
-                let answer = answered(&report);
-                assert_agrees("sagebrush", &instance.name, &ours, &answer.invariants);
-                assert_eq!(
-                    canonical_basis(answer.basis.as_ref().expect("a basis")),
-                    our_basis,
-                    "sagebrush on {} differs from Zeebra term for term",
-                    instance.name
-                );
-            }
-        }};
+    for entry in corpus::ladder() {
+        // The Zeebra side, at the same characteristic and in the corpus's own `x1..xN` names.
+        let (ours, our_basis) = match entry.name {
+            "katsura-4" => corpus_reference::<4>(&katsura::<4, Ref>(), order),
+            "katsura-5" => corpus_reference::<5>(&katsura::<5, Ref>(), order),
+            "katsura-6" => corpus_reference::<6>(&katsura::<6, Ref>(), order),
+            "katsura-7" => corpus_reference::<7>(&katsura::<7, Ref>(), order),
+            "cyclic-4" => corpus_reference::<4>(&cyclic::<4, Ref>(), order),
+            "cyclic-5" => corpus_reference::<5>(&cyclic::<5, Ref>(), order),
+            "cyclic-6" => corpus_reference::<6>(&cyclic::<6, Ref>(), order),
+            other => panic!(
+                "the corpus grew a rung this test has no Zeebra side for: {}",
+                other
+            ),
+        };
+        let instance = corpus::instance(entry.name, corpus::REFERENCE_CHARACTERISTIC, order)
+            .expect("every ladder name builds");
+        assert_eq!(
+            instance.digest(),
+            entry.digest,
+            "{} is not the problem the corpus froze",
+            entry.name
+        );
+        // The corpus records whether the ideal is zero-dimensional; Zeebra's own answer must agree,
+        // or the two sides disagree about the problem before any tool is consulted.
+        assert_eq!(
+            ours.quotient_dimension.is_some(),
+            entry.zero_dimensional,
+            "{}: Zeebra and the corpus disagree about zero-dimensionality",
+            entry.name
+        );
+
+        for (name, solver) in [
+            (
+                "groebner.jl",
+                julia.as_mut().map(|s| s as &mut dyn ExternalSolver),
+            ),
+            (
+                "sagebrush",
+                sage.as_mut().map(|s| s as &mut dyn ExternalSolver),
+            ),
+        ] {
+            let Some(solver) = solver else { continue };
+            let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
+            let answer = answered(&report);
+            assert_agrees(name, &instance.name, &ours, &answer.invariants);
+            assert_eq!(
+                canonical_basis(answer.basis.as_ref().expect("a basis")),
+                our_basis,
+                "{} on {} differs from Zeebra term for term",
+                name,
+                instance.name
+            );
+            checked += 1;
+        }
     }
-
-    rung!(3);
-    rung!(4);
-    rung!(5);
+    assert!(
+        checked >= corpus::ladder().len(),
+        "every rung must be checked at least once"
+    );
 }
 
-/// Both comparands agree with Zeebra on the cyclic rungs, including positive-dimensional cyclic-4.
+/// Neither comparand confuses `x1` with `x10`, which is the one error agreement cannot detect.
 ///
-/// **Cyclic-4 is positive-dimensional** (`src/grobner/benchmark_systems.rs:10-15`), so it is a
-/// basis row and not a zero-dimensional-solving row. It is included deliberately: a reduced basis
-/// is still unique, so the agreement check is as strong as anywhere, and an adapter that assumed a
-/// finite quotient dimension would break here. Groebner.jl reports `dimension > 0` and omits
-/// `@vdim`; the Sagebrush driver reports no dimension at all.
+/// **Why this needs its own test.** Every engine is handed the same bytes, so a tokenizer that
+/// reads `x1*x10` as `x1*x1*0` misreads it identically everywhere — and the cross-validation this
+/// whole milestone rests on then shows four engines agreeing with each other while all four answer
+/// a different question. Agreement is blind to it by construction.
+///
+/// The system is built so a misread is loud rather than subtle: `x1*x10 - 1` with the prefix
+/// collapsed becomes `x1^2*0 - 1 = -1`, the ideal becomes the whole ring, and the basis collapses
+/// from fifteen elements to `{1}`.
+///
+/// The corpus tops out at seven variables, so this rung is deliberately hand-rolled: it is testing
+/// the two parsers rather than the ladder, and it is here so the hazard is pinned **before** a
+/// ten-or-more-variable rung is added rather than after.
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
-fn test_both_comparands_agree_with_zeebra_on_cyclic() {
-    let mut julia = groebner_jl("jl-cyclic");
-    let mut sage = sagebrush("sb-cyclic");
+fn test_neither_comparand_confuses_a_variable_with_its_prefix() {
+    let mut julia = groebner_jl("jl-prefix");
+    let mut sage = sagebrush("sb-prefix");
     assert!(
         julia.is_some() || sage.is_some(),
         "neither comparand is installed, so nothing would be checked"
     );
     let order = MonomialOrder::GradedReverseLexicographic;
-    let limits = Limits::wall(Duration::from_secs(300));
 
-    macro_rules! rung {
-        ($n:literal) => {{
-            let variables: Vec<String> = (0..$n).map(|i| format!("x{}", i)).collect();
-            let names: Vec<&str> = variables.iter().map(String::as_str).collect();
-            let system = cyclic::<$n, F>();
-            let (ours, our_basis) = zeebra_invariants(&system, &names, order);
-            let instance = instance(concat!("cyclic-", $n), "cyclic", &system, &names, order);
-            if let Some(solver) = julia.as_mut() {
-                let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
-                let answer = answered(&report);
-                assert_agrees("groebner.jl", &instance.name, &ours, &answer.invariants);
-                assert_eq!(
-                    canonical_basis(answer.basis.as_ref().expect("a basis")),
-                    our_basis,
-                    "groebner.jl on {} differs from Zeebra term for term",
-                    instance.name
-                );
-            }
-            if let Some(solver) = sage.as_mut() {
-                let report = solver.run(&instance, Task::ReducedGrobnerBasis, &limits);
-                let answer = answered(&report);
-                assert_agrees("sagebrush", &instance.name, &ours, &answer.invariants);
-                assert_eq!(
-                    canonical_basis(answer.basis.as_ref().expect("a basis")),
-                    our_basis,
-                    "sagebrush on {} differs from Zeebra term for term",
-                    instance.name
-                );
-            }
-        }};
+    let variables: Vec<String> = (1..=14).map(|i| format!("x{}", i)).collect();
+    let names: Vec<&str> = variables.iter().map(String::as_str).collect();
+    let mut system = vec!["x1*x10-1".to_string(), "x1^2-x10".to_string()];
+    system.extend(
+        (1..=14)
+            .filter(|i| *i != 1 && *i != 10)
+            .map(|i| format!("x{}-1", i)),
+    );
+    let instance = Instance::new(
+        "prefix-collision-14",
+        "prefix",
+        FieldSpec::prime(P),
+        names.iter().map(|v| v.to_string()).collect(),
+        system,
+        order,
+    );
+
+    for (name, solver) in [
+        (
+            "groebner.jl",
+            julia.as_mut().map(|s| s as &mut dyn ExternalSolver),
+        ),
+        (
+            "sagebrush",
+            sage.as_mut().map(|s| s as &mut dyn ExternalSolver),
+        ),
+    ] {
+        let Some(solver) = solver else { continue };
+        let report = solver.run(
+            &instance,
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(120)),
+        );
+        let answer = answered(&report);
+        let leading = answer
+            .invariants
+            .leading_monomials
+            .as_ref()
+            .expect("leading monomials");
+        assert_ne!(
+            leading.as_slice(),
+            ["1".to_string()],
+            "{} collapsed the ideal to <1>: it read x1*x10 as a power of x1",
+            name
+        );
+        assert_eq!(
+            answer.invariants.basis_cardinality,
+            Some(15),
+            "{} did not read fourteen distinct variables",
+            name
+        );
+        // The term a prefix misread would annihilate has to survive into the basis.
+        let basis = canonical_basis(answer.basis.as_ref().expect("a basis"));
+        assert!(
+            basis.iter().any(|f| f.contains("x1*x10")),
+            "{} lost the x1*x10 term entirely: {:?}",
+            name,
+            basis
+        );
     }
-
-    rung!(3);
-    rung!(4);
-    rung!(5);
 }
 
 /// Groebner.jl honours the declared variable order, checked on a system whose basis depends on it.
