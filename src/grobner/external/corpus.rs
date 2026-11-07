@@ -41,6 +41,19 @@
 //! [`Task::LexBasisByConversion`](super::Task) does not apply to it, which is a fact about the
 //! ideal and not a failure of any engine.
 //!
+//! # Hazard 3: a declared field that was not the generated one
+//!
+//! An instance carries a [`FieldSpec`] and a system, and nothing in the text ties them together:
+//! coefficients render as **residues**, so `−1` over `2^31 − 1` is the numeral `2147483646`, which
+//! is a perfectly well-formed element of a smaller prime field and a different one. A
+//! `characteristic` that reached only the label therefore produced a valid input file describing a
+//! different ideal from the one named, with a digest and a name both claiming otherwise (#425).
+//!
+//! **Resolved by construction.** The const-generic families are generated over the declared field
+//! via `over_prime!`, whose arms are [`GENERATED_CHARACTERISTICS`]; a prime with no compiled field
+//! yields `None`. `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` is
+//! the property, asserted on the rendered text rather than on the polynomials.
+//!
 //! # The ladder
 //!
 //! Rungs are chosen to be easy, intermediate and genuinely challenging rather than uniformly
@@ -71,8 +84,60 @@ use super::{FieldSpec, Instance};
 /// its cryptanalysis scoreboard, where there is no comparand to lose.
 pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 
-/// The corpus's reference field.
-type Reference = PrimeFieldElement64<REFERENCE_CHARACTERISTIC>;
+/// A second prime the const-generic families are compiled over: `2^30 + 3`.
+///
+/// **Not a second corpus identity.** The manifest, every frozen digest and every published row
+/// remain at [`REFERENCE_CHARACTERISTIC`].
+///
+/// This prime rather than an arbitrary one for two independent reasons. It is the characteristic
+/// msolve's own distributed `input_files/kat6-31.ms` declares, so it is the field the Katsura
+/// equivalence evidence was shipped over. And it is **below**
+/// [`ceilings::MSOLVE_ELIMINANT`](ceilings::MSOLVE_ELIMINANT) where the reference prime is above
+/// it, which is why `msolve.rs`'s eliminant tests ask the corpus for rungs here — those tests were
+/// the live victims of this label-only `characteristic`, having been handed systems reduced mod
+/// `2^31 − 1` and declared mod this prime.
+pub const ALTERNATE_CHARACTERISTIC: u64 = 1_073_741_827;
+
+/// The primes the const-generic families have a compiled field for.
+///
+/// Katsura, Cyclic and planted MQ are const-generic in the field, so a prime known only at run
+/// time cannot be turned into a type and the compiled instantiations **are** the available primes.
+/// [`instance`] returns `None` outside this list rather than generating over the reference prime
+/// and labelling the result with the prime that was asked for.
+///
+/// Random MQ is not listed here because it does not need to be: its generator reduces at run time
+/// through [`CaseField`](crate::grobner::differential::CaseField), so every prime is available to
+/// it. Poseidon and Anemoi carry the registry's own field and ignore the argument entirely.
+pub const GENERATED_CHARACTERISTICS: [u64; 2] =
+    [ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC];
+
+/// Run `$body` with `$field` bound to the compiled field for `$characteristic`, or yield `None`.
+///
+/// The families are const-generic in the field, so a prime known only at run time cannot be turned
+/// into a type: the match below is what picks the instantiation, and its arms are exactly
+/// [`GENERATED_CHARACTERISTICS`] — `test_every_compiled_characteristic_builds_every_rung` pins the
+/// two together.
+///
+/// **Why a dispatch and not a characteristic-independent renderer.** Coefficients could be rendered
+/// from signed integers instead, which would make these families' text the same at every prime —
+/// and would change every frozen digest in [`ladder`], retroactively making every published figure
+/// a figure about a differently-identified problem. Generating over the declared field leaves the
+/// reference-prime text byte-identical.
+macro_rules! over_prime {
+    ($characteristic:expr, |$field:ident| $body:block) => {
+        match $characteristic {
+            ALTERNATE_CHARACTERISTIC => {
+                type $field = PrimeFieldElement64<ALTERNATE_CHARACTERISTIC>;
+                Some($body)
+            }
+            REFERENCE_CHARACTERISTIC => {
+                type $field = PrimeFieldElement64<REFERENCE_CHARACTERISTIC>;
+                Some($body)
+            }
+            _ => None,
+        }
+    };
+}
 
 /// How hard a rung is meant to be.
 ///
@@ -134,26 +199,27 @@ pub struct CorpusEntry {
 /// Build one corpus instance by name, at `characteristic`, under `order`.
 ///
 /// # Errors
-/// `None` for a name not in [`ladder`], or for a name whose variable count has no compiled
-/// instantiation. The families are const-generic, so the available sizes are exactly those listed
-/// here — adding a rung means adding a match arm, which is deliberate: a size nobody wrote down is
-/// a size nobody checked the equivalence of.
+/// `None` for a name not in [`ladder`], for a name whose variable count has no compiled
+/// instantiation, or — for the const-generic families — for a characteristic outside
+/// [`GENERATED_CHARACTERISTICS`]. The families are const-generic in both the size and the field, so
+/// the available sizes are exactly those listed here — adding a rung means adding a match arm,
+/// which is deliberate: a size nobody wrote down is a size nobody checked the equivalence of.
 pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option<Instance> {
     match name {
-        "katsura-4" => Some(katsura_instance::<4>(characteristic, order)),
-        "katsura-5" => Some(katsura_instance::<5>(characteristic, order)),
-        "katsura-6" => Some(katsura_instance::<6>(characteristic, order)),
-        "katsura-7" => Some(katsura_instance::<7>(characteristic, order)),
-        "cyclic-4" => Some(cyclic_instance::<4>(characteristic, order)),
-        "cyclic-5" => Some(cyclic_instance::<5>(characteristic, order)),
-        "cyclic-6" => Some(cyclic_instance::<6>(characteristic, order)),
+        "katsura-4" => katsura_instance::<4>(characteristic, order),
+        "katsura-5" => katsura_instance::<5>(characteristic, order),
+        "katsura-6" => katsura_instance::<6>(characteristic, order),
+        "katsura-7" => katsura_instance::<7>(characteristic, order),
+        "cyclic-4" => cyclic_instance::<4>(characteristic, order),
+        "cyclic-5" => cyclic_instance::<5>(characteristic, order),
+        "cyclic-6" => cyclic_instance::<6>(characteristic, order),
         // Seeds are part of the name, so a rung is reproducible from the name alone.
         "mq-random-6" => Some(random_mq_instance(6, 6, characteristic, order)),
         "mq-random-10" => Some(random_mq_instance(10, 10, characteristic, order)),
         "mq-random-14" => Some(random_mq_instance(14, 14, characteristic, order)),
-        "mq-planted-6" => Some(planted_mq_instance::<6>(characteristic, order)),
-        "mq-planted-10" => Some(planted_mq_instance::<10>(characteristic, order)),
-        "mq-planted-14" => Some(planted_mq_instance::<14>(characteristic, order)),
+        "mq-planted-6" => planted_mq_instance::<6>(characteristic, order),
+        "mq-planted-10" => planted_mq_instance::<10>(characteristic, order),
+        "mq-planted-14" => planted_mq_instance::<14>(characteristic, order),
         // Poseidon and Anemoi carry the registry's own field, not `characteristic`: their round
         // constants are derived from the prime, so the same row over another prime is another
         // problem. The argument is unused for them by design, and the digest records the field
@@ -167,37 +233,54 @@ pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option
 }
 
 /// The Katsura instance in `N` variables — the literature's Katsura-`(N-1)`.
-pub fn katsura_instance<const N: usize>(characteristic: u64, order: MonomialOrder) -> Instance {
-    let system = katsura::<N, Reference>();
-    text_instance(
-        format!("katsura-{}", N),
-        "katsura",
-        &system,
-        characteristic,
-        order,
-    )
+///
+/// # Errors
+/// `None` for a characteristic outside [`GENERATED_CHARACTERISTICS`]. The system is generated over
+/// the declared field, so a prime with no compiled instantiation has no instance rather than a
+/// mislabeled one.
+pub fn katsura_instance<const N: usize>(
+    characteristic: u64,
+    order: MonomialOrder,
+) -> Option<Instance> {
+    over_prime!(characteristic, |F| {
+        text_instance(
+            format!("katsura-{}", N),
+            "katsura",
+            &katsura::<N, F>(),
+            characteristic,
+            order,
+        )
+    })
 }
 
 /// The affine cyclic-`N` roots instance in `N` variables.
-pub fn cyclic_instance<const N: usize>(characteristic: u64, order: MonomialOrder) -> Instance {
-    let system = cyclic::<N, Reference>();
-    text_instance(
-        format!("cyclic-{}", N),
-        "cyclic",
-        &system,
-        characteristic,
-        order,
-    )
+///
+/// # Errors
+/// As [`katsura_instance`].
+pub fn cyclic_instance<const N: usize>(
+    characteristic: u64,
+    order: MonomialOrder,
+) -> Option<Instance> {
+    over_prime!(characteristic, |F| {
+        text_instance(
+            format!("cyclic-{}", N),
+            "cyclic",
+            &cyclic::<N, F>(),
+            characteristic,
+            order,
+        )
+    })
 }
 
 /// Render a system to the text form every engine parses, and wrap it as an [`Instance`].
 ///
 /// Variables are `x1 … xN`, which is what msolve's and Singular's own files use, and the order they
-/// are declared in **is** the monomial order's variable order.
-fn text_instance<const N: usize>(
+/// are declared in **is** the monomial order's variable order. `characteristic` must be `F`'s, which
+/// is why every caller goes through [`over_prime`] rather than passing the two independently.
+fn text_instance<const N: usize, F: FiniteField>(
     name: String,
     family: &str,
-    system: &[MultivariatePolynomial<N, Reference>],
+    system: &[MultivariatePolynomial<N, F>],
     characteristic: u64,
     order: MonomialOrder,
 ) -> Instance {
@@ -503,17 +586,23 @@ pub fn random_mq_instance(
 /// engine must find it** — an oracle no digest provides. See
 /// [`planted`](crate::grobner::benchmark_systems::planted) on why the equations are nonlinear: a
 /// system of `x_i - a_i` is already a Gröbner basis under every order and measures nothing.
-pub fn planted_mq_instance<const N: usize>(characteristic: u64, order: MonomialOrder) -> Instance {
-    let point = planted_point::<N, Reference>();
-    let system = planted::<N, Reference>(&point);
-    text_instance(
-        format!("mq-planted-{}", N),
-        "mq-planted",
-        &system,
-        characteristic,
-        order,
-    )
-    .transformed("planted at (3, 5, 7, ...), one value per variable".to_string())
+/// # Errors
+/// As [`katsura_instance`].
+pub fn planted_mq_instance<const N: usize>(
+    characteristic: u64,
+    order: MonomialOrder,
+) -> Option<Instance> {
+    over_prime!(characteristic, |F| {
+        let point = planted_point::<N, F>();
+        text_instance(
+            format!("mq-planted-{}", N),
+            "mq-planted",
+            &planted::<N, F>(&point),
+            characteristic,
+            order,
+        )
+        .transformed("planted at (3, 5, 7, ...), one value per variable".to_string())
+    })
 }
 
 /// Render a const-generic system at an unknown dimension to `(variables, generators)`.
@@ -870,7 +959,7 @@ pub fn manifest() -> String {
 mod tests {
     use super::{
         ceilings, corroboration, corroboration_for, instance, ladder, manifest, CorpusEntry,
-        Corroboration, Equivalence, Rung, REFERENCE_CHARACTERISTIC,
+        Corroboration, Equivalence, Rung, ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC,
     };
     use crate::{
         fields::Zp2147483647,
@@ -1029,6 +1118,139 @@ mod tests {
         }
     }
 
+    /// Every **coefficient** numeral in `generator`, with exponents and variable indices skipped.
+    ///
+    /// A digit run is a coefficient only where it does not continue an identifier (`x10`) and is
+    /// not an exponent (`x1^2`), so the preceding character decides it.
+    fn coefficient_numerals(generator: &str) -> Vec<u64> {
+        let bytes: Vec<char> = generator.chars().collect();
+        let mut out = Vec::new();
+        let mut index = 0;
+        while index < bytes.len() {
+            if !bytes[index].is_ascii_digit() {
+                index += 1;
+                continue;
+            }
+            let start = index;
+            while index < bytes.len() && bytes[index].is_ascii_digit() {
+                index += 1;
+            }
+            let continues_identifier =
+                start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == '_');
+            let is_exponent = start > 0 && bytes[start - 1] == '^';
+            if continues_identifier || is_exponent {
+                continue;
+            }
+            out.push(
+                bytes[start..index]
+                    .iter()
+                    .collect::<String>()
+                    .parse()
+                    .expect("a digit run"),
+            );
+        }
+        out
+    }
+
+    /// Every coefficient an instance renders is a residue of the characteristic it declares.
+    ///
+    /// The defect #425 names: generation was over the compile-time reference field whatever
+    /// `characteristic` said, so `katsura-4` at 32003 rendered `−1` as `2147483646` and handed
+    /// every engine a different ideal from the one its `FieldSpec` claimed. Coefficients are
+    /// rendered as residues, so "is a residue of the declared prime" is exactly the property the
+    /// text must have.
+    #[test]
+    fn test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic() {
+        for name in ["katsura-4", "cyclic-5", "mq-planted-6", "mq-random-6"] {
+            for characteristic in [
+                REFERENCE_CHARACTERISTIC,
+                ALTERNATE_CHARACTERISTIC,
+                32003,
+                101,
+            ] {
+                let Some(built) = instance(name, characteristic, GREVLEX) else {
+                    continue;
+                };
+                assert_eq!(
+                    built.field.characteristic, characteristic,
+                    "{} declared a characteristic it was not asked for",
+                    name
+                );
+                for generator in &built.system {
+                    for numeral in coefficient_numerals(generator) {
+                        assert!(
+                            numeral < characteristic,
+                            "{} at {} renders {} in {:?}, which is not a residue",
+                            name,
+                            characteristic,
+                            numeral,
+                            generator
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The characteristic is a parameter of generation: two compiled primes render differently.
+    ///
+    /// The observable half of #425. Katsura's `−1` is `p − 1`, so the two renderings cannot
+    /// coincide, and a generator that ignored the argument would make them identical.
+    #[test]
+    fn test_the_characteristic_changes_the_rendered_generators() {
+        let reference = instance("katsura-4", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+        let alternate = instance("katsura-4", ALTERNATE_CHARACTERISTIC, GREVLEX).expect("builds");
+        assert_ne!(
+            reference.system, alternate.system,
+            "the generators are identical at two primes, so the field is only a label"
+        );
+        assert_ne!(reference.digest(), alternate.digest());
+    }
+
+    /// A characteristic with no compiled field makes a const-generic family refuse, not mislabel.
+    ///
+    /// `None` is already [`instance`]'s idiom for a size nobody compiled, and a prime nobody
+    /// compiled is the same kind of absence. The three dispositions in the corpus differ for
+    /// stated reasons, so each is pinned: const-generic families refuse, the runtime-field MQ
+    /// generator accepts any prime, and a registry row keeps its own field.
+    #[test]
+    fn test_an_uncompiled_characteristic_is_refused_rather_than_mislabeled() {
+        for name in ["katsura-4", "cyclic-5", "mq-planted-6"] {
+            assert!(
+                instance(name, 101, GREVLEX).is_none(),
+                "{} claims to be buildable over an uncompiled prime",
+                name
+            );
+        }
+        assert!(
+            instance("mq-random-6", 101, GREVLEX).is_some(),
+            "the random MQ generator reduces at run time, so every prime is available to it"
+        );
+        assert!(
+            instance("poseidon-t2-rf2-rp0-planted", 101, GREVLEX).is_some(),
+            "a registry row carries its own field and ignores the argument"
+        );
+    }
+
+    /// Every compiled characteristic builds every ladder rung.
+    ///
+    /// Pins [`GENERATED_CHARACTERISTICS`] against the dispatch itself: the list is what a caller
+    /// reads and the match is what runs, and a prime in one and not the other is the drift this
+    /// catches.
+    #[test]
+    fn test_every_compiled_characteristic_builds_every_rung() {
+        for characteristic in super::GENERATED_CHARACTERISTICS {
+            for entry in ladder() {
+                assert!(
+                    instance(entry.name, characteristic, GREVLEX).is_some(),
+                    "{} does not build at {}, which GENERATED_CHARACTERISTICS lists",
+                    entry.name,
+                    characteristic
+                );
+            }
+        }
+    }
+
     /// The digest changes with the monomial order and with the characteristic.
     ///
     /// Both change the answer, so both must be part of the problem's identity — otherwise a figure
@@ -1044,7 +1266,9 @@ mod tests {
         .expect("builds");
         assert_ne!(grevlex.digest(), lex.digest());
 
-        let other_field = instance("katsura-5", 65521, GREVLEX).expect("builds");
+        // A **compiled** second prime, so the difference is in the generated coefficients and not
+        // only in the `FieldSpec` line of the canonical form.
+        let other_field = instance("katsura-5", ALTERNATE_CHARACTERISTIC, GREVLEX).expect("builds");
         assert_ne!(grevlex.digest(), other_field.digest());
     }
 

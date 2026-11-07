@@ -1405,9 +1405,13 @@ mod tests {
     const P31: u64 = REFERENCE_CHARACTERISTIC;
     /// The corpus's reference field type, for recomputing a rung's basis in Zeebra.
     type Reference = PrimeFieldElement64<REFERENCE_CHARACTERISTIC>;
-    /// The prime the recorded parametrization fixtures were taken over. Below
+    /// The prime the recorded parametrization fixtures were taken over, `2^30 + 3`. Below
     /// [`MAX_CHARACTERISTIC_ELIMINANT`], which `P31` is not.
-    const P30: u64 = 1073741827;
+    ///
+    /// Taken from the corpus rather than written again: the corpus generates over the prime it
+    /// declares, so a rung at a prime the corpus has no compiled field for is `None` — and a
+    /// literal here would make that a panic in these tests instead of a build error.
+    const P30: u64 = corpus::ALTERNATE_CHARACTERISTIC;
 
     // ---------------------------------------------------------------------------------------
     // Fixtures. Every one is **verbatim output of msolve 0.11.0** on this machine, captured on
