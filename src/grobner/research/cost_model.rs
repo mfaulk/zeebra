@@ -3477,6 +3477,28 @@ mod tests {
         }
     }
 
+    /// The committed Markdown is exactly what the renderer produces from the committed records.
+    ///
+    /// The file promises in its own first lines that it is generated and must not be edited. That
+    /// promise is worth nothing unless something checks it: a hand-edited table is the failure
+    /// mode a generated table exists to remove, and it is invisible in review.
+    #[test]
+    fn test_the_committed_markdown_is_what_the_renderer_produces() {
+        let board = CostModelBoard::load(
+            &Json::parse(include_str!(
+                "../../../research/cost-model/results/history.json"
+            ))
+            .expect("parses"),
+        )
+        .expect("every row");
+        assert_eq!(
+            board.to_markdown(),
+            include_str!("../../../research/cost-model/COST-MODEL.md"),
+            "COST-MODEL.md has drifted from its records; regenerate it with \
+             `cargo run --release --example cost_model -- --write`"
+        );
+    }
+
     /// The committed register renders the unexplained findings and the open prediction it carries.
     #[test]
     fn test_the_committed_register_renders_its_open_and_unexplained_rows() {
