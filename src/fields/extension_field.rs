@@ -128,6 +128,46 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> ExtensionFiel
     pub fn coefficients(&self) -> &[u64; N] {
         &self.coefficients
     }
+
+    /// `c_0, c_1, ..., c_{N-1}` — the inside of the bracketed form [`Display`] writes.
+    ///
+    /// Exactly N coefficients are required, so a list written for a different degree is rejected
+    /// rather than zero-padded into a different field's element. Each is reduced mod P, as the
+    /// inherent `new` and the prime fields' `from_str` both do.
+    fn from_coefficient_list(inner: &str) -> Result<Self, ParseFieldElementError> {
+        let mut coefficients = [0u64; N];
+        let mut count = 0usize;
+        for field in inner.split(',') {
+            if count == N {
+                return Err(ParseFieldElementError::OutOfRange);
+            }
+            coefficients[count] = parse_decimal_u128(field.trim())? as u64 % P;
+            count += 1;
+        }
+        if count != N {
+            return Err(ParseFieldElementError::OutOfRange);
+        }
+        Ok(Self::new(coefficients))
+    }
+}
+
+/// A decimal integer, with the leading `+` the polynomial grammar may emit.
+///
+/// `u128` because an extension field's order is held as one; a value beyond that cannot name an
+/// element of any field in this crate and so is [`ParseFieldElementError::OutOfRange`].
+fn parse_decimal_u128(value: &str) -> Result<u128, ParseFieldElementError> {
+    let digits = value.strip_prefix('+').unwrap_or(value);
+    if digits.is_empty() {
+        return Err(ParseFieldElementError::OutOfRange);
+    }
+    if let Some(offender) = digits.bytes().find(|b| !b.is_ascii_digit()) {
+        return Err(ParseFieldElementError::InvalidCharacter(
+            offender.wrapping_sub(b'0'),
+        ));
+    }
+    digits
+        .parse()
+        .map_err(|_| ParseFieldElementError::OutOfRange)
 }
 
 // impl Serialize
@@ -233,6 +273,10 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> Ring
 impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
     for ExtensionFieldElement<P, N, M>
 {
+    /// The constant polynomial `val mod P`: the prime subfield, which is all the integers reach.
+    ///
+    /// Not the inherent [`ExtensionFieldElement::new`], which takes the whole coefficient array.
+    /// See [`FiniteField::new`], and [`KnownOrder::element_at`] to address elements by index.
     fn new(val: u64) -> Self {
         // The constant polynomial `val`.
         let mut coefficients = [0u64; N];
@@ -243,11 +287,27 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> FiniteField
         }
     }
 
-    // TODO: unimplemented. Unlike a prime field, the input here is a polynomial rather than a
-    // decimal integer, so this first needs a decision about the accepted syntax — plausibly the
-    // Sage-style form that `SparseMultiPoly::parse` already handles.
-    fn from_str(_value: &str) -> Result<Self, ParseFieldElementError> {
-        todo!()
+    /// Either `[c_0, c_1, ..., c_{N-1}]` — what [`Display`] writes — or a bare decimal read as the
+    /// base-`P` digits of that same list.
+    ///
+    /// So `from_str("5")` over GF(13^4) is `[5, 0, 0, 0]` and `from_str("170")` is `[1, 0, 1, 0]`,
+    /// rather than `170 mod 13`. See [`FiniteField::from_str`] for why a representation and not
+    /// the integer embedding.
+    fn from_str(value: &str) -> Result<Self, ParseFieldElementError> {
+        let trimmed = value.trim();
+        match trimmed.strip_prefix('[') {
+            Some(inner) => {
+                let inner = inner
+                    .strip_suffix(']')
+                    .ok_or(ParseFieldElementError::OutOfRange)?;
+                Self::from_coefficient_list(inner)
+            }
+            // A bare decimal: the element's index, as base-P digits. Agrees with `new` on `0..P`.
+            None => {
+                let index = parse_decimal_u128(trimmed)?;
+                <Self as KnownOrder>::element_at(index).ok_or(ParseFieldElementError::OutOfRange)
+            }
+        }
     }
 
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
@@ -302,6 +362,22 @@ impl<const P: u64, const N: usize, M: IrreduciblePolynomial<P, N>> KnownOrder
     fn characteristic_limbs() -> &'static [u64] {
         // q = p^N with N > 1, so the characteristic is genuinely not the order.
         trim_limbs(&Self::CHARACTERISTIC_LIMBS)
+    }
+
+    /// The base-P digits of `index` as coefficients, so `0..P^N` covers the field exactly once.
+    ///
+    /// Overrides the default, which refuses an extension rather than enumerate its prime subfield.
+    fn element_at(index: u128) -> Option<Self> {
+        if index >= Self::ORDER {
+            return None;
+        }
+        let mut coefficients = [0u64; N];
+        let mut remaining = index;
+        for c in coefficients.iter_mut() {
+            *c = (remaining % P as u128) as u64;
+            remaining /= P as u128;
+        }
+        Some(Self::new(coefficients))
     }
 }
 
@@ -536,6 +612,101 @@ mod tests {
     };
 
     use super::delayed_reduction_fits;
+    use crate::ParseFieldElementError;
+
+    /// The bracketed coefficient list `Display` writes is read straight back.
+    #[test]
+    fn test_from_str_reads_the_bracketed_coefficient_list() {
+        type F = ExtensionFieldElement<13, 4, Modulus13Pow4>;
+        let a = F::new([1, 0, 2, 12]);
+        assert_eq!(a.to_string(), "[1, 0, 2, 12]");
+        assert_eq!(<F as FiniteField>::from_str("[1, 0, 2, 12]"), Ok(a));
+        // Whitespace is not significant.
+        assert_eq!(<F as FiniteField>::from_str("[1,0,2,12]"), Ok(a));
+    }
+
+    /// A bare decimal is the element's index in base P, not the integer reduced mod P.
+    #[test]
+    fn test_from_str_reads_a_bare_decimal_as_the_base_p_index() {
+        type F = ExtensionFieldElement<13, 4, Modulus13Pow4>;
+        // 170 = 1 + 13^2, so the digits are [1, 0, 1, 0] — not 170 mod 13 = 1.
+        assert_eq!(
+            <F as FiniteField>::from_str("170"),
+            Ok(F::new([1, 0, 1, 0]))
+        );
+        assert_ne!(
+            <F as FiniteField>::from_str("170"),
+            Ok(<F as FiniteField>::new(170))
+        );
+        // Below P the index and the embedding agree, so small constants read as expected.
+        for value in 0..13u64 {
+            assert_eq!(
+                <F as FiniteField>::from_str(&value.to_string()),
+                Ok(<F as FiniteField>::new(value))
+            );
+        }
+    }
+
+    /// An index at or above q, and a coefficient list of the wrong degree, are out of range.
+    #[test]
+    fn test_from_str_rejects_input_outside_the_field() {
+        type F = ExtensionFieldElement<13, 4, Modulus13Pow4>;
+        // 13^4 = 28561.
+        assert_eq!(
+            <F as FiniteField>::from_str("28561"),
+            Err(ParseFieldElementError::OutOfRange)
+        );
+        for malformed in ["[1, 0, 2]", "[1, 0, 2, 12, 5]", "[]", "[1, 0, 2, 12", "[+]"] {
+            assert_eq!(
+                <F as FiniteField>::from_str(malformed),
+                Err(ParseFieldElementError::OutOfRange),
+                "{malformed} should be rejected"
+            );
+        }
+    }
+
+    /// Malformed text is a `Result`, never a panic.
+    #[test]
+    fn test_from_str_rejects_malformed_text() {
+        type F = ExtensionFieldElement<13, 4, Modulus13Pow4>;
+        assert_eq!(
+            <F as FiniteField>::from_str(""),
+            Err(ParseFieldElementError::OutOfRange)
+        );
+        assert_eq!(
+            <F as FiniteField>::from_str("[a, 0, 0, 0]"),
+            Err(ParseFieldElementError::InvalidCharacter(b'a' - b'0'))
+        );
+        assert_eq!(
+            <F as FiniteField>::from_str("nonsense"),
+            Err(ParseFieldElementError::InvalidCharacter(b'n' - b'0'))
+        );
+    }
+
+    /// `element_at` walks all P^N coefficient vectors and stops there.
+    #[test]
+    fn test_element_at_is_the_base_p_digit_expansion() {
+        type F = ExtensionFieldElement<3, 2, Modulus3Pow2>;
+        let mut seen = Vec::new();
+        for index in 0..9u128 {
+            seen.push(*F::element_at(index).expect("below q").coefficients());
+        }
+        assert_eq!(
+            seen,
+            vec![
+                [0, 0],
+                [1, 0],
+                [2, 0],
+                [0, 1],
+                [1, 1],
+                [2, 1],
+                [0, 2],
+                [1, 2],
+                [2, 2]
+            ]
+        );
+        assert_eq!(F::element_at(9), None);
+    }
 
     /// x^2 + 1 over GF(2^31 - 1), for the large-coefficient multiplication tests.
     ///

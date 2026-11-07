@@ -212,9 +212,10 @@ pub(crate) fn is_nonzero_constant<const N: usize, F: FiniteField>(
 
 /// Every element of the field.
 ///
-/// Built from a generator because `FiniteField` offers no way to enumerate elements directly:
-/// `new` maps integers into the field, which reaches only the prime subfield of an extension.
-/// The multiplicative group is cyclic of order q - 1, so its powers cover every nonzero element.
+/// Built from a generator: the multiplicative group is cyclic of order q - 1, so its powers cover
+/// every nonzero element. [`KnownOrder::element_at`] would do as well since #377 — what neither
+/// route can use is `FiniteField::new`, which reaches only the prime subfield of an extension — but
+/// it would renumber the elements, and that would change which solution `solve` reports first.
 fn field_elements<F: KnownOrder, R: RngCore + CryptoRng>(rng: &mut R) -> Vec<F> {
     let order = F::order_u128().unwrap_or(u128::MAX);
     assert!(

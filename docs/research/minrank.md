@@ -1,21 +1,31 @@
 # Courtois MinRank challenges A–F: the parameters, and the instances that never existed
 
-Reference for F1 (#205), under the MinRank epic #195. Consumes the provenance conventions of
-`docs/research/external-provenance-policy.md` §9 and the redistribution discipline of
+Reference for F1 (#205) and F1b (#382), under the MinRank epic #195. Consumes the provenance
+conventions of `docs/research/external-provenance-policy.md` §9 and the redistribution discipline of
 `docs/research/fukuoka-mq.md` §3.
 
-**Sources of record.** Three primary documents, each read in place rather than through a search
-summary, with the bytes pinned:
+#382 added §5.4 and rewrote §9. If you are here for one question — *did anyone ever actually run a
+solve of challenge C?* — the answer is **yes, once: Allan Steel, 23 August 2014, on a generated
+same-parameter instance, in about 30 hours on one CPU core and one GPU**, reported at PASCO 2015.
+§5.4 has the evidence and the three ways that sentence is usually got wrong.
+
+**Sources of record.** Each read in place rather than through a search summary, with the bytes
+pinned. The first four are primary and were read in full; the last two are reachable only in part,
+and every claim resting on them says so.
 
 | short name | what it is | how it was obtained | sha256 | accessed |
 |---|---|---|---|---|
 | **`asia01`** | Courtois, *Efficient Zero-knowledge Authentication Based on a Linear Algebra Problem MinRank*, Asiacrypt 2001, LNCS 2248 pp. 402–421; IACR ePrint 2001/058 | `eprint.iacr.org` PDFs 403 here, so the Wayback Machine's capture of the author's own ePrint PDF: [`web.archive.org/web/20040723070613id_/http://eprint.iacr.org/2001/058.pdf`](https://web.archive.org/web/20040723070613id_/http://eprint.iacr.org/2001/058.pdf) | `bbdfe4521eb102eb7dc137bea245f2a6ec186ee9fddf2b5b906a2cbfc0daee34` (256 966 B, 19 pp.) | 2026-11-07 |
+| **`phd`** | Courtois, *La sécurité des primitives cryptographiques basées sur des problèmes algébriques multivariables : MQ, IP, MinRank, HFE*, thèse de doctorat, Université Paris 6, soutenue 25 septembre 2001 | the scheme's own host still serves it over plain HTTP (§3.1): [`http://www.minrank.org/phd.pdf`](http://www.minrank.org/phd.pdf) | `b907bced0836298381e22dc025758296a40da57def87f50c7cb84e41e7a02e9d` (1 490 144 B, 221 pp.) | 2026-11-07 |
 | **`FauSafSpa10`** | Faugère, Safey El Din, Spaenlehauer, *Computing Loci of Rank Defects of Linear Matrices using Gröbner Bases and Applications to Cryptology*, ISSAC 2010 | author mirror, [`members.loria.fr/PJSpaenlehauer/data/papers/FauSafSpa10a.pdf`](https://members.loria.fr/PJSpaenlehauer/data/papers/FauSafSpa10a.pdf) | `eeb0330b0490c6296c5b33d2515b84b072358ca7a883e141b548bff0fda201ad` (146 591 B, 8 pp.) | 2026-11-07 |
+| **`Steel14`** | Allan Steel, *A Dense Variant of the F4 Gröbner Basis Algorithm* (December 2013), carrying the update *Minrank Challenge C Solved Directly* (August 2014) and a further update of July 2015 — the author's own page on the Magma site, linked from his homepage | [`http://magma.maths.usyd.edu.au/users/allan/densef4/`](http://magma.maths.usyd.edu.au/users/allan/densef4/) | `7eb1b3566bcb002f2ead1bc8626116a10123a30c646002d7f6f6bcfbf6fd4c71` (16 854 B of HTML) | 2026-11-07 |
+| **`Steel15`** | Allan Steel, *Direct solution of the (11,9,8)-MinRank problem by the block Wiedemann algorithm in magma with a tesla GPU*, PASCO '15, Bath, 10 July 2015, pp. 2–6, [doi:10.1145/2790282.2791392](https://doi.org/10.1145/2790282.2791392) | **abstract only.** Closed access; `dl.acm.org` 403s here and Unpaywall reports no OA copy. Bibliographic record from Crossref and from Sydney's own publication list; abstract text from OpenAlex (§9) | — | 2026-11-07 |
 | **`MinRank2.0`** | Aragon, Bros, Perlner, Smith-Tone, Verbel, *Cryptanalysis of MinRank 2.0*, IACR ePrint 2026/2733 | **abstract page only**; the PDF still 403s and Wayback has no capture (§9) | — | 2026-11-07 |
 
 Licensing, per `external-provenance-policy.md` §4: `MinRank2.0` is **CC BY** (stated on its ePrint
 page). The artifact repository in §5.3 is **GPL-3.0** and its data is therefore *not* redistributed
-here. `asia01` and `FauSafSpa10` are read as publications; nothing is copied from either.
+here. `asia01`, `phd`, `FauSafSpa10` and `Steel14` are read as publications; nothing is copied from
+any of them.
 
 ---
 
@@ -96,14 +106,26 @@ comparison", and they are italicised here to keep them out of the challenge set.
 **This supersedes the second-hand table in #205's body**, which came via `MinRank2.0`'s Table 1 and
 a search summary. It agrees on every challenge parameter. Two differences are worth recording:
 
-- The two HFE columns are over **`q = 2^80` and `q = 2^103`**, not `q = 2`. #205's reading of
-  Courtois's thesis recorded `q = 2` for those columns. `2^80` is what `asia01` prints and is the
-  mathematically expected value — Kipnis–Shamir lifts HFE to the degree-`n` extension — so the
-  thesis reading should be re-checked before anything is built on it. Flagged, not resolved: I did
-  not read the thesis.
+- The two HFE columns are over **`q = 2^80` and `q = 2^103`**, not `q = 2`.
 - `MinRank2.0`'s Table 1 labels the matrix dimensions `m, n` and the unknown count `k`. Courtois
   labels the dimensions `η, n` and the unknown count `m`. **Same numbers, rotated names.** The
   fixture uses Courtois's names, since it transcribes Courtois.
+
+**The thesis/paper `q` discrepancy was an artifact, and is closed.** #205 recorded Courtois's thesis
+as printing `q = 2` for the two HFE columns where `asia01` prints `2^80` and `2^103`, and the
+previous revision of this document left that open. It was a text-extraction artifact, exactly the
+one this section's own first paragraph warns about. `phd` Table 24.7.1 (p. 183, PDF page 183) was
+rendered as an image and read: it prints **`2^80` and `2^103`**, and `pdftotext` drops those
+exponents onto the preceding line, where a reader scanning the flattened `q` row sees `… 2 2 2 2 2`
+and counts eight twos. **There is no discrepancy between `asia01` and `phd`.**
+
+Reading the thesis page also buys a free check on the whole of §2.2. `phd` Table 24.7.1 reproduces
+`asia01` §4.3 **cell for cell across all eight columns and all twelve rows, including the source's
+own bolding** — Kernel bold on A–F, Sub-matrices bold on the two HFE columns. The table above is
+therefore transcribed from one primary document and confirmed against a second, independently
+typeset one. One cosmetic difference, recorded so nobody reports it as a conflict: in `phd` the
+`Pr_α[Rank ≤ r]` entry `< 2^(−10^5)` is a **single cell merged across both** HFE columns, where the
+table above puts it under *HFE Chall. 1* and leaves *Quartz* blank.
 
 ### 2.3 The table checks out against its own paper
 
@@ -201,9 +223,11 @@ value is low. Recorded as not examined.
 |---|---|---|
 | `minrank.org` live deep paths | challenge files 404; HFE files survive | #205 comments |
 | Courtois's PhD thesis (`minrank.org/phd.pdf`) | parameters present, **matrices absent** | #205 comments |
+| the thesis's own parameter table, read as an image | confirms §2.2 cell for cell; the `q = 2` reading was a `pdftotext` artifact | this document, §2.2 |
 | `minrank.org/minrank/` official page, 2001–2003 archives | **papers and slides only; no data** | this document, §3.2 |
 | `asia01` / ePrint 2001/058, the original publication | **"six sets of parameters"; no data, no prize** | this document, §1 |
 | `FauSafSpa10`, the 2010 paper on C | **generated its own random instances** | this document, §5.1 |
+| `Steel14`/`Steel15`, the "2015 Steel" reference | identified; **an executed solve of a C-shaped instance, 23 August 2014**; no instance published | this document, §5.4 |
 | `MinRank2.0`, the 2026 paper on D | **solved "an instance"**, and ships it | this document, §5.2–5.3 |
 | Asiacrypt 2001 slides | scan, no text layer; not OCR'd | this document, §3.2 |
 
@@ -211,9 +235,9 @@ value is low. Recorded as not examined.
 
 | | parameters | authentic instance | status in the literature |
 |---|---|---|---|
-| **A** | **verified** (`asia01` §4.3) | **none published** | reported solved 2008; see §9 |
-| **B** | **verified** | **none published** | reported solved 2008; see §9 |
-| **C** | **verified** | **none published** | method + cost published 2010 (`FauSafSpa10`); see §5.1 on what "solved" means |
+| **A** | **verified** (`asia01` §4.3, confirmed against `phd` §24.7) | **none published** | `FauSafSpa10` Table 1 runs A's shape `(6, 9, 3)` in 1.1 s and attributes solving A to its [14] = the 2008 paper; see §9 |
+| **B** | **verified** | **none published** | same, for B's shape `(7, 9, 4)`, 37 s; see §9 |
+| **C** | **verified** | **none published** | **solved by execution, 23 August 2014**, on a generated same-parameter instance (`Steel14`, reported in `Steel15`). The 2010 result is a method plus a projection — §5.1, §5.4 |
 | **D** | **verified** | **none published**; one third-party same-parameter instance exists (§5.3) | solved 2026 on a generated instance (`MinRank2.0`) |
 | **E** | **verified** | **none published** | open |
 | **F** | **verified** | **none published** | open |
@@ -280,9 +304,24 @@ solve `65521^s` over-determined `(11, 9 − s, 8)` systems. The reported choice 
 
 | `s` | 3 | 2 | **1** | 0 |
 |---|---:|---:|---:|---:|
-| minors F5 time | 79 s | 1 594 s | **80 255 s** | 2 570 396 s |
-| `d_reg` | 9 | 10 | **13** | 25 |
-| log₂ ops | 73 | 60 | **49.1** | 40.2 |
+| minors F5 time | 79 s | 1 594 s | **80 255 s** | *2 570 396 s* |
+| minors F5 mem | < 1 000 MB | 2 400 MB | **29 929 MB** | — |
+| `d_reg` | 9 | 10 | **13** | *25* |
+| log₂ ops | 73 | 60 | **49.1** | *40.2* |
+
+**The paper marks its own estimates, and that is what licenses the reading above.** Table 2's
+caption says, verbatim:
+
+> The values in italic font were not effectively computed but are given as estimates based on
+> practical and theoretical results.
+
+Italics here reproduce the source's. The page was rendered as an image to read them, because the
+distinction is carried entirely by the typeface and `pdftotext` discards it. **Only the `s = 0`
+column is italic.** So `80 255 s`, `29 929 MB` and `d_reg = 13` at `s = 1` are the paper's own
+measurements of a run that happened, and `2 570 396 s` and `d_reg = 25` at `s = 0` are not. The
+`log₂ ops` row is one step removed in both cases: the caption defines it as
+`log₂(65521^s · OpF5)`, an estimate of the cost of the **whole** challenge, so `49.1` is an executed
+`OpF5` scaled by `65521`, and `40.2` is an interpolated one.
 
 and then, verbatim:
 
@@ -308,6 +347,21 @@ These are three different kinds of claim and none converts into another here.
 For #206: the minors route reaches `(11, 9, 8)` at `d_reg = 25` against Kipnis–Shamir's `2^64.4`
 estimate, so minors beats KS on this instance by the paper's own numbers — but `r + 1 = 9`, so the
 minors are `9 × 9`, which #206 already records as out of reach of a cofactor expansion.
+
+**The door `FauSafSpa10` left open is the one that was eventually walked through** (§5.4). Its
+closing remark on `s = 0` — solving the challenge directly, with no exhaustive search at all — is,
+verbatim:
+
+> Note that it may be possible to compute directly a Gröbner basis of the ideal generated by the
+> minors (`s = 0`). By interpolating the practical results, we give a rough estimate of the
+> complexity of this computation: it would take approximately 29 days (on one CPU). However, it is
+> not clear how much memory would be required, and the FGLM step could be untractable since the
+> degree of the ideal is 259545 (Corollary 1).
+
+Two things to carry forward. The "approximately 29 days" is the table's italic `2 570 396 s`
+restated — `2 570 396 / 86 400 = 29.75`, my arithmetic on two of the paper's own figures, not a
+third figure. And the stated obstacle is **FGLM**, not the Gröbner step: `deg(I) = 259545` and FGLM
+is cubic in it. That is precisely the obstacle §5.4 removes.
 
 ### 5.2 `MinRank2.0` and challenge D
 
@@ -368,6 +422,119 @@ Cheemalakonda. Unresolved; probably an anonymized-submission version differing f
 
 ---
 
+### 5.4 Steel 2014/2015 and challenge C: the one solve that was actually executed
+
+This section answers #382. The short form: **yes — someone ran it to completion, and it was neither
+2010 nor, strictly, 2015.** Allan Steel solved a challenge-C-shaped instance on **23 August 2014**,
+on one CPU core and one GPU, and reported it at PASCO 2015.
+
+**Identifying the reference.** `MinRank2.0` says C was solved "again in 2015 by Steel [41] with an
+improved implementation". Its bibliography could not be read — the PDF 403s and Wayback still has
+no capture (§9) — so **[41] is identified by content, not by reading the entry**, and that is the
+one inferential step in this section. The identification is safe because the target is unique:
+searching both OpenAlex and Crossref for works by Allan Steel on MinRank returns **exactly one**,
+`Steel15`; it is dated 2015; and "an improved implementation" describes it precisely. Its
+bibliographic record is confirmed twice over, from
+Crossref's registration metadata and from the University of Sydney's own
+[2015 publication list](https://www.maths.usyd.edu.au/u/pubs/publist/pubs2015.html):
+
+> Allan Steel (2015). Direct Solution of the (11,9,8)-MinRank problem by the Block Wiedemann
+> Algorithm in Magma with a Tesla GPU. The 7th International Workshop on Parallel Symbolic
+> Computation (PASCO), … PASCO '15, ACM, ISBN 978-1-4503-3599-7, 2–6.
+
+**The run, in the author's own words.** `Steel14` — Steel's page on the Magma site, which his
+homepage links as "**NEW:** Minrank Challenge C Solved Directly (August 2014)" — says, verbatim:
+
+> In 2014 I have developed code within Magma for the Wiedemann algorithm for computing the minimal
+> polynomial of large sparse matrices. Using this, **on 23 August 2014 I managed to solve a random
+> instance over GF(65521) of the Cortois [*sic*] Minrank Challenge C where `(n,k,r)=(11,9,8)`**,
+> using the direct approach with the Wiedemann algorithm (that is, without using the above
+> evaluation method).
+>
+> The current times for this direct method are:
+> - Dense F4: 7.0 hours [computes the grevlex GB of the zero-dimensional ideal; the GB has 51275
+>   polys with up to 48620 terms each].
+> - Wiedemann: 23.2 hours [computes the minimal polynomial of a 259545 by 259545 matrix with
+>   density 13.4%].
+>
+> This is using just one Intel E5-2687W (3.1GHz) core and a Tesla C2075 GPU (same as above).
+
+and, under "Update (July 2015)":
+
+> Details on the computation (which can now be done in 15.1 hours with just one core and a K40
+> Tesla GPU) can be found in my PASCO 2015 paper.
+
+`Steel15`'s abstract agrees and is the published form of the claim:
+
+> As a result, the Magma implementation can directly solve a 16-bit **random instance** of the
+> Courtois (11,9,8)-MinRank Challenge C in about 15.1 hours with a single Intel Sandybridge CPU
+> core coupled with an Nvidia Tesla K40 GPU.
+
+**This is `s = 0` — the route `FauSafSpa10` raised and set aside.** The cross-check is exact and is
+the reason this is worth trusting: Steel's Wiedemann step computes the minimal polynomial of a
+**259545 × 259545** matrix, and `259545` is `FauSafSpa10`'s `deg(I)` for `(11, 9, 8)` from its
+Corollary 1 — the very number it cited as the reason FGLM "could be untractable" (§5.1). Steel did
+not make FGLM tractable; he replaced it. `Steel15`'s abstract says what with:
+
+> We show how some very large multivariate polynomial systems over finite fields can be solved by
+> Gröbner basis techniques coupled with the Block Wiedemann algorithm, thus extending the
+> Wiedemann-based 'Sparse FGLM' approach of Faugère and Mou.
+
+**Two independent computations, fifteen years and two codebases apart, agree on the degree of this
+ideal to the digit.** For F2 (§7) that is a checkable quantity of a quality the timing rows do not
+have. (`Steel14` writes "the Wiedemann algorithm" where the 2015 title and abstract say "Block
+Wiedemann"; whether the 2014 run used the block variant is not stated on the page.)
+
+**It is still a generated same-parameter instance, so §1 stands unchanged.** "A random instance over
+GF(65521) … where `(n,k,r)=(11,9,8)`" is the same kind of object `FauSafSpa10` and `MinRank2.0`
+used. `Steel14` publishes no instance file, no seed and no generator; probing the site for one under
+seven spellings (§9) returns 404 throughout, and the
+page's one offer of input files — "[Links for the actual input files will be added soon.]", about
+the HFE systems — was never redeemed. **There is still no downloadable MinRank object with challenge
+parameters other than the challenge-D file of §5.3.**
+
+**Note the normalisation.** `(n, k, r) = (11, 9, 8)` is §2.4's nine-unknown form, not Courtois's
+`m = 10`. Steel solved the shape `FauSafSpa10` defined, which is C with one unknown pinned. #206
+must say which it means.
+
+**Steel's separate, and still projected, figure for the evaluation route.** Before the direct solve,
+the same page compares Magma's dense F4 against `FauSafSpa10` on the `s = 1` route:
+
+> Faugere et al estimated that a single instance … takes 80255 seconds using Faugere's F5 code, so
+> the challenge can be solved in about 166.7 core years, or in about 238 days on a 256-core Xeon
+> cluster. With the dense variant of F4 in Magma V2.20 …, a single instance … takes 1637 seconds, so
+> the challenge can be solved in about 3.4 core years, or in about 4.8 days on a 256-core cluster.
+
+**That half is a projection too** — one sub-instance measured, `× 65521`, exactly as in §5.1, and
+nobody ran 65521 of them. It is recorded here so it is not mistaken for the solve. Every derived
+number in it reproduces (my arithmetic): `80 255 × 65521 = 5.258 × 10⁹ s = 166.6` core-years, which
+on 256 cores is 237.7 days — so Steel reads `FauSafSpa10`'s "64 quadri-core processors" as 256 cores
+and lands on its 238 days; `1 637 × 65521 = 1.073 × 10⁸ s = 3.40` core-years and 4.85 days on 256
+cores; and `80 255 / 1 637 = 49.0`, Steel's "about 50 times faster".
+
+One wording difference, recorded rather than resolved: Steel writes that Faugère et al.
+"**estimated**" the 80 255 s, where `FauSafSpa10`'s own italic convention marks that figure as
+effectively computed (§5.1). Nothing here turns on it — the 80 255 s is used identically either way
+— but a reader comparing the two sources will meet it.
+
+**Units, kept apart as §5.1 and §5.2 do.** The 2014 run: `7.0 h` dense F4 **plus** `23.2 h`
+Wiedemann, **measured**, on 1 core of an Intel E5-2687W (3.1 GHz) with one Tesla C2075 — 30.2 hours
+of wall clock in total (my addition). The 2015 run: `15.1 h`, **measured**, on 1 Intel Sandybridge
+core with one Tesla K40. Neither is an operation count, and neither is comparable to
+`FauSafSpa10`'s `2^49.1` arithmetic operations without a model. The two Steel runs are not
+comparable to each other either: different GPU, different reported hardware, and the page does not
+say whether the 15.1 h is the same instance re-run.
+
+**So what is the honest status of challenge C?** Three claims, which the literature tends to merge:
+
+| claim | status |
+|---|---|
+| "C was solved in 2010" | **overstated.** `FauSafSpa10` executed one `s = 1` sub-system and projected the rest (§5.1) |
+| "C was solved again in 2015 by Steel" | **true in substance, off by a year in fact.** The execution was 23 August 2014; PASCO 2015 is where it was published, with a faster time |
+| "someone has run a challenge-C-parameter MinRank solve to completion" | **true, once, by Steel, in about 30 hours on one core and one GPU** — and the 2015 paper reports 15.1 hours |
+
+---
+
 ## 6. Corrections to the record
 
 Collected so they are not buried.
@@ -376,14 +543,27 @@ Collected so they are not buried.
    #205's motivation and #195's self-verification argument both state it without `M₀`. The argument
    survives — it is still one rank computation — but an implementation written from the issue text
    would be wrong. (§2.1)
-2. **The HFE comparison columns are over `2^80` and `2^103`, not `2`.** (§2.2)
+2. **The HFE comparison columns are over `2^80` and `2^103`, not `2`** — in `asia01` *and* in the
+   thesis. The previous revision of this document left an `asia01`-versus-thesis conflict open on
+   this row; there is none. #205's `q = 2` reading was `pdftotext` dropping the superscripts, and
+   the rendered page says `2^80`/`2^103`. **This corrects a correction**, and closes the question.
+   (§2.2)
 3. **`FauSafSpa10`'s 14-day/12-hour figure is the cost of computing the minors, not of solving.**
    (§5.1)
 4. **`FauSafSpa10`'s `2^49` is a projection**, from one executed sub-system; the 238-day figure was
-   never run. "Challenge C was solved in 2010" overstates what that paper reports. (§5.1)
-5. **Nobody solved a Courtois instance, because there are none.** Both the 2010 and the 2026 results
-   are on generated same-parameter instances. (§5)
+   never run. "Challenge C was solved in 2010" overstates what that paper reports. The paper's own
+   italic convention in Table 2 now backs this: the `s = 1` column is roman (computed), the `s = 0`
+   column italic (estimated). (§5.1)
+5. **Nobody solved a Courtois instance, because there are none.** The 2010, 2014 and 2026 results
+   are all on generated same-parameter instances. (§5)
 6. **`minrank.org` is not a dead host**; its front door is. (§3.1)
+7. **Challenge C *has* been solved by execution — on 23 August 2014.** Not in 2010, and not quite
+   in 2015 either: `Steel15` (PASCO 2015) is where the 2014 run was published, with a faster
+   re-reported time. This supersedes the previous revision's §9, which recorded the Steel reference
+   as unpursued and the executed status of C as unknown. (§5.4)
+8. **`FauSafSpa10`'s `deg(I) = 259545` for `(11, 9, 8)` is independently confirmed.** Steel's
+   executed Wiedemann step computes the minimal polynomial of a `259545 × 259545` matrix. Two
+   codebases, fifteen years apart, same digit. (§5.4)
 
 ### 6.3 One row that does not check out
 
@@ -398,6 +578,9 @@ The brute-force row is `q^m · O(rηn)` to within rounding for A, B, C, E and F:
 arithmetic, not a claim by the paper, and I did not find an erratum. It matters only if the
 brute-force row is used as a difficulty scale for D; the kernel row, which is the row the paper
 bolds as best, is unaffected. Recorded rather than corrected.
+
+**It is not a typesetting slip in one document.** `phd` Table 24.7.1 prints `2^81` for D's
+brute-force entry as well (§2.2), so the figure is whatever Courtois intended it to be, twice.
 
 ---
 
@@ -415,7 +598,7 @@ What a future F2 should register, when a generator exists:
 | id | class | significance | objective | notes |
 |---|---|---|---|---|
 | `courtois-minrank-A-surrogate-<seed>` | `Engineering` | `SurrogateWitness` | **new** `MinRank { eta, n, m, r }` | `GF(65521)`, 11 matrices `6×6`, `r = 3`. Smallest member. |
-| `courtois-minrank-C-surrogate-<seed>` | `Engineering` | `SurrogateWitness` | same | `GF(65521)`, 11 matrices `11×11`, `r = 8`. The reproduction target: `FauSafSpa10` publishes a method and a cost for this shape. |
+| `courtois-minrank-C-surrogate-<seed>` | `Engineering` | `SurrogateWitness` | same | `GF(65521)`, 11 matrices `11×11`, `r = 8`. The reproduction target: `FauSafSpa10` publishes a method and a cost for this shape, and `Steel14` ran one to completion (§5.4). |
 | `courtois-minrank-D-external` | — | — | same | **record only**, not an instance in the corpus: §5.3's file, pinned by SHA-256, not redistributed, not fetched by script. |
 | E, F | — | — | — | **do not register.** Unattempted and out of reach; `GF(2)` blocks on #196 G2. |
 
@@ -437,13 +620,25 @@ computation, and `FauSafSpa10` publishes `d_reg`, ideal degree, operation counts
 both modellings at exactly `(11, 9, 8)` — four independent quantities a Zeebra run can be checked
 against without any of them being a timing comparison. A's shape is the smoke test on the way.
 
+**§5.4 strengthens this recommendation rather than adding to it.** It does not add a fifth
+quantity — `Steel14` publishes wall clock, which is the one kind of figure this corpus does not
+compare against. What it adds is that one of the four is now **double-sourced**: `deg(I) = 259545`
+is both derived from `FauSafSpa10`'s Corollary 1 and measured by an executed computation that had
+to build a `259545 × 259545` matrix to finish. A Zeebra run on a C-shaped surrogate that reports a
+different ideal degree is wrong, and that is now known from two directions rather than one.
+
+It also settles the framing question #382 was filed to answer: a C-shaped solve **reproduces a
+result**, it does not extend a projection. The honest caveat is that it reproduces *Steel's* result
+on *Steel's* kind of instance — a random one — and no two random `(11, 9, 8)` instances have to
+cost the same.
+
 ---
 
 ## 8. What is in the repository
 
 | path | what it is |
 |---|---|
-| `research/minrank/courtois-challenges.tsv` | the §2.2 table, machine-readable, with the source and its SHA-256 in the header |
+| `research/minrank/courtois-challenges.tsv` | the §2.2 table, machine-readable, with both primary sources and their SHA-256s in the header |
 | `tests/minrank_challenges.rs` | eight tests over that fixture |
 
 The fixture is **parameters, and its header says so twice**. The tests are not a parse check: they
@@ -462,35 +657,48 @@ No field was declared, no instance generated, no system solved, and no measureme
 
 ## 9. Secondary-only, and uncertain
 
-**Recorded in secondary literature only.** The following are from `MinRank2.0` as quoted in #205's
-comments. Its PDF 403s here, Wayback has no capture of it, and its abstract page — which does
-resolve — does not contain them. **I did not verify these and they must not be treated as checked:**
+**The four claims this section carried, and where each stands after #382.** They came from
+`MinRank2.0` as quoted in #205's comments; its PDF still 403s and Wayback still has no capture, so
+its bibliography remains unread.
 
-- A and B "were solved by Faugère, Levy-dit-Vehel, and Perret in 2008". Plausible and consistent
-  with `FauSafSpa10`'s §1 ("the challenges A and B proposed in [7]"), but the 2008 paper was not
-  read.
-- "Challenge C was solved in 2010 by [27], and again in 2015 by Steel [41] with an improved
-  implementation." §5.1 shows the 2010 half overstates what `FauSafSpa10` reports. **The 2015 Steel
-  reference is the most likely record of an executed solve of C and was not pursued** — it is the
-  single highest-value unread source on this issue.
-- "Challenges D, E, and F have remained unsolved for 25 years."
-- `MinRank2.0`'s Table 1 itself. §2.2 replaces it with the original.
+| claim | status now |
+|---|---|
+| "Challenge C was solved in 2010 by [27], and again in 2015 by Steel [41] with an improved implementation." | **resolved, and both halves need qualifying.** §5.1 for 2010; §5.4 for Steel — an executed solve, dated 23 August 2014, published at PASCO 2015. Read at `Steel14`, the author's own page, plus `Steel15`'s abstract. [41] identified by content, not by reading the bibliography entry (§5.4) |
+| A and B "were solved by Faugère, Levy-dit-Vehel, and Perret in 2008" | **still not read at source; upgraded from one secondary witness to a primary one.** `FauSafSpa10` §1, read in full, says the Kipnis–Shamir modelling "combined with the algorithms F5 and FGLM … can solve the challenges A and B proposed in [7]", and its [14] is the 2008 paper by those three authors. Its Table 1 also runs A's and B's shapes, `(6, 9, 3)` in 1.1 s and `(7, 9, 4)` in 37 s. That is a primary source attributing the result and demonstrating the shapes are trivial — it is **not** the 2008 authors reporting a run. The 2008 paper itself could not be obtained (below) |
+| "Challenges D, E, and F have remained unsolved for 25 years." | **still secondary-only, and now partly contradicted by `MinRank2.0` itself**, whose abstract reports solving D (§5.2). Read as a statement about the position before that paper. E and F unexamined here |
+| `MinRank2.0`'s Table 1 itself | **superseded.** §2.2 replaces it with the original, now confirmed against a second primary document |
 
 **Uncertain or not established.**
 
 - Whether Courtois ever distributed instances privately — by email, in the thesis defence, or to
   correspondents. §3 establishes only that none was *published*. This is unfalsifiable from here and
   is recorded as such rather than as a negative.
-- The `q = 2` versus `q = 2^80` discrepancy between `asia01` and #205's reading of the thesis (§2.2).
+- Whether `Steel15` reports anything the `Steel14` page does not. Only its abstract was read; the
+  five pages were not. In particular the page does not say whether its 15.1 h is the same instance
+  re-run on newer hardware or a fresh one, and the abstract does not say either.
+- `Steel15`'s abstract places Magma V2.20's release in "late 2014"; `Steel14` says "released
+  December 2013". Magma's own release-note pages return `401` to this machine, so the dates were not
+  reconciled. Nothing in §5.4 depends on it.
+- Steel describes `FauSafSpa10`'s 80 255 s as "estimated" where that paper's own typography marks it
+  computed (§5.4). Recorded, not resolved; no figure here turns on it.
 - The author-list discrepancy for `MinRank2.0` (§5.3).
-- D's brute-force row (§6.3).
+- D's brute-force row (§6.3) — now known to read `2^81` in both `asia01` and `phd`, so not a
+  one-document slip, but still unexplained.
 - The Asiacrypt 2001 slides are a scan and were not OCR'd (§3.2).
-- `web.archive.org` returned "Temporarily Offline" intermittently throughout this work. Every
-  Wayback result quoted here was fetched successfully and is reproducible by URL; but a reader who
-  gets an error page should retry rather than conclude the capture is gone.
+- `web.archive.org` returned "Temporarily Offline" or `429` intermittently throughout this work and
+  throughout #382's. Every Wayback result quoted here was fetched successfully and is reproducible
+  by URL; a reader who gets an error page should retry rather than conclude the capture is gone.
 
-**Attempted and failed, with what was tried.** `https://eprint.iacr.org/2026/2733.pdf` → `403`
-(the abstract page at the same host returns `200`, so this is PDF-specific, matching
-`elimination-beyond-grobner.md` §8). Wayback CDX for `eprint.iacr.org/2026/2733*` → the service was
-offline on each attempt; not retried to exhaustion. `https://anonymous.4open.science/r/…` HTML →
-`401 not_connected`; the JSON API under `/api/repo/…` works and is what §5.3 used.
+**Resolved since the previous revision.** The `q = 2` versus `q = 2^80` question (§2.2) — closed,
+and there never was a conflict.
+
+**Attempted and failed, with what was tried.**
+
+| target | what was tried | result |
+|---|---|---|
+| `MinRank2.0` full text, to read entry [41] | `https://eprint.iacr.org/2026/2733.pdf`; `/archive/2026/2733/…` | `403` both, while the abstract page at the same host returns `200` — PDF-specific, matching `elimination-beyond-grobner.md` §8 |
+| `Steel15` full text (PASCO 2015, 5 pp.) | `dl.acm.org/citation.cfm?id=2791392`, `dl.acm.org/doi/10.1145/2790282.2791392`, `doi.org/…` | `403` from `dl.acm.org` on all three. Unpaywall: `is_oa: false`, no OA locations. OpenAlex: `oa_status: closed`. **The paper is closed access and no free copy exists to find.** Bibliographic record obtained from Crossref and Sydney's publication list; abstract from OpenAlex's index of the publisher abstract — reconstructed from its inverted index, which was checked to be gapless and duplicate-free over positions 0–147 before being quoted |
+| Faugère–Levy-dit-Vehel–Perret, *Cryptanalysis of MinRank*, CRYPTO 2008, LNCS 5157 pp. 280–296 | `iacr.org/archive/crypto2008/51570280/51570280.{pdf,ps}` → `403`; `link.springer.com/chapter/10.1007/978-3-540-85174-5_16` → `303` to an `idp.springer.com` login; `www-polsys.lip6.fr/~jcf/Papers/…` → connection timed out twice; HAL → one record, `hal-00976374`, **metadata only, no file**; Unpaywall and OpenAlex → closed, no abstract indexed | **not obtained.** This is the one acceptance item of #382 left open |
+| a published instance file for challenge C | `Steel14`'s host, at `densef4/magma/`, `densef4/minrank`, `densef4/minrank.txt`, `densef4/MinRank`, `densef4/input/`, `densef4/mr`, `densef4/chalC.txt` | `404` throughout; `gb/magma/` is `403` (listing denied, individual files serve). No instance, no seed, no generator published |
+| Wayback captures of `dl.acm.org`'s page for the DOI, to read the abstract at the publisher | CDX for `dl.acm.org/citation.cfm*` filtered on `2791392`, and prefix CDX for the `/doi/` form | `504` and `503 Temporarily Offline`; retried later and got `429`. Not retried to exhaustion — the abstract was obtained by another route, so this was not needed |
+| `anonymous.4open.science` HTML (§5.3) | `/r/…` | `401 not_connected`; the JSON API under `/api/repo/…` works and is what §5.3 used |
