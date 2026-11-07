@@ -1,6 +1,5267 @@
 {
   "schema": 1,
   "contract": "every cross-library row ever recorded, APPEND-ONLY and in the order recorded, INCLUDING the runs that produced no answer. A row whose outcome is unsupported, stopped-by-limit or failed carries NO publishable time: see docs/research/external-comparison-protocol.md section 3. Ratios are valid only between rows agreeing on problem_digest, task, limits, machine and build, with both outcomes answered and their invariants agreed.",
-  "row_count": 0,
-  "rows": []
+  "row_count": 72,
+  "rows": [
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4^2",
+          "x2^2",
+          "x3*x4^2",
+          "x3^2",
+          "x4^4"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 218834,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 218834
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 5510
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-4 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4^2",
+          "x2^2",
+          "x3*x4^2",
+          "x3^2",
+          "x4^4"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 36099898,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20414464,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^8"
+        ],
+        "basis_cardinality": 4
+      },
+      "wall_nanos": 310908,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 215097
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 95811
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-4 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-4",
+      "problem_digest": "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 8,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^8"
+        ],
+        "basis_cardinality": 4
+      },
+      "wall_nanos": 35907523,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21032960,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4^2",
+          "x2*x5^3",
+          "x2^2",
+          "x3*x4",
+          "x3*x5^3",
+          "x3^2",
+          "x4*x5^3",
+          "x4^2*x5",
+          "x4^3",
+          "x5^5"
+        ],
+        "basis_cardinality": 13
+      },
+      "wall_nanos": 1038897,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 1038897
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 17253
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-5 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4^2",
+          "x2*x5^3",
+          "x2^2",
+          "x3*x4",
+          "x3*x5^3",
+          "x3^2",
+          "x4*x5^3",
+          "x4^2*x5",
+          "x4^3",
+          "x5^5"
+        ],
+        "basis_cardinality": 13
+      },
+      "wall_nanos": 35957628,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20447232,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5^16"
+        ],
+        "basis_cardinality": 5
+      },
+      "wall_nanos": 1137263,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 955128
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 182135
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-5 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-5",
+      "problem_digest": "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5^16"
+        ],
+        "basis_cardinality": 5
+      },
+      "wall_nanos": 35998996,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20856832,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 1000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4*x6^2",
+          "x2*x5*x6^2",
+          "x2*x5^2",
+          "x2*x6^4",
+          "x2^2",
+          "x3*x4",
+          "x3*x5*x6^2",
+          "x3*x5^2",
+          "x3*x6^4",
+          "x3^2",
+          "x4*x5*x6",
+          "x4*x5^2",
+          "x4*x6^4",
+          "x4^2",
+          "x5*x6^4",
+          "x5^2*x6^2",
+          "x5^3*x6",
+          "x5^4",
+          "x6^6"
+        ],
+        "basis_cardinality": 22
+      },
+      "wall_nanos": 3678785,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 3678785
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 27252
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-6 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4*x6^2",
+          "x2*x5*x6^2",
+          "x2*x5^2",
+          "x2*x6^4",
+          "x2^2",
+          "x3*x4",
+          "x3*x5*x6^2",
+          "x3*x5^2",
+          "x3*x6^4",
+          "x3^2",
+          "x4*x5*x6",
+          "x4*x5^2",
+          "x4*x6^4",
+          "x4^2",
+          "x5*x6^4",
+          "x5^2*x6^2",
+          "x5^3*x6",
+          "x5^4",
+          "x6^6"
+        ],
+        "basis_cardinality": 22
+      },
+      "wall_nanos": 35933061,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20480000,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6^32"
+        ],
+        "basis_cardinality": 6
+      },
+      "wall_nanos": 3881370,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 3382114
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 499256
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-6 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-6",
+      "problem_digest": "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 32,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6^32"
+        ],
+        "basis_cardinality": 6
+      },
+      "wall_nanos": 36046917,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20492288,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 1000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4*x6*x7",
+          "x2*x4*x6^2",
+          "x2*x4*x7^3",
+          "x2*x5*x6",
+          "x2*x5*x7^3",
+          "x2*x5^2",
+          "x2*x6*x7^3",
+          "x2*x6^2*x7",
+          "x2*x6^3",
+          "x2*x7^5",
+          "x2^2",
+          "x3*x4",
+          "x3*x5*x6",
+          "x3*x5*x7^3",
+          "x3*x5^2",
+          "x3*x6*x7^3",
+          "x3*x6^2*x7",
+          "x3*x6^3",
+          "x3*x7^5",
+          "x3^2",
+          "x4*x5",
+          "x4*x6*x7^3",
+          "x4*x6^2*x7",
+          "x4*x6^3",
+          "x4*x7^5",
+          "x4^2",
+          "x5*x6*x7^2",
+          "x5*x6^2*x7",
+          "x5*x6^3",
+          "x5*x7^5",
+          "x5^2*x6",
+          "x5^2*x7",
+          "x5^3",
+          "x6*x7^5",
+          "x6^2*x7^3",
+          "x6^3*x7^2",
+          "x6^4*x7",
+          "x6^5",
+          "x7^7"
+        ],
+        "basis_cardinality": 41
+      },
+      "wall_nanos": 25840714,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 25840714
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 65614
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-7 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
+      "family": "katsura",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4*x6*x7",
+          "x2*x4*x6^2",
+          "x2*x4*x7^3",
+          "x2*x5*x6",
+          "x2*x5*x7^3",
+          "x2*x5^2",
+          "x2*x6*x7^3",
+          "x2*x6^2*x7",
+          "x2*x6^3",
+          "x2*x7^5",
+          "x2^2",
+          "x3*x4",
+          "x3*x5*x6",
+          "x3*x5*x7^3",
+          "x3*x5^2",
+          "x3*x6*x7^3",
+          "x3*x6^2*x7",
+          "x3*x6^3",
+          "x3*x7^5",
+          "x3^2",
+          "x4*x5",
+          "x4*x6*x7^3",
+          "x4*x6^2*x7",
+          "x4*x6^3",
+          "x4*x7^5",
+          "x4^2",
+          "x5*x6*x7^2",
+          "x5*x6^2*x7",
+          "x5*x6^3",
+          "x5*x7^5",
+          "x5^2*x6",
+          "x5^2*x7",
+          "x5^3",
+          "x6*x7^5",
+          "x6^2*x7^3",
+          "x6^3*x7^2",
+          "x6^4*x7",
+          "x6^5",
+          "x7^7"
+        ],
+        "basis_cardinality": 41
+      },
+      "wall_nanos": 51377262,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20606976,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 10000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7^64"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 28946003,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 26877747
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 2068256
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row katsura-7 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "katsura-7",
+      "problem_digest": "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
+      "family": "katsura",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7^64"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 51411106,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21323776,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 10000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 8000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
+      "family": "cyclic",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "leading_monomials": [
+          "x1",
+          "x2*x3*x4^2",
+          "x2*x3^2",
+          "x2*x4^4",
+          "x2^2",
+          "x3^2*x4^4",
+          "x3^3*x4^2"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 103405,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 103405
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-4 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
+      "family": "cyclic",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "leading_monomials": [
+          "x1",
+          "x2*x3*x4^2",
+          "x2*x3^2",
+          "x2*x4^4",
+          "x2^2",
+          "x3^2*x4^4",
+          "x3^3*x4^2"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 36022852,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20455424,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
+      "family": "cyclic",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "order conversion needs a finite quotient algebra, and this ideal is positive-dimensional",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 145926
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-4 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-4",
+      "problem_digest": "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
+      "family": "cyclic",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "failed",
+      "outcome_detail": "the tool reported an error: no @gbsize marker was printed",
+      "invariants": {},
+      "cpu_nanos": 0,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 14893056,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
+      "family": "cyclic",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 70,
+        "leading_monomials": [
+          "x1",
+          "x2*x3*x4*x5^2",
+          "x2*x3*x4^2",
+          "x2*x3^2",
+          "x2*x4^2*x5^3",
+          "x2*x4^3",
+          "x2*x5^5",
+          "x2^2",
+          "x3*x4*x5^5",
+          "x3*x4^2*x5^3",
+          "x3*x4^3",
+          "x3*x5^7",
+          "x3^2*x4^2",
+          "x3^2*x5^5",
+          "x3^3",
+          "x4*x5^7",
+          "x4^2*x5^6",
+          "x4^3*x5^4",
+          "x4^4",
+          "x5^8"
+        ],
+        "basis_cardinality": 20
+      },
+      "wall_nanos": 1512724,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 1512724
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 40807
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-5 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
+      "family": "cyclic",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 70,
+        "leading_monomials": [
+          "x1",
+          "x2*x3*x4*x5^2",
+          "x2*x3*x4^2",
+          "x2*x3^2",
+          "x2*x4^2*x5^3",
+          "x2*x4^3",
+          "x2*x5^5",
+          "x2^2",
+          "x3*x4*x5^5",
+          "x3*x4^2*x5^3",
+          "x3*x4^3",
+          "x3*x5^7",
+          "x3^2*x4^2",
+          "x3^2*x5^5",
+          "x3^3",
+          "x4*x5^7",
+          "x4^2*x5^6",
+          "x4^3*x5^4",
+          "x4^4",
+          "x5^8"
+        ],
+        "basis_cardinality": 20
+      },
+      "wall_nanos": 36060723,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20545536,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
+      "family": "cyclic",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 70,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5^5",
+          "x2^2",
+          "x3*x4",
+          "x3*x5^5",
+          "x3^3",
+          "x4^2*x5^5",
+          "x4^7",
+          "x5^15"
+        ],
+        "basis_cardinality": 11
+      },
+      "wall_nanos": 2337245,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 1823753
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 513492
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-5 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-5",
+      "problem_digest": "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
+      "family": "cyclic",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 70,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5^5",
+          "x2^2",
+          "x3*x4",
+          "x3*x5^5",
+          "x3^3",
+          "x4^2*x5^5",
+          "x4^7",
+          "x5^15"
+        ],
+        "basis_cardinality": 11
+      },
+      "wall_nanos": 36033021,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20885504,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 1000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+      "family": "cyclic",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 156,
+        "leading_monomials": [
+          "x1",
+          "x2*x3*x4",
+          "x2*x3*x5*x6^4",
+          "x2*x3*x5^2",
+          "x2*x3*x6^6",
+          "x2*x3^2",
+          "x2*x4*x5*x6^5",
+          "x2*x4*x5^2",
+          "x2*x4*x6^6",
+          "x2*x4^2",
+          "x2*x5*x6^7",
+          "x2*x5^2*x6^5",
+          "x2*x5^3",
+          "x2*x6^8",
+          "x2^2",
+          "x3*x4*x5*x6^5",
+          "x3*x4*x5^2",
+          "x3*x4*x6^7",
+          "x3*x4^2*x5",
+          "x3*x4^2*x6^3",
+          "x3*x4^3",
+          "x3*x5*x6^7",
+          "x3*x5^2*x6^5",
+          "x3*x5^3",
+          "x3*x6^8",
+          "x3^2*x4",
+          "x3^2*x5*x6^4",
+          "x3^2*x5^2",
+          "x3^2*x6^6",
+          "x3^3",
+          "x4*x5*x6^7",
+          "x4*x5^2*x6^5",
+          "x4*x5^3",
+          "x4*x6^8",
+          "x4^2*x5*x6^5",
+          "x4^2*x5^2",
+          "x4^2*x6^7",
+          "x4^3*x5",
+          "x4^3*x6^4",
+          "x4^4",
+          "x5^2*x6^7",
+          "x5^3*x6^6",
+          "x5^4*x6^3",
+          "x5^5",
+          "x6^9"
+        ],
+        "basis_cardinality": 45
+      },
+      "wall_nanos": 13148053,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 13148053
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 116300
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-6 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+      "family": "cyclic",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 156,
+        "leading_monomials": [
+          "x1",
+          "x2*x3*x4",
+          "x2*x3*x5*x6^4",
+          "x2*x3*x5^2",
+          "x2*x3*x6^6",
+          "x2*x3^2",
+          "x2*x4*x5*x6^5",
+          "x2*x4*x5^2",
+          "x2*x4*x6^6",
+          "x2*x4^2",
+          "x2*x5*x6^7",
+          "x2*x5^2*x6^5",
+          "x2*x5^3",
+          "x2*x6^8",
+          "x2^2",
+          "x3*x4*x5*x6^5",
+          "x3*x4*x5^2",
+          "x3*x4*x6^7",
+          "x3*x4^2*x5",
+          "x3*x4^2*x6^3",
+          "x3*x4^3",
+          "x3*x5*x6^7",
+          "x3*x5^2*x6^5",
+          "x3*x5^3",
+          "x3*x6^8",
+          "x3^2*x4",
+          "x3^2*x5*x6^4",
+          "x3^2*x5^2",
+          "x3^2*x6^6",
+          "x3^3",
+          "x4*x5*x6^7",
+          "x4*x5^2*x6^5",
+          "x4*x5^3",
+          "x4*x6^8",
+          "x4^2*x5*x6^5",
+          "x4^2*x5^2",
+          "x4^2*x6^7",
+          "x4^3*x5",
+          "x4^3*x6^4",
+          "x4^4",
+          "x5^2*x6^7",
+          "x5^3*x6^6",
+          "x5^4*x6^3",
+          "x5^5",
+          "x6^9"
+        ],
+        "basis_cardinality": 45
+      },
+      "wall_nanos": 46223865,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20738048,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 7000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+      "family": "cyclic",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 156,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5",
+          "x2*x6^6",
+          "x2^2",
+          "x3*x4",
+          "x3*x5",
+          "x3*x6^6",
+          "x3^3",
+          "x4*x5",
+          "x4*x6^6",
+          "x4^3",
+          "x5^2*x6^12",
+          "x5^3*x6^6",
+          "x5^6",
+          "x6^48"
+        ],
+        "basis_cardinality": 17
+      },
+      "wall_nanos": 15277654,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 13020932
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 2256722
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row cyclic-6 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "cyclic-6",
+      "problem_digest": "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+      "family": "cyclic",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 156,
+        "leading_monomials": [
+          "x1",
+          "x2*x3",
+          "x2*x4",
+          "x2*x5",
+          "x2*x6^6",
+          "x2^2",
+          "x3*x4",
+          "x3*x5",
+          "x3*x6^6",
+          "x3^3",
+          "x4*x5",
+          "x4*x6^6",
+          "x4^3",
+          "x5^2*x6^12",
+          "x5^3*x6^6",
+          "x5^6",
+          "x6^48"
+        ],
+        "basis_cardinality": 17
+      },
+      "wall_nanos": 51294385,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21721088,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 8000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 6000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-6",
+      "problem_digest": "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+      "family": "mq-random",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 57,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3",
+          "x1*x4*x6^2",
+          "x1*x5",
+          "x1*x6^4",
+          "x1^2*x4*x6",
+          "x1^2*x6^2",
+          "x1^3*x6",
+          "x1^4",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4*x6^2",
+          "x2*x5*x6^3",
+          "x2*x5^2",
+          "x2*x6^4",
+          "x2^2*x4*x6",
+          "x2^2*x5",
+          "x2^2*x6^2",
+          "x2^3*x6",
+          "x2^4*x4",
+          "x2^5",
+          "x3*x4",
+          "x3*x5*x6^3",
+          "x3*x5^2",
+          "x3*x6^4",
+          "x3^2*x5",
+          "x3^2*x6^2",
+          "x3^3*x6",
+          "x3^5",
+          "x4*x5*x6^3",
+          "x4*x5^2",
+          "x4*x6^4",
+          "x4^2",
+          "x5*x6^4",
+          "x5^2*x6^3",
+          "x5^3",
+          "x6^6"
+        ],
+        "basis_cardinality": 37
+      },
+      "wall_nanos": 22892282,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 22892282
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 49133
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-6 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-6",
+      "problem_digest": "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+      "family": "mq-random",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 57,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3",
+          "x1*x4*x6^2",
+          "x1*x5",
+          "x1*x6^4",
+          "x1^2*x4*x6",
+          "x1^2*x6^2",
+          "x1^3*x6",
+          "x1^4",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4*x6^2",
+          "x2*x5*x6^3",
+          "x2*x5^2",
+          "x2*x6^4",
+          "x2^2*x4*x6",
+          "x2^2*x5",
+          "x2^2*x6^2",
+          "x2^3*x6",
+          "x2^4*x4",
+          "x2^5",
+          "x3*x4",
+          "x3*x5*x6^3",
+          "x3*x5^2",
+          "x3*x6^4",
+          "x3^2*x5",
+          "x3^2*x6^2",
+          "x3^3*x6",
+          "x3^5",
+          "x4*x5*x6^3",
+          "x4*x5^2",
+          "x4*x6^4",
+          "x4^2",
+          "x5*x6^4",
+          "x5^2*x6^3",
+          "x5^3",
+          "x6^6"
+        ],
+        "basis_cardinality": 37
+      },
+      "wall_nanos": 51389915,
+      "cpu_nanos": 20000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20623360,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 14000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-6",
+      "problem_digest": "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+      "family": "mq-random",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 57,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6^57"
+        ],
+        "basis_cardinality": 6
+      },
+      "wall_nanos": 27075752,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 25128165
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 1947587
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-6 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-6",
+      "problem_digest": "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+      "family": "mq-random",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 57,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6^57"
+        ],
+        "basis_cardinality": 6
+      },
+      "wall_nanos": 56424949,
+      "cpu_nanos": 30000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21221376,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 14000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 7000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-10",
+      "problem_digest": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+      "family": "mq-random",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 354,
+        "leading_monomials": [
+          "x1*x10^5",
+          "x1*x2",
+          "x1*x3*x10^4",
+          "x1*x3*x7",
+          "x1*x3*x9",
+          "x1*x4",
+          "x1*x5",
+          "x1*x7*x10^4",
+          "x1*x7*x8*x10^2",
+          "x1*x7*x8*x9",
+          "x1*x7*x8^2*x10",
+          "x1*x7*x8^4",
+          "x1*x7*x9^2",
+          "x1*x7^2*x10^2",
+          "x1*x7^2*x8*x10",
+          "x1*x7^2*x8^3",
+          "x1*x7^2*x9",
+          "x1*x7^3*x8^2",
+          "x1*x7^4*x10",
+          "x1*x7^4*x8",
+          "x1*x7^5",
+          "x1*x8*x10^4",
+          "x1*x8*x9^3",
+          "x1*x8^2*x10^2",
+          "x1*x8^2*x9",
+          "x1*x8^4*x10",
+          "x1*x8^5",
+          "x1*x9*x10",
+          "x1*x9^4",
+          "x10^6",
+          "x1^2*x10^4",
+          "x1^2*x3*x10^2",
+          "x1^2*x7*x10^2",
+          "x1^2*x7*x8*x10",
+          "x1^2*x7*x8^2",
+          "x1^2*x7^2*x10",
+          "x1^2*x7^2*x8",
+          "x1^2*x7^4",
+          "x1^2*x8*x10^2",
+          "x1^2*x8^2*x10",
+          "x1^2*x8^4",
+          "x1^2*x9",
+          "x1^3*x10^2",
+          "x1^3*x3*x10",
+          "x1^3*x7*x10",
+          "x1^3*x7*x8",
+          "x1^3*x7^2",
+          "x1^3*x8^2",
+          "x1^4*x10",
+          "x1^4*x3",
+          "x1^4*x7",
+          "x1^4*x8",
+          "x1^5",
+          "x2*x10^5",
+          "x2*x3*x10^4",
+          "x2*x3*x7",
+          "x2*x3*x9*x10",
+          "x2*x3*x9^2",
+          "x2*x4",
+          "x2*x5",
+          "x2*x7*x10",
+          "x2*x7*x8",
+          "x2*x7*x9^2",
+          "x2*x7^2*x9",
+          "x2*x7^4",
+          "x2*x8*x10^4",
+          "x2*x8*x9*x10",
+          "x2*x8*x9^3",
+          "x2*x8^2*x10^2",
+          "x2*x8^2*x9^2",
+          "x2*x8^4*x10",
+          "x2*x8^4*x9",
+          "x2*x8^5",
+          "x2*x9*x10^4",
+          "x2*x9^2*x10^3",
+          "x2*x9^3*x10",
+          "x2*x9^4",
+          "x2^2*x10^4",
+          "x2^2*x3*x10^2",
+          "x2^2*x3*x9",
+          "x2^2*x7",
+          "x2^2*x8*x10^2",
+          "x2^2*x8*x9^2",
+          "x2^2*x8^3*x10",
+          "x2^2*x8^3*x9",
+          "x2^2*x8^4",
+          "x2^2*x9*x10",
+          "x2^2*x9^3",
+          "x2^3*x10^3",
+          "x2^3*x3*x10",
+          "x2^3*x8^2*x10",
+          "x2^3*x8^2*x9",
+          "x2^3*x8^3",
+          "x2^4*x10^2",
+          "x2^4*x3",
+          "x2^4*x8*x10",
+          "x2^4*x8*x9",
+          "x2^4*x8^2",
+          "x2^4*x9^2",
+          "x2^5*x10",
+          "x2^5*x8",
+          "x2^5*x9",
+          "x2^6",
+          "x3*x10^5",
+          "x3*x4*x10^4",
+          "x3*x4*x7",
+          "x3*x4*x9",
+          "x3*x4^2",
+          "x3*x5",
+          "x3*x7*x10",
+          "x3*x7*x9^2",
+          "x3*x7^2*x9",
+          "x3*x7^4",
+          "x3*x8",
+          "x3*x9*x10^4",
+          "x3*x9^2*x10^3",
+          "x3*x9^3*x10",
+          "x3*x9^4",
+          "x3^2",
+          "x4*x10^5",
+          "x4*x5*x7*x9",
+          "x4*x5*x7^4",
+          "x4*x5*x8",
+          "x4*x5*x9^2",
+          "x4*x5^2*x7^2",
+          "x4*x5^2*x9",
+          "x4*x5^3*x7",
+          "x4*x5^4",
+          "x4*x7*x10^4",
+          "x4*x7*x8",
+          "x4*x7*x9*x10",
+          "x4*x7*x9^2",
+          "x4*x7^2*x10^2",
+          "x4*x7^2*x9",
+          "x4*x7^4*x10",
+          "x4*x7^5",
+          "x4*x8*x10^4",
+          "x4*x8*x9*x10",
+          "x4*x8*x9^3",
+          "x4*x8^2*x10^2",
+          "x4*x8^2*x9",
+          "x4*x8^3*x10",
+          "x4*x8^5",
+          "x4*x9*x10^4",
+          "x4*x9^2*x10^3",
+          "x4*x9^3*x10",
+          "x4*x9^4",
+          "x4^2*x10^4",
+          "x4^2*x5*x7^2",
+          "x4^2*x5*x9",
+          "x4^2*x5^2*x7",
+          "x4^2*x5^3",
+          "x4^2*x7*x10^2",
+          "x4^2*x7*x9",
+          "x4^2*x7^2*x10",
+          "x4^2*x7^4",
+          "x4^2*x8*x10^2",
+          "x4^2*x8*x9^2",
+          "x4^2*x8^2",
+          "x4^2*x9*x10^2",
+          "x4^2*x9^2*x10",
+          "x4^2*x9^3",
+          "x4^3*x10^2",
+          "x4^3*x5*x7",
+          "x4^3*x5^2",
+          "x4^3*x7^3",
+          "x4^3*x8*x10",
+          "x4^3*x9*x10",
+          "x4^4*x5",
+          "x4^4*x7",
+          "x4^4*x8*x9",
+          "x4^4*x9^2",
+          "x4^5",
+          "x5*x10",
+          "x5*x7*x8*x9",
+          "x5*x7*x8^4",
+          "x5*x7*x9^2",
+          "x5*x7^2*x8^3",
+          "x5*x7^2*x9",
+          "x5*x7^3*x8^2",
+          "x5*x7^4*x8",
+          "x5*x7^5",
+          "x5*x8*x9^3",
+          "x5*x8^3*x9^2",
+          "x5*x8^4*x9",
+          "x5*x8^5",
+          "x5*x9^4",
+          "x5^2*x7*x8^2",
+          "x5^2*x7*x9",
+          "x5^2*x7^2*x8",
+          "x5^2*x7^4",
+          "x5^2*x8^3*x9",
+          "x5^2*x8^4",
+          "x5^2*x9^2",
+          "x5^3*x7*x8",
+          "x5^3*x7^2",
+          "x5^3*x8^3",
+          "x5^3*x9",
+          "x5^4*x7",
+          "x5^4*x8",
+          "x5^5",
+          "x6",
+          "x7*x10^5",
+          "x7*x8*x10^4",
+          "x7*x8*x9*x10",
+          "x7*x8*x9^3",
+          "x7*x8^2*x10^2",
+          "x7*x8^2*x9",
+          "x7*x8^5",
+          "x7*x9*x10^4",
+          "x7*x9^2*x10^3",
+          "x7*x9^3*x10",
+          "x7*x9^4",
+          "x7^2*x10^4",
+          "x7^2*x8*x10^2",
+          "x7^2*x8*x9",
+          "x7^2*x8^3*x10",
+          "x7^2*x8^4",
+          "x7^2*x9*x10",
+          "x7^2*x9^3",
+          "x7^3*x10^2",
+          "x7^3*x8*x10",
+          "x7^3*x8^3",
+          "x7^3*x9",
+          "x7^4*x8^2",
+          "x7^5*x10",
+          "x7^5*x8",
+          "x7^6",
+          "x8*x10^5",
+          "x8*x9*x10^4",
+          "x8*x9^2*x10^3",
+          "x8*x9^3*x10",
+          "x8*x9^4",
+          "x8^2*x10^4",
+          "x8^2*x9*x10^3",
+          "x8^2*x9^2*x10",
+          "x8^2*x9^3",
+          "x8^3*x10^2",
+          "x8^4*x9*x10",
+          "x8^4*x9^2",
+          "x8^5*x9",
+          "x8^6",
+          "x9*x10^5",
+          "x9^2*x10^4",
+          "x9^3*x10^3",
+          "x9^4*x10",
+          "x9^5"
+        ],
+        "basis_cardinality": 247
+      },
+      "wall_nanos": 28708509238,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 28708509238
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 2033991
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-10 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-10",
+      "problem_digest": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+      "family": "mq-random",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 354,
+        "leading_monomials": [
+          "x1*x10^5",
+          "x1*x2",
+          "x1*x3*x10^4",
+          "x1*x3*x7",
+          "x1*x3*x9",
+          "x1*x4",
+          "x1*x5",
+          "x1*x7*x10^4",
+          "x1*x7*x8*x10^2",
+          "x1*x7*x8*x9",
+          "x1*x7*x8^2*x10",
+          "x1*x7*x8^4",
+          "x1*x7*x9^2",
+          "x1*x7^2*x10^2",
+          "x1*x7^2*x8*x10",
+          "x1*x7^2*x8^3",
+          "x1*x7^2*x9",
+          "x1*x7^3*x8^2",
+          "x1*x7^4*x10",
+          "x1*x7^4*x8",
+          "x1*x7^5",
+          "x1*x8*x10^4",
+          "x1*x8*x9^3",
+          "x1*x8^2*x10^2",
+          "x1*x8^2*x9",
+          "x1*x8^4*x10",
+          "x1*x8^5",
+          "x1*x9*x10",
+          "x1*x9^4",
+          "x10^6",
+          "x1^2*x10^4",
+          "x1^2*x3*x10^2",
+          "x1^2*x7*x10^2",
+          "x1^2*x7*x8*x10",
+          "x1^2*x7*x8^2",
+          "x1^2*x7^2*x10",
+          "x1^2*x7^2*x8",
+          "x1^2*x7^4",
+          "x1^2*x8*x10^2",
+          "x1^2*x8^2*x10",
+          "x1^2*x8^4",
+          "x1^2*x9",
+          "x1^3*x10^2",
+          "x1^3*x3*x10",
+          "x1^3*x7*x10",
+          "x1^3*x7*x8",
+          "x1^3*x7^2",
+          "x1^3*x8^2",
+          "x1^4*x10",
+          "x1^4*x3",
+          "x1^4*x7",
+          "x1^4*x8",
+          "x1^5",
+          "x2*x10^5",
+          "x2*x3*x10^4",
+          "x2*x3*x7",
+          "x2*x3*x9*x10",
+          "x2*x3*x9^2",
+          "x2*x4",
+          "x2*x5",
+          "x2*x7*x10",
+          "x2*x7*x8",
+          "x2*x7*x9^2",
+          "x2*x7^2*x9",
+          "x2*x7^4",
+          "x2*x8*x10^4",
+          "x2*x8*x9*x10",
+          "x2*x8*x9^3",
+          "x2*x8^2*x10^2",
+          "x2*x8^2*x9^2",
+          "x2*x8^4*x10",
+          "x2*x8^4*x9",
+          "x2*x8^5",
+          "x2*x9*x10^4",
+          "x2*x9^2*x10^3",
+          "x2*x9^3*x10",
+          "x2*x9^4",
+          "x2^2*x10^4",
+          "x2^2*x3*x10^2",
+          "x2^2*x3*x9",
+          "x2^2*x7",
+          "x2^2*x8*x10^2",
+          "x2^2*x8*x9^2",
+          "x2^2*x8^3*x10",
+          "x2^2*x8^3*x9",
+          "x2^2*x8^4",
+          "x2^2*x9*x10",
+          "x2^2*x9^3",
+          "x2^3*x10^3",
+          "x2^3*x3*x10",
+          "x2^3*x8^2*x10",
+          "x2^3*x8^2*x9",
+          "x2^3*x8^3",
+          "x2^4*x10^2",
+          "x2^4*x3",
+          "x2^4*x8*x10",
+          "x2^4*x8*x9",
+          "x2^4*x8^2",
+          "x2^4*x9^2",
+          "x2^5*x10",
+          "x2^5*x8",
+          "x2^5*x9",
+          "x2^6",
+          "x3*x10^5",
+          "x3*x4*x10^4",
+          "x3*x4*x7",
+          "x3*x4*x9",
+          "x3*x4^2",
+          "x3*x5",
+          "x3*x7*x10",
+          "x3*x7*x9^2",
+          "x3*x7^2*x9",
+          "x3*x7^4",
+          "x3*x8",
+          "x3*x9*x10^4",
+          "x3*x9^2*x10^3",
+          "x3*x9^3*x10",
+          "x3*x9^4",
+          "x3^2",
+          "x4*x10^5",
+          "x4*x5*x7*x9",
+          "x4*x5*x7^4",
+          "x4*x5*x8",
+          "x4*x5*x9^2",
+          "x4*x5^2*x7^2",
+          "x4*x5^2*x9",
+          "x4*x5^3*x7",
+          "x4*x5^4",
+          "x4*x7*x10^4",
+          "x4*x7*x8",
+          "x4*x7*x9*x10",
+          "x4*x7*x9^2",
+          "x4*x7^2*x10^2",
+          "x4*x7^2*x9",
+          "x4*x7^4*x10",
+          "x4*x7^5",
+          "x4*x8*x10^4",
+          "x4*x8*x9*x10",
+          "x4*x8*x9^3",
+          "x4*x8^2*x10^2",
+          "x4*x8^2*x9",
+          "x4*x8^3*x10",
+          "x4*x8^5",
+          "x4*x9*x10^4",
+          "x4*x9^2*x10^3",
+          "x4*x9^3*x10",
+          "x4*x9^4",
+          "x4^2*x10^4",
+          "x4^2*x5*x7^2",
+          "x4^2*x5*x9",
+          "x4^2*x5^2*x7",
+          "x4^2*x5^3",
+          "x4^2*x7*x10^2",
+          "x4^2*x7*x9",
+          "x4^2*x7^2*x10",
+          "x4^2*x7^4",
+          "x4^2*x8*x10^2",
+          "x4^2*x8*x9^2",
+          "x4^2*x8^2",
+          "x4^2*x9*x10^2",
+          "x4^2*x9^2*x10",
+          "x4^2*x9^3",
+          "x4^3*x10^2",
+          "x4^3*x5*x7",
+          "x4^3*x5^2",
+          "x4^3*x7^3",
+          "x4^3*x8*x10",
+          "x4^3*x9*x10",
+          "x4^4*x5",
+          "x4^4*x7",
+          "x4^4*x8*x9",
+          "x4^4*x9^2",
+          "x4^5",
+          "x5*x10",
+          "x5*x7*x8*x9",
+          "x5*x7*x8^4",
+          "x5*x7*x9^2",
+          "x5*x7^2*x8^3",
+          "x5*x7^2*x9",
+          "x5*x7^3*x8^2",
+          "x5*x7^4*x8",
+          "x5*x7^5",
+          "x5*x8*x9^3",
+          "x5*x8^3*x9^2",
+          "x5*x8^4*x9",
+          "x5*x8^5",
+          "x5*x9^4",
+          "x5^2*x7*x8^2",
+          "x5^2*x7*x9",
+          "x5^2*x7^2*x8",
+          "x5^2*x7^4",
+          "x5^2*x8^3*x9",
+          "x5^2*x8^4",
+          "x5^2*x9^2",
+          "x5^3*x7*x8",
+          "x5^3*x7^2",
+          "x5^3*x8^3",
+          "x5^3*x9",
+          "x5^4*x7",
+          "x5^4*x8",
+          "x5^5",
+          "x6",
+          "x7*x10^5",
+          "x7*x8*x10^4",
+          "x7*x8*x9*x10",
+          "x7*x8*x9^3",
+          "x7*x8^2*x10^2",
+          "x7*x8^2*x9",
+          "x7*x8^5",
+          "x7*x9*x10^4",
+          "x7*x9^2*x10^3",
+          "x7*x9^3*x10",
+          "x7*x9^4",
+          "x7^2*x10^4",
+          "x7^2*x8*x10^2",
+          "x7^2*x8*x9",
+          "x7^2*x8^3*x10",
+          "x7^2*x8^4",
+          "x7^2*x9*x10",
+          "x7^2*x9^3",
+          "x7^3*x10^2",
+          "x7^3*x8*x10",
+          "x7^3*x8^3",
+          "x7^3*x9",
+          "x7^4*x8^2",
+          "x7^5*x10",
+          "x7^5*x8",
+          "x7^6",
+          "x8*x10^5",
+          "x8*x9*x10^4",
+          "x8*x9^2*x10^3",
+          "x8*x9^3*x10",
+          "x8*x9^4",
+          "x8^2*x10^4",
+          "x8^2*x9*x10^3",
+          "x8^2*x9^2*x10",
+          "x8^2*x9^3",
+          "x8^3*x10^2",
+          "x8^4*x9*x10",
+          "x8^4*x9^2",
+          "x8^5*x9",
+          "x8^6",
+          "x9*x10^5",
+          "x9^2*x10^4",
+          "x9^3*x10^3",
+          "x9^4*x10",
+          "x9^5"
+        ],
+        "basis_cardinality": 247
+      },
+      "wall_nanos": 6958827170,
+      "cpu_nanos": 6880000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 24997888,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 6836000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-10",
+      "problem_digest": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+      "family": "mq-random",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 354,
+        "leading_monomials": [
+          "x1",
+          "x10^354",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9"
+        ],
+        "basis_cardinality": 10
+      },
+      "wall_nanos": 29408934663,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 28940355669
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 468578994
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-10 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-10",
+      "problem_digest": "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+      "family": "mq-random",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 354,
+        "leading_monomials": [
+          "x1",
+          "x10^354",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9"
+        ],
+        "basis_cardinality": 10
+      },
+      "wall_nanos": 8234920969,
+      "cpu_nanos": 8150000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 38010880,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 6735000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 1405000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-14",
+      "problem_digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "family": "mq-random",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "stopped-by-limit",
+      "outcome_detail": "stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros)",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 34435474502
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-14 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-14",
+      "problem_digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "family": "mq-random",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "stopped-by-limit",
+      "outcome_detail": "stopped at the tool's own cap: stopped at a 60s wall-clock limit",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-14",
+      "problem_digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "family": "mq-random",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "stopped-by-limit",
+      "outcome_detail": "stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros)",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 34424757563
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-random-14 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-random-14",
+      "problem_digest": "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+      "family": "mq-random",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "stopped-by-limit",
+      "outcome_detail": "stopped at the tool's own cap: stopped at a 60s wall-clock limit",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-6",
+      "problem_digest": "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+      "family": "mq-planted",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1*x2",
+          "x1^2",
+          "x2^3",
+          "x3*x4",
+          "x3^2",
+          "x4^3",
+          "x5*x6",
+          "x5^2",
+          "x6^3"
+        ],
+        "basis_cardinality": 9
+      },
+      "wall_nanos": 71736,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 71736
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 48522
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-6 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-6",
+      "problem_digest": "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+      "family": "mq-planted",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1*x2",
+          "x1^2",
+          "x2^3",
+          "x3*x4",
+          "x3^2",
+          "x4^3",
+          "x5*x6",
+          "x5^2",
+          "x6^3"
+        ],
+        "basis_cardinality": 9
+      },
+      "wall_nanos": 35969772,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20496384,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-6",
+      "problem_digest": "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+      "family": "mq-planted",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2^4",
+          "x3",
+          "x4^4",
+          "x5",
+          "x6^4"
+        ],
+        "basis_cardinality": 6
+      },
+      "wall_nanos": 672523,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 77036
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 595487
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-6 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-6",
+      "problem_digest": "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+      "family": "mq-planted",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 6,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 64,
+        "leading_monomials": [
+          "x1",
+          "x2^4",
+          "x3",
+          "x4^4",
+          "x5",
+          "x6^4"
+        ],
+        "basis_cardinality": 6
+      },
+      "wall_nanos": 36082536,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 19877888,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 1000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-10",
+      "problem_digest": "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+      "family": "mq-planted",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 1024,
+        "leading_monomials": [
+          "x1*x2",
+          "x10^3",
+          "x1^2",
+          "x2^3",
+          "x3*x4",
+          "x3^2",
+          "x4^3",
+          "x5*x6",
+          "x5^2",
+          "x6^3",
+          "x7*x8",
+          "x7^2",
+          "x8^3",
+          "x9*x10",
+          "x9^2"
+        ],
+        "basis_cardinality": 15
+      },
+      "wall_nanos": 143532,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 143532
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 1059225
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-10 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-10",
+      "problem_digest": "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+      "family": "mq-planted",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 1024,
+        "leading_monomials": [
+          "x1*x2",
+          "x10^3",
+          "x1^2",
+          "x2^3",
+          "x3*x4",
+          "x3^2",
+          "x4^3",
+          "x5*x6",
+          "x5^2",
+          "x6^3",
+          "x7*x8",
+          "x7^2",
+          "x8^3",
+          "x9*x10",
+          "x9^2"
+        ],
+        "basis_cardinality": 15
+      },
+      "wall_nanos": 36003526,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20680704,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-10",
+      "problem_digest": "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+      "family": "mq-planted",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 1024,
+        "leading_monomials": [
+          "x1",
+          "x10^4",
+          "x2^4",
+          "x3",
+          "x4^4",
+          "x5",
+          "x6^4",
+          "x7",
+          "x8^4",
+          "x9"
+        ],
+        "basis_cardinality": 10
+      },
+      "wall_nanos": 19159575,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 133102
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 19026473
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-10 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-10",
+      "problem_digest": "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+      "family": "mq-planted",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 10,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 1024,
+        "leading_monomials": [
+          "x1",
+          "x10^4",
+          "x2^4",
+          "x3",
+          "x4^4",
+          "x5",
+          "x6^4",
+          "x7",
+          "x8^4",
+          "x9"
+        ],
+        "basis_cardinality": 10
+      },
+      "wall_nanos": 158556369,
+      "cpu_nanos": 130000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 54054912,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 120000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-14",
+      "problem_digest": "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+      "family": "mq-planted",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16384,
+        "leading_monomials": [
+          "x1*x2",
+          "x10^3",
+          "x11*x12",
+          "x11^2",
+          "x12^3",
+          "x13*x14",
+          "x13^2",
+          "x14^3",
+          "x1^2",
+          "x2^3",
+          "x3*x4",
+          "x3^2",
+          "x4^3",
+          "x5*x6",
+          "x5^2",
+          "x6^3",
+          "x7*x8",
+          "x7^2",
+          "x8^3",
+          "x9*x10",
+          "x9^2"
+        ],
+        "basis_cardinality": 21
+      },
+      "wall_nanos": 212473,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 212473
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 25370785
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-14 --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-14",
+      "problem_digest": "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+      "family": "mq-planted",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16384,
+        "leading_monomials": [
+          "x1*x2",
+          "x10^3",
+          "x11*x12",
+          "x11^2",
+          "x12^3",
+          "x13*x14",
+          "x13^2",
+          "x14^3",
+          "x1^2",
+          "x2^3",
+          "x3*x4",
+          "x3^2",
+          "x4^3",
+          "x5*x6",
+          "x5^2",
+          "x6^3",
+          "x7*x8",
+          "x7^2",
+          "x8^3",
+          "x9*x10",
+          "x9^2"
+        ],
+        "basis_cardinality": 21
+      },
+      "wall_nanos": 36058360,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20111360,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-14",
+      "problem_digest": "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+      "family": "mq-planted",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "stopped-by-limit",
+      "outcome_detail": "stopped at the tool's own cap: the quotient algebra has more than the 4096 dimensions allowed",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 216800
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 5881867
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row mq-planted-14 --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "mq-planted-14",
+      "problem_digest": "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+      "family": "mq-planted",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "GF(2147483647)",
+        "characteristic": 2147483647,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 14,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 16384,
+        "leading_monomials": [
+          "x1",
+          "x10^4",
+          "x11",
+          "x12^4",
+          "x13",
+          "x14^4",
+          "x2^4",
+          "x3",
+          "x4^4",
+          "x5",
+          "x6^4",
+          "x7",
+          "x8^4",
+          "x9"
+        ],
+        "basis_cardinality": 14
+      },
+      "wall_nanos": 45691092720,
+      "cpu_nanos": 45330000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 10912239616,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 44931000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp0-planted",
+      "problem_digest": "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+      "family": "poseidon",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 9,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3",
+          "x1*x5^2",
+          "x1^2",
+          "x2*x3",
+          "x2*x5^2",
+          "x2^2",
+          "x3*x5^2",
+          "x3^2",
+          "x4",
+          "x5^3"
+        ],
+        "basis_cardinality": 11
+      },
+      "wall_nanos": 795837,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 795837
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 11241
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf2-rp0-planted --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp0-planted",
+      "problem_digest": "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+      "family": "poseidon",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 9,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3",
+          "x1*x5^2",
+          "x1^2",
+          "x2*x3",
+          "x2*x5^2",
+          "x2^2",
+          "x3*x5^2",
+          "x3^2",
+          "x4",
+          "x5^3"
+        ],
+        "basis_cardinality": 11
+      },
+      "wall_nanos": 36104347,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20516864,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp0-planted",
+      "problem_digest": "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+      "family": "poseidon",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 9,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5^9"
+        ],
+        "basis_cardinality": 5
+      },
+      "wall_nanos": 737857,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 654880
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 82977
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf2-rp0-planted --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp0-planted",
+      "problem_digest": "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+      "family": "poseidon",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 5,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 9,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5^9"
+        ],
+        "basis_cardinality": 5
+      },
+      "wall_nanos": 36132220,
+      "cpu_nanos": 10000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20504576,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp2-planted",
+      "problem_digest": "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+      "family": "poseidon",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3*x4",
+          "x1*x3*x5",
+          "x1*x3*x7^3",
+          "x1*x3^2",
+          "x1*x4*x5*x7",
+          "x1*x4*x5^2",
+          "x1*x4*x7^3",
+          "x1*x4^2*x5",
+          "x1*x4^2*x7",
+          "x1*x4^3",
+          "x1*x5*x7^3",
+          "x1*x5^2*x7",
+          "x1*x5^3",
+          "x1*x7^4",
+          "x1^2",
+          "x2*x3*x4*x5",
+          "x2*x3*x4*x7",
+          "x2*x3*x4^2",
+          "x2*x3*x5*x7",
+          "x2*x3*x5^2",
+          "x2*x3*x7^3",
+          "x2*x3^2",
+          "x2*x4*x5*x7",
+          "x2*x4*x5^2",
+          "x2*x4*x7^3",
+          "x2*x4^2*x5",
+          "x2*x4^2*x7",
+          "x2*x4^3",
+          "x2*x5*x7^3",
+          "x2*x5^2*x7",
+          "x2*x5^3",
+          "x2*x7^4",
+          "x2^2",
+          "x3*x4*x5*x7",
+          "x3*x4*x5^2",
+          "x3*x4*x7^3",
+          "x3*x4^2*x5",
+          "x3*x4^2*x7",
+          "x3*x4^3",
+          "x3*x5*x7^3",
+          "x3*x5^2*x7",
+          "x3*x5^3",
+          "x3*x7^4",
+          "x3^2*x4*x5",
+          "x3^2*x4*x7",
+          "x3^2*x4^2",
+          "x3^2*x5*x7",
+          "x3^2*x5^2",
+          "x3^2*x7^3",
+          "x3^3*x4",
+          "x3^3*x5",
+          "x3^3*x7",
+          "x3^4",
+          "x4*x5*x7^3",
+          "x4*x5^2*x7^2",
+          "x4*x5^3",
+          "x4*x7^4",
+          "x4^2*x5*x7",
+          "x4^2*x5^2",
+          "x4^2*x7^3",
+          "x4^3*x5",
+          "x4^3*x7",
+          "x4^4",
+          "x5*x7^4",
+          "x5^2*x7^3",
+          "x5^3*x7^2",
+          "x5^4",
+          "x6",
+          "x7^5"
+        ],
+        "basis_cardinality": 70
+      },
+      "wall_nanos": 108495457,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 108495457
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 119376
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf2-rp2-planted --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp2-planted",
+      "problem_digest": "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+      "family": "poseidon",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3*x4",
+          "x1*x3*x5",
+          "x1*x3*x7^3",
+          "x1*x3^2",
+          "x1*x4*x5*x7",
+          "x1*x4*x5^2",
+          "x1*x4*x7^3",
+          "x1*x4^2*x5",
+          "x1*x4^2*x7",
+          "x1*x4^3",
+          "x1*x5*x7^3",
+          "x1*x5^2*x7",
+          "x1*x5^3",
+          "x1*x7^4",
+          "x1^2",
+          "x2*x3*x4*x5",
+          "x2*x3*x4*x7",
+          "x2*x3*x4^2",
+          "x2*x3*x5*x7",
+          "x2*x3*x5^2",
+          "x2*x3*x7^3",
+          "x2*x3^2",
+          "x2*x4*x5*x7",
+          "x2*x4*x5^2",
+          "x2*x4*x7^3",
+          "x2*x4^2*x5",
+          "x2*x4^2*x7",
+          "x2*x4^3",
+          "x2*x5*x7^3",
+          "x2*x5^2*x7",
+          "x2*x5^3",
+          "x2*x7^4",
+          "x2^2",
+          "x3*x4*x5*x7",
+          "x3*x4*x5^2",
+          "x3*x4*x7^3",
+          "x3*x4^2*x5",
+          "x3*x4^2*x7",
+          "x3*x4^3",
+          "x3*x5*x7^3",
+          "x3*x5^2*x7",
+          "x3*x5^3",
+          "x3*x7^4",
+          "x3^2*x4*x5",
+          "x3^2*x4*x7",
+          "x3^2*x4^2",
+          "x3^2*x5*x7",
+          "x3^2*x5^2",
+          "x3^2*x7^3",
+          "x3^3*x4",
+          "x3^3*x5",
+          "x3^3*x7",
+          "x3^4",
+          "x4*x5*x7^3",
+          "x4*x5^2*x7^2",
+          "x4*x5^3",
+          "x4*x7^4",
+          "x4^2*x5*x7",
+          "x4^2*x5^2",
+          "x4^2*x7^3",
+          "x4^3*x5",
+          "x4^3*x7",
+          "x4^4",
+          "x5*x7^4",
+          "x5^2*x7^3",
+          "x5^3*x7^2",
+          "x5^4",
+          "x6",
+          "x7^5"
+        ],
+        "basis_cardinality": 70
+      },
+      "wall_nanos": 92183233,
+      "cpu_nanos": 60000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 20959232,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 46000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp2-planted",
+      "problem_digest": "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+      "family": "poseidon",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7^81"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 110979330,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 108163378
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 2815952
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf2-rp2-planted --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf2-rp2-planted",
+      "problem_digest": "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+      "family": "poseidon",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 7,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7^81"
+        ],
+        "basis_cardinality": 7
+      },
+      "wall_nanos": 102489937,
+      "cpu_nanos": 70000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21569536,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 46000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 16000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf4-rp0-planted",
+      "problem_digest": "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+      "family": "poseidon",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3",
+          "x1*x4*x5",
+          "x1*x4*x6",
+          "x1*x4*x7",
+          "x1*x4*x9^2",
+          "x1*x4^2",
+          "x1*x5*x6",
+          "x1*x5*x7",
+          "x1*x5*x9^2",
+          "x1*x5^2",
+          "x1*x6*x7",
+          "x1*x6*x9^2",
+          "x1*x6^2",
+          "x1*x7*x9^2",
+          "x1*x7^2*x9",
+          "x1*x7^3",
+          "x1*x9^3",
+          "x1^2",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4*x6",
+          "x2*x4*x7",
+          "x2*x4*x9^2",
+          "x2*x4^2",
+          "x2*x5*x6",
+          "x2*x5*x7",
+          "x2*x5*x9^2",
+          "x2*x5^2",
+          "x2*x6*x7",
+          "x2*x6*x9^2",
+          "x2*x6^2",
+          "x2*x7*x9^2",
+          "x2*x7^2*x9",
+          "x2*x7^3",
+          "x2*x9^3",
+          "x2^2",
+          "x3*x4*x5",
+          "x3*x4*x6",
+          "x3*x4*x7",
+          "x3*x4*x9^2",
+          "x3*x4^2",
+          "x3*x5*x6",
+          "x3*x5*x7",
+          "x3*x5*x9^2",
+          "x3*x5^2",
+          "x3*x6*x7*x9",
+          "x3*x6*x7^2",
+          "x3*x6*x9^2",
+          "x3*x6^2",
+          "x3*x7*x9^2",
+          "x3*x7^2*x9",
+          "x3*x7^3",
+          "x3*x9^3",
+          "x3^2*x4",
+          "x3^2*x5",
+          "x3^2*x6",
+          "x3^2*x7",
+          "x3^2*x9^2",
+          "x3^3",
+          "x4*x5*x6",
+          "x4*x5*x7",
+          "x4*x5*x9^2",
+          "x4*x5^2",
+          "x4*x6*x7*x9",
+          "x4*x6*x7^2",
+          "x4*x6*x9^2",
+          "x4*x6^2",
+          "x4*x7*x9^2",
+          "x4*x7^2*x9",
+          "x4*x7^3",
+          "x4*x9^3",
+          "x4^2*x5",
+          "x4^2*x6",
+          "x4^2*x7",
+          "x4^2*x9^2",
+          "x4^3",
+          "x5*x6*x7*x9",
+          "x5*x6*x7^2",
+          "x5*x6*x9^2",
+          "x5*x6^2",
+          "x5*x7*x9^2",
+          "x5*x7^2*x9",
+          "x5*x7^3",
+          "x5*x9^3",
+          "x5^2*x6",
+          "x5^2*x7",
+          "x5^2*x9^2",
+          "x5^3",
+          "x6*x7*x9^2",
+          "x6*x7^2*x9",
+          "x6*x7^3",
+          "x6*x9^3",
+          "x6^2*x7",
+          "x6^2*x9^2",
+          "x6^3",
+          "x7*x9^3",
+          "x7^2*x9^2",
+          "x7^3*x9",
+          "x7^4",
+          "x8",
+          "x9^4"
+        ],
+        "basis_cardinality": 102
+      },
+      "wall_nanos": 306036207,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 306036207
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 206892
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf4-rp0-planted --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf4-rp0-planted",
+      "problem_digest": "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+      "family": "poseidon",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1*x2",
+          "x1*x3",
+          "x1*x4*x5",
+          "x1*x4*x6",
+          "x1*x4*x7",
+          "x1*x4*x9^2",
+          "x1*x4^2",
+          "x1*x5*x6",
+          "x1*x5*x7",
+          "x1*x5*x9^2",
+          "x1*x5^2",
+          "x1*x6*x7",
+          "x1*x6*x9^2",
+          "x1*x6^2",
+          "x1*x7*x9^2",
+          "x1*x7^2*x9",
+          "x1*x7^3",
+          "x1*x9^3",
+          "x1^2",
+          "x2*x3",
+          "x2*x4*x5",
+          "x2*x4*x6",
+          "x2*x4*x7",
+          "x2*x4*x9^2",
+          "x2*x4^2",
+          "x2*x5*x6",
+          "x2*x5*x7",
+          "x2*x5*x9^2",
+          "x2*x5^2",
+          "x2*x6*x7",
+          "x2*x6*x9^2",
+          "x2*x6^2",
+          "x2*x7*x9^2",
+          "x2*x7^2*x9",
+          "x2*x7^3",
+          "x2*x9^3",
+          "x2^2",
+          "x3*x4*x5",
+          "x3*x4*x6",
+          "x3*x4*x7",
+          "x3*x4*x9^2",
+          "x3*x4^2",
+          "x3*x5*x6",
+          "x3*x5*x7",
+          "x3*x5*x9^2",
+          "x3*x5^2",
+          "x3*x6*x7*x9",
+          "x3*x6*x7^2",
+          "x3*x6*x9^2",
+          "x3*x6^2",
+          "x3*x7*x9^2",
+          "x3*x7^2*x9",
+          "x3*x7^3",
+          "x3*x9^3",
+          "x3^2*x4",
+          "x3^2*x5",
+          "x3^2*x6",
+          "x3^2*x7",
+          "x3^2*x9^2",
+          "x3^3",
+          "x4*x5*x6",
+          "x4*x5*x7",
+          "x4*x5*x9^2",
+          "x4*x5^2",
+          "x4*x6*x7*x9",
+          "x4*x6*x7^2",
+          "x4*x6*x9^2",
+          "x4*x6^2",
+          "x4*x7*x9^2",
+          "x4*x7^2*x9",
+          "x4*x7^3",
+          "x4*x9^3",
+          "x4^2*x5",
+          "x4^2*x6",
+          "x4^2*x7",
+          "x4^2*x9^2",
+          "x4^3",
+          "x5*x6*x7*x9",
+          "x5*x6*x7^2",
+          "x5*x6*x9^2",
+          "x5*x6^2",
+          "x5*x7*x9^2",
+          "x5*x7^2*x9",
+          "x5*x7^3",
+          "x5*x9^3",
+          "x5^2*x6",
+          "x5^2*x7",
+          "x5^2*x9^2",
+          "x5^3",
+          "x6*x7*x9^2",
+          "x6*x7^2*x9",
+          "x6*x7^3",
+          "x6*x9^3",
+          "x6^2*x7",
+          "x6^2*x9^2",
+          "x6^3",
+          "x7*x9^3",
+          "x7^2*x9^2",
+          "x7^3*x9",
+          "x7^4",
+          "x8",
+          "x9^4"
+        ],
+        "basis_cardinality": 102
+      },
+      "wall_nanos": 204277824,
+      "cpu_nanos": 180000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 21745664,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "solve",
+          "elapsed_nanos": 156000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf4-rp0-planted",
+      "problem_digest": "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+      "family": "poseidon",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9^81"
+        ],
+        "basis_cardinality": 9
+      },
+      "wall_nanos": 311615319,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 306922534
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 4692785
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row poseidon-t2-rf4-rp0-planted --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "poseidon-t2-rf4-rp0-planted",
+      "problem_digest": "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+      "family": "poseidon",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "KoalaBear",
+        "characteristic": 2130706433,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 9,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 81,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5",
+          "x6",
+          "x7",
+          "x8",
+          "x9^81"
+        ],
+        "basis_cardinality": 9
+      },
+      "wall_nanos": 224872066,
+      "cpu_nanos": 200000000,
+      "cpu_basis": "proc-stat-ticks",
+      "peak_rss_bytes": 22368256,
+      "peak_rss_basis": "unavailable",
+      "stages": [
+        {
+          "name": "source-basis",
+          "elapsed_nanos": 166000000
+        },
+        {
+          "name": "solve",
+          "elapsed_nanos": 21000000
+        }
+      ],
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n1-fcico",
+      "problem_digest": "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+      "family": "anemoi",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 2,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 5,
+        "leading_monomials": [
+          "x1*x2^2",
+          "x1^2",
+          "x2^3"
+        ],
+        "basis_cardinality": 3
+      },
+      "wall_nanos": 45807,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 45807
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 2244
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row anemoi64-cico-n1-fcico --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n1-fcico",
+      "problem_digest": "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+      "family": "anemoi",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 2,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "characteristic 18446744073709551263 is at or above the tool's bound of 2147483648",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n1-fcico",
+      "problem_digest": "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+      "family": "anemoi",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 2,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 5,
+        "leading_monomials": [
+          "x1",
+          "x2^5"
+        ],
+        "basis_cardinality": 2
+      },
+      "wall_nanos": 86503,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 57799
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 28704
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row anemoi64-cico-n1-fcico --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n1-fcico",
+      "problem_digest": "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+      "family": "anemoi",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 2,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "characteristic 18446744073709551263 is at or above the tool's bound of 2147483648",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n2-fcico",
+      "problem_digest": "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
+      "family": "anemoi",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 25,
+        "leading_monomials": [
+          "x1*x2*x3",
+          "x1*x3*x4",
+          "x1*x3^3",
+          "x1*x4^2",
+          "x1^2",
+          "x2*x3*x4^3",
+          "x2*x3^2",
+          "x2^2",
+          "x3^2*x4^3",
+          "x3^3*x4",
+          "x3^4",
+          "x4^4"
+        ],
+        "basis_cardinality": 12
+      },
+      "wall_nanos": 618522,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 618522
+        },
+        {
+          "name": "quotient-dimension (for the invariant)",
+          "elapsed_nanos": 12855
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row anemoi64-cico-n2-fcico --task reduced-grobner-basis"
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n2-fcico",
+      "problem_digest": "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
+      "family": "anemoi",
+      "task": "reduced-grobner-basis",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "characteristic 18446744073709551263 is at or above the tool's bound of 2147483648",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n2-fcico",
+      "problem_digest": "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
+      "family": "anemoi",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "zeebra",
+      "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "complete",
+      "invariants": {
+        "quotient_dimension": 25,
+        "leading_monomials": [
+          "x1",
+          "x2",
+          "x3",
+          "x4^25"
+        ],
+        "basis_cardinality": 4
+      },
+      "wall_nanos": 915002,
+      "cpu_basis": "unavailable",
+      "stages": [
+        {
+          "name": "basis",
+          "elapsed_nanos": 720835
+        },
+        {
+          "name": "conversion",
+          "elapsed_nanos": 194167
+        },
+        {
+          "name": "conversion: dependence",
+          "elapsed_nanos": 0
+        },
+        {
+          "name": "conversion: border",
+          "elapsed_nanos": 0
+        }
+      ],
+      "reproduce": "cargo run --release --example competitive_sweep -- --row anemoi64-cico-n2-fcico --task lex-basis-by-conversion"
+    },
+    {
+      "schema": 1,
+      "problem": "anemoi64-cico-n2-fcico",
+      "problem_digest": "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
+      "family": "anemoi",
+      "task": "lex-basis-by-conversion",
+      "field": {
+        "name": "2^64 - 353",
+        "characteristic": 18446744073709551263,
+        "extension_degree": 1,
+        "defining_polynomial": null
+      },
+      "order": "grevlex",
+      "variable_count": 4,
+      "library": "singular",
+      "library_version": "singular build 44105 (44105)",
+      "environment": {
+        "commit": "663097a",
+        "machine": "workstation",
+        "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "policy": "60 s wall, 1 worker, many rows per process (no memory figure)"
+      },
+      "limits": {
+        "wall_nanos": 60000000000,
+        "workers": 1,
+        "max_rss_bytes": null,
+        "tool_caps": []
+      },
+      "outcome": "unsupported",
+      "outcome_detail": "characteristic 18446744073709551263 is at or above the tool's bound of 2147483648",
+      "invariants": {},
+      "cpu_basis": "unavailable",
+      "reproduce": ""
+    }
+  ]
 }
