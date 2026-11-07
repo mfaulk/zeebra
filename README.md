@@ -2327,6 +2327,31 @@ per run, the accumulated history, and a generated `SCOREBOARD.md`. `Json::parse`
 `Json::to_json` writes — round-tripping is asserted — so the history accumulates rather than being
 overwritten, with no dependency to read eighty lines of writer.
 
+#### The cost model: predicted against measured, with the difference attributed
+
+```bash
+cargo run --release --example cost_model                  # render research/cost-model/COST-MODEL.md
+cargo run --release --example cost_model -- --write       # regenerate the register from its records
+cargo run --release --example cost_model -- --write --seed  # append any transcribed row not yet held
+```
+
+`grobner::research::cost_model` keeps one row per **claim** about what a stage would cost, against
+what it cost. Every figure carries a `FigureBasis` — `Measured`, `Fitted`, `Predicted` or
+`Extrapolated` — because the failure it exists to prevent is documented rather than hypothetical:
+M24 found that every prediction about a stage already measured held, and every prediction about an
+unmeasured quantity was wrong, three of four by more than an order of magnitude, because all ten
+were written in the same prose with the same confidence. A `measured_` field holds only a measured
+figure and a `predicted_` field never holds one; a row violating either does not load.
+
+Three further rules are code rather than convention. **Peak allocated and peak resident do not
+share a column**, since #237 measured 21 674 MiB allocated against 13 996 MiB resident on one row.
+**The resource-limiting stage is a closed set**, so "memory" and "the monomial queue of one refused
+batch" cannot be written in the same field. **Prediction error is derived** — nothing in
+`research/cost-model/results/history.json` is an error column, and `CostRow::prediction_errors`
+computes it from the predicted and measured fields. The history is append-only: a re-measurement is
+a new row with a new commit, which is what keeps #318's two figures for the same measurement both
+visible.
+
 #### Elimination that is not a Gröbner basis
 
 `grobner::research::bivariate_resultant` computes `Res_y(f, g)` for two bivariate polynomials, as
