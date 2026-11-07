@@ -1238,8 +1238,8 @@ dispatched the same way, recursively, and what it costs depends on the factor:
 So `2520 = 2^3 * 3^2 * 5 * 7` costs `n log 8` plus `n * (9 + 5 + 7)`, which is why a size whose
 odd factors are small is cheap and **a large prime size is quadratic**. Bluestein is the fix for
 that case — rewriting the DFT as a convolution of length `>= 2n - 1` — and it is deliberately not
-here: it needs a `2n`-th root of unity and the convolution rather than a re-indexing. Filed as a
-follow-up.
+here: it needs a `2n`-th root of unity and the convolution rather than a re-indexing. Filed as
+#357.
 
 Two consequences of allowing any size, both visible in the API:
 
