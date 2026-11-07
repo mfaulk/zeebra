@@ -694,22 +694,40 @@ fn basis_options(rounds: usize) -> F4Options {
     if rounds < 6 {
         return recommended;
     }
-    // 200 M entries, 10x what N = 6 was refused for, and the byte budget raised to match. Both,
-    // because `live_entry_limit` is the *min* of the two: lifting only the entry count would leave
-    // `max_live_bytes / 16` binding at exactly the same 20 M and change nothing. 3.2 GB of live
-    // entries is well inside the standing gate. Printed rather than silent, for the same reason
-    // the conversion pre-flight is printed.
+    // Four budgets, not one, and each was found by a separate refusal rather than by reading the
+    // struct — which is the #322 pattern three times over:
+    //
+    //   * `max_live_nonzeros`, crossed by PCICO N = 6 by 112 entries in 20 million;
+    //   * `max_live_bytes`, which must move with it because `live_entry_limit` is the *min* of the
+    //     two and 320 MB / 16 is exactly the same 20 M, so lifting the entry count alone is a
+    //     no-op;
+    //   * `max_matrix_rows`, crossed by FCICO N = 6 in symbolic preprocessing after 3.8 s. For
+    //     reference the published Magma run on this exact row peaks at 173 808 x 189 401, *inside*
+    //     the 200 000 default — so this crate's preprocessing enumerates more rows than Magma's for
+    //     the same system, and the default is not obviously the wrong size for a library;
+    //   * `max_matrix_columns`, lifted with it because a matrix wide enough to need the rows will
+    //     need the columns, and discovering that with a second 4-second refusal is waste.
+    //
+    // The row and column counts are not a memory budget: memory is bounded by the live-entry
+    // budget above, and a sparse row costs what its entries cost. Printed rather than silent, for
+    // the same reason the conversion pre-flight is printed.
     let lifted = 200_000_000;
     let lifted_bytes = lifted * F4Options::bytes_per_entry::<A64>();
+    let lifted_rows = 4_000_000;
     println!(
-        "- f4 budget: LIFTED to {lifted} live nonzeros ({lifted_bytes} bytes) from {} ({}) -- \
-         N = {rounds} crosses the default by 112 entries, and a refused basis is not a statement \
-         about the ideal.",
-        recommended.max_live_nonzeros, recommended.max_live_bytes
+        "- f4 budget: LIFTED to {lifted} live nonzeros ({lifted_bytes} bytes) from {} ({}), and \
+         to {lifted_rows} matrix rows/columns from {}/{} -- N = {rounds} crosses all four, each \
+         found by a separate refusal. A refused basis is not a statement about the ideal.",
+        recommended.max_live_nonzeros,
+        recommended.max_live_bytes,
+        recommended.max_matrix_rows,
+        recommended.max_matrix_columns
     );
     F4Options {
         max_live_nonzeros: lifted,
         max_live_bytes: lifted_bytes,
+        max_matrix_rows: lifted_rows,
+        max_matrix_columns: lifted_rows,
         ..recommended
     }
 }
