@@ -21,32 +21,32 @@ use crate::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MultiplyRoute {
     /// Materialise every product in one `Vec`, then collect like terms. The pre-#243 behaviour,
-    /// kept because it is the fastest route on small operands and is the reference the differential
-    /// test compares against.
+    /// **never selected**: kept as the reference the differential test compares against and as the
+    /// measurement's baseline arm.
+    ///
+    /// It cannot win, and not only by measurement: it *is* [`MultiplyRoute::Accumulate`] with a
+    /// `Vec` of every product in front of it, because `SparseMultiPoly::new` performs the same
+    /// monomial-keyed merge. `examples/multivariate_mul.rs` measures it slowest at every size,
+    /// down to 36 term-products.
     Materialize,
-    /// Merge each product into a monomial-keyed map as it is formed. Live set `O(output)`.
+    /// Merge each product into a monomial-keyed map as it is formed. Live set `O(output)`, and the
+    /// general route.
     Accumulate,
     /// Materialise one block of the outer loop at a time and fold each block into the map. Live set
     /// `O(block)`; the block is `rows` terms of the left operand against all of the right.
+    ///
+    /// **Never selected** — a measured negative result, kept reachable so that it stays
+    /// reproducible. #243 named this as the smaller change, and it is: a block buffer bounds the
+    /// transient without touching the combine. But it bounds it at `O(rows · |b|)` where
+    /// accumulating directly bounds it at `O(output)`, and the sweep in
+    /// `examples/multivariate_mul.rs` finds its time *flat* in `rows` while its memory is linear in
+    /// `rows` — so the best block is one row, which is direct accumulation with a redundant `Vec`
+    /// round-trip, measured at 1.4x its time.
     Chunked { rows: usize },
     /// Accumulate into a flat `Vec<F>` indexed by the bivariate total-degree triangle, so the inner
     /// loop hashes nothing. `N == 2` and a dense output only — see [`dense_triangle_profitable`].
     DenseTriangle,
 }
-
-/// Product count at or below which [`MultiplyRoute::Materialize`] is kept.
-///
-/// Measured by `examples/multivariate_mul.rs`: below this the `Vec` is one allocation and `push`
-/// beats a hash lookup per product, and the transient it is being protected from is a few kilobytes.
-/// Above it the collecting routes are both faster and bounded.
-const MATERIALIZE_PRODUCT_LIMIT: u64 = 1 << 14;
-
-/// Rows of the left operand per block in [`MultiplyRoute::Chunked`].
-///
-/// Swept in `examples/multivariate_mul.rs`. The figure is flat across two orders of magnitude
-/// because the block buffer is reused and so costs one allocation whatever its size; what it buys
-/// is a `push` loop the compiler can keep in registers, and 64 rows is enough for that.
-const CHUNK_ROWS: usize = 64;
 
 /// Bytes the flat triangle accumulator may reach before [`MultiplyRoute::DenseTriangle`] is refused.
 ///
@@ -93,21 +93,21 @@ pub(crate) fn multiply_by<const N: usize, F: FiniteField>(
 
 /// The route for this operand pair.
 ///
-/// Three tiers, in the shape `multiply_dense` uses on the univariate side: keep the cheap path
-/// where it is cheap, take the specialised one where it is both applicable and profitable, and
-/// otherwise take the general collecting one.
+/// Two tiers, in the shape `multiply_dense` uses on the univariate side: the specialised route
+/// where it is both applicable and profitable, otherwise the general one. There is deliberately no
+/// small-operand tier — `examples/multivariate_mul.rs` measured for one and did not find it, for
+/// the reason recorded on [`MultiplyRoute::Materialize`].
+///
+/// No size threshold also means the operand size does not change where the answer comes from, so
+/// the small `mul/{arity}` Criterion arms and the six-round build exercise the same code.
 pub(crate) fn route<const N: usize, F: FiniteField>(
     a: &SparseMultiPoly<N, F>,
     b: &SparseMultiPoly<N, F>,
 ) -> MultiplyRoute {
-    let products = (a.terms.len() as u64).saturating_mul(b.terms.len() as u64);
-    if products <= MATERIALIZE_PRODUCT_LIMIT {
-        return MultiplyRoute::Materialize;
-    }
     if dense_triangle_profitable(a, b) {
         return MultiplyRoute::DenseTriangle;
     }
-    MultiplyRoute::Chunked { rows: CHUNK_ROWS }
+    MultiplyRoute::Accumulate
 }
 
 /// Whether the flat triangle accumulator is applicable and output-sized for this pair.
@@ -380,7 +380,7 @@ mod tests {
         MultiplyRoute::Accumulate,
         MultiplyRoute::Chunked { rows: 1 },
         MultiplyRoute::Chunked { rows: 7 },
-        MultiplyRoute::Chunked { rows: CHUNK_ROWS },
+        MultiplyRoute::Chunked { rows: 64 },
         MultiplyRoute::DenseTriangle,
     ];
 
@@ -477,8 +477,10 @@ mod tests {
     fn test_route_selects_by_density_not_by_arity() {
         type F = PrimeFieldElement64<541>;
 
+        // A dense bivariate pair takes the triangle at every size, small included: there is no
+        // small-operand tier to fall into.
         let small: SparseMultiPoly<2, F> = dense_triangle(8, 1);
-        assert_eq!(route(&small, &small), MultiplyRoute::Materialize);
+        assert_eq!(route(&small, &small), MultiplyRoute::DenseTriangle);
 
         let dense: SparseMultiPoly<2, F> = dense_triangle(200, 1);
         assert_eq!(route(&dense, &dense), MultiplyRoute::DenseTriangle);
@@ -492,7 +494,7 @@ mod tests {
         let wide = &sparse * &dense;
         assert_eq!(
             route(&wide, &wide),
-            MultiplyRoute::Chunked { rows: CHUNK_ROWS },
+            MultiplyRoute::Accumulate,
             "a sparse bivariate pair must not be forced into a dense triangle"
         );
 
@@ -506,10 +508,7 @@ mod tests {
             }
             SparseMultiPoly::new(&terms)
         };
-        assert_eq!(
-            route(&trivariate, &trivariate),
-            MultiplyRoute::Chunked { rows: CHUNK_ROWS }
-        );
+        assert_eq!(route(&trivariate, &trivariate), MultiplyRoute::Accumulate);
     }
 
     // The dense triangle route reproduces the `p*p` then `(p^2)*p` cube the six-round build runs,
@@ -601,8 +600,6 @@ mod tests {
         let p: SparseMultiPoly<2, F> =
             SparseMultiPoly::new(&[(Monomial::<2>::new(&[u32::MAX, 0]), F::one())]);
         assert!(!dense_triangle_profitable(&p, &p));
-        // And the operator still produces the right answer, by another route: squaring this one
-        // term overflows the exponent, which is `Monomial`'s documented panic.
-        assert_eq!(route(&p, &p), MultiplyRoute::Materialize);
+        assert_eq!(route(&p, &p), MultiplyRoute::Accumulate);
     }
 }

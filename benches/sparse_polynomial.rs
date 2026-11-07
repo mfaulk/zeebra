@@ -67,6 +67,64 @@ fn exponent_bound<const N: usize>(terms: usize) -> u32 {
     bound
 }
 
+/// The dense total-degree simplex of `degree` in N variables, every coefficient nonzero.
+///
+/// The shape the symbolic Groebner build actually produces, and the one the specialised
+/// bivariate route is selected for: `cico_bivariate`'s six-round outputs are the dense triangle
+/// `(729+1)(729+2)/2` with no cancellation anywhere. [`random_poly`]'s independent monomial draws
+/// are sparse in the total-degree sense at every size, so a benchmark built only out of them never
+/// reaches that route.
+fn dense_simplex<const N: usize>(degree: u32, rng: &mut StdRng) -> MultivariatePolynomial<N, F> {
+    let mut exponents = [0u32; N];
+    let mut terms: Vec<(Monomial<N>, F)> = Vec::new();
+    fill_simplex::<N>(0, degree, &mut exponents, &mut terms, rng);
+    MultivariatePolynomial::new(&terms)
+}
+
+/// The largest total degree whose dense N-variable simplex has at most `terms` terms.
+///
+/// At least 1, so that an arity too large for the target still produces something to multiply.
+fn simplex_degree<const N: usize>(terms: usize) -> u32 {
+    let mut degree = 1u32;
+    while simplex_len::<N>(degree + 1) <= terms as u128 {
+        degree += 1;
+    }
+    degree
+}
+
+/// `C(degree + N, N)`, the number of monomials of total degree at most `degree` in N variables.
+fn simplex_len<const N: usize>(degree: u32) -> u128 {
+    let mut count: u128 = 1;
+    for i in 1..=(N as u128) {
+        count = count * (degree as u128 + i) / i;
+    }
+    count
+}
+
+/// Enumerate the exponent vectors of total degree at most `remaining` over variables `index..N`.
+fn fill_simplex<const N: usize>(
+    index: usize,
+    remaining: u32,
+    exponents: &mut [u32; N],
+    terms: &mut Vec<(Monomial<N>, F)>,
+    rng: &mut StdRng,
+) {
+    if index == N {
+        let mut coefficient = F::random(rng);
+        // A zero coefficient would be dropped on construction, undoing the density.
+        while coefficient.is_zero() {
+            coefficient = F::random(rng);
+        }
+        terms.push((Monomial::new(exponents), coefficient));
+        return;
+    }
+    for e in 0..=remaining {
+        exponents[index] = e;
+        fill_simplex::<N>(index + 1, remaining - e, exponents, terms, rng);
+    }
+    exponents[index] = 0;
+}
+
 fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
     let mut group = c.benchmark_group("sparse_poly");
 
@@ -98,6 +156,29 @@ fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
             BenchmarkId::new(format!("mul_by_term/{}", arity), terms),
             &(&a, &single),
             |bencher, (a, t)| bencher.iter(|| black_box(black_box(*a) * black_box(*t))),
+        );
+    }
+
+    // Two sizes past the arms above, which top out at 256 x 256 = 65 536 term-products — about a
+    // megabyte of transient, four orders below the regime #243 is about. The dense-output shape is
+    // also what selects the specialised bivariate route, so this is the arm that regresses if that
+    // route's dispatch predicate is wrong.
+    //
+    // Sized by term count rather than by degree, because a fixed degree is a wildly different size
+    // at each arity: the simplex of degree 16 is 153 terms at N = 2 and 5.3 million at N = 10.
+    for target in [1024usize, 4096] {
+        let mut rng = StdRng::seed_from_u64(29);
+        let degree = simplex_degree::<N>(target);
+        let a = dense_simplex::<N>(degree, &mut rng);
+        let b = dense_simplex::<N>(degree, &mut rng);
+        let products = a.terms().len() * b.terms().len();
+        // Hundreds of milliseconds a sample; the point of the arm is the shape and the size, not a
+        // tight interval.
+        group.sample_size(10);
+        group.bench_with_input(
+            BenchmarkId::new(format!("mul_dense/{}", arity), products),
+            &(&a, &b),
+            |bencher, (a, b)| bencher.iter(|| black_box(black_box(*a) * black_box(*b))),
         );
     }
 
@@ -136,6 +217,9 @@ fn bench_arity<const N: usize>(c: &mut Criterion, arity: &str) {
 }
 
 fn benches(c: &mut Criterion) {
+    // N = 2 because it is the arity the symbolic resultant build runs at and the one the
+    // dense-triangle route is written for; the file had no bivariate arm before #243.
+    bench_arity::<2>(c, "n2");
     bench_arity::<3>(c, "n3");
     bench_arity::<6>(c, "n6");
     bench_arity::<10>(c, "n10");
