@@ -91,11 +91,16 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --doc
 ```
 
-The shell tooling under `scripts/agent/` is checked separately, by CI's `agent-scripts` job:
+The shell tooling under `scripts/agent/` and `tools/` is invisible to every Rust job, so CI's
+`agent-scripts` job checks it separately. The shellcheck arguments are globs rather than a file
+list, so a script added under either directory is checked without anyone remembering to add it:
 
 ```sh
-shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh
+shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
+  tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 bash scripts/agent/test/zb-claim-test.sh
+bash tools/test/rss-guard-test.sh
+bash tools/test/benchlock-test.sh
 ```
 
 The Rust examples in this file are **compiled and run** by `cargo test --doc`, through a
@@ -450,6 +455,78 @@ The lock handles contention and nothing else. Also needed, per invocation:
   against everyone else.
 - A memory ceiling enforced by `tools/rss-guard.sh`, not by a hand-rolled `pgrep -f` loop. See
   below.
+- **`setsid`, so the run survives its launcher.** See *Why a run ended* below.
+- A build whose ISA floor actually survived. `.cargo/config.toml` is not inherited by a harness
+  crate built outside this worktree, which is a third route to losing `-C target-cpu=x86-64-v3`
+  with no `RUSTFLAGS` mistake to avoid (#352); `tools/benchlock.sh` lists it among the hazards the
+  lock does not handle.
+
+#### Why a run ended
+
+An `END` line names its cause, and **`end=exited` rather than `status=0` is what says a measurement
+completed**. The distinction is not decorative. A 1.5-hour Anemoi run was killed at 3 177 s of a
+5 400 s budget when the agent harness stopped the background shell that had launched it — taking
+`benchlock`, `timeout`, `taskset` and the binary with it, since all four were its descendants — and
+the log recorded:
+
+```text
+2026-11-06T20:01:47-05:00  END  zb-m25-anemoi  pid=2761621  status=0  elapsed=3177s  ...
+```
+
+`status=0`, a plausible `elapsed`, and no resource limit anywhere near being crossed. From the
+lock's side the measurement had finished; the only clue otherwise was an output file holding eleven
+header lines and no stage table. That consumed 53 minutes of a serialized mutex with three other
+agents queued behind it *while reporting success*, and it made every historical `END status=0`
+retroactively ambiguous — which matters because the resource policy authorizes bounded runs on the
+grounds that a budget stop is observable and attributable, and it is not, if a budget stop and an
+unrelated kill read the same (#344).
+
+So the cause is now explicit:
+
+| field | meaning |
+|---|---|
+| `end=exited` | the command ran and returned on its own; `status=` is its own status |
+| `end=budget` | status 124, GNU `timeout`'s convention — a resource-attributed stop |
+| `end=signalled-child(NAME)` | the command itself died of a signal; `status=` is 128+n |
+| `end=launcher-signal(NAME)` | **the lock itself was signalled.** `status=` is forced to 128+n however the command exited, and `child=` keeps the command's own status visible |
+| `launcher=gone` | the run outlived the process that launched it |
+| `end=aborted`, `route=trap` | the `END` came from the `EXIT` trap, so the lock never reached its own last line and never observed the command return. Never `end=exited`, and `status=` is 128 rather than 0 |
+
+`end=launcher-signal` is the one that closes the incident, and the override is the point: in that
+run the child reported **0**, because an intermediate `bash run.sh` with no `set -e` exited on its
+own last command after the binary beneath it had died. No exit status reaching the lock could have
+been trusted, so a signal to the lock now outranks whatever the command said.
+
+Two cases leave no `END` at all, both honestly. A signal arriving while a caller is still
+**queued** leaves a `QUEUED` line and nothing else, which is right: no `START` means no window was
+opened, so nothing later can look like it overlapped. And `kill -9` cannot be trapped, so it leaves
+a `START` with no `END` — an unterminated window, unhelpful but not a claim that anything finished,
+and the one case no script can prevent. Verified by process-group kill:
+
+```text
+kill -TERM  ->  status=143 end=launcher-signal(TERM) child=143
+kill -HUP   ->  status=129 end=launcher-signal(HUP)  child=129
+kill -USR1  ->  status=138 end=launcher-signal(USR1) child=138
+kill -KILL  ->  (no END line)
+```
+
+`launcher=gone` is a note and not a failure, deliberately — `setsid` reparents a run to init on
+purpose, so overriding the status on it would fail the very discipline being recommended:
+
+```sh
+setsid nohup bash run.sh > log 2>&1 < /dev/null &
+ps -o pid=,sid= -p "$!"   # a session id that differs from this shell's is the confirmation
+```
+
+The lock does **not** call `setsid` itself. A detached run that nobody can cancel is its own
+hazard, and that trade is worse than the one it would fix; so the lock records what happened rather
+than preventing it.
+
+`tools/test/benchlock-test.sh` covers the classification and reproduces the incident end to end —
+benchlock in its own session, a measured command whose wrapper swallows the kill and exits 0, and a
+signal to the whole process group — asserting that the resulting `END` is not `status=0`. It runs
+in CI's `agent-scripts` job, in a throwaway `ZEEBRA_BENCHLOCK_DIR`, so it never takes the real lock
+or appends to the real log.
 
 #### Enforcing a memory ceiling
 
