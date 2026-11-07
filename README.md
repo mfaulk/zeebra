@@ -98,6 +98,9 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] Squarefree decomposition in characteristic `p`, where the derivative is blind to every
       multiplicity `p` divides: the invisible part is a `p`-th power, so its root is taken exactly
       and recursed on, and the zero polynomial is the only refusal left
+- [x] Collins' subresultant PRS beside the primitive one, which becomes the reference: one exact
+      division per Euclidean step rather than a recursive content GCD, with the two routes asserted
+      equal exhaustively and the saving stated as an operation count rather than a timing
 - [x] Reed-Solomon codes over an FFT domain: encoding, erasure recovery, and a Euclidean
       decoder that verifies its correction rather than returning the nearest codeword
 
@@ -2151,6 +2154,7 @@ classical primitive PRS. The recursion terminates because the coefficients of a 
 | method | what it gives |
 |---|---|
 | `gcd(&other)` | the GCD, normalized so the lexicographic leading coefficient is one |
+| `gcd_by(&other, route)` | the same, by a named `GcdRoute` |
 | `content(i)` / `primitive_part(i)` | the GCD of the coefficients in `x_i`, and the quotient by it |
 | `degree_in(i)` / `coefficients_in(i)` | the univariate-in-`x_i` view the recursion is built on |
 | `exact_div(&divisor)` | the quotient, or `None` when the division leaves a remainder |
@@ -2247,10 +2251,41 @@ divisor and asserts the defining property — the result divides both inputs, an
 divisor divides the result. That is the property to test, because a GCD is only unique up to a unit
 and several candidates share the maximal degree.
 
-Faster GCD routes are deliberately not taken here. The subresultant PRS replaces the per-step
-content GCD with one exact division, and over a prime field Brown's modular algorithm evaluates
-down to univariate GCDs and lifts. No timings are published for either: the implementation is the
-one whose coefficient growth is bounded by construction, and it has not been measured.
+#### Two remainder sequences
+
+`GcdRoute` picks which polynomial-remainder sequence the Euclidean step runs. Both are the same
+recursion and return the same value — a reduced GCD is unique once normalized — and differ only in
+what they do to a pseudo-remainder before the next step.
+
+| route | per step | coefficient bound |
+|---|---|---|
+| `PrimitivePrs` | divide out the content, which is a recursive GCD | by construction: nothing grows |
+| `SubresultantPrs` (default) | divide by `g * h^delta`, one exact division | by a theorem: the entries are subresultants |
+
+Collins' subresultant PRS carries `g = lc(a)` and `h = h^(1-delta) * g^delta` across steps, and the
+fundamental theorem of subresultants is what makes the division by `g * h^delta` exact. The entries
+of the sequence then *are* subresultants — determinants of submatrices of the inputs' Sylvester
+matrix — so Hadamard's inequality bounds them in terms of the inputs alone. The primitive PRS
+instead makes every remainder primitive, which cannot grow at all, and pays a recursive GCD in a
+smaller ring for each step.
+
+It needs a pseudo-remainder with **exactly** `delta + 1` powers of the divisor's leading
+coefficient, which is what the theorem is stated over. The primitive route's pseudo-remainder
+multiplies once per division *step*, and a step that skips a degree leaves the power short —
+`x^6 + 1` against `x^2 + 1` takes three steps where `delta + 1` is five — so the two
+pseudo-remainders are not interchangeable and the subresultant route has its own.
+
+**The subresultant route is the default on correctness evidence, not on a measurement.** The two
+are asserted to return the same value by the exhaustive brute force, by `for_each_field!` at two
+arities, and case by case including the degree-gap cases. What is also asserted is the *operation
+count*: on a degree-five-against-degree-two pair the primitive route takes 18 recursive content
+GCDs and the subresultant route 6. That is a count and not a duration. **No timing is published
+for either route**, and whether the wall clock follows the operation count on any particular
+machine is exactly what has not been measured.
+
+Brown's modular algorithm — evaluate all but one variable at points over a prime field, take
+univariate GCDs, interpolate back, with degree bounds and a check against bad evaluation points —
+is the route that changes the asymptotics and is not implemented.
 
 ### Composition
 
