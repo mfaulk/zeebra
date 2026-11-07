@@ -41,6 +41,9 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] A contract for driving external Gröbner engines as subprocesses, which separates "this tool
       cannot represent the input" from "this tool was slower", and refuses to quote a ratio against
       a comparand that could not accept the problem
+- [x] Multivariate multiplication that collects as it multiplies, so the live set is bounded by the
+      product's size and not by the term-product count: the six-round symbolic build from 57.0 GB
+      peak resident to 0.32 GB, 179x, for byte-identical output
 - [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
       resolved against msolve's own distributed input files
@@ -358,7 +361,14 @@ cargo bench --bench f4_stages
 cargo bench --bench fglm                 # order conversion: stages, pipeline, strategies,
                                          # dependence, the shipped configuration, verification
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
+cargo bench --bench sparse_polynomial    # multivariate arithmetic, four arities
 ```
+
+`sparse_polynomial`'s `mul_dense` arm is separate from `mul` because they are different shapes, not
+just different sizes. `mul` draws monomials independently, which is sparse in the total-degree sense
+at every size; `mul_dense` builds the dense total-degree simplex, which is what the symbolic
+resultant build actually produces and what selects the specialised bivariate multiplication route.
+An arm of only the first kind cannot catch a wrong dispatch predicate.
 
 `sparse_linear_algebra` has two groups, and the difference between them matters. `sparse_linalg`
 times sparse row echelon beside dense *reduced* row echelon, which performs a back-substitution
@@ -427,6 +437,9 @@ cargo run --release --example karatsuba_crossover  # Karatsuba against schoolboo
 cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example multiplication_dispatch  # schoolbook vs Karatsuba vs transform, and the crossings
 cargo run --release --example multiplication_dispatch -- koalabear max_log=17
+cargo run --release --example multivariate_mul     # multivariate multiply: time and live heap per route
+cargo run --release --example multivariate_mul -- chunk         # block size sensitivity
+cargo run --release --example multivariate_mul -- max_degree=90 # stop short of the six-round size
 cargo run --release --example graeffe_root         # Graeffe root finding, stage by stage, against `roots`
 cargo run --release --example graeffe_root -- list
 cargo run --release --example graeffe_root -- goldilocks degrees=256,1024,4096   # where the method does not pay

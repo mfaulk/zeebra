@@ -987,6 +987,234 @@ says. So the six-round run records, and `MILESTONE-PUBLISHED-ATTACK-REPRODUCTION
 inflation is in `elapsed_nanos` and the verification stage, not in `sampling` or `interpolation`,
 which were never wrong. Any row recorded from this commit onwards does not carry it, and a total
 compared across the boundary should subtract the verification stage from the older one.
+### 6.12 The collecting multiply (#243): the memory, and the time with it
+
+§6.8 left the mechanism named and the fix unmeasured, with an explicit caveat — "a map insert per
+product may cost more time than `push` plus one sort, so it is a memory win that has to be measured
+for time". It was measured for time. **The caveat does not hold: the collecting routes are faster
+as well as smaller, at every size measured.**
+
+`src/poly/multivariate/sparse_multivariate_multiply.rs` now holds four routes, and
+`examples/multivariate_mul.rs` measures all four against the same operands with a tracking
+`#[global_allocator]`. Two memory quantities appear below and they are not interchangeable: **live
+heap** is the allocator's peak of `sum(alloc) - sum(dealloc)` during one product, so it attributes
+bytes to a route; **peak RSS** is `VmHWM` for the whole process, so it bounds a run and attributes
+nothing. #237 measured the two differing by 55% on an F4 row. Every per-route figure here is live
+heap.
+
+
+
+| route | inner loop | live set |
+|---|---|---|
+| `Materialize` | `push` into one `Vec`, then `SparseMultiPoly::new` | `O(\|a\|·\|b\|)` |
+| `Accumulate` | merge into one `HashMap<Monomial<N>, F>` | `O(output)` |
+| `Chunked { rows }` | `push` into a reused block buffer, fold each block in | `O(rows·\|b\|)` |
+| `DenseTriangle` | `slots[triangle_index(x, y)] += a·b`, no hashing | `O(triangle)` |
+
+The operands are dense bivariate total-degree triangles, because that is the shape §6.8 found: 266
+815 terms at degree 729, exactly `(729+1)(729+2)/2`, with no cancellation anywhere in six rounds.
+Sparsity is not the lever here, so a sparse operand would measure a different problem.
+
+#### The measurement
+
+KoalaBear, one pinned core, under `tools/benchlock.sh`. `p * p` then `(p²) * p` at each degree, the
+pair `cico_bivariate`'s α = 3 S-box runs. Times are wall clock; "heap" is peak live heap added,
+from the tracking allocator.
+
+| terms | step | products | out terms | materialize | accumulate | chunked (64) | triangle |
+|---:|---|---:|---:|---|---|---|---|
+| 6 | `p·p` | 36 | 15 | 2.7 µs / 1.4 KiB | 1.3 µs / 432 B | 3.6 µs / 4.9 KiB | **0.8 µs / 492 B** |
+| 6 | `p²·p` | 90 | 28 | 3.4 µs / 2.1 KiB | 1.8 µs / 432 B | 2.7 µs / 4.9 KiB | **1.0 µs / 544 B** |
+| 15 | `p·p` | 225 | 45 | 7.0 µs / 4.2 KiB | 3.8 µs / 848 B | 9.4 µs / 12.1 KiB | **1.5 µs / 1.0 KiB** |
+| 28 | `p·p` | 784 | 91 | 26.1 µs / 14.5 KiB | 11.3 µs / 1.6 KiB | 26.7 µs / 22.6 KiB | **3.6 µs / 2.0 KiB** |
+| 45 | `p·p` | 2 025 | 153 | 47.2 µs / 28.9 KiB | 26.8 µs / 3.3 KiB | 46.6 µs / 37.0 KiB | **7.7 µs / 3.9 KiB** |
+| 325 | `p·p` | 105 625 | 1 225 | 2.70 ms / 1.5 MiB | 1.33 ms / 26.0 KiB | 2.07 ms / 269.8 KiB | **316 µs / 30.8 KiB** |
+| 325 | `p²·p` | 398 125 | 2 701 | 11.09 ms / 6.1 MiB | 5.13 ms / 52.0 KiB | 7.95 ms / 295.8 KiB | **1.77 ms / 62.6 KiB** |
+| 1 653 | `p·p` | 2 732 409 | 6 441 | 74.0 ms / 48.2 MiB | 35.3 ms / 104 KiB | 54.8 ms / 1.3 MiB | **7.68 ms / 129 KiB** |
+| 1 653 | `p²·p` | 10 646 973 | 14 365 | 294 ms / 192.6 MiB | 151 ms / 416 KiB | 230 ms / 1.6 MiB | **42.2 ms / 472 KiB** |
+| 4 186 | `p·p` | 17 522 596 | 16 471 | 486 ms / 384.6 MiB | 265 ms / 416 KiB | 374 ms / 3.5 MiB | **49.8 ms / 480 KiB** |
+| 4 186 | `p²·p` | 68 947 606 | 36 856 | 2.051 s / 1.5 GiB | 1.179 s / 832 KiB | 1.592 s / 3.9 MiB | **212 ms / 976 KiB** |
+| 29 890 | `p·p` | 893 412 100 | 118 828 | *skipped* | 18.65 s / 3.3 MiB | 24.45 s / 25.1 MiB | **2.85 s / 3.7 MiB** |
+| 29 890 | `p²·p` | 3 551 768 920 | 266 815 | *skipped* | 84.85 s / 6.5 MiB | 103.39 s / 28.4 MiB | **11.25 s / 7.5 MiB** |
+| 1 653 | `p·term` | 1 653 | 1 653 | 94.6 µs / 63.0 KiB | 39.0 µs / 26.0 KiB | 63.5 µs / 26.8 KiB | **26.8 µs / 33.2 KiB** |
+
+The last row is one term against 1 653 — the inner operation of every Gröbner reduction step, and
+the case that decided the dispatch predicate below.
+
+The two rows above it are the six-round-relevant ones: 29 890 is the dense triangle of degree 243,
+against the 29 768 terms §6.8's words actually carry, and 266 815 output terms is exactly the figure
+§6.8 measured. The materialising arm is **skipped** above 2^28 products rather than run: its cost
+there is 56.6 GB in closed form, which is the measurement §6.8 already took once and which the
+example exists to avoid taking again. A skipped cell is marked, never reported as a result.
+
+Read the memory column at the bottom: materialising holds **24 484 bytes per output term** at 4 186
+terms, where every collecting route holds **23 to 33**. That ratio is the whole of §6.8's 838x.
+
+#### What the dispatch became, and why it has no size threshold
+
+`route` (`sparse_multivariate_multiply.rs`) is two tiers, not the three the first cut guessed:
+
+```text
+dense_triangle_profitable(a, b)  ->  DenseTriangle
+otherwise                        ->  Accumulate
+```
+
+**There is no small-operand tier, because there is no small-operand regime.** That was the expected
+result and the measurement refused it: `Accumulate` is 0.38x–0.66x `Materialize`'s time at every
+size down to 36 term-products, and holds 3x–1000x less. It is not a close call, and the reason is
+structural rather than empirical — `SparseMultiPoly::new`
+(`sparse_multivariate_polynomial.rs:47-74`) *is* a monomial-keyed hash accumulate, so materialising
+is accumulating with a `Vec` of every product in front of it. There is no size at which the extra
+`Vec` pays for itself.
+
+Not having a threshold is worth something on its own: the operand size does not change where the
+answer comes from, so the small `mul/{arity}` Criterion arms and the six-round build exercise the
+same code.
+
+**The predicate.** `DenseTriangle` is selected on a *dense-output* test, not on `N == 2`:
+
+* `N == 2`, because the index is bivariate — `triangle_index(i, j) = t(t+1)/2 + j` for `t = i + j`;
+* the triangle of the summed degree must fit in 64 MiB of coefficients;
+* **and the triangle must be within 4x the output's upper bound**, `|a|·|b|`. The product has at
+  most `|a|·|b|` distinct monomials, so a triangle within a constant factor of `|a|·|b|` is within
+  that factor of being exactly the output.
+
+The third clause is what keeps a sparse bivariate pair out. `(x^20000 + 1) · (y^20000 + 1)` is
+bivariate, dense in nothing, and would want 800 million slots for four output terms; the ratio
+rejects it on **four products**, and the pair goes to `Accumulate`.
+
+That clause replaced a first cut that tested *each operand* for being dense in its own triangle.
+Sufficient but not necessary, and it rejected the case Gröbner reduction runs most — **one term
+against many**, where the output is exactly `|a|` terms and the triangle is 20 910 slots for 20 301
+of them, the right accumulator by any measure, yet a single term is dense in nothing. Measured in
+the table above at 26.8 µs on the triangle against 39.0 µs accumulating: the operand test was
+giving away 1.5x on the inner operation of every reduction step. A regression test
+(`test_route_selects_by_density_not_by_arity`) pins the sparse pair out, the one-term case in, two
+lone terms out, and that arity alone selects nothing.
+
+**What happens when the estimate is wrong, in each direction.** A dispatch predicate's failure
+modes are more interesting than its happy path, and these two are deliberately asymmetric:
+
+* *Too pessimistic* — a pair whose product really is dense goes to `Accumulate` anyway. It costs
+  **time**: the triangle is 3x to 6x faster at every bivariate size in the table, and that is what
+  is forfeited. Memory is unaffected, because both routes are output-bounded, which is the property
+  §6.8 was about.
+* *Too optimistic* — a pair that passes the ratio but whose product cancels nearly everything
+  allocates a triangle far larger than its output. It costs **memory**, capped at 64 MiB however
+  wrong the estimate was. Over a field this takes engineered coefficients rather than bad luck.
+
+So the pessimistic direction costs unbounded time and the optimistic one costs bounded memory.
+After 57 GB, that is the right way round — and it is the same lesson #237 drew from F4's symbolic
+preprocessing, where 88.4% of a 14 GB peak was one `VecDeque<Monomial<20>>` grown to `2^28` slots
+with ~60% never written. A growable buffer sized by the *work* rather than by the *output* is the
+shared failure mode; what differs is only which structure wears it.
+
+#### The chunked route is a negative result
+
+#243 named chunking as the smaller change, and it is: a block buffer bounds the transient without
+touching the combine. It is also the wrong trade, and the sweep says why. At 4 186 terms:
+
+| rows per block | `p·p` elapsed | `p·p` heap | `p²·p` elapsed | `p²·p` heap |
+|---:|---|---|---|---|
+| 1 | 371.6 ms | 465.1 KiB | 1.544 s | 881.1 KiB |
+| 4 | 367.9 ms | 612.2 KiB | 1.584 s | 1.0 MiB |
+| 16 | 377.9 ms | 1.2 MiB | 1.553 s | 1.6 MiB |
+| 64 | 362.0 ms | 3.5 MiB | 1.541 s | 3.9 MiB |
+| 256 | 353.4 ms | 12.7 MiB | 1.548 s | 13.1 MiB |
+| 1 024 | 381.4 ms | 49.5 MiB | 1.588 s | 49.9 MiB |
+| 4 096 | 457.3 ms | 196.6 MiB | 1.682 s | 197.0 MiB |
+
+**Time is flat and memory is linear**, across more than three orders of magnitude of block size. So
+the optimum is one row — which is direct accumulation with a redundant `Vec` round-trip, and
+measures 371.6 ms against `Accumulate`'s 265.4 ms on the same operands: **1.40x for nothing**. The
+sensitivity question has an answer and the answer is that the parameter should not exist. The route
+is kept reachable (`MultiplyRoute::Chunked`) so the negative result stays reproducible, and is never
+selected.
+
+#### The small-operation control
+
+The `mul/{arity}` Criterion arms are the regression control, and they top out at 256 × 256 = 65 536
+term-products — about a megabyte of transient, four orders below the regime this is about.
+
+The A/B is a timing measurement, so unlike the peak above it **does** need the lock, and it is
+queued behind several hours of other agents' work. It is set up and will be filed when it lands:
+Criterion's baseline mechanism, the `origin/main` bench binary against the branch's, the same
+pinned core and the same `CRITERION_HOME`, filtered to the arms both binaries have
+(`sparse_poly/mul(_by_term)?/n(3|6|10)`).
+
+What it is expected to show, stated in advance so the measurement can contradict it: **no
+regression anywhere, and a modest improvement throughout.** The claim is not a guess — the
+per-route table above measures the same operation at the same sizes and finds the selected route
+faster than the materialising one at every point, including 36 term-products, and the `n3` arms sit
+between the 100-product and 27 225-product trivariate rows where `Accumulate` measured 0.49x and
+0.59x. A Criterion result slower than `main` on any shared arm would contradict the sweep and would
+be reported as that.
+
+Two arms were missing and are added in `benches/sparse_polynomial.rs`: an **`n2` arity**, which the
+file did not have although N = 2 is the arity the whole resultant route runs at, and a
+**`mul_dense`** arm two sizes past the existing ones. The second matters because `random_poly`
+draws monomials independently, which is sparse in the total-degree sense at every size — so the
+pre-existing arms never produce the dense-output shape `DenseTriangle` is selected for, and could
+not have caught a wrong predicate.
+
+#### End to end: the number that decides the issue
+
+`examples/resultant_cico --row poseidon31-cico-t16-rf2-rp4 --build-only`, single-threaded on one
+pinned core, against §6.8's recorded before:
+
+| | §6.8, recorded | after #243 | |
+|---|---:|---:|---|
+| peak RSS | 57.0 GB | **0.32 GB** | **179x smaller** |
+| elapsed | 48.37 min | 5.6 min | ~8.6x — see the protocol note |
+| output | deg 729 / 729, 266 815 / 266 815 terms | **identical** | the same two polynomials |
+
+**The protocol, because the two rows were not taken under the same one.** `f4-resource-scaling.md`
+§8 states that peak-RSS probes do not need `tools/benchlock.sh` and timings do, so the peak was
+taken **off the lock**, with the binary backgrounded directly and `/proc/<pid>/status` polled for
+`VmHWM` — no `timeout` wrapper, because `taskset` execs and keeps the pid where `timeout` forks and
+does not, a confusion that once reported 2 MB for a 14 GB run in this repository. The external poll
+and `resultant_cico`'s own `util::peak_resident_bytes` agreed exactly at 317 872 kB. **The 5.6 min
+from that same off-lock run is an indicative upper bound, not a result**; the on-lock timing is
+queued behind several hours of other agents' work and will be filed when it lands. Nothing about
+the memory claim depends on it.
+
+Read 57.0 GB → 0.32 GB as the ratio, not the absolute: **179x**, for a build whose output is 4.3 MB.
+§6.8's "wrong by 838x" is now wrong by 4.7x, and in the same direction.
+
+**What the remaining 0.32 GB is, and why it is not a transient.** It is the *output*, three times
+over. At the last round the state is sixteen words of 266 815 terms each — 68 MB of `(Monomial<2>,
+F)` pairs, about 110 MB once a `HashMap`'s load factor is paid — and `cico_bivariate`'s MDS layer
+folds those with `acc + word.scale(m)`, where `Add` still materialises a `Vec` of `|a| + |b|` terms
+and rebuilds a fresh map (`sparse_multivariate_polynomial_arithmetic.rs:32-39`). So two to three
+copies of the whole state are live across the linear layer. That is a constant factor on the
+output, which is the regime #243 set out to reach; collecting `Add` and `scale` the same way the
+multiply now is would take the constant down and is worth its own issue.
+
+**A note on which memory number is which, because this milestone has three.** Per-route **live
+heap** in the tables above is allocator-tracked: the peak of `sum(alloc) - sum(dealloc)` during one
+product. The 0.32 GB here is **`VmHWM`**, resident. They are not interchangeable and the gap is not
+small — #237 measured 21 674 MB allocator-observed against 13 996 MB resident on
+`fukuoka-mq-III-n20-seed0`, a 55% spread, because a `VecDeque<Monomial<20>>` reserving `2^28` slots
+takes 20 480 MiB in one allocation of which ~60% is never written. The competitive board now carries
+`RssBasis::AllocatorTracked` so the two cannot share a column by accident; the same discipline
+applies to reading this section. A figure labelled only "peak memory" tells a reader nothing.
+
+#### #164 is left unmeasured, deliberately
+
+`Monomial<N>`'s `Hash` is derived (`monomial.rs:14-19`), so it is SipHash-1-3 over `N` `write_u32`
+calls, and #164 wants a monomial-keyed hasher instead. **#164 and #243 compound, and the order they
+land in changes what the second one measures.** A collecting multiply does a hash lookup per
+*product* rather than per output term — 3.54 × 10⁹ of them on the `(p²) · p` step — so #243 has made
+the `Accumulate` route hash-bound in a way the materialising route was not, and whichever of the two
+lands second will be measured on a workload the other created.
+
+Not implemented here, and the measurement that would decide it is stated rather than taken: the
+`Accumulate` row at 29 890 terms is **84.85 s for 3.55 × 10⁹ hash lookups**, about 24 ns a product
+on a 4-byte field, against `DenseTriangle`'s 11.25 s for the same products with no hashing at all.
+That 7.5x gap is an upper bound on what a faster hasher could recover on the bivariate path — and on
+the bivariate path the triangle route already takes it, so #164's value is in the arities the
+triangle does not cover. The trivariate arm of `examples/multivariate_mul.rs` is where that would be
+read.
 
 ## 7. The deeper consequence
 
