@@ -76,11 +76,45 @@ where
     Ok(coefficients)
 }
 
+/// A decimal integer as a bit pattern of degree below the modulus' degree.
+///
+/// Rejects rather than reduces: a pattern of degree at least m is not an element of GF(2^m), and
+/// masking it to one would silently accept input the field cannot represent. Overflow of a `u64`
+/// is the same answer, since the pattern is at most 63 bits wide.
+fn parse_bit_pattern<const P: u64>(value: &str) -> Result<u64, ParseFieldElementError> {
+    let digits = value.strip_prefix('+').unwrap_or(value);
+    if digits.is_empty() {
+        return Err(ParseFieldElementError::OutOfRange);
+    }
+    if let Some(offender) = digits.bytes().find(|b| !b.is_ascii_digit()) {
+        return Err(ParseFieldElementError::InvalidCharacter(
+            offender.wrapping_sub(b'0'),
+        ));
+    }
+
+    let pattern: u64 = digits
+        .parse()
+        .map_err(|_| ParseFieldElementError::OutOfRange)?;
+    if pattern >= num_elements::<P>() {
+        return Err(ParseFieldElementError::OutOfRange);
+    }
+    Ok(pattern)
+}
+
 impl<const P: u64> BinaryFieldElement<P> {
     /// An element in the binary field GF(2^m).
     ///
+    /// Takes a representation, where [`FiniteField::new`] takes an integer to embed; this reaches
+    /// every element and that one reaches GF(2). An inherent method wins method resolution, so
+    /// `BinaryFieldElement::<P>::new(5)` is this one.
+    ///
     /// # Arguments
     /// * `coefficients` - The i^th bit represents c_i in the polynomial \sum_{i=1}^m c_i * x_i.
+    ///
+    /// # Panics
+    /// Panics if the pattern has degree at least that of the modulus, i.e. is not an element of
+    /// this field. Use [`FiniteField::from_str`] or [`KnownOrder::element_at`] where the value is
+    /// not known to be in range.
     pub fn new(coefficients: u64) -> Self {
         // TODO: debug_assert that P is irreducible?
         //
@@ -120,12 +154,26 @@ impl<const P: u64> Ring for BinaryFieldElement<P> {}
 
 // impl FiniteField
 impl<const P: u64> FiniteField for BinaryFieldElement<P> {
-    fn new(_val: u64) -> Self {
-        todo!()
+    /// `val mod 2`: the prime subfield GF(2), which is all the integers reach here.
+    ///
+    /// Not the inherent [`BinaryFieldElement::new`], which takes a bit pattern and reaches every
+    /// element. See [`FiniteField::new`] for why the trait method is the embedding instead, and
+    /// [`KnownOrder::element_at`] for addressing elements by index.
+    fn new(val: u64) -> Self {
+        if val.is_multiple_of(2) {
+            Self::zero()
+        } else {
+            Self::one()
+        }
     }
 
-    fn from_str(_value: &str) -> Result<Self, ParseFieldElementError> {
-        todo!()
+    /// A decimal integer, read as the coefficient bit pattern — what [`Display`] writes.
+    ///
+    /// So `from_str("5")` is `x^2 + 1`, not `5 mod 2`. See [`FiniteField::from_str`].
+    fn from_str(value: &str) -> Result<Self, ParseFieldElementError> {
+        // The inherent `new`, which takes the bit pattern — an inherent method wins method
+        // resolution over the trait method of the same name directly above.
+        Ok(BinaryFieldElement::<P>::new(parse_bit_pattern::<P>(value)?))
     }
 
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
@@ -169,6 +217,16 @@ impl<const P: u64> KnownOrder for BinaryFieldElement<P> {
 
     fn characteristic_limbs() -> &'static [u64] {
         trim_limbs(&Self::CHARACTERISTIC_LIMBS)
+    }
+
+    /// The bit pattern `index`, so `0..2^m` covers the field exactly once.
+    ///
+    /// Overrides the default, which refuses an extension rather than enumerate its prime subfield.
+    fn element_at(index: u128) -> Option<Self> {
+        if index >= Self::ORDER {
+            return None;
+        }
+        Some(BinaryFieldElement::<P>::new(index as u64))
     }
 }
 
@@ -244,9 +302,11 @@ impl<const P: u64> ops::Div<Self> for &BinaryFieldElement<P> {
 impl_div_variants!([const P: u64], BinaryFieldElement<P>);
 
 // impl Display
+//
+// The bit pattern in decimal. `FiniteField::from_str` reads exactly this back, which is what makes
+// the round trip hold and what fixes the meaning of a bare decimal over this field.
 impl<const P: u64> Display for BinaryFieldElement<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO: ???
         write!(f, "{}", self.coefficients)
     }
 }
@@ -452,9 +512,100 @@ mod tests {
             finite_field::fermat_inverse_via_recursive_pow,
             irreducible_polynomials::{X5_X2_1, X63_X_1, X8_X4_X3_X2_1, X8_X4_X3_X_1},
         },
-        FiniteField, KnownOrder,
+        FiniteField, KnownOrder, ParseFieldElementError,
     };
     use rand::{Rng, SeedableRng};
+
+    /// A decimal is the coefficient bit pattern, so `from_str` inverts `Display` over GF(2^8).
+    #[test]
+    fn test_from_str_reads_a_decimal_as_the_bit_pattern() {
+        type F = BinaryFieldElement<X8_X4_X3_X_1>;
+        for pattern in 0..256u64 {
+            let element = F::new(pattern);
+            assert_eq!(
+                <F as FiniteField>::from_str(&pattern.to_string()),
+                Ok(element)
+            );
+            assert_eq!(element.to_string(), pattern.to_string());
+        }
+        // x^2 + 1, not 5 mod 2.
+        assert_eq!(
+            <F as FiniteField>::from_str("5"),
+            Ok(F::new(0b101)),
+            "a decimal is the bit pattern"
+        );
+    }
+
+    /// The trait `new` is the prime-subfield embedding; the inherent `new` is the bit pattern.
+    #[test]
+    fn test_the_trait_new_embeds_the_prime_subfield() {
+        type F = BinaryFieldElement<X8_X4_X3_X_1>;
+        for value in 0..16u64 {
+            let embedded = <F as FiniteField>::new(value);
+            assert_eq!(
+                embedded,
+                if value % 2 == 0 { F::zero() } else { F::one() },
+                "the embedding of {value} is not {value} mod 2"
+            );
+        }
+        // The inherent `new`, which wins method resolution, means something else for the same 5.
+        assert_eq!(<F as FiniteField>::new(5), F::one());
+        assert_eq!(F::new(5).coefficients(), 0b101);
+    }
+
+    /// A pattern of degree at least the modulus' is out of range, not a masked element.
+    #[test]
+    fn test_from_str_rejects_a_pattern_outside_the_field() {
+        type F = BinaryFieldElement<X8_X4_X3_X_1>;
+        for value in ["256", "257", "1000", "18446744073709551616"] {
+            assert_eq!(
+                <F as FiniteField>::from_str(value),
+                Err(ParseFieldElementError::OutOfRange),
+                "{value} should be out of range for GF(2^8)"
+            );
+        }
+        // GF(2^5) stops five bits earlier.
+        assert_eq!(
+            <BinaryFieldElement<X5_X2_1> as FiniteField>::from_str("32"),
+            Err(ParseFieldElementError::OutOfRange)
+        );
+    }
+
+    /// Malformed text is a `Result`, never a panic.
+    #[test]
+    fn test_from_str_rejects_malformed_text() {
+        type F = BinaryFieldElement<X8_X4_X3_X_1>;
+        assert_eq!(
+            <F as FiniteField>::from_str(""),
+            Err(ParseFieldElementError::OutOfRange)
+        );
+        assert_eq!(
+            <F as FiniteField>::from_str("+"),
+            Err(ParseFieldElementError::OutOfRange)
+        );
+        assert_eq!(
+            <F as FiniteField>::from_str("x^2+1"),
+            Err(ParseFieldElementError::InvalidCharacter(b'x' - b'0'))
+        );
+        assert_eq!(
+            <F as FiniteField>::from_str("-1"),
+            Err(ParseFieldElementError::InvalidCharacter(
+                b'-'.wrapping_sub(b'0')
+            ))
+        );
+        // A leading `+` is accepted, as the polynomial grammar may emit one.
+        assert_eq!(<F as FiniteField>::from_str("+7"), Ok(F::new(7)));
+    }
+
+    /// `element_at` walks all 2^m bit patterns and stops there.
+    #[test]
+    fn test_element_at_is_the_bit_pattern() {
+        type F = BinaryFieldElement<X5_X2_1>;
+        for index in 0..32u128 {
+            assert_eq!(F::element_at(index), Some(F::new(index as u64)));
+        }
+        assert_eq!(F::element_at(32), None);
+    }
 
     /// A deterministic stream of operand pairs reduced for a degree-m modulus.
     fn operand_pairs(m: u32, count: usize, seed: u64) -> Vec<(u64, u64)> {

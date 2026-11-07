@@ -7,11 +7,12 @@ breaks, in detail. A list of concrete failures is the most valuable possible out
 There are none at the pipeline level. The real gaps were elsewhere, and one of them is a correctness
 hazard that nothing had noticed.
 
-**Written in two passes.** §1–§5 are the first (#233): the stale blocker, the pipeline result, the
+**Written in three passes.** §1–§5 are the first (#233): the stale blocker, the pipeline result, the
 `0x11D` hazard, and the field-equation mechanism. §6–§10 are the second (#379), which asserted the
 *solving* half the first pass left out, answered questions 4 and 5, and found three gaps — one of
-them a panic on any text input over `GF(2^8)`. §9 is why the issue is still open: question 3's
-measurement was deliberately not taken.
+them a panic on any text input over `GF(2^8)`. §13 is the third: that panic is **closed** (#377),
+and §13 records the trait-level decision it turned on. §9 is why the issue is still open: question
+3's measurement was deliberately not taken.
 
 ## 1. The blocker everyone was waiting on had already cleared
 
@@ -256,9 +257,10 @@ fixtures had not been tried. Characteristic two was never the restriction.
 **The restriction is extension fields**, and it is three things rather than one: the dispatch at
 `check.rs:190` monomorphizes only into `PrimeFieldElement64<p>`; `DifferentialCase` carries a
 `characteristic: u64` and nothing else, so `GF(2)` and `GF(2^8)` are both `characteristic: 2` and
-cannot be told apart; and neither side can render or read the elements — Zeebra's parser panics over
-`Gf256` (§10), and Singular needs its Galois-field ring syntax with a declared minimal polynomial,
-which has to be *the same* polynomial on both sides, which §4 showed is a real distinction.
+cannot be told apart; and the two sides do not agree on how an element is written — Zeebra now reads
+and writes `Gf256` as a coefficient bit pattern (§13), while Singular needs its Galois-field ring
+syntax with a declared minimal polynomial, which has to be *the same* polynomial on both sides,
+which §4 showed is a real distinction.
 
 The consequence for the issues: **#219 (G1) and #221 (G4) are over `GF(2)` and have their oracle
 today.** What lacks one is the `GF(2^8)` half of #197 and #198, which is **#378**.
@@ -316,9 +318,9 @@ scoped to exactly this for the linear-algebra kernel, and **#218 stays open on t
   Over `GF(2)` the identical call works, because `Zp2` is a prime field, which is why nothing
   noticed. `ExtensionFieldElement::from_str` is `todo!()` too, and its `new` is the prime-subfield
   embedding, so a generic enumeration through `new` would walk 2 of 256 elements and report a point
-  count that is **wrong rather than failed**. Fixed here in the one caller this branch owns:
-  `rational_points_by_enumeration` now refuses a field whose order and characteristic differ. The
-  general fix is a trait-level decision about what `new(val: u64)` means and is #377's.
+  count that is **wrong rather than failed**. Mitigated here in the one caller this branch owned:
+  `rational_points_by_enumeration` refused a field whose order and characteristic differ. **Now
+  closed — see §13**, which records the trait-level decision about what `new(val: u64)` means.
 - **#376 — `solve_one`'s default route misdiagnoses a missing field equation.** #218's gap 2 was "no
   field-equation mechanism, and no refusal when they are absent". The refusal exists and is correct,
   but not on the default path: `GrevlexF4ThenFglm` says *the system is not zero-dimensional* at once,
@@ -326,8 +328,10 @@ scoped to exactly this for the linear-algebra kernel, and **#218 stays open on t
   failure** — an error that tells a caller to raise a limit when the fix is to adjoin the equations.
   Both halves are asserted, so closing #376 breaks the test on purpose and brings this section with
   it.
-- **#378 — the differential oracle is prime-field only.** §7. Blocked on #377: there is no point
-  emitting `GF(2^8)` rings while Zeebra cannot read an element back.
+- **#378 — the differential oracle is prime-field only.** §7. Was blocked on #377 — there was no
+  point emitting `GF(2^8)` rings while Zeebra could not read an element back. **Unblocked by §13**;
+  what remains on it is the dispatch at `check.rs:190`, `DifferentialCase`'s missing degree, and
+  agreeing the minimal polynomial with Singular.
 
 Still deliberately out of scope, as in the first pass: **no import was enabled** (`MqField::Gf2` and
 `MqField::Gf256` still refuse, with accurate reasons; wiring the importer against a published answer
@@ -347,8 +351,9 @@ cargo test --lib -- --exact grobner::research::mq::tests::test_the_binary_and_ex
 cargo test --lib -- --exact grobner::differential::tests::test_every_committed_fixture_agrees
 ```
 
-`boolean_readiness` reports **8 passed, 2 ignored**; the two ignored name #377 and turn green when it
-closes. The live Singular sweep of §7 needs a local install and is `--ignored`:
+`boolean_readiness` reports **10 passed, 0 ignored**: the two that named #377 —
+`the_enumeration_oracle_should_cover_gf256` and `a_system_over_gf256_should_parse_from_text` — are
+un-ignored and green (§13). The live Singular sweep of §7 needs a local install and is `--ignored`:
 
 ```sh
 cargo test --lib -- --ignored --exact \
@@ -361,15 +366,59 @@ cargo test --lib -- --ignored --exact \
   the `GF(2)` solve path returns verified points, and the Singular oracle is available in
   characteristic two (§7). Nothing on #218 still gates it.
 - **#221 (G4, LowMC)** — unblocked, oracle included. Still rank 4 on its merits.
-- **#197 (A5, Fukuoka types I–V)** — unblocked at the field level, and `Gf256Mq` exists, but the
-  `GF(2^8)` types **cannot be imported from text until #377**. The `GF(2)` types can. Use `Zp2` for
-  those (§8).
-- **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked. HFE-80 remains far out of reach;
-  the reduced `HFE n_D` rungs on Steel's page are the target.
+- **#197 (A5, Fukuoka types I–V)** — unblocked at the field level, and `Gf256Mq` exists. The
+  `GF(2^8)` types are now importable from text too (§13); a coefficient is written as its
+  coefficient bit pattern, `0..255`. The `GF(2)` types always could — use `Zp2` for those (§8).
+- **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked, and the `GF(2^8)` text input the
+  ladder's upper rungs need now exists (§13). HFE-80 remains far out of reach; the reduced
+  `HFE n_D` rungs on Steel's page are the target.
 - **#206 (F2, MinRank modellings)** — gets the field-equation mechanism it needs for challenges D–F,
   and §5.1's rule says the mechanism is worthless for A–C over `GF(65521)`. That is the answer to
   F2's question 5 for the prime-field half, derived rather than assumed.
 - **Anemoi over `GF(2^n)`**, deferred in `docs/research/additional-benchmarks.md` §9 — unblocked at
-  the field level; text input over `GF(2^8)` waits on #377.
+  the field level, and text input over `GF(2^8)` now works too (§13).
 - **#272 (H16)** — owns the per-nonzero measurement of §9, and its end-to-end judgement belongs back
   on #218.
+
+## 13. #377 closed: what `new` means, and what `from_str` reads
+
+The gap of §10 was not a `todo!()` to fill in. The two `FiniteField::new` implementations meant
+different things by `new(val: u64)` — `ExtensionFieldElement`'s was the prime-subfield embedding,
+`BinaryFieldElement`'s inherent one was a bit pattern — and either reading, applied uniformly, broke
+one of the two callers. Settled at the trait:
+
+| | meaning |
+|---|---|
+| `FiniteField::new(val)` | the image of `val` under the unique ring homomorphism from the integers: `val mod p`. Uniform over every field, and **deliberately not onto an extension** |
+| `FiniteField::from_str(s)` | the text `Display` writes, so `from_str(&a.to_string()) == Ok(a)` over every field in the crate |
+| `KnownOrder::element_at(i)` | **new.** The bijection from `0..q` onto the field that the enumeration callers actually wanted from `new` |
+
+Why that split. `new` as the embedding is the reading `ExtensionFieldElement` already had and the one
+`solve.rs`'s comment already assumed, and it is the only reading that means the same thing in every
+field; `BinaryFieldElement::new` is now `val mod 2`. `from_str` is a *representation* parser rather
+than the embedding because `Display` has to distinguish all `q` elements and an integer embedding
+cannot — so over an extension `from_str("5")` is deliberately not `new(5)`.
+
+Concretely, a bare decimal in `from_str` is the element's **index**: the coefficient bit pattern over
+`GF(2^m)`, the base-`p` digits over `GF(p^k)`. That rule agrees with `new` on `0..p` — so on `0` and
+`1` in every field, and on the whole of any prime field, which is why nothing in the existing text
+corpus changes meaning — and extends it to the whole field instead of folding onto the subfield.
+`ExtensionFieldElement` additionally accepts the bracketed `[c_0, …, c_{k-1}]` form its `Display`
+writes. Anything outside the field's representation is a `ParseFieldElementError`, not a panic.
+
+`element_at`'s default **is** `new`, which is that bijection exactly when `q = p`; over a field whose
+order and characteristic differ it returns `None` rather than an element `new` would have put in the
+wrong place. So the prime fields inherit it correctly with no edit, both extension families override
+it, and a future field that forgets to override reports that it cannot be enumerated instead of
+enumerating wrongly — the §10 hazard is structurally closed rather than patched at one caller.
+`rational_points_by_enumeration` walks `element_at` and now covers `GF(2^8)`;
+`FieldEquationError::NotIndexableByInteger` survives as the refusal for a field that has not
+overridden it, and no field in the crate raises it.
+
+`multi_poly_parser.rs` no longer `unwrap`s: a coefficient outside the field, an unknown variable and
+an exponent beyond a `u32` are all parse errors against the offending span.
+
+Pinned by `from_str_inverts_display` and `new_is_the_integer_embedding` over all eleven
+`for_each_field!` types, `element_at_covers_the_field_exactly_once` over the small ones, and
+`fields::finite_field::tests::test_element_at_covers_an_extension_field_where_new_does_not`, which
+runs both maps over `0..q` and counts their images: `q` against `p`.

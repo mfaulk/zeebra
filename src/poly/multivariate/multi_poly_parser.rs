@@ -4,13 +4,28 @@ use crate::{
     poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, Monomial},
     FiniteField,
 };
-use pest::{error::Error, iterators::Pair, Parser};
+use pest::{
+    error::{Error, ErrorVariant},
+    iterators::Pair,
+    Parser, Span,
+};
 use pest_derive::*;
-use std::str::FromStr;
 
 #[derive(Parser)]
 #[grammar = "poly/multivariate/multi_poly.pest"]
 struct MultivariatePolynomialParser;
+
+/// A failure the grammar cannot express, reported against the span that caused it.
+///
+/// The grammar accepts any decimal integer, so whether a coefficient names an element of `F` or an
+/// exponent fits a `u32` is only knowable once the field and the variable list are known. Those
+/// used to be `unwrap`s, which made text input over GF(2^8) abort the process (#377).
+fn semantic_error(span: Span<'_>, message: String) -> Box<Error<Rule>> {
+    Box::new(Error::new_from_span(
+        ErrorVariant::CustomError { message },
+        span,
+    ))
+}
 
 /// Parse a string as a Multivariate polynomial over a finite field.
 ///
@@ -33,7 +48,7 @@ pub fn parse_multivariate_polynomial<const N: usize, F: FiniteField>(
     // The grammar matches a single `polynomial` pair, so only the first is significant.
     if let Some(pair) = MultivariatePolynomialParser::parse(Rule::polynomial, &str)?.next() {
         match pair.as_rule() {
-            Rule::polynomial => polynomial = parse_polynomial(pair, variables),
+            Rule::polynomial => polynomial = parse_polynomial(pair, variables)?,
             Rule::EOI => {} // Empty input is the zero polynomial.
             _ => panic!("Not a Multivariate polynomial: {}", str),
         }
@@ -46,72 +61,80 @@ pub fn parse_multivariate_polynomial<const N: usize, F: FiniteField>(
 fn parse_polynomial<const N: usize, F: FiniteField>(
     polynomial: Pair<Rule>,
     variables: [&str; N],
-) -> SparseMultiPoly<N, F> {
-    // println!("parsing univariate: {}", univariate.as_span().as_str());
+) -> Result<SparseMultiPoly<N, F>, Box<Error<Rule>>> {
     let mut result = SparseMultiPoly::<N, F>::zero();
 
     for pair in polynomial.into_inner() {
         match pair.as_rule() {
             Rule::term => {
-                result = &result + &parse_term(pair, variables);
+                result = &result + &parse_term(pair, variables)?;
             }
             Rule::EOI => break, // End of Input.
             _ => panic!("A univariate should only contain terms: {:?}", pair),
         }
     }
 
-    result
+    Ok(result)
 }
 
 // Parse a Pair that has matched on the 'term' rule.
 fn parse_term<const N: usize, F: FiniteField>(
     term: Pair<Rule>,
     variables: [&str; N],
-) -> SparseMultiPoly<N, F> {
-    // println!("parsing term: {}", term.as_span().as_str());
-
+) -> Result<SparseMultiPoly<N, F>, Box<Error<Rule>>> {
     // A term is a monomial (i.e. c*x*y) or a constant.
     let pair = term
         .into_inner()
         .next()
         .expect("A term must contain a monomial or a constant");
     match pair.as_rule() {
-        Rule::constant => SparseMultiPoly::from(parse_constant::<F>(&pair)),
+        Rule::constant => Ok(SparseMultiPoly::from(parse_constant::<F>(&pair)?)),
         Rule::monomial => parse_monomial(pair, variables),
         _ => panic!("A term must be a monomial or a constant: {:?}", pair),
     }
 }
 
 // Parse a Pair that has matched on the 'constant' rule.
-fn parse_constant<F: FiniteField>(matched: &Pair<Rule>) -> F {
+//
+// The digits go to `F::from_str`, whose accepted syntax is the field's own `Display` form: a
+// residue over a prime field, a coefficient bit pattern over GF(2^m).
+fn parse_constant<F: FiniteField>(matched: &Pair<Rule>) -> Result<F, Box<Error<Rule>>> {
     // TODO: clean this up using the `sign` and `integer` rules.
-    let matched_string = matched.as_span().as_str();
-    if matched_string.starts_with('+') {
-        // Skip the "+" and parse the rest.
-        return F::from_str(&matched_string[1..matched_string.len()]).unwrap();
-    }
+    let span = matched.as_span();
+    let matched_string = span.as_str();
+    let (negated, digits) = match matched_string.strip_prefix('-') {
+        Some(digits) => (true, digits),
+        None => (
+            false,
+            matched_string.strip_prefix('+').unwrap_or(matched_string),
+        ),
+    };
 
-    if matched_string.starts_with('-') {
-        // Skip the "-" and parse the rest.
-        return F::zero() - F::from_str(&matched_string[1..matched_string.len()]).unwrap();
-    }
-
-    F::from_str(matched_string).unwrap()
+    let element = F::from_str(digits).map_err(|e| {
+        semantic_error(
+            span,
+            format!("{digits} is not an element of this field: {e}"),
+        )
+    })?;
+    Ok(if negated {
+        F::zero() - element
+    } else {
+        element
+    })
 }
 
 // Parse a Pair that has matched on the 'monomial' rule.
 fn parse_monomial<const N: usize, F: FiniteField>(
     monomial: Pair<Rule>,
     variables: [&str; N],
-) -> SparseMultiPoly<N, F> {
-    // println!("parsing monomial: {}", monomial.as_span().as_str());
+) -> Result<SparseMultiPoly<N, F>, Box<Error<Rule>>> {
     let mut c: Option<F> = None;
     let mut result = SparseMultiPoly::<N, F>::one();
 
     for pair in monomial.into_inner() {
         match pair.as_rule() {
             Rule::constant => {
-                c = Some(parse_constant(&pair));
+                c = Some(parse_constant(&pair)?);
             }
             Rule::sign => {
                 if pair.as_span().as_str() == "-" {
@@ -120,7 +143,7 @@ fn parse_monomial<const N: usize, F: FiniteField>(
             }
             // Parse a power, (e.g. x^3)
             Rule::power => {
-                result = &result * &parse_power(pair, variables);
+                result = &result * &parse_power(pair, variables)?;
             }
             Rule::EOI => continue,
             _ => panic!("Unexpected rule {:?}", pair),
@@ -132,15 +155,13 @@ fn parse_monomial<const N: usize, F: FiniteField>(
         result = &result * &SparseMultiPoly::from(constant);
     }
 
-    // TODO: multiply this by c, if any, or negate, if necessary.
-    result
+    Ok(result)
 }
 
 fn parse_power<const N: usize, F: FiniteField>(
     power: Pair<Rule>,
     variables: [&str; N],
-) -> SparseMultiPoly<N, F> {
-    // println!("parsing power: {}", power.as_span().as_str());
+) -> Result<SparseMultiPoly<N, F>, Box<Error<Rule>>> {
     let mut exponents = [0u32; N];
     let mut variable_index = 0;
     let mut exponent = 1;
@@ -150,25 +171,43 @@ fn parse_power<const N: usize, F: FiniteField>(
         match pair.as_rule() {
             // A power (e.g. x^3) should contain a variable and an integer.
             Rule::var => {
-                let variable = pair.as_span().as_str();
-                variable_index = variables.iter().position(|&v| v == variable).unwrap();
+                let span = pair.as_span();
+                let variable = span.as_str();
+                variable_index =
+                    variables
+                        .iter()
+                        .position(|&v| v == variable)
+                        .ok_or_else(|| {
+                            semantic_error(
+                                span,
+                                format!("{variable} is not one of the variables {variables:?}"),
+                            )
+                        })?;
             }
             Rule::integer => {
                 // By assumption, variable_index has already been set.
-                // println!("Setting exponent {}", variable_index);
-                exponent = u32::from_str(pair.as_span().as_str()).unwrap();
+                let span = pair.as_span();
+                exponent = span.as_str().parse().map_err(|_| {
+                    semantic_error(
+                        span,
+                        format!("the exponent {} does not fit a u32", span.as_str()),
+                    )
+                })?;
             }
             _ => panic!("Unexpected rule {:?}", pair),
         }
     }
     exponents[variable_index] = exponent;
-    SparseMultiPoly::new(&[(F::one(), Monomial::new(&exponents))])
+    Ok(SparseMultiPoly::new(&[(
+        F::one(),
+        Monomial::new(&exponents),
+    )]))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        fields::PrimeFieldElement64,
+        fields::{Gf256, PrimeFieldElement64},
         poly::{
             multivariate::{
                 multi_poly_parser::parse_multivariate_polynomial,
@@ -178,6 +217,44 @@ mod tests {
         },
         FiniteField, One,
     };
+
+    /// A system over GF(2^8) parses, with each coefficient read as its bit pattern.
+    #[test]
+    fn test_parse_over_a_binary_field() {
+        let parsed =
+            parse_multivariate_polynomial::<2, Gf256>("5*x0*x1 + 173*x0 + 1", ["x0", "x1"])
+                .expect("well formed");
+        assert_eq!(
+            parsed,
+            SparseMultiPoly::new(&[
+                (Monomial::new(&[1, 1]), Gf256::new(5)),
+                (Monomial::new(&[1, 0]), Gf256::new(173)),
+                (Monomial::one(), Gf256::new(1)),
+            ])
+        );
+    }
+
+    /// A coefficient outside the field is a parse error rather than a panic (#377).
+    #[test]
+    fn test_a_coefficient_outside_the_field_is_an_error() {
+        // 256 is not a bit pattern of degree below 8.
+        let error = parse_multivariate_polynomial::<1, Gf256>("256*x0", ["x0"])
+            .expect_err("256 is not an element of GF(2^8)");
+        assert!(
+            error.to_string().contains("256 is not an element"),
+            "{error}"
+        );
+    }
+
+    /// An unknown variable and an unrepresentable exponent are errors rather than panics.
+    #[test]
+    fn test_unknown_variables_and_oversized_exponents_are_errors() {
+        assert!(parse_multivariate_polynomial::<1, PrimeFieldElement64<1091>>("y", ["x"]).is_err());
+        assert!(
+            parse_multivariate_polynomial::<1, PrimeFieldElement64<1091>>("x^99999999999", ["x"])
+                .is_err()
+        );
+    }
 
     #[test]
     // Attempting to parse an empty string should return a ParsingError.

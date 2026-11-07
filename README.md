@@ -38,6 +38,8 @@ As the saying goes, you can either make software so simple that it obviously has
       scoreboard and a cross-concurrency comparison refused rather than quoted
 - [x] The whole solving pipeline in characteristic two, over GF(2) and GF(2^8), and field equations
       `x^q - x` that make a quotient dimension count base-field points
+- [x] Text input and exhaustive enumeration over an extension field, on a settled split between the
+      integer embedding `FiniteField::new` and the element index `KnownOrder::element_at`
 - [x] A contract for driving external Gröbner engines as subprocesses, which separates "this tool
       cannot represent the input" from "this tool was slower", and refuses to quote a ratio against
       a comparand that could not accept the problem
@@ -1019,6 +1021,43 @@ the 65025 nonzero operand pairs separate them. An order check cannot tell them a
 order 256 — so the field is named at the type level rather than inferred.
 `docs/research/fukuoka-mq.md` §2.4 has the consequence for importing an instance.
 
+**An integer names an element of an extension field in two different ways, and the API keeps them
+apart.** `FiniteField::new` is the image of an integer under the unique ring homomorphism from the
+integers — `val mod p` — so over an extension it only ever reaches the prime subfield, and walking
+it over `0..q` is not an enumeration. `KnownOrder::element_at` is the bijection from `0..q`, and
+`FiniteField::from_str` reads the text `Display` writes, which is the coefficient bit pattern over
+GF(2^m) and the bracketed coefficient list over GF(p^k):
+
+```rust
+use zeebra::{fields::{Gf13Pow4, Gf256}, FiniteField, KnownOrder, One};
+
+// `new` is the embedding: 5 copies of one, which in characteristic two is one.
+assert_eq!(<Gf256 as FiniteField>::new(5), Gf256::one());
+
+// `from_str` is the representation, and inverts `Display`.
+let x2_plus_1 = <Gf256 as FiniteField>::from_str("5").unwrap();
+assert_eq!(x2_plus_1.to_string(), "5");
+assert_eq!(Gf256::element_at(5), Some(x2_plus_1));
+
+// Out of range is a `Result`, not a panic.
+assert!(<Gf256 as FiniteField>::from_str("256").is_err());
+
+// Over GF(13^4) a bare decimal is the base-13 digits; `Display`'s own form reads back too.
+assert_eq!(
+    <Gf13Pow4 as FiniteField>::from_str("170").unwrap().to_string(),
+    "[1, 0, 1, 0]",
+);
+assert_eq!(
+    <Gf13Pow4 as FiniteField>::from_str("[1, 0, 1, 0]"),
+    <Gf13Pow4 as FiniteField>::from_str("170"),
+);
+```
+
+`element_at`'s default is `new`, which is that bijection exactly when `q = p`, and returns `None`
+for every index over a field whose order and characteristic differ — so a field that has not
+overridden it reports that it cannot be enumerated rather than enumerating its prime subfield and
+returning a count that is wrong rather than failed.
+
 ### Characteristic two in the solver, and field equations
 
 The Gröbner stack is generic over `FiniteField` and had never been run in even characteristic. It
@@ -1083,9 +1122,11 @@ Three caveats a caller should know, each asserted rather than described:
 - **GF(2) is `Zp2`, not `BinaryFieldElement<0b11>`.** The two are the same field — the full operation
   tables agree — but `Zp2` is 4 bytes to the other's 8 and needs no carry-less multiply for a field
   where multiplication is `and`.
-- **No GF(2^8) system can be read from text.** `FiniteField::from_str` is `todo!()` for
-  `BinaryFieldElement`, and `MultivariatePolynomial::parse` unwraps it, so parsing over `Gf256`
-  **panics**. GF(2) parses fine. This is #377, and it is what actually blocks the GF(2^8) importers.
+- **A GF(2^8) coefficient is written as its bit pattern.** `MultivariatePolynomial::parse` works over
+  `Gf256`, reading each decimal `0..255` as the coefficient bit pattern `Display` writes — so
+  `from_str` inverts `Display` over every field, and over an extension it is deliberately not
+  `FiniteField::new`, which only ever reaches the prime subfield. `KnownOrder::element_at` is the
+  route that enumerates all `q` elements. #377.
 - **Omitting the field equations is diagnosed on only one route.** `SolveStrategy::GrevlexF4ThenFglm`
   reports a positive-dimensional ideal immediately; the default `DirectLexF4` exhausts a
   Macaulay-matrix budget and reports a *resource* failure, which invites raising a limit that cannot
@@ -3173,9 +3214,9 @@ bytes — and the GF(2) and GF(2^8) families are refused by name, each for its o
 want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
 long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
 path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
-*and* #377, because `FiniteField::from_str` is `todo!()` for `BinaryFieldElement`, so a `Gf256`
-system cannot be read from text at all; the challenge's modulus, which is not the AES one, is
-`Gf256Mq`.
+too, and no longer anything else: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, so
+a `Gf256` system reads from text with each coefficient as its bit pattern. The challenge's modulus,
+which is not the AES one, is `Gf256Mq`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
