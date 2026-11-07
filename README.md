@@ -310,6 +310,74 @@ is invoked with this directory as the working directory, and profile settings co
 workspace being built. A downstream build gets whatever that build configures, so a dependent
 crate wanting these settings must set them itself.
 
+#### An out-of-tree measurement harness
+
+That last paragraph is also **a third way to lose the ISA floor, and the only one with no mistake
+to avoid.** A benchmark harness in its own crate outside this worktree, depending on `zeebra` by
+path, inherits neither the `rustflags` nor the profile — cargo resolves config from the invocation
+directory upward, and `[profile.release]` comes from the crate being built. `RUSTFLAGS` need never
+be set. The build succeeds, the tests pass, and the numbers are smooth and self-consistent.
+
+It happened, and because both runs were kept the cost is measured rather than estimated
+(#352, [`docs/research/structured-sylvester.md`](docs/research/structured-sylvester.md) §5.5.1):
+
+| build | order-1 458 LU | order-1 458 Euclid | ratio |
+|---|---:|---:|---:|
+| no `target-cpu`, no LTO | 6.360 s | 3.295 ms | 1 930x |
+| `x86-64-v3`, fat LTO, cgu 1 | **2.272 s** | **1.343 ms** | **1 692x** |
+| what the flags were worth | **2.80x** | **2.45x** | — |
+
+**2.80x on the determinant**, and 12 % on the ratio — small enough to look plausible, which is the
+dangerous size. Nothing in the toolchain objected. What caught it was comparing the baseline column
+against an independently measured figure for the same quantity: #312 puts the order-1 458
+single-worker determinant at 2.404 s, the first harness said 6.360 s, and 2.6x apart is not a noise
+story.
+
+So, for a harness built anywhere but here, in order of what it buys:
+
+1. **State the comparison.** A harness that measures a quantity something else in this repository
+   already measures should print both and name the discrepancy. That is what found this, and it is
+   the only item on this list that also catches the mistakes nobody has thought of yet.
+
+2. **Print the ISA floor from inside the harness.** `zeebra::util::isa_floor()` is compiled as part
+   of *your* build, so it reports your flags and not this repository's — one line in the header and
+   a silent miss becomes a visible one:
+
+   ```rust
+   println!("ISA: {}", zeebra::util::isa_floor());
+   ```
+
+   `zeebra::util::has_isa_floor()` is the predicate, for a harness that would rather refuse to
+   record a figure than label it.
+
+3. **Pass the build configuration explicitly.** Either put the settings on the invocation —
+
+   ```sh
+   cargo build --release \
+     --config 'target."cfg(target_arch = \"x86_64\")".rustflags = ["-C", "target-cpu=x86-64-v3"]' \
+     --config 'profile.release.lto = "fat"' \
+     --config 'profile.release.codegen-units = 1'
+   ```
+
+   — or copy `.cargo/config.toml` into the harness crate **and** restate `[profile.release]` in its
+   `Cargo.toml`. Copying the config file alone is not enough and is the trap inside the fix:
+   profiles live in `Cargo.toml`, and this repository's `.cargo/config.toml` carries no `[profile]`
+   section, so the copy brings the ISA floor and leaves `lto = "fat"` and `codegen-units = 1`
+   behind.
+
+   Verified on a throwaway out-of-tree crate, counting VEX-encoded instructions over SIMD registers
+   in the resulting binary: **0** for a plain `cargo build --release`, **70** with
+   `.cargo/config.toml` copied, **79** with all three settings passed by `--config`.
+
+Note that `tools/vec_census.sh` will not catch this for an arbitrary harness. Its signal is vector
+*multiplies*, which only exist for an artifact exercising a **4-byte** field — a 32-bit Montgomery
+reduction is 64-bit arithmetic LLVM can put in a lane and a 64-bit one is 128-bit arithmetic it
+cannot — so it reports zero for an 8-byte-field harness whether the floor is there or not. A
+general static probe is harder than it looks, and #385 records the measurements that killed one:
+the AVX2 and BMI2 instructions in a baseline-built binary's explicitly dispatched
+`#[target_feature]` kernels are indistinguishable, instruction by instruction, from those a real
+`x86-64-v3` build emits.
+
 #### No compiler cache, and why that is the measured choice
 
 `.cargo/config.toml` sets `[build] rustc-wrapper = ""`, which **disables** any compiler cache
