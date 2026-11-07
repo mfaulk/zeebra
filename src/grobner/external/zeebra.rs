@@ -180,7 +180,17 @@ fn solve<const N: usize, F: FiniteField>(
             // separate outcome for it. `limit_name` is the stable key; `max_wall_time` is the one
             // that is a time stop, and the harness sets it from `Limits::wall`.
             let status = match error {
+                // Both time stops, and both must land here rather than in the `other` arm below:
+                // that arm reports a `ToolCap`, so an unlisted time stop would be recorded as a
+                // capability limit of the engine instead of as the wall clock it is. The variants
+                // differ only in which stage noticed the budget — the batch loop or final
+                // interreduction (#395) — which is not a distinction the contract draws.
                 F4Error::TimeBudgetExceeded {
+                    elapsed_millis,
+                    budget_millis,
+                    ..
+                }
+                | F4Error::InterreductionTimeBudgetExceeded {
                     elapsed_millis,
                     budget_millis,
                     ..
@@ -584,6 +594,56 @@ mod tests {
         );
         assert!(report.status.is_timing_evidence());
         assert_eq!(report.solver, "zeebra");
+    }
+
+    /// An interreduction time stop is reported as a wall clock, not as a capability cap.
+    ///
+    /// The regression this guards is a silent one. The error match has an `other =>` arm that
+    /// reports `LimitStop::ToolCap`, so a time stop the arms do not name is recorded as a limit of
+    /// the **engine** rather than of the clock — and #369 is about to populate a board from these
+    /// records. `limit_name()` returning `max_wall_time` is not enough on its own, because the
+    /// match is on the variant and not on the name.
+    ///
+    /// The squares of four distinct variables have pairwise coprime leading monomials, so the
+    /// product criterion takes every pair, the batch loop never runs, and the stop can only come
+    /// from final interreduction (#395).
+    #[test]
+    fn test_an_interreduction_time_stop_is_a_wall_clock_not_a_tool_cap() {
+        use crate::grobner::external::{FieldSpec, Instance, LimitStop};
+        use crate::grobner::F4Options;
+
+        let coprime = Instance::new(
+            "coprime-pair",
+            "synthetic",
+            FieldSpec {
+                characteristic: REFERENCE_CHARACTERISTIC,
+                extension_degree: 1,
+                name: format!("GF({REFERENCE_CHARACTERISTIC})"),
+                defining_polynomial: None,
+            },
+            // Four variables, because the adapter compiles [4, 5, 6, 7, 10, 14] at this
+            // characteristic and a two-variable instance is refused before the engine is reached.
+            (1..=4).map(|i| format!("x{i}")).collect(),
+            (1..=4).map(|i| format!("x{i}^2")).collect(),
+            GREVLEX,
+        );
+
+        let mut solver = ZeebraSolver::new().with_f4_options(F4Options {
+            max_wall_time: Some(Duration::ZERO),
+            ..F4Options::default()
+        });
+        let report = solver.run(&coprime, Task::ReducedGrobnerBasis, &limits());
+
+        match &report.status {
+            RunStatus::StoppedByLimit(LimitStop::WallClock { limit, elapsed }) => {
+                assert_eq!(*limit, Duration::ZERO);
+                assert!(*elapsed >= *limit);
+            }
+            RunStatus::StoppedByLimit(LimitStop::ToolCap { detail }) => {
+                panic!("an interreduction time stop was filed as a capability cap: {detail}")
+            }
+            other => panic!("expected a wall-clock stop, got {other:?}"),
+        }
     }
 
     /// Zeebra's quotient dimensions agree with the literature's on three corpus rungs.

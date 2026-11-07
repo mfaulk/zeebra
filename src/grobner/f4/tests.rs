@@ -3057,6 +3057,57 @@ fn test_a_time_budget_stops_with_the_degree_and_the_counters() {
     assert_eq!(error.limit_name(), "max_wall_time");
 }
 
+/// A budget is honored during final interreduction, which runs after the batch loop (#395).
+///
+/// Deterministic rather than a race, and the construction is the point: `x^2` and `y^2` have
+/// coprime leading monomials, so the one critical pair dies to the product criterion, the batch
+/// loop never runs a single iteration, and the batch-loop clock check is therefore never reached.
+/// Before #395 interreduction was not checked at all, so a zero budget returned `Ok` here —
+/// four fifths of `mq-random-10` sat in that unchecked stage.
+#[test]
+fn test_a_time_budget_stops_during_final_interreduction() {
+    use crate::grobner::{f4_reported, StopKind};
+    use std::time::Duration;
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let vars = ["x", "y"];
+    let system: Vec<MultivariatePolynomial<2, Zp2147483647>> = ["x^2", "y^2"]
+        .iter()
+        .map(|t| MultivariatePolynomial::parse(t, vars).expect("a bivariate polynomial"))
+        .collect();
+    let options = F4Options {
+        max_wall_time: Some(Duration::ZERO),
+        ..F4Options::default()
+    };
+
+    let (result, statistics) = f4_reported(&system, order, &options);
+    let Err(F4Error::InterreductionTimeBudgetExceeded {
+        elements_reduced,
+        elements,
+        elapsed_millis,
+        budget_millis,
+    }) = result
+    else {
+        panic!(
+            "a zero budget must stop in interreduction, not {:?} after {} batches",
+            result, statistics.batches
+        );
+    };
+
+    // The batch loop genuinely never ran, which is what makes this a test of the other stage.
+    assert_eq!(statistics.batches, 0, "the product criterion took the pair");
+    assert_eq!(elements_reduced, 0, "stopped before paying for an element");
+    assert_eq!(elements, 2, "and reports the work the stage had to do");
+    assert_eq!(budget_millis, 0);
+    assert!(elapsed_millis >= budget_millis);
+
+    // Classified as a clock and never as a resource, exactly as the batch-loop stop is.
+    let error = result.expect_err("already matched");
+    assert_eq!(error.stop_kind(), StopKind::Time);
+    assert_ne!(error.stop_kind(), StopKind::Resource);
+    assert_eq!(error.limit_name(), "max_wall_time");
+}
+
 /// Every other stop is classified as a resource stop, a caller mistake, or a failed certification.
 ///
 /// Guards the distinction the time stop rests on: if a resource variant were ever classified as

@@ -12,6 +12,8 @@
 //! cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 --build-only
 //! cargo run --release --example resultant_cico -- --row poseidon31-cico-t16-rf2-rp4 \
 //!     --max-samples 6562 --wall-budget 14400      # one named row under one named budget
+//! cargo run --release --example resultant_cico -- --kernel euclidean \\
+//!     --root-finder deflation                     # #350 and #351's routes
 //! ```
 //!
 //! # Rows and budgets
@@ -80,12 +82,13 @@ use rand::{prelude::StdRng, SeedableRng};
 
 use zeebra::{
     fields::PrimeFieldElement64,
+    graeffe_all_roots,
     grobner::research::{
         bivariate_resultant_ntt_with, bivariate_resultant_predicted,
         bivariate_resultant_reference_with, challenge, cico_bivariate, predicted_resultant_degree,
         registry, sylvester_determinant_at, ChallengeManifest, CicoInstance, DegreeSource,
-        Environment, Json, ResultantOptions, ResultantRoute, ResultantStages, RunOutcome,
-        RunRecord, Scoreboard, Specialization, Stage, StageCost, KOALABEAR_PRIME,
+        DeterminantKernel, Environment, Json, ResultantOptions, ResultantRoute, ResultantStages,
+        RunOutcome, RunRecord, Scoreboard, Specialization, Stage, StageCost, KOALABEAR_PRIME,
     },
     roots,
     util::peak_resident_bytes,
@@ -173,6 +176,15 @@ const ABOVE_L2_EXPONENT: f64 = 2.9953;
 /// that under-predicts refuses nothing.
 const CORE_TIME_PER_DOUBLING: f64 = 0.065;
 
+/// Euclidean core-time per determinant at [`EUCLID_MEASURED_ORDER`], milliseconds, **measured**.
+const EUCLID_MS_AT_1458: f64 = 1.109;
+
+/// The order the Euclidean anchor was measured at — the order every six-round row uses.
+const EUCLID_MEASURED_ORDER: f64 = 1458.0;
+
+/// The Euclidean kernel's fitted exponent above the L2 footprint, **fitted** over three orders.
+const EUCLID_EXPONENT: f64 = 1.8452;
+
 /// Core-time of one Sylvester determinant at `matrix_order` on `workers` workers, in milliseconds.
 ///
 /// The **larger** of the measured above-L2 law and the cubic, both anchored at order 162, times the
@@ -191,6 +203,54 @@ fn determinant_core_ms(matrix_order: usize, workers: usize) -> f64 {
     cubic.max(fitted) * width_penalty(workers)
 }
 
+/// Core-time per determinant for the **Euclidean** kernel, in milliseconds.
+///
+/// Anchored at the measurement that landed with #350: **1.109 ms at order 1 458**, one pinned core,
+/// on the lock, the Euclidean kernel and its dense comparand taken in the same binary minutes
+/// apart. The exponent is the **1.8452** fitted above the L2 footprint over orders 162/486/1 458,
+/// against the dense kernel's 2.94 — the two differ by about one power of the order, which is the
+/// whole point of axis 4 and the reason the gap widens with the row.
+///
+/// The width penalty is this kernel's **own, measured**, and it is worse than the dense one —
+/// which falsifies the hypothesis this function was first written under.
+///
+/// #350 predicted axis 4 would *recover* #319's width penalty, on the reasoning that the working
+/// set falls from a 17 MB matrix to two ~6 kB coefficient vectors. The authorized `rf4-rp2` row
+/// measured the opposite: **3.21x at 32 workers**, against the dense law's 1.32x. 59 050
+/// determinants took 6.574 s of wall on 32 workers, so 210.4 s of core time, so **3.563 ms** a
+/// determinant against the **1.109 ms** measured on one core.
+///
+/// The first version of this function used `width_penalty` — the dense curve — and called that
+/// conservative. It was optimistic, and under-predicted the row's determinant stage by **2.43x**.
+/// The mechanism is **unmeasured**; the plausible candidate is allocator contention, since
+/// `remainder` allocates a fresh vector per step and there are as many steps as the degree, so 32
+/// threads each allocate thousands of times per determinant where the dense kernel allocates a
+/// handful of large matrices. That is a hypothesis and #412 is the measurement.
+fn euclidean_core_ms(matrix_order: usize, workers: usize) -> f64 {
+    let ratio = matrix_order as f64 / EUCLID_MEASURED_ORDER;
+    EUCLID_MS_AT_1458 * ratio.powf(EUCLID_EXPONENT) * euclidean_width_penalty(workers)
+}
+
+/// The Euclidean kernel's measured core-time penalty for running at `workers` workers.
+///
+/// Anchored on the two points there are: **1.0x at one worker** and **3.21x at 32**, interpolated
+/// linearly in `log2(workers)` as [`width_penalty`] does for the dense kernel, and extrapolated at
+/// the same slope beyond 32 rather than held flat — nothing wider has been measured and flattening
+/// it would make the guard optimistic exactly where it has no evidence, which is the mistake this
+/// function already made once.
+fn euclidean_width_penalty(workers: usize) -> f64 {
+    const PER_DOUBLING: f64 = (3.21 - 1.0) / 5.0;
+    1.0 + PER_DOUBLING * (workers.max(1) as f64).log2()
+}
+
+/// Core-time per determinant for `kernel`.
+fn kernel_core_ms(kernel: DeterminantKernel, matrix_order: usize, workers: usize) -> f64 {
+    match kernel {
+        DeterminantKernel::Dense => determinant_core_ms(matrix_order, workers),
+        DeterminantKernel::Euclidean => euclidean_core_ms(matrix_order, workers),
+    }
+}
+
 /// The measured core-time penalty for running at `workers` workers, as a factor.
 ///
 /// Linear in `log2(workers)` through the three widths §6.9 measured, and extrapolated at the same
@@ -198,6 +258,63 @@ fn determinant_core_ms(matrix_order: usize, workers: usize) -> f64 {
 /// make the guard optimistic exactly where it has no evidence.
 fn width_penalty(workers: usize) -> f64 {
     1.0 + CORE_TIME_PER_DOUBLING * (workers.max(1) as f64).log2()
+}
+
+/// The determinant kernel named by `--kernel <dense|euclidean>`, defaulting to dense.
+///
+/// Dense by default so every figure taken before #350 reproduces unchanged. The flag selects both
+/// the kernel the run uses **and** the cost law the budget guard applies, which must agree: a row
+/// costed by the dense law and run by the Euclidean one would be admitted on the wrong arithmetic.
+///
+/// # Panics
+/// On an unrecognized value. The two kernels differ by three orders of magnitude at order 1 458,
+/// so silently defaulting a mistyped flag would report one as the other.
+fn kernel_flag() -> DeterminantKernel {
+    let args: Vec<String> = std::env::args().collect();
+    let Some(at) = args.iter().position(|a| a == "--kernel") else {
+        return DeterminantKernel::Dense;
+    };
+    match args.get(at + 1).map(String::as_str) {
+        Some("dense") | None => DeterminantKernel::Dense,
+        Some("euclidean") => DeterminantKernel::Euclidean,
+        Some(other) => panic!("--kernel takes dense or euclidean, not {other}"),
+    }
+}
+
+/// Whether `--root-finder deflation` was given, selecting #351's deflate-and-repeat.
+///
+/// The gcd finder by default, for the same reason the dense kernel is. Both return every
+/// base-field root and agree as sets; they differ by 306x at degree 59 049 (#351).
+///
+/// # Panics
+/// On an unrecognized value.
+fn deflation_root_finder() -> bool {
+    let args: Vec<String> = std::env::args().collect();
+    let Some(at) = args.iter().position(|a| a == "--root-finder") else {
+        return false;
+    };
+    match args.get(at + 1).map(String::as_str) {
+        Some("gcd") | None => false,
+        Some("deflation") => true,
+        Some(other) => panic!("--root-finder takes gcd or deflation, not {other}"),
+    }
+}
+
+/// Every base-field root of `f`, by the finder the flags selected.
+///
+/// Both find every root; `graeffe_all_roots` reports multiplicity where `roots` reports distinct
+/// values, so the result is deduplicated to one meaning for the caller. A candidate is a candidate
+/// once however many times the eliminant vanishes at it.
+fn all_roots(f: &UnivariatePolynomial<K>, seed: u64, deflation: bool) -> Vec<K> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    if !deflation {
+        return roots(f, &mut rng);
+    }
+    let mut found = graeffe_all_roots(f, &mut rng)
+        .expect("KoalaBear's two-adicity admits the transform at these degrees");
+    found.sort_by_key(|r| r.value());
+    found.dedup();
+    found
 }
 
 /// The value of a `--flag <value>` argument, if it was given and parses.
@@ -259,7 +376,7 @@ struct RowCost {
 
 impl RowCost {
     /// Cost `manifest` at `workers` determinant workers.
-    fn of(manifest: &ChallengeManifest, workers: usize) -> Self {
+    fn of(manifest: &ChallengeManifest, workers: usize, kernel: DeterminantKernel) -> Self {
         let parameters = manifest.poseidon_parameters().expect("a CICO row");
         let rounds = parameters.rounds();
         let degree = 3usize.pow(rounds as u32);
@@ -269,7 +386,7 @@ impl RowCost {
         let matrix_order = 2 * degree;
         // Core-time per determinant, divided by the workers that share it. `determinant_core_ms`
         // carries both the cost law and the measured penalty for running wide.
-        let each = determinant_core_ms(matrix_order, workers) / 1e3 / workers.max(1) as f64;
+        let each = kernel_core_ms(kernel, matrix_order, workers) / 1e3 / workers.max(1) as f64;
         let samples = predicted_degree + 1;
         let proven_samples = 2 * degree * degree + 1;
         Self {
@@ -385,7 +502,8 @@ fn main() {
         }
         let manifest = challenge(id).expect("registered");
         let workers = concurrencies.iter().copied().max().unwrap_or(1);
-        let cost = RowCost::of(&manifest, workers);
+        let kernel = kernel_flag();
+        let cost = RowCost::of(&manifest, workers, kernel);
         println!("## {} — {} rounds\n", manifest.id, cost.rounds);
         println!(
             "- predicted degree `{}^(2·{} + {})` = {}, so {} samples of an order-{} determinant; \
@@ -398,15 +516,27 @@ fn main() {
             cost.matrix_order,
             cost.proven_samples
         );
+        // The anchors named here are the ones the prediction was computed from. Before the
+        // kernel became selectable this message hardcoded the dense pair, which meant a run under
+        // `--kernel euclidean` reported a Euclidean number attributed to a dense law — a figure
+        // that cannot be checked against anything, which is worse than no figure.
+        let (anchor_ms, anchor_order, exponent) = match kernel {
+            DeterminantKernel::Dense => (DETERMINANT_MS_AT_162, MEASURED_ORDER, ABOVE_L2_EXPONENT),
+            DeterminantKernel::Euclidean => {
+                (EUCLID_MS_AT_1458, EUCLID_MEASURED_ORDER, EUCLID_EXPONENT)
+            }
+        };
         println!(
-            "- predicted determinant wall clock **{}** on {} worker{}, from {:.3} ms per \
-             determinant measured at order 162 and one worker, scaled by the measured \
+            "- predicted determinant wall clock **{}** on {} worker{}, {} kernel, from {:.3} ms \
+             per determinant measured at order {:.0} and one worker, scaled by the fitted \
              `order^{:.4}` law and a {:.2}x penalty for running at this width — **{}** at order {}",
             human_seconds(cost.predicted_seconds),
             workers,
             plural(workers),
-            DETERMINANT_MS_AT_162,
-            ABOVE_L2_EXPONENT,
+            kernel,
+            anchor_ms,
+            anchor_order,
+            exponent,
             width_penalty(workers),
             if cost.matrix_order <= 4_374 {
                 "measured"
@@ -716,7 +846,7 @@ fn solve(
     concurrency: usize,
 ) -> Option<Pass> {
     let (rounds, predicted_degree) = shape;
-    let options = ResultantOptions::with_concurrency(concurrency);
+    let options = ResultantOptions::with_concurrency(concurrency).with_kernel(kernel_flag());
     // Sized against [JAZ] slide 22's experimental degree, and validated off the domain inside the
     // route rather than trusted — see `DegreeSource`.
     let (resultant, stages) =
@@ -857,7 +987,7 @@ fn solve(
     );
 
     let at = Instant::now();
-    let candidates = roots(&resultant, &mut StdRng::seed_from_u64(7));
+    let candidates = all_roots(&resultant, 7, deflation_root_finder());
     let root_finding = at.elapsed();
     println!(
         "- {} roots over KoalaBear, found in {:.1} ms",
@@ -1182,7 +1312,7 @@ fn extend(f: &MultivariatePolynomial<2, K>, g: &MultivariatePolynomial<2, K>, fi
         // built for, and reporting no candidate is the honest answer.
         return Vec::new();
     }
-    roots(&fx, &mut StdRng::seed_from_u64(11))
+    all_roots(&fx, 11, deflation_root_finder())
         .into_iter()
         .filter(|second| gx.eval(second).is_zero())
         .collect()

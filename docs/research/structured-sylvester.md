@@ -273,19 +273,25 @@ so one was written — small, isolated, and differential against the thing it wo
 | `resultant_vanishes_on_a_shared_root` | zero exactly on a common factor |
 | `constant_and_zero_arguments` | `Res(f, c) = c^{deg f}`, and the zero polynomial |
 
-**It is on branch `research/m25-euclidean-resultant`, not in this change, and the reason is a process
-gate rather than a problem with the code.** M25-D's rule was that a prototype must be justified *in
-the document* before it exists. The *analysis* did precede the code — §5.1's scope change and §5.2's
-operation count are what authorised it — but this document was written afterwards, so the letter of
-the gate was not met. Three things make holding it free:
+**It was held out of that change, and the reason was a process gate rather than a problem with the
+code.** M25-D's rule was that a prototype must be justified *in the document* before it exists. The
+*analysis* did precede the code — §5.1's scope change and §5.2's operation count are what authorised
+it — but this document was written afterwards, so the letter of the gate was not met. Three things
+made holding it free:
 
-1. It is not integrated into anything, so nothing is lost by waiting.
-2. The integration needs a check this workstream could not run: whether `lc_y(f)` and `lc_y(g)` are
-   constant on `cico_bivariate`'s outputs (§5.3), in a file another agent owns this milestone.
+1. It was not integrated into anything, so nothing was lost by waiting.
+2. The integration needed a check that workstream could not run: whether `lc_y(f)` and `lc_y(g)` are
+   constant on `cico_bivariate`'s outputs (§5.3), in a file another agent owned that milestone.
 3. §9's issue — integrate behind a flag, dense determinant as differential reference, gated on that
-   check — is the natural place to review the module and its integration together.
+   check — was the natural place to review the module and its integration together.
 
 §5.5's measurements were taken against that branch, through a harness that adds nothing to `src/`.
+
+**That issue is #350, and it is now done — §5.6.** The holding commit was
+`5ebb516 feat(poly): resultant by the Euclidean algorithm, and the five Sylvester axes priced`,
+reverted by `b3bd7f0 revert(poly): hold the Euclidean resultant for its own issue`, so the code
+reached `main` only as history. #350 restored it to the location that commit chose,
+`src/poly/univariate/resultant.rs`, rather than reimplementing it elsewhere.
 
 ### 5.5 Measured, at the orders that matter
 
@@ -361,6 +367,90 @@ instead of ~10 s, and §7.1's row totals move by well under a percent because th
 root finding either way. What the measurement changes is what should be quoted: **1 692× measured**,
 not 3 888× derived — the operation count overstates the real gap by 2.3× and has no business in a
 recommendation now that there is a measurement.
+
+### 5.6 Landed in `src/`, re-measured, and the asymptotic claim confirmed
+
+#350 restored the held module to `src/poly/univariate/resultant.rs` and added the allocation-free
+form a sample loop needs, `resultant_from_coefficients`, whose formal degrees are the coefficient
+slice lengths. `src/grobner/research/resultant.rs` selects between the kernels through
+`DeterminantKernel::{Dense, Euclidean}` on `ResultantOptions`, **defaulting to dense** so every
+figure taken before this existed still reproduces.
+
+**The figures below are from the shipped code**, not the throwaway harness: both kernels in one
+binary, one pinned core, on the lock, minutes apart, inside the worktree so
+`-C target-cpu=x86-64-v3` is inherited rather than hoped for (§5.5.1).
+
+| order | dense | Euclidean | ratio |
+|---:|---:|---:|---:|
+| 162 | 3.609 ms | 26.40 µs | 137× |
+| 486 | 94.790 ms | 146.07 µs | 649× |
+| **1 458** | **2.322 s** | **1.109 ms** | **2 094×** |
+| fitted exponent | **2.9431 ± 0.0183** | **1.8452** (above L2) | — |
+
+**The asymptotic claim is now measured rather than derived.** §5.2 argued `O(n³)` against `O(n²)`
+from operation counts; the fitted exponents are **2.94 and 1.85**, a gap of 1.09 powers of the order.
+That is also why the ratio climbs with the order — 137× to 2 094× over a 9× order range — and why
+M23-E's judgement was right at order 18 and wrong at order 1 458. A constant-factor framing of this
+axis was never the right one.
+
+**On 1 692× versus ~2 100×.** Across three matched runs the order-1 458 ratio was **2 006×, 2 094×
+and 2 151×**, so ~2.1 × 10³ rather than §5.5's 1 692×. The difference decomposes, and neither half is
+a correction to §5.5:
+
+- The **dense** side measured 2.322, 2.413 and 2.553 s against §5.5's 2.272 s. The spread is
+  run-to-run — order 1 458 is 8 determinants a draw — and the whole range sits inside #318's recorded
+  ~1.2× drift. Nothing here says the recorded figure was wrong.
+- The **Euclidean** side measured 1.109–1.203 ms against the prototype's 1.343 ms, about 17% faster,
+  and the mechanism is known: the prototype took `&a % &b` on `UnivariatePolynomial` once per
+  remainder step, where the shipped path works in place on coefficient slices. The sequence is as
+  long as the degree, so one allocation per step is the step.
+
+**So §5.5 stays the quotable cross-harness figure and this is the quotable same-binary one.** Per
+#350's own framing and §7, none of this raises the reachable round count: after axis 4 the six-round
+route is 78% root finding, and the row gains ~3× against the stage's ~2 000×.
+
+#### 5.6.0 The parallel hypothesis, falsified
+
+§5.2 and #350 predicted that axis 4 would **recover** #319's width penalty as well as the exponent,
+because the per-sample working set falls from a 17 MB matrix to two ~6 kB coefficient vectors. The
+authorized `rf4-rp2` row (#367) measured the opposite:
+
+| quantity | Euclidean | dense |
+|---|---:|---:|
+| core-time per determinant, 1 worker | **1.109 ms** | 2.322 s |
+| core-time per determinant, 32 workers | **3.563 ms** | — |
+| **width penalty at 32 workers** | **3.21x** | **1.32x** modelled, 31-44% measured (#319) |
+
+So the kernel with the small working set contends **worse** than the one with the large one, and the
+bandwidth story §5.2 told cannot be what dominates. The budget guard had been given the dense
+penalty on the stated grounds that this was conservative; it was optimistic, and under-predicted the
+determinant stage by **2.43x**. Corrected to a measured two-point penalty.
+
+The candidate mechanism is **allocator contention** rather than bandwidth — `remainder` allocates a
+fresh vector per step, and the sequence is as long as the degree, so one order-1 458 determinant
+makes on the order of a thousand allocations and 32 threads do it at once. **Unmeasured**, and #412
+is the measurement; it also names the fix, which is two reusable buffers swapped per step.
+
+Nothing here argues against axis 4: it is 2 094x per determinant at this order and it is what made
+the `rf4-rp2` row affordable. What it argues against is quoting its parallel behaviour from a
+working-set argument.
+
+#### 5.6.1 The specialization trap, closed twice and cross-checked
+
+§5.3's correction was derived a second time, independently, while implementing #350 — and the two
+derivations agree exactly: `(−1)^(m·deficit) · lc(g)^deficit` when `f` drops, `lc(f)^deficit` with
+**no** sign when `g` drops, zero when both do. Agreement between two derivations is worth more than
+either alone, and it is pinned by a test rather than by this paragraph:
+`the_two_forms_agree_over_a_coefficient_sweep` runs every combination of formal degrees up to 2 over
+a coefficient set containing zero — 15 625 pairs, so every way the trap can fire — against **both**
+an explicitly built Sylvester determinant and the polynomial-typed form.
+
+Two further guards, because a fast kernel checked against itself is not checked:
+
+- `agrees_off_domain` validates against the **dense** kernel whatever the route used, so every
+  predicted run is a differential test of the remainder sequence rather than only the unit tests.
+- `DeterminantBatch` records its `kernel`. The two differ by three orders of magnitude at the same
+  order, so a batch that does not name its kernel is a number nothing can be compared with.
 
 ## 6. Axis 5 — polynomial-matrix determinant algorithms
 

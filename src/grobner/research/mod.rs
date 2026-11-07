@@ -49,8 +49,8 @@ pub use resultant::{
     bivariate_resultant_predicted, bivariate_resultant_reference,
     bivariate_resultant_reference_with, cico_bivariate, fit_power_law, interpolation_route,
     predicted_resultant_degree, random_bivariate, sylvester_determinant_at,
-    time_sylvester_determinants, DegreeSource, DeterminantBatch, PowerLawFit, ResultantError,
-    ResultantOptions, ResultantRoute, ResultantStages,
+    time_sylvester_determinants, DegreeSource, DeterminantBatch, DeterminantKernel, PowerLawFit,
+    ResultantError, ResultantOptions, ResultantRoute, ResultantStages,
 };
 pub use scoreboard::{
     colliding_run_file, wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit,

@@ -23,7 +23,10 @@ pub use big_integers::{
 };
 pub use gcd::*;
 pub use jacobi::jacobi_symbol;
-pub use prime_factors::{factor, find_generator, from_prime_factorization};
+pub use prime_factors::{
+    ecm_find_factor, factor, factor_with_budget, find_generator, from_prime_factorization,
+    EcmBudget, PartialFactorization,
+};
 #[cfg(test)]
 use rand::{CryptoRng, RngCore};
 pub use roots::perfect_power;

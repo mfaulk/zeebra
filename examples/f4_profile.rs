@@ -14,6 +14,7 @@
 //! cargo run --release --example f4_profile                 # the baseline, every system
 //! cargo run --release --example f4_profile -- baseline     # the same, named
 //! cargo run --release --example f4_profile -- list         # the configurations available
+//! cargo run --release --example f4_profile -- mq           # #349: the competitive MQ split
 //! ```
 //!
 //! Each configuration is one row of the milestone's ablation table. They are named here rather
@@ -25,6 +26,7 @@ use zeebra::{
     fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
+        external::{instance, REFERENCE_CHARACTERISTIC},
         f4_with_options, CacheMode, F4Options, F4Statistics, PairCriteria, ReducerSelection,
         ReductionStrategy,
     },
@@ -280,11 +282,104 @@ fn each_system(options: &F4Options, stage_times: bool) {
     );
 }
 
+/// The competitive-board MQ instance, profiled per stage — #349.
+///
+/// `mq-random-10` is the instance M25 measured Zeebra **4.11x slower than Singular** on, and it is
+/// the corpus family closest in shape to a cryptanalytic system. Everything else this example
+/// profiles is a classical benchmark whose stage shares were what the H-series was scoped against;
+/// the losing instance's split was never taken, so the optimization backlog was prioritized from
+/// katsura and cyclic and applied to a gap measured on neither.
+///
+/// It is **not** in [`each_system`] because it is not a comparison-corpus system and because it
+/// costs about half a minute a run, which a default invocation should not pay.
+///
+/// # The equivalence check, which is the point of doing it this way
+///
+/// This builds the instance through `grobner::external::instance` at
+/// [`REFERENCE_CHARACTERISTIC`] under grevlex, and **asserts its identity digest against the one
+/// in the retained record**. A stage split taken on a different instance than the 4.11x was
+/// measured on would answer a different question while looking like an answer to this one.
+fn competitive_mq(options: &F4Options) {
+    // From `research/competitive/results/history.json`: both the zeebra and singular
+    // `reduced-grobner-basis` records for this problem carry this digest.
+    const RECORDED_DIGEST: &str =
+        "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2";
+
+    let built = instance(
+        "mq-random-10",
+        REFERENCE_CHARACTERISTIC,
+        MonomialOrder::GradedReverseLexicographic,
+    )
+    .expect("mq-random-10 is a corpus rung with a compiled dimension");
+
+    assert_eq!(
+        built.digest(),
+        RECORDED_DIGEST,
+        "the generated instance is not the one the 4.11x was measured on"
+    );
+    assert_eq!(built.variables.len(), 10, "ten variables");
+
+    let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
+    let mut compiled = [""; 10];
+    compiled.copy_from_slice(&names[..10]);
+    let system: Vec<MultivariatePolynomial<10, F>> = built
+        .system
+        .iter()
+        .map(|text| {
+            MultivariatePolynomial::parse(text, compiled).expect("this crate rendered this text")
+        })
+        .collect();
+
+    println!();
+    println!("## #349: the competitive MQ instance, per stage");
+    println!();
+    println!(
+        "`mq-random-10` at GF({}) under grevlex, digest `{}` — the instance the 4.11x against",
+        REFERENCE_CHARACTERISTIC,
+        &RECORDED_DIGEST[..16]
+    );
+    println!(
+        "Singular was measured on (28.709 s against 6.959 s, one worker, affinity 0-7). One order"
+    );
+    println!("only, because that is the order the record was taken under.");
+    println!();
+    header();
+    row::<10>(
+        "mq-random-10",
+        &system,
+        &[("grevlex", MonomialOrder::GradedReverseLexicographic)],
+        options,
+    );
+    println!();
+    diagnostics::<10>(
+        "mq-random-10",
+        &system,
+        &[("grevlex", MonomialOrder::GradedReverseLexicographic)],
+        options,
+    );
+}
+
 fn main() {
     let argument = std::env::args().nth(1).unwrap_or_else(|| "baseline".into());
 
     if argument == "list" {
         println!("configurations: {}", CONFIGURATIONS.join(", "));
+        println!("modes: mq (the #349 competitive MQ stage split)");
+        return;
+    }
+
+    if argument == "mq" {
+        // `default()`, not `baseline()`, because that is what the record was taken under:
+        // `examples/competitive_sweep.rs` builds its Zeebra solver from `F4Options::default()`.
+        // The difference is not cosmetic — under `baseline()` this instance does not finish at
+        // all, refusing at 20 000 277 live nonzero entries against the 20 000 000 budget both
+        // configurations share. Profiling the ablation's starting point would be a stage split of
+        // a computation no record describes.
+        let options = F4Options {
+            measure_stages: true,
+            ..F4Options::default()
+        };
+        competitive_mq(&options);
         return;
     }
 

@@ -52,7 +52,7 @@ use std::time::Instant;
 
 use crate::{
     grobner::{
-        buchberger::reduce_grobner_basis,
+        buchberger::reduce_grobner_basis_until,
         pairs::{CriterionCounts, PairQueue},
     },
     poly::MonomialOrder,
@@ -505,9 +505,38 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // Timed separately: on katsura-6 under lex it is the majority of the computation, which no
     // per-batch counter would have revealed — 59 matrices and a six-element answer, with the cost
     // in the reduction between them.
+    // The wall clock is checked **inside** this stage, not only in the batch loop above. #349
+    // measured interreduction at 80.4% of `mq-random-10`, so a budget honored at every batch could
+    // previously be overrun by four fifths of the computation (#395).
     let mut interreduction_clock = StageClock::new(options.measure_stages);
-    let reduced = reduce_grobner_basis(&basis, order);
+    let interreduction = reduce_grobner_basis_until(&basis, order, || {
+        match (wall_clock.as_ref(), options.max_wall_time) {
+            (Some(clock), Some(budget)) => clock.elapsed() >= budget,
+            _ => false,
+        }
+    });
     statistics.stages.interreduction = interreduction_clock.lap();
+    let reduced = match interreduction {
+        Ok(reduced) => reduced,
+        Err(stopped) => {
+            // The stage time is recorded above before returning, so a stopped run still accounts
+            // for where it spent the budget — which is the point of a cooperative stop.
+            let elapsed = wall_clock
+                .as_ref()
+                .map(Instant::elapsed)
+                .unwrap_or_default();
+            return Err(F4Error::InterreductionTimeBudgetExceeded {
+                elements_reduced: stopped.elements_reduced,
+                elements: stopped.elements,
+                elapsed_millis: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
+                budget_millis: options
+                    .max_wall_time
+                    .unwrap_or_default()
+                    .as_millis()
+                    .min(u128::from(u64::MAX)) as u64,
+            });
+        }
+    };
 
     // The independent check, when asked for. It is not what makes the computation complete — no
     // strategy here discards a pair on heuristic grounds, and the deferred set is drained by the
