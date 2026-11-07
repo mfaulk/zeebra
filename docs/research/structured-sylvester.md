@@ -6,13 +6,14 @@ improvement in it". This document separates that into five distinct things, pric
 **measured** determinant cost law of #312, and recommends building exactly one of them.
 
 **Build axis 4, the Euclidean/subresultant route. Do not build axes 1, 2, 3 or 5.** The prototype
-that axis 4's analysis authorised exists, is tested, and is `src/poly/univariate/resultant.rs`.
+that axis 4's analysis authorised exists and is tested, on branch
+`research/m25-euclidean-resultant` — held out of this change for the process reason in §5.4, not
+for a defect.
 
 **And the headline is not the one the determinant stage suggests.** Axis 4 is a **measured 1 692×**
 improvement to the determinant stage (§5.5) and only a **~3× improvement to the row**, because
 once the determinants go, root finding at degree `5.3 × 10^5` and a 57 GB symbolic build are what
-is left. §7 is that
-accounting and it is the most useful part of this document. The verdict in §8 is still *build* —
+is left. §7 is that accounting and it is the most useful part of this document. The verdict in §8 is still *build* —
 1 692× on the largest stage for ~200 lines is not a close call — but the claim "this raises the
 reachable round count" **does not survive the accounting**, and saying so is the point.
 
@@ -258,15 +259,12 @@ sample can trigger it. For `cico_bivariate`'s Poseidon outputs that is a propert
 inspectable in milliseconds. **That check gates any integration**, and it is not done here:
 `src/grobner/research/resultant.rs` is owned by another agent this milestone.
 
-### 5.4 The prototype this analysis authorised
+### 5.4 The prototype, and why it is not in this change
 
-An operation-count gap of 3 888× at the stage that stops the ladder cleared §0's bar for a
-prototype, so one was built before §5.5 measured the real figure — small,
-isolated, and differential against the thing it would replace:
-
-**`src/poly/univariate/resultant.rs`** — `resultant(f, g)` (classical Euclidean, `O(d²)`) and
-`resultant_at_formal_degrees(f, g, n, m)` (§5.3's correction, which is what an elimination route
-calls). Four tests, all passing:
+An operation-count gap of 3 888× at the stage that stops the ladder cleared §0's bar for a prototype,
+so one was written — small, isolated, and differential against the thing it would replace.
+`resultant(f, g)` (classical Euclidean, `O(d²)`) and `resultant_at_formal_degrees(f, g, n, m)`
+(§5.3's correction, which is what an elimination route calls), with four tests:
 
 | test | what it pins |
 |---|---|
@@ -275,8 +273,19 @@ calls). Four tests, all passing:
 | `resultant_vanishes_on_a_shared_root` | zero exactly on a common factor |
 | `constant_and_zero_arguments` | `Res(f, c) = c^{deg f}`, and the zero polynomial |
 
-**Not integrated into the elimination route**, deliberately: that file is owned by another agent this
-milestone, and §5.3's check should gate integration anyway.
+**It is on branch `research/m25-euclidean-resultant`, not in this change, and the reason is a process
+gate rather than a problem with the code.** M25-D's rule was that a prototype must be justified *in
+the document* before it exists. The *analysis* did precede the code — §5.1's scope change and §5.2's
+operation count are what authorised it — but this document was written afterwards, so the letter of
+the gate was not met. Three things make holding it free:
+
+1. It is not integrated into anything, so nothing is lost by waiting.
+2. The integration needs a check this workstream could not run: whether `lc_y(f)` and `lc_y(g)` are
+   constant on `cico_bivariate`'s outputs (§5.3), in a file another agent owns this milestone.
+3. §9's issue — integrate behind a flag, dense determinant as differential reference, gated on that
+   check — is the natural place to review the module and its integration together.
+
+§5.5's measurements were taken against that branch, through a harness that adds nothing to `src/`.
 
 ### 5.5 Measured, at the orders that matter
 
@@ -509,7 +518,7 @@ natural successor to this document.
 | 1 — SIMD / threading constants | `O(n³)`, 3–5× (blocking half dead: #312 found no cache anomaly) | high; `src/linalg/` contention | implementation performance, near zero-sum against the sweep | **do not build**; axis 4 deletes the work |
 | 2 — reuse across evaluations | no improvement available | — | nothing | **nothing to build** |
 | 3 — displacement / Sylvester structure | `O(n²)` | high; generators + breakdown handling | same as axis 4 | **do not build**; identical complexity, strictly more work |
-| 4 — **subresultant / Euclidean** | **`O(n²)`; `3^R` saved** | **low; ~200 lines, written and tested** | **1 692× measured on the stage, 3× on the row** | **BUILD** |
+| 4 — **subresultant / Euclidean** | **`O(n²)`; `3^R` saved** | **low; ~200 lines, written and tested, on its own branch** | **1 692× measured on the stage, 3× on the row** | **BUILD** |
 | 5 — polynomial-matrix determinant | `Õ(N^ω D)` | **new major subsystem** | overtakes axis 4 past `R ≈ 8.7` once Euclid's measured per-operation penalty is charged | **do not build; file with a trigger** |
 
 **Build axis 4**, scored against §0:
@@ -523,7 +532,8 @@ natural successor to this document.
    (§7.1), not a new reachable size. At seven rounds it removes the largest of **four** walls and is
    **necessary but not sufficient** (§7.2). The claim "it raises the reachable round count" is
    **withdrawn**; the accounting does not support it.
-3. **No new subsystem**: two functions and four tests, which exist.
+3. **No new subsystem**: two functions and four tests, which exist on
+   `research/m25-euclidean-resultant` (§5.4).
 4. **The rejection is reconsidered on named evidence**: order 18 → 1 458, gap 48× → 3 888×, the stage
    from milliseconds to 67% of a row that cannot be run — and the trap that motivated the rejection
    closed in `O(1)` per sample (§5.3), which the 2023 decision did not have.
@@ -537,7 +547,8 @@ three rungs.
 
 ## 9. Issues this suggests
 
-**File, High.** *"Integrate the Euclidean resultant into the bivariate elimination route"* — consume
+**File, High.** *"Land the Euclidean resultant and integrate it into the bivariate elimination
+route"* — take `research/m25-euclidean-resultant`'s module (§5.4), then consume
 `resultant_at_formal_degrees` in `src/grobner/research/resultant.rs`'s sample loop behind a flag, so
 the dense determinant stays as the differential reference, **gated on §5.3's leading-coefficient
 check**. Deliverable: `rf4-rp2` and `rf6-rp0` run. It is the only item in M25-D the arithmetic says
