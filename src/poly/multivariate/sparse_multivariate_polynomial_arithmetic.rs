@@ -187,6 +187,48 @@ impl<const N: usize, F: FiniteField> ops::Mul<&SparseMultiPoly<N, F>> for &Spars
 
 impl_mul_variants!([const N: usize, F: FiniteField], SparseMultiPoly<N, F>);
 
+/// Mul by a scalar: `&p * &c`.
+///
+/// The one definition of what scaling a multivariate polynomial means as an operator; the other
+/// three ownership spellings and all four of `c * p` (`impl_left_scalar_mul!`) delegate here, so
+/// no spelling can disagree with another. `scale` remains the route for code generic over `F`,
+/// which the orphan rule keeps the left-hand operators out of reach of.
+impl<const N: usize, F: FiniteField> ops::Mul<&F> for &SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn mul(self, rhs: &F) -> Self::Output {
+        self.scale(rhs)
+    }
+}
+
+/// Mul by a scalar: `&p * c`.
+impl<const N: usize, F: FiniteField> ops::Mul<F> for &SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn mul(self, rhs: F) -> Self::Output {
+        self * &rhs
+    }
+}
+
+/// Mul by a scalar: `p * &c`. Scales in place, since the polynomial is owned.
+impl<const N: usize, F: FiniteField> ops::Mul<&F> for SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn mul(mut self, rhs: &F) -> Self::Output {
+        self.scale_assign(rhs);
+        self
+    }
+}
+
+/// Mul by a scalar: `p * c`.
+impl<const N: usize, F: FiniteField> ops::Mul<F> for SparseMultiPoly<N, F> {
+    type Output = SparseMultiPoly<N, F>;
+
+    fn mul(self, rhs: F) -> Self::Output {
+        self * &rhs
+    }
+}
+
 /// Sub: &p - &q
 impl<const N: usize, F: FiniteField> ops::Sub<&SparseMultiPoly<N, F>> for &SparseMultiPoly<N, F> {
     type Output = SparseMultiPoly<N, F>;

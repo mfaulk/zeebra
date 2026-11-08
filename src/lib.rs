@@ -24,6 +24,7 @@ pub mod fields;
 pub mod grobner;
 mod identities;
 pub mod integers;
+mod left_scalar_mul;
 pub mod linalg;
 mod poly;
 mod rings;

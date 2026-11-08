@@ -2198,8 +2198,19 @@ ownership of the spelling you write, and that is the whole of the optimization:
 | `&a + &b`, `&a - &b` | clones one side; for `+` the *larger*, since addition commutes |
 | `a + &b`, `a - &b`, `a + b`, `a - b` | nothing — the owned operand's map is merged into |
 | `a += &b`, `a -= &b`, `a += b`, `a -= b` | nothing |
-| `a.scale(&c)` | clones `a` |
-| `a.scale_assign(&c)` | nothing |
+| `a.scale(&c)`, `&a * &c`, `&a * c` | clones `a` |
+| `a.scale_assign(&c)`, `a * &c`, `a * c` | nothing — the owned polynomial's map is scaled in place |
+
+**`c * a` works too, and allocates what `a * c` does.** The mathematics writes `c·a`, and the
+orphan rule is why it took a macro: `impl<F: FiniteField> Mul<MultivariatePolynomial<N, F>> for F`
+is rejected, since `F` is a type parameter and so the impl's `Self` type is not local. The impls
+are therefore generated per field **struct** — `PrimeFieldElement64<P>` is local for every `P`, so
+six invocations in `src/left_scalar_mul.rs` cover every prime, binary modulus and extension the
+crate names. Each left-hand spelling delegates to the right-hand one with the *same* ownership, so
+`c * a` on an owned `a` reaches `scale_assign` rather than cloning. `scale` stays the route for
+code that is generic over `F`, which none of this is reachable from.
+
+It covers `UnivariatePolynomial`, `MultivariatePolynomial`, `Matrix` and `Vector`.
 
 So an accumulator you own grows in place:
 
