@@ -610,31 +610,98 @@ mod tests {
         );
     }
 
-    /// Every planted rung on the ladder has a declared quotient dimension.
+    /// Every planted rung on the ladder has a declared quotient dimension, and the figures agree.
     ///
     /// The anti-staleness half, and the #333 lesson applied: a statement about the corpus that
     /// lives outside the corpus has to be pinned to it, or the next expansion falsifies it in
     /// silence. Adding `mq-planted-18` fails here until its dimension is declared and the cap
     /// relationship above is reconsidered.
     ///
-    /// **Scoped to the planted family on purpose.** Its dimension is an identity in `N`, so a
-    /// declared figure is checkable; `poseidon-*` and `anemoi64-*` have no published or measured
-    /// quotient dimension in this tree, which is #473 rather than something to guess at here.
+    /// The **figures** are pinned too, not only the names. `CorpusEntry::quotient_dimension` now
+    /// carries the same numbers, and a second copy that nothing compares is the duplication #333
+    /// is about: a corpus figure corrected here and not there would leave the cap argument above
+    /// reasoning from the stale one.
     #[test]
     fn test_every_planted_rung_has_a_declared_quotient_dimension() {
         let declared: Vec<&str> = PLANTED_QUOTIENT_DIMENSIONS
             .iter()
             .map(|(name, _)| *name)
             .collect();
-        let on_the_ladder: Vec<String> = corpus::ladder()
+        let ladder = corpus::ladder();
+        let planted: Vec<&corpus::CorpusEntry> = ladder
             .iter()
             .filter(|entry| entry.family == "mq-planted")
-            .map(|entry| entry.name.to_string())
             .collect();
+        let on_the_ladder: Vec<String> =
+            planted.iter().map(|entry| entry.name.to_string()).collect();
 
         assert_eq!(
             on_the_ladder, declared,
             "the ladder's planted rungs and the declared dimensions have diverged"
+        );
+        for (entry, (name, dimension)) in planted.iter().zip(PLANTED_QUOTIENT_DIMENSIONS) {
+            assert_eq!(
+                entry.quotient_dimension,
+                Some(*dimension as u64),
+                "{name}: the corpus and the figure this cap argument reads have diverged"
+            );
+        }
+    }
+
+    /// Zero-dimensional rungs whose quotient dimension is **not** recorded, and the reason.
+    ///
+    /// Exactly one, and it is not an oversight: `mq-random-14`'s *basis* does not finish in this
+    /// tree, so there is no conversion to read a dimension off. Zeebra stops at 20 006 072 live
+    /// nonzero entries after 34.4 s and Singular hits its 60 s wall
+    /// (`research/competitive/COMPETITIVE.md`), on the basis alone and before any order
+    /// conversion. Unlike the other five rungs #473 named — three `poseidon-*` and two
+    /// `anemoi64-*`, all of which now carry a figure — this one cannot be closed by recording
+    /// something somebody already knows.
+    ///
+    /// **Named individually rather than exempted by family**, which is the whole point: a rung
+    /// added without a dimension fails the test below instead of joining a silent exemption.
+    const UNDECLARED_ZERO_DIMENSIONAL: &[&str] = &["mq-random-14"];
+
+    /// Every zero-dimensional rung on the **whole** ladder declares a quotient dimension.
+    ///
+    /// #473: the planted test above covers three of the ladder's rungs because the planted
+    /// family's dimension is an identity in `N`. The envelope assertion it exists for is about the
+    /// corpus and not about one family, so a poseidon or anemoi rung added with no dimension used
+    /// to trip nothing. Every such rung now carries one, so the assertion widens to all of them
+    /// with [`UNDECLARED_ZERO_DIMENSIONAL`] as the one named exception.
+    ///
+    /// The converse is asserted in the same pass, because it is the error that would make the
+    /// first half vacuous: a **positive-dimensional** ideal has no finite quotient dimension, so a
+    /// figure on one of those rungs is a figure about something else. `cyclic-4`, `cyclic-8` and
+    /// `cyclic-9` are the rungs this holds for.
+    #[test]
+    fn test_every_zero_dimensional_rung_declares_a_quotient_dimension() {
+        let mut undeclared: Vec<&str> = Vec::new();
+        let mut positive_dimensional = 0usize;
+        for entry in corpus::ladder() {
+            match (entry.zero_dimensional, entry.quotient_dimension) {
+                (true, Some(dimension)) => assert!(
+                    dimension > 0,
+                    "{}: a zero-dimensional ideal has a nonzero quotient dimension",
+                    entry.name
+                ),
+                (true, None) => undeclared.push(entry.name),
+                (false, None) => positive_dimensional += 1,
+                (false, Some(dimension)) => panic!(
+                    "{}: positive-dimensional, so it has no finite quotient dimension, yet it \
+                     declares {}",
+                    entry.name, dimension
+                ),
+            }
+        }
+        assert_eq!(
+            undeclared, UNDECLARED_ZERO_DIMENSIONAL,
+            "a zero-dimensional rung with no declared quotient dimension is outside the envelope \
+             assertion; record its dimension, or name it and say why it cannot be recorded"
+        );
+        assert_eq!(
+            positive_dimensional, 3,
+            "cyclic-4, cyclic-8 and cyclic-9; a change here means the ladder's shape moved"
         );
     }
 }
