@@ -13,9 +13,13 @@ attached, rather than re-derived from complexity formulas each time.
 | F4 echelonization | **Won't do.** It computes the wrong object, and the arithmetic agrees even granting that it applied. Do not reopen. | nothing open on the algorithm; see §1.4 for what has actually moved this stage |
 | FGLM order conversion | Deferred in M18 on measurements that still stand; the deferral has since been **reopened on new evidence**. | [#368](https://github.com/mfaulk/zeebra/issues/368) (M26-B, staged), [#224](https://github.com/mfaulk/zeebra/issues/224) (D5, the alternatives survey) |
 
-Pinned to `30348938`. Every figure below was re-read out of the document cited beside it while
-writing this record; §6 is the audit, including the four citations in #58's body that **no longer
-hold as written**. Nothing here is newly measured and nothing is re-derived.
+**Measured at:** not measured here — every figure is quoted from the document cited beside it, and
+the audit that re-read them is pinned to `30348938`. The commit a figure was taken at is the one its
+source document declares; this record adds no measurement of its own.
+
+Every figure below was re-read out of the document cited beside it while writing this record; §6 is
+the audit, including the four citations in #58's body that **no longer hold as written**. Nothing
+here is newly measured and nothing is re-derived.
 
 ---
 
