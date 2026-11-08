@@ -259,7 +259,7 @@ fn sparse_reduce_rows_against_pivots<F: FiniteField>(
 mod tests {
     use super::{reduce_rows_against_pivots_with, row_echelon_with, Backend};
     use crate::{
-        fields::{Zp13, Zp18446744073709551557, Zp2147483647, Zp541, Zp7},
+        fields::{Gf256, Zp13, Zp18446744073709551557, Zp2, Zp2147483647, Zp541, Zp7},
         linalg::sparse::{
             reduced_row_echelon, row_echelon, EliminationStatistics, SparseMatrix, SparseRow,
         },
@@ -613,6 +613,20 @@ mod tests {
         check::<Zp541>("GF(541)");
         check::<Zp2147483647>("GF(2^31-1)");
         check::<Zp18446744073709551557>("GF(2^64-59)");
+        // Characteristic two, which until #218 nothing in `src/linalg/` reached: `Zp2`, `Gf256`
+        // and `BinaryFieldElement` appeared nowhere under it, so of the three backends only
+        // `Adaptive` had ever run at this characteristic — and only indirectly, because
+        // `F4Options::default()` selects it. Two shapes of even characteristic, because they are
+        // different code: `Zp2` keeps the wide-remainder path, since `2^32` is not invertible
+        // modulo an even number, while `Gf256` is carry-less multiplication with a Barrett
+        // reduction.
+        //
+        // The pivot rule is what makes this worth checking rather than assuming. Every nonzero
+        // coefficient over `GF(2)` is one, so normalization never divides and `pivot_inversions`
+        // stays zero; and `a + a = 0` makes cancellation far more frequent, which is the path on
+        // which the backends maintain their nonzero counters separately.
+        check::<Zp2>("GF(2)");
+        check::<Gf256>("GF(2^8)");
     }
 
     /// Every backend's echelon rows lie in the original row space, certified by an identity block.
@@ -757,6 +771,11 @@ mod tests {
         check::<Zp541>("GF(541)");
         check::<Zp2147483647>("GF(2^31-1)");
         check::<Zp18446744073709551557>("GF(2^64-59)");
+        // The split contract at characteristic two as well (#218): an upper block whose pivots are
+        // all one is exactly the case where "normalized" is free, so a backend could skip a step
+        // and still look correct over an odd field.
+        check::<Zp2>("GF(2)");
+        check::<Gf256>("GF(2^8)");
     }
 
     /// Each backend is deterministic, and the adaptive one agrees with both fixed backends.

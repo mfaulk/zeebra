@@ -630,8 +630,10 @@ also what every published type V and type VI solve did.
   `n = 10, 15, 20` and `n = 5, 10, 15` respectively (§1) — and §7.2 confirms both reproduce from
   the generator. The field exists two ways — `fields::Zp2` (`PrimeFieldElement32<2>`, which keeps
   the wide-remainder path because `2^32` is not invertible modulo an even number) and
-  `BinaryFieldElement<0b11>` — and which one the importer should use is a decision to record once,
-  not per call site. #197.
+  `BinaryFieldElement<0b11>` — and which one the importer should use **has now been recorded once**:
+  [`boolean-solving.md`](boolean-solving.md) §8 decides `GF(2)` is `Zp2` throughout, this importer
+  included, and `tests/boolean_readiness.rs` pins the two as one field at twice the storage. What
+  remains for #197 is the import path and the toy dimensions, not the representation.
 - **Characteristic 2 is no longer untested in the solver.** `grep -rl "BinaryFieldElement" src/grobner/`
   used to be empty. `grobner::tests::test_the_whole_pipeline_over_gf2` and its `Gf256` twin now take
   a planted system through F4, Buchberger agreement, FGLM, both routes to lex, and `solve_one`, with

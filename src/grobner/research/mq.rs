@@ -79,9 +79,13 @@ pub enum MqField {
     /// Types I and IV. **Not importable yet** — but no longer for want of a field.
     ///
     /// `fields::Zp2` is `PrimeFieldElement32<2>` and `fields::BinaryFieldElement` has been
-    /// publicly exported since `8757b4a`; what is missing is the import path itself, the toy
-    /// dimensions these families publish (which differ from type III's and type VI's), and a
-    /// recorded decision between the two representations of GF(2). See #197.
+    /// publicly exported since `8757b4a`. What is missing is the import path itself and the toy
+    /// dimensions these families publish, which differ from type III's and type VI's. See #197.
+    ///
+    /// **Which representation is no longer open**: `docs/research/boolean-solving.md` §8 decided
+    /// `GF(2)` is `Zp2` throughout, including in this importer, and
+    /// `tests/boolean_readiness.rs::gf2_by_either_route_is_one_field_at_twice_the_storage` pins
+    /// the two as one field at twice the storage.
     Gf2,
 
     /// Types II and V. Importable, and the modulus is **checked** rather than assumed.
