@@ -3675,6 +3675,31 @@ patch id — `Environment::from_git` fills all three, and one test per board ass
 row passes. Records written before the fields existed read back with both empty, which reports as
 unresolvable; that is the fact about them and not a defect in the reader.
 
+Such a record can be **repaired rather than re-run**, but only while the branch commit is still an
+object in some checkout — a dangling commit is reachable by name until `git gc` collects it, and
+both fields are derivable from it:
+
+```bash
+git cat-file -t <commit>                              # still here, or this is the point of no return
+base=$(git merge-base <commit> origin/main)
+git diff "$base..<commit>" | git patch-id --stable    # the patch_id to record
+```
+
+Write `base_commit` and that patch id to **both** places a run lives: `research/scoreboard/runs/<stem>.json`
+and the matching entry of `research/scoreboard/results/history.json`. Repairing one and not the
+other is the defect `tests/scoreboard_run_files.rs` exists to catch — the history has unit tests
+over an `include_str!`, the per-run files had none, and #550 landed in exactly that gap.
+
+This is a **backfill of what the writer would have recorded**, not a new claim, so it is honest only
+when both reads come from the measured commit itself; a base inferred from the merge commit is
+precisely the plausible-looking stamp `stamp_is_resolvable` exists to refuse.
+
+Checking such a stamp against `main` has one trap worth naming. The range to compare is the
+measured **code** delta, not the whole squash: a squash merge of a measuring branch also carries the
+records the measurement produced, which were not in the tree it was taken from, so the whole-commit
+patch id will not match while the per-file code ones do. The four `fukuoka-mq-{V,VI}-n24-seed0` runs
+at `a3e5d66` are the worked example — three files, same patch id on the branch and on `main`.
+
 **Comparing different problems.** A `RunRecord` references its problem by identity *digest*, not by
 name. `Scoreboard::add` looks the problem up in the registry and refuses a run whose digest no
 longer matches — the problem was redefined after the run, so the measurement is about something

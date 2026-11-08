@@ -2348,10 +2348,19 @@ mod tests {
     /// were reconstructed afterwards from the commit the records already named — following
     /// [`Environment::capture`] exactly, `merge-base` then `git diff base..HEAD | git patch-id
     /// --stable`. That makes them resolvable to the commit they name, which is what this asserts.
-    /// It does **not** make the delta recomputable from `main`: #530 was squash-merged onto a newer
-    /// base, so `30348938..8d6f0cfe` does not reproduce `9762e649…`. Any patch-id stamp from a
-    /// squash-merged branch has that gap, so read a pass here as "the stamp is well formed and its
-    /// base survives", not as "a later reader can rebuild this tree".
+    /// It does **not** by itself make the delta recomputable from `main`, and the whole-commit range
+    /// is the wrong place to look for it: `30348938..8d6f0cfe` does not reproduce `9762e649…`,
+    /// because the squash also carries the four run records the measurement *produced*, which did
+    /// not exist in the tree it was taken from. Compare the **code half** and the figures are
+    /// reconstructable after all — `examples/scoreboard.rs`, `src/grobner/research/challenge.rs`
+    /// and `src/grobner/research/mq.rs` each have the same patch id over `a772145..a3e5d66` as
+    /// over `8d6f0cfe^..8d6f0cfe` (#550). So the measured tree is `a772145` plus a delta reachable
+    /// from `main`.
+    ///
+    /// The general rule that leaves is narrower than "squash merges lose this": a patch id taken
+    /// over a range that a later commit *extends* with the measurement's own output will not match
+    /// that commit, and a reader checking one has to exclude the record files. A branch whose
+    /// squash adds nothing beyond what was measured matches directly.
     #[test]
     fn test_every_committed_run_carries_a_resolvable_stamp() {
         let history = Json::parse(include_str!(
