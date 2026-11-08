@@ -8,7 +8,9 @@ which is what #335 asked for. **§3d was taken on this branch's two commits befo
 onto `4b0d2282`** — the region-split counters (`c24bcc01` post-rebase) for the counts, and those
 against the hoist (`132d20b8`) for the A/B, two builds from one tree. The rebase brings in
 `922deeb6`, which adds `F4Options::reduce_batch_rows` **off by default**, so it changes neither the
-path these figures describe nor their comparability with §3a and §3b.
+path these figures describe nor their comparability with §3a and §3b. **§3e was taken at
+`0840207f`, base `9746b4ce`**, also recorded at the time; its board rows carry their own resolvable
+#505 stamp, so that one is checkable from the data and not only from this header.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -307,8 +309,19 @@ change's to fix, and this change does not need it to be worth 4.18x.
 > stage from 2 400 ms to **16.4 ms**, which is 9.4x the comparand rather than 2 353x. The
 > attribution in this paragraph was correct: the cost was the main loop's, and paying it there
 > costs 2.4% of the elimination stage.
+>
+> **And the 4 094 ms above is the high end of a range.** §2.4 of `m27-baseline.md` measures the
+> same stage at **2 306.2 ms** and §3e.4 at **2 085.9 ms**, on boxes whose division side matches
+> the board row where this one's is 1.40x it. So the pre-#477 stage is **2 086–4 094 ms**, and the
+> figure #477 reasoned from was 1.78x–1.96x the smaller end. None of the cell counts move: they are
+> exact and reproduce to the digit.
 
-### 3a.1b The small instances, which say the matrix route must **not** become the default
+### 3a.1b The small instances, which say the matrix route must not become the default *globally*
+
+> **Superseded in part by §3e.** The lex regression below is confirmed end-to-end and across more
+> rungs, and the order-aware route this section proposes now exists as
+> `InterreductionRoute::ByOrder`. What keeps the default on the division route is no longer this
+> section's reason — see §3e.3, which is memory with no budget on it.
 
 `cargo bench --bench f4_stages -- interreduction`, on the lock, pinned. Both routes over the **same**
 basis from the same trace, so each pair is an A/B rather than two numbers over two inputs.
@@ -338,6 +351,11 @@ right shape is not a global default but a route chosen from the instance and the
 implied and which **#273** owns. `fglm::shape` already ships a tested shape-position detector that
 is deliberately unwired; it would serve as the criterion here.
 
+**What §3e did with that.** The order half is now built — `InterreductionRoute::ByOrder` builds a
+matrix under a graded order and divides under lex — and measured across the whole ladder, where the
+split this section inferred from four rungs holds on seventeen. The instance half is still #273's.
+`ByOrder` is **not** the default, for the reason in §3e.3 rather than the reason here.
+
 ### 3a.2 What the matrix route does not change
 
 * **The answer.** Asserted equal on every rep here, and asserted equal against the division route
@@ -346,9 +364,10 @@ is deliberately unwired; it would serve as the criterion here.
 * **Any other instance's cost.** Every figure above is `mq-random-10` grevlex at one digest. The
   stage's shape on katsura under lex is completely different — `buchberger.rs:294-314` records the
   ascending sort alone taking it from 2.5 s to a millisecond — and nothing here transfers.
-* **The division route's existence.** It remains the default — see §3a.1b, where it wins by 25x —
-  remains the fallback when a budget refuses the matrix, and remains the oracle the matrix route is
-  tested against. It is also still on the critical path of FGLM border reduction, the differential
+* **The division route's existence.** It remains the default — see §3a.1b, where it wins by 25x,
+  and §3e.3, which is why the default did not move even once the lex case was handled — remains the
+  fallback when a budget refuses the matrix, and remains the oracle the matrix route is tested
+  against. It is also still on the critical path of FGLM border reduction, the differential
   oracles and `multi_div_rem`, which is why #440 stage 2's windowed merge is worth taking
   independently of this change.
 
@@ -677,6 +696,189 @@ moves to #507 with better evidence than it had.
 * **The 7 395 reducer multiples.** §3a.1 attributed the row count to reducible tails in the basis;
   removing them took the autoreduce matrix to the comparand's shape, which is consistent with that
   attribution but does not separately measure the closure.
+## 3e. #507: the decision, on a cohort rather than on a single-instance A/B
+
+Pinned at `b89d68b7`, except the board rows, which are at `f153c59` — the commit that added
+`competitive_sweep --interreduce-by-matrix on|off`, whose `off` and `on` are exactly
+`InterreductionRoute::Division` and `::Matrix` under the name they had before the enum. Every
+figure under `tools/benchlock.sh`, `taskset -c 0-7`, `ZEEBRA_MACHINE=workstation`,
+`ZEEBRA_AFFINITY=0-7`, `RUSTC_WRAPPER=""`, a private `CARGO_TARGET_DIR`, one worker. Board rows
+`--measure --write`, one row per process, so their peak-RSS figures are attributable.
+
+### 3e.0 What #451 projected, and what the board actually says
+
+`m27-baseline.md` §2.4 applied a measured **3.627x** to the board's own 29 011.4 ms and projected
+**~7 999 ms**, labelling it arithmetic and requiring the row to be re-taken before publication.
+Here is the row, as a five-engine cohort at one commit on one digest (`72d0ad315fc2`),
+`reduced-grobner-basis`, grevlex, three reps of the Zeebra side and six of each comparand:
+
+| engine | mean | min | max | peak RSS |
+|---|---:|---:|---:|---:|
+| **zeebra, division** | **31 950.9 ms** | 29 623.8 | 35 069.4 | 162.7 MB |
+| **zeebra, matrix** | **8 159.6 ms** | 8 056.7 | 8 351.4 | **602.1 MB** |
+| singular | 7 524.4 ms | 7 207.8 | 8 153.4 | 23.5 MB |
+| sagebrush | 357.8 ms | 344.6 | 364.5 *(not authoritative)* | 31.4 MB |
+| msolve | 256.6 ms | 243.4 | 263.5 | 12.5 MB |
+| groebner.jl | 90.5 ms | 87.5 | 92.8 | 729.5 MB |
+
+**The projection was good.** Measured end to end: **3.92x** on the means, **3.68x** on the minima —
+and 3.68x is 1.4% from §2.4's 3.627x, taken by a different instrument. The projected 7 999 ms lands
+against a measured 8 159.6 ms, 2.0% out.
+
+So the figure that may now be published is a row and not an arithmetic step, and it says:
+
+> `mq-random-10` under the matrix route is **1.08x behind Singular** on the means and 1.12x on the
+> minima, where the division route is **4.25x** behind on the means and **4.11x** on the minima.
+> M27's 2x minimum is met with room; Singular parity is **not** reached, and stops about 1.1x
+> short — which is what §2.4 predicted at 1.14x.
+
+Two things the division side corroborates. Its **minimum**, 29 623.8 ms, is **1.021x** the retained
+board row's 29 011.4 ms, so this cohort composes with §1.1's ratios. Its **spread** is wide — 18%
+across three reps against the matrix route's 3.7% — because other agents were building on the box
+throughout; `benchlock` excludes other measurements and not other load. The minima are the cleaner
+statistic and both are quoted.
+
+### 3e.1 And the lex task crosses Singular, which no Zeebra row had done on this instance
+
+One rep each, same cohort:
+
+| engine | `lex-basis-by-conversion` |
+|---|---:|
+| zeebra, division | 31 637.9 ms |
+| **zeebra, matrix** | **8 777.7 ms** |
+| singular | 9 074.1 ms (mean of two) |
+| sagebrush | 441.0 ms *(not authoritative)* |
+
+**8 777.7 against 9 074.1 is 1.034x ahead**, which is inside this box's noise and so is parity
+rather than a lead — but it is the first `mq-random-10` row on which Zeebra's figure is not behind
+Singular's. msolve and Groebner.jl are `unsupported` on this task, so the column has two operands.
+
+### 3e.2 The ladder, interleaved: the matrix route wins under every graded order and loses under lex
+
+`examples/interreduction_routes.rs`, both routes in one process on one build with the bases asserted
+equal, 60 s per route, `F4Options::default()` otherwise. This is the instrument the board rows
+cannot be: it reports `F4Statistics::interreduction_matrix`, so a rung that does not move can be
+told apart from one where the matrix was never built.
+
+| rung | grevlex | grlex | lex |
+|---|---:|---:|---:|
+| katsura-4 | 1.77x | 1.18x | **0.67x** |
+| katsura-5 | 1.38x | 1.13x | **0.37x** |
+| katsura-6 | 1.01x | 1.26x | **0.16x** |
+| katsura-7 | 1.24x | 1.71x | both stopped |
+| katsura-8 | 1.53x | — | — |
+| katsura-9 | 1.80x | — | — |
+| katsura-10 | 2.06x | — | — |
+| cyclic-4 | 1.43x | 1.14x | 1.11x |
+| cyclic-5 | 1.14x | 1.25x | **0.64x** |
+| cyclic-6 | 1.35x | — | — |
+| cyclic-7 | 1.84x | — | — |
+| cyclic-8 | 1.21x | — | — |
+| mq-random-6 | 1.50x | 1.50x | both stopped |
+| **mq-random-10** | **3.78x** | — | — |
+| mq-planted-6 | 1.35x | 1.08x | 1.07x |
+| mq-planted-10 | 1.22x | 1.07x | 1.10x |
+| mq-planted-14 | 1.55x | 1.24x | 1.12x |
+
+Above 1.00x the matrix route is faster. **Every graded entry is at or above 1.00x** — grevlex
+0.99x–3.78x across two runs of katsura-6, grlex 1.07x–1.71x — and **every lex regression is on a
+rung whose basis is in shape position**: katsura and cyclic-5. The lex rungs that are *not*
+(`mq-planted`, whose lex basis is the planted point's linear forms, and cyclic-4) are unaffected at
+1.07x–1.12x.
+
+`cyclic-9`, `cyclic-10` and `mq-random-14` stopped under both routes at 60 s, which is a fact about
+the rungs. The three Poseidon and two Anemoi rungs pin their own characteristic and this example
+compiles the reference field only; their board times are 0.05–293 ms, so interreduction is not
+where their cost is.
+
+**The mechanism is legible in the matrix shape, not inferred.** katsura-6:
+
+| order | matrix | basis | density |
+|---|---|---:|---:|
+| grevlex | 217 × 249 | 22 | 5.81% |
+| grlex | 169 × 201 | 32 | 10.97% |
+| **lex** | **7 983 × 8 015** | **6** | 0.49% |
+
+A lex basis in shape position — linear elements over one univariate of high degree — is the **best**
+case for iterated division, because the ascending-order sort leaves every substituted tail already
+in normal form, and the **worst** case for a matrix, which must carry columns spanning the
+univariate's whole degree range. This is what `buchberger.rs:294-314` already documented and what
+§3a.1b measured at the stage level as a 25x regression on katsura-5 lex; the end-to-end figure for
+that rung is 0.37x, and the regression **grows with the rung** — 1.49x, 2.73x, 6.20x slower for
+katsura-4, 5 and 6.
+
+**No rung fell back.** `fell_back` was false and `refused_by` `None` on every rung under every
+order, including the 7 983 × 8 015 lex matrix. That is not reassurance; §3e.3 is why.
+
+### 3e.3 The decision: the default does not move, and the reason is memory with no budget on it
+
+The time evidence above would flip the default to `InterreductionRoute::ByOrder`. The peak-RSS
+figures, which §3a's A/B had no way to take because `f4_profile` does not report memory, say not
+yet:
+
+| rung | division | matrix | memory | time |
+|---|---:|---:|---:|---:|
+| `mq-random-10` | 162.7 MB | 602.1 MB | 3.70x | 3.92x faster |
+| **`katsura-11`** | **535.8 MB** | **13 144.9 MB** | **24.54x** | 2.28x faster |
+
+`katsura-11` finished both ways at a 600 s budget — 258 487 ms by division against 113 298 ms by
+matrix — so 13.1 GB is what the pass costs and not a stopped run's partial footprint.
+
+**And every budget was satisfied.** The matrix route's refusal tests rows, columns and live
+*entries* (`mod.rs:546` into `interreduce::interreduce_by_matrix`, against `max_matrix_rows`,
+`max_matrix_columns` and `live_entry_allowance::<F>()`), and the entries are not where the memory
+goes. `mq-random-10` shows the gap directly: **893 531 nonzeros**, on the order of ten megabytes of
+entries, against a **439 MB** increase in process peak. The quantity being budgeted is a small
+fraction of the quantity that binds — which is precisely the defect `f4-resource-scaling.md` §10
+records for symbolic preprocessing before #305 (88.4% of peak RSS in one `VecDeque<Monomial<20>>`
+while the budget saw 1.3%), in a different stage. The suspected site is the one #477 names: the
+closure is built as polynomials before it becomes rows, and `mq-random-10`'s closure adds **7 395**
+reducer multiples where Groebner.jl's adds about three.
+
+> **A default must not be able to take a 536 MB computation to 13.1 GB with every limit
+> satisfied**, however much faster it is, because that converts a working computation into an OOM on
+> any machine smaller than this one. So `ByOrder` ships selectable and measured, `Division` stays
+> the default and stays the configuration every published figure was taken in, and the flip is
+> gated on **#536** making the matrix pass's working set a budgeted quantity.
+
+Siting a size threshold instead was considered and rejected: two points, 3.70x and 24.54x, do not
+locate a crossover, and an unmeasured threshold is the thing this file exists not to produce.
+
+**This supersedes §3a.1b's consequence and not its measurement.** §3a.1b concluded "the default
+stays on the division route" from the lex regression alone, and proposed an order-aware route as
+the right shape. The order-aware route now exists and is measured across the ladder, which is
+§3a.1b's proposal carried out; what keeps the default where it is has turned out to be a different
+and larger reason than the one §3a.1b gave.
+
+### 3e.4 Two figures corrected
+
+**#477's "remaining stage cost is 4 094 ms" is 2 085.9 ms.** The interleaved ladder run measures
+`mq-random-10`'s matrix-route interreduction stage at **2 085.9 ms** of a 7 818.6 ms total (26.68%),
+and §2.4 measured 2 306.2 ms at `53fbf50`. #477's 4 094 ms belongs to #478's PR run, whose division
+side was 1.40x the board row — the loaded box §2.4 attributes the 4.18x to. The honest range is
+**2 086–2 306 ms**, so #477's downstream reasoning about the 405x cell count is built on a figure
+**1.78x–1.96x too large**. The cell count itself is unaffected: 7 642 × 7 996 is reproduced exactly
+here, as is the 893 531 nonzeros.
+
+**katsura-11 is a new board row**, and the first evidence that the route choice can be a capability
+difference rather than a speed one. At a **120 s** budget the matrix route finishes and the division
+route does not — it had reduced 259 of 537 basis elements when the budget expired — so inside that
+budget the rung is reachable by one route only. At 600 s both finish, so the difference is
+budget-relative and is stated that way. The cohort:
+
+| engine | katsura-11, `reduced-grobner-basis` | peak RSS |
+|---|---:|---:|
+| zeebra, division | 258 487.3 ms | 535.8 MB |
+| **zeebra, matrix** | **113 297.8 ms** | **13 144.9 MB** |
+| singular | 51 545–52 153 ms | 41.8 MB |
+| sagebrush | 2 735–2 777 ms *(not authoritative)* | 114.0 MB |
+| msolve | 1 762–1 771 ms | 22.7 MB |
+| groebner.jl | 514–526 ms | 873.8 MB |
+
+All five engines agree on quotient dimension **1 024**. Zeebra's division route is **4.96x** behind
+Singular here and its matrix route **2.19x** — the same shape as `mq-random-10`, one rung further
+up, and the first `katsura-11` row the board has had at any characteristic.
+
 
 ---
 
@@ -720,4 +922,25 @@ tools/benchlock.sh <tag> taskset -c 0-7 cargo bench --bench f4_stages -- interre
 # from one tree into separate target directories, interleaved. See §3b. The same applies to
 # §3d.2's hoist; §3d's region split is counts and comes out of the `mq-counts` run above,
 # on the `regions:` and `merge ops:` lines.
+
+# §3e's ladder sweep: both routes per rung, in one process, with the matrix route's own
+# verdict and the fallback reason. `--orders` adds grlex and lex.
+tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example interreduction_routes -- --wall 60
+tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example interreduction_routes -- --orders --wall 60 \
+  katsura-4 katsura-5 katsura-6 katsura-7 cyclic-4 cyclic-5 \
+  mq-planted-6 mq-planted-10 mq-planted-14 mq-random-6
+
+# §3e's board rows. One row per process, so the peak-RSS figure is attributable; the
+# memory figures in §3e.3 come from here and not from the sweep above.
+. tools/external/env.sh
+for route in division matrix; do
+  ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+    tools/benchlock.sh <tag> taskset -c 0-7 \
+    cargo run --release --example competitive_sweep -- \
+      --row mq-random-10 --task reduced-grobner-basis \
+      --interreduction "$route" --measure --wall 60 --write
+done
+
 ```

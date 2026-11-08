@@ -14,6 +14,12 @@ before #437 landed and nothing in the tree could say whether #437 moved it.
 > **the baseline survives**, for one reason that matters more than the re-measurement:
 > `interreduce_by_matrix` is **off in `F4Options::recommended()`**, which is `default()`, so no
 > board row and no default-path run gets the 4.18x yet. §2.3 and §2.4.
+>
+> **Since #507** the flag is `F4Options::interreduction: InterreductionRoute` and its default is
+> still the division route, so the sentence above still holds of the default path — but the board
+> now does carry matrix-route rows, each labelled in its `library_version`. §2.4's projection was
+> re-taken as a measured cohort and held to 2.0%; what keeps the default where it is turned out to
+> be unbudgeted memory rather than a missing A/B. `interreduction-cost.md` §3c and **#536**.
 
 ## 0. Four conventions, because three of the four discrepancies below are conventions
 
@@ -215,6 +221,12 @@ this struct follows."* So:
 > description of `main`'s default path. Flipping the flag is a separate decision on separate
 > evidence, and §2.4 is that evidence re-taken.
 
+**Since #507, the board does carry matrix-route rows** — `mq-random-10` at both tasks and
+`katsura-11`, each labelled in its `library_version` — and `F4Options::default()` still does not
+produce them: the option is now `InterreductionRoute`, and its default is still `Division`. So the
+29 011 ms figure remains the accurate description of the default path, for the reason in
+`interreduction-cost.md` §3c.3 rather than for want of an A/B.
+
 ### 2.4 The interreduction A/B at `53fbf50`, and it comes in at 3.63x rather than 4.18x
 
 #478 landed `f4_profile -- mq-matrix`, which runs both routes **interleaved in one process on one
@@ -299,6 +311,20 @@ again.
 
 **This projection is arithmetic on two measurements and is not itself a measurement.** The board row
 must be re-taken with the flag on before any of it is published.
+
+> **Re-taken, and the projection held.** #507 took the row as a five-engine cohort at one commit on
+> the pinned digest — `docs/research/interreduction-cost.md` §3c.0. Measured: **8 159.6 ms** mean of
+> three against the 7 999 ms projected here, **2.0% out**, and **1.08x behind Singular** against the
+> 1.14x projected. End to end the cohort gives 3.92x on the means and **3.68x on the minima**, the
+> latter 1.4% from the 3.627x applied above. The division side's minimum is 1.021x the board row, so
+> the cohort composes with §1.1.
+>
+> Two things §2.4 could not have said. On `lex-basis-by-conversion` the matrix route reaches
+> **8 777.7 ms against Singular's 9 074.1 ms** — parity, and the first `mq-random-10` row not behind
+> Singular. And **the default did not move anyway**: peak RSS, which `f4_profile` does not report,
+> goes 162.7 MB → 602.1 MB here and **535.8 MB → 13 144.9 MB on katsura-11**, with every budget
+> satisfied, because the refusal counts matrix entries and the entries are not where the memory
+> goes. §3c.3 and **#536**.
 
 ---
 

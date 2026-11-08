@@ -878,6 +878,17 @@ tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
     --characteristic 32003 --row katsura-6 --task reduced-grobner-basis --measure --write
                                                    # the same rung at the corpus's other identity;
                                                    #   only a PUBLISHED characteristic is accepted
+tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
+    --row mq-random-10 --task reduced-grobner-basis \
+    --interreduction matrix --measure --write      # a row under a non-default F4 route; the route
+                                                   #   lands in the row's library_version, because
+                                                   #   the commit does not determine it (#507)
+cargo run --release --example interreduction_routes            # both interreduction routes per
+                                                   #   ladder rung, interleaved in one process,
+                                                   #   with the matrix route's own verdict
+cargo run --release --example interreduction_routes -- --orders --wall 60 katsura-6
+                                                   # the same rung under grevlex, grlex and lex —
+                                                   #   where the two routes disagree (#507 §3c.2)
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
@@ -3254,9 +3265,19 @@ when a ratio carries the #318/#319 systematic. **Cite it rather than re-deriving
 things it establishes that are easy to get wrong: a ratio formed *within* one cohort carries no
 systematic while one spanning a pre-M25 record carries +26%/−8%; `mq-random-10`'s interreduction
 share is unchanged at ~80% after #437 and is **still ~80% on the default path**, because
-`interreduce_by_matrix` is off in `F4Options::recommended()`; and the interreduction A/B measures
-**3.63x** end to end on a box whose division side matches the board row, against the 4.18x measured
-on one 1.40x slower than it.
+`F4Options::recommended()` still selects `InterreductionRoute::Division`; and the interreduction A/B
+measures **3.63x** end to end on a box whose division side matches the board row, against the 4.18x
+measured on one 1.40x slower than it.
+
+#507 then took that A/B as a **five-engine board cohort** rather than a projection, and
+[`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) §3c is the result:
+**8 159.6 ms** measured against 7 999 ms projected, **1.08x behind Singular** on
+`reduced-grobner-basis` and **parity on `lex-basis-by-conversion`**, with the matrix route ahead on
+every graded rung of the ladder (0.99x–3.78x) and behind on every lex one (up to 6.20x, because a
+shape-position lex basis makes katsura-6 build 7 983 × 8 015 for a six-element basis). The default
+nevertheless stays on the division route, and the reason is **memory that no budget sees**:
+`katsura-11` goes 535.8 MB → 13 144.9 MB with every limit satisfied, because the refusal counts
+matrix entries and the entries are not where the memory goes. That gate is **#536**.
 
 **Two strategy flags now sit off by default in that position, not one.** #477 found that the 80%
 interreduction share is a debt the *main loop* accrues — candidates are extracted from an echelon
