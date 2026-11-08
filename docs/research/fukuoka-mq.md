@@ -329,6 +329,16 @@ tools/fetch-mq-challenge.sh            # fetch and verify
 tools/fetch-mq-challenge.sh --verify   # check what is already there
 ```
 
+`PI` is in the same position and has its own script, because it is fetched once and then serves
+every instance (§7, `src/grobner/research/mq_generator.rs`):
+
+```sh
+tools/fetch-pi.sh                      # fetch, extract and verify PI
+tools/fetch-pi.sh --verify             # check what is already there
+```
+
+Both destinations honour `ZEEBRA_MQ_DIR`, and `research/instances/` is gitignored.
+
 The checksums are what make a result reproducible without redistributing the data, which is what
 `Provenance::sha256` and `Provenance::redistribution` are for. Unconditional parser coverage comes
 from a hand-written fixture in the same format; the test against the genuine instance is
@@ -594,6 +604,33 @@ also what every published type V and type VI solve did.
 `guidance` links two archives under `utility/` that `site` and `format` do not mention. They are
 the whole of this section.
 
+**Implemented** as of #420: `src/grobner/research/mq_generator.rs` is the walk below, and
+`tools/fetch-pi.sh` fetches and checksums the stream. Implementing it changed what this section
+claims, in three ways that only running against the data could show:
+
+- **Both of §7.3's "defects" are parameters**, and the published data falls into three classes —
+  toy example, real encryption, real signature — which differ in whether `31` is resampled and
+  whether the constant column comes from π. The table is in §7.3; the types are `ThirtyOne` and
+  `ConstantColumn`.
+- **A real signature challenge is reproducible in full**, constants included, from `(type, m, seed)`
+  alone. §7.4 recorded that as not established, on toy-example evidence.
+- Its parameters are `(type, n, m, seed)` and **not** `(type, n, seed)`. `n` and `m` are related by
+  the type's own rule for every real instance, but not for the type IV–VI toy example at `n = 5`,
+  whose header says `m = 3` where `floor(1.5 * 3)` is 4. The pair the file states is the pair the
+  walk was run with, so it is what the generator takes; `MqParameters::challenge` applies the rule
+  for the real files, which do obey it.
+
+Two smaller choices, both to keep a failure loud. The constant column, where it is not generated, is
+**required from the caller** — there is no path that fills it with zeros, because a system with zero
+constants is a different system. And the digit stream is validated as `0`/`1` on construction rather
+than read the way `readPI` does, which treats every non-`'0'` byte as a one bit, so a truncated
+download would otherwise produce plausible coefficients.
+
+The offline tests drive a synthetic stream of a few hundred bytes, so the arithmetic — strides,
+widths, the carry across polynomials, the extra read, the wrap at the end — is checked in CI
+without the data. The comparison against genuine files is `#[ignore]`d and is §7.2 and §7.3's table
+as an assertion rather than as a paragraph.
+
 > **Coefficient Verifier.** The coefficients of the challenges are generated from the digits of PI.
 > We provide two kinds of coefficient verifier to let participants check the correctness of the
 > downloaded challenges. For encryption scheme (Type I, Type II, Type III), the encryption
@@ -630,8 +667,11 @@ with `pos` carrying across them, and each carries `binomial_coef(n+2, 2)` coeffi
 number as `n(n+1)/2 + n + 1`, asserted against the importer by
 `fukuoka_mq_records::test_the_coefficient_count_is_the_binomial_the_generator_uses`.
 
-So an instance is a function of `(type, n, seed)` and `PI` alone. No seed is secret, and `PI` is
-published.
+So an instance is a function of `(type, n, m, seed)`, `PI`, and §7.3's rejection policy. No seed is
+secret and `PI` is published. Two corrections to "a function of `(type, n, seed)`", both found by
+implementing it (#420): `m` is not always the type's rule applied to `n` — the type IV–VI toy
+example at `n = 5` carries `m = 3` where `floor(1.5 * 3)` is 4 — and the rejection policy differs
+between the toy examples and the real challenges.
 
 ### 7.2 Verified against every published toy example
 
@@ -656,25 +696,47 @@ claim: not a distributional match, every coefficient.
 Neither archive reproduces the data it exists to check. Both failures are in the generator source,
 both are one-line, and both are reported here rather than worked around.
 
-**1. `generate31` rejects `31`, and the published files do not.** `generateCoef_enc.h`:
+**1. `generate31` rejects `31`, and the *toy examples* do not.** `generateCoef_enc.h`:
 
 ```c
 coef = readPI(pos, 5);
-while (coef == 31) {               /* not in the published data */
+while (coef == 31) {               /* not in the toy examples; yes in the real challenges */
         pos += interval;
         pos %= PI_LEN;
         coef = readPI(pos, 5);
 }
 ```
 
-Running `./coefVerifier 3 10 0` diverges from the genuine file at **polynomial 0, coefficient 55**,
-where the file has `31` and the verifier emits `30`; because the rejection also advances `pos`,
-everything after that is shifted and **1 214 of 1 300 coefficients disagree**. Remove the `while`
-loop and the match is exact. Same at `n = 15` (first divergence at coefficient 42, 3 884/4 050
-disagree), `n = 20` (coefficient 14, 8 912/9 200) and `n = 10` seed 3 (coefficient 8, 1 263/1 300).
+Running `./coefVerifier 3 10 0` diverges from the genuine toy file at **polynomial 0, coefficient
+55**, where the file has `31` and the verifier emits `30`; because the rejection also advances
+`pos`, everything after that is shifted and **1 214 of 1 300 coefficients disagree**. Remove the
+`while` loop and the match is exact. Same at `n = 15` (first divergence at coefficient 42,
+3 884/4 050 disagree), `n = 20` (coefficient 14, 8 912/9 200) and `n = 10` seed 3 (coefficient 8,
+1 263/1 300).
+
+**The previous revision of this section then generalized, and was wrong to.** It is not that the
+loop is a defect in the generator; it is that **the loop is a parameter of the file**, and the two
+published classes are on opposite sides of it. Found by #420's implementation on its first run
+against the data, which reproduced all nine toy examples exactly and disagreed with
+`challenge-6-16-0` on 5 012 of 5 184 coefficients, first at polynomial 0 coefficient 24 — the
+signature of a rejection, not of a misread.
+
+Counted over the token streams:
+
+| file | coefficients | `31` | `30` | mean per residue |
+|---|---:|---:|---:|---:|
+| `ToyExample-type3-n20-seed0` | 9 240 | **310** | 302 | 289 over 32 values |
+| `ToyExample-type6-n15-seed0` | 1 360 | **40** | 57 | 42 over 32 values |
+| `challenge-6-16-0` (real, `m = 16`) | 5 200 | **0** | 166 | 168 over 31 values |
+
+Zero occurrences in 5 200 draws where the rate would put ~168 is not a sampling accident, and the
+`30` count moving from "one of 32" to "one of 31" is the other side of the same change. So the real
+challenges were generated **with** the rejection and the toy examples **without** it. Both are
+reproducible; neither policy reproduces both. `MqParameters::thirty_one` carries it, and
+`ThirtyOne`'s documentation is this table.
 
 This affects types III and VI — the two families this crate imports — and only them: types I, II,
-IV and V have no such loop and their generator code is correct as shipped.
+IV and V have no such loop, and no value a bit or a byte can hold is out of range anyway.
 
 **2. The signature generator reads one coefficient too many per polynomial.**
 `generateCoef_sig.h` loops `j < mon` where the encryption version loops `j < mon-1`, and prints no
@@ -684,12 +746,26 @@ their constants do not come from it. The first divergence is therefore at exactl
 polynomial 0 — coefficient 65 of 66 at `n = 10`, 135 of 136 at `n = 15`, 20 of 21 at `n = 5` — and
 the extra read desynchronizes every later polynomial. Verified for all three signature types.
 
-So `guidance`'s claim that the signature verifier "can check all the coefficients including the
-constant terms" is **false for the published files in all three signature types**. The correct rule
-is the encryption one, uniformly: `mon-1` coefficients from π, and the constant from elsewhere.
+**This one is also a parameter, and the shipped verifier is right about the file it was written
+for.** The paragraph above is true of the signature *toy examples* and false of the real signature
+challenges, which take `mon` reads per polynomial and whose constant **is** the last of them:
+`challenge-6-16-0` and `challenge-5-16-0` each reproduce on all 325 coefficients of all 16
+polynomials, constants included, under exactly the rule `generateCoef_sig.h` implements. Measured
+by #420 at the same time as the rejection policy, and the two together give §7's three classes:
 
-Reported as observations, not patched: nothing in this repository runs either verifier, and §7.2's
-reimplementation is the check that is actually used.
+| class | reads per polynomial | the value `31` | the constant column | measured on |
+|---|---|---|---|---|
+| toy examples, all six types | `mon - 1` | kept | **not** from π | 27 530 coefficients, §7.2 |
+| real encryption, types I–III | `mon - 1` | **resampled** | **not** from π | `challenge-3-34-0`, 42 840 |
+| real signature, types IV–VI | **`mon`** | resampled | **from π** | `challenge-{5,6}-16-0`, 5 200 each |
+
+So `guidance`'s claim that the signature verifier "can check all the coefficients including the
+constant terms" is **true of the challenges and false of the toy examples** — the opposite of what
+the previous revision of this section concluded from the toy examples alone.
+
+Neither verifier is patched here: nothing in this repository runs them, and the reimplementation in
+`src/grobner/research/mq_generator.rs` — which carries both axes as `ThirtyOne` and
+`ConstantColumn` — is the check that is actually used.
 
 ### 7.4 The constant column
 
@@ -704,21 +780,29 @@ solution by adjusting the constant coefficients". So the encryption constants *a
 answer, which is why `site`'s rule 4 says the challenge team will not compete in types I–III, and
 why the verifier prints a literal `0` there. Fully explained, and consistent with the data.
 
-For the signature types it is **not established**, and the two authoritative statements conflict:
+For the signature types the previous revision recorded it as **not established**, and the two
+authoritative statements as conflicting:
 
 - `guidance`: "the coefficients are all chosen from PI digits, and the MQ challenge team do not
   know the answers".
 - `YDHTS15` Algorithm 2: "Select randomly `a_ij`, `b_i`, `c^(k)` for all `i, j, k`" — all
   coefficients random, constants included.
 
-The data says only that the constants are not the next value of the π stream. Type VI `n = 15` seed
-0's ten constants are `[11, 2, 27, 4, 21, 23, 5, 16, 27, 20]`, and they are not produced by
-continuing `pos` past the `m(mon-1)` main reads, nor by a second pass from `start`, nor by any
-offset in the first 4 000 000 bits of `PI` stepping at this instance's `interval`. **Recorded as not
-established rather than guessed.** It does not affect reproducibility of a downloaded file — the
-constants are *in* the file — only the claim that a file can be rebuilt from nothing but
-`(type, n, seed)`, which holds for types I–III and fails by one column per polynomial for types
-IV–VI.
+**Established now, and `guidance` is right about the challenges.** A real signature challenge's
+constants *are* from π: they are the `mon`-th read of each polynomial, under the rejection policy,
+and `challenge-6-16-0` and `challenge-5-16-0` reproduce in full — 16 polynomials × 325
+coefficients each, zero mismatches, nothing taken from the file but `n` and `m`. The evidence that
+looked like a refutation was entirely about the toy examples, where it still holds: type VI
+`n = 15` seed 0's ten constants are `[11, 2, 27, 4, 21, 23, 5, 16, 27, 20]`, and they are not
+produced by continuing `pos` past the `m(mon-1)` main reads, nor by a second pass from `start`, nor
+by any offset in the first 4 000 000 bits of `PI` at that instance's `interval`.
+
+The consequence for this repository is the useful one. A **real signature challenge needs no
+instance file at all** — `(type, m, seed)` and `PI` rebuild it exactly, which is what
+`MqParameters::challenge` plus `GeneratedMq::into_instance` do, and it removes the redistribution
+problem for types IV–VI outright. A **real encryption challenge** is rebuilt except for one column
+per polynomial, and that column is the planted answer, so no walk can produce it and no walk should
+pretend to: `into_instance_with_constants` takes it from the caller.
 
 ---
 

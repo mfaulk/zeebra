@@ -3920,12 +3920,40 @@ verification, and one quirk worth knowing: coefficients are uniform over `0..=31
 **zero is twice as likely as any other coefficient** in the published GF(31) data.
 
 That quirk is no longer an inference. The challenge publishes its own **coefficient generator**, and
-every instance is reproducible from `(type, n, seed)` plus a 200 Mbit file of π it distributes —
+every instance is reproducible from `(type, n, m, seed)` plus a 200 Mbit file of π it distributes —
 confirmed against all six types' toy examples, coefficient for coefficient
-([`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §7). So the redistribution problem has
-a cheaper answer than a download recipe, and `research/fukuoka-mq/solved-instances.tsv` records all
-37 published solves of types II, III, V and VI — parameters, dates, solvers, algorithms, hardware
-and figures, with no instance data — checked by `tests/fukuoka_mq_records.rs`.
+([`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §7). **That generator is implemented**
+(#420, `src/grobner/research/mq_generator.rs`): `tools/fetch-pi.sh` fetches and checksums the digit
+stream once, after which an instance is a walk over it — `start = type * n`,
+`interval = (seed + n) * 10 + type`, one coefficient per stride at the field's own width, with both
+corrections the shipped verifiers need applied (§7.3).
+
+```sh
+tools/fetch-pi.sh            # fetch and verify PI, once; it serves every instance
+tools/fetch-pi.sh --verify   # check what is already there
+```
+
+**Implementing it changed what the record says.** §7.3 had reported the shipped verifiers as broken
+in two ways, from the toy examples; running the implementation against the real challenges showed
+both "defects" are **parameters**, and that the published data falls into three classes:
+
+| class | reads per polynomial | the value `31` | the constant column |
+|---|---|---|---|
+| toy examples, all six types | `mon - 1` | kept | **not** from π |
+| real encryption, types I–III | `mon - 1` | **resampled** | **not** from π |
+| real signature, types IV–VI | **`mon`** | resampled | **from π** |
+
+Each row is zero mismatches against genuine files, every coefficient compared. So a **real signature
+challenge needs no instance file at all** — `(type, m, seed)` plus `PI` rebuilds it exactly,
+constants included, which settles a question `docs/research/fukuoka-mq.md` §7.4 had recorded as not
+established and removes the redistribution problem for types IV–VI outright. A **real encryption
+challenge** is rebuilt except for one column per polynomial, and that column is the planted answer
+(`YDHTS15` Algorithm 1 Step 4), so `GeneratedMq::into_instance_with_constants` takes it from the
+caller rather than inventing it.
+
+`research/fukuoka-mq/solved-instances.tsv` records all 37 published solves of types II, III, V and
+VI — parameters, dates, solvers, algorithms, hardware and figures, with no instance data — checked
+by `tests/fukuoka_mq_records.rs`.
 
 #### Candidate external instances, surveyed but not imported
 

@@ -13,6 +13,7 @@ pub mod cost_model;
 pub mod linear;
 pub mod manifest;
 pub mod mq;
+pub mod mq_generator;
 pub mod poseidon;
 pub mod record;
 pub mod reorder;
@@ -38,6 +39,10 @@ pub use cost_model::{
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};
 pub use mq::{MqError, MqField, MqInstance, MqVisitor, SUPPORTED_DIMENSIONS};
+pub use mq_generator::{
+    read_pi, ConstantColumn, DigitSource, GeneratedMq, MqGeneratorError, MqParameters, MqType,
+    ThirtyOne, PI_LENGTH, PI_SHA256,
+};
 pub use poseidon::{
     verify_against_trace, CicoInstance, GrainLfsr, Poseidon, PoseidonError, PoseidonParameters,
     PoseidonTrace, KOALABEAR_PRIME,
