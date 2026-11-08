@@ -581,7 +581,7 @@ mod tests {
             binary_field::BinaryFieldElement,
             extension_field::ExtensionFieldElement,
             irreducible_polynomials::{Modulus13Pow4, X8_X4_X3_X_1},
-            Bn254Fr, Gf13Pow4, Gf256, PrimeFieldElement128, Zp13, Zp2, Zp2147483647,
+            Bn254Fr, Gf13Pow4, Gf256, Zp13, Zp2, Zp2147483647,
         },
         FiniteField, KnownOrder, One, Zero,
     };
@@ -692,9 +692,10 @@ mod tests {
 
     /// An order above 2^64 reports both limbs, least significant first.
     #[test]
+    #[allow(deprecated)]
     fn test_a_wide_order_reports_both_limbs_little_endian() {
         // 3 * 2^66 + 1 = 12 * 2^64 + 1.
-        type F = PrimeFieldElement128<221360928884514619393>;
+        type F = crate::fields::PrimeFieldElement128<221360928884514619393>;
         assert_eq!(F::order_limbs(), &[1, 12]);
         assert_eq!(F::order_u128(), Some(221360928884514619393));
     }
@@ -717,8 +718,9 @@ mod tests {
 
     /// `pow_limbs` agrees with `pow` on every exponent both can express.
     #[test]
+    #[allow(deprecated)]
     fn test_pow_limbs_agrees_with_pow() {
-        type F = PrimeFieldElement128<221360928884514619393>;
+        type F = crate::fields::PrimeFieldElement128<221360928884514619393>;
         for value in [0u64, 1, 2, 3, 97, 12345] {
             let a = <F as FiniteField>::new(value);
             for exponent in [0u128, 1, 2, 3, 17, 64, 255, 1 << 40, u64::MAX as u128] {
