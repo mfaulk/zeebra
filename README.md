@@ -1013,7 +1013,10 @@ Recorded baselines, before/after measurements, and the reasoning behind each opt
 [`docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](docs/MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md), and
 [`docs/MILESTONE-COMPETITIVE-ALGEBRA.md`](docs/MILESTONE-COMPETITIVE-ALGEBRA.md).
 [`docs/MILESTONE-ALGORITHMIC-ELIMINATION.md`](docs/MILESTONE-ALGORITHMIC-ELIMINATION.md) is the
-current plan rather than a record of measurements taken.
+current plan rather than a record of measurements taken, and
+[`docs/MILESTONE-COMPETITIVE-MQ-SOLVING.md`](docs/MILESTONE-COMPETITIVE-MQ-SOLVING.md) is the next
+one. That plan opens by recording that the one before it is unfinished, because its own scope
+depends on measurements M26 has not yet reported.
 
 The last of those reproduced a published cryptanalytic attack end to end, extended the verified resultant
 frontier from four rounds to **six** with a witness checked through the permutation, and calibrated
