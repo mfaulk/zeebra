@@ -1,5 +1,8 @@
 # M27 — Competitive MQ Solving and Published-Instance Frontier
 
+**Measured at:** publication bound `2205c7db`…`5e1b8ea9` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** planned.
 **Prerequisite:** M26, **not yet complete** — see §0, which is why this plan opens with a
 reconciliation workstream rather than with a target.
@@ -1287,7 +1290,10 @@ Before any figure enters a report or a record:
 - [ ] `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` set, and recorded in the record.
 - [ ] `RUSTFLAGS` unset, `RUSTC_WRAPPER=""`, private `CARGO_TARGET_DIR`, and `target-cpu=x86-64-v3`
       verified by `cargo build -v`, not assumed.
-- [ ] Commit recorded next to the figure (#335 is the standing defect this closes).
+- [ ] Commit recorded next to the figure, and the document's header declaration still true.
+      `tools/check-measurement-provenance.sh` enforces the declaration's presence and runs in CI;
+      what it cannot check is whether a *new* figure is inside the header's stated era, which is the
+      author's to keep honest (#335, and `external-comparison-protocol.md` §10).
 - [ ] Labelled measured / fitted / predicted / extrapolated; `Fitted` carrying residual and
       applicability limit.
 - [ ] Peak allocated and peak resident in separate columns, each with its basis.

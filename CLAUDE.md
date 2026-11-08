@@ -231,6 +231,8 @@ race resolution, and the lease arithmetic:
 ```bash
 bash scripts/agent/test/zb-claim-test.sh
 bash tools/test/rss-guard-test.sh
+bash tools/test/check-measurement-provenance-test.sh
+bash tools/check-measurement-provenance.sh
 shellcheck -S warning scripts/agent/*.sh scripts/agent/test/*.sh \
   tools/*.sh tools/test/*.sh tools/external/*.sh tools/external/smoke/*.sh
 ```
@@ -240,6 +242,13 @@ cover the pure half against a synthetic `/proc`, because the failure it exists
 to prevent is a guard watching the wrong pid. Never find a measured binary with
 `pgrep -f`: a heredoc script's own text is in its wrapper's cmdline, so the
 pattern matches the wrapper (#328).
+
+`tools/check-measurement-provenance.sh` is the only one of these that reads the
+repository's own documents rather than a script: a document publishing a timing
+or memory figure must say in its header which commit it came from. A finding is a
+document to fix, not a broken script. Writing a new figure means writing the
+commit beside it — `docs/research/external-comparison-protocol.md` §10 is the
+rule, and #335 is what it costs when nobody does.
 
 All of the above run in CI (the `agent-scripts` job). The subcommands that call `gh` are
 deliberately not unit-tested: they are thin wrappers whose failure modes are the

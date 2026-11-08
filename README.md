@@ -151,6 +151,8 @@ bash scripts/agent/test/zb-claim-test.sh
 bash tools/test/rss-guard-test.sh
 bash tools/test/merge-base-age-test.sh
 bash tools/test/benchlock-test.sh
+bash tools/test/check-measurement-provenance-test.sh
+bash tools/check-measurement-provenance.sh      # the documents, not the script
 ```
 
 The Rust examples in this file are **compiled and run** by `cargo test --doc`, through a
@@ -709,6 +711,46 @@ the pid from `$!` and pass it with `--kill-pid`.
 `tools/test/rss-guard-test.sh` covers the pure half against a synthetic `/proc` — including a case
 where both wrappers' command lines contain the row id and only the binary is matched — and runs in
 CI's `agent-scripts` job.
+
+### Which commit a figure came from
+
+A measurement published under `docs/` states the commit it was taken at. The field has always
+existed — `Environment::commit`, filled from `git rev-parse` by `examples/scoreboard.rs` — and the
+gap was the prose, which recorded the machine, the pinning, the build flags and the lock and never
+the commit (#335). The cost was concrete: #318 found a figure on record 1.2x faster than the same
+measurement taken later, and "re-measure at the old commit" could not be *set up* from what was
+written down.
+
+So every document under `docs/research/` and `docs/MILESTONE-*.md` that contains a timing or memory
+figure in a table carries a declaration in its header:
+
+```text
+**Measured at:** `93bb1c2`                    the commit the figures were taken at
+**Measured at:** publication bound `x`…`y`    retrospective: at or before the commits that published them
+**Measured at:** not measured here — <why>    every figure is quoted from a cited source
+**Measured at:** unrecorded — <why>           genuinely unrecoverable, and said so
+```
+
+```sh
+tools/check-measurement-provenance.sh            # all of docs/; rc 1 = a document with no era
+tools/check-measurement-provenance.sh docs/research/f4-resource-scaling.md
+```
+
+The checker runs in CI's `agent-scripts` job. It exists rather than a convention because the M27
+reproducibility checklist already asked for the commit and the documents still did not carry one.
+
+A figure already published without its commit can usually be dated from git, which is where the
+existing `publication bound` declarations came from:
+
+```sh
+git log -S "37 634.3" --format='%h %ad' --date=short -- docs/research/resultant-elimination.md | tail -1
+```
+
+That is an upper bound, not the measured tree, and it is labelled as one — never written into
+`Environment::commit`, whose contract is the commit the run actually used. A commit is also not by
+itself reproducibility: §6.5's figure does not reproduce at its own commit, because the session and
+the ambient load moved it more than any code did, which is why `tools/benchlock.sh` records `load=`.
+`docs/research/external-comparison-protocol.md` §10 is the authority on all of this.
 
 ### Benchmarks
 
