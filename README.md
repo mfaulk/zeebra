@@ -1623,6 +1623,23 @@ assert_eq!(fibonacci.pow(10).unwrap()[[0, 1]], F::new(55));
 `Err(NotSquare)` for a non-square matrix, including at exponent zero, where there is no size the
 identity could take. `hconcat` and `vconcat` return `Err(IncompatibleShapes)` carrying both shapes.
 
+The product is `ikj` with `k` unrolled four deep, not the textbook `ijk`. Row-major storage makes
+`ijk`'s innermost loop stride the right operand by `num_columns`, a cache line per multiplication;
+`ikj`'s is an axpy over contiguous spans. `benches/linear_algebra.rs` measures it two ways: square
+sizes, and a family of `m x k` times `k x n` shapes holding the multiplication count at 2^26 so the
+only thing that varies is the right operand's footprint. **The permutation is not the free win it
+looks like.** It converts a kernel that is memory-bound out of cache into one that is ALU-bound at
+every footprint — over a 31-bit prime, pinned, three interleaved reps, the new kernel is flat at
+124-128 ms whether that operand is 256 KiB, 8 MiB or 128 MiB, where `ijk` goes 149 ms → 171 ms →
+252-267 ms — which is the §8.2 result in
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md) arrived at from the other
+side. But in cache it buys little and can cost: 1.31x at square n=32, neutral at n=64, **8% slower
+at n=128**, 1.11x at n=256, rising to 2.0x only once the right operand is past L3. `ijk` keeps one
+entry of the product in a register where `ikj` reads and writes a whole row of it per `k`, and in
+cache that register is worth more than the stride costs; the unroll — four right-hand rows per load
+and store of the product row — is what pays most of it back. Plain `ikj` measured 11-18% slower
+than `ijk` at square sizes that fit in cache.
+
 Two gaps are deliberate. There is no mutable column iterator — handing out disjoint `&mut` down a
 strided column of a row-major buffer is where the borrow checker stops being free, and nothing in
 the crate needs it yet. And `Matrix<T>` does not implement `Ring`, so a matrix cannot yet be a
