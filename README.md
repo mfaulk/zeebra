@@ -404,6 +404,32 @@ is still cheap to run before merging anything that changes the corpus, the chall
 either engine's side of the comparison. The test that #339 is named for lives here:
 `grobner::external::msolve::tests`, driven from `corpus::ladder()`.
 
+### What a pull request validates in `benches/`, and what it used to not
+
+Both halves, since #586. The `Benchmarks run` job is no longer gated to `push`:
+
+| | covered on a pull request | by what |
+|---|---|---|
+| a benchmark that stops **compiling** | yes, always was | `cargo build --all-targets` and `cargo clippy --all-targets`, which build `benches/` because `test = false` keeps them out of the *test* run and not out of the build |
+| a benchmark that compiles and then **panics in setup** | **yes, since #586** | `Benchmarks run` — `cargo bench --profile ci-release -- --test` |
+| a benchmark **figure** | **no, deliberately** | nothing. `--test` runs each case once and samples nothing; a shared runner's numbers are not comparable to a `tools/benchlock.sh`-serialized workstation's, so CI never produces one |
+
+The second row was the gap, and it had cost twice. `14f69182` asked `random_poly` for 48 distinct
+monomials where 25 exist at N = 2, its own assert fired, and the branch was green through review
+and merge with `main` going red on the push run afterwards. Worse, every commit in such a window is
+**unmeasurable** without cherry-picking the fix onto it, which is how #363's A/B could not be taken
+against the tree it was meant to measure — a red job after a merge is an inconvenience, a
+historical commit whose benchmarks cannot run is a hole in the record.
+
+The job was verified non-vacuous by reinstating that exact defect: `cargo build --all-targets`
+exits **0** with it present and `cargo bench --profile ci-release -- --test` exits **101**, naming
+the assert. So the compile coverage alone would not have caught it.
+
+It costs job-minutes and **no wall clock**: ~8.4 minutes against `Tests (release)`'s 25–27 on the
+same run, so it finishes well inside the critical path. A pull request's job set is now the push
+set apart from one step (`Gröbner engines agree on the slow systems`, still `push`-only), which is
+what makes the 20.7–25.9 figure above the right baseline for a PR run too.
+
 ### Build configuration
 
 `.cargo/config.toml` sets an instruction-set floor of `x86-64-v3` — the Haswell/Excavator feature
