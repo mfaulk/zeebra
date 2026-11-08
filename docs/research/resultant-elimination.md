@@ -1508,7 +1508,7 @@ exactly why this is fixed before a row whose margin is thinner.
 #### The model, and what each term's number is worth
 
 The cost model moved out of the example into **`src/grobner/research/row_cost.rs`**, which is pure
-and has unit tests over the race it exists to prevent: the determinant laws of §6.9 and §5.6 are
+and has unit tests over the race it exists to prevent: the determinant laws of §6.9 and of `structured-sylvester.md` §5.6 are
 there unchanged, and five terms are built on top of them. Every term carries a `TermBasis` and the
 printed budget line prints it, because a budget line that silently covers 15% of a row reads as
 though it covers the row.
@@ -1516,10 +1516,10 @@ though it covers the row.
 | term | law | basis |
 |---|---|---|
 | symbolic build | a **recorded constant per round count** — 2.9 ms at `R = 2`, 419.3 ms at `R = 4` (§6.1), **324.0 s at `R = 6`** (`MILESTONE-COMPETITIVE-ALGEBRA.md` §8.4.2, on the lock, post-#243) | **measured** |
-| determinants | §6.9's dense law or §5.6's Euclidean one, times the measured width penalty | fitted to order 4 374 / 1 458 |
+| determinants | §6.9's dense law or `structured-sylvester.md` §5.6's Euclidean one, times the measured width penalty | fitted to order 4 374 / 1 458 |
 | interpolation | **5.1 ms at `S = 730`** (§6.7) and **31.7 s at `S = 59 050`** (#367), log-log between them, `O(S²)` above | **measured anchors** |
 | off-domain validation | eight **dense** determinants — `off_domain_check` calls `sylvester_determinant_at` whatever `--kernel` says — over `min(8, workers)` | fitted |
-| root finding | a **band**: §9.7.4's doubling sweep, §9.7.2 and §6.1's real resultants as the gcd envelope; §9.7.2's deflation points as the other edge | fitted to degree 65 536 / 59 049 |
+| root finding | a **band**: `graeffe-root-finding.md` §9.7.4's doubling sweep, its §9.7.2 and §6.1's real resultants as the gcd envelope; §9.7.2's deflation points as the other edge | fitted to degree 65 536 / 59 049 |
 
 Three things in that table are the point rather than bookkeeping.
 
@@ -1527,7 +1527,7 @@ Three things in that table are the point rather than bookkeeping.
 get right, because every row at a round count shares the same word degrees — §6.1's two four-round
 rows measure 419.3 ms and 397.7 ms, and §8.4.2's six-round figure is "identical for every six-round
 row". Round counts with **no** measurement return no figure rather than an extrapolation: the growth
-per two rounds is 145x then 772x, which no law covers, and §7.3 predicts a ~1 TB transient at
+per two rounds is 145x then 772x, which no law covers, and `structured-sylvester.md` §7.3 predicts a ~1 TB transient at
 `R = 7`. So `rf4-rp4`, `rf6-rp2` and `rf6-rp4` are refused as **unbounded** — an unmodelled term is
 not a zero term, and a guard that totalled around one would admit a row on the strength of what it
 had not looked at.
@@ -1540,7 +1540,7 @@ therefore a measurement and not a projection; above 59 050 it is an extrapolatio
 one. No new benchmark was needed and none was taken.
 
 **Root finding is a band because its cost is a property of the problem.** Deflation pays
-`(roots + 1)` Graeffe searches (§9.7.1), so it is a bet on the eliminant's base-field root count —
+`(roots + 1)` Graeffe searches (`graeffe-root-finding.md` §9.7.1), so it is a bet on the eliminant's base-field root count —
 `O(1)` on all three registered rows that have one, and **unmeasured on exactly the rows nobody has
 attempted**. The gcd route is one quasi-quadratic pass and does not care. The guard carries both
 edges and refuses on the pessimistic one; the band's width *is* that assumption, and a guard sitting
@@ -1548,7 +1548,7 @@ on its narrow edge would be assuming the thing it cannot check.
 
 The anchor tables are **monotone upper envelopes** — the running maximum of every measurement at or
 below a degree — rather than fits. That is not fussiness: §6.1's real `rf4-rp0` resultant takes
-**3 933.3 ms** at degree 6 561 where §9.7.4's planted degree-8 192 polynomial takes **3 161.2 ms**,
+**3 933.3 ms** at degree 6 561 where `graeffe-root-finding.md` §9.7.4's planted degree-8 192 polynomial takes **3 161.2 ms**,
 so a law fitted through the planted sweep alone under-predicts the row it exists to cost. Between
 anchors the law interpolates in log-log using only the local exponent, which stops a small anchor's
 fixed per-call overhead from being projected forward as a growth rate.

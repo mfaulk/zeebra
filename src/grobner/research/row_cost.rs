@@ -273,7 +273,8 @@ impl ResultantRowCost {
 /// `cico_bivariate`'s measured wall clock by round count, seconds.
 ///
 /// A **recorded constant rather than a model**: the build's cost is set by the round count alone,
-/// because every row at a given round count shares the same word degrees — §6.1 measures 419.3 ms
+/// because every row at a given round count shares the same word degrees — `resultant-elimination.md` §6.1
+/// measures 419.3 ms
 /// and 397.7 ms for the two four-round rows, and `MILESTONE-COMPETITIVE-ALGEBRA.md` §8.4.2's
 /// 5.4 min six-round figure is "identical for every six-round row".
 ///
@@ -285,7 +286,8 @@ impl ResultantRowCost {
 /// pre-#243 one at a different round count.
 ///
 /// Round counts with no measurement return `None` rather than an extrapolation: the build's growth
-/// per two rounds is 145x then 772x, which no law covers, and at seven rounds §7.3 predicts a ~1 TB
+/// per two rounds is 145x then 772x, which no law covers, and at seven rounds
+/// `structured-sylvester.md` §7.3 predicts a ~1 TB
 /// transient from a mechanism that predicted the six-round peak to 0.7%. A number invented for
 /// those rows would be the one thing a guard must not do.
 fn measured_build_seconds(rounds: usize) -> Option<f64> {
@@ -304,15 +306,16 @@ fn build_term(rounds: usize) -> CostTerm {
             stage: "symbolic build",
             seconds,
             basis: TermBasis::Measured,
-            anchor: "recorded constant per round count: 2.9 ms at R=2, 419.3 ms at R=4 (§6.1), \
-                     324.0 s at R=6 (§8.4.2, on-lock, post-#243)",
+            anchor: "recorded constant per round count, resultant-elimination.md 6.1: 2.9 ms at \
+                     R=2, 419.3 ms at R=4, 324.0 s at R=6 (MILESTONE-COMPETITIVE-ALGEBRA.md \
+                     8.4.2, on-lock, post-#243)",
         },
         None => CostTerm {
             stage: "symbolic build",
             seconds: 0.0,
             basis: TermBasis::Unmeasured,
-            anchor:
-                "no build measured at this round count; §7.3 predicts ~1 TB of transient at R=7",
+            anchor: "no build measured at this round count; structured-sylvester.md 7.3 \
+                 predicts ~1 TB of transient at R=7",
         },
     }
 }
@@ -320,7 +323,8 @@ fn build_term(rounds: usize) -> CostTerm {
 /// Lagrange interpolation of the resultant from `samples` evaluations, **measured** anchors.
 ///
 /// Two measurements of the predicted-count Lagrange route, which is the one the example takes:
-/// **5.1 ms at 730 samples** (§6.7) and **31.7 s at 59 050** (#367's authorized `rf4-rp2` run).
+/// **5.1 ms at 730 samples** (`resultant-elimination.md` §6.7) and **31.7 s at 59 050** (#367's
+/// authorized `rf4-rp2` run).
 /// Their implied exponent is **1.99**, which confirms the `O(S²)` the quadratic
 /// `lagrange_interpolate` derives, so that is the exponent used above the larger anchor.
 ///
@@ -334,7 +338,8 @@ fn interpolation_term(samples: usize) -> CostTerm {
         stage: "interpolation",
         seconds,
         basis,
-        anchor: "measured 5.1 ms at S=730 (§6.7) and 31.7 s at S=59 050 (#367); O(S^2) above",
+        anchor: "measured 5.1 ms at S=730 (resultant-elimination.md 6.7) and 31.7 s at S=59 050 \
+                 (#367); O(S^2) above",
     }
 }
 
@@ -359,9 +364,11 @@ fn validation_term(matrix_order: usize, workers: usize) -> CostTerm {
 
 /// Root finding by `roots()` — `gcd(f, x^q − x)` — the band's **pessimistic** edge.
 ///
-/// The anchor table is a monotone upper envelope over three sources: §9.7.4's nine-point doubling
+/// The anchor table is a monotone upper envelope over three sources: `graeffe-root-finding.md`
+/// §9.7.4's nine-point doubling
 /// sweep (256–65 536, one session, one binary, local exponent 1.90–1.97), §9.7.2's four points on
-/// planted polynomials, and §6.1's three **real resultants** from registered rows. The real rows
+/// planted polynomials, and `resultant-elimination.md` §6.1's three **real resultants** from
+/// registered rows. The real rows
 /// are the slowest at their degrees — 3.93 s at 6 561 against the sweep's 3.16 s at 8 192 — which
 /// is why they are in the table and why the table is an envelope rather than a fit: a law through
 /// the planted sweep alone under-predicts the row it exists to cost.
@@ -391,14 +398,17 @@ fn gcd_root_term(degree: usize) -> CostTerm {
         stage: "root finding, gcd route (pessimistic)",
         seconds,
         basis,
-        anchor: "measured envelope over §9.7.4's doubling sweep, §9.7.2 and §6.1's real \
-                 resultants; exponent 1.933 above degree 65 536",
+        anchor:
+            "measured envelope over graeffe-root-finding.md 9.7.4's doubling sweep, its 9.7.2, \
+                 and resultant-elimination.md 6.1's real resultants; exponent 1.933 above degree \
+                 65 536",
     }
 }
 
 /// Root finding by deflate-and-repeat over `graeffe_root`, the band's **optimistic** edge.
 ///
-/// §9.7.2, one pinned core, on the lock. The cost is `(roots + 1)` Graeffe searches, so it is a bet
+/// `graeffe-root-finding.md` §9.7.2, one pinned core, on the lock. The cost is `(roots + 1)`
+/// Graeffe searches, so it is a bet
 /// on the **root count** and not on the degree: against a polynomial with `O(d)` base-field roots
 /// it would lose to a single gcd pass. Every registered row measured so far came in at `O(1)` roots
 /// — 3 at degree 81, 1 at 729, 1 at 59 049 — and this edge assumes that holds. That assumption is
@@ -419,8 +429,8 @@ fn deflation_root_term(degree: usize) -> CostTerm {
         seconds,
         basis,
         anchor:
-            "measured 0.0117–0.5001 s over degrees 729–59 049 (§9.7.2), at the O(1) root count \
-                 every registered row has measured; linear above",
+            "measured 0.0117-0.5001 s over degrees 729-59 049 (graeffe-root-finding.md 9.7.2), at \
+             the O(1) root count every registered row has measured; linear above",
     }
 }
 
