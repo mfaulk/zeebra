@@ -805,7 +805,7 @@ A/B would have two. It prices one change — storing a monomial's total degree i
 that never reads the degree. So `production` is `MonomialOrder::cmp` on the real `Monomial<N>`,
 `summed` is a bench-local transcription of it, and `stored` is that transcription with the degree in
 a field; `summed` against `production` is the fidelity check, and the `lex` rows of `summed` against
-`stored` are the control. See `docs/research/interreduction-cost.md` §3e.
+`stored` are the control. See `docs/research/interreduction-cost.md` §3f.
 
 `sparse_polynomial`'s `mul_dense` arm is separate from `mul` because they are different shapes, not
 just different sizes. `mul` draws monomials independently, which is sparse in the total-degree sense
