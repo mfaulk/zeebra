@@ -864,7 +864,10 @@ interreduction route — and could not say where the bytes were.
 construction and in elimination". The matrix interreduction route honoured the first half only: it
 passed `live_entry_allowance::<F>()` to `MacaulayMatrix::build_within` and then called the
 **unbounded** `reduced_row_echelon`. The batch loop has never had that gap — `reduce_batch_in`
-passes the same allowance into `eliminate`, which checks it after every row operation.
+passes the same allowance into `eliminate`, which checks it after every row operation — and #477
+added `reduced_row_echelon_within` for the batch path while naming this stage in its own doc comment
+as the one still "budgeting at matrix *construction* instead, which bounds what is built rather than
+what elimination then makes of it". This is that sentence closed.
 
 So the budgeted quantity was the matrix as *built*, and the quantity that binds is the matrix as
 *reduced*. The two are not close, and nothing about the shape says how far apart they are:
@@ -1014,7 +1017,11 @@ itself rather than on constants:
 
 ```sh
 cargo nextest run -E 'test(the_allowance_covers_the_elimination) \
-  + test(the_budget_covers_back_substitution) \
   + test(the_entry_capacity_is_counted) \
+  + test(tracking_the_buffers_changes_nothing_else) \
   + test(falls_back_on_its_elimination_working_set)'
 ```
+
+The budget on the second pass itself is #477's
+`test_the_budget_covers_the_back_substitution_pass`, which this section relies on and does not
+duplicate.
