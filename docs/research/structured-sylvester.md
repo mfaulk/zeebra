@@ -2,6 +2,8 @@
 
 **Measured at:** publication bound `5ebb5165`…`c19e8c12` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+§5.6.2's figures are **recorded rather than recovered**: `f8555dd0`…`f9772f90`, the commits the
+`determinant_width` binary was built from.
 
 M25-D deliverable 3. `docs/research/resultant-elimination.md` §6.7 ranks "the determinant's
 per-sample cost" first among what is left and calls it "the only axis left with an asymptotic
@@ -236,6 +238,15 @@ matrix (**17 MB** at `R = 6`) to two coefficient vectors (**~6 kB**), a factor o
 also recover the **31% core-time penalty** measured for running 32-wide — a **hypothesis**, worth one
 measurement after integration.
 
+> **Measured, twice, with opposite verdicts — and the second one is right.** §5.6.0 records a
+> measurement that appeared to refute this, at 3.21x against the dense kernel's 1.32x. §5.6.2 swept
+> the width properly and the penalty is **1.100x at 32 workers, 90.9% parallel efficiency** — equal
+> to a register-only control's, and *lower* than the dense kernel's measured in the same session.
+> **The hypothesis in this paragraph holds.** What the 3.21x was measuring is a term this paragraph
+> does not mention and the cost law did not have: the per-sample **specialization**, `d(d+1)` Horner
+> multiply-adds, which is 2.00x the `n²/2` tabled above and is inside the same timer. The operation
+> counts in the table are the kernel's and are correct; they are not the whole of a sample.
+
 ### 5.3 The specialization trap, closed in `O(1)` per sample
 
 The trap is real as stated: `Res(f(a,·), g(a,·))` is the resultant of the *specialized* pair, whose
@@ -412,31 +423,244 @@ a correction to §5.5:
 #350's own framing and §7, none of this raises the reachable round count: after axis 4 the six-round
 route is 78% root finding, and the row gains ~3× against the stage's ~2 000×.
 
-#### 5.6.0 The parallel hypothesis, falsified
+#### 5.6.0 The parallel hypothesis, falsified — and then the falsification itself was wrong
+
+> **Read §5.6.2 with this section.** The 3.21x below is real arithmetic over two real measurements
+> and it is **not a width penalty**. The two measurements were taken over different *pairs*, and the
+> per-sample cost of the two pairs differs by 3.01x at identical width. Swept in one process the
+> Euclidean kernel's width penalty is **1.100x at 32 workers**, which is the dense kernel's own
+> figure. §5.2's prediction that axis 4 would not contend worse was **right**; what was wrong was
+> the one-term cost law that made it look otherwise.
 
 §5.2 and #350 predicted that axis 4 would **recover** #319's width penalty as well as the exponent,
 because the per-sample working set falls from a 17 MB matrix to two ~6 kB coefficient vectors. The
-authorized `rf4-rp2` row (#367) measured the opposite:
+authorized `rf4-rp2` row (#367) appeared to measure the opposite:
 
 | quantity | Euclidean | dense |
 |---|---:|---:|
-| core-time per determinant, 1 worker | **1.109 ms** | 2.322 s |
-| core-time per determinant, 32 workers | **3.563 ms** | — |
-| **width penalty at 32 workers** | **3.21x** | **1.32x** modelled, 31-44% measured (#319) |
+| core-time per determinant, 1 worker, **synthetic pair** | **1.109 ms** | 2.322 s |
+| core-time per determinant, 32 workers, **the row's pair** | **3.563 ms** | — |
+| the ratio, quoted as a width penalty | **3.21x** | **1.32x** modelled, 31-44% measured (#319) |
 
-So the kernel with the small working set contends **worse** than the one with the large one, and the
-bandwidth story §5.2 told cannot be what dominates. The budget guard had been given the dense
-penalty on the stated grounds that this was conservative; it was optimistic, and under-predicted the
-determinant stage by **2.43x**. Corrected to a measured two-point penalty.
+Read as a width penalty this says that the kernel with the small working set contends **worse** than
+the one with the large one, which is what the row of the table was labelled as saying. The budget
+guard had been given the dense penalty on the stated grounds that this was conservative; it was
+optimistic, and under-predicted the determinant stage by **2.43x**. Corrected to a measured
+two-point penalty in #367, which made the guard right about `rf4-rp2` for the wrong reason.
 
-The candidate mechanism is **allocator contention** rather than bandwidth — `remainder` allocates a
-fresh vector per step, and the sequence is as long as the degree, so one order-1 458 determinant
-makes on the order of a thousand allocations and 32 threads do it at once. **Unmeasured**, and #412
-is the measurement; it also names the fix, which is two reusable buffers swapped per step.
+The candidate mechanism recorded here was **allocator contention** — `remainder` allocates a fresh
+vector per step, and the sequence is as long as the degree, so one order-1 458 determinant makes on
+the order of a thousand allocations and 32 threads do it at once. #412 measured it and **it is not
+that either**. §5.6.2.
 
 Nothing here argues against axis 4: it is 2 094x per determinant at this order and it is what made
-the `rf4-rp2` row affordable. What it argues against is quoting its parallel behaviour from a
-working-set argument.
+the `rf4-rp2` row affordable.
+
+#### 5.6.2 The mechanism, measured: there is no width penalty to explain
+
+**Measured at** `f8555dd0`…`f9772f90`. `examples/determinant_width`, one process per pair,
+`taskset --cpu-list 0-31` on a 64-physical-core Threadripper PRO 5995WX (cpus 0–31 are 32 distinct
+physical cores, so no SMT sibling is shared — ruled out before anything else), under
+`tools/benchlock.sh`, five draws a point, 1 024 samples a draw, `-C target-cpu=x86-64-v3` verified
+present in the build log, `RUSTFLAGS` never set. The ambient one-minute load at **each arm's own
+start** is a column in every table below, and no arm is quoted above 8.
+
+**The method, and why the recorded figure could not have been right.** 3.21x is `3.563 ms` divided
+by `1.109 ms`. Those came from two binaries, two sessions, and — the part nobody had noticed — two
+different polynomial **pairs**. A ratio assembled from two numbers taken apart is not a measurement
+of anything until both ends come out of one process, so `determinant_width` takes every arm against
+one pair and reports each penalty against that run's own one-worker point.
+
+##### The width sweep, on the `rf4-rp2` row's own two polynomials
+
+Not a stand-in: `cico_bivariate` on the registered row, 4.94 min of symbolic build outside every
+timer, which is the pair #367's `3.563 ms` was taken over. Ambient load **2.1–3.8**.
+
+| workers | wall/determinant | core-time/determinant | penalty | **parallel efficiency** | load |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 3.259 ms | **3.259 ms** | 1.000x | **100.0%** | 3.5 |
+| 2 | 1.613 ms | **3.226 ms** | 0.990x | **101.0%** | 3.1 |
+| 4 | 845.7 µs | **3.383 ms** | 1.038x | **96.3%** | 3.1 |
+| 8 | 444.1 µs | **3.552 ms** | 1.090x | **91.7%** | 3.1 |
+| 16 | 222.4 µs | **3.559 ms** | 1.092x | **91.6%** | 3.6 |
+| **32** | **112.0 µs** | **3.584 ms** | **1.100x** | **90.9%** | 3.6 |
+
+**1.100x at 32 workers, 90.9% parallel efficiency**, against the 3.21x on record — and §6.6's
+92–95% for this route on the dense kernel. The penalty is flat from 4 workers on, so **there is no
+width at which anything turns on**, which is the shape the question was asked to find.
+
+**And the 32-worker end of the recorded figure reproduces.** This run's `3.584 ms` against #367's
+`3.563 ms` is **0.6%**. So nothing about #367's measurement was wrong. What was wrong was what it
+was divided by.
+
+| the recorded ratio, re-derived in this session | |
+|---|---:|
+| the row's pair, 32 workers (#367 measured 3.563 ms) | 3.584 ms |
+| the **synthetic** pair, one worker (#350 measured 1.109 ms) | 1.122 ms |
+| their ratio, which is how 3.21x was obtained | **3.19x** |
+| the row's pair, **one worker** — the figure that was never taken | **3.259 ms** |
+| the ratio that is actually a width penalty | **1.100x** |
+
+##### The figure that does not depend on which session you took
+
+A register-only control runs in the same process: a dependent chain of `d²/2` field multiply-adds
+holding two registers, no memory traffic, no allocation. Whatever it shows at width is the floor
+this machine imposes on a batch of that width, and nothing of the kernel's is in it. Three sessions,
+at ambient loads of 2.4–2.8, 4.0–5.3 and 2.1–3.8, and this box's absolute penalty moves with that
+(#319, §6.13) — so what matters is the ratio in the last row:
+
+| order 1 458 | session 1, at 16 | session 2, at 32 | session 3 (the row's pair), at 16 / 32 |
+|---|---:|---:|---:|
+| register-only control | **1.060x** | **1.125x** | **1.096x** / noisy |
+| Euclidean, whole kernel | 1.041x | 1.127x | **1.092x** / **1.100x** |
+| specialization half | 1.029x | 1.115x | 1.101x / **1.109x** |
+| remainder-sequence half | 1.046x | 1.136x | 1.113x / noisy |
+| **kernel ÷ control** | **0.98** | **1.00** | **1.00** |
+
+**The Euclidean kernel's width penalty is the register-only control's, to within 2%, in all three
+sessions.** It pays what this box charges any 32-wide batch and not one percent more. That is a
+stronger statement than any single absolute figure, because it survives the sessions the absolute
+figure does not — and a kernel with memory contention or allocator contention cannot make it, since
+the control has neither.
+
+##### Where the 3.21x actually comes from
+
+One worker, the two pairs, the kernel timed whole and then in its two halves separately:
+
+| at one worker, order 1 458 | **the `rf4-rp2` row's pair** | **the synthetic pair** (degree 1 in `x`) |
+|---|---:|---:|
+| specialize only | **2.209 ms** | 4.70 µs |
+| remainder sequence only | 1.029 ms | 1.095 ms |
+| the two halves summed | 3.238 ms | 1.100 ms |
+| the whole kernel, timed as one | **3.259 ms** | **1.122 ms** |
+
+Three things at once. The halves **sum to the whole to 0.6%**, so the split is an attribution and
+not an estimate. The synthetic pair reproduces the recorded **1.109 ms** anchor at 1.122 ms, 1.2%
+apart — so the old anchor was not wrong, it was measuring something else. And the two pairs differ
+by **2.90x at identical width**, almost all of it in a half the synthetic pair barely has.
+
+`2.90 × 1.100 = 3.19`, against the recorded **3.21x**, which closes to **0.6%**. The figure was a
+pair ratio with a width penalty folded into it, and the width penalty was the small factor.
+
+Two further sessions on a *random* pair of total degree 729 — the row's shape without the symbolic
+build — give the same decomposition at 3.495 / 3.301 ms whole, 2.368 / 2.197 ms specializing and
+1.172 / 1.118 ms in the remainder sequence, summing to the whole within 1.3% and 0.4%. So none of
+this is a property of the particular row.
+
+##### Why the two pairs differ, counted rather than argued
+
+`sylvester_resultant_euclid` specializes the pair at the sample point *inside* the per-determinant
+timer, once per sample:
+
+```rust
+let a: Vec<F> = fc.iter().map(|c| c.eval(&at)).collect();
+let b: Vec<F> = gc.iter().map(|c| c.eval(&at)).collect();
+resultant_from_coefficients(&a, &b)
+```
+
+A CICO row of `R` rounds is a straight-line program of total degree `d = 3^R` in its two free
+inputs, so `fc[j]` has degree `d − j` and specializing both polynomials at one point is
+`2 · Σ_j (d − j) = d(d + 1)` Horner multiply-adds, with `d` half the Sylvester order. The synthetic
+pair is degree **1** in the surviving variable, so the same step is `2(d + 1)` steps. `determinant_width`
+sums `Σ_j deg_x(fc[j]) + Σ_j deg_x(gc[j])` off each pair rather than deriving it:
+
+| order | specialization, counted | remainder sequence, `d²/2` | ratio | specialize, measured, 1 worker | ns/operation |
+|---:|---:|---:|---:|---:|---:|
+| 162 | 6 642 | 3 280 | **2.02x** | 28.62 / 28.58 µs | 4.31 / 4.30 |
+| 486 | 59 292 | 29 524 | **2.01x** | 255.0 / 243.2 µs | 4.30 / 4.10 |
+| 1 458 | 532 170 | 265 720 | **2.00x** | 2.368 / 2.197 / **2.209** ms | 4.45 / 4.13 / **4.15** |
+| 1 458, synthetic | 1 460 | 265 720 | **0.01x** | 4.36 / 4.70 µs | — |
+
+So on a real row the specialization is **twice the remainder sequence it feeds** and about **two
+thirds of the whole determinant**, and on the pair the anchor was taken over it is 0.4% of it. The
+per-operation rate is flat to 8% across a 9x order range and across both sessions — Horner is a
+fixed-stride dependent chain with nothing to amortize — so this term's exponent is the operation
+count's, and the measured local exponent is **2.010** against the remainder sequence's 1.76–1.85.
+
+**That is the mechanism of the recorded 3.21x, in full: a missing term in the cost law, not a
+property of the machine.** 3.01x of it is work the 1.109 ms anchor never did.
+
+##### The dense comparand, in the same session — and it is the *worse* of the two
+
+#412 asked for the dense kernel at the same widths in the same session, so the two penalties are
+compared without the ~20% systematic of #318/#319 between them. Order 1 458, session 2, same binary,
+minutes apart:
+
+| workers | dense penalty | **efficiency** | Euclidean penalty | **efficiency** | load at arm start |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 1.074x | **93.1%** | 1.018x | **98.3%** | 3.6 |
+| 4 | 1.111x | **90.0%** | 1.088x | **91.9%** | 5.7 |
+| 8 | **1.178x** | **84.9%** | **1.118x** | **89.5%** | 7.0 |
+| 16 | *1.172x* | *85.3%* | 1.117x | **89.5%** | 9.9 — **withheld** |
+| 32 | *1.359x* | *73.6%* | — | — | 13.7 — **withheld** |
+
+**At every width the two agree on, the dense kernel's penalty is the larger.** So the recorded
+claim is reversed twice over: the Euclidean kernel does not contend worse than the dense one, it
+contends slightly *less*, which is what §5.2 predicted in the first place.
+
+The 16- and 32-wide dense arms are withheld, and the reason is worth recording because it is a
+hazard for anyone repeating this. At order 1 458 one dense determinant is 2.3 s, so a single arm
+runs for minutes with 32 workers resident — and the one-minute load average *this run itself*
+produces is 13.7 by the 32-wide arm. There is no reading of `/proc/loadavg`, before the arm or
+during it, that separates the measurement from its own footprint at that arm length. The Euclidean
+arms are 0.1–3.5 ms a determinant and never move their own figure; the dense ones cannot be gated
+this way at all. Those two rows are therefore the dense kernel measured against a load it made, and
+they are in the table in italics only so that nobody re-derives them and thinks they are new.
+
+##### The allocator hypothesis, refuted four ways
+
+1. **Allocation calls, counted.** A wrapping global allocator at one worker: the Euclidean kernel
+   makes **1 391** allocation calls per determinant at order 1 458, the dense kernel **666**. So the
+   Euclidean kernel makes **2.1x the allocator calls** and its width penalty is the **lower** of the
+   two — 1.100x against the dense kernel's 1.178x at 8 workers in the same session.
+2. **The half the allocations are in does not contend more than the half they are not.** Every
+   per-step allocation is in the remainder sequence — ~730 of them a determinant — and the
+   specialization makes **two**. Timed apart at order 1 458 they are **1.113x and 1.101x** at 16
+   workers on the row's own pair, and **1.046x / 1.029x** and **1.136x / 1.115x** in the other two
+   sessions. If allocation *rate* were the mechanism these two would separate by a factor of
+   hundreds; they differ by 1–2%.
+3. **The whole kernel pays exactly what a kernel with no allocations at all pays.** The
+   register-only control allocates nothing and shows the same penalty to within 2% in both
+   sessions. There is no residual left for an allocator to be responsible for.
+4. **The penalty shrinks as the kernel grows.** Euclidean at 32 workers: **1.370 / 1.393x at order
+   162**, **1.114 / 1.143x at 486**, **1.100x at 1 458**. Contention per unit work rises with the
+   working set and with the allocation rate; this falls, which is fixed per-batch thread-spawn
+   overhead failing to amortize on the short arms. At order 162 one determinant is 51 µs and
+   `std::thread::scope` spawning 32 threads is a visible fraction of it; at 1 458 it is 3.5 ms and
+   it is not. The clearest case is the specialization half on the *synthetic* pair, where one
+   sample is 4.4 µs: it reports 5.2–5.5x at 32 workers, which is the thread-spawn floor and nothing
+   about the kernel — a useful calibration of how small an arm has to be before this table lies.
+
+So `remainder`'s per-step `a.to_vec()` is still waste worth removing, and it is **not** what #412
+was looking for. **#599**, on its own terms rather than sold as a contention fix.
+
+##### What this changes in the guard
+
+`row_cost::euclidean_core_ms` was one term and is now two, and the correction is not cosmetic:
+
+| at order 1 458 | old law | new law | measured |
+|---|---:|---:|---:|
+| 1 worker | 1.109 ms | **3.540 ms** | **3.259–3.495 ms** over three sessions |
+| 32 workers | 3.560 ms | **3.894 ms** | **3.563 ms** (#367), **3.584 ms** (re-measured) |
+| the `rf4-rp2` determinant stage, 32 workers | 6.57 s | **7.18 s** | **6.574 s** |
+
+The old law was right at `(1 458, 32)` **because two wrong factors cancelled** — a 3x-low anchor
+times a 3x-high penalty — and wrong everywhere else: 3.2x optimistic at one worker, and 3.4x
+pessimistic past 32 workers where it extrapolated a contention slope that does not exist. It also
+mis-ranked the stage's own composition, which matters for what to optimize next: at seven rounds the
+new law puts **70% of the determinant cost in the specialization**, because that term is exactly
+quadratic in the order where the remainder sequence is `order^1.8452`. The new law is **9%
+pessimistic** on the one determinant stage anyone has measured, which is the side of it a budget
+guard belongs on.
+
+##### Not claimed
+
+That the specialization is necessary work. It is a multipoint evaluation of `2(d + 1)` **fixed**
+univariate polynomials at `S` **fixed** points, computed one Horner pass per polynomial per point —
+and on the NTT route all `2^k` evaluations of one polynomial are a single forward transform. That is
+**#598**, with its own correctness surface — §5.3's specialization trap is applied per sample on
+the specialized coefficients, so a batched route has to keep that per-sample case analysis — and
+it is filed rather than done here.
 
 #### 5.6.1 The specialization trap, closed twice and cross-checked
 
