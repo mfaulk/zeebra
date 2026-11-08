@@ -74,7 +74,8 @@ pub mod zeebra;
 
 #[cfg(feature = "external-runners")]
 pub use board::{
-    BoardError, CompetitiveBoard, CompetitiveRecord, Outcome, Speedup, COMPETITIVE_HISTORY_CONTRACT,
+    BoardError, CompetitiveBoard, CompetitiveRecord, EngineRatio, Outcome, Speedup,
+    COMPETITIVE_HISTORY_CONTRACT,
 };
 #[cfg(feature = "external-runners")]
 pub use contract::{

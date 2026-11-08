@@ -626,3 +626,150 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.22x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 
+## Engine-internal speedups over Zeebra
+
+**A different statistic from the table above, and not a correction to it.** Each operand here is the library's **own reported stage time** for the task, so process startup, parsing and output are excluded from both sides. It is therefore **not an end-to-end cost** and may not be quoted as one: what a caller pays is the wall-clock table.
+
+It exists because the startup-floor guard above correctly disqualifies every classical row this board holds — Singular's wall on everything up to `katsura-6` is its own `exec` — while the data for an engine comparison is already recorded. The floor guard is **not** relaxed; there is no startup in either operand of this ratio, so the condition that replaces it is one of **resolution**: a stage printed in whole milliseconds says nothing about a figure of one or two, and a reported figure must be at least 5x its own library's granularity. Each published figure carries the quantization uncertainty the coarser operand puts on it.
+
+Stage selection per library, and what is excluded from each, is `engine_internal_time`; the granularities are `stage_resolution`. A library that reports no usable stage contributes no row, which is visible as an em dash in the measurement table's `stages` column.
+
+**134 pairs**: 0 refused for want of a recorded ideal equivalence, 20 refused on stage resolution, 0 with no checked invariant, 114 publishable as an engine-internal comparison.
+
+| problem | task | library | zeebra engine | their engine | ratio | provenance | checked |
+|---|---|---|---:|---:|---:|---|---|
+| `katsura-5` | lex-basis-by-conversion | singular | 1.1 ms | 1.0 ms | 1.14x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `katsura-6` | reduced-grobner-basis | singular | 3.7 ms | 1.0 ms | 3.68x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `katsura-6` | lex-basis-by-conversion | singular | 3.9 ms | 2.0 ms | 1.94x ±25% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 2.0x its own stage resolution, so the figure carries ±25%** |
+| `katsura-7` | reduced-grobner-basis | singular | 25.8 ms | 10.0 ms | 2.58x ±5% | comparand-file | 3 invariants agreed |
+| `katsura-7` | lex-basis-by-conversion | singular | 28.9 ms | 18.0 ms | 1.61x ±3% | comparand-file | 3 invariants agreed |
+| `cyclic-5` | reduced-grobner-basis | singular | 1.5 ms | 1.0 ms | 1.51x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `cyclic-5` | lex-basis-by-conversion | singular | 2.3 ms | 2.0 ms | 1.17x ±25% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 2.0x its own stage resolution, so the figure carries ±25%** |
+| `cyclic-6` | reduced-grobner-basis | singular | 13.1 ms | 7.0 ms | 1.88x ±7% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | lex-basis-by-conversion | singular | 15.3 ms | 14.0 ms | 1.09x ±4% | comparand-file | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | singular | 22.9 ms | 14.0 ms | 1.64x ±4% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | lex-basis-by-conversion | singular | 27.1 ms | 21.0 ms | 1.29x ±2% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | singular | 28.71 s | 6.84 s | 4.20x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | singular | 29.41 s | 8.14 s | 3.61x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.7 ms | 1.0 ms | 0.67x ±50% | known-solution | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 19.2 ms | 120.0 ms | 0.16x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | singular | 108.5 ms | 46.0 ms | 2.36x ±1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | singular | 111.0 ms | 62.0 ms | 1.79x ±1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 306.0 ms | 156.0 ms | 1.96x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 311.6 ms | 187.0 ms | 1.67x ±<1% | known-solution | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.8 ms | 0.23x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 1.20x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.2 ms | 0.2 ms | 1.07x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-5` | reduced-grobner-basis | singular | 0.8 ms | 1.0 ms | 0.81x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.8 ms | 0.8 ms | 0.96x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-5` | reduced-grobner-basis | sagebrush | 0.8 ms | 0.4 ms | 2.19x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-5` | lex-basis-by-conversion | singular | 0.9 ms | 1.0 ms | 0.92x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `katsura-5` | lex-basis-by-conversion | sagebrush | 0.9 ms | 0.5 ms | 1.80x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-6` | reduced-grobner-basis | singular | 3.9 ms | 1.0 ms | 3.86x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.9 ms | 1.1 ms | 3.64x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-6` | reduced-grobner-basis | sagebrush | 3.9 ms | 1.0 ms | 3.75x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-6` | lex-basis-by-conversion | singular | 4.0 ms | 2.0 ms | 2.00x ±25% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 2.0x its own stage resolution, so the figure carries ±25%** |
+| `katsura-6` | lex-basis-by-conversion | sagebrush | 4.0 ms | 1.3 ms | 3.03x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-7` | reduced-grobner-basis | singular | 27.2 ms | 10.0 ms | 2.72x ±5% | comparand-file | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | groebner.jl | 27.2 ms | 1.7 ms | 15.89x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | sagebrush | 27.2 ms | 3.1 ms | 8.67x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-7` | lex-basis-by-conversion | singular | 29.7 ms | 18.0 ms | 1.65x ±3% | comparand-file | 3 invariants agreed |
+| `katsura-7` | lex-basis-by-conversion | sagebrush | 29.7 ms | 4.9 ms | 6.05x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.8 ms | 0.20x ±<1% | comparand-file | 2 invariants agreed |
+| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 0.93x ±<1% | comparand-file | 2 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-5` | reduced-grobner-basis | singular | 1.8 ms | 1.0 ms | 1.77x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.8 ms | 1.0 ms | 1.77x ±<1% | comparand-file | 3 invariants agreed |
+| `cyclic-5` | reduced-grobner-basis | sagebrush | 1.8 ms | 0.7 ms | 2.46x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-5` | lex-basis-by-conversion | sagebrush | 2.4 ms | 1.2 ms | 1.89x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-6` | reduced-grobner-basis | singular | 13.2 ms | 9.0 ms | 1.47x ±6% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | groebner.jl | 13.2 ms | 2.1 ms | 6.20x ±<1% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | sagebrush | 13.2 ms | 3.8 ms | 3.45x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-6` | lex-basis-by-conversion | singular | 15.8 ms | 15.0 ms | 1.06x ±3% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | lex-basis-by-conversion | sagebrush | 15.8 ms | 6.4 ms | 2.46x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-6` | reduced-grobner-basis | singular | 25.8 ms | 15.0 ms | 1.72x ±3% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | groebner.jl | 25.8 ms | 2.4 ms | 10.97x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | sagebrush | 25.8 ms | 4.8 ms | 5.40x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-6` | lex-basis-by-conversion | singular | 27.9 ms | 20.0 ms | 1.40x ±2% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | lex-basis-by-conversion | sagebrush | 27.9 ms | 5.3 ms | 5.22x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.01 s | 6.88 s | 4.22x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.01 s | 83.4 ms | 347.83x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.01 s | 311.7 ms | 93.08x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 29.45 s | 8.22 s | 3.58x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 29.45 s | 390.8 ms | 75.36x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.8 ms | 0.08x ±1% | known-solution | 3 invariants agreed |
+| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.1 ms | 0.1 ms | 0.52x ±1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.6 ms | 1.0 ms | 0.59x ±50% | known-solution | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.6 ms | 0.6 ms | 0.98x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.7 ms | 0.16x ±<1% | known-solution | 3 invariants agreed |
+| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.1 ms | 0.2 ms | 0.57x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 28.4 ms | 112.0 ms | 0.25x ±<1% | known-solution | 3 invariants agreed |
+| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 28.4 ms | 27.7 ms | 1.03x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.7 ms | 0.27x ±<1% | known-solution | 3 invariants agreed |
+| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 1.31x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | groebner.jl | 0.7 ms | 0.8 ms | 0.78x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | sagebrush | 0.7 ms | 0.4 ms | 1.58x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | singular | 0.8 ms | 1.0 ms | 0.76x ±50% | known-solution | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | sagebrush | 0.8 ms | 0.4 ms | 2.00x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | singular | 113.5 ms | 41.0 ms | 2.77x ±1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | groebner.jl | 113.5 ms | 3.4 ms | 33.33x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | sagebrush | 113.5 ms | 9.3 ms | 12.15x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | singular | 113.1 ms | 56.0 ms | 2.02x ±1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | sagebrush | 113.1 ms | 10.3 ms | 11.02x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 292.8 ms | 151.0 ms | 1.94x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | groebner.jl | 292.8 ms | 7.6 ms | 38.43x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | sagebrush | 292.8 ms | 20.4 ms | 14.38x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 297.6 ms | 170.0 ms | 1.75x ±<1% | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | sagebrush | 297.6 ms | 23.1 ms | 12.88x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `anemoi64-cico-n1-fcico` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.8 ms | 0.07x ±1% | sole-comparand (Groebner.jl) | 3 invariants agreed; **NOT CORROBORATED: Groebner.jl is the only external engine here — 2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's 2^31, so Groebner.jl is the only external engine that reaches it** |
+| `anemoi64-cico-n2-fcico` | reduced-grobner-basis | groebner.jl | 0.6 ms | 1.0 ms | 0.64x ±<1% | sole-comparand (Groebner.jl) | 3 invariants agreed; **NOT CORROBORATED: Groebner.jl is the only external engine here — 2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's 2^31, so Groebner.jl is the only external engine that reaches it** |
+| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.9 ms | 0.23x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 1.10x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.3 ms | 0.3 ms | 0.81x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.8 ms | 1.0 ms | 0.83x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-5` | reduced-grobner-basis | sagebrush | 0.8 ms | 0.3 ms | 2.44x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-5` | lex-basis-by-conversion | singular | 1.0 ms | 1.0 ms | 1.00x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `katsura-5` | lex-basis-by-conversion | sagebrush | 1.0 ms | 0.6 ms | 1.71x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-6` | reduced-grobner-basis | singular | 3.6 ms | 2.0 ms | 1.79x ±25% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 2.0x its own stage resolution, so the figure carries ±25%** |
+| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.6 ms | 1.1 ms | 3.21x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-6` | reduced-grobner-basis | sagebrush | 3.6 ms | 1.1 ms | 3.12x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-6` | lex-basis-by-conversion | singular | 4.0 ms | 2.0 ms | 1.99x ±25% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 2.0x its own stage resolution, so the figure carries ±25%** |
+| `katsura-6` | lex-basis-by-conversion | sagebrush | 4.0 ms | 1.5 ms | 2.66x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-7` | reduced-grobner-basis | singular | 26.2 ms | 8.0 ms | 3.27x ±6% | comparand-file | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | groebner.jl | 26.2 ms | 1.8 ms | 14.89x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | sagebrush | 26.2 ms | 3.1 ms | 8.34x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-7` | lex-basis-by-conversion | singular | 28.0 ms | 15.0 ms | 1.87x ±3% | comparand-file | 3 invariants agreed |
+| `katsura-7` | lex-basis-by-conversion | sagebrush | 28.0 ms | 4.6 ms | 6.07x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.9 ms | 0.18x ±<1% | comparand-file | 2 invariants agreed |
+| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 1.00x ±<1% | comparand-file | 2 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-5` | reduced-grobner-basis | singular | 1.7 ms | 1.0 ms | 1.66x ±50% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.7 ms | 1.0 ms | 1.59x ±<1% | comparand-file | 3 invariants agreed |
+| `cyclic-5` | reduced-grobner-basis | sagebrush | 1.7 ms | 0.7 ms | 2.47x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-5` | lex-basis-by-conversion | singular | 2.1 ms | 2.0 ms | 1.05x ±25% | comparand-file | **NOT A RESOLVED COMPARISON: an operand is 2.0x its own stage resolution, so the figure carries ±25%** |
+| `cyclic-5` | lex-basis-by-conversion | sagebrush | 2.1 ms | 1.2 ms | 1.70x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-6` | reduced-grobner-basis | singular | 13.0 ms | 7.0 ms | 1.86x ±7% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | groebner.jl | 13.0 ms | 2.1 ms | 6.13x ±<1% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | sagebrush | 13.0 ms | 3.9 ms | 3.35x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `cyclic-6` | lex-basis-by-conversion | singular | 15.1 ms | 13.0 ms | 1.16x ±4% | comparand-file | 3 invariants agreed |
+| `cyclic-6` | lex-basis-by-conversion | sagebrush | 15.1 ms | 6.3 ms | 2.41x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-6` | reduced-grobner-basis | singular | 29.4 ms | 13.0 ms | 2.26x ±4% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | groebner.jl | 29.4 ms | 2.6 ms | 11.42x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | sagebrush | 29.4 ms | 4.5 ms | 6.49x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-6` | lex-basis-by-conversion | singular | 29.4 ms | 20.0 ms | 1.47x ±2% | live-oracle | 3 invariants agreed |
+| `mq-random-6` | lex-basis-by-conversion | sagebrush | 29.4 ms | 5.0 ms | 5.83x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 28.69 s | 6.94 s | 4.13x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 28.69 s | 84.8 ms | 338.23x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 28.69 s | 296.5 ms | 96.76x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 30.95 s | 7.92 s | 3.91x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 30.95 s | 382.1 ms | 81.01x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.9 ms | 0.08x ±1% | known-solution | 3 invariants agreed |
+| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.1 ms | 0.1 ms | 0.64x ±1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.6 ms | 1.0 ms | 0.55x ±50% | known-solution | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.6 ms | 0.6 ms | 0.86x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.1 ms | 0.9 ms | 0.16x ±<1% | known-solution | 3 invariants agreed |
+| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.1 ms | 0.1 ms | 0.97x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 17.5 ms | 121.0 ms | 0.14x ±<1% | known-solution | 3 invariants agreed |
+| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 17.5 ms | 30.5 ms | 0.57x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-14` | reduced-grobner-basis | singular | 0.2 ms | 1.0 ms | 0.20x ±50% | known-solution | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
+| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.9 ms | 0.22x ±<1% | known-solution | 3 invariants agreed |
+| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 0.93x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+
