@@ -647,8 +647,9 @@ pub fn determinant_core_ms(matrix_order: usize, workers: usize) -> f64 {
 /// [`EUCLID_REMAINDER_MS_AT_1458`] scaled by [`EUCLID_EXPONENT`]. Their sum times this kernel's
 /// own [`euclidean_width_penalty`].
 ///
-/// On a CICO row at order 1 458 that is `2.368 + 1.172 = 3.540 ms` against **3.533 ms** measured on
-/// the `rf4-rp2` pair at one worker, and the two halves sum to the whole to 1.3% when timed apart.
+/// On a CICO row at order 1 458 that is `2.368 + 1.172 = 3.540 ms` against **3.259–3.495 ms**
+/// measured at one worker over three sessions, and the two halves sum to the whole to 0.6% when
+/// timed apart.
 /// On a row the specialization is the *larger* half, and because it is exactly quadratic where the
 /// remainder sequence is `order^1.8452`, its share grows with the round count: ~67% at six rounds
 /// and ~70% at seven.
@@ -677,24 +678,31 @@ pub fn euclidean_core_ms(matrix_order: usize, workers: usize) -> f64 {
 
 /// The Euclidean kernel's core-time penalty for running at `workers` workers, **measured**.
 ///
-/// **1.049x at 32 workers — 95.3% parallel efficiency**, swept over 1 / 2 / 4 / 8 / 16 / 32 in one
-/// process against one row-shaped pair at order 1 458, on the lock, at an ambient one-minute load of
-/// 2.4–4.2. Interpolated linearly in `log2(workers)` as [`width_penalty`] does for the dense kernel
-/// and extrapolated at the same slope beyond 32.
+/// **1.100x at 32 workers — 90.9% parallel efficiency**, swept over 1 / 2 / 4 / 8 / 16 / 32 in one
+/// process against the registered `rf4-rp2` row's **own two polynomials**, on the lock, at an
+/// ambient one-minute load of 2.1–3.8. Interpolated linearly in `log2(workers)` as
+/// [`width_penalty`] does for the dense kernel and extrapolated at the same slope beyond 32. Two
+/// further sessions on a random pair of the same shape gave 1.049x and 1.127x; the largest is
+/// taken.
 ///
 /// This replaces a **3.21x** that was not a width penalty at all. That figure was `3.563 ms` from a
 /// 32-worker row divided by `1.109 ms` from a one-worker synthetic pair — two binaries, two
 /// sessions, and two pairs whose per-sample cost differs by 3.01x at *identical* width, which is
 /// the term [`specialization_operations`] now carries.
 ///
-/// So axis 4 does not contend worse than the dense kernel. At order 1 458 and 32 workers the
-/// Euclidean kernel is 1.049x and the dense one 1.058–1.063x (#319 §6.13) — the same, and both of
-/// them near the 1.060x a register-only control shows, which is the floor the machine imposes.
-/// The penalty is also **larger at smaller orders** — 1.370x at order 162, 1.114x at 486, 1.049x at
+/// So axis 4 does not contend worse than the dense kernel. Measured in the same session, same
+/// binary, minutes apart, the **dense** kernel is 1.178x at 8 workers where this one is 1.090x, so
+/// the Euclidean kernel contends slightly *less*. Both sit on the 1.096–1.125x a **register-only**
+/// control shows — a dependent chain of field multiply-adds holding two registers, no memory and no
+/// allocation — which is the floor this machine imposes on any batch of that width. The kernel
+/// tracks that control to within 2% across three sessions at three different ambient loads, and a
+/// kernel with memory or allocator contention cannot do that.
+///
+/// The penalty is also **larger at smaller orders** — 1.370x at order 162, 1.114x at 486, 1.100x at
 /// 1 458 — which is fixed per-batch thread-spawn overhead failing to amortize, the opposite shape
 /// from contention.
 pub fn euclidean_width_penalty(workers: usize) -> f64 {
-    const PER_DOUBLING: f64 = (1.049 - 1.0) / 5.0;
+    const PER_DOUBLING: f64 = (1.100 - 1.0) / 5.0;
     1.0 + PER_DOUBLING * (workers.max(1) as f64).log2()
 }
 
@@ -919,8 +927,10 @@ mod tests {
     /// anchor was 3x below the thing it was costing, and the 3.21x "width penalty" was what hid it.
     #[test]
     fn the_euclidean_law_at_one_worker_covers_a_row_pair_determinant() {
-        // `determinant_width --pair row`, order 1 458, one pinned core, on the lock: 3.533 ms.
-        const MEASURED_MS: f64 = 3.533;
+        // `determinant_width`, order 1 458, one worker, on the lock, over a pair of the shape a
+        // CICO row has: 3.495 ms, the largest of three sessions. The registered `rf4-rp2` row's
+        // own pair gave 3.259 ms in the quietest of them.
+        const MEASURED_MS: f64 = 3.495;
         let predicted = euclidean_core_ms(1_458, 1);
         assert!(
             predicted >= MEASURED_MS,
@@ -932,14 +942,15 @@ mod tests {
     /// The Euclidean width penalty does not exceed what the swept curve measured.
     ///
     /// The 3.21x the law carried was never a width penalty: it was the ratio of two *pairs*, taken
-    /// at the same width in two different sessions. Swept in one process the penalty is 1.049x at
-    /// 32 workers — 95.3% parallel efficiency, which is the dense kernel's own figure.
+    /// at the same width in two different sessions. Swept in one process over the `rf4-rp2` row's
+    /// own pair the penalty is 1.100x at 32 workers — 90.9% parallel efficiency, and lower than the
+    /// dense kernel's 1.178x measured at 8 workers in the same session.
     #[test]
     fn the_euclidean_width_penalty_is_the_swept_one() {
         let at_32 = euclidean_width_penalty(32);
         assert!(
-            (1.0..=1.10).contains(&at_32),
-            "the penalty at 32 workers is {at_32}x against a measured 1.049x"
+            (1.0..=1.15).contains(&at_32),
+            "the penalty at 32 workers is {at_32}x against a measured 1.100x"
         );
         assert!(
             euclidean_width_penalty(1) == 1.0,
