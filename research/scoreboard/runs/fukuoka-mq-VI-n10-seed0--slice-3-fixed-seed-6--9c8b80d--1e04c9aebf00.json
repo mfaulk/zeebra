@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "challenge": "fukuoka-mq-VI-n10-seed0",
+  "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+  "class": "official",
+  "formulation": "slice(3 fixed, seed 6)",
+  "transformations": [
+    "specialize variables 7..10 at seed 6"
+  ],
+  "outcome": "verified_witness",
+  "significance": "reproduction of a challenge solved externally on publication",
+  "verification": "evaluated against the published coefficient vectors; the published answer starts [5, 7, 14, 25]",
+  "elapsed_nanos": 592397759,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 100240,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 10,
+        "equations": 10
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 582097365,
+      "estimated_peak_bytes": 4661120,
+      "detail": {
+        "max_matrix_rows": 4980,
+        "max_matrix_columns": 5102,
+        "max_pair_degree": 9,
+        "pairs_considered": 337,
+        "pairs_reduced": 337,
+        "elements_added": 65
+      }
+    },
+    {
+      "stage": "conversion",
+      "elapsed_nanos": 9866061,
+      "estimated_peak_bytes": 881568,
+      "detail": {
+        "quotient_dimension": 128
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 313243,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "lex_basis_elements": 10
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 20850,
+      "estimated_peak_bytes": null,
+      "detail": {}
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 9,
+    "highest_completed_degree": 9,
+    "max_matrix_rows": 4980,
+    "max_matrix_columns": 5102,
+    "peak_live_nonzeros": 288769,
+    "peak_estimated_bytes": 4661120,
+    "pairs_reduced": 337,
+    "elements_added": 65,
+    "quotient_dimension": 128
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "9c8b80d",
+    "base_commit": "9c8b80d",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+}

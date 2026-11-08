@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "challenge": "fukuoka-mq-VI-n10-seed0",
+  "challenge_digest": "2558f4bccd7d595b642c58c81f697156c7571c9faa9987767764da0a6376eefe",
+  "class": "official",
+  "formulation": "campaign over 8 slices",
+  "transformations": [
+    "8 slices, each fixing 3 of 10 variables at a seeded value"
+  ],
+  "outcome": "verified_witness",
+  "significance": "reproduction of a challenge solved externally on publication",
+  "verification": "every witness evaluated against the original published coefficient vectors",
+  "elapsed_nanos": 4668269703,
+  "stages": [
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 4668269703,
+      "estimated_peak_bytes": null,
+      "detail": {}
+    }
+  ],
+  "grobner_frontier": null,
+  "campaign": {
+    "trials": 8,
+    "stopped_at_limit": 0,
+    "decided": 8,
+    "witnesses": 6,
+    "fixed_variables": 3,
+    "total_nanos": 4668269703,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "work_per_witness": {
+      "nanos": 4668269703,
+      "witnesses": 6
+    },
+    "success_rate_basis_points": {
+      "low": 4093,
+      "high": 9285,
+      "method": "wilson-95"
+    }
+  },
+  "environment": {
+    "commit": "9c8b80d",
+    "base_commit": "9c8b80d",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 300 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "tools/scoreboard.sh mq fukuoka-mq-VI-n10-seed0 --seeds 8"
+}

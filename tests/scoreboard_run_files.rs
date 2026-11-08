@@ -11,9 +11,9 @@
 //! added to it has to be covered without anyone remembering to list it, which is the property
 //! `include_str!` cannot have.
 
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{collections::BTreeSet, fs, path::PathBuf};
 
-use zeebra::grobner::research::Json;
+use zeebra::grobner::research::{registry, Json, RunRecord, Scoreboard};
 
 fn runs_directory() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("research/scoreboard/runs")
@@ -88,97 +88,78 @@ fn test_every_committed_run_file_carries_a_resolvable_stamp() {
     );
 }
 
-/// A run file and the history record it mirrors agree on the provenance stamp.
+/// Every run file is named by the record it holds, and every retained run has one — #540.
 ///
-/// The invariant #550 broke in the half that was fixed: repairing one copy and not the other leaves
-/// the board internally inconsistent, and the history test — the only one there was — passes on it.
-/// Matched on the file stem, which is `RunRecord::run_file_stem`, so a stem shared by two runs is
-/// satisfied by agreeing with *either*: that ambiguity is #540's subject and this test must not
-/// pretend it is resolved.
+/// This replaces a stamp-by-stamp comparison that had to key on
+/// `challenge--formulation--commit` and therefore could not distinguish two runs of one problem.
+/// It subsumes it: the stem carries a digest over the whole record, so a file whose contents
+/// disagree with its history row — #550's half-landing, where the history got a resolvable stamp
+/// and the file kept a dangling one — is named inconsistently with both and shows up below as an
+/// orphan.
 #[test]
-fn test_a_run_file_and_the_history_agree_on_the_stamp() {
-    let text = fs::read_to_string(history_path()).expect("the committed history is readable");
-    let history = Json::parse(&text).expect("the committed history parses");
-    let runs = history
-        .get("runs")
-        .and_then(|runs| match runs {
-            Json::Array(items) => Some(items),
-            _ => None,
-        })
-        .expect("the history holds a runs array");
-
-    // Stem -> every stamp the history records under it. A Vec because two runs legitimately share
-    // a stem (#540), and collapsing them would make the comparison below depend on which came
-    // last in the file.
-    let mut by_stem: BTreeMap<String, Vec<(String, String, String)>> = BTreeMap::new();
-    for run in runs {
-        let Some(environment) = run.get("environment") else {
-            continue;
-        };
-        let challenge = run
+fn test_every_run_file_is_named_by_the_record_it_holds() {
+    let registry = registry();
+    let mut checked = 0usize;
+    for (name, value) in run_files() {
+        let challenge = value
             .get("challenge")
             .and_then(Json::as_str)
             .expect("every record names its challenge");
-        let formulation = run
-            .get("formulation")
-            .and_then(Json::as_str)
-            .expect("every record names its formulation");
-        let commit = environment
-            .get("commit")
-            .and_then(Json::as_str)
-            .unwrap_or_default();
-        by_stem
-            .entry(file_stem(challenge, formulation, commit))
-            .or_default()
-            .push(stamp(environment));
+        let manifest = registry
+            .iter()
+            .find(|candidate| candidate.id == challenge)
+            .unwrap_or_else(|| panic!("{name} names an unregistered challenge {challenge:?}"));
+        let run = RunRecord::from_json(&value, manifest)
+            .unwrap_or_else(|error| panic!("{name} does not parse: {error}"));
+        assert_eq!(
+            name,
+            format!("{}.json", run.run_file_stem()),
+            "a run file must be named by the record it holds"
+        );
+        checked += 1;
     }
-
-    let mut disagreements: Vec<String> = Vec::new();
-    let mut matched = 0usize;
-    for (name, value) in run_files() {
-        let Some(environment) = value.get("environment") else {
-            continue;
-        };
-        let stem = name.trim_end_matches(".json");
-        let Some(candidates) = by_stem.get(stem) else {
-            // A run file with no history entry is #540's other direction and not this test's
-            // subject; `test_the_committed_run_files_have_no_collisions` is where that lives.
-            continue;
-        };
-        matched += 1;
-        let here = stamp(environment);
-        if !candidates.contains(&here) {
-            disagreements.push(format!(
-                "{name}: file has {here:?}, history has {candidates:?}"
-            ));
-        }
-    }
-
     assert!(
-        matched > 0,
-        "no run file matched a history stem, so the stem derivation below is wrong and this test \
-         asserts nothing"
-    );
-    assert!(
-        disagreements.is_empty(),
-        "{} run files disagree with the history on their stamp: {:#?}",
-        disagreements.len(),
-        disagreements
+        checked > 0,
+        "no run files were read, so this asserts nothing"
     );
 }
 
-/// `RunRecord::run_file_stem`'s slugging, restated over the text.
+/// The run directory is exactly the retained history: no run without a file, no file without a run.
 ///
-/// Duplicated rather than called because the function takes a parsed `RunRecord`, which needs the
-/// registry and so would make this test fail for a record whose challenge was redefined — a
-/// different defect from the one being checked. Kept in step by
-/// `test_a_run_file_and_the_history_agree_on_the_stamp`'s `matched > 0` assertion, which fails
-/// loudly if the two ever diverge.
-fn file_stem(challenge: &str, formulation: &str, commit: &str) -> String {
-    format!(
-        "{}--{}--{}",
-        challenge,
-        formulation.replace(' ', "-"),
-        commit
-    )
+/// Before #540 both sets numbered 89 and were **not the same set** — sixteen retained runs shared a
+/// stem with another and so had no file of their own, while seven files carried names an earlier
+/// slug rule had produced that no current stem matched. A citation that resolves to nothing is the
+/// defect `CostRow::from_run`'s `source` exists not to have.
+#[test]
+fn test_the_run_directory_is_exactly_the_retained_history() {
+    let text = fs::read_to_string(history_path()).expect("the committed history is readable");
+    let history = Json::parse(&text).expect("the committed history parses");
+    let board = Scoreboard::load(&history, &registry()).expect("every retained run is registered");
+
+    let expected: BTreeSet<String> = board
+        .runs()
+        .iter()
+        .map(|run| format!("{}.json", run.run_file_stem()))
+        .collect();
+    let actual: BTreeSet<String> = run_files().into_iter().map(|(name, _)| name).collect();
+
+    let missing: Vec<&String> = expected.difference(&actual).collect();
+    let orphaned: Vec<&String> = actual.difference(&expected).collect();
+    assert!(
+        missing.is_empty(),
+        "{} retained runs have no record file: {:#?}",
+        missing.len(),
+        missing
+    );
+    assert!(
+        orphaned.is_empty(),
+        "{} record files are a record of nothing: {:#?}",
+        orphaned.len(),
+        orphaned
+    );
+    assert_eq!(
+        actual.len(),
+        board.runs().len(),
+        "one file per retained run, so every run is addressable"
+    );
 }

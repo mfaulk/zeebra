@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf2-rp0",
+  "challenge_digest": "56ccc99d85e099ce212311850170489f95b86495dc36d3823cdc9f14f24f7dad",
+  "class": "faithful-reduction",
+  "formulation": "resultant, slice(12 fixed, seed 1)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 1",
+    "evaluate the 32 S-box variables away: two bivariate polynomials of degree 9",
+    "eliminate the second unknown by a Sylvester resultant"
+  ],
+  "outcome": "verified_witness",
+  "significance": "witness for a reduction of poseidon31-cico-rf6-rp8; says nothing about it",
+  "verification": "3 candidates checked by running permutation_plus_linear; 3 verified",
+  "elapsed_nanos": 51858487,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 2796634,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "bivariate_degree": 9,
+        "terms": 55
+      }
+    },
+    {
+      "stage": "elimination",
+      "elapsed_nanos": 31069690,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "resultant_degree": 81,
+        "bezout_bound": 81
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 17468962,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "roots": 3
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 523201,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "witnesses": 3
+      }
+    }
+  ],
+  "grobner_frontier": null,
+  "campaign": null,
+  "environment": {
+    "commit": "744fdf9",
+    "base_commit": "744fdf9",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS from .cargo/config.toml",
+    "policy": "straight-line evaluation, one Sylvester resultant by interpolation, no budget"
+  },
+  "experiment": null,
+  "reproduce": "cargo run --release --example resultant_cico -- --write"
+}

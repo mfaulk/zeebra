@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "challenge": "poseidon-t2-rf4-rp0-planted",
+  "challenge_digest": "ebd238585cc068019d03ac798614737c9bef01c787c68669f032f76b91ea5ff7",
+  "class": "engineering",
+  "formulation": "as generated",
+  "transformations": [],
+  "outcome": "verified_witness",
+  "significance": "witness for a surrogate (state width below 16, k = 1, and a planted target)",
+  "verification": "CicoInstance::is_solution, which runs permutation_plus_linear on the recovered inputs",
+  "elapsed_nanos": 403938938,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 5280,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 9,
+        "equations": 9
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 380987728,
+      "estimated_peak_bytes": 3806968,
+      "detail": {
+        "max_matrix_rows": 1862,
+        "max_matrix_columns": 1341,
+        "max_pair_degree": 5,
+        "pairs_reduced": 897
+      }
+    },
+    {
+      "stage": "conversion",
+      "elapsed_nanos": 5532173,
+      "estimated_peak_bytes": 446632,
+      "detail": {
+        "quotient_dimension": 81
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 17412064,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "lex_basis_elements": 9
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 1693,
+      "estimated_peak_bytes": null,
+      "detail": {}
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 5,
+    "highest_completed_degree": 5,
+    "max_matrix_rows": 1862,
+    "max_matrix_columns": 1341,
+    "peak_live_nonzeros": 237265,
+    "peak_estimated_bytes": 3806968,
+    "pairs_reduced": 897,
+    "elements_added": 186,
+    "quotient_dimension": 81
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "744fdf9",
+    "base_commit": "744fdf9",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
+  },
+  "experiment": null,
+  "reproduce": "cargo run --release --example scoreboard -- smoke  # poseidon-t2-rf4-rp0-planted"
+}

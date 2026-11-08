@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf2-rp2",
+  "challenge_digest": "af93deb46aa5e57cc3af5cc7c4c0f6bbfd71448aa928a08351c3ff2f4b1f72b9",
+  "class": "faithful-reduction",
+  "formulation": "slice(12 fixed, seed 0)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 0 (12 values)"
+  ],
+  "outcome": "stopped_at_limit",
+  "limit": {
+    "resource": "max_live_nonzeros",
+    "detail": "20000038 live nonzero entries were needed, over the limit of 20000000",
+    "degree": 4,
+    "last_completed_stage": "generation"
+  },
+  "significance": "no verified witness",
+  "verification": "no candidate was produced, so nothing was verified",
+  "elapsed_nanos": 55047214694,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 69505690,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 48,
+        "equations": 48,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 54977709004,
+      "estimated_peak_bytes": 212898576,
+      "detail": {
+        "max_matrix_rows": 37629,
+        "max_matrix_columns": 40182,
+        "max_pair_degree": 4,
+        "pairs_considered": 6370,
+        "pairs_reduced": 6370,
+        "elements_added": 1183
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": false,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 3,
+    "max_matrix_rows": 37629,
+    "max_matrix_columns": 40182,
+    "peak_live_nonzeros": 13286070,
+    "peak_estimated_bytes": 212898576,
+    "pairs_reduced": 6370,
+    "elements_added": 1183,
+    "quotient_dimension": null
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "3fe69c6",
+    "base_commit": "3fe69c6",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 120 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=120 tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp2 --slice 0"
+}
