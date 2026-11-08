@@ -434,6 +434,11 @@ pub trait KnownOrder: FiniteField {
     /// is what makes it the check on [`Self::try_two_adic_root_of_unity`]'s construction.
     ///
     /// False for `n = 0`, which no element satisfies.
+    ///
+    /// `n: u64` caps the testable order at `2^63`, the same ceiling [`Self::try_root_of_unity`]
+    /// has. For a power-of-two order above it, test `2^k` limb-wise instead:
+    /// `pow_limbs(2^k) == 1` and `pow_limbs(2^(k-1)) != 1` is the whole condition, since every
+    /// proper divisor of `2^k` divides its half.
     fn is_primitive_nth_root<R: RngCore + CryptoRng>(&self, n: u64, rng: &mut R) -> bool {
         if n == 0 || self.pow(n as u128) != Self::one() {
             return false;
@@ -450,6 +455,12 @@ pub trait KnownOrder: FiniteField {
     /// Fails unless `n` divides `q - 1`, which is when such an element exists at all, and unless
     /// the field has a generator this crate can produce. A power-of-two `n` over a wide field
     /// needs neither — see [`Self::try_two_adic_root_of_unity`].
+    ///
+    /// `n: u64` caps the nameable order at `2^63`, there being no `u64` equal to `2^64`. A field
+    /// whose [`Self::two_adicity`] exceeds 63 — `3*2^66 + 1` is one — therefore holds primitive
+    /// power-of-two roots this cannot be asked for at all; [`Self::try_two_adic_root_of_unity`]
+    /// takes `log_n: u32` and reaches them. The ceiling costs no capability: a transform of size
+    /// `2^64` is not computable, so the orders it hides are not orders an NTT would run at.
     fn try_root_of_unity<R: RngCore + CryptoRng>(
         n: u64,
         rng: &mut R,
@@ -466,7 +477,8 @@ pub trait KnownOrder: FiniteField {
 
     /// A primitive nth root of unity, panicking if the field holds none.
     ///
-    /// A convenience over [`Self::try_root_of_unity`], which is the one to override.
+    /// A convenience over [`Self::try_root_of_unity`], whose `2^63` ceiling on `n` it inherits.
+    /// That is also the method to override.
     ///
     /// # Panics
     /// Panics with the [`RootOfUnityError`] the fallible form returns.
@@ -479,6 +491,10 @@ pub trait KnownOrder: FiniteField {
     /// The ceiling on every power-of-two NTT over this field — a transform of size `2^k` needs a
     /// primitive `2^k`-th root of unity, which exists exactly for `k <= s`. Read off `q - 1`
     /// rather than declared, so it cannot disagree with the compiled-in modulus.
+    ///
+    /// Where `s > 63` this exceeds what [`Self::try_root_of_unity`] can be asked for, since its
+    /// `n: u64` names no order above `2^63`. [`Self::try_two_adic_root_of_unity`] serves the
+    /// whole range.
     fn two_adicity() -> u32 {
         two_adic::two_adic_decomposition(Self::order_limbs()).0
     }

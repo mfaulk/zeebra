@@ -1387,7 +1387,9 @@ What the representation means for a caller:
   the multiplicative group means factoring a 254-bit `q - 1`, which no algorithm here needs and
   which should not start by accident. `try_root_of_unity` works for any **power-of-two** order,
   through the two-adic construction below, and refuses any other — that order is the one that
-  needs the factorization.
+  needs the factorization. Its `n: u64` names no order above `2^63`, so over a modulus of
+  two-adicity beyond 63 the higher power-of-two roots are reachable only through
+  `try_two_adic_root_of_unity`, which takes `log_n: u32`.
 
 ### A generator under an explicit effort budget
 

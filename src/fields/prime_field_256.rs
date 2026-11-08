@@ -291,6 +291,11 @@ impl<M: PrimeModulus256> KnownOrder for PrimeFieldElement256<M> {
     /// power-of-two n is the only kind the NTT uses. Any other n still needs the factorization,
     /// and so is [`RootOfUnityError::NoKnownGenerator`] however many elements of that order the
     /// field holds.
+    ///
+    /// `n: u64` still caps the nameable order at `2^63`, which bites over a modulus of
+    /// two-adicity above 63 such as `Proth68Fr`'s `3*2^66 + 1`. Call
+    /// [`try_two_adic_root_of_unity`](KnownOrder::try_two_adic_root_of_unity) with `log_n` for
+    /// those orders; it is where this routes anyway.
     fn try_root_of_unity<R: RngCore + CryptoRng>(
         n: u64,
         rng: &mut R,
@@ -1361,5 +1366,48 @@ mod tests {
         let w = Proth68Fr::root_of_unity(1u64 << 32, &mut rng);
         assert!(w.pow_limbs(&two_to_the(32)).is_one());
         assert!(!w.pow_limbs(&two_to_the(31)).is_one());
+    }
+
+    /// `root_of_unity`'s `n: u64` reaches order 2^63 exactly and no higher; 2^64 needs `log_n`.
+    #[test]
+    fn test_the_u64_order_ceiling_of_root_of_unity() {
+        // 2^log_n as little-endian limbs. No `u64` holds 2^64, which is the ceiling itself.
+        fn two_to_the(log_n: u32) -> Vec<u64> {
+            if log_n < 64 {
+                vec![1u64 << log_n]
+            } else {
+                vec![0, 1u64 << (log_n - 64)]
+            }
+        }
+
+        // 2^63 is the largest power of two a u64 names, so it is the largest order `n: u64` can
+        // ask for. Proth68Fr's two-adicity is 66, so the root exists and the call must succeed.
+        let mut rng = StdRng::seed_from_u64(487);
+        let w = Proth68Fr::root_of_unity(1u64 << 63, &mut rng);
+        assert!(
+            w.pow_limbs(&two_to_the(63)).is_one(),
+            "w^(2^63) should be 1"
+        );
+        assert!(
+            !w.pow_limbs(&two_to_the(62)).is_one(),
+            "w^(2^62) should not be 1"
+        );
+
+        // One order higher exists over this field but is unnameable in a u64, so the two-adic
+        // constructor is the only route to it. Exactness is checked limb-wise for the same reason.
+        let w64 = Proth68Fr::two_adic_root_of_unity(64, &mut rng);
+        assert!(
+            w64.pow_limbs(&two_to_the(64)).is_one(),
+            "w^(2^64) should be 1"
+        );
+        assert!(
+            !w64.pow_limbs(&two_to_the(63)).is_one(),
+            "w^(2^63) should not be 1"
+        );
+
+        // The ceiling is a property of the parameter type, not of the field: 2^63 is the top bit,
+        // so no `u64` argument to `root_of_unity` can name the order one doubling above it.
+        assert_eq!((1u64 << 63).leading_zeros(), 0);
+        assert!((1u64 << 63).checked_mul(2).is_none());
     }
 }
