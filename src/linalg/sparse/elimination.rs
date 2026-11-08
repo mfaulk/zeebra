@@ -153,12 +153,28 @@ pub fn row_echelon_within<F: FiniteField>(
 /// time a pivot row is used to clear its own column it has already been cleared of every pivot
 /// column to its right — which is what makes one pass enough.
 ///
+/// The second pass is output-sensitive: it indexes the pivot columns and visits only the rows that
+/// hold one, rather than asking every row for its coefficient in every pivot column, which cost
+/// `rank * num_rows` probes however sparse the matrix was.
+///
 /// The reported statistics cover both passes. The result is canonical: reduced row echelon form is
 /// unique up to the order of the rows, and the rows are sorted by leading column.
 pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> EliminationStatistics {
+    reduced_row_echelon_counting_rows(matrix).0
+}
+
+/// [`reduced_row_echelon`], also reporting how many rows the back-substitution pass examined.
+///
+/// The count is what the output-sensitivity test weighs against the entries the pivot columns
+/// actually hold; it is not part of the public contract, which is why it is not an
+/// [`EliminationStatistics`] field.
+fn reduced_row_echelon_counting_rows<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+) -> (EliminationStatistics, usize) {
     let mut statistics = row_echelon(matrix);
     let mut scratch: Vec<(usize, F)> = Vec::new();
     let mut resident = statistics.final_nonzeros;
+    let mut rows_examined = 0usize;
 
     // Pivot columns, right to left. The sort stays: the rows are visited in row order, and what
     // the pass needs is column order, so the sort is what converts the one into the other rather
@@ -169,15 +185,28 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
         .collect();
     pivots.sort_unstable();
 
-    for &(column, pivot_index) in pivots.iter().rev() {
-        for index in 0..matrix.num_rows() {
+    // Asking each pivot column which rows hold it, rather than asking each row for its coefficient
+    // in each pivot column, is what keeps this pass proportional to the entries it touches.
+    //
+    // The index is built once and never updated, which rests on the right-to-left order: a pivot
+    // row's entries all lie at or right of its own leading column, so subtracting it cannot reach
+    // any column further left, and the column being cleared therefore holds exactly the entries the
+    // echelon pass left in it. Visit the pivots left to right and that stops being true.
+    let column_rows = PivotColumnRows::build(matrix, &pivots);
+
+    for (slot, &(column, pivot_index)) in pivots.iter().enumerate().rev() {
+        for &index in column_rows.rows_in(slot) {
             if index == pivot_index {
                 continue;
             }
+            rows_examined += 1;
             let factor = matrix.row(index).coefficient(column);
-            if factor.is_zero() {
-                continue;
-            }
+            debug_assert!(
+                !factor.is_zero(),
+                "the column index named row {} for column {}, which is zero there",
+                index,
+                column
+            );
             let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
             resident -= row.nonzeros();
             row.subtract_scaled(matrix.row(pivot_index), &factor, &mut scratch);
@@ -191,12 +220,70 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
     matrix.sort_rows_by_leading_column();
     statistics.final_nonzeros = resident;
     debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
-    statistics
+    (statistics, rows_examined)
+}
+
+/// Which rows hold a nonzero entry in each pivot column, by increasing row index.
+///
+/// One flat array with per-column offsets rather than a `Vec` per column: a single allocation, and
+/// a column's rows are contiguous. Row order is ascending because the build walks the rows in
+/// order, which is what makes the back-substitution visit them in the order a scan over all rows
+/// would have — the sequence of row operations, and so the reported statistics, is unchanged.
+struct PivotColumnRows {
+    /// Slot `slot` occupies `rows[offsets[slot]..offsets[slot + 1]]`.
+    offsets: Vec<usize>,
+    rows: Vec<usize>,
+}
+
+impl PivotColumnRows {
+    /// Index the pivot columns of a matrix already in row echelon form.
+    ///
+    /// `pivots` is the `(column, row)` list sorted by column, so an entry's column is located by
+    /// binary search over it: `O(nnz log rank)`, and no storage proportional to the matrix width,
+    /// which a column-indexed array would have cost on a matrix far wider than it is tall.
+    fn build<F: FiniteField>(matrix: &SparseMatrix<F>, pivots: &[(usize, usize)]) -> Self {
+        let slot_of = |column: usize| pivots.binary_search_by_key(&column, |(c, _)| *c).ok();
+
+        // Counting pass, then a prefix sum, then placement: the two passes over the entries are
+        // what let the result be one array instead of `rank` of them.
+        let mut offsets = vec![0usize; pivots.len() + 1];
+        for row in matrix.rows() {
+            for (column, _) in row.entries() {
+                if let Some(slot) = slot_of(*column) {
+                    offsets[slot + 1] += 1;
+                }
+            }
+        }
+        for slot in 0..pivots.len() {
+            offsets[slot + 1] += offsets[slot];
+        }
+
+        let mut rows = vec![0usize; offsets[pivots.len()]];
+        let mut cursor = offsets.clone();
+        for (index, row) in matrix.rows().iter().enumerate() {
+            for (column, _) in row.entries() {
+                if let Some(slot) = slot_of(*column) {
+                    rows[cursor[slot]] = index;
+                    cursor[slot] += 1;
+                }
+            }
+        }
+
+        Self { offsets, rows }
+    }
+
+    /// The rows holding the pivot column in the given slot of the pivot list.
+    fn rows_in(&self, slot: usize) -> &[usize] {
+        &self.rows[self.offsets[slot]..self.offsets[slot + 1]]
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{reduced_row_echelon, row_echelon, row_echelon_within, EliminationStatistics};
+    use super::{
+        reduced_row_echelon, reduced_row_echelon_counting_rows, row_echelon, row_echelon_within,
+        EliminationStatistics,
+    };
     use crate::{
         fields::{Zp13, Zp2147483647, Zp541, Zp7},
         linalg::{gauss_jordan_elimination, sparse::SparseMatrix, sparse::SparseRow, Matrix},
@@ -554,6 +641,392 @@ mod tests {
                 .count();
             assert_eq!(occupied, 1, "pivot column {} is not isolated", pivot);
         }
+    }
+
+    /// The back-substitution pass as it stood before the column index: every row probed for every
+    /// pivot column.
+    ///
+    /// The oracle for the differential test below, kept as a transcription of the original so that
+    /// "the two agree" is a statement about the optimization rather than about a reimplementation.
+    /// Returns the same statistics plus the rows it examined, which is `rank * (num_rows - 1)` by
+    /// construction and is the figure the indexed pass has to beat.
+    fn probing_reduced_row_echelon<G: FiniteField>(
+        matrix: &mut SparseMatrix<G>,
+    ) -> (EliminationStatistics, usize) {
+        let mut statistics = row_echelon(matrix);
+        let mut scratch: Vec<(usize, G)> = Vec::new();
+        let mut resident = statistics.final_nonzeros;
+        let mut rows_examined = 0usize;
+
+        let mut pivots: Vec<(usize, usize)> = (0..matrix.num_rows())
+            .filter_map(|index| matrix.row(index).leading_column().map(|c| (c, index)))
+            .collect();
+        pivots.sort_unstable();
+
+        for &(column, pivot_index) in pivots.iter().rev() {
+            for index in 0..matrix.num_rows() {
+                if index == pivot_index {
+                    continue;
+                }
+                rows_examined += 1;
+                let factor = matrix.row(index).coefficient(column);
+                if factor.is_zero() {
+                    continue;
+                }
+                let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
+                resident -= row.nonzeros();
+                row.subtract_scaled(matrix.row(pivot_index), &factor, &mut scratch);
+                statistics.row_operations += 1;
+                resident += row.nonzeros();
+                statistics.peak_nonzeros = statistics.peak_nonzeros.max(resident);
+                matrix.rows_mut()[index] = row;
+            }
+        }
+
+        matrix.sort_rows_by_leading_column();
+        statistics.final_nonzeros = resident;
+        (statistics, rows_examined)
+    }
+
+    /// The pivot columns of an echelon form, and the `(column, row)` incidences they hold.
+    fn pivot_column_incidences<G: FiniteField>(matrix: &SparseMatrix<G>) -> (usize, usize) {
+        let mut pivot_columns: Vec<usize> = matrix
+            .rows()
+            .iter()
+            .filter_map(|row| row.leading_column())
+            .collect();
+        pivot_columns.sort_unstable();
+        let incidences = matrix
+            .rows()
+            .iter()
+            .map(|row| {
+                row.entries()
+                    .iter()
+                    .filter(|(column, _)| pivot_columns.binary_search(column).is_ok())
+                    .count()
+            })
+            .sum();
+        (pivot_columns.len(), incidences)
+    }
+
+    /// Reduced forms pin to known matrices: rank deficiency, interleaved zero rows, duplicate
+    /// leading columns, a free column, and entries on both sides of a pivot.
+    #[test]
+    fn test_reduced_row_echelon_pins_known_forms() {
+        // Every row a multiple of (1, 2), with an empty row in the middle: rank one, three zero
+        // rows, and three input rows leading with the same column.
+        let mut rank_one = matrix_of(
+            &[&[(0, 1), (1, 2)], &[(0, 2), (1, 4)], &[], &[(0, 3), (1, 6)]],
+            2,
+        );
+        reduced_row_echelon(&mut rank_one);
+        assert_eq!(
+            rank_one,
+            matrix_of(&[&[(0, 1), (1, 2)], &[], &[], &[]], 2),
+            "rank-deficient form"
+        );
+
+        // x1 + x2, x0 + x2, x0 + x1 over GF(13): the determinant is 2, so the form is the identity.
+        // Every row holds an entry in a pivot column other than its own, on both sides of it.
+        let mut full_rank = matrix_of(
+            &[&[(1, 1), (2, 1)], &[(0, 1), (2, 1)], &[(0, 1), (1, 1)]],
+            3,
+        );
+        reduced_row_echelon(&mut full_rank);
+        assert_eq!(
+            full_rank,
+            matrix_of(&[&[(0, 1)], &[(1, 1)], &[(2, 1)]], 3),
+            "full-rank form"
+        );
+
+        // Column 1 is free, and column 3's pivot sits to the right of two rows that hold it.
+        let mut with_free_column = matrix_of(
+            &[
+                &[(0, 1), (1, 2), (3, 3)],
+                &[(0, 2), (1, 4), (3, 1)],
+                &[(2, 1), (3, 5)],
+            ],
+            4,
+        );
+        reduced_row_echelon(&mut with_free_column);
+        assert_eq!(
+            with_free_column,
+            matrix_of(&[&[(0, 1), (1, 2)], &[(2, 1)], &[(3, 1)]], 4),
+            "form with a free column"
+        );
+    }
+
+    /// Clearing a pivot column changes no column to its left, and no pivot column's entry set
+    /// changes before the right-to-left pass reaches it.
+    ///
+    /// This is the invariant that lets the column index be built once instead of maintained: a
+    /// pivot row's entries all lie at or right of its own leading column, so subtracting it cannot
+    /// reach further left. The test performs the pass itself so it can look between the pivots.
+    #[test]
+    fn test_clearing_a_pivot_column_leaves_columns_to_its_left_alone() {
+        // Fill-in heavy: a dense row plus rows sharing column zero, so clearing pivots rewrites
+        // most of the matrix rather than nothing.
+        let width = 24;
+        let mut rng = StdRng::seed_from_u64(168);
+        let mut rows: Vec<SparseRow<F>> = vec![SparseRow::new(
+            &(0..width)
+                .map(|c| (c, F::new(1 + c as u64 % 12)))
+                .collect::<Vec<_>>(),
+        )];
+        rows.extend((0..width).map(|_| {
+            let mut entries: Vec<(usize, F)> = Vec::new();
+            for column in 0..width {
+                if rng.gen_bool(0.35) {
+                    entries.push((column, F::random(&mut rng)));
+                }
+            }
+            SparseRow::new(&entries)
+        }));
+        let mut matrix = SparseMatrix::new(width, rows);
+        row_echelon(&mut matrix);
+
+        let mut pivots: Vec<(usize, usize)> = (0..matrix.num_rows())
+            .filter_map(|index| matrix.row(index).leading_column().map(|c| (c, index)))
+            .collect();
+        pivots.sort_unstable();
+        assert!(pivots.len() > 1, "the case needs several pivots");
+
+        let rows_holding = |matrix: &SparseMatrix<F>, column: usize| -> Vec<usize> {
+            (0..matrix.num_rows())
+                .filter(|&index| !matrix.row(index).coefficient(column).is_zero())
+                .collect()
+        };
+        let entries_left_of = |matrix: &SparseMatrix<F>, column: usize| -> Vec<Vec<(usize, F)>> {
+            matrix
+                .rows()
+                .iter()
+                .map(|row| {
+                    row.entries()
+                        .iter()
+                        .copied()
+                        .filter(|(c, _)| *c < column)
+                        .collect()
+                })
+                .collect()
+        };
+
+        // The entry sets as the echelon pass left them, before any back-substitution.
+        let initial: Vec<Vec<usize>> = pivots
+            .iter()
+            .map(|&(column, _)| rows_holding(&matrix, column))
+            .collect();
+
+        let mut scratch: Vec<(usize, F)> = Vec::new();
+        let mut cleared_something = false;
+        for (slot, &(column, pivot_index)) in pivots.iter().enumerate().rev() {
+            assert_eq!(
+                rows_holding(&matrix, column),
+                initial[slot],
+                "pivot column {} gained or lost an entry before the pass reached it",
+                column
+            );
+            let left_before = entries_left_of(&matrix, column);
+
+            for index in 0..matrix.num_rows() {
+                if index == pivot_index {
+                    continue;
+                }
+                let factor = matrix.row(index).coefficient(column);
+                if factor.is_zero() {
+                    continue;
+                }
+                cleared_something = true;
+                let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
+                row.subtract_scaled(matrix.row(pivot_index), &factor, &mut scratch);
+                matrix.rows_mut()[index] = row;
+            }
+
+            assert_eq!(
+                entries_left_of(&matrix, column),
+                left_before,
+                "clearing column {} changed a column to its left",
+                column
+            );
+        }
+        assert!(cleared_something, "the case cleared no pivot column at all");
+    }
+
+    /// Back-substitution examines only the rows that hold a pivot-column entry, not every row.
+    ///
+    /// A block-diagonal matrix: full rank, but each pivot column holds entries in at most two
+    /// rows, so the pass has a few hundred rows to examine rather than `rank * (num_rows - 1)`.
+    #[test]
+    fn test_back_substitution_is_output_sensitive() {
+        let blocks = 64;
+        let width = 2 * blocks;
+        let rows: Vec<SparseRow<F>> = (0..blocks)
+            .flat_map(|block| {
+                let (a, b) = (2 * block, 2 * block + 1);
+                [
+                    SparseRow::new(&[(a, F::new(1)), (b, F::new(2))]),
+                    SparseRow::new(&[(a, F::new(3)), (b, F::new(4))]),
+                ]
+            })
+            .collect();
+        let matrix = SparseMatrix::new(width, rows);
+
+        // The incidences present once the echelon pass is done, which is the pass's input.
+        let mut echelon = matrix.clone();
+        row_echelon(&mut echelon);
+        let (rank, incidences) = pivot_column_incidences(&echelon);
+        assert_eq!(rank, width, "the blocks are all nonsingular");
+
+        let mut indexed = matrix.clone();
+        let (_, examined) = reduced_row_echelon_counting_rows(&mut indexed);
+
+        // Every pivot column's own pivot row is skipped, so the bound is exact.
+        assert_eq!(
+            examined,
+            incidences - rank,
+            "the pass examined rows it had no entry for"
+        );
+
+        let mut probed = matrix.clone();
+        let (_, probed_examined) = probing_reduced_row_echelon(&mut probed);
+        assert_eq!(probed_examined, rank * (matrix.num_rows() - 1));
+        assert!(
+            examined * 8 < probed_examined,
+            "examined {} rows against the probing pass's {}",
+            examined,
+            probed_examined
+        );
+    }
+
+    /// Across shapes, the indexed pass examines fewer rows than `rank * (num_rows - 1)`, and by
+    /// how much depends on whether the elimination filled the matrix in.
+    ///
+    /// The counts are exact integers rather than timings, so they are the reproducible half of the
+    /// asymptotic claim; `cargo test -- --nocapture test_probe_counts` prints them.
+    #[test]
+    fn test_probe_counts_fall_with_the_entries_actually_present() {
+        fn square(n: usize, density: f64, seed: u64) -> SparseMatrix<F> {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let rows: Vec<SparseRow<F>> = (0..n)
+                .map(|_| {
+                    let mut entries: Vec<(usize, F)> = Vec::new();
+                    for column in 0..n {
+                        if rng.gen_bool(density) {
+                            entries.push((column, F::random(&mut rng)));
+                        }
+                    }
+                    SparseRow::new(&entries)
+                })
+                .collect();
+            SparseMatrix::new(n, rows)
+        }
+
+        // Entries within four columns of the diagonal: elimination fills in only inside the band,
+        // so the matrix is as sparse at the end as at the start.
+        fn banded(n: usize, half: usize, seed: u64) -> SparseMatrix<F> {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let rows: Vec<SparseRow<F>> = (0..n)
+                .map(|index| {
+                    let mut entries: Vec<(usize, F)> = Vec::new();
+                    for offset in 0..=(2 * half) {
+                        let column = index + offset;
+                        if column >= half && column - half < n {
+                            entries.push((column - half, F::random(&mut rng)));
+                        }
+                    }
+                    SparseRow::new(&entries)
+                })
+                .collect();
+            SparseMatrix::new(n, rows)
+        }
+
+        let cases: Vec<(String, SparseMatrix<F>)> = vec![
+            ("square 128 at 2%".to_string(), square(128, 0.02, 7)),
+            ("square 128 at 30%".to_string(), square(128, 0.3, 7)),
+            ("banded 512 half 4".to_string(), banded(512, 4, 13)),
+            ("banded 2048 half 4".to_string(), banded(2048, 4, 13)),
+        ];
+
+        for (label, matrix) in cases {
+            let mut echelon = matrix.clone();
+            row_echelon(&mut echelon);
+            let (rank, incidences) = pivot_column_incidences(&echelon);
+
+            let mut indexed = matrix.clone();
+            let (_, examined) = reduced_row_echelon_counting_rows(&mut indexed);
+            let probes = rank * (matrix.num_rows() - 1);
+
+            println!(
+                "{}: rank {}, probing pass {} probes, indexed pass {} rows examined \
+                 ({} pivot-column entries)",
+                label, rank, probes, examined, incidences
+            );
+            assert_eq!(
+                examined,
+                incidences - rank,
+                "{} examined rows with no entry",
+                label
+            );
+            assert!(
+                examined < probes,
+                "{} examined {} rows against {} probes",
+                label,
+                examined,
+                probes
+            );
+        }
+    }
+
+    /// The indexed pass reproduces the probing pass exactly — matrix and statistics — across
+    /// densities, shapes, and characteristics.
+    #[test]
+    fn test_column_index_matches_the_probing_pass_on_random_matrices() {
+        fn check<G: FiniteField>(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            for (rows, columns) in [
+                (1usize, 1usize),
+                (8, 8),
+                (16, 9),
+                (9, 16),
+                (24, 24),
+                (32, 11),
+            ] {
+                for density in [0.0f64, 0.02, 0.1, 0.3, 0.6, 1.0] {
+                    let sparse_rows: Vec<SparseRow<G>> = (0..rows)
+                        .map(|_| {
+                            let mut entries: Vec<(usize, G)> = Vec::new();
+                            for column in 0..columns {
+                                if rng.gen_bool(density) {
+                                    entries.push((column, G::random(&mut rng)));
+                                }
+                            }
+                            SparseRow::new(&entries)
+                        })
+                        .collect();
+                    let matrix = SparseMatrix::new(columns, sparse_rows);
+
+                    let mut indexed = matrix.clone();
+                    let indexed_statistics = reduced_row_echelon(&mut indexed);
+                    let mut probed = matrix.clone();
+                    let (probed_statistics, _) = probing_reduced_row_echelon(&mut probed);
+
+                    assert_eq!(
+                        indexed, probed,
+                        "{}x{} at {} differ as matrices",
+                        rows, columns, density
+                    );
+                    assert_eq!(
+                        indexed_statistics, probed_statistics,
+                        "{}x{} at {} differ in statistics",
+                        rows, columns, density
+                    );
+                }
+            }
+        }
+
+        check::<Zp7>(1681);
+        check::<Zp13>(1682);
+        check::<Zp541>(1683);
+        check::<Zp2147483647>(1684);
     }
 
     /// Elimination preserves the row space, certified by the transformation it performs.
