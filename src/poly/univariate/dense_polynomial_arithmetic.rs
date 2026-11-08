@@ -1,7 +1,10 @@
 //! Arithmetic operations for dense univariate polynomials.
 
 use crate::{impl_add_variants, impl_div_variants, impl_mul_variants, impl_rem_variants};
-use crate::{impl_sub_variants, poly::univariate::div_with_remainder::div_with_remainder};
+use crate::{
+    impl_sub_variants,
+    poly::univariate::div_with_remainder::{div_with_remainder, quotient},
+};
 use crate::{
     poly::univariate::{dense_polynomial::DensePolynomial, karatsuba::multiply_dense},
     FiniteField, Polynomial,
@@ -99,11 +102,16 @@ impl_mul_variants!([F: FiniteField], DensePolynomial<F>);
 
 // Borrowed / Borrowed. The quotient half of division with remainder; `%` is the other half, and a
 // caller that wants both should call `div_with_remainder` rather than pay for the division twice.
+//
+// `quotient` rather than `div_with_remainder(..).0`: on the Newton route the remainder costs a full
+// extra multiplication, which `/` does not need and would otherwise have paid for silently. Below
+// the crossover the two are the same code, since long division forms the remainder in its working
+// array whether or not anybody reads it.
 impl<F: FiniteField> ops::Div<&DensePolynomial<F>> for &DensePolynomial<F> {
     type Output = DensePolynomial<F>;
 
     fn div(self, rhs: &DensePolynomial<F>) -> Self::Output {
-        div_with_remainder(self, rhs).0
+        quotient(self, rhs)
     }
 }
 

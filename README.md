@@ -801,6 +801,9 @@ cargo run --release --example univariate_scaling -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
 cargo run --release --example karatsuba_crossover  # Karatsuba against schoolbook, per field width
 cargo run --release --example karatsuba_crossover -- bn254
+cargo run --release --example division_crossover   # Newton inversion against long division, per field width
+cargo run --release --example division_crossover -- bn254
+cargo run --release --example division_crossover -- all max_log=13
 cargo run --release --example multiplication_dispatch  # schoolbook vs Karatsuba vs transform, and the crossings
 cargo run --release --example multiplication_dispatch -- koalabear max_log=17
 cargo run --release --example multivariate_mul     # multivariate multiply: time and live heap per route
@@ -1941,11 +1944,19 @@ and so is in the crossover section below:
 | stage | exponent | KoalaBear | BN254 `Fr` | peak bytes |
 |---|---|---|---|---|
 | `mul`, schoolbook | 2 | 2^15 | 2^13 | `4 n B` |
-| `div`, long division | 2 | 2^15 | 2^13 | `6 n B` |
+| `div`, dispatched (#193) | **1.6** | **2^16** | **2^14** | `6 n B` / `10 n B` |
 | `evaluate` (NTT) | 1 | **2^24** | **2^22** | `1 n B` |
 | `interpolate` (iNTT) | 1 | **2^24** | **2^22** | `2 n B` |
 | `lagrange_interpolate` | 2 | 2^14 | 2^12 | `5 n B` |
-| `roots` | 2 | 2^12 | 2^8 | `12 n B` |
+| `roots` | **1.5–1.9** | **2^13** | **2^9** | `12 n B` / `16 n B` |
+
+The `div` and `roots` rows moved in #193, which put Newton inversion of the reversed divisor behind
+a measured crossover: `div`'s exponent fell from 2 to 1.6, its reach doubled over KoalaBear and
+quadrupled over BN254 `Fr`, and `roots` doubled on both fields because it is `O(log q)`
+multiplications **and divisions** at the working degree. The two peak figures per row are the two
+routes — long division's `6 n B` below the crossover and Newton's `10 n B` above it — and the step
+between them is visible in the sweep's own bytes-per-element column, exactly at the constant. See
+the crossover section below.
 
 `fftmul` reaches operand `2^22` over KoalaBear at the same one-second budget, peak `12 n B`. It
 used to stop at `2^18`, and that was **its own verification**: the stage asserted the transform's
@@ -1963,7 +1974,10 @@ word, so a byte budget carried over from the F4 side under-estimates this layer 
 **Division is an operator.** `/` and `%` on `UnivariatePolynomial` are the quotient and the
 remainder of that `div` row, in all four owned/borrowed combinations plus `/=` and `%=`. Each runs
 the whole division, so a caller wanting both halves should call `Polynomial::div_with_remainder`,
-which returns the pair. That trait method used to be named `div`; it carries its full name now
+which returns the pair. `/` is **not** a projection of that pair: on the Newton route the remainder
+costs a full extra multiplication, so `/` takes a quotient-only path that skips it, while `%`
+cannot. Below the crossover the two are the same code, since long division forms the remainder in
+its working array whether or not anybody reads it. That trait method used to be named `div`; it carries its full name now
 because an inherent `div(&self, ..)` loses method resolution to `Div::div`, which takes `self` by
 value, and every `p.div(&q)` would otherwise have silently become the quotient alone. `lcm(a, b)`
 is `a * b / gcd(a, b)` renormalized monic, and zero when either argument is zero:
@@ -1979,7 +1993,7 @@ assert_eq!(gcd(&f, &g), P::try_from("1 + x").unwrap());
 // (x + 1)^2 (x + 6) = x^3 + x^2 - x - 1
 assert_eq!(lcm(&f, &g), P::try_from("6 + 6x + x^2 + x^3").unwrap());
 
-// `/` and `%` are the two halves of one long division; `div_with_remainder` returns both.
+// `/` and `%` are the two halves of one division; `div_with_remainder` returns both.
 let (quotient, remainder) = f.div_with_remainder(&g);
 assert_eq!(&f / &g, quotient);
 assert_eq!(&f % &g, remainder);
@@ -2011,13 +2025,28 @@ let (v, r) = partial_bezout(&a, &b, 2);
 assert!(r.degree() < 2);
 ```
 
-Both stay quadratic, and that is a decision rather than an omission. Newton-inversion division is
-`O(M(d))` and half-GCD is `O(M(d) log d)`, but `M(d)` *at the operator* is still schoolbook: `Mul`
-cannot choose an NTT domain from its signature, and Karatsuba is not wired into it either (§4.1 of
-[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)). With a quadratic `M`
-underneath, neither is faster than long division — so both are gated on that dispatch work (#185)
-rather than written against a multiplication that would make them slower. They are #193 and #194;
-§4.5 of the same document has the arithmetic.
+**Division is no longer one of them.** Newton inversion is `O(M(d))`, which is only worth writing
+when `M` is subquadratic *where a division can call it* — and that became true when #231 put the
+schoolbook-or-Karatsuba dispatcher on `Mul`. #193 then landed it: `div_with_remainder` chooses
+between long division and Newton inversion of the reversed divisor on a measured per-width
+crossover, and the exponent fell from 2 to 1.6.
+
+The crossover is asymmetric in the quotient length `k` and the divisor length `m`, which is the
+part worth knowing before reaching for it. `k` is the precision the power series is carried to, so
+Newton pays `M(k)` however long the divisor is; only the remainder recovery sees `m`, and it sees
+it as the long operand of an asymmetric product. A long quotient against a short divisor therefore
+belongs on long division — dividing degree `10^6` by degree `250` is 2.5e8 multiplications
+long-hand against `M(10^6)` by Newton — while a short quotient against a long divisor belongs on
+Newton, where it measures 2.2x to 7.8x faster. A single threshold on `deg(g)`, or on
+`min(k, m)`, gets one of those two wrong; the shipped rule is `m > t^(2-e) * k^(e-1)` with
+`e = log2 3` and one measured `t` per element width.
+
+**`gcd` stays quadratic**, and that is now a smaller gap than it was. Half-GCD is `O(M(d) log d)`,
+which against Euclid's `d^2` is a real crossing rather than the `d^2 log d`-against-`d^2`
+non-crossing it was under a schoolbook `M`; it also needs a fast division to recurse on, and that
+now exists. It is #194. §4.5 of
+[`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the arithmetic, the
+per-width constants and the one part of the rule that is still unmeasured (#527).
 
 The two transforms are the only quasi-linear stages, and they now cost the same: at a matched
 `2^18`, `interpolate` is within 2–10% of `evaluate` over all three fields, where it used to be
@@ -2206,6 +2235,20 @@ cargo run --release --example karatsuba_crossover
 is the kernel measurement; [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md)
 §4.1.1 has the per-width tables and §4.1.2 the dispatched ones.
 
+**Division has its own crossover**, measured the same way and for the same reason — one number
+would be wrong, because the trade depends on the element width:
+
+```text
+cargo run --release --example division_crossover
+```
+
+sweeps both routes interleaved at each size, in two tables: a balanced sweep `deg f = 2d - 2` by
+`deg g = d - 1`, which is the shape every `pow_mod` squaring produces and which the shipped
+constant is read off, and a skew check that moves `k` and `m` apart to test the rule's asymmetry
+rather than only its balanced point. The skew table is what caught a symmetric `min(k, m)` rule
+taking long division at `k = 1024, m = 65536`, where Newton is 3.6x faster. Measured `t`: **1024**
+for a 4-byte element, **256** for 5–8 bytes, **128** above that. §4.5 has the tables.
+
 **`Mul` dispatches too**, since #231: schoolbook below the Karatsuba base case and Karatsuba above
 it, so a caller who writes only `a * b` gets the subquadratic route without opting in. Below the
 base case it *is* the schoolbook loop, so the operator is bit-identical to what it replaced at
@@ -2217,7 +2260,13 @@ every size.
 | `lcm` | 1.17x–1.65x | 1.14x–1.66x |
 | `from_zeros` | **2.83x** | 1.04x |
 | one product | 2.08x–6.49x | 2.56x–7.31x |
-| `div_with_remainder` *(control)* | 0.99x | 1.00x |
+| `div_with_remainder` *(control, no longer one)* | 0.99x | 1.00x |
+
+The control row is a control only as of #231. `div_with_remainder` was unaffected because long
+division is a coefficient loop that never forms a product; #193 then built a second route on top of
+this kernel, so the same measurement re-taken today would not be flat. That is the point of the
+control rather than a defect in it — it recorded that the dispatcher cost nothing where it was not
+called, which is what made the later route's gain attributable.
 
 Getting there needed two things first, both of which are the interesting part. The agreement tests
 in `karatsuba` and `fft::multiply` compared against `&a * &b`, which would have made them check an

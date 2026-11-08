@@ -22,8 +22,9 @@ one tree and run interleaved.
 
 **Figures marked superseded are kept rather than overwritten.** Where a later issue re-measures a
 stage, the earlier number stays with a pointer to the newer one, because the rest of the table it
-sits in was taken in the same run. §3's `lagrange` row, §3.1, §3.2 and §5 all carry such a marker,
-all from #162 stage 1.
+sits in was taken in the same run. §3, §3.1, §3.2, §4.1, §4.1.1, §4.1.2, §5 and §6 all carry such
+markers, from #118, #161, #162, #185, #189, #193 and #244 — the marker names the issue that
+re-measured, so the enumeration here is a pointer rather than the record.
 
 ## 1. The blocker, cleared
 
@@ -126,11 +127,18 @@ source.
 |---|---|---|
 | mul | 1.93 – 2.14 → **2** | schoolbook, which is what `Mul` does |
 | fftmul | 1.03 – 1.27 → **1** | `multiply` through the transform — **measured separately and re-taken after #189**, below |
-| div | 1.63 – 2.12 → **2** | in-place long division, after §2 |
+| div | 1.63 – 2.12 → **2** | in-place long division, after §2 — **superseded, see §4.5** |
 | ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive — **superseded, see §3.3** |
 | intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed — **superseded, see §3.3** |
 | lagrange | 2.68 – 2.98 → **3** | arbitrary abscissae — **superseded, see §4.3** |
-| roots | 1.64 – 2.01 → **2** | `roots`, dominated by `x^q mod f` |
+| roots | 1.64 – 2.01 → **2** | `roots`, dominated by `x^q mod f` — **superseded, see §4.5** |
+
+**The `div` and `roots` rows are superseded by #193.** Division now dispatches to Newton inversion
+of the reversed divisor above a measured crossover, which takes `div` to **1.52 – 1.61** over
+KoalaBear and **1.57 – 1.62** over BN254 `Fr`. `roots` is `O(log q)` multiplications *and*
+divisions at the working degree, so it moved with it, to **1.51 – 1.78** and **1.63 – 1.87**. The
+figures above are the pre-#193 ones, kept because the rest of the table was taken in the same run.
+§4.5 has the new curves, the crossover and the dispatch rule.
 
 **The `lagrange` row is superseded.** #162 stage 1 rewrote `lagrange_interpolate` around one
 numerator product and synthetic division; the exponent is now **1.86 – 2.12 → 2** and the figure
@@ -211,24 +219,45 @@ the rest of the table was taken in the same run:
 | lagrange, after #162 | **16 384** | **16 384** | **16 384** | **4 096** |
 | factor | 16x | 16x | 16x | 8x |
 
+**The `div` and `roots` rows are superseded by #193**, likewise re-measured on the same workstation
+under the same protocol. Only the two fields the absolute-cost table below reports were re-taken:
+
+| stage | KoalaBear | BN254 `Fr` |
+|---|---|---|
+| div, before #193 | 32 768 | 8 192 |
+| div, after #193 | **65 536** | **32 768** |
+| factor | 2x | **4x** |
+| roots, before #193 | 4 096 | 256 |
+| roots, after #193 | **8 192** | **512** |
+| factor | 2x | 2x |
+
+`roots` doubling is the result the issue was filed for. It is `O(log q)` multiplications **and
+divisions** at the working degree — 31 of each over KoalaBear, 254 over BN254 — so division is half
+of what the binding stage does, and halving its exponent had to move the stage or the premise was
+wrong.
+
 Absolute cost at the largest size reached, and the peak bytes there:
 
 | field | stage | size | seconds | ns/element | peak bytes |
 |---|---|---|---|---|---|
 | KoalaBear | mul | 2^15 | 2.19 | 66 821 | 1 048 560 |
 | KoalaBear | div | 2^15 | 2.30 | 70 109 | 1 572 848 |
+| KoalaBear | div, after #193 | 2^16 | 1.07 | 16 302 | 5 242 496 |
 | KoalaBear | ntt | 2^23 | 1.94 | **232** | 469 762 016 |
 | KoalaBear | intt | 2^22 | 2.03 | 485 | 301 989 856 |
 | KoalaBear | lagrange | 2^10 | 2.74 | 2 677 318 | 65 544 |
 | KoalaBear | lagrange, after #162 | 2^14 | 2.39 | 146 044 | 655 368 |
 | KoalaBear | roots | 2^12 | 1.72 | 418 695 | 393 176 |
+| KoalaBear | roots, after #193 | 2^13 | 1.25 | 152 537 | 1 048 512 |
 | BN254 `Fr` | mul | 2^13 | 1.59 | 193 550 | 1 048 512 |
 | BN254 `Fr` | div | 2^13 | 1.64 | 199 615 | 1 572 800 |
+| BN254 `Fr` | div, after #193 | 2^14 | 1.00 | 61 011 | 5 242 112 |
 | BN254 `Fr` | ntt | 2^21 | 2.16 | **1 032** | 469 761 920 |
 | BN254 `Fr` | intt | 2^18 | 1.89 | 7 209 | 75 497 344 |
 | BN254 `Fr` | lagrange | 2^9 | 3.16 | 6 167 733 | 131 104 |
 | BN254 `Fr` | lagrange, after #162 | 2^12 | 1.34 | 327 072 | 655 392 |
 | BN254 `Fr` | roots | 2^8 | 1.04 | 4 074 934 | 98 144 |
+| BN254 `Fr` | roots, after #193 | 2^9 | 1.87 | 3 650 070 | 262 464 |
 
 The NTT is the stage in good shape: 232 ns per element over a 31-bit field at size 2^23, 1 032 ns
 over a 254-bit one at 2^21 — a 4.5x ratio against the 4x element-width ratio, so the transform is
@@ -662,6 +691,12 @@ once the base case is the measured one. The honest limit is the one the issue st
 at the degrees this crate reaches today the gain is a constant-factor 10–23x, not a change in
 which degrees are reachable, and `div` is not Karatsuba and will not move.
 
+> **The last clause is superseded, and by this kernel.** `div` is Karatsuba now: #231 put the
+> dispatcher on `Mul`, which is the condition #193 was waiting on, and #193's Newton inversion
+> calls the kernel above. `div`'s exponent moved from 2 to 1.59 and its reachable degree doubled
+> over KoalaBear and quadrupled over BN254 `Fr` — so this section's "not a change in which degrees
+> are reachable" is also narrower than it reads. See §4.5.
+
 #### 4.1.2 The dispatcher, and the threshold that had to be re-measured (#185)
 
 #165's kernel and #124's transform landed without either calling the other. #185 joined them, and
@@ -1079,51 +1114,170 @@ stage at the same size) — which together give 91x. The measurement is 1.4x abo
 residue is inversions again: the equal-degree splitter and the gcd both invert, and inversion is
 relatively dearer over the wide field than multiplication is.
 
-### 4.5 Division and GCD: quadratic, and gated on the multiplication they would be built from
+### 4.5 Division: sub-quadratic since #193, and the GCD that is now unblocked
 
-**Partly closed by #126, and the rest deliberately not.** `/`, `%`, `/=` and `%=` now exist on
-`UnivariatePolynomial`, and `lcm` with them; `Polynomial::div`, which returns both halves, is
-renamed `div_with_remainder` so that `Div::div` — taking `self` by value — cannot win method
-resolution over it and silently return the quotient alone. That is interface work, not cost work:
-every operator is one call to the §2 long division, so the `div` row of §3.1 governs all of them,
-and `gcd`'s Euclidean loop costs exactly what it did.
+**Closed by #193.** `div_with_remainder` dispatches between long division and Newton inversion of
+the reversed divisor on a measured crossover, and the `div` row of §3 is superseded: its exponent
+is **1.52 – 1.61** over KoalaBear and **1.57 – 1.62** over BN254 `Fr`, against the
+1.63 – 2.12 → 2 recorded there. The reach at one second doubles over KoalaBear and **quadruples**
+over BN254, and `roots`'s doubles on both — which is the point of the issue rather than a side
+effect. §4.4 is `O(log q)` multiplications **and divisions** at the working degree, so halving the
+division exponent moves the binding stage directly, and it did.
 
-The two algorithmic items from the same issue are **not** written — they are #193 (Newton
-inversion) and #194 (half-GCD) — and the arithmetic says they should not be yet:
+| route | cost | with the `M` available at the operator | measured exponent |
+|---|---|---|---|
+| long division | `d^2` | `d^2` | 1.95 – 2.03 |
+| Newton inversion of `rev(g)` | `O(M(d))` | `O(d^1.585)` | **1.56 – 1.61** |
+| classical Euclid | `O(d^2)` | `O(d^2)` | not separately measured |
+| half-GCD (#194) | `O(M(d) log d)` | `O(d^1.585 log d)` | **unblocked, unwritten** |
 
-| route | cost | with the `M` available at the operator |
-|---|---|---|
-| long division (today) | `d^2` | `d^2` |
-| Newton inversion of `rev(g)` | `O(M(d))` | `O(d^2)`, with a worse constant |
-| classical Euclid (today) | `O(d^2)` | `O(d^2)` |
-| half-GCD | `O(M(d) log d)` | `O(d^2 log d)` — **slower** |
+The exponent column is `examples/division_crossover.rs`'s fitted slope over the top half of its
+balanced sweep, which is the figure that compares the two routes at the same sizes; §3's per-row
+figures are `examples/univariate_scaling.rs`'s and are the ones quoted above. They agree.
 
-`M(d)` at the operator is schoolbook, and §4.1 is why: `Mul` cannot choose a transform domain from
-its signature, so the quasi-linear route is reachable only through `fft::multiply`, which needs
-`KnownOrder` and an RNG. Karatsuba needs neither — but it is still called from nothing outside its
-own tests, so `Mul` is `d^2` there too. Newton inversion over a quadratic `M` is `d^2` with
-several multiplications per iteration instead of one pass of long division, and half-GCD is
-`d^2 log d`: the asymptotically better algorithm is the measurably slower one until the
-multiplication underneath moves. §4.1.1's closing line — "`div` is not Karatsuba and will not
-move" — is the same finding from the multiplication side.
+#### The gate opened two months before anything noticed
 
-So the gate is a crossover, not a date, and it is #185's — specifically its open
-`DensePolynomial::Mul` dispatch question rather than its recommended first step, since wiring
-Karatsuba into `fft::multiply`'s fallbacks alone leaves `*` and `%` on the schoolbook route.
-Wiring Karatsuba into `Mul` makes `M(d) = d^1.585` for
-every field including Mersenne-31, at which point Newton inversion is `d^1.585` against long
-division's `d^2` and half-GCD is `d^1.585 log d` against Euclid's `d^2`, and both are worth
-measuring. Its base case is already measured per element width (§4.1.1: 48 / 16 / 4 bytes), so the
-dispatch thresholds a fast division would inherit exist; what does not exist is the dispatch.
+The row above is the same arithmetic the superseded version of this section carried; what changed
+is the third column. `M(d)` at the operator is **not** schoolbook any more. #231 put the
+schoolbook-or-Karatsuba dispatcher on `DensePolynomial`'s `Mul`
+(`src/poly/univariate/dense_polynomial_arithmetic.rs` is one call to `multiply_dense`), which is
+precisely the condition #126 and #193 named:
 
-The stage this would serve is §4.4's. `roots` is `O(log q)` multiplications **and divisions** at
-the working degree, so halving the division exponent moves the binding stage directly — which is
-why the two sit in one issue with root finding rather than being filed as polish.
+> So the gate is a crossover, not a date, and it is #185's — specifically its open
+> `DensePolynomial::Mul` dispatch question rather than its recommended first step.
+
+#193 listed three facts as "verified at the time of #192, not assumed". All three are now false:
+`Mul` is not the schoolbook double loop, `multiply_karatsuba` has callers outside its own tests,
+and the dispatch that does not exist does. The issue nevertheless carried a `blocked` label
+pointing at an issue that had closed, and a label cannot expire — which is the same failure mode
+the claim tooling's §4 lease exists to prevent, one level up. **A dependency recorded as a label is
+a dependency nobody re-checks.** The arithmetic in this section was correct and current the whole
+time; what was stale was the one sentence saying it had not happened yet.
+
+#### The algorithm, and why its crossover is asymmetric
+
+Reversing `f = qg + r` through `x -> 1/x` and multiplying by `x^deg f` gives
+`rev(f) = rev(q) * rev(g) + x^k * rev(r)` with `k = deg f - deg g + 1`, so
+`rev(q) = rev(f) * rev(g)^-1 mod x^k` and the remainder term is annihilated by the truncation
+rather than computed. `rev(g)`'s constant term is `g`'s leading coefficient — non-zero for every
+non-zero `g`, and the same quantity long division inverts — so the power series inverse always
+exists. The inverse is Newton's `h <- h * (2 - g*h) mod x^(2^i)`, doubling precision per step.
+
+The dispatch rule is **not** a threshold on the divisor's degree, and the measurement is what
+established that. Writing `k` for the quotient length and `m` for the divisor length:
+
+```text
+  long division   k * m
+  Newton          C * M(k)  +  (m/k) * M(k)
+```
+
+`k` is the precision, and the iteration's second product multiplies two series that are both as
+long as the precision — so Newton pays `M(k)` however long the divisor is. Only the `r = f - q*g`
+recovery sees `m`, and it sees it as the *long* operand of an asymmetric product. Dividing through
+by `k * m`, the recovery term is `k^(e-1)/k < 1` for every `k` past the Karatsuba base case: the
+recovery never blocks the route, only the inversion does, and Newton wins when
+`m > C * k^(e-1)` with `e = log2 3`.
+
+That asymmetry is measurable in both directions, and a first implementation of this issue got it
+wrong in one of them. A symmetric `min(k, m)` rule sends a **short quotient against a long
+divisor** to long division, where Newton is 2.2x to 7.8x faster:
+
+| `k` | `m` | field | long division | Newton | speedup |
+|---:|---:|---|---:|---:|---:|
+| 1024 | 4096 | Mersenne-31, 4-byte | 1.445 ms | 0.642 ms | **2.25x** |
+| 1024 | 65536 | Mersenne-31, 4-byte | 23.18 ms | 6.46 ms | **3.59x** |
+| 1024 | 65536 | BN254 `Fr` | 1.634 s | 0.209 s | **7.82x** |
+| 4096 | 1024 | Mersenne-31, 4-byte | 1.480 ms | 2.403 ms | 0.62x |
+| 65536 | 1024 | Mersenne-31, 4-byte | 23.97 ms | 148.2 ms | **0.16x** |
+
+The last row is the one a `deg(g) >= t` gate would have taken, at six times the cost. The
+derivation, including the floor on `k` that is **not** implied by the inequality and is #527's
+subject, is in the module comment of `src/poly/univariate/div_with_remainder.rs`.
+
+#### The measured crossover, per element width
+
+Fixing `C = t^(2-e)` makes the balanced case `k = m = d` cross exactly at `d = t`, which leaves one
+constant per width — the same three-tier shape as §4.1.1's base case, and the same direction: the
+crossover falls 8x across the widths this crate uses, against the base case's 12x.
+
+| element | field measured | `t` | first clear win | speedup there |
+|---|---|---:|---:|---:|
+| 4 bytes | Mersenne-31 in a `u32` | **1024** | `d = 2048` | 1.31x |
+| 8 bytes | Mersenne-31 in a `u64` | **256** | `d = 512` | 1.23x |
+| 8 bytes | Goldilocks | **256** | `d = 512` | 1.09x |
+| 32 bytes | BN254 `Fr` | **128** | `d = 256` | 1.17x |
+
+Each `t` is the largest swept length at which Newton does **not** win by more than 10%, rather than
+the largest at which it loses. Inside 10% the two routes cost the same to within this
+workstation's run-to-run variation, and the tiebreak is then memory: long division peaks at `6 n B`
+and Newton at `10 n B`. The two 8-byte fields disagreed — 1.23x against 1.09x at `d = 512` — and
+256 is the tier that costs neither, winning clearly on one and tying on the other, where 512 would
+have forgone the 1.23x.
+
+**The crossover is visible in §3.2's memory column**, which is the cheapest confirmation that the
+dispatch fires where it says. The `div` row's bytes-per-element over KoalaBear is 47.9 at `n = 256`
+and 79.4 at `n = 512` — `6 n B` below the 8-byte tier's crossover and `10 n B` above it, with the
+step exactly at the constant.
+
+#### `Div` does not pay for the remainder
+
+`/` routes through a separate `quotient` entry point rather than projecting `div_with_remainder`,
+and the asymmetry above is why. Long division forms the remainder *in* its working array, so
+dropping it saves nothing; Newton recovers `r = f - q*g` with a full multiplication, which is about
+a third of the route's cost at the balanced shape. `%` cannot have the same treatment, and `gcd`'s
+Euclidean loop wants the remainder anyway.
+
+#### What is left
+
+- **#194, half-GCD**, is unblocked by this section's argument and by this issue's product: it needs
+  both a sub-quadratic `M` to be worth writing and a fast division to recurse on, and both now
+  exist. `d^1.585 log d` against Euclid's `d^2` is a real crossing rather than the
+  `d^2 log d`-against-`d^2` non-crossing it was.
+- **#527**, the floor on the precision. The rule carries `k > t` as well as the inequality, and
+  that floor is the one part of it no measurement here covers. The model puts the true floor near
+  `t/68`, which would widen the Newton band by nearly two decades in `k` — in exactly the regime
+  where it measured fastest.
+
+#### Protocol
+
+Every figure in this section was taken on **`7af2377` plus the change itself** — the two routes are
+two entry points in one binary rather than two binaries, so there is no before-side tree to name
+and nothing merged after `7af2377` can have moved one arm relative to the other. That stamp is a
+**merge base** rather than a branch commit, which is what makes it resolvable later: #505 found 315
+of 387 competitive rows naming branch commits that their own PR's merge destroyed, and the fix
+there was to record `git merge-base HEAD origin/main` beside the commit for exactly this reason. A
+prose protocol has no `Environment` struct to carry the pair, so the durable half is the one
+written down. The
+128-logical-core / 500 GB development workstation, one core (`taskset --cpu-list 12`), release
+profile with the repository's default `Cargo.toml` settings (fat LTO, `codegen-units = 1`) and
+`-C target-cpu=x86-64-v3` from `.cargo/config.toml`, `RUSTC_WRAPPER=""` and a private
+`CARGO_TARGET_DIR`, under [`tools/benchlock.sh`](../../tools/benchlock.sh).
+
+Each timed figure is the **fastest** of up to 7 repetitions, with the two routes interleaved
+*within* each repetition rather than run arm-by-arm, so a transient on this shared workstation
+lands on both. The routes are also checked against each other once per shape, outside the timing:
+a crossover measured against a wrong answer is worthless, and `examples/division_crossover.rs`
+asserts quotient and remainder equality before it starts the clock.
+
+```sh
+tools/benchlock.sh zb-sunny-193 env CARGO_TARGET_DIR="$PWD/target" RUSTC_WRAPPER="" \
+  timeout --signal=INT --kill-after=60s 3000 \
+  taskset --cpu-list 12 target/release/examples/division_crossover max_log=13
+tools/benchlock.sh zb-sunny-193 ... taskset --cpu-list 12 \
+  target/release/examples/univariate_scaling koalabear budget=1.0
+```
 
 ## 5. Largest reachable degree, and the first stage to fail
 
-**The first stage to stop is now `roots` on every field** — 4 096 on KoalaBear, 2 048 on
-Goldilocks, 256 on BN254 `Fr` — at one second per measurement. Arbitrary-point interpolation was
+**The first stage to stop is still `roots` on every field, and it moved** — 8 192 on KoalaBear and
+512 on BN254 `Fr` after #193, from 4 096 and 256 — at one second per measurement. It is the only
+stage that binds anywhere, and it is now the only one left that is neither quasi-linear nor
+sub-quadratic: `div` joined the transforms on the other side of that line in #193 (§4.5), so what
+remains is `roots`'s own structure rather than the cost of the division inside it. Goldilocks was
+not re-taken; its 2 048 below is a pre-#193 figure.
+
+The figures in the rest of this section are pre-#193 and kept as the record of what the sweep said
+then. Arbitrary-point interpolation was
 the first stage to stop on the three narrow fields when this section was written, at n = 1 024;
 #162 stage 1 took it to 16 384 (§4.3.1) and it is no longer the binding stage anywhere. The
 pre-#162 conclusion is kept here as the record of what the sweep said then:

@@ -10,6 +10,14 @@
 mod dense_polynomial;
 mod dense_polynomial_arithmetic;
 mod div_with_remainder;
+// Measurement and differential-testing hooks for `examples/division_crossover.rs`, not API. The
+// two routes have to be separately reachable or the crossover cannot be swept and the differential
+// test could only ever check whichever route the shipped constant happens to select.
+#[doc(hidden)]
+pub use div_with_remainder::{
+    div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
+    newton_crossover_unstable, newton_is_cheaper_at_unstable,
+};
 mod factorize;
 mod gcd;
 mod graeffe;
