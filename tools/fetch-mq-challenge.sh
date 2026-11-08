@@ -40,6 +40,7 @@ ecb087b4128d490dd0931b877f7827786d3f49fa27facabde629d9e1f057e072  ToyExample-typ
 ad22fe9a065688453b481fe8cb0e2990f3207920dc83e8c64f8dea2651b5e888  ToyExample-type6-n15-seed0
 354de307fa5524d01c8a6ece3c712c27119cf3388bdd7a3e1c84095ed6cc43de  challenge-6-16-0
 fb4b6a3d27fb8263b1a9883745691f3836ad747a6a4052d28919ea5b1a213cc7  challenge-5-16-0
+a6f1a1626d296f68c11895bdf4d8b0948a5239feea35f1cfeb3e96a4228bd901  challenge-3-34-0
 EOF
 
 verify() {
@@ -89,9 +90,17 @@ done
 # The real challenges are plain bzip2 files rather than tarballs, and are indexed by `n` for the
 # encryption types and by `m` for the signature ones: `challenge-6-16-0` is type VI, m = 16,
 # seed 0, and its header says n = 24.
+#
+# `challenge-3-34-0` is the smallest real *encryption* instance (type III's range starts at n = 34)
+# and is far past what the solvers reach. It is fetched because it is the only evidence for one of
+# the three generator classes of `docs/research/fukuoka-mq.md` §7.3 — real encryption resamples the
+# value 31 and still keeps its constant column out of the stream — and
+# `mq_generator::tests::test_a_published_instance_is_generated_coefficient_for_coefficient` asserts
+# it. 115 kB.
 CHALLENGES="
 VI/challenge-6-16-0
 V/challenge-5-16-0
+III/challenge-3-34-0
 "
 for challenge in $CHALLENGES; do
     name="${challenge##*/}"
