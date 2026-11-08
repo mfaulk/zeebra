@@ -699,3 +699,141 @@ The closure-equivalence checks run in the ordinary test suite and need no instan
 ```sh
 cargo nextest run -E 'test(push_time_deduplication) + test(the_monomial_queue)'
 ```
+
+## 11. The re-diagnosis asked for in §10.4 (#453)
+
+§10.4 closed by naming a question it had no reason to ask before #305:
+
+> Whether a much longer budget and an external supervisor would finish that batch is a question
+> this document cannot answer and did not previously have any reason to ask.
+
+This section answers it, and the answer corrects a reading the recorded figures invite.
+
+**Authorization and protocol.** `docs/MILESTONE-COMPETITIVE-MQ-SOLVING.md` §9 authorizes the III
+n=20 re-diagnosis at **≤ 30 min wall and ≤ 32 GB peak RSS**, and authorizes **no completion
+attempt**. Both caps were enforced externally and neither was approached. Machine and protocol as
+§4: `taskset --cpu-list 0-7`, every run under `tools/benchlock.sh`, an external
+`tools/rss-guard.sh` matching the measured binary by `/proc/<pid>/comm` and never by `pgrep -f`
+(#328), launched under `setsid` so the run outlives its launcher (#344). The ISA floor was
+**verified and not assumed** — `cargo build -v` shows `target-cpu=x86-64-v3`.
+
+Taken at `96bf1969`, whose base is `b7847824` on `main`. The delta from that base is `CLAUDE.md`
+and two files under `scripts/agent/` — **no Rust at all**, so it cannot affect a measurement, and
+the recorded `patch_id` is what lets a later reader check that rather than take it on trust.
+
+### 11.1 §10.3's attribution reproduces at current `main`
+
+Same instrument, same two rungs, three milestones later:
+
+| | §10.3 | here | agreement |
+| --- | ---: | ---: | --- |
+| degree-5 rung, process `VmHWM` | 1 496.5 MB | **1 495.5 MB** | 0.07% |
+| the basis, held twice | 904.6 MB, 60.4% | **904.6 MB, 60.5%** | exact |
+| matrix entries — the budgeted quantity | 186.4 MB, 12.5% | **186.4 MB, 12.4%** | exact |
+| pending monomial queue | 3.1 MB, 0.21% | **3.1 MB** | exact |
+| degree-4 rung, process `VmHWM` | 211.2 MB | **213.1 MB** | 0.9% |
+| degree-4, matrix construction's stage peak | 109.7 MB, 51.9% | **109.7 MB** | exact |
+| degree-4, the basis held twice | 40.4 MB, 19.1% | **40.4 MB** | exact |
+
+The counter-derived rows are exact because they are counts times `size_of` and the counts did not
+move; only the two allocator-measured peaks differ at all, and by under 1%. **§10.3 stands as
+written**, and the site that binds at the degree-5 rung is still the basis held twice.
+
+### 11.2 Doubling the entry budget buys nothing, and the recorded figure never bounded the demand
+
+The authorized run raised `max_live_nonzeros` to 40 000 000 — past the 20 001 424 the record names
+— with `max_live_bytes` already at 64 GB so that the raised knob genuinely binds (#322's trap does
+not apply to this tier, and `BudgetReport` prints which of the two it is). Against the record it
+replaces:
+
+| budget | reported "needed" | **excess over its own budget** | degree | last completed stage | elapsed |
+| ---: | ---: | ---: | ---: | --- | ---: |
+| 10 000 000 | 10 000 178 | **178** | 4 | generation | 5.0 s |
+| 20 000 000 | 20 001 424 | **1 424** | 5 | generation | 67.5 s |
+| **40 000 000** | **40 003 287** | **3 287** | **5** | generation | **66.9 s** |
+
+**The refusal tracks the budget.** Each run stops a few thousand entries past whatever limit it was
+given, which means the number the record reports is **the budget plus one step, not the demand.**
+Read on its own, `20 001 424 live nonzero entries were needed, over the limit of 20 000 000` invites
+the inference that a 0.01% larger budget would clear it. Doubling the budget does not clear it.
+
+And doubling it does not buy progress of any other kind either: same degree, same stage, same
+resource, and **66.9 s against 67.5 s** — a 0.9% difference, which is noise on this instrument. The
+twenty million additional entries were consumed inside the same operation with no measurable time
+and no additional degree.
+
+So the degree-5 batch's entry demand is **greater than 40 000 000 (> 640 MB of entries)** and these
+measurements do not bound it above. That is a statement about what was measured, not an estimate.
+
+### 11.3 What binds, and the branch this selects
+
+#453 offered four branches. The measurement selects the second:
+
+> **the entry budget again, now agreeing with the resource consumed** → the barrier is matrix size
+> at degree 5.
+
+Both halves hold. The budget binds — `max_live_nonzeros` is the named resource at every rung, and
+`BudgetReport` confirms the byte budget has slack. And it now agrees with the resource consumed, as
+§10.4 said: the run peaks at 1 495.5 MB and refuses on the quantity its budget is written in,
+against the pre-#305 state where it reached 14 GB and refused on a 186 MB matrix.
+
+What the re-diagnosis adds to §10.4 is that this is **not** a near miss. §10.4 established the
+obstacle was "time alone, at a working set an order of magnitude smaller"; the first branch — time
+alone, a costed single run to the owner — would have followed from that. It is wrong. The run does
+not spend its budget getting further; it stops in the same place at twice the budget. **The barrier
+is the size of the degree-5 matrix, and no authorized budget reaches it.**
+
+### 11.4 The cost of a completion, and its dominant term is unmeasured by construction
+
+| term | value | measured? |
+| --- | ---: | --- |
+| everything before the degree-5 batch | ~66 s | **measured**, and stable across both budgets |
+| the degree-5 batch's entry demand | **> 40 000 000 entries, > 640 MB** | **a lower bound only** |
+| peak RSS at the degree-5 refusal | 1 495.5 MB | measured |
+| of which the basis, held twice | 904.6 MB, 60.5% | measured (a floor — §10.3's 1.0–1.5 GB) |
+| the degree-5 batch's wall clock | **unknown** | **not measured, and not bounded** |
+
+**The dominant term is the one that is unmeasured**, and this is the #410 situation stated in
+advance rather than discovered later: a guard that models only the terms it can price authorizes
+runs whose cost is in the term it cannot. No completion is costed here, and none should be
+authorized on this section — §9's prohibition stands and this measurement strengthens rather than
+weakens it.
+
+Two things would make the dominant term measurable, and neither is this issue: a budget ladder that
+locates the degree-5 entry demand rather than bounding it below, and the representation question
+M27-A owns — at 60.5% of peak, the basis held twice is what makes a larger matrix unaffordable in
+memory even where it is affordable in time.
+
+**Magma V2.19-9 solved this instance in 259.27 s** on a 1 TB machine in 2015
+(`fukuoka-mq.md:644`). That licenses **no ratio** — `classical-benchmarks.md:160` forbids a
+wall-clock comparison against a figure of that age, and Magma is not installed here. What it
+establishes is that the target exists: this instance is solvable by an F4 on one machine. It is not
+a budget for this machine, and §9 says so explicitly.
+
+### 11.5 Reproducing §11
+
+```sh
+tools/fetch-mq-challenge.sh && tools/fetch-mq-challenge.sh --verify
+
+# §11.1, the attribution at both rungs. f4_memory reads VmHWM itself, so no pid hazard.
+export CARGO_TARGET_DIR="$PWD/target-rediagnosis" RUSTC_WRAPPER=""
+cargo build --release --example f4_memory --example scoreboard
+cargo build -v --release --example f4_memory | grep target-cpu   # must show x86-64-v3
+for rung in 20000000 10000000; do
+  ZEEBRA_MAX_ENTRIES=$rung ZEEBRA_WALL_SECONDS=1800 taskset --cpu-list 0-7 \
+    ./target-rediagnosis/release/examples/f4_memory mq fukuoka-mq-III-n20-seed0
+done
+
+# §11.2's third row, the authorized run: one instance, --write, never --all, externally guarded.
+tools/rss-guard.sh f4_memory fukuoka-mq-III-n20-seed0 $((32 * 1024 * 1024)) --poll 10 --wait 2400 &
+ZEEBRA_MACHINE=fedora ZEEBRA_AFFINITY=0-7 ZEEBRA_WALL_SECONDS=1620 ZEEBRA_MAX_ENTRIES=40000000 \
+  tools/benchlock.sh zb-453 timeout --signal=INT --kill-after=60s 1800 taskset --cpu-list 0-7 \
+  ./target-rediagnosis/release/examples/scoreboard mq fukuoka-mq-III-n20-seed0 --write
+```
+
+`end=exited` in `$HOME/.zeebra/benchlock.log` is what asserts the run completed; `status=0` does not
+(#344). The guard's exit 0 means the ceiling was never crossed, and **exit 1 means nothing was
+guarded and is not a pass**. Two traps cost time here and are worth stating: `rss-guard`'s
+`--wait` defaults to **60 s**, which a run queued behind another agent's lock will exceed, leaving
+it unguarded; and one guard cannot span several rungs, because it returns 0 at its first non-match
+and would report a clean run for the gap between them.
