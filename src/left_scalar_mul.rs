@@ -16,15 +16,14 @@
 
 use crate::{
     fields::{
-        BinaryFieldElement, ExtensionFieldElement, IrreduciblePolynomial, PrimeFieldElement128,
-        PrimeFieldElement256, PrimeFieldElement32, PrimeFieldElement64, PrimeModulus256,
+        BinaryFieldElement, ExtensionFieldElement, IrreduciblePolynomial, PrimeFieldElement256,
+        PrimeFieldElement32, PrimeFieldElement64, PrimeModulus256,
     },
     impl_left_scalar_mul,
 };
 
 impl_left_scalar_mul!([const P: u32], PrimeFieldElement32<P>);
 impl_left_scalar_mul!([const P: u64], PrimeFieldElement64<P>);
-impl_left_scalar_mul!([const P: u128], PrimeFieldElement128<P>);
 impl_left_scalar_mul!([M: PrimeModulus256], PrimeFieldElement256<M>);
 impl_left_scalar_mul!([const P: u64], BinaryFieldElement<P>);
 impl_left_scalar_mul!(
@@ -32,8 +31,21 @@ impl_left_scalar_mul!(
     ExtensionFieldElement<P, N, M>
 );
 
+/// `PrimeFieldElement128` is deprecated by #163 but still public, so it keeps the operators.
+///
+/// The module exists only to scope `allow(deprecated)` over the expansion: a lint attribute on a
+/// macro invocation is inert, and the expansion names the deprecated type sixteen times.
+#[allow(deprecated)]
+mod deprecated_prime_field_128 {
+    use crate::{fields::PrimeFieldElement128, impl_left_scalar_mul};
+
+    impl_left_scalar_mul!([const P: u128], PrimeFieldElement128<P>);
+}
+
 #[cfg(test)]
 mod tests {
+    // Zp221360928884514619393 is deprecated by #163; the coverage test still has to name it.
+    #[allow(deprecated)]
     use crate::{
         fields::{Bn254Fr, Gf13Pow4, Gf256, KoalaBear, Zp13, Zp221360928884514619393},
         linalg::{Matrix, Vector},
@@ -108,6 +120,7 @@ mod tests {
     /// struct, with `Gf13Pow4` standing for `ExtensionFieldElement` and `Bn254Fr` for
     /// `PrimeFieldElement256`.
     #[test]
+    #[allow(deprecated)] // PrimeFieldElement128 is still a struct the crate defines.
     fn test_the_field_list_covers_every_field_type() {
         fn covered<F>()
         where
