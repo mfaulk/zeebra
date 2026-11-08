@@ -338,6 +338,67 @@ is deliberately unwired; it would serve as the criterion here.
 
 ---
 
+## 3b. #440 stage 2: the windowed merge, and where the divisor tail actually lands
+
+Three reps, interleaved between this change and its parent, one session, on the lock, pinned, both
+artifacts' ISA floor verified. The division route is what `mq` measures, so this is an A/B on the
+merge alone.
+
+| rep | unwindowed total | windowed total | ratio | unwindowed stage | windowed stage | ratio |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 41 373.19 | 38 945.18 | 1.062x | 35 744.99 | 33 051.01 | 1.082x |
+| 2 | 42 473.61 | 41 083.92 | 1.034x | 36 889.26 | 35 261.24 | 1.046x |
+| 3 | 41 771.20 | 38 216.97 | 1.093x | 35 909.35 | 32 617.00 | 1.101x |
+
+**Median 1.073x end to end. The windowed side's own run-to-run spread is 1.075x.**
+
+So the effect is **inside the noise band**, and well inside the ~20% this repository reads
+differences at. What can be said is weaker than a ratio and still worth saying: the sign is
+consistent **3 of 3**, paired within each rep, at 3.4%–9.3%. That is evidence the change is not a
+regression. **It is not a measured speedup and is not quoted as one.**
+
+### 3b.1 And that answers #440's own open question, in the opposite direction to its guess
+
+#440's comment reasoned about where the shifted tail lands:
+
+> The shifted tail is `q · tail(d)`, bounded above by `q · lead(d)`, which is exactly the term just
+> popped — i.e. `working`'s old maximum. So the tail lands *below the old top but plausibly near
+> it*, and the comparison region then spans almost all of `working` in order to place terms
+> clustered at its far end. The cheap memcpy region gets what is left, which may be almost nothing.
+>
+> **This is a hypothesis about where the tail lands, not a measurement.**
+
+If that were right, the prefix below `q · tail_min` would be almost all of `working` and windowing
+would remove almost all of the comparison work — a large win, not a 7% one. The measurement says the
+prefix is **small**, so `q · tail_min` lands near `working`'s *bottom* and the shifted tail **spans
+most of the working polynomial** rather than clustering near its top. With a mean tail of 34.3 terms
+over a mean working length of 2 199, the tail is sparse across a wide span rather than dense in a
+narrow one.
+
+**The consequence, stated plainly: the 64.2x amplification is largely irreducible by windowing.**
+Most of those 1.17 billion rewrites are inside the span the tail genuinely straddles, and no merge
+boundary removes them. Two routes remain:
+
+- **#440 stage 3, heap division**, which is what removes the per-step live set rather than
+  narrowing it. Its own staging said stage 3 should be reached "only if stage 2 leaves the copies
+  dominant"; the measurement says stage 2 leaves *most of the work* dominant, which is a stronger
+  trigger than the one it wrote.
+- **#471's matrix route**, which does not narrow the rewrite or make it cheaper: it does not perform
+  it. Measured at **4.18x** (§3a), against this change's unmeasurable ~7%.
+
+So the ordering the evidence supports is the one §3a already took: replace the stage, and keep the
+windowed merge because it is free, correct and marginally positive for the division route that
+remains on FGLM border reduction, the differential oracles and `multi_div_rem`.
+
+### 3b.2 What this does not establish
+
+The per-step region split #440 stage 1 asked for is **still not measured directly** — this infers
+the prefix's size from an end-to-end ratio, which is a weaker instrument than counting it. A
+`terms_below_window` counter beside the existing ones would turn the inference into a measurement,
+and is the honest remaining item on #440.
+
+---
+
 ## 4. Reproducing
 
 ```sh
@@ -366,4 +427,7 @@ ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
 
 # The stage in isolation, over a basis from a real trace. Both routes, same input.
 tools/benchlock.sh <tag> taskset -c 0-7 cargo bench --bench f4_stages -- interreduction
+
+# #440 stage 2's A/B is between two commits rather than two flags, so it needs two builds
+# from one tree into separate target directories, interleaved. See §3b.
 ```
