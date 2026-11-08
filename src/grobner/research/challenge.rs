@@ -1308,12 +1308,55 @@ const INITIATIVE: ChallengeProgram = ChallengeProgram {
 /// The Fukuoka MQ Challenge.
 const FUKUOKA: ChallengeProgram = ChallengeProgram {
     name: "Fukuoka MQ Challenge",
-    version: "toy examples, retrieved 2026-11-05",
+    version:
+        "toy examples retrieved 2026-11-05; type VI m = 16 challenge file retrieved 2026-11-07",
     url: "https://www.mqchallenge.org/",
     reward: None,
     redistribution: "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved; instance files are \
                      not redistributed here and are fetched by tools/fetch-mq-challenge.sh",
 };
+
+/// No published figure for this row, which is not the same as none having been looked for.
+const NO_REFERENCE_POINTS: &[ReferencePoint] = &[];
+
+/// The challenge's own recorded solves at the three sizes this crate imports and a solver reached.
+///
+/// Transcribed from `research/fukuoka-mq/solved-instances.tsv`, which names the detail page each
+/// figure came from. Every one of the three is tagged `wall-total` in that fixture; five figures on
+/// the site are per-subsystem costs of a hybrid attack rather than campaign totals, and none of
+/// these three is one of them. See `docs/research/fukuoka-mq.md` §8.2 and §8.4.
+const HUANG_2015_III_N20: &[ReferencePoint] = &[ReferencePoint {
+    source: "Fukuoka MQ Challenge submission details, details/details_III_cs.html, accessed \
+             2026-11-07",
+    parameters: "type III, n = 20, m = 40, seed 0",
+    step: "whole solve, wall-clock total",
+    reported_time: "259.27 seconds",
+    reported_memory: None,
+    hardware: "Intel Xeon E5-4617 @ 2.90 GHz, 1 TB RAM",
+    software: "Magma V2.19-9, F4",
+}];
+
+const HUANG_2015_VI_N15: &[ReferencePoint] = &[ReferencePoint {
+    source: "Fukuoka MQ Challenge submission details, details/details_VI_cs.html, accessed \
+             2026-11-07",
+    parameters: "type VI, m = 10, n = 15, seed 0",
+    step: "whole solve, wall-clock total",
+    reported_time: "2764.41 seconds",
+    reported_memory: None,
+    hardware: "Intel Xeon E5-4617 @ 2.90 GHz, 1 TB RAM",
+    software: "Magma V2.19-9, F4",
+}];
+
+const FAUGERE_2015_VI_N24: &[ReferencePoint] = &[ReferencePoint {
+    source: "Fukuoka MQ Challenge submission details, details/details_VI_20150401.html, accessed \
+             2026-11-07",
+    parameters: "type VI, m = 16, n = 24, seed 0",
+    step: "whole solve, wall-clock total",
+    reported_time: "5280 seconds",
+    reported_memory: None,
+    hardware: "Intel Xeon E5-2670 v2 @ 2.50 GHz",
+    software: "F5 - FGb",
+}];
 
 /// How a CICO answer is checked without trusting anything that produced it.
 const CICO_VERIFIER: &str = "CicoInstance::is_solution rebuilds the input state and runs \
@@ -1901,7 +1944,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
         }
     }
 
-    for (id, kind, n, m, sha256, external, notes) in [
+    for (id, kind, n, m, sha256, external, reference_points, notes) in [
         (
             "fukuoka-mq-III-n10-seed0",
             "III",
@@ -1909,8 +1952,10 @@ pub fn registry() -> Vec<ChallengeManifest> {
             20usize,
             "9436e45dbd4247f152681e954f1db19d92e8cf5e76b2bc35530bed74aae522ba",
             ExternalStatus::PublishedWithAnswer,
+            NO_REFERENCE_POINTS,
             "The overdetermined encryption family. Published with its answer so an \
-             implementation can check itself; 45 variables short of the smallest real challenge.",
+             implementation can check itself; 24 variables short of the smallest type III \
+             challenge and 14 short of the smallest importable one.",
         ),
         (
             "fukuoka-mq-III-n15-seed0",
@@ -1919,6 +1964,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             30,
             "1dcee7e5e1a5dad4885471fed133158d6bce7a61822ed4aa39a1f91c9264b97b",
             ExternalStatus::PublishedWithAnswer,
+            NO_REFERENCE_POINTS,
             "The next published type III size up from n = 10.",
         ),
         (
@@ -1928,6 +1974,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             40,
             "ecb087b4128d490dd0931b877f7827786d3f49fa27facabde629d9e1f057e072",
             ExternalStatus::PublishedWithAnswer,
+            HUANG_2015_III_N20,
             "The largest published type III toy example.",
         ),
         (
@@ -1937,6 +1984,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             7,
             "9512b6032be415ae8391b72ed8ad4f43357bafa4f0058d60b06dba3537a41af3",
             ExternalStatus::PublishedWithAnswer,
+            NO_REFERENCE_POINTS,
             "The signature family: n > m, so positive-dimensional as published. A specialized \
              slice is a different problem and is registered as its own instance when run.",
         ),
@@ -1947,6 +1995,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             10,
             "ad22fe9a065688453b481fe8cb0e2990f3207920dc83e8c64f8dea2651b5e888",
             ExternalStatus::PublishedWithAnswer,
+            HUANG_2015_VI_N15,
             "Five surplus variables rather than three, so a specialization campaign has a larger \
              slice space.",
         ),
@@ -1959,9 +2008,33 @@ pub fn registry() -> Vec<ChallengeManifest> {
             ExternalStatus::NoneRecorded {
                 as_of: "2026-11-05",
             },
-            "The smallest size in the real challenge rather than the toy examples. Registered to \
-             show the gap and deliberately not implemented: SUPPORTED_DIMENSIONS stops at 20, and \
-             its file checksum is empty because this registry does not hold those bytes.",
+            NO_REFERENCE_POINTS,
+            "Registered to show the gap and deliberately not implemented; its file checksum is \
+             empty because this registry does not hold those bytes. Note that n = 55 is type I's \
+             range: type III publishes n = 34..=53, so this row is the smallest size in *a* real \
+             challenge and not in type III's — #501.",
+        ),
+        (
+            // The first row in this family that is challenge data rather than a toy example. The
+            // generator's `n = m * 1.5` assigns a double to an int, so m = 16 is n = 24 and not
+            // n = 26 at m = 17; that truncation is why 24 is the dimension to compile.
+            "fukuoka-mq-VI-n24-seed0",
+            "VI",
+            24,
+            16,
+            "354de307fa5524d01c8a6ece3c712c27119cf3388bdd7a3e1c84095ed6cc43de",
+            // Solved externally rather than open: the hall of fame records m = 16..=24 for type VI,
+            // and seed 0 at m = 16 is Faugère's 2015 F5-FGb submission. A witness here would be a
+            // reproduction, which is the honest reading and the weaker one.
+            ExternalStatus::SolvedExternally {
+                verified: "2015-04-01",
+            },
+            FAUGERE_2015_VI_N24,
+            "The smallest real challenge in a type this crate can import: type VI at m = 16, so \
+             n = 24 and eight surplus variables. Underdetermined and therefore \
+             positive-dimensional as published — a run of it is a run of slice(8 fixed, seed s), \
+             which is a result about that slice. No instance bytes and no answer vector are \
+             committed; the checksum names the file tools/fetch-mq-challenge.sh fetches.",
         ),
     ] {
         challenges.push(ChallengeManifest {
@@ -1980,8 +2053,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             program: FUKUOKA,
             external,
             method: default_method(external),
-            // No published cost figure for this row; see ReferencePoint.
-            reference_points: &[],
+            reference_points,
             verifier: MQ_VERIFIER,
             notes,
         });
@@ -2108,7 +2180,7 @@ mod tests {
         fields::{PrimeFieldElement64, Zp18446744073709551263},
         grobner::research::{
             anemoi_cico::{dispatch_anemoi_cico, verify_against_anemoi_trace, AnemoiCicoVisitor},
-            verify_against_trace, KOALABEAR_PRIME,
+            verify_against_trace, KOALABEAR_PRIME, SUPPORTED_DIMENSIONS,
         },
         FiniteField, KnownOrder, MultivariatePolynomial,
     };
@@ -2349,6 +2421,9 @@ mod tests {
             ("fukuoka-mq-VI-n10-seed0", "2558f4bccd7d"),
             ("fukuoka-mq-VI-n15-seed0", "0345980a26d8"),
             ("fukuoka-mq-III-n55-seed0", "f3ac89821637"),
+            // #454. Appended, so the six frozen digests above keep both their order and their
+            // values — and they did: notes and reference points are paperwork, not identity.
+            ("fukuoka-mq-VI-n24-seed0", "e97e852ee8f0"),
         ];
         let registry = registry();
         assert_eq!(registry.len(), expected.len(), "a row was added or removed");
@@ -2761,6 +2836,54 @@ mod tests {
                 assert!(m < n, "{}", manifest.id);
             }
         }
+    }
+
+    /// Every signature row's shape is the one the generator computes, truncation included.
+    ///
+    /// `generateCoef_sig.h` assigns `m * 1.5` to an `int`, so `m = 17` is `n = 25` rather than 26.
+    /// A row that wrote the rounded value, or that transposed `n` and `m`, would name an instance
+    /// the challenge does not publish while still passing every other check here.
+    #[test]
+    fn test_the_signature_rows_use_the_generators_truncated_shape() {
+        for manifest in registry() {
+            let ChallengeParameters::MqSystem { kind, n, m, .. } = manifest.parameters else {
+                continue;
+            };
+            if kind != "VI" {
+                continue;
+            }
+            assert_eq!(n, 3 * m / 2, "{} is not floor(3m/2)", manifest.id);
+        }
+    }
+
+    /// The `n = 24` row is a real challenge instance, importable, and a reproduction if solved.
+    ///
+    /// Type VI at `m = 16` is the smallest published instance in any type this crate can import,
+    /// and the row only means anything if `dispatch` actually reaches its dimension — the two were
+    /// out of step for as long as `SUPPORTED_DIMENSIONS` stopped at 20 (#454).
+    #[test]
+    fn test_the_smallest_real_challenge_row_is_importable() {
+        let row = challenge("fukuoka-mq-VI-n24-seed0").expect("registered");
+        let ChallengeParameters::MqSystem {
+            kind, n, m, sha256, ..
+        } = row.parameters
+        else {
+            panic!("an MQ row");
+        };
+        assert_eq!((kind, n, m), ("VI", 24, 16));
+        assert_eq!(sha256.len(), 64, "the fetched file's bytes are named");
+        assert!(
+            SUPPORTED_DIMENSIONS.contains(&n),
+            "registered at a dimension dispatch cannot reach"
+        );
+        // Faugère solved this instance in 2015, so a witness here reproduces rather than opens.
+        assert_eq!(
+            row.significance(true),
+            Significance::Reproduction {
+                externally_verified: "2015-04-01"
+            }
+        );
+        assert_eq!(row.reference_points.len(), 1, "the published comparand");
     }
 
     /// `FCICO` and `PCICO` at the same round count have **different** identities.
