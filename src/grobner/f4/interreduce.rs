@@ -265,7 +265,8 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     // the fill-in and not of the shape. Measured on `katsura-11` under grevlex, a 104 403 x 105 427
     // matrix is built at 11 311 802 entries — inside the default 20 000 000 allowance, which is why
     // #507 found every budget satisfied — and reduced at a high-water of 103 865 277 live entries,
-    // **5.19x the allowance**, in a run peaking at 13 148 MB against the division route's 536 MB.
+    // **5.19x the allowance**, in a run peaking at 13 144.3 MB against the division route's
+    // 533.0 MB.
     // `docs/research/f4-resource-scaling.md` §11 has the attribution.
     //
     // So the same allowance is applied here, which is what `F4Options::max_live_nonzeros` already

@@ -377,7 +377,7 @@ pub struct F4Options {
     /// back-substitution clears every pivot column out of every row holding one, and on
     /// `katsura-11` under grevlex that takes 9.18x the entries the matrix was built with and 5.19x
     /// the allowance that admitted the construction. Until the budget looked at that number, the
-    /// route could take a 532.5 MB computation to 13 142.5 MB with every limit satisfied. So a rung
+    /// route could take a 533.0 MB computation to 13 144.3 MB with every limit satisfied. So a rung
     /// whose interreduction working set exceeds
     /// [`live_entry_allowance`](Self::live_entry_allowance) now **falls back by default**, and
     /// running it by matrix is a matter of raising the allowance deliberately — see

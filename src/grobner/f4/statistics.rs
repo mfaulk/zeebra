@@ -34,7 +34,7 @@ pub struct MatrixInterreduction {
     /// Entries the rows' buffers were allocated for at that high-water.
     ///
     /// The figure that explains the resident cost. On `katsura-11` the payload above is 1 584.9 MB
-    /// against a 13 142.5 MB process peak, and this is **18 126.4 MB** — more than the peak,
+    /// against a 13 144.3 MB process peak, and this is **18 126.4 MB** — more than the peak,
     /// because capacity is reserved and `VmHWM` counts touched pages, so the one site covers the
     /// whole of it. The gap is
     /// [`SparseRow::subtract_scaled`](crate::linalg::sparse::SparseRow::subtract_scaled) reserving

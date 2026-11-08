@@ -29,11 +29,11 @@ nothing, and — separately — **the budget is not what bounds the memory.**
 > memory. No stop reason and no default changed, so §§3-9 still reproduce.
 >
 > **M27 (#536) added §12**, which does the same for the stage after the batch loop. The matrix
-> interreduction route took `katsura-11` from 532.5 MB to **13 142.5 MB with every budget
+> interreduction route took `katsura-11` from 533.0 MB to **13 144.3 MB with every budget
 > satisfied**, because the live-entry allowance was checked at construction and not at elimination.
 > The peak is **one allocation** — the `SparseRow` entry buffers during back-substitution, 1 584.9 MB
 > of payload held in 18 126.4 MB of capacity — and the budget saw the construction's 172.6 MB.
-> Budgeting the elimination takes the same run to **1 080.9 MB**. §§1-10 are unaffected: the batch
+> Budgeting the elimination takes the same run to **1 083.7 MB**. §§1-10 are unaffected: the batch
 > loop's allowance already covered its own elimination.
 
 ## 1. What M23 left open
@@ -855,7 +855,7 @@ and would report a clean run for the gap between them.
 
 §9 and §10 attribute the **batch loop's** memory. This attributes the stage that runs after it, and
 it exists because [#507](https://github.com/mfaulk/zeebra/issues/507) found a configuration that
-takes `katsura-11` from **532.5 MB to 13 142.5 MB with every budget satisfied** — the matrix
+takes `katsura-11` from **533.0 MB to 13 144.3 MB with every budget satisfied** — the matrix
 interreduction route — and could not say where the bytes were.
 
 ### 12.1 What was unbudgeted, and why the shape could not show it
@@ -909,7 +909,7 @@ is `(usize, Zp2147483647)` = **16 B**.
 | the batch loop's own high-water, over 11 batches | 260.9 | 1.98% | 17 099 200 entries x 16 B — **inside the 20 000 000 allowance**, which is why #507 found every budget satisfied |
 | the column vector and the monomial-to-column map | 8.8 | 0.07% | 105 427 monomials x `Monomial<11>` = 44 B, twice; a payload figure, excluding the map's table slack |
 | the preprocessed row vector, held twice | 14.3 | 0.11% | 104 403 rows x `PreprocessedRow<11>` = 72 B, twice (`Preprocessed` and `MacaulayMatrix` each hold one) |
-| **measured `VmHWM`** | **13 142.5** | 100% | the example's own in-process read; `/usr/bin/time -v` reports 13 457 960 kB on the same run, the same figure |
+| **measured `VmHWM`** | **13 144.3** | 100% | the example's own in-process read; `/usr/bin/time -v` reports 13 459 732 kB on the same run, the same figure |
 
 **The answer is one allocation, and it is not the one #536 suspected.** The issue named the closure
 "built as polynomials before it becomes rows". It is not: `interreduction_rows` stores a row as a
@@ -921,28 +921,28 @@ and the single named site accounts for the entire peak with 1.38x to spare.
 18 126.4 MB. The ratio is not allocator policy — a `Vec`'s doubling would give at most 2x — it is
 `subtract_scaled`'s reserve-and-swap: every row the pass touches acquires a buffer sized for the
 worst-case merge and keeps it after cancellation shortens the row. **At most 72.5%** of that
-capacity is ever written, which is the 13 142.5 MB against 18 126.4 MB — at most, because the
+capacity is ever written, which is the 13 144.3 MB against 18 126.4 MB — at most, because the
 resident figure also covers the basis, the columns, and everything else the process holds.
 
 All "MB" in this section are the 1024-based megabytes `util::peak_resident_bytes` and the example
-print, which is also what `kB` means in `/proc` and in `rusage`: 13 457 960 / 1024 = 13 142.5, so
+print, which is also what `kB` means in `/proc` and in `rusage`: 13 459 732 / 1024 = 13 144.3, so
 the two instruments agree exactly rather than approximately.
 
 ### 12.4 The amplification grows with the rung, so one rung does not locate it
 
 | rung | matrix | built | elimination payload | x built | buffer capacity | x payload | `VmHWM` by matrix | by division | x |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `katsura-9` | 7 977 x 8 233 | 413 640 | 1 966 015 | 4.75x | 12 157 282 | 6.18x | 165.4 MB | 23.7 MB | 6.98x |
-| `katsura-10` | 26 839 x 27 351 | 2 113 826 | 13 260 077 | 6.27x | 102 979 071 | 7.77x | 1 215.4 MB | 103.4 MB | 11.75x |
-| **`katsura-11`** | **104 403 x 105 427** | **11 311 802** | **103 865 277** | **9.18x** | **1 187 934 712** | **11.44x** | **13 142.5 MB** | **532.5 MB** | **24.68x** |
+| `katsura-9` | 7 977 x 8 233 | 413 640 | 1 966 015 | 4.75x | 12 157 282 | 6.18x | 164.5 MB | 24.3 MB | 6.77x |
+| `katsura-10` | 26 839 x 27 351 | 2 113 826 | 13 260 077 | 6.27x | 102 979 071 | 7.77x | 1 217.6 MB | 101.5 MB | 11.99x |
+| **`katsura-11`** | **104 403 x 105 427** | **11 311 802** | **103 865 277** | **9.18x** | **1 187 934 712** | **11.44x** | **13 144.3 MB** | **533.0 MB** | **24.66x** |
 
 Both ratios rise monotonically, which is why a size threshold on the matrix shape would not have
 worked: rows grow **3.4x** and then **3.9x** a rung while the elimination payload grows **6.7x** and
 then **7.8x**, so a threshold calibrated on one rung's shape is wrong by about 2x at the next.
 
 `katsura-9` and `katsura-10` are **inside** the default allowance at 1.97 M and 13.26 M live entries
-and are admitted, as they should be — `katsura-10`'s 1 215.4 MB against the division route's
-103.4 MB is a real 11.75x, and it is the amplification of §12.3 rather than a budget failure.
+and are admitted, as they should be — `katsura-10`'s 1 217.6 MB against the division route's
+101.5 MB is a real 11.99x, and it is the amplification of §12.3 rather than a budget failure.
 Removing it is [#554](https://github.com/mfaulk/zeebra/issues/554), not this issue.
 
 ### 12.5 The budget, and what the refusal costs
@@ -953,12 +953,12 @@ and falls back, recording `MatrixRefusal::LiveEntries`:
 
 | arm | wall | interreduction stage | `VmHWM` | verdict |
 |---|---:|---:|---:|---|
-| division (the default) | 274 168.7 ms | 217 950.1 ms | **532.5 MB** | — |
-| matrix, allowance lifted | 112 558.6 ms | 57 671.1 ms | **13 142.5 MB** | the pass ran |
-| **matrix, default allowance** | 294 312.4 ms | 236 709.1 ms | **1 080.9 MB** | **refused at 20 000 020 live entries, fell back** |
+| division (the default) | 281 453.9 ms | 227 501.9 ms | **533.0 MB** | — |
+| matrix, allowance lifted | 110 695.7 ms | 55 762.2 ms | **13 144.3 MB** | the pass ran |
+| **matrix, default allowance** | 284 226.2 ms | 230 855.6 ms | **1 083.7 MB** | **refused at 20 000 020 live entries, fell back** |
 
-So the pass that could reach 13.1 GB now costs **1 080.9 MB**, a **12.16x** reduction, and the
-remaining 548.4 MB over the division route's own peak is the attempt: the 104 403 x 105 427 matrix
+So the pass that could reach 13.1 GB now costs **1 083.7 MB**, a **12.13x** reduction, and the
+remaining 550.7 MB over the division route's own peak is the attempt: the 104 403 x 105 427 matrix
 plus elimination filled to the 20 000 000-entry ceiling, which is 305.2 MB of payload by
 construction. That is the sense in which the cost is now visible to a limit — it is proportional to
 the allowance a caller set, not to what the instance happens to want.
@@ -991,7 +991,7 @@ export CARGO_TARGET_DIR=/path/outside/the/worktree RUSTC_WRAPPER=""
 unset RUSTFLAGS
 cargo build --release --example interreduce_working_set
 
-# One arm per process. katsura-11 is ~114 s by matrix and ~277 s by division.
+# One arm per process. katsura-11 is 111-114 s by matrix and 274-281 s by division.
 for arm in unbounded division default; do
   tools/benchlock.sh <tag> taskset --cpu-list 0-7 \
     ./target/release/examples/interreduce_working_set katsura-11 --arm "$arm"
@@ -1003,10 +1003,18 @@ for rung in katsura-9 katsura-10; do
 done
 ```
 
-Every figure in §§12.3-11.5 is from **one** locked run at `5fb72c5e`, this branch's docs commit, in
-twelve minutes: two rungs x two arms plus `katsura-11` x three. The counters are deterministic and
-reproduce to the unit across three separate runs of the campaign; only the wall times and the
-resident figures move, by under 0.5%.
+Every figure in §§12.3-12.5 is from **one** locked run, in twelve minutes: two rungs x two arms plus
+`katsura-11` x three arms. The binary was built at the commit this section's code lands in; the
+commits after it change a doc comment and this section only, so the measured code is that
+commit's.
+
+**Three campaigns, and what moved between them.** The campaign was run three times during this
+work, at different ambient loads. Every *counter* is identical to the unit across all three —
+11 311 802 built, 103 865 277 live, 1 187 934 712 allocated, 20 000 020 at the refusal, and the same
+104 403 x 105 427 shape — which is what makes the attribution a measurement rather than a sample.
+`VmHWM` moved by **under 0.05%** (13 142.5 / 13 144.3 / 13 148.0 MB) and the wall times by up to
+**7%**, which is this machine's spread with a dozen agents on it and is why the memory ratio is the
+figure this section rests on and the wall times are reported but not compared.
 
 The example reads `VmHWM` itself, so §2's pid hazard does not arise; the `/usr/bin/time -v`
 cross-check in §12.3 was taken through `taskset` and agrees, because `%M` comes from `wait4`'s

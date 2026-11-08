@@ -4394,7 +4394,7 @@ matrix is written *and* after every row operation, because the two quantities ar
 `katsura-11` under grevlex the interreduction matrix is built at 11 311 802 entries and reduced at a
 high-water of **103 865 277**, 9.18x the construction and 5.19x the allowance that admitted it. Until
 [#536](https://github.com/mfaulk/zeebra/issues/536) the matrix interreduction route checked only the
-construction, so it could take a 532.5 MB computation to **13 142.5 MB with every budget satisfied**;
+construction, so it could take a 533.0 MB computation to **13 144.3 MB with every budget satisfied**;
 it now refuses and falls back, recording `MatrixRefusal::LiveEntries`. See
 [`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §11 for the
 attribution and `cargo run --release --example interreduce_working_set` to reproduce it.
@@ -4552,7 +4552,7 @@ and the method; `cargo run --release --example f4_memory` reproduces it on any s
 
 **And the same question for the final interreduction**, which no per-batch probe reaches. §11
 attributes the matrix route's `katsura-11` peak to the elimination's **row buffers**: the payload at
-the high-water is 1 584.9 MB of a 13 142.5 MB peak, and the capacity those buffers were *allocated*
+the high-water is 1 584.9 MB of a 13 144.3 MB peak, and the capacity those buffers were *allocated*
 for is **18 126.4 MB** — more than the peak, because capacity is reserved and `VmHWM` counts touched
 pages, so that one site covers the whole of it. The budget was looking at the construction's
 172.6 MB. `MatrixInterreduction::peak_nonzeros` and `peak_entry_capacity` report the two; `cargo run
