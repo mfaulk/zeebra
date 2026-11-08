@@ -326,7 +326,9 @@ impl CompetitiveRecord {
     /// the same one. Left to `Environment::comparable` alone the board paired them, which doubled
     /// its own pair count and ratioed a cold row against a warm one. Checked here rather than in
     /// `Environment` because that type is shared with the cryptanalysis scoreboard, whose own
-    /// comparability rules are #77's to change.
+    /// comparability rules are #77's to change — written out in
+    /// `docs/research/mq-comparison-methodology.md` §2, which also records that the startup floor
+    /// below is this board's and deliberately not the scoreboard's.
     pub fn comparable_with(&self, other: &CompetitiveRecord) -> bool {
         self.problem_digest == other.problem_digest
             && self.task == other.task
