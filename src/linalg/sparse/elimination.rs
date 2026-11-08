@@ -50,6 +50,32 @@ pub struct EliminationStatistics {
     pub pivot_inversions: usize,
 }
 
+/// What a sparse elimination's row buffers were allocated for, at their high-water mark.
+///
+/// # Why this is not an [`EliminationStatistics`] field
+///
+/// Because every field of that struct is a count of **work**, and
+/// `test_every_backend_reports_the_same_elimination_statistics` holds the backends to reporting the
+/// same ones for the same elimination. The dense backends compute it through one dense buffer and
+/// have no row buffers at all, so a field they all left at zero would either break that check or
+/// have to be excluded from it at every comparison site. This is an *allocator* measurement, which
+/// `docs/research/f4-resource-scaling.md` §9.1 keeps separate from the solver's own counters for
+/// the same reason.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct EntryBufferPeak {
+    /// Entries the rows' buffers, plus the merge scratch, were *allocated* for at the high-water.
+    ///
+    /// [`EliminationStatistics::peak_nonzeros`] is what the mathematics needs; this is what the
+    /// allocator holds, and the two are not close. [`SparseRow::subtract_scaled`] reserves the
+    /// merge's worst case and swaps the buffer in, so a row that cancelled down keeps the capacity
+    /// the merge might have needed and nothing shrinks it — 11.44x the payload on `katsura-11`'s
+    /// interreduction matrix (#536, #554).
+    ///
+    /// Reported rather than budgeted: a budget has to count a quantity a caller can reason about on
+    /// another machine, which is the payload. This is the amplification between it and the bytes.
+    pub capacity: usize,
+}
+
 /// Reduce `matrix` to row echelon form in place, and report the work done.
 ///
 /// Every nonzero row of the result has a unit leading coefficient and a leading column distinct
@@ -78,6 +104,18 @@ pub fn row_echelon_within<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     max_nonzeros: usize,
 ) -> Result<EliminationStatistics, usize> {
+    row_echelon_tracked(matrix, max_nonzeros, &mut EntryBufferPeak::default())
+}
+
+/// [`row_echelon_within`], folding the row buffers' high-water into `buffers`.
+///
+/// Out-parameter rather than a second return value so that the bounded and tracked forms are one
+/// implementation: a second copy of this loop is a second place for the budget check to drift from.
+fn row_echelon_tracked<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    max_nonzeros: usize,
+    buffers: &mut EntryBufferPeak,
+) -> Result<EliminationStatistics, usize> {
     let initial_nonzeros = matrix.nonzeros();
     let mut statistics = EliminationStatistics {
         initial_nonzeros,
@@ -92,6 +130,12 @@ pub fn row_echelon_within<F: FiniteField>(
     // the matrix, so its own entries are added back in when the peak is sampled.
     let mut resident = statistics.initial_nonzeros;
 
+    // The same bookkeeping over the buffers rather than the payload, which is the figure #536's
+    // attribution needed: a `Vec` the merge grew and cancellation did not shrink is resident
+    // whatever its length says.
+    let mut allocated = matrix.entry_capacity();
+    buffers.capacity = buffers.capacity.max(allocated);
+
     // Which row is the pivot for a given column, indexed by the column. Never iterated, so no
     // storage order can reach the result.
     let mut pivot_of_column = PivotIndex::new(matrix.num_columns(), matrix.num_rows());
@@ -102,6 +146,7 @@ pub fn row_echelon_within<F: FiniteField>(
         // one is written. A pivot's index is always one already processed, so never this one.
         let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
         resident -= row.nonzeros();
+        allocated -= row.capacity();
 
         while let Some(column) = row.leading_column() {
             match pivot_of_column.pivot_of(column) {
@@ -116,6 +161,9 @@ pub fn row_echelon_within<F: FiniteField>(
                     statistics.row_operations += 1;
                     let live = resident + row.nonzeros();
                     statistics.peak_nonzeros = statistics.peak_nonzeros.max(live);
+                    buffers.capacity = buffers
+                        .capacity
+                        .max(allocated + row.capacity() + scratch.capacity());
                     if live > max_nonzeros {
                         return Err(live);
                     }
@@ -135,7 +183,9 @@ pub fn row_echelon_within<F: FiniteField>(
             statistics.zero_rows += 1;
         }
         resident += row.nonzeros();
+        allocated += row.capacity();
         statistics.peak_nonzeros = statistics.peak_nonzeros.max(resident);
+        buffers.capacity = buffers.capacity.max(allocated + scratch.capacity());
         matrix.rows_mut()[index] = row;
     }
 
@@ -170,16 +220,31 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
 /// crossed the limit and `matrix` should not be read, exactly as [`row_echelon_within`].
 ///
 /// Added for F4's batch path (#477), which has a live-entry allowance to respect and so could not
-/// call the unbounded form. [`crate::grobner::f4`]'s final interreduction works around the same
-/// gap by budgeting at matrix *construction* instead, which bounds what is built rather than what
-/// elimination then makes of it.
+/// call the unbounded form. The final interreduction used to work around the same gap by budgeting
+/// at matrix *construction* instead — which bounds what is built rather than what elimination then
+/// makes of it, and let `katsura-11` reach 13 144.3 MB with every limit satisfied. It calls
+/// [`reduced_row_echelon_tracked`] since #536.
 pub fn reduced_row_echelon_within<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     max_nonzeros: usize,
 ) -> Result<EliminationStatistics, usize> {
-    let mut statistics = row_echelon_within(matrix, max_nonzeros)?;
-    back_substitute_pivots_within(matrix, max_nonzeros, &mut statistics)?;
-    Ok(statistics)
+    reduced_row_echelon_tracked(matrix, max_nonzeros).map(|(statistics, _)| statistics)
+}
+
+/// [`reduced_row_echelon_within`], also reporting what the row buffers were allocated for.
+///
+/// The attribution entry point. #536 needed the figure because the payload the budget counts is a
+/// *twelfth* of what the machine pays on `katsura-11`'s interreduction matrix, and the difference
+/// is one nameable allocation rather than allocator slack; see
+/// `docs/research/f4-resource-scaling.md` §12.
+pub fn reduced_row_echelon_tracked<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    max_nonzeros: usize,
+) -> Result<(EliminationStatistics, EntryBufferPeak), usize> {
+    let mut buffers = EntryBufferPeak::default();
+    let mut statistics = row_echelon_tracked(matrix, max_nonzeros, &mut buffers)?;
+    back_substitute_pivots_tracked(matrix, max_nonzeros, &mut statistics, &mut buffers)?;
+    Ok((statistics, buffers))
 }
 
 /// Clear every pivot column from every other row, so a pivot column holds one nonzero entry.
@@ -198,8 +263,29 @@ pub fn back_substitute_pivots_within<F: FiniteField>(
     max_nonzeros: usize,
     statistics: &mut EliminationStatistics,
 ) -> Result<usize, usize> {
+    back_substitute_pivots_tracked(
+        matrix,
+        max_nonzeros,
+        statistics,
+        &mut EntryBufferPeak::default(),
+    )
+}
+
+/// [`back_substitute_pivots_within`], folding the row buffers' high-water into `buffers`.
+///
+/// This pass is where the figure comes from: it clears every pivot column out of every row holding
+/// one, so a large share of the rows acquire a buffer sized for a merge against a long pivot row
+/// within a single sweep.
+fn back_substitute_pivots_tracked<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    max_nonzeros: usize,
+    statistics: &mut EliminationStatistics,
+    buffers: &mut EntryBufferPeak,
+) -> Result<usize, usize> {
     let mut scratch: Vec<(usize, F)> = Vec::new();
     let mut resident = statistics.final_nonzeros;
+    let mut allocated = matrix.entry_capacity();
+    buffers.capacity = buffers.capacity.max(allocated);
     let mut rows_examined = 0usize;
 
     // Pivot columns, right to left. The sort stays: the rows are visited in row order, and what
@@ -235,10 +321,13 @@ pub fn back_substitute_pivots_within<F: FiniteField>(
             );
             let mut row = std::mem::take(&mut matrix.rows_mut()[index]);
             resident -= row.nonzeros();
+            allocated -= row.capacity();
             row.subtract_scaled(matrix.row(pivot_index), &factor, &mut scratch);
             statistics.row_operations += 1;
             resident += row.nonzeros();
+            allocated += row.capacity();
             statistics.peak_nonzeros = statistics.peak_nonzeros.max(resident);
+            buffers.capacity = buffers.capacity.max(allocated + scratch.capacity());
             matrix.rows_mut()[index] = row;
             if resident > max_nonzeros {
                 return Err(resident);
@@ -325,7 +414,8 @@ impl PivotColumnRows {
 mod tests {
     use super::{
         back_substitute_pivots_within, reduced_row_echelon, reduced_row_echelon_counting_rows,
-        reduced_row_echelon_within, row_echelon, row_echelon_within, EliminationStatistics,
+        reduced_row_echelon_tracked, reduced_row_echelon_within, row_echelon, row_echelon_within,
+        EliminationStatistics,
     };
     use crate::{
         fields::{Zp13, Zp2147483647, Zp541, Zp7},
@@ -1351,6 +1441,74 @@ mod tests {
             Ok(reduced)
         );
         assert_eq!(bounded, reduced_copy);
+    }
+
+    /// The row buffers' peak is counted, is at least the payload, and exceeds it where the merge
+    /// grew a row that cancellation then shortened — #536's attribution.
+    ///
+    /// `peak_nonzeros` is what the mathematics needs and `EntryBufferPeak::capacity` is what the
+    /// allocator holds. The gap is the whole finding, so a test that only checked the first would
+    /// pass against an implementation that never measured the second.
+    #[test]
+    fn test_the_entry_capacity_is_counted_above_the_payload() {
+        // Distinct leading columns, so the forward pass does nothing and all the fill-in is the
+        // back-substitution's. No cancellation here, so capacity merely tracks the payload.
+        let width = 20;
+        let mut rows: Vec<SparseRow<F>> = (0..3)
+            .map(|k| SparseRow::new(&[(k, F::ONE), (3, F::ONE)]))
+            .collect();
+        rows.push(SparseRow::new(
+            &(3..width).map(|c| (c, F::ONE)).collect::<Vec<_>>(),
+        ));
+        let growing = SparseMatrix::new(width, rows);
+        let (statistics, buffers) = reduced_row_echelon_tracked(&mut growing.clone(), usize::MAX)
+            .expect("an unbounded elimination cannot refuse");
+        assert!(
+            buffers.capacity >= statistics.peak_nonzeros,
+            "a buffer holds at least what is in it: {} against {}",
+            buffers.capacity,
+            statistics.peak_nonzeros
+        );
+
+        // And a matrix whose rows all cancel to zero shows the gap: each merges to full width and
+        // then collapses, and the buffer the merge reserved stays.
+        let width = 24;
+        let dense = SparseRow::new(&(0..width).map(|c| (c, F::ONE)).collect::<Vec<_>>());
+        let duplicates = SparseMatrix::new(width, vec![dense; width]);
+        let (collapsing, collapsed) =
+            reduced_row_echelon_tracked(&mut duplicates.clone(), usize::MAX)
+                .expect("an unbounded elimination cannot refuse");
+        assert_eq!(
+            collapsing.zero_rows,
+            width - 1,
+            "every row but the first cancels"
+        );
+        assert!(
+            collapsed.capacity > collapsing.peak_nonzeros,
+            "the buffers outlive the entries that grew them: {} against {}",
+            collapsed.capacity,
+            collapsing.peak_nonzeros
+        );
+    }
+
+    /// The tracked form computes exactly what the untracked one does; only the extra figure is new.
+    #[test]
+    fn test_tracking_the_buffers_changes_nothing_else() {
+        let mut rng = StdRng::seed_from_u64(0x0005_3601);
+        for (rows, columns) in [(8usize, 8usize), (16, 24), (24, 16)] {
+            for density in [0.1, 0.5, 1.0] {
+                let matrix = random_sparse::<F>(rows, columns, density, &mut rng);
+                let mut untracked = matrix.clone();
+                let expected = reduced_row_echelon_within(&mut untracked, usize::MAX)
+                    .expect("unbounded cannot refuse");
+                let mut tracked = matrix.clone();
+                let (statistics, buffers) = reduced_row_echelon_tracked(&mut tracked, usize::MAX)
+                    .expect("unbounded cannot refuse");
+                assert_eq!(statistics, expected, "{rows}x{columns} at {density}");
+                assert_eq!(tracked, untracked, "{rows}x{columns} at {density}");
+                assert!(buffers.capacity >= statistics.peak_nonzeros);
+            }
+        }
     }
 
     /// A budget below the input is refused before any work, by both passes alike.

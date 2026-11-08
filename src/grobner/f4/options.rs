@@ -372,6 +372,17 @@ pub struct F4Options {
     /// end. If any budget would be crossed, the division route runs instead, which always
     /// terminates within the same memory the old default used. The fallback is recorded in
     /// [`super::F4Statistics::interreduction_matrix`] rather than being silent.
+    ///
+    /// **The entry budget covers the elimination and not only the construction**, which is #536:
+    /// back-substitution clears every pivot column out of every row holding one, and on
+    /// `katsura-11` under grevlex that takes 9.18x the entries the matrix was built with and 5.19x
+    /// the allowance that admitted the construction. Until the budget looked at that number, the
+    /// route could take a 533.0 MB computation to 13 144.3 MB with every limit satisfied. So a rung
+    /// whose interreduction working set exceeds
+    /// [`live_entry_allowance`](Self::live_entry_allowance) now **falls back by default**, and
+    /// running it by matrix is a matter of raising the allowance deliberately — see
+    /// [`with_live_budget`](Self::with_live_budget) — which is what makes the cost visible to a
+    /// limit rather than to the machine.
     pub interreduce_by_matrix: bool,
 
     /// Leave each batch's rows in **reduced** row echelon form rather than merely echelon.

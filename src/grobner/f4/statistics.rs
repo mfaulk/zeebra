@@ -24,6 +24,22 @@ pub struct MatrixInterreduction {
     pub columns: usize,
     /// Nonzero entries at construction.
     pub nonzeros: usize,
+    /// Nonzero entries live at once at elimination's high-water mark.
+    ///
+    /// Reported beside [`Self::nonzeros`] because the two are far apart and only this one is
+    /// comparable with the live-entry allowance: on `katsura-11` under grevlex the matrix is built
+    /// at 11 311 802 entries and reduced at 103 865 277, 5.19x the 20 000 000 the allowance admits
+    /// (#536). Zero when the route fell back, since no elimination ran.
+    pub peak_nonzeros: usize,
+    /// Entries the rows' buffers were allocated for at that high-water.
+    ///
+    /// The figure that explains the resident cost. On `katsura-11` the payload above is 1 584.9 MB
+    /// against a 13 144.3 MB process peak, and this is **18 126.4 MB** — more than the peak,
+    /// because capacity is reserved and `VmHWM` counts touched pages, so the one site covers the
+    /// whole of it. The gap is
+    /// [`SparseRow::subtract_scaled`](crate::linalg::sparse::SparseRow::subtract_scaled) reserving
+    /// the merge's worst case and nothing shrinking it afterwards (#536).
+    pub peak_entry_capacity: usize,
     /// Elements in the minimized basis, i.e. how many rows were seeds rather than reducers.
     pub elements: usize,
     /// Set when a budget refused the matrix and the division route ran instead.
@@ -48,8 +64,13 @@ pub enum MatrixRefusal {
     Rows { limit: usize },
     /// The matrix needed more distinct monomials than `max_matrix_columns`.
     Columns { limit: usize },
-    /// The matrix needed more nonzero entries than the live-entry allowance.
+    /// The matrix needed more nonzero entries than the live-entry allowance **to build**.
     Nonzeros { nonzeros: usize },
+    /// Elimination's fill-in crossed the live-entry allowance.
+    ///
+    /// The refusal #536 added, and the one that fires in practice: a matrix well inside the
+    /// allowance at construction can be reduced at tens of times it.
+    LiveEntries { nonzeros: usize },
 }
 
 /// Where the time in a batch, or in a whole computation, went.

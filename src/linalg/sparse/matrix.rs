@@ -82,6 +82,11 @@ impl<F: FiniteField> SparseMatrix<F> {
         self.rows.iter().map(|row| row.nonzeros()).sum()
     }
 
+    /// The entries the rows' buffers are allocated for. See [`SparseRow::capacity`].
+    pub fn entry_capacity(&self) -> usize {
+        self.rows.iter().map(|row| row.capacity()).sum()
+    }
+
     /// The fraction of entries that are nonzero, or zero for a matrix with no entries at all.
     pub fn density(&self) -> f64 {
         let cells = self.num_rows() * self.num_columns;

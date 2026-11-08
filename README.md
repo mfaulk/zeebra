@@ -800,6 +800,7 @@ cargo run --release --example f4_statistics        # F4, beside Buchberger
 cargo run --release --example f4_profile           # F4, cost attributed per stage
 cargo run --release --example f4_profile -- list   # the configurations available
 cargo run --release --example f4_memory            # F4, memory attributed per structure
+cargo run --release --example interreduce_working_set -- katsura-11 --arm unbounded
 cargo run --release --example f4_degrees           # F4, work and useful work per degree
 cargo run --release --example f4_schedule          # critical-pair order, and batch size, apart
 cargo run --release --example f4_schedule -- list  # the instances available
@@ -929,6 +930,14 @@ and prints each named structure's share against the measured peak. `ZEEBRA_MAX_E
 `ZEEBRA_WALL_SECONDS` set the entry cap and `max_wall_time`, so a rung of the
 `docs/research/f4-resource-scaling.md` ladder reproduces here with the attribution attached. Pass
 `mq <instance>` for a registered MQ instance, whose files `tools/fetch-mq-challenge.sh` fetches.
+
+`interreduce_working_set` is that question for the *final interreduction*, which `f4_memory`'s
+per-batch probe does not reach. It runs **one rung and one arm per process**, because peak resident
+size is a per-process reading: `--arm unbounded` lifts the live-entry allowance so the matrix pass
+runs to completion and reports its elimination's own high-water mark, `--arm default` is the shipped
+allowance where that pass refuses and falls back, and `--arm division` is the comparand the memory
+ratio is against. It is the instrument [#536](https://github.com/mfaulk/zeebra/issues/536) was
+settled with; `docs/research/f4-resource-scaling.md` §12 has the table it produced.
 
 `f4_degrees` is M22-0's baseline: one table per system giving, for each lcm degree, the pairs
 selected and discarded, the split of matrix rows into reducer scaffolding and pair halves, **the
@@ -4422,6 +4431,16 @@ The two agree over a 64-bit field, which is the width every F4 figure in
 byte budget binds only where it is needed. Whichever budget bound names the error:
 `F4Error::TooManyNonzeros` or `F4Error::TooManyLiveBytes`.
 
+**The allowance covers every elimination, final interreduction's included.** It is counted as the
+matrix is written *and* after every row operation, because the two quantities are not close: on
+`katsura-11` under grevlex the interreduction matrix is built at 11 311 802 entries and reduced at a
+high-water of **103 865 277**, 9.18x the construction and 5.19x the allowance that admitted it. Until
+[#536](https://github.com/mfaulk/zeebra/issues/536) the matrix interreduction route checked only the
+construction, so it could take a 533.0 MB computation to **13 144.3 MB with every budget satisfied**;
+it now refuses and falls back, recording `MatrixRefusal::LiveEntries`. See
+[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §12 for the
+attribution and `cargo run --release --example interreduce_working_set` to reproduce it.
+
 **That agreement is also a trap, so set the two together.** The effective limit is the `min`, and at
 the default over a 16-byte entry the two are numerically *identical* — `320_000_000 / 16` is exactly
 `20_000_000` — so **assigning one field alone changes the limit by nothing**, while the error goes on
@@ -4572,6 +4591,14 @@ suspect at `O(|G|²)` pairs, is **0.03%**. `F4Statistics` reports the counts:
 `max_pending_monomials`, `monomials_enqueued`, `peak_pair_queue`, `peak_basis_terms`.
 [`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §9 has the full table
 and the method; `cargo run --release --example f4_memory` reproduces it on any system.
+
+**And the same question for the final interreduction**, which no per-batch probe reaches. §12
+attributes the matrix route's `katsura-11` peak to the elimination's **row buffers**: the payload at
+the high-water is 1 584.9 MB of a 13 144.3 MB peak, and the capacity those buffers were *allocated*
+for is **18 126.4 MB** — more than the peak, because capacity is reserved and `VmHWM` counts touched
+pages, so that one site covers the whole of it. The budget was looking at the construction's
+172.6 MB. `MatrixInterreduction::peak_nonzeros` and `peak_entry_capacity` report the two; `cargo run
+--release --example interreduce_working_set` reproduces them.
 
 #### What the computation did before it ran out of room
 
