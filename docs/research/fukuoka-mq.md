@@ -17,17 +17,16 @@ If you are here for one question — *can an instance be reproduced without down
 answer is **yes, from three integers and a published file of π**, and §7 has the recipe, the
 verification, and the two ways the challenge's own verifiers get it wrong.
 
-> **Superseded, 2026-11-08 (#70).** The paragraph below was true when it was written — the machine
-> was frozen for M26 — and was falsified by §4.1 (M23-D), §4.4 (#454) and §4.5 (#510), which were
-> appended afterwards. **The F4 baseline half of #70 is here**, in §4: §4.1 solves the published
-> type III `n = 10` in **111 ms** by grevlex F4 then FGLM, reports `D = 1`, and recovers the
-> published answer without being told it; §4.4 and §4.5 import and run the first *real* challenges
-> at `m = 16`. Kept rather than deleted because the sentence after it is still true and is the more
-> useful claim: §7–§10 are about provenance and published results, not about this crate's
-> performance.
+**§4 holds this crate's own F4 baseline.** §7–§10 do not: they are about provenance, the generator
+and published results, and nothing in them is a measurement of this crate.
 
-**The F4 baseline half of #70 is not here.** No run, no timing, no estimate. §4 holds measurements
-other work recorded; nothing in §7–§10 is a measurement of this crate.
+> **Superseded, 2026-11-08 (#70).** This paragraph used to read *"The F4 baseline half of #70 is not
+> here. No run, no timing, no estimate."* That was true when written — the machine was frozen for
+> M26 — and was falsified by §4.1 (M23-D), §4.4 (#454) and §4.5 (#510), appended afterwards. §4.1
+> solves the published type III `n = 10` in **111 ms** by grevlex F4 then FGLM, reports `D = 1`, and
+> recovers the published answer without being told it; §4.4 and §4.5 import and run the first *real*
+> challenges at `m = 16`. The sentence is quoted here rather than left standing above it, because a
+> correction a reader can skip past is not a correction.
 
 ---
 
