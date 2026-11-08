@@ -265,6 +265,21 @@ pub(crate) struct InterreductionStopped {
     pub elements: usize,
 }
 
+/// The minimized basis final interreduction reduces, sorted as the reduction loop sorts it.
+///
+/// Both interreduction routes start here: the division loop reduces these elements one at a time,
+/// and the matrix route makes each of them a row. Shared so that neither route can disagree with
+/// the other about what "minimized" means — the matrix route's pivot argument depends on no
+/// leading monomial dividing another, which is exactly what minimization establishes.
+pub(crate) fn minimal_basis_for_interreduction<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    let mut minimal = minimize_grobner_basis(g, order);
+    minimal.sort_by(|a, b| order.cmp(&a.0, &b.0));
+    minimal.into_iter().map(|(_, p)| p).collect()
+}
+
 /// [`reduce_grobner_basis`] over a basis F4 produced, for benchmarking the stage in isolation.
 ///
 /// # Why this is public
@@ -286,6 +301,31 @@ pub fn interreduce_for_benchmark<const N: usize, F: FiniteField>(
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
     reduce_grobner_basis(g, order)
+}
+
+/// The matrix interreduction route over the same input, for the same reason.
+///
+/// Paired with [`interreduce_for_benchmark`] so a benchmark can time the two routes over one
+/// basis. #471's claim is a ratio between them, and a ratio taken from two groups whose inputs
+/// were built separately would carry the difference between the inputs.
+#[doc(hidden)]
+pub fn interreduce_by_matrix_for_benchmark<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+) -> Vec<MultivariatePolynomial<N, F>> {
+    let minimal = minimal_basis_for_interreduction(g, order);
+    match crate::grobner::f4::interreduce::interreduce_by_matrix(
+        minimal,
+        order,
+        usize::MAX,
+        usize::MAX,
+        usize::MAX,
+        || false,
+    ) {
+        Ok((reduced, _)) => reduced,
+        // Unreachable: every budget is unbounded and the predicate is constant `false`.
+        Err(_) => unreachable!("an unbounded, never-stopping interreduction cannot abort"),
+    }
 }
 
 /// What final interreduction cost, split by the two things it does.

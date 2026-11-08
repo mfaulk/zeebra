@@ -11,6 +11,47 @@ use crate::{
     grobner::pairs::CriterionCounts, linalg::sparse::EliminationStatistics, poly::NormalFormCounts,
 };
 
+/// The shape of the one matrix a matrix interreduction built, and whether it ran at all.
+///
+/// Reported because the stage's cost is a property of this shape, and because the comparand's is
+/// known: Groebner.jl's `f4_autoreduce!` on `mq-random-10` built **250 x 604** and spent 1.74 ms
+/// in it (`docs/research/groebner-jl-gap.md` §4).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct MatrixInterreduction {
+    /// Rows: the minimized basis elements, plus the reducer multiples the closure added.
+    pub rows: usize,
+    /// Columns, i.e. distinct monomials in the closure.
+    pub columns: usize,
+    /// Nonzero entries at construction.
+    pub nonzeros: usize,
+    /// Elements in the minimized basis, i.e. how many rows were seeds rather than reducers.
+    pub elements: usize,
+    /// Set when a budget refused the matrix and the division route ran instead.
+    ///
+    /// A run that fell back produces the same basis by the old mechanism, so its timings describe
+    /// the division route and must not be quoted as the matrix route's.
+    pub fell_back: bool,
+
+    /// Which budget refused, when one did.
+    ///
+    /// Recorded rather than discarded for the reason #322 exists: that issue is three of F4's four
+    /// budgets having been discovered one refusal at a time, because a refusal named a budget that
+    /// was not the binding one. A fallback that reported only *that* it happened would repeat the
+    /// mistake on a new path.
+    pub refused_by: Option<MatrixRefusal>,
+}
+
+/// Which budget refused a matrix interreduction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MatrixRefusal {
+    /// The closure needed more rows than `max_matrix_rows`.
+    Rows { limit: usize },
+    /// The matrix needed more distinct monomials than `max_matrix_columns`.
+    Columns { limit: usize },
+    /// The matrix needed more nonzero entries than the live-entry allowance.
+    Nonzeros { nonzeros: usize },
+}
+
 /// Where the time in a batch, or in a whole computation, went.
 ///
 /// A total says a computation was slow. Only a breakdown says whether to attack preprocessing,
@@ -510,6 +551,14 @@ pub struct F4Statistics {
     ///
     /// Zero unless [`F4Options::measure_stages`](super::F4Options::measure_stages) is set.
     pub interreduction: NormalFormCounts,
+
+    /// What the matrix interreduction route did, when
+    /// [`F4Options::interreduce_by_matrix`](super::F4Options::interreduce_by_matrix) selected it.
+    ///
+    /// `None` when the division route ran — either because the flag was off, or because a budget
+    /// refused the matrix and the run fell back. The distinction is recorded rather than silent,
+    /// because a figure taken from a run that fell back is a figure about the division route.
+    pub interreduction_matrix: Option<MatrixInterreduction>,
 
     /// Elements in the minimized basis that final interreduction reduced.
     ///

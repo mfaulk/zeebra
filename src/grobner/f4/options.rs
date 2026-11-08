@@ -347,6 +347,33 @@ pub struct F4Options {
     /// Setting this implies the split that `measure_stages` records, so it does not need both.
     pub count_interreduction: bool,
 
+    /// Perform final interreduction as **one Macaulay matrix** rather than as one division per
+    /// basis element.
+    ///
+    /// Off by default until the A/B is on record, which is the discipline every other strategy
+    /// flag in this struct follows.
+    ///
+    /// # What it changes, and what it cannot change
+    ///
+    /// `docs/research/groebner-jl-gap.md` §3 measured the division route at **13 871x**
+    /// Groebner.jl's on `mq-random-10`, against 11.6x–97.1x for every other stage, and §4
+    /// attributes the outlier to the stage computing the right thing the wrong way. The matrix
+    /// route is the same computation Groebner.jl's `f4_autoreduce!` performs.
+    ///
+    /// It **cannot** change the answer: a reduced Gröbner basis is determined by its leading
+    /// monomials, so both routes return the same unique object, and
+    /// `interreduce::tests::test_the_matrix_route_reproduces_the_division_route` asserts exact
+    /// equality over three orders and two fields.
+    ///
+    /// # When it falls back
+    ///
+    /// The matrix is subject to the same row, column and entry budgets as any batch's — a stage
+    /// exempt from them would be a way to exceed the computation's budgets by waiting until the
+    /// end. If any budget would be crossed, the division route runs instead, which always
+    /// terminates within the same memory the old default used. The fallback is recorded in
+    /// [`super::F4Statistics::interreduction_matrix`] rather than being silent.
+    pub interreduce_by_matrix: bool,
+
     /// Break the work down by the degree it was done at, into
     /// [`super::F4Statistics::degrees`].
     ///
@@ -384,6 +411,7 @@ impl F4Options {
             reducer_cache: CacheMode::Off,
             measure_stages: false,
             count_interreduction: false,
+            interreduce_by_matrix: false,
             profile_degrees: false,
         }
     }

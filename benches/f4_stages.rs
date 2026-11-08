@@ -18,7 +18,8 @@
 //! matrix is wide, tall, a few entries per row, with leading entries colliding in low columns, and
 //! a density sweep does not reproduce that shape.
 //!
-//! - `interreduction` — the final pass, over the basis F4 actually produced.
+//! - `interreduction` / `interreduction_matrix` — the final pass over the basis F4 actually
+//!   produced, by iterated division and by one Macaulay matrix. #471's A/B.
 //!
 //! The groups are directly comparable to each other, because every one iterates over the same
 //! batches in the same order. Summing a system's group medians is *not* the whole computation:
@@ -44,7 +45,8 @@ use zeebra::{
             reduce_batch,
             symbolic::{symbolic_preprocessing_with, ReducerCache},
         },
-        interreduce_for_benchmark, trace_batches, F4Options, ReducerSelection,
+        interreduce_by_matrix_for_benchmark, interreduce_for_benchmark, trace_batches, F4Options,
+        ReducerSelection,
     },
     linalg::{echelon::row_echelon_with, Backend, DenseRows},
     MonomialOrder, MultivariatePolynomial,
@@ -324,6 +326,19 @@ fn bench_interreduction<const N: usize>(
             BatchSize::LargeInput,
         )
     });
+
+    // The same input through the matrix route, so the pair is #471's A/B and not two numbers
+    // taken over two inputs.
+    group.bench_function(
+        BenchmarkId::new("interreduction_matrix", label),
+        |bencher| {
+            bencher.iter_batched(
+                || basis.clone(),
+                |basis| black_box(interreduce_by_matrix_for_benchmark(basis, order)),
+                BatchSize::LargeInput,
+            )
+        },
+    );
 }
 
 fn stages(c: &mut Criterion) {
