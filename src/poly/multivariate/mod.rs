@@ -3,6 +3,7 @@
 mod dense_index;
 mod monomial;
 mod monomial_arithmetic;
+mod monomial_hash;
 mod monomial_order;
 mod multi_poly_parser;
 mod multivariate_gcd;
@@ -15,6 +16,7 @@ mod term;
 mod term_arithmetic;
 
 pub use monomial::Monomial;
+pub use monomial_hash::{BuildMonomialHasher, MonomialHasher, MonomialMap, MonomialSet};
 pub use monomial_order::MonomialOrder;
 pub use multivariate_gcd::{GcdRoute, SquarefreeError};
 pub use sparse_multivariate_multiply::{

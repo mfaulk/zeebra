@@ -27,7 +27,6 @@
 use std::{
     cmp::Ordering,
     collections::{HashSet, VecDeque},
-    hash::{BuildHasher, Hasher},
 };
 
 use crate::{
@@ -36,110 +35,8 @@ use crate::{
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
-/// A set of monomials, hashed the cheap way. See [`MonomialHasher`].
-pub type MonomialSet<const N: usize> = HashSet<Monomial<N>, BuildMonomialHasher>;
-
-/// A multiplicative hash over machine words, for keys that are a handful of integers.
-///
-/// A monomial is `[u32; N]`, and the closure traversal hashes one per monomial it meets — twice,
-/// once to decide whether the monomial has been examined and once to ask whether it is already
-/// covered. The standard library's `SipHash-1-3` is chosen to withstand adversarially chosen keys,
-/// and costs more per key than the work being guarded: the keys here are monomials the computation
-/// produced itself, and a caller who can choose them can already choose the ideal.
-///
-/// The construction is the one `rustc` uses for its own interned-key maps: rotate, xor the next
-/// word in, multiply by an odd constant.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct MonomialHasher {
-    hash: u64,
-}
-
-/// An odd 64-bit constant with a well-mixed bit pattern, from `rustc`'s `FxHasher`.
-const HASH_MULTIPLIER: u64 = 0x517c_c1b7_2722_0a95;
-
-impl MonomialHasher {
-    #[inline]
-    fn add(&mut self, word: u64) {
-        self.hash = (self.hash.rotate_left(5) ^ word).wrapping_mul(HASH_MULTIPLIER);
-    }
-}
-
-impl Hasher for MonomialHasher {
-    /// Eight bytes at a time.
-    ///
-    /// This is the path a monomial actually takes: `[u32; N]` hashes through the standard library's
-    /// `hash_slice` for integers, which hands the whole exponent array over as one byte slice. A
-    /// byte-at-a-time loop here turns a 28-byte key into 28 rounds and was measured to be *slower*
-    /// than the SipHash it replaced.
-    #[inline]
-    fn write(&mut self, bytes: &[u8]) {
-        // `as_chunks` rather than `chunks_exact`: the chunk size is a constant, so the array
-        // length is known to the compiler and `from_le_bytes` needs no fallible conversion.
-        let (words, tail) = bytes.as_chunks::<8>();
-        for word in words {
-            self.add(u64::from_le_bytes(*word));
-        }
-        if !tail.is_empty() {
-            let mut padded = [0u8; 8];
-            padded[..tail.len()].copy_from_slice(tail);
-            self.add(u64::from_le_bytes(padded));
-        }
-    }
-
-    #[inline]
-    fn write_u8(&mut self, value: u8) {
-        self.add(value as u64);
-    }
-
-    #[inline]
-    fn write_u16(&mut self, value: u16) {
-        self.add(value as u64);
-    }
-
-    #[inline]
-    fn write_u32(&mut self, value: u32) {
-        self.add(value as u64);
-    }
-
-    #[inline]
-    fn write_u64(&mut self, value: u64) {
-        self.add(value);
-    }
-
-    #[inline]
-    fn write_usize(&mut self, value: usize) {
-        self.add(value as u64);
-    }
-
-    /// The accumulator, with its high entropy folded down.
-    ///
-    /// The fold is not optional. A multiplicative accumulator leaves the *low* bits of the product
-    /// depending only on the low bits of the inputs, and `hashbrown` takes the bucket index from
-    /// exactly those bits — so returning the accumulator raw makes small exponent vectors collide
-    /// in droves. Measured, it doubled the cost of the stage it was meant to cheapen. The finalizer
-    /// is `splitmix64`'s: two shifts and a multiply.
-    #[inline]
-    fn finish(&self) -> u64 {
-        let mut hash = self.hash;
-        hash ^= hash >> 32;
-        hash = hash.wrapping_mul(0xd6e8_feb8_6659_fd93);
-        hash ^= hash >> 32;
-        hash
-    }
-}
-
-/// Builds a [`MonomialHasher`].
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BuildMonomialHasher;
-
-impl BuildHasher for BuildMonomialHasher {
-    type Hasher = MonomialHasher;
-
-    #[inline]
-    fn build_hasher(&self) -> MonomialHasher {
-        MonomialHasher::default()
-    }
-}
+/// The monomial hash lives in the polynomial layer, which also keys its term maps with it.
+pub use crate::poly::{BuildMonomialHasher, MonomialHasher, MonomialSet};
 
 /// What one symbolic preprocessing pass cost.
 ///
@@ -1125,8 +1022,8 @@ pub struct RowBudgetExceeded {
 mod tests {
     use super::{
         symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within,
-        BuildMonomialHasher, CacheMode, MonicBasis, MonomialSet, Preprocessed, PreprocessedRow,
-        ReducerCache, RowBudgetExceeded, RowKind, SymbolicCounts,
+        CacheMode, MonicBasis, MonomialSet, Preprocessed, PreprocessedRow, ReducerCache,
+        RowBudgetExceeded, RowKind, SymbolicCounts,
     };
 
     /// Three polynomials with tails and distinct leads, for the corruption tests below.
@@ -1838,46 +1735,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    /// The cheap monomial hasher agrees with equality, and is not degenerate on small exponents.
-    #[test]
-    fn test_monomial_hasher() {
-        use std::collections::hash_map::RandomState;
-        use std::hash::BuildHasher;
-
-        fn hash_of(monomial: &Monomial<4>) -> u64 {
-            BuildMonomialHasher.hash_one(monomial)
-        }
-
-        // Equal monomials hash equally, which is the only thing `Hash` actually requires.
-        let monomials: Vec<Monomial<4>> = (0..8)
-            .flat_map(|a| (0..8).map(move |b| Monomial::new(&[a, b, (a + b) % 5, 0])))
-            .collect();
-        for monomial in &monomials {
-            assert_eq!(
-                hash_of(monomial),
-                hash_of(&Monomial::new(monomial.exponents()))
-            );
-        }
-
-        // And distinctly: the low bits are what `hashbrown` buckets on, and an unfinalized
-        // multiplicative hash leaves them barely mixed. Compare bucket spread against the standard
-        // hasher on the same keys.
-        let mask = 63;
-        let mine: std::collections::HashSet<u64> =
-            monomials.iter().map(|m| hash_of(m) & mask).collect();
-        let standard = RandomState::new();
-        let theirs: std::collections::HashSet<u64> = monomials
-            .iter()
-            .map(|m| standard.hash_one(m) & mask)
-            .collect();
-        assert!(
-            mine.len() * 4 >= theirs.len() * 3,
-            "the low bits spread over {} buckets against the standard hasher's {}",
-            mine.len(),
-            theirs.len()
-        );
     }
 
     /// No row is duplicated: the same multiple is never added twice.

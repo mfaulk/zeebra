@@ -46,9 +46,9 @@ pub use poly::{
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
     is_permutation_polynomial, lagrange_interpolate, lcm, partial_bezout, permutation_exponents,
     pow_mod, resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd,
-    GcdRoute, GraeffeError, GraeffeStats, Monomial, MonomialOrder, MultivariatePolynomial,
-    Polynomial, PolynomialParams, PowerPermutation, SquarefreeError, SubgroupRoute,
-    UnivariatePolynomial,
+    BuildMonomialHasher, GcdRoute, GraeffeError, GraeffeStats, Monomial, MonomialHasher,
+    MonomialMap, MonomialOrder, MonomialSet, MultivariatePolynomial, Polynomial, PolynomialParams,
+    PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
 };
 #[doc(hidden)]
 pub use poly::{

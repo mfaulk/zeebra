@@ -8,7 +8,8 @@ pub use multivariate::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use multivariate::{
-    GcdRoute, Monomial, MonomialOrder, MultivariatePolynomial, NormalFormCounts, SquarefreeError,
+    BuildMonomialHasher, GcdRoute, Monomial, MonomialHasher, MonomialMap, MonomialOrder,
+    MonomialSet, MultivariatePolynomial, NormalFormCounts, SquarefreeError,
 };
 pub(crate) use univariate::multiply_dense;
 pub use univariate::{
