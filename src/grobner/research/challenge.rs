@@ -2015,9 +2015,9 @@ pub fn registry() -> Vec<ChallengeManifest> {
              challenge and not in type III's — #501.",
         ),
         (
-            // The first row in this family that is challenge data rather than a toy example. The
-            // generator's `n = m * 1.5` assigns a double to an int, so m = 16 is n = 24 and not
-            // n = 26 at m = 17; that truncation is why 24 is the dimension to compile.
+            // The first row in this family that is challenge data rather than a toy example.
+            // Type VI publishes m = 16..=35 and the generator computes n = m * 1.5, so the
+            // smallest of them is n = 24.
             "fukuoka-mq-VI-n24-seed0",
             "VI",
             24,

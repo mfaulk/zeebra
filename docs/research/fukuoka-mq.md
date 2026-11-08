@@ -435,9 +435,9 @@ grows is the width at that degree.
 ### 4.4 Type VI `m = 16`: the first real challenge, imported (M27-B, #454)
 
 `SUPPORTED_DIMENSIONS` now reaches **24**, and `fukuoka-mq-VI-n24-seed0` is the first row in this
-family that is **challenge data rather than a toy example**. Type VI publishes `m = 16..=35`; the
-generator computes `n = m * 1.5` into an `int`, so `m = 16` is `n = 24` — not 26 at `m = 17`, which
-is 25. The file's own header confirms it:
+family that is **challenge data rather than a toy example**. Type VI publishes `m = 16..=35`, and the
+generator computes `n = m * 1.5` into an `int`, so the smallest of those is `n = 24`. The file's own
+header confirms it:
 
 ```text
 Galois Field : GF(31)
@@ -451,6 +451,11 @@ polynomial (`binomial(26, 2)`), fetched by `tools/fetch-mq-challenge.sh`. **No i
 answer vector and no coefficient are committed** — §3 is unchanged by this, and a real challenge
 publishes no answer at all, so the witness check here is evaluation against the imported
 coefficient vectors and nothing else.
+
+`m = 16` happens to be exact — `1.5 * 16` is 24 on the nose — and **the next size up is where the
+truncation bites**: `m = 17` is `n = 25`, not 26, because the `double` is assigned to an `int`
+(§7.1). So 24 and 25 are consecutive dimensions and not a step of two, which is what a reader
+extrapolating `1.5m` would expect.
 
 Everything below the dimension is still a toy example. Type III's smallest real instance is
 `n = 34`; `n = 24` is the smallest real instance in **any** type this crate can import.

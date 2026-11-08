@@ -409,9 +409,10 @@ impl std::error::Error for MqError {}
 /// Variable counts this build can turn into polynomials.
 ///
 /// The three toy-example sizes plus **24**, which is where the real challenge starts in a type this
-/// crate can import: type VI publishes `m = 16..=35`, the generator computes `n = m * 1.5` into an
-/// `int`, and `m = 16` therefore gives `n = 24`. Below it every importable instance is a toy example
-/// published so an implementation can check itself.
+/// crate can import: both signature families publish `m = 16..=35`, the generator computes
+/// `n = m * 1.5`, and `m = 16` therefore gives `n = 24`. So one arm serves two fields — type VI over
+/// GF(31) and type V over GF(2^8). Below it every importable instance is a toy example published so
+/// an implementation can check itself.
 ///
 /// The list stops there rather than covering the published ranges. Type III's real range is
 /// `n = 34..=53` and type I's is `n = 55..=100`, both far past anything the solvers reach; compiling
