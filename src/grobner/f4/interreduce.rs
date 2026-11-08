@@ -17,7 +17,7 @@
 //! fifths of the computation there.
 //!
 //! Every component of the replacement already existed: [`MacaulayMatrix`] builds the matrix,
-//! [`symbolic`](super::symbolic) finds the reducers, [`reduced_row_echelon`] eliminates, and
+//! [`symbolic`](super::symbolic) finds the reducers, [`reduced_row_echelon_tracked`] eliminates, and
 //! `minimize_grobner_basis` produces the row set. What was missing was the assembly.
 //!
 //! # Why the answer cannot change
@@ -44,7 +44,7 @@ use crate::{
         symbolic::{interreduction_rows, MonicBasis, ReducerCache, RowBudgetExceeded},
         ReducerSelection,
     },
-    linalg::sparse::reduced_row_echelon,
+    linalg::sparse::reduced_row_echelon_tracked,
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
@@ -60,8 +60,16 @@ pub(crate) enum MatrixInterreductionRefused {
     Rows { limit: usize },
     /// The matrix needed more distinct monomials than allowed.
     Columns { limit: usize },
-    /// The matrix needed more nonzero entries than allowed.
+    /// The matrix needed more nonzero entries than allowed **at construction**.
     Nonzeros { nonzeros: usize },
+    /// Elimination's fill-in took more entries live at once than allowed.
+    ///
+    /// Separate from [`MatrixInterreductionRefused::Nonzeros`] because the two are different
+    /// quantities against the same limit, and #536 is the gap between them: on `katsura-11` the
+    /// matrix is built at 11 311 802 entries — inside the 20 000 000-entry allowance — and reduced
+    /// at a high-water of **103 865 277**, 5.19x the allowance. A refusal that reported only
+    /// "nonzeros" would hide which of the two crossed, which is the mistake #322 is a record of.
+    LiveEntries { nonzeros: usize },
 }
 
 /// Why a matrix interreduction did not produce a basis.
@@ -72,11 +80,21 @@ pub(crate) enum MatrixInterreductionRefused {
 /// a milestone getting final interreduction down to one live copy of the basis — "one copy reaches
 /// it instead of three" — and a fallback implemented by cloning the input up front would hold two
 /// for the whole matrix pass, reinstating the cost on the path that is supposed to be the fast one.
+///
+/// # Why `Refused` also carries a report
+///
+/// Because a refusal on the elimination happens **after** the matrix exists, so its shape is known
+/// and is the most useful thing the record can hold: "fell back, and the matrix it would have
+/// reduced was 104 403 x 105 427 at 11 311 802 entries" says why, where a bare `fell_back` says
+/// only that it happened. The earlier refusals have no shape to report and leave the report at its
+/// default, which is the honest encoding of not knowing.
 pub(crate) enum MatrixInterreductionAborted<const N: usize, F: FiniteField> {
-    /// A budget refused the matrix, with the basis returned for the fallback.
+    /// A budget refused the matrix, with the basis returned for the fallback and whatever shape
+    /// had been established when it was refused.
     Refused(
         MatrixInterreductionRefused,
         Vec<MultivariatePolynomial<N, F>>,
+        MatrixInterreductionReport,
     ),
 
     /// The caller's stop predicate fired. The basis is **not** returned: `F4Error`'s contract is
@@ -94,6 +112,15 @@ pub(crate) struct MatrixInterreductionReport {
     pub columns: usize,
     /// Nonzero entries at construction.
     pub nonzeros: usize,
+    /// Nonzero entries live at once at elimination's high-water mark.
+    ///
+    /// The quantity that actually binds: reduced row echelon form clears every pivot column out of
+    /// every row holding one, and the entries that takes are not a function of the matrix's shape
+    /// or of its construction density. Zero on a basis too small to need a matrix.
+    pub peak_nonzeros: usize,
+    /// Entries the rows' buffers were *allocated* for at that high-water, which is the figure the
+    /// machine pays. See [`crate::linalg::sparse::EntryBufferPeak`].
+    pub peak_entry_capacity: usize,
     /// Elements in the minimized basis, which is how many rows were seeds rather than reducers.
     pub elements: usize,
 }
@@ -181,6 +208,10 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
         MatrixInterreductionAborted::Refused(
             MatrixInterreductionRefused::Rows { limit },
             minimal.clone(),
+            MatrixInterreductionReport {
+                elements,
+                ..Default::default()
+            },
         )
     })?;
 
@@ -197,15 +228,24 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
                         MatrixInterreductionRefused::Nonzeros { nonzeros }
                     }
                 };
-                MatrixInterreductionAborted::Refused(reason, minimal.clone())
+                MatrixInterreductionAborted::Refused(
+                    reason,
+                    minimal.clone(),
+                    MatrixInterreductionReport {
+                        elements,
+                        ..Default::default()
+                    },
+                )
             })?;
 
     stop_if_asked!(elements);
 
-    let report = MatrixInterreductionReport {
+    let mut report = MatrixInterreductionReport {
         rows: matrix.num_rows(),
         columns: matrix.num_columns(),
         nonzeros: matrix.matrix().nonzeros(),
+        peak_nonzeros: 0,
+        peak_entry_capacity: 0,
         elements,
     };
 
@@ -217,7 +257,39 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     // are what bound how long it can run.
     stop_if_asked!(elements);
 
-    reduced_row_echelon(matrix.matrix_mut());
+    // # The budget that binds, and why construction's is not it (#536)
+    //
+    // `max_nonzeros` bounded the entries the matrix was **built** with, and that is the smaller
+    // number by a factor this stage does not control: back-substitution clears every pivot column
+    // out of every row that holds one, so the live entry count during this call is a function of
+    // the fill-in and not of the shape. Measured on `katsura-11` under grevlex, a 104 403 x 105 427
+    // matrix is built at 11 311 802 entries — inside the default 20 000 000 allowance, which is why
+    // #507 found every budget satisfied — and reduced at a high-water of 103 865 277 live entries,
+    // **5.19x the allowance**, in a run peaking at 13 148 MB against the division route's 536 MB.
+    // `docs/research/f4-resource-scaling.md` §11 has the attribution.
+    //
+    // So the same allowance is applied here, which is what `F4Options::max_live_nonzeros` already
+    // documents itself as doing ("in construction and in elimination") and what the batch loop does
+    // through `reduced_row_echelon_within` since #477 — whose own doc comment names this stage as
+    // the one still budgeting construction instead. The basis is handed back on a crossing, so the
+    // caller falls back to the division route having paid the ceiling rather than the blow-up.
+    match reduced_row_echelon_tracked(matrix.matrix_mut(), max_nonzeros) {
+        Ok((statistics, buffers)) => {
+            report.peak_nonzeros = statistics.peak_nonzeros;
+            report.peak_entry_capacity = buffers.capacity;
+        }
+        Err(nonzeros) => {
+            // The partially reduced matrix is dropped on the way out, so the fallback starts from
+            // the basis alone. `minimal` is still owned here — `basis` borrowed it and is not read
+            // past construction — so the hand-back still costs no clone.
+            drop(matrix);
+            return Err(MatrixInterreductionAborted::Refused(
+                MatrixInterreductionRefused::LiveEntries { nonzeros },
+                minimal,
+                report,
+            ));
+        }
+    }
 
     // The row led by `lm(g_i)` is the reduced element with that leading monomial. Rows led by
     // anything else are reducer multiples, and rows that cancelled to zero have no leading column.
@@ -253,7 +325,7 @@ mod tests {
         grobner::{
             benchmark_systems::{cyclic, katsura},
             buchberger::{minimal_basis_for_interreduction, reduce_grobner_basis},
-            f4::f4_with_options,
+            f4::{f4_with_options, trace_batches},
             F4Options,
         },
         poly::MonomialOrder,
@@ -265,6 +337,36 @@ mod tests {
         MonomialOrder::GradedLexicographic,
         MonomialOrder::GradedReverseLexicographic,
     ];
+
+    /// The minimized basis the interreduction stage actually receives: F4's basis **before** the
+    /// stage runs, taken from the last traced batch as `benches/f4_stages.rs` does.
+    ///
+    /// Not `f4_with_options`'s return value, which is already interreduced — a reduced basis has
+    /// almost nothing left to close over, so the matrix built from it has no fill-in and could not
+    /// exercise an elimination budget.
+    fn before_interreduction<const N: usize, F: FiniteField>(
+        label: &str,
+        system: &[MultivariatePolynomial<N, F>],
+        order: MonomialOrder,
+    ) -> Vec<MultivariatePolynomial<N, F>> {
+        let (_, _, trace) = trace_batches(
+            system,
+            order,
+            &F4Options {
+                interreduce_by_matrix: false,
+                ..F4Options::default()
+            },
+        )
+        .unwrap_or_else(|error| panic!("{label} completes by the division route: {error}"));
+        let last = trace
+            .batches()
+            .last()
+            .unwrap_or_else(|| panic!("{label} reduces at least one batch"));
+        let basis: Vec<MultivariatePolynomial<N, F>> = (0..last.basis.len())
+            .map(|index| MultivariatePolynomial::new(&last.basis.element(index).terms))
+            .collect();
+        minimal_basis_for_interreduction(basis, order)
+    }
 
     /// Both routes over the same basis, asserted equal element for element.
     fn assert_routes_agree<const N: usize, F: FiniteField>(
@@ -359,26 +461,126 @@ mod tests {
             Err(MatrixInterreductionAborted::Refused(
                 MatrixInterreductionRefused::Rows { limit: 1 },
                 returned,
-            )) => assert_eq!(returned, minimal, "the basis comes back for the fallback"),
+                refused,
+            )) => {
+                assert_eq!(returned, minimal, "the basis comes back for the fallback");
+                assert_eq!(
+                    refused.rows, 0,
+                    "no matrix was built, so there is none to report"
+                );
+            }
             _ => panic!("expected a row refusal"),
         }
         match interreduce_by_matrix(minimal.clone(), order, usize::MAX, 1, usize::MAX, || false) {
             Err(MatrixInterreductionAborted::Refused(
                 MatrixInterreductionRefused::Columns { limit: 1 },
                 returned,
-            )) => assert_eq!(returned, minimal, "the basis comes back for the fallback"),
+                refused,
+            )) => {
+                assert_eq!(returned, minimal, "the basis comes back for the fallback");
+                assert_eq!(refused.columns, 0);
+            }
             _ => panic!("expected a column refusal"),
         }
         match interreduce_by_matrix(minimal.clone(), order, usize::MAX, usize::MAX, 1, || false) {
             Err(MatrixInterreductionAborted::Refused(
                 MatrixInterreductionRefused::Nonzeros { nonzeros },
                 returned,
+                refused,
             )) => {
                 assert!(nonzeros > 1, "the refusal reports what was needed");
                 assert_eq!(returned, minimal);
+                assert_eq!(refused.nonzeros, 0, "construction did not finish");
             }
             _ => panic!("expected a nonzero refusal"),
         }
+    }
+
+    /// The live-entry allowance covers elimination, not only construction — #536.
+    ///
+    /// An allowance that admits the matrix as **built** but not as **reduced** must refuse and hand
+    /// the basis back, rather than running the elimination it cannot afford. The figures are taken
+    /// from an unbounded run of the same input rather than written down, so the test asserts the
+    /// relation and not a constant.
+    #[test]
+    fn test_the_allowance_covers_the_elimination_and_not_only_the_construction() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let minimal = before_interreduction("katsura-6", &katsura::<6, Zp2147483647>(), order);
+
+        let (_, report) = interreduce_by_matrix(
+            minimal.clone(),
+            order,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            || false,
+        )
+        .unwrap_or_else(|_| panic!("an unbounded interreduction cannot abort"));
+        assert!(
+            report.peak_nonzeros > report.nonzeros,
+            "the premise of this test is that elimination fills the matrix in: built {}, peak {}",
+            report.nonzeros,
+            report.peak_nonzeros
+        );
+
+        // The allowance the defect lived in: large enough to build the matrix, too small to reduce
+        // it. The old budget saw only the first of those and ran anyway.
+        let allowance = report.peak_nonzeros - 1;
+        assert!(
+            allowance >= report.nonzeros,
+            "this allowance has to admit the construction, or the refusal would be the old one"
+        );
+        match interreduce_by_matrix(
+            minimal.clone(),
+            order,
+            usize::MAX,
+            usize::MAX,
+            allowance,
+            || false,
+        ) {
+            Err(MatrixInterreductionAborted::Refused(
+                MatrixInterreductionRefused::LiveEntries { nonzeros },
+                returned,
+                refused,
+            )) => {
+                assert!(
+                    nonzeros > allowance,
+                    "the refusal reports the count that crossed {allowance}, got {nonzeros}"
+                );
+                assert_eq!(returned, minimal, "the basis comes back for the fallback");
+                // The matrix existed before it was refused, so the record describes it.
+                assert_eq!(
+                    (refused.rows, refused.columns, refused.nonzeros),
+                    (report.rows, report.columns, report.nonzeros),
+                    "a refusal on the elimination reports the shape it refused"
+                );
+            }
+            other => panic!(
+                "expected a live-entry refusal; got {}",
+                match other {
+                    Ok((_, report)) => format!(
+                        "a completed pass at {} live entries against an allowance of {}",
+                        report.peak_nonzeros, allowance
+                    ),
+                    Err(MatrixInterreductionAborted::Refused(reason, _, _)) =>
+                        format!("{reason:?}"),
+                    Err(MatrixInterreductionAborted::Stopped(_)) => "a stop".to_string(),
+                }
+            ),
+        }
+
+        // And an allowance of exactly the peak runs, so the budget is not merely conservative.
+        let (reduced, report) = interreduce_by_matrix(
+            minimal.clone(),
+            order,
+            usize::MAX,
+            usize::MAX,
+            report.peak_nonzeros,
+            || false,
+        )
+        .unwrap_or_else(|_| panic!("an allowance of exactly the peak must suffice"));
+        assert_eq!(reduced, reduce_grobner_basis(minimal, order));
+        assert!(report.peak_nonzeros > 0);
     }
 
     /// The stop predicate is honored, which #395 is the reason for and which #461 item 4 asked

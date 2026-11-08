@@ -19,7 +19,8 @@ use crate::{
         f4::{
             f4, f4_observed_reported, f4_reported, f4_with_options,
             symbolic::symbolic_preprocessing_pop_deduplicated, symbolic_preprocessing_with,
-            BatchObserver, F4Error, F4Options, MonicBasis, Preprocessed, ReducerCache,
+            BatchObserver, F4Error, F4Options, MatrixRefusal, MonicBasis, Preprocessed,
+            ReducerCache,
         },
         reference::buchberger_reference,
         s_polynomial, CriticalPair,
@@ -3750,4 +3751,73 @@ fn test_a_failed_computation_retains_its_degree_sequence() {
     let (_, statistics) = f4_reported(&katsura::<5, G>(), MonomialOrder::Lexicographic, &options);
     assert_eq!(statistics.step_degrees.len(), statistics.batches);
     assert!(!statistics.step_degrees.is_empty(), "three batches ran");
+}
+
+/// The matrix interreduction route falls back when its elimination would cross the live-entry
+/// allowance, and the run still returns the right basis — #536.
+///
+/// The allowance is set from the pass's own measured high-water mark rather than from a constant,
+/// and above the batch loop's own peak, so the refusal under test is the interreduction's and not a
+/// batch's.
+#[test]
+fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
+    type G = Zp2147483647;
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let system = katsura::<6, G>();
+
+    let unbounded = F4Options {
+        interreduce_by_matrix: true,
+        max_live_nonzeros: usize::MAX,
+        max_live_bytes: usize::MAX,
+        ..F4Options::default()
+    };
+    let (basis, statistics) =
+        f4_with_options(&system, order, &unbounded).expect("katsura-6 completes");
+    let matrix = statistics
+        .interreduction_matrix
+        .expect("the matrix route recorded its pass");
+    assert!(
+        matrix.peak_nonzeros > matrix.nonzeros,
+        "elimination fills the matrix in: built {}, peak {}",
+        matrix.nonzeros,
+        matrix.peak_nonzeros
+    );
+    assert!(
+        statistics.max_live_nonzeros < matrix.peak_nonzeros,
+        "the batch loop's peak {} must sit under the interreduction's {} for this test to be \
+         about the interreduction",
+        statistics.max_live_nonzeros,
+        matrix.peak_nonzeros
+    );
+
+    // One entry below what the pass needs. Everything else in the computation fits.
+    let entries = matrix.peak_nonzeros - 1;
+    let bounded = F4Options {
+        interreduce_by_matrix: true,
+        max_live_nonzeros: entries,
+        max_live_bytes: entries * F4Options::bytes_per_entry::<G>(),
+        ..F4Options::default()
+    };
+    let (fallback, statistics) =
+        f4_with_options(&system, order, &bounded).expect("the fallback completes the computation");
+    let refused = statistics
+        .interreduction_matrix
+        .expect("a fallback is recorded");
+    assert!(refused.fell_back, "the route fell back rather than running");
+    assert_eq!(
+        (refused.rows, refused.columns, refused.nonzeros),
+        (matrix.rows, matrix.columns, matrix.nonzeros),
+        "a fallback on the elimination records the matrix it refused"
+    );
+    match refused.refused_by {
+        Some(MatrixRefusal::LiveEntries { nonzeros }) => assert!(
+            nonzeros > entries,
+            "the refusal names the count that crossed {entries}, got {nonzeros}"
+        ),
+        other => panic!("expected a live-entry refusal, got {other:?}"),
+    }
+    assert_eq!(
+        fallback, basis,
+        "the fallback is the division route over the same basis, so the answer is unchanged"
+    );
 }

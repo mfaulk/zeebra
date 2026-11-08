@@ -564,6 +564,8 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
                     rows: matrix.rows,
                     columns: matrix.columns,
                     nonzeros: matrix.nonzeros,
+                    peak_nonzeros: matrix.peak_nonzeros,
+                    peak_entry_capacity: matrix.peak_entry_capacity,
                     elements: matrix.elements,
                     fell_back: false,
                     refused_by: None,
@@ -571,8 +573,16 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
                 report.elements = matrix.elements;
                 Ok(reduced)
             }
-            Err(MatrixInterreductionAborted::Refused(reason, minimal)) => {
+            Err(MatrixInterreductionAborted::Refused(reason, minimal, refused)) => {
                 statistics.interreduction_matrix = Some(MatrixInterreduction {
+                    // The shape as far as it was established before the refusal, so a `fell_back`
+                    // row says *what* was refused. Zero throughout when the closure or the
+                    // construction is what crossed, since there was no matrix to describe.
+                    rows: refused.rows,
+                    columns: refused.columns,
+                    nonzeros: refused.nonzeros,
+                    peak_nonzeros: refused.peak_nonzeros,
+                    peak_entry_capacity: refused.peak_entry_capacity,
                     elements: minimal.len(),
                     fell_back: true,
                     refused_by: Some(match reason {
@@ -585,8 +595,10 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
                         MatrixInterreductionRefused::Nonzeros { nonzeros } => {
                             MatrixRefusal::Nonzeros { nonzeros }
                         }
+                        MatrixInterreductionRefused::LiveEntries { nonzeros } => {
+                            MatrixRefusal::LiveEntries { nonzeros }
+                        }
                     }),
-                    ..Default::default()
                 });
                 // The division route always terminates inside the memory the old default used, so
                 // a refusal is a fallback rather than a failure. It takes its own stop predicate,
