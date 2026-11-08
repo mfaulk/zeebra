@@ -363,6 +363,17 @@ prose. It does not change any frontier figure above — none of the duplicated r
 but a reader counting stopped runs will overcount. **Filed for M27-C**, which owns the board
 defects; recorded here so the frontier count is not read off that table.
 
+**Resolved (#506): the generator, and no record is duplicated.** Checked by hashing each record in
+`results/history.json` whole — **zero** byte-identical records. The three planted rows are three
+real runs, at `7e333fb` twice (17.09 s and 17.19 s) and `744fdf9` once (18.68 s); the matrix figures
+are identical because F4 is deterministic, and the rows rendered identically because the table had a
+column for neither the commit nor the elapsed time. The `slice(12 fixed, seed 0)` pair is likewise
+**one problem, two runs**: identical frontier down to `peak_live_nonzeros`, at `3fe69c6`
+(`basis_only`, no quotient dimension recorded) and `7e333fb` (`slice_established_nothing`,
+`quotient_dimension = 81`) — the same computation under a later and more precise verdict, not two
+formulations sharing a label. The table now renders one row per distinct rendering with `runs` and
+`commits` columns, so the count is 38 rows standing for 40 runs and both facts are readable.
+
 ---
 
 ## 4. The `rf4-rp2` row: the three cost tables agree, and the discrepancy was a unit

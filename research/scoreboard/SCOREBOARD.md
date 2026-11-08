@@ -89,46 +89,46 @@ Surrogates: reduced width, planted targets. Evidence about the implementation, n
 
 A higher degree is **not** nearer a solution: this table is a diagnostic, not a progress bar. Each row names the bound that bound, the degree reached, and the last stage that completed.
 
-| problem | formulation | outcome | deg | last deg done | max cols | peak MB |
-|---|---|---|---:|---:|---:|---:|
-| `poseidon31-cico-t16-rf2-rp0` | as generated | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 36284 | 108.2 |
-| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 0) | basis only, no witness | 4 | 4 | 17424 | 102.8 |
-| `poseidon31-cico-t16-rf2-rp2` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 50148 | 195.1 |
-| `poseidon31-cico-t16-rf2-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 40182 | 212.9 |
-| `poseidon31-cico-t16-rf2-rp4` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 70244 | 311.9 |
-| `poseidon31-cico-t16-rf2-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 8642 | 24.8 |
-| `poseidon31-cico-t16-rf4-rp0` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 81800 | 246.2 |
-| `poseidon31-cico-t16-rf4-rp0` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 12861 | 22.0 |
-| `poseidon31-cico-t16-rf4-rp2` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 21098 | 24.0 |
-| `poseidon31-cico-t16-rf4-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 15363 | 23.7 |
-| `poseidon31-cico-t16-rf4-rp4` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 24441 | 29.8 |
-| `poseidon31-cico-t16-rf4-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 18706 | 26.2 |
-| `poseidon31-cico-t16-rf6-rp0` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 28794 | 30.6 |
-| `poseidon31-cico-t16-rf6-rp0` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 23059 | 25.0 |
-| `poseidon31-cico-t16-rf6-rp2` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 31296 | 34.9 |
-| `poseidon31-cico-t16-rf6-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 25561 | 29.3 |
-| `poseidon31-cico-t16-rf6-rp4` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 34639 | 40.7 |
-| `poseidon31-cico-t16-rf6-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 28904 | 35.1 |
-| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 0) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
-| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 3) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
-| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 4) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
-| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 5) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
-| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 7) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 |
-| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
-| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 0) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 1) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 2) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 3) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 4) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 5) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 6) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
-| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 7) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 |
-| `fukuoka-mq-VI-n15-seed0` | campaign over 8 slices | stopped: campaign reached no verdict | — | — | — | — |
-| `fukuoka-mq-III-n20-seed0` | as published | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 10147 | 195.5 |
-| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
-| `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 1) | the slice is empty, which says nothing about the problem | 9 | 9 | 5103 | 4.7 |
-| `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 3) | the slice is empty, which says nothing about the problem | 9 | 9 | 5104 | 4.6 |
-| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 |
-| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — |
+One row per distinct rendering, not per run: repeated runs of the same problem differ in commit and elapsed time, and this table has a column for neither, so `runs` says how many a row stands for and `commits` says where they were taken. A row reading `3` is three runs that agreed, not one run recorded three times.
+
+| problem | formulation | outcome | deg | last deg done | max cols | peak MB | runs | commits |
+|---|---|---|---:|---:|---:|---:|---:|---|
+| `poseidon31-cico-t16-rf2-rp0` | as generated | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 36284 | 108.2 | 1 | 3fe69c6 |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 0) | basis only, no witness | 4 | 4 | 17424 | 102.8 | 1 | 3fe69c6 |
+| `poseidon31-cico-t16-rf2-rp2` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 50148 | 195.1 | 1 | 3fe69c6 |
+| `poseidon31-cico-t16-rf2-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 40182 | 212.9 | 1 | 3fe69c6 |
+| `poseidon31-cico-t16-rf2-rp4` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 70244 | 311.9 | 1 | 3fe69c6 |
+| `poseidon31-cico-t16-rf2-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 8642 | 24.8 | 1 | 3fe69c6 |
+| `poseidon31-cico-t16-rf4-rp0` | as generated | stopped: max_matrix_columns at degree 6 | 6 | 5 | 81800 | 246.2 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf4-rp0` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 12861 | 22.0 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf4-rp2` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 21098 | 24.0 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf4-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 15363 | 23.7 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf4-rp4` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 24441 | 29.8 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf4-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 18706 | 26.2 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf6-rp0` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 28794 | 30.6 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf6-rp0` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 23059 | 25.0 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf6-rp2` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 31296 | 34.9 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf6-rp2` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 25561 | 29.3 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf6-rp4` | as generated | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 34639 | 40.7 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf6-rp4` | slice(12 fixed, seed 0) | stopped: max_live_nonzeros at degree 4 | 4 | 3 | 28904 | 35.1 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 0) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 3) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 4) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 5) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 | 1 | 7e333fb |
+| `poseidon31-cico-t16-rf2-rp0` | slice(12 fixed, seed 7) | the slice is empty, which says nothing about the problem | 4 | 4 | 17424 | 102.8 | 1 | 7e333fb |
+| `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 | 3 | 7e333fb, 744fdf9 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 0) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 1) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 2) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 3) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 4) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 5) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 6) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 7) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 | 1 | b166e56 |
+| `fukuoka-mq-VI-n15-seed0` | campaign over 8 slices | stopped: campaign reached no verdict | — | — | — | — | 1 | b166e56 |
+| `fukuoka-mq-III-n20-seed0` | as published | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 10147 | 195.5 | 1 | b166e56 |
+| `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 1) | the slice is empty, which says nothing about the problem | 9 | 9 | 5103 | 4.7 | 1 | 9c8b80d |
+| `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 3) | the slice is empty, which says nothing about the problem | 9 | 9 | 5104 | 4.6 | 1 | 9c8b80d |
+| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 | 1 | 1409a48 |
+| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 1 | 1409a48 |
 
