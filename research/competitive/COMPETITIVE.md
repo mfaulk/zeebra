@@ -8,11 +8,11 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 | library | rows | answered |
 |---|---:|---:|
-| groebner.jl | 63 | 29 |
-| msolve | 63 | 27 |
-| sagebrush | 63 | 52 |
-| singular | 99 | 81 |
-| zeebra | 99 | 86 |
+| groebner.jl | 75 | 39 |
+| msolve | 75 | 37 |
+| sagebrush | 75 | 64 |
+| singular | 111 | 93 |
+| zeebra | 111 | 98 |
 
 ## anemoi
 
@@ -133,6 +133,16 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 | problem | task | field | library | commit | outcome | wall | cpu | peak RSS | stages | verification |
 |---|---|---|---|---|---|---:|---:|---:|---|---|
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=off)) | `f153c595` | complete | 258.49 s | — | 535.8 MB | basis 258.49 s; quotient-dimension (for the invariant) 13.5 ms | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c595` | complete | 52.15 s | 51.74 s | 41.8 MB | solve 51.57 s | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c595` | complete | 1.76 s | 1.73 s | 22.7 MB | f4/overall(elapsed) 1.65 s; f4/overall(cpu) 1.64 s; f4/select 110.0 ms; f4/symbolic prep. 170.0 ms; f4/update 30.0 ms; f4/convert 10.0 ms; f4/linear algebra 1.33 s; f4/reduce gb 0.0 ms | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c595` | complete | 513.6 ms | — | 865.9 MB | solve 513.6 ms; process-wall 10.01 s; process-cpu 12.21 s | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c595` | complete | 2.74 s | 2.69 s | 114.0 MB | solve 2.58 s | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=on)) | `f153c595` | complete | 113.30 s | — | 12.84 GB | basis 113.30 s; quotient-dimension (for the invariant) 12.5 ms | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c595` | complete | 51.55 s | 51.14 s | 41.5 MB | solve 50.97 s | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c595` | complete | 1.77 s | 1.74 s | 22.7 MB | f4/overall(elapsed) 1.66 s; f4/overall(cpu) 1.65 s; f4/select 100.0 ms; f4/symbolic prep. 170.0 ms; f4/update 30.0 ms; f4/convert 10.0 ms; f4/linear algebra 1.34 s; f4/reduce gb 0.0 ms | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c595` | complete | 525.6 ms | — | 873.8 MB | solve 525.6 ms; process-wall 10.09 s; process-cpu 10.89 s | unchecked |
+| `katsura-11` `03bf44d5d614` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c595` | complete | 2.78 s | 2.73 s | 114.0 MB | solve 2.60 s | unchecked |
 | `katsura-4` `825a3aa54e15` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.2 ms | — | — | basis 0.2 ms; quotient-dimension (for the invariant) 0.0 ms | unchecked |
 | `katsura-4` `825a3aa54e15` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | complete | 36.1 ms | 10.0 ms | 19.5 MB | solve 0.0 ms | unchecked |
 | `katsura-4` `825a3aa54e15` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | complete | 0.3 ms | — | — | basis 0.2 ms; conversion 0.1 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
@@ -335,6 +345,56 @@ Every row is one library's attempt at one task on one problem, **including the a
 | `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | msolve (msolve 0.11.0) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `87a807e` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
 | `mq-random-10` `16422dafcdb6` | lex-basis-by-conversion | GF(32003) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `87a807e` | complete | 395.1 ms | 370.0 ms | 31.9 MB | solve 382.1 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=off)) | `f153c59` | complete | 35.07 s | — | 163.1 MB | basis 35.07 s; quotient-dimension (for the invariant) 2.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 7.70 s | 7.62 s | 23.5 MB | solve 7.55 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | complete | 263.0 ms | 240.0 ms | 12.6 MB | f4/overall(elapsed) 240.0 ms; f4/overall(cpu) 240.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 170.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | complete | 87.5 ms | — | 729.3 MB | solve 87.5 ms; process-wall 7.93 s; process-cpu 8.74 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 364.3 ms | 340.0 ms | 31.5 MB | solve 334.4 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=on)) | `f153c59` | complete | 8.35 s | — | 602.0 MB | basis 8.35 s; quotient-dimension (for the invariant) 1.8 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 8.15 s | 8.06 s | 23.5 MB | solve 8.00 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | complete | 263.5 ms | 240.0 ms | 12.6 MB | f4/overall(elapsed) 240.0 ms; f4/overall(cpu) 240.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 170.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | complete | 90.8 ms | — | 730.9 MB | solve 90.8 ms; process-wall 8.09 s; process-cpu 8.89 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 364.4 ms | 340.0 ms | 31.4 MB | solve 340.8 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=off)) | `f153c59` | complete | 31.16 s | — | 162.1 MB | basis 31.16 s; quotient-dimension (for the invariant) 1.8 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 7.41 s | 7.33 s | 23.5 MB | solve 7.28 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | complete | 253.3 ms | 230.0 ms | 12.3 MB | f4/overall(elapsed) 230.0 ms; f4/overall(cpu) 230.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 160.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | complete | 91.9 ms | — | 728.6 MB | solve 91.9 ms; process-wall 7.81 s; process-cpu 8.51 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 364.3 ms | 340.0 ms | 31.6 MB | solve 336.3 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=on)) | `f153c59` | complete | 8.07 s | — | 601.8 MB | basis 8.07 s; quotient-dimension (for the invariant) 1.6 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 7.39 s | 7.31 s | 23.4 MB | solve 7.25 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | complete | 253.5 ms | 230.0 ms | 12.5 MB | f4/overall(elapsed) 230.0 ms; f4/overall(cpu) 230.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 160.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | complete | 91.0 ms | — | 732.5 MB | solve 91.0 ms; process-wall 7.84 s; process-cpu 8.65 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 364.5 ms | 350.0 ms | 31.4 MB | solve 333.8 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=off)) | `f153c59` | complete | 29.62 s | — | 162.9 MB | basis 29.62 s; quotient-dimension (for the invariant) 1.7 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 7.21 s | 7.12 s | 23.5 MB | solve 7.07 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | complete | 243.4 ms | 220.0 ms | 12.2 MB | f4/overall(elapsed) 230.0 ms; f4/overall(cpu) 230.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 160.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | complete | 88.9 ms | — | 725.9 MB | solve 88.9 ms; process-wall 7.53 s; process-cpu 8.39 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 344.8 ms | 320.0 ms | 31.4 MB | solve 320.8 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=on)) | `f153c59` | complete | 8.06 s | — | 602.4 MB | basis 8.06 s; quotient-dimension (for the invariant) 1.6 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 7.28 s | 7.20 s | 23.5 MB | solve 7.14 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | complete | 263.0 ms | 240.0 ms | 12.6 MB | f4/overall(elapsed) 240.0 ms; f4/overall(cpu) 240.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 170.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | complete | 92.8 ms | — | 730.0 MB | solve 92.8 ms; process-wall 7.90 s; process-cpu 8.69 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 344.6 ms | 320.0 ms | 31.4 MB | solve 321.3 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=off)) | `f153c59` | complete | 31.64 s | — | 164.1 MB | basis 31.24 s; conversion 400.1 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 9.25 s | 9.14 s | 36.0 MB | source-basis 7.57 s; solve 1.57 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 436.0 ms | 410.0 ms | 31.0 MB | solve 423.1 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduce_by_matrix=on)) | `f153c59` | complete | 8.78 s | — | 600.6 MB | basis 8.38 s; conversion 396.5 ms; conversion: dependence 0.0 ms; conversion: border 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | singular (singular build 44105 (44105)) | `f153c59` | complete | 8.90 s | 8.81 s | 36.0 MB | source-basis 7.28 s; solve 1.52 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | msolve (msolve 0.11.0) | `f153c59` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `f153c59` | unsupported: the tool does not offer lex-basis-by-conversion | — | — | — | — | unchecked |
+| `mq-random-10` `72d0ad315fc2` | lex-basis-by-conversion | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)) | `f153c59` | complete | 446.0 ms | 420.0 ms | 31.6 MB | solve 440.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=matrix, batch-rows=echelon)) | `ecaba175` | complete | 14.77 s | — | 603.6 MB | basis 14.77 s; quotient-dimension (for the invariant) 2.4 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `ecaba175` | complete | 8.63 s | 8.51 s | 23.7 MB | solve 8.43 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `ecaba175` | complete | 263.0 ms | 240.0 ms | 12.5 MB | f4/overall(elapsed) 240.0 ms; f4/overall(cpu) 240.0 ms; f4/select 10.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 170.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `ecaba175` | complete | 93.1 ms | — | 731.6 MB | solve 93.1 ms; process-wall 7.89 s; process-cpu 8.70 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))) | `ecaba175` | complete | 354.6 ms | 330.0 ms | 31.5 MB | solve 331.4 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness; interreduction=division, batch-rows=reduced)) | `cdfe4345` | complete | 6.12 s | — | 413.8 MB | basis 6.12 s; quotient-dimension (for the invariant) 1.9 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `cdfe4345` | complete | 7.51 s | 7.43 s | 23.9 MB | solve 7.36 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | msolve (msolve 0.11.0) | `cdfe4345` | complete | 273.5 ms | 250.0 ms | 12.3 MB | f4/overall(elapsed) 250.0 ms; f4/overall(cpu) 250.0 ms; f4/select 20.0 ms; f4/symbolic prep. 40.0 ms; f4/update 10.0 ms; f4/convert 10.0 ms; f4/linear algebra 180.0 ms; f4/reduce gb 0.0 ms | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | groebner.jl (groebner.jl 0.10.11 (julia 1.11.7)) | `cdfe4345` | complete | 89.8 ms | — | 727.5 MB | solve 89.8 ms; process-wall 7.81 s; process-cpu 8.58 s | unchecked |
+| `mq-random-10` `72d0ad315fc2` | reduced-grobner-basis | GF(2147483647) | sagebrush (sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b, built for x86-64-v3 or better (AVX2))) | `cdfe4345` | complete | 384.8 ms | 360.0 ms | 31.4 MB | solve 352.8 ms | unchecked |
 | `mq-random-14` `029def705543` | reduced-grobner-basis | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | — | basis 34.44 s | unchecked |
 | `mq-random-14` `029def705543` | reduced-grobner-basis | GF(2147483647) | singular (singular build 44105 (44105)) | `663097a` | stopped at the tool's own cap: stopped at a 60s wall-clock limit | — | — | — | — | unchecked |
 | `mq-random-14` `029def705543` | lex-basis-by-conversion | GF(2147483647) | zeebra (zeebra 0.1.0 (in-process, same build as the harness)) | `663097a` | stopped at the tool's own cap: 20006072 live nonzero entries were needed, over the limit of 20000000 (max_live_nonzeros) | — | — | — | basis 34.42 s | unchecked |
@@ -437,7 +497,7 @@ Computed only for rows agreeing on problem digest, task, limits, machine and bui
 
 The **provenance** column is the corpus's own record of how the problem's ideal equivalence was established, which is the gate on quoting a figure for it at all. A problem with no recorded equivalence, or one no external engine can represent, is **refused here rather than omitted**; a ratio resting on a single external engine is published with that fact stated, because nothing can triangulate it.
 
-**184 pairs**: 0 refused for want of a recorded ideal equivalence, 145 disqualified by the startup floor, 0 with no checked invariant, 39 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 3 inside the 20% noise band, 10 against a comparand that is not authoritative, and 27 that a conclusion may rest on.
+**360 pairs**: 0 refused for want of a recorded ideal equivalence, 145 disqualified by the startup floor, 0 with no checked invariant, 215 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 23 inside the 20% noise band, 56 against a comparand that is not authoritative, and 137 that a conclusion may rest on.
 
 | problem | task | library | ratio | provenance | checked |
 |---|---|---|---:|---|---|
@@ -625,6 +685,182 @@ The **provenance** column is the corpus's own record of how the problem's ideal 
 | `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.22x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
 | `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.55x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 133.32x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 400.85x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 96.27x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.30x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 133.10x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 386.05x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 96.25x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.73x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 138.43x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 381.44x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 96.27x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.74x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 138.34x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 385.52x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 96.20x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.87x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 144.07x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 394.63x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 101.70x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.82x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 133.36x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 377.82x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 101.76x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.08x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.75x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 95.46x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.93x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.02x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.70x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 91.93x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.92x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.13x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 32.96x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 90.84x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.93x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.13x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 32.94x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 91.81x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.91x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.16x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 34.31x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 93.98x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 24.22x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.15x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.76x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 89.97x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 24.23x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.05x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 118.46x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 356.16x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 85.54x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 3.82x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 118.26x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 343.01x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 85.52x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.20x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 122.99x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 338.92x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 85.54x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.21x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 122.92x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 342.54x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 85.48x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.32x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 128.01x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 350.64x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 90.36x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.28x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 118.50x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 335.70x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 90.42x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.05x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 30.68x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 92.25x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.16x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 0.99x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 30.63x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 88.84x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.15x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.09x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.86x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 87.78x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.16x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.09x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.84x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 88.72x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.14x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.12x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 33.15x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 90.82x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 23.40x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.11x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 30.69x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 86.95x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 23.42x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 3.85x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 112.62x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 338.60x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 81.32x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 3.63x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 112.43x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 326.10x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 81.30x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.00x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 116.93x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 322.21x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 81.32x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.01x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 116.86x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 325.66x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 81.27x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.11x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 121.70x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 333.36x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 85.91x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.07x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 112.66x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 319.15x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 85.96x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.05x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 30.63x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 92.09x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.12x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 0.99x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 30.58x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 88.69x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.11x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.09x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.80x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 87.63x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.12x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.09x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 31.78x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 88.57x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 22.10x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.12x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 33.10x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 90.66x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 23.36x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.11x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 30.64x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 86.80x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 23.38x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 3.42x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 72.57x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 3.55x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 70.94x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 0.95x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 20.13x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 0.99x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 19.68x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 4.96x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | msolve | 146.66x | comparand-file | 2 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 503.25x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 94.51x | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 5.01x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | msolve | 145.92x | comparand-file | 2 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 491.78x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 93.08x | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 2.17x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | msolve | 64.28x | comparand-file | 2 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 220.58x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 41.42x | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 2.20x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | msolve | 63.96x | comparand-file | 2 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 215.55x | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 40.80x | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 1.71x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 56.17x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 158.62x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 41.66x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 0.81x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 22.36x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 68.09x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 15.89x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 
 ## Engine-internal speedups over Zeebra
 
@@ -634,7 +870,7 @@ It exists because the startup-floor guard above correctly disqualifies every cla
 
 Stage selection per library, and what is excluded from each, is `engine_internal_time`; the granularities are `stage_resolution`. A library that reports no usable stage contributes no row, which is visible as an em dash in the measurement table's `stages` column.
 
-**134 pairs**: 0 refused for want of a recorded ideal equivalence, 20 refused on stage resolution, 0 with no checked invariant, 114 publishable as an engine-internal comparison.
+**268 pairs**: 0 refused for want of a recorded ideal equivalence, 20 refused on stage resolution, 0 with no checked invariant, 248 publishable as an engine-internal comparison.
 
 | problem | task | library | zeebra engine | their engine | ratio | provenance | checked |
 |---|---|---|---:|---:|---:|---|---|
@@ -772,4 +1008,138 @@ Stage selection per library, and what is excluded from each, is `engine_internal
 | `mq-planted-14` | reduced-grobner-basis | singular | 0.2 ms | 1.0 ms | 0.20x ±50% | known-solution | **NOT A RESOLVED COMPARISON: an operand is 1.0x its own stage resolution, so the figure carries ±50%** |
 | `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.2 ms | 0.9 ms | 0.22x ±<1% | known-solution | 3 invariants agreed |
 | `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.2 ms | 0.2 ms | 0.93x ±<1% | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 35.07 s | 7.55 s | 4.64x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 35.07 s | 87.5 ms | 400.85x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 35.07 s | 334.4 ms | 104.88x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 35.07 s | 8.00 s | 4.38x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 35.07 s | 90.8 ms | 386.05x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 35.07 s | 340.8 ms | 102.89x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 35.07 s | 7.28 s | 4.82x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 35.07 s | 91.9 ms | 381.44x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 35.07 s | 336.3 ms | 104.28x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 35.07 s | 7.25 s | 4.83x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 35.07 s | 91.0 ms | 385.52x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 35.07 s | 333.8 ms | 105.05x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 35.07 s | 7.07 s | 4.96x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 35.07 s | 88.9 ms | 394.63x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 35.07 s | 320.8 ms | 109.32x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 35.07 s | 7.14 s | 4.91x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 35.07 s | 92.8 ms | 377.82x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 35.07 s | 321.3 ms | 109.14x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.35 s | 7.55 s | 1.11x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.35 s | 87.5 ms | 95.46x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.35 s | 334.4 ms | 24.98x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.35 s | 8.00 s | 1.04x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.35 s | 90.8 ms | 91.93x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.35 s | 340.8 ms | 24.50x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.35 s | 7.28 s | 1.15x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.35 s | 91.9 ms | 90.84x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.35 s | 336.3 ms | 24.83x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.35 s | 7.25 s | 1.15x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.35 s | 91.0 ms | 91.81x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.35 s | 333.8 ms | 25.02x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.35 s | 7.07 s | 1.18x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.35 s | 88.9 ms | 93.98x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.35 s | 320.8 ms | 26.03x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.35 s | 7.14 s | 1.17x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.35 s | 92.8 ms | 89.97x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.35 s | 321.3 ms | 25.99x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 31.16 s | 7.55 s | 4.12x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 31.16 s | 87.5 ms | 356.16x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 31.16 s | 334.4 ms | 93.19x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 31.16 s | 8.00 s | 3.89x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 31.16 s | 90.8 ms | 343.01x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 31.16 s | 340.8 ms | 91.42x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 31.16 s | 7.28 s | 4.28x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 31.16 s | 91.9 ms | 338.92x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 31.16 s | 336.3 ms | 92.65x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 31.16 s | 7.25 s | 4.29x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 31.16 s | 91.0 ms | 342.54x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 31.16 s | 333.8 ms | 93.34x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 31.16 s | 7.07 s | 4.41x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 31.16 s | 88.9 ms | 350.64x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 31.16 s | 320.8 ms | 97.13x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 31.16 s | 7.14 s | 4.36x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 31.16 s | 92.8 ms | 335.70x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 31.16 s | 321.3 ms | 96.97x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.07 s | 7.55 s | 1.07x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.07 s | 87.5 ms | 92.25x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.07 s | 334.4 ms | 24.14x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.07 s | 8.00 s | 1.01x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.07 s | 90.8 ms | 88.84x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.07 s | 340.8 ms | 23.68x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.07 s | 7.28 s | 1.11x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.07 s | 91.9 ms | 87.78x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.07 s | 336.3 ms | 24.00x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.07 s | 7.25 s | 1.11x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.07 s | 91.0 ms | 88.72x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.07 s | 333.8 ms | 24.18x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.07 s | 7.07 s | 1.14x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.07 s | 88.9 ms | 90.82x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.07 s | 320.8 ms | 25.16x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.07 s | 7.14 s | 1.13x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.07 s | 92.8 ms | 86.95x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.07 s | 321.3 ms | 25.12x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.62 s | 7.55 s | 3.92x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.62 s | 87.5 ms | 338.60x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.62 s | 334.4 ms | 88.59x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.62 s | 8.00 s | 3.70x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.62 s | 90.8 ms | 326.10x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.62 s | 340.8 ms | 86.92x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.62 s | 7.28 s | 4.07x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.62 s | 91.9 ms | 322.21x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.62 s | 336.3 ms | 88.08x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.62 s | 7.25 s | 4.08x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.62 s | 91.0 ms | 325.66x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.62 s | 333.8 ms | 88.74x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.62 s | 7.07 s | 4.19x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.62 s | 88.9 ms | 333.36x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.62 s | 320.8 ms | 92.34x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 29.62 s | 7.14 s | 4.15x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 29.62 s | 92.8 ms | 319.15x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 29.62 s | 321.3 ms | 92.19x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.06 s | 7.55 s | 1.07x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.06 s | 87.5 ms | 92.09x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.06 s | 334.4 ms | 24.09x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.06 s | 8.00 s | 1.01x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.06 s | 90.8 ms | 88.69x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.06 s | 340.8 ms | 23.64x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.06 s | 7.28 s | 1.11x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.06 s | 91.9 ms | 87.63x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.06 s | 336.3 ms | 23.96x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.06 s | 7.25 s | 1.11x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.06 s | 91.0 ms | 88.57x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.06 s | 333.8 ms | 24.13x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.06 s | 7.07 s | 1.14x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.06 s | 88.9 ms | 90.66x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.06 s | 320.8 ms | 25.11x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 8.06 s | 7.14 s | 1.13x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 8.06 s | 92.8 ms | 86.80x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 8.06 s | 321.3 ms | 25.07x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 31.64 s | 9.14 s | 3.46x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 31.64 s | 423.1 ms | 74.78x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 31.64 s | 8.80 s | 3.60x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 31.64 s | 440.0 ms | 71.91x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 8.78 s | 9.14 s | 0.96x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 8.78 s | 423.1 ms | 20.75x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 8.78 s | 8.80 s | 1.00x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 8.78 s | 440.0 ms | 19.95x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 258.49 s | 51.57 s | 5.01x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 258.49 s | 513.6 ms | 503.25x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 258.49 s | 2.58 s | 100.09x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 258.49 s | 50.97 s | 5.07x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 258.49 s | 525.6 ms | 491.78x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 258.49 s | 2.60 s | 99.60x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 113.30 s | 51.57 s | 2.20x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 113.30 s | 513.6 ms | 220.58x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 113.30 s | 2.58 s | 43.87x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `katsura-11` | reduced-grobner-basis | singular | 113.30 s | 50.97 s | 2.22x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | groebner.jl | 113.30 s | 525.6 ms | 215.55x ±<1% | comparand-file | 3 invariants agreed |
+| `katsura-11` | reduced-grobner-basis | sagebrush | 113.30 s | 2.60 s | 43.66x ±<1% | comparand-file | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 14.77 s | 8.43 s | 1.75x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 14.77 s | 93.1 ms | 158.62x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 14.77 s | 331.4 ms | 44.57x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | reduced-grobner-basis | singular | 6.12 s | 7.36 s | 0.83x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 6.12 s | 89.8 ms | 68.09x ±<1% | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 6.12 s | 352.8 ms | 17.34x ±<1% | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 

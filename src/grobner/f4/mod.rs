@@ -42,7 +42,9 @@ pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
-pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy, StopKind};
+pub use options::{
+    F4Error, F4Options, InterreductionRoute, ReducerSelection, ReductionStrategy, StopKind,
+};
 pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
 pub use statistics::{
     BatchStatistics, F4Statistics, HilbertCounts, MatrixInterreduction, MatrixRefusal, StageClock,
@@ -541,7 +543,7 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     // The measured variant is the same code behind a const-generic flag, so the split and the
     // operation counters cannot drift from the path that runs when nothing is being measured.
     let mut report = InterreductionReport::default();
-    let interreduction = if options.interreduce_by_matrix {
+    let interreduction = if options.interreduction.builds_a_matrix(order) {
         // One matrix, not 247 divisions. The budgets are the batch loop's, so a basis whose
         // closure is too wide falls back rather than exceeding a limit the rest of the
         // computation obeyed — and the fallback is recorded, because a timing from a run that

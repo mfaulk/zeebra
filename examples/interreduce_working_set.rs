@@ -26,7 +26,7 @@ use zeebra::{
     fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura},
-        f4_reported, F4Options, F4Statistics, MatrixRefusal,
+        f4_reported, F4Options, F4Statistics, InterreductionRoute, MatrixRefusal,
     },
     util::{isa_floor, peak_resident_bytes},
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -57,7 +57,11 @@ enum Arm {
 fn options(arm: Arm, wall: Option<Duration>) -> F4Options {
     let mut options = F4Options {
         measure_stages: true,
-        interreduce_by_matrix: arm != Arm::Division,
+        interreduction: if arm == Arm::Division {
+            InterreductionRoute::Division
+        } else {
+            InterreductionRoute::Matrix
+        },
         max_wall_time: wall,
         ..F4Options::default()
     };

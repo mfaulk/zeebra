@@ -321,6 +321,7 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
 #[cfg(test)]
 mod tests {
     use super::{interreduce_by_matrix, MatrixInterreductionAborted, MatrixInterreductionRefused};
+    use crate::grobner::f4::InterreductionRoute;
     use crate::{
         fields::{Zp13, Zp2147483647},
         grobner::{
@@ -354,7 +355,7 @@ mod tests {
             system,
             order,
             &F4Options {
-                interreduce_by_matrix: false,
+                interreduction: InterreductionRoute::Division,
                 ..F4Options::default()
             },
         )
@@ -380,7 +381,7 @@ mod tests {
             system,
             order,
             &F4Options {
-                interreduce_by_matrix: false,
+                interreduction: InterreductionRoute::Division,
                 ..F4Options::default()
             },
         ) else {
@@ -449,7 +450,7 @@ mod tests {
             &system,
             order,
             &F4Options {
-                interreduce_by_matrix: false,
+                interreduction: InterreductionRoute::Division,
                 ..F4Options::default()
             },
         )
@@ -594,7 +595,7 @@ mod tests {
             &system,
             order,
             &F4Options {
-                interreduce_by_matrix: false,
+                interreduction: InterreductionRoute::Division,
                 ..F4Options::default()
             },
         )
@@ -624,7 +625,7 @@ mod tests {
             &system,
             order,
             &F4Options {
-                interreduce_by_matrix: false,
+                interreduction: InterreductionRoute::Division,
                 ..F4Options::default()
             },
         )

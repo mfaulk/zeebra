@@ -11,11 +11,11 @@
 //!     --row katsura-6 --task reduced-grobner-basis --measure --write
 //! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
 //!     --row mq-random-10 --task reduced-grobner-basis \
-//!     --interreduce-by-matrix on --measure --write    # the A/B as board rows
+//!     --interreduction division --measure --write     # the pre-#478 route, as a board row
 //! ```
 //!
-//! `--interreduce-by-matrix on|off` overrides F4's final-interreduction route for the Zeebra side
-//! only; absent, the row is taken at whatever `F4Options::default()` says. The effective value is
+//! `--interreduction by-order|division|matrix` overrides F4's final-interreduction route for the
+//! Zeebra side only; absent, the row is taken at whatever `F4Options::default()` says. The value is
 //! recorded in the row's `library_version`, because the commit does not determine it and two rows
 //! that differ only in it agree on every field a ratio is checked against (#507).
 //!
@@ -48,7 +48,7 @@ use zeebra::grobner::{
         SingularSolver, Task, ZeebraSolver,
     },
     research::{Environment, Json},
-    F4Options,
+    F4Options, InterreductionRoute,
 };
 
 const ROOT: &str = "research/competitive";
@@ -100,19 +100,18 @@ fn main() {
     let only_engines: Option<Vec<String>> =
         value("--engines").map(|list| list.split(',').map(|e| e.trim().to_string()).collect());
     let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(600));
-    // Override F4's interreduction route for the Zeebra side. Takes `on`/`off` rather than being a
-    // bare presence flag so that the request stays legible after the default moves: once
-    // `recommended()` carries the matrix route, `--interreduce-by-matrix off` is how the division
-    // route is still reachable, and a bare `--interreduce-by-matrix` would then mean nothing.
-    // Absent, the row is taken at whatever `F4Options::default()` says, which is the state every
-    // historical row was taken in.
-    let interreduce_by_matrix: Option<bool> =
-        value("--interreduce-by-matrix").map(|v| match v.as_str() {
-            "on" => true,
-            "off" => false,
+    // Override F4's interreduction route for the Zeebra side. Named for the option rather than
+    // for one of its values, so the request stays legible as the default moves: `division` is how
+    // the pre-#478 route stays reachable now that `by-order` ships, and a bare presence flag could
+    // not ask for it at all. Absent, the row is taken at `F4Options::default()`.
+    let interreduction: Option<InterreductionRoute> =
+        value("--interreduction").map(|v| match v.as_str() {
+            "by-order" => InterreductionRoute::ByOrder,
+            "division" => InterreductionRoute::Division,
+            "matrix" => InterreductionRoute::Matrix,
             other => {
                 eprintln!(
-                    "--interreduce-by-matrix wants `on` or `off`, got {:?}",
+                    "--interreduction wants `by-order`, `division` or `matrix`, got {:?}",
                     other
                 );
                 std::process::exit(2);
@@ -243,7 +242,7 @@ fn main() {
                 &environment,
                 measure,
                 only_engines.as_deref(),
-                interreduce_by_matrix,
+                interreduction,
             );
         }
     }
@@ -283,7 +282,7 @@ fn run_one(
     environment: &Environment,
     measure: bool,
     only: Option<&[String]>,
-    interreduce_by_matrix: Option<bool>,
+    interreduction: Option<InterreductionRoute>,
 ) {
     let wanted = |engine: &str| only.is_none_or(|list| list.iter().any(|e| e == engine));
 
@@ -294,8 +293,8 @@ fn run_one(
             max_wall_time: Some(limits.wall),
             ..F4Options::default()
         };
-        if let Some(route) = interreduce_by_matrix {
-            options.interreduce_by_matrix = route;
+        if let Some(route) = interreduction {
+            options.interreduction = route;
         }
         let mut zeebra = ZeebraSolver::new().with_f4_options(options);
         if measure {

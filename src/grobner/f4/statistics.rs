@@ -582,7 +582,7 @@ pub struct F4Statistics {
     pub interreduction: NormalFormCounts,
 
     /// What the matrix interreduction route did, when
-    /// [`F4Options::interreduce_by_matrix`](super::F4Options::interreduce_by_matrix) selected it.
+    /// [`F4Options::interreduction`](super::F4Options::interreduction) selected it.
     ///
     /// `None` when the division route ran — either because the flag was off, or because a budget
     /// refused the matrix and the run fell back. The distinction is recorded rather than silent,

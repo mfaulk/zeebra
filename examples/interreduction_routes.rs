@@ -8,7 +8,7 @@
 //!
 //! # Why this exists and the competitive board does not answer it
 //!
-//! `competitive_sweep --interreduce-by-matrix on|off` produces two board rows and therefore two
+//! `competitive_sweep --interreduction division|matrix` produces two board rows and therefore two
 //! wall times. A row that does not move between them is ambiguous in a way that matters for
 //! deciding the default (#507): the matrix route is subject to the same row, column and entry
 //! budgets as any batch's, and **falls back to the division route** when one would be crossed. So
@@ -28,7 +28,7 @@
 //! millisecond, and the board sweep already carries their timings. What is reported here is the
 //! classical ladder, which is where `#507`'s unmeasured question lives.
 
-use std::time::Duration;
+use std::{io::Write, time::Duration};
 
 use zeebra::{
     fields::Zp2147483647,
@@ -37,7 +37,7 @@ use zeebra::{
             corpus::{instance, ladder},
             Instance,
         },
-        f4_reported, F4Options, MatrixRefusal,
+        f4_reported, F4Options, InterreductionRoute, MatrixRefusal,
     },
     MonomialOrder, MultivariatePolynomial,
 };
@@ -70,7 +70,7 @@ fn millis(d: Duration) -> f64 {
 /// A budget stop is reported rather than skipped: `f4_reported` returns its statistics whatever
 /// the outcome, and a rung that stops under both routes is still evidence about the stage.
 macro_rules! compare {
-    ($instance:expr, $order_name:expr, $order:expr, $($n:literal),+ $(,)?) => {{
+    ($instance:expr, $order_name:expr, $order:expr, $wall:expr, $($n:literal),+ $(,)?) => {{
         let built: &Instance = $instance;
         let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
         match built.variables.len() {
@@ -85,7 +85,7 @@ macro_rules! compare {
                                 .expect("this crate rendered this text"),
                         );
                     }
-                    run_both(&built.name, $order_name, &system, $order)
+                    run_both(&built.name, $order_name, &system, $order, $wall)
                 }
             )+
             other => {
@@ -103,15 +103,21 @@ fn run_both<const N: usize>(
     order_name: &'static str,
     system: &[MultivariatePolynomial<N, F>],
     order: MonomialOrder,
+    wall: Duration,
 ) -> Option<Row> {
+    // A per-route wall budget, because this example sweeps rungs with no board row and therefore
+    // no evidence that they finish. Both routes get the same budget, so a rung that stops stops
+    // for both and the pair stays an A/B rather than becoming a comparison of two budgets.
     let division = F4Options {
         measure_stages: true,
-        interreduce_by_matrix: false,
+        interreduction: InterreductionRoute::Division,
+        max_wall_time: Some(wall),
         ..F4Options::default()
     };
     let matrix = F4Options {
         measure_stages: true,
-        interreduce_by_matrix: true,
+        interreduction: InterreductionRoute::Matrix,
+        max_wall_time: Some(wall),
         ..F4Options::default()
     };
 
@@ -124,15 +130,29 @@ fn run_both<const N: usize>(
             "{rung} under {order_name}: the matrix route returned a different basis. A reduced \
              Grobner basis is unique, so this is a correctness failure and not a tolerance."
         ),
-        // Both stopped, which is a fact about the rung and not about the route. Reported with the
-        // timings it did take, because a stage share under a budget stop is still a stage share.
-        (Err(_), Err(_)) => eprintln!("- {rung} under {order_name}: both routes stopped short"),
-        // One finished and one did not. Never silently averaged: the two sides are no longer the
-        // same computation, so the row would be a ratio between different amounts of work.
-        _ => {
+        // Both stopped, which is a fact about the rung and not about the route. No row: a stopped
+        // run's `total` is zero under `measure_stages`, and a table line of zeros reads as a
+        // measurement of something very fast rather than as the absence of one.
+        (Err(stopped), Err(_)) => {
+            eprintln!("- {rung} under {order_name}: both routes stopped short ({stopped})");
+            return None;
+        }
+        // One finished and one did not. No row, because the two sides are no longer the same
+        // computation and the ratio would be between different amounts of work — but **which**
+        // side stopped is the finding, so it is named rather than elided. A rung the matrix route
+        // reaches inside a budget the division route does not is a capability difference and not
+        // a speed one.
+        (Err(stopped), Ok(_)) => {
             eprintln!(
-                "- {rung} under {order_name}: one route stopped and the other did not, so there \
-                 is no comparison to report"
+                "- {rung} under {order_name}: the MATRIX route finished inside the budget and the \
+                 division route did not ({stopped}), so this rung is reachable by one route only"
+            );
+            return None;
+        }
+        (Ok(_), Err(stopped)) => {
+            eprintln!(
+                "- {rung} under {order_name}: the DIVISION route finished inside the budget and \
+                 the matrix route did not ({stopped}) — a regression, not a null"
             );
             return None;
         }
@@ -164,18 +184,114 @@ fn refusal(reason: &MatrixRefusal) -> String {
     match reason {
         MatrixRefusal::Rows { limit } => format!("rows > {}", limit),
         MatrixRefusal::Columns { limit } => format!("columns > {}", limit),
-        MatrixRefusal::Nonzeros { nonzeros } => format!("{} live nonzeros", nonzeros),
+        MatrixRefusal::Nonzeros { nonzeros } => {
+            format!("{} live nonzeros at construction", nonzeros)
+        }
+        // #536: the elimination's fill-in, which is the refusal that actually binds on the
+        // upper rungs — back-substitution costs multiples of what the matrix was built with.
+        MatrixRefusal::LiveEntries { nonzeros } => {
+            format!("{} live nonzeros under elimination", nonzeros)
+        }
     }
+}
+
+fn share(stage: Duration, total: Duration) -> f64 {
+    if total.is_zero() {
+        0.0
+    } else {
+        100.0 * stage.as_secs_f64() / total.as_secs_f64()
+    }
+}
+
+/// What the matrix route did, which is the half the board rows cannot report.
+fn verdict(row: &Row) -> String {
+    match (&row.shape, &row.fell_back) {
+        (Some((r, c, nz)), None) => format!(
+            "built {} x {}, {} nonzeros ({:.2}% dense)",
+            r,
+            c,
+            nz,
+            100.0 * *nz as f64 / (*r as f64 * *c as f64).max(f64::MIN_POSITIVE)
+        ),
+        (Some((r, c, nz)), Some(reason)) => format!(
+            "FELL BACK to division, refused on {}; would have been {} x {}, {} nonzeros",
+            refusal(reason),
+            r,
+            c,
+            nz
+        ),
+        (None, _) => {
+            "no interreduction matrix recorded - nothing reducible to close over".to_string()
+        }
+    }
+}
+
+fn header() {
+    println!(
+        "{:<30} {:<8} {:>11} {:>11} {:>8} {:>11} {:>11} {:>8} {:>7} {:>6}",
+        "rung",
+        "order",
+        "div/ms",
+        "div stage",
+        "stage %",
+        "matrix/ms",
+        "mtx stage",
+        "stage %",
+        "e2e",
+        "basis"
+    );
+}
+
+/// One rung, printed and flushed as soon as it is known.
+///
+/// Streamed rather than tabulated at the end because the upper rungs have no board row and
+/// therefore no evidence that they finish: a run killed on the outer timeout must still leave
+/// behind every rung it did measure.
+fn emit(row: &Row) {
+    println!(
+        "{:<30} {:<8} {:>11.3} {:>11.3} {:>7.2}% {:>11.3} {:>11.3} {:>7.2}% {:>6.2}x {:>6}",
+        row.rung,
+        row.order,
+        millis(row.division_total),
+        millis(row.division_stage),
+        share(row.division_stage, row.division_total),
+        millis(row.matrix_total),
+        millis(row.matrix_stage),
+        share(row.matrix_stage, row.matrix_total),
+        millis(row.division_total) / millis(row.matrix_total).max(f64::MIN_POSITIVE),
+        row.basis
+    );
+    println!("    {}", verdict(row));
+    std::io::stdout().flush().expect("stdout");
 }
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let all_orders = arguments.iter().any(|a| a == "--orders");
-    let wanted: Vec<&str> = arguments
-        .iter()
-        .filter(|a| !a.starts_with("--"))
-        .map(String::as_str)
-        .collect();
+    let value = |name: &str| {
+        arguments
+            .iter()
+            .position(|a| a == name)
+            .and_then(|at| arguments.get(at + 1))
+            .cloned()
+    };
+    // The board's own policy, so a rung that stops here is a rung that stops there.
+    let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(60));
+    // Rung names are the positional arguments. A flag's own value is skipped by position rather
+    // than by text, so a rung whose name happened to equal it is still selectable.
+    let mut wanted: Vec<&str> = Vec::new();
+    let mut skip_next = false;
+    for argument in &arguments {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if argument == "--wall" {
+            skip_next = true;
+        } else if !argument.starts_with("--") {
+            wanted.push(argument.as_str());
+        }
+    }
 
     let orders: &[(&'static str, MonomialOrder)] = if all_orders {
         &[
@@ -188,12 +304,13 @@ fn main() {
     };
 
     println!(
-        "# #507: both interreduction routes over the corpus ladder, GF({})",
-        REFERENCE
+        "# #507: both interreduction routes over the corpus ladder, GF({}), {} s per route",
+        REFERENCE,
+        wall.as_secs()
     );
     println!();
+    header();
 
-    let mut rows: Vec<Row> = Vec::new();
     for entry in ladder() {
         if !wanted.is_empty() && !wanted.contains(&entry.name) {
             continue;
@@ -215,72 +332,12 @@ fn main() {
                 );
                 continue;
             }
-            if let Some(row) = compare!(&built, order_name, *order, 4, 5, 6, 7, 8, 9, 10, 11, 14) {
-                rows.push(row);
+            if let Some(row) =
+                compare!(&built, order_name, *order, wall, 4, 5, 6, 7, 8, 9, 10, 11, 14)
+            {
+                emit(&row);
             }
         }
-    }
-
-    println!(
-        "{:<30} {:<8} {:>11} {:>11} {:>8} {:>11} {:>11} {:>8} {:>7} {:>6}",
-        "rung",
-        "order",
-        "div/ms",
-        "div stage",
-        "stage %",
-        "matrix/ms",
-        "mtx stage",
-        "stage %",
-        "e2e",
-        "basis"
-    );
-    for row in &rows {
-        let share = |stage: Duration, total: Duration| {
-            if total.is_zero() {
-                0.0
-            } else {
-                100.0 * stage.as_secs_f64() / total.as_secs_f64()
-            }
-        };
-        println!(
-            "{:<30} {:<8} {:>11.3} {:>11.3} {:>7.2}% {:>11.3} {:>11.3} {:>7.2}% {:>6.2}x {:>6}",
-            row.rung,
-            row.order,
-            millis(row.division_total),
-            millis(row.division_stage),
-            share(row.division_stage, row.division_total),
-            millis(row.matrix_total),
-            millis(row.matrix_stage),
-            share(row.matrix_stage, row.matrix_total),
-            millis(row.division_total) / millis(row.matrix_total).max(f64::MIN_POSITIVE),
-            row.basis
-        );
-    }
-
-    println!();
-    println!("## What the matrix route did on each rung");
-    println!();
-    for row in &rows {
-        let verdict = match (&row.shape, &row.fell_back) {
-            (Some((r, c, nz)), None) => format!(
-                "built {} x {}, {} nonzeros ({:.2}% dense)",
-                r,
-                c,
-                nz,
-                100.0 * *nz as f64 / (*r as f64 * *c as f64).max(f64::MIN_POSITIVE)
-            ),
-            (Some((r, c, nz)), Some(reason)) => format!(
-                "FELL BACK to division, refused on {}; would have been {} x {}, {} nonzeros",
-                refusal(reason),
-                r,
-                c,
-                nz
-            ),
-            (None, _) => {
-                "no interreduction matrix recorded — nothing reducible to close over".to_string()
-            }
-        };
-        println!("- `{}` {}: {}", row.rung, row.order, verdict);
     }
 
     println!();
