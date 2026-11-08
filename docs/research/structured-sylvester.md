@@ -2,8 +2,11 @@
 
 **Measured at:** publication bound `5ebb5165`…`c19e8c12` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
-§5.6.2's figures are **recorded rather than recovered**: `f8555dd0`…`f9772f90`, the commits the
-`determinant_width` binary was built from.
+§5.6.2's figures are **recorded rather than recovered**, and stamped so the stamp survives this
+branch's merge (#505): base commit `47b5ccd0`, which is an ancestor of `main` and cannot stop
+being one, plus the **blob** `9dba27fa0fe2` — `git hash-object examples/determinant_width.rs` —
+which names the measured source itself and so survives a rebase, a squash and a branch SHA that
+no longer exists.
 
 M25-D deliverable 3. `docs/research/resultant-elimination.md` §6.7 ranks "the determinant's
 per-sample cost" first among what is left and calls it "the only axis left with an asymptotic
@@ -458,7 +461,7 @@ the `rf4-rp2` row affordable.
 
 #### 5.6.2 The mechanism, measured: there is no width penalty to explain
 
-**Measured at** `f8555dd0`…`f9772f90`. `examples/determinant_width`, one process per pair,
+**Measured at** base `47b5ccd0`, source blob `9dba27fa0fe2`. `examples/determinant_width`, one process per pair,
 `taskset --cpu-list 0-31` on a 64-physical-core Threadripper PRO 5995WX (cpus 0–31 are 32 distinct
 physical cores, so no SMT sibling is shared — ruled out before anything else), under
 `tools/benchlock.sh`, five draws a point, 1 024 samples a draw, `-C target-cpu=x86-64-v3` verified
