@@ -92,7 +92,7 @@ and three of the four have a trap.
 
 | tool | how degrevlex is requested | how the variable order is set | trap |
 |---|---|---|---|
-| msolve | **default and only order** for `-g`; `-e` makes a two-block elimination order, each block degrevlex | the order of names on line 1 of the input file, greatest first | none for `-g`; msolve may **add a variable** (§3.4) |
+| msolve | **default and only order** for `-g`; `-e` makes a two-block elimination order, each block degrevlex | the order of names on line 1 of the input file, greatest first | none for `-g`; msolve may **add a variable** (§3.4), and a factor naming an **undeclared** variable is dropped with no signal (§3.8) |
 | Groebner.jl | `ordering = DegRevLex()` on `groebner` | the order of the name vector given to `polynomial_ring`, greatest first | `leading_monomial` reports against the **ring's** `internal_ordering`, not `ordering=` (§4.2) |
 | Sagebrush | `Order::DegRevLex` argument to `f4::groebner_p` | index in the packed exponent word: variable 0 in the **highest** bit field | terms are stored in **lex** order whatever the order argument is (§5.2) |
 | Singular | `dp` in the ring declaration | the order of variables in the ring declaration, greatest first | `Dp` is degree **lexicographical**; `dp` is degree **reverse** lexicographical |
@@ -100,6 +100,14 @@ and three of the four have a trap.
 Reading the first column as "they all just do degrevlex" is the error. §4.2 and §5.2 are both
 cases where the *basis* is right and the *leading monomials you read off it* are wrong, which is
 the failure mode that does not announce itself.
+
+**And one hazard in this class is provably invisible to §7's cross-engine agreement**: a misparse of
+the input. Every engine is handed the same bytes, so if they all read them the same wrong way, all
+four agree on the same wrong ideal. The specific hazard is the `x1`/`x10` prefix collision #261
+found while widening past nine variables — the corpus names its variables `x1..xN`
+(`corpus.rs`'s `text_instance`), i.e. the naming with the hazard in it, and its rungs go well past
+nine. **msolve is immune**, by construction and by measurement (§3.8). The other three are not
+assessed here.
 
 ---
 
@@ -186,6 +194,47 @@ inside the prime-field range: `-S` (f4sat) is "restricted to 32 bit prime fields
 (`main.c:189-190`), and `-n` (normal form) "only works for prime field computations"
 (`main.c:153`).
 
+**`p < 2^31` is the ceiling for the basis, not for the eliminant.** The parametrization path has a
+second, much lower one. `src/fglm/fglm_core.c:1384-1389` (and again at `:1586`, `:1805`):
+
+```c
+/* 1147878294 */
+if(prime>=1518500213){
+  fprintf(ERRSTREAM, "Prime %u is too large.\n", prime);
+  fprintf(ERRSTREAM, "One needs to use updated linear algebra fglm functions\n");
+  return NULL;
+```
+
+and **above it msolve does not terminate.** The `NULL` is laundered into `success = 0`
+(`msolve/msolve.c:1740-1752`) — the *same* encoding as a genuinely non-generic staircase — which
+becomes exit 1 and reaches the `goto restart` handler at `msolve.c:4513-4533`. That loop cannot
+exit: `add_linear_form_to_input_system` has no failure path (`msolve.c:649`) and
+`undo_variable_order_change` permanently returns 0 once a linear form exists (`msolve.c:482-484`),
+so each round adds another linear form and successive attempts get *slower*. Measured: katsura-5
+over GF(2^31 − 1) produced **25 353 retries and 1.37 M lines of `Prime 2147483647 is too large.` in
+eight seconds and never exited.** `p = 1518500201` returns the correct eliminant; `p = 1518500213`
+loops. `-g 2` is unaffected and works at every `p ≤ 2147483647`.
+
+There is also a window where msolve is unguarded. `src/fglm/linalg-fglm.c:33-39` documents the safe
+modulus as `1515531528` — the kernels accumulate eight products before folding:
+
+```c
+//  -> modulus <= DOT2_ACC8_MAX_MODULUS   (about 2**30.5, slightly less)
+#define DOT2_ACC8_MAX_MODULUS UWORD(1515531528)
+```
+
+Neither `DOT2_ACC8_MAX_MODULUS` nor its length companion is **ever compared against anything** in
+msolve's tree. So the runtime guard admits `p ≤ 1518500212` while the stated precondition stops at
+`1515531528` — a **2 968 684-wide window** that runs to completion with no accumulation guarantee.
+`src/grobner/external/msolve.rs` bounds the eliminant task at the documented-safe
+`MAX_CHARACTERISTIC_ELIMINANT = 1515531529` (exclusive) for that reason, not at msolve's own guard.
+
+**So §8's "msolve and Singular stop at 2^31 − 1" is true for a basis and not for an eliminant.**
+For conversion comparisons msolve stops at ~1.5e9, which puts `Mersenne31`, `Zp2147483647` and
+hence `corpus::REFERENCE_CHARACTERISTIC` out of range — a sharper limitation than a 2^31 ceiling.
+Full source-grounded treatment in
+[`docs/research/msolve-implementation.md`](msolve-implementation.md) §3.3, §3.4.
+
 ### 3.4 msolve may add a variable, and the eliminant degree is not what you expect
 
 On the smoke system the default mode returns a parametrization in **four** variables,
@@ -242,21 +291,65 @@ not just end to end. (The percentages above are from the smoke system and are me
 0 bytes of stderr, exit 0. Everything in this section is therefore invisible unless `-v 1` is
 passed, which an adapter should treat as mandatory rather than optional.
 
+**`-v 1`'s output goes to stderr, not stdout.** `src/neogb/streams.h:24-26`:
+
+```c
+#define OUTSTREAM stdout
+#define VERBSTREAM stderr
+#define ERRSTREAM stderr
+```
+
+and every advisory — the genericity messages included — is written to `VERBSTREAM`. Measured on the
+smoke system with the streams separated: `-v 1` puts **0 lines on stdout and 414 on stderr**.
+Immaterial to an adapter driven through `Supervisor`, which merges both into one log, but it matters
+to anyone following this section by hand: `msolve -v 1 … 2>/dev/null` discards exactly the evidence
+the table below tells you to look for.
+
 | condition | exit | where | message / behaviour |
 |---|---|---|---|
 | characteristic ≥ 2^31 | **1** | stderr | `Warning: characteristic must be 0 or < 2^31` (§3.3) |
-| not in generic position, `-c 2` (default) | 0 | **stdout, only at `-v 1`** | `Ideal not in generic position, parametrizations are not correct`, then `Changing variable order for possibly more generic staircase:`, then a new variable `A` (§3.4) |
+| `p ≥ 1518500213`, eliminant path | — | stderr | `Prime … is too large.`, then **does not terminate** (§3.3) |
+| not in generic position, `-c 2` (default) | 0 | **stderr, only at `-v 1`** | `Ideal not in generic position, parametrizations are not correct`, then `Changing variable order for possibly more generic staircase:`, then a new variable `A` (§3.4) |
 | not in generic position, `-c 0` | **1** | stderr | `=====> Computation failed <=====` plus advice to use `-c2`; **output file is empty** |
+| a factor naming an undeclared variable | 0 | **nowhere** | the factor is dropped; `#invalid equations 0` (below) |
 | no solution in the algebraic closure | 0 | output file | `[-1]:` (`main.c:94`) |
 | infinitely many solutions | 0 | output file | `[1, nvars, -1,[]]:` (`main.c:95`) |
 
-The third row is the clean one — non-zero exit, stderr, empty output — and the second is the
-trap: **msolve recovers by changing the problem, and says so only on stdout at `-v 1` while
-exiting 0.** The smoke system hits it. An adapter that runs `-v 0`, sees exit 0 and parses the
-output file gets a correct parametrization *of a system with a variable msolve added*, and
-nothing anywhere tells it so except the variable list in the output (`['x','y','z','A']`).
-**Compare the output's variable list against the input's**; that check is cheap and it is the
-only reliable signal.
+The `-c 0` row is the clean one — non-zero exit, stderr, empty output — and the `-c 2` row is the
+trap: **msolve recovers by changing the problem, and says so only at `-v 1` while exiting 0.** The
+smoke system hits it. An adapter that runs `-v 0`, sees exit 0 and parses the output file gets a
+correct parametrization *of a system with a variable msolve added*, and nothing anywhere tells it
+so except the variable list in the output (`['x','y','z','A']`). **Compare the output's variable
+list against the input's**; that check is cheap and it is the only reliable signal.
+
+**An undeclared variable is the quieter one, because there is no signal at all.**
+`store_exponent` (`iofiles.c:26-73`) splits each term on `*` and matches every factor name with a
+full `strcmp`, but the matching loop (`:57-62`) has no `else`:
+
+```c
+for (k = 0; k < gens->nvars; ++k) {
+    if (strcmp(gens->vnames[k], var) == 0) {
+        ((gens->exps) + pos)[k] = strtol(ev, NULL, 10);
+        break;
+    }
+}
+```
+
+A factor matching nothing is dropped. Measured: `x*z-1, y^2-1` with line 1 reading `x,y` yields the
+leading ideal `{x, y^2}` instead of `{x*z, y^2}` — exit 0, `#invalid equations 0`, nothing on either
+stream. So **check every identifier in every generator against the declared order before running**;
+`src/grobner/external/msolve.rs` does. (Duplicate variable names msolve *does* catch:
+`iofiles.c:1005`, exit 1, "Duplicate variable name x in input file.")
+
+**The same `strcmp` is a positive result worth stating.** Because it is a whole-string comparison
+rather than an `strncmp`, msolve is **immune to the `x1`/`x10` prefix collision** #261 found while
+widening past nine variables. Verified rather than assumed: 53 distinct degree-2 monomials over
+`x1..x14`, pairing every single-digit index with every double-digit one in both orders of
+appearance, round-trip as a **set** through `msolve -g 1` (that works as a test because distinct
+degree-2 monomials are pairwise non-dividing, so the reduced basis of the monomial ideal they
+generate *is* the generating set). Worth recording explicitly rather than leaving unstated, because
+a misparse is the one hazard cross-engine agreement provably cannot catch — every engine is handed
+the same bytes, so all four would agree on the same wrong ideal.
 
 ---
 
@@ -592,11 +685,14 @@ accept).
 
 ## 8. Blockers and what is not provisioned
 
-- **No comparand covers Zeebra's large prime fields.** msolve and Singular stop at 2^31 − 1
-  (§3.3, §6.2). Groebner.jl and Sagebrush accept 64-bit primes, and for p > 2^31 **nothing
-  corroborates them**, so any such run is a single unverified data point. Zeebra's 254/255-bit
-  fields have **no external comparand at all** at any size. That is a capability gap to record
-  in the results table, not a gap to paper over.
+- **No comparand covers Zeebra's large prime fields.** msolve and Singular stop at 2^31 − 1 for a
+  **basis** (§3.3, §6.2). For an **eliminant** msolve stops much lower — the documented-safe bound
+  is `1515531529` and above `1518500213` it does not terminate at all (§3.3) — so `Mersenne31`,
+  `Zp2147483647` and `corpus::REFERENCE_CHARACTERISTIC` are out of range for a conversion
+  comparison even though they are in range for a basis. Groebner.jl and Sagebrush accept 64-bit
+  primes, and for p > 2^31 **nothing corroborates them**, so any such run is a single unverified
+  data point. Zeebra's 254/255-bit fields have **no external comparand at all** at any size. That
+  is a capability gap to record in the results table, not a gap to paper over.
 - **Operation (c), solutions over a finite field, is unsupported by all four.** msolve returns
   a parametrization over prime fields (§3.5); Groebner.jl has no solver; Singular's `solve` is
   numerical. Any GF(p) point enumeration is the adapter's root-finding, not a comparand's
