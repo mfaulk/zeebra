@@ -486,16 +486,28 @@ lex route returns the same basis and the same quotient dimension at every prime 
 accepts, up to `2^64 − 59` — which follows from §5.4: `LexBasis` is the *identical* F4 under a
 different ordering, because there is no FGLM to have a narrower bound.
 
-**One consequence for the corpus.** The Anemoi rungs carry
-`Equivalence::NoComparand { reason: "msolve and Singular both stop below 2^31" }`, and their field
-is `2^64 − 353`. That reason is true and incomplete: Groebner.jl represents that field and returns
-a correct basis there — the same six leading monomials and `vdim = 12` as the reference system at
-`2^30 + 3`. So the adapter's `supports()` says **yes**, because
-[`ExternalSolver::supports`](../../src/grobner/external/contract.rs) is a statement about declared
-capability and nothing else, and `Equivalence::licenses_timing()` remains the gate on publishing a
-cross-library timing. The real constraint on an Anemoi row is not that no tool can represent it; it
-is that **nothing corroborates Groebner.jl above 2^31**, which is a different and weaker claim, and
-the corpus's recorded reason would be more accurate if it said so.
+**One consequence for the corpus, now landed.** The Anemoi rungs are over `2^64 − 353`, and
+Groebner.jl represents that field and returns a correct basis there — the same six leading
+monomials and `vdim = 12` as the reference system at `2^30 + 3`. So the adapter's `supports()` says
+**yes**, because [`ExternalSolver::supports`](../../src/grobner/external/contract.rs) is a
+statement about declared capability and nothing else. The constraint on an Anemoi row was never
+that no tool can represent it; it is that **nothing corroborates Groebner.jl above 2^31**, which is
+a different and weaker claim. The rungs recorded `NoComparand` until `1d17b6e` (#341) and now
+record
+
+```rust
+Equivalence::SoleComparand {
+    tool: "Groebner.jl",
+    reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
+             2^31, so Groebner.jl is the only external engine that reaches it",
+}
+```
+
+which splits the question the way the evidence does: `licenses_timing()` is **true** — one engine
+at one field on one machine is a valid ratio against a checkable invariant — and
+`is_corroborated()` is **false**, because a two-way disagreement cannot name the odd one out.
+Resolved as the intended encoding in #386; what the board does *not* yet do is state either fact
+beside a published figure (#518).
 
 ### 5.4 Capability surface, confirmed by running it
 
