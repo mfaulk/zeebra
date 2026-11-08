@@ -3960,7 +3960,27 @@ arithmetic printed. `--build-only` times `cico_bivariate` alone, which is the bo
 row past the budget still supports. There is no `--all` — it removed the guard entirely, which put
 a 12.9-day row beside a bounded one.
 
-What the guard costs a row with is **measured rather than assumed**. `examples/determinant_sweep`
+**`--wall-budget` is against the whole row, not against one stage of it.** Until #410 it costed the
+Sylvester determinants and nothing else, which was defensible while those were ~99% of a four-round
+row and stopped being so when #350 and #351 landed: they are **15% of an `rf4-rp2` row and 0.5% of
+an `rf6-rp0` one**. `grobner::research::row_cost` is the model — pure and unit-tested, with the
+determinant laws below moved into it unchanged — and it costs five terms, each printed with its own
+basis (`measured` / `fitted` / `extrapolated` / `NOT MODELLED`) and the anchor behind it, so a
+budget line cannot read as covering a row it covers a fraction of. The symbolic build is a
+**recorded constant per round count** rather than a law (324.0 s at six rounds, measured on the
+lock after #243) and interpolation is anchored on two measurements, 5.1 ms at 730 samples and 31.7 s
+at 59 050. **Root finding is a band** — the gcd route pessimistic against deflation optimistic,
+because its cost is `(roots + 1)` searches and the eliminant's base-field root count is a property
+of the problem, `O(1)` on every registered row measured and unmeasured on every row nobody has
+attempted — and the refusal is on the pessimistic edge. A row whose symbolic build nobody has
+measured at its round count is refused as **unbounded** rather than admitted on the terms that are
+modelled, because an unmodelled term is not a zero term. The default 1 800 s budget is unchanged and
+admits the same rows. See
+[`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md) §6.14, which also
+records that the predicted band brackets #367's measured `rf4-rp2` row with the optimistic edge 1.2%
+above it.
+
+What the guard costs a row's determinants with is **measured rather than assumed**. `examples/determinant_sweep`
 times the Sylvester determinant kernel at orders 18, 162, 486, 1 458 and 4 374 on random bivariate
 pairs and fits a power law with per-point residuals, and the answer is piecewise: above the L2
 footprint the exponent is **2.9953 ± 0.0285** with a worst residual of 3.7% — cubic to within the
@@ -3969,9 +3989,11 @@ cliff to model — and below it 2.79, which is fixed per-determinant overhead th
 amortize. `determinant_core_ms` takes the **larger** of the fitted and cubic laws, because 2.9953 is
 below 3 and a cost model that under-predicts authorizes a run nobody costed, times a measured
 core-time penalty for running wide (2.404 s, 2.821 s and 3.148 s a determinant at order 1 458 on 1,
-8 and 32 workers). The six-round rows come out at 12.0 min (`rf2-rp4`), 1.79 h (`rf4-rp2`) and
-16.15 h (`rf6-rp0`) on 32 workers; the eight-round rows at order 13 122 are 490 and 4 415 days, out
-of reach by three orders of magnitude rather than by a factor the sample count could recover. See
+8 and 32 workers). The six-round rows' **determinants** come out at 12.0 min (`rf2-rp4`), 1.79 h
+(`rf4-rp2`) and 16.15 h (`rf6-rp0`) on 32 dense workers — the whole rows under the Euclidean kernel
+are 5.5 min, 6.1–8.6 min and 49.3 min–3.61 h, §6.14 — and the eight-round rows at order 13 122 are
+490 and 4 415 days of determinants, out of reach by three orders of magnitude rather than by a
+factor the sample count could recover. See
 [`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md) §6.9, which also
 records that the figures on record are about 1.2x faster than the same measurements today, and that
 the 2.868 ms order-162 anchor every earlier projection used does not reproduce.

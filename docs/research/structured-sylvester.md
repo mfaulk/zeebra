@@ -545,6 +545,17 @@ All determinant and tail figures **extrapolated** from the anchors above; the bu
 So: **axis 4 is 1 692× measured on the stage and 3× on the row**, and after it `rf6-rp0` is
 **root-finding-bound** — 5.63 h of a 7.2 h row, 78%.
 
+> **Superseded on three of its five lines, and the direction of the verdict survives.**
+> `resultant-elimination.md` §6.14 re-costs this table with every term measured or anchored: #243
+> takes the build from 0.81 h to **5.4 min**, #351's eight-point sweep takes `rf6-rp0`'s
+> root-finding edge from the 5.63 h extrapolated here to **2.79 h**, and #367's measured width
+> penalty takes the determinants the other way, from ~31 s to **59.1 s**. The row becomes
+> **0.82–3.61 h** as a band, and it is still the tail that bounds it — interpolation at 42.8 min is
+> now its largest *modelled* term and root finding its largest pessimistic one. The 78% figure is
+> the arithmetic of this table and not of that one; what it was quoted for — that axis 4 does not
+> raise the reachable round count because the constant it removes is not the one that bounds the row
+> — is unaffected.
+
 ### 7.2 Seven rounds
 
 | stage | `rf7-rp0` (`S = 4 782 970`, `D = 4 782 969`) |
