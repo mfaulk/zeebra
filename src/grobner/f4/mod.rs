@@ -445,6 +445,9 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
         let outcome = reduce_batch_in(&monic, &batch, order, options, &mut cache)?;
         statistics.record(&outcome.statistics);
+        // Beside `record`, which is what increments `batches`, so the sequence and the count stay
+        // the same length by construction rather than by agreement.
+        statistics.record_step_degree(degree);
         if options.profile_degrees {
             statistics.degrees.record(degree, &outcome.statistics);
         }

@@ -369,6 +369,28 @@ pub struct F4Statistics {
     /// The largest lcm degree of any pair selected.
     pub max_pair_degree: u64,
 
+    /// The selection degree of each batch, in the order the batches ran.
+    ///
+    /// Magma's `GroebnerBasis` added exactly this as a second return value in V2.26 — "the integer
+    /// sequence of degrees encountered in each step of the F4 algorithm" — and the sequence is
+    /// strictly more informative than [`F4Statistics::max_pair_degree`]: the degree a system
+    /// stalls at, whether it climbed monotonically or jumped, and where a degree-fall happened are
+    /// all invisible in a maximum. [`F4Statistics::degrees`] is not a substitute either, because
+    /// it is keyed *by* degree, so a degree revisited after a drop appears once and the order is
+    /// gone.
+    ///
+    /// # One entry per batch that built a matrix
+    /// `step_degrees.len() == batches`, by construction: the push sits beside the increment in
+    /// [`F4Statistics::record`]'s caller. A selection every pair criterion discarded built nothing
+    /// and is **not** a step here, which is also why the maximum of this sequence can be *below*
+    /// `max_pair_degree` — that field is accumulated over the pairs as selected, before the
+    /// criteria run. The two agree on every system in the corpus; the inequality is the invariant.
+    ///
+    /// Always collected. One `u64` push per batch, against batch counts in the hundreds, is
+    /// unmeasurable beside a matrix construction — so unlike `degrees` it is not gated on an
+    /// option a measurement has to remember to set.
+    pub step_degrees: Vec<u64>,
+
     /// The largest number of rows in any matrix.
     pub max_matrix_rows: usize,
 
@@ -577,6 +599,29 @@ pub struct F4Statistics {
 }
 
 impl F4Statistics {
+    /// Append one batch's selection degree to [`F4Statistics::step_degrees`].
+    ///
+    /// Separate from [`F4Statistics::record`] because [`BatchStatistics`] does not carry the
+    /// degree its batch was selected at — the main loop reads it off the pair queue — and because
+    /// a caller driving batches itself has to supply it. Call it once per `record`, so the two
+    /// stay in step.
+    pub fn record_step_degree(&mut self, degree: u64) {
+        self.step_degrees.push(degree);
+    }
+
+    /// The largest degree any batch was selected at, or `None` if no matrix was built.
+    ///
+    /// The quantity `cost_model`'s `solving_degree` wants: a run's observed maximum selection
+    /// degree. **Not the solving degree or the degree of regularity of the ideal**, which are
+    /// properties of the ideal rather than of a run — see
+    /// [`F4Statistics::max_monomial_degree`] for the same caution.
+    ///
+    /// `None` rather than zero for an empty run, because zero is a degree a batch could in
+    /// principle be selected at and a consumer cannot tell the two apart.
+    pub fn observed_solving_degree(&self) -> Option<u64> {
+        self.step_degrees.iter().copied().max()
+    }
+
     /// Fold one batch's counters into the totals.
     ///
     /// Public because [`super::reduce_batch`] is: a caller driving batches itself accumulates the
