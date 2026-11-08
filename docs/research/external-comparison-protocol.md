@@ -1,5 +1,8 @@
 # The external comparison protocol: what a cross-library measurement must record, and what it may claim
 
+**Measured at:** publication bound `2e722797` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](#10-the-commit-and-what-a-publication-bound-is)).
+
 Policy for #257, binding on every figure in `research/competitive/` and on every adapter built to
 the `#258` runner contract (`src/grobner/external/contract.rs`).
 
@@ -89,6 +92,7 @@ measurement method is unstated is a field two runs can disagree on without eithe
 |---|---|
 | Solver id | `singular`, `msolve`, `groebner.jl`, `sagebrush`, `zeebra`. `ExternalSolver::id()`. |
 | Version | Obtained by **running the tool**, once per sweep, through `probe_version()` — never read from a package manifest, which can describe a build that is not the one on the path. Singular reports a build number (`4.4.1`, build `44105`); Groebner.jl a package version; msolve a version string. The raw text is kept beside the parsed value so a misparse is recoverable. |
+| Source commit | For Zeebra: the SHA the measured binary was built from, `Environment::commit`, read with `git rev-parse` at run time — never a branch name, which stops identifying a binary as soon as the branch moves, and never a date, which at this repository's commit rate names no commit at all. For a comparand: the version or pin `external-comparands.md` records. A figure without it cannot be re-taken, which is #335; what a commit does and does not buy is §10. |
 | Build configuration | For Zeebra: the cargo profile and `RUSTFLAGS`, which is `Environment::build` in the existing scoreboard. For an external tool: how it was obtained (distribution package, source build) and the relevant flags. A source build at `-march=native` and a distribution build are different software. |
 | CPU ISA floor | The instruction-set baseline the binary was compiled for. This repo has measured a 4-byte-vector loss from an unset `-C target-cpu` (`util::isa_floor`, and the figures corrected in #185/#231) — a comparison between a tool built for its distribution's baseline and one built for the host is not a comparison of algorithms. Record it; where it cannot be determined for an external binary, record that it could not. **For a comparand this repository builds from source, match it rather than record it** — see below. |
 
@@ -581,4 +585,82 @@ Every row carries what is needed, and nothing else is required:
 4. The machine tag, CPU model and affinity.
 5. The limits.
 
-If a row cannot be reproduced from those five, the row is the defect, not the reproduction attempt.
+6. The commit the measured binary was built from (§10).
+
+If a row cannot be reproduced from those six, the row is the defect, not the reproduction attempt.
+
+---
+
+## 10. The commit, and what a publication bound is
+
+A figure states the commit it was taken at. `Environment::commit` has held the field since the
+scoreboard existed and `examples/scoreboard.rs` fills it from `git rev-parse`, so this was never a
+missing capability — the gap was in the prose documents, which recorded the machine, the pinning,
+the build flags and the lock, and never the commit (#335). What that cost is exact: #318 found a
+figure on record 1.2x faster than the same measurement taken months later, and the one experiment
+that settles such a thing — re-measure at the old commit — could not be *set up* from what was
+written down. It took a separate archaeology pass to recover the SHA before the question could even
+be asked.
+
+### 10.1 The declaration
+
+Every document under `docs/` that publishes a measurement carries one of three declarations in its
+header:
+
+| Declaration | Means |
+|---|---|
+| **Measured at:** `` `93bb1c2` `` | the commit, or the commits, the figures were taken at. The strong form, and the only one a new measurement may use. |
+| **Measured at:** publication bound `` `x` ``…`` `y` `` | retrospective only: the figures were taken *at or before* the commits that published them, recovered from git rather than recorded at the time. §10.2. |
+| **Measured at:** not measured here — … | the document takes no measurement; every figure is quoted from a cited source, which carries its own era. |
+| **Measured at:** unrecorded — … | the era is genuinely unrecoverable, said out loud rather than left for the reader to assume. |
+
+`Frozen at:` is the same declaration under another name, which `m27-baseline.md` already uses. A
+section stating its own commit overrides the document's header for that section, and is what
+`resultant-elimination.md` §6.13 does when it names both ends of an A/B by SHA rather than by
+branch — `origin/main today` stops identifying a binary the moment `main` moves.
+
+`tools/check-measurement-provenance.sh` enforces the declaration's presence, over
+`docs/research/*.md` and `docs/MILESTONE-*.md`, and runs in CI. It was written because the
+reproducibility checklist had asked for the commit for a milestone already and that did not produce
+it.
+
+### 10.2 A publication bound is weaker than a measurement's commit, and is labelled so
+
+A figure already in a document whose commit nobody wrote down can still be dated, because the
+commit that *wrote the figure into the document* is in git:
+
+```sh
+git log -S "37 634.3" --format='%h %ad' --date=short -- docs/research/resultant-elimination.md | tail -1
+```
+
+That returns `93bb1c25`, which is independently the commit `resultant-elimination.md` §6.5's table
+was taken at. The recovery is cheap and it is an **upper bound**: the run happened at or before the
+commit that published it, on a tree that was that branch's head and need not be the published
+commit's tree. Dates do not substitute — this repository has run at ~200 commits a day, so a date
+names no commit at all.
+
+A bound is therefore never written into `Environment::commit`, whose contract is the commit the
+measurement was taken at. A transcribed row with no commit on record keeps the empty string, which
+the register renders as recorded-absent; the bound lives in the source document's header, which is
+where the register's `source` column already points. Filling a measured-provenance field with an
+inferred value is the same category error as reporting an estimate in a measured column.
+
+### 10.3 The commit is necessary and is not sufficient
+
+#318's resolution is the caution against reading a SHA as reproducibility. §6.5's figure does not
+reproduce *at its own commit*: re-run at `93bb1c2` under the lock on one pinned core it gives
+45 159.7–47 944.4 ms against the 37 634.3 ms on record, so no commit in the 435-commit range could
+be responsible and the bisection the issue proposed would have landed nowhere. What differed was the
+session and the ambient load — the width penalty is 6% and contention up to 1.4x, with three other
+agents' `cargo test --release` runs resident during the original sweep, which `tools/benchlock.sh`
+serializes benchmarks against but not builds.
+
+So the era of a figure is the commit **and** the session **and** the load. `tools/benchlock.sh`
+records `load=` on its START and END lines for the second half of that. A figure quoted across two
+sessions is not comparable with itself, which is what `Attribution::IncomparableFigures` exists to
+say.
+
+And a commit that is recorded is not necessarily a commit that can be checked out: three of the four
+competitive cohorts record branch commits that did not survive their pull request's squash merge, so
+"re-measure at `7adb29e`" is an instruction nobody can carry out. That is #505, and it is a defect
+in where the SHA is taken rather than in recording one.
