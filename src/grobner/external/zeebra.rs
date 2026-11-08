@@ -601,8 +601,22 @@ impl ExternalSolver for ZeebraSolver {
         // reproducible. `CARGO_PKG_VERSION` is a compile-time constant, so there is nothing to
         // fail — but the signature keeps the `Result` so that no caller has to special-case
         // Zeebra, which is the whole point of putting it behind the contract.
-        Ok(ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION"))
-            .with_build("in-process, same build as the harness"))
+        //
+        // The build string also names the effective interreduction route. The commit does not
+        // determine it — `interreduce_by_matrix` is a caller's option, so two rows taken at one
+        // commit on either side of it agree on every field a ratio is checked against
+        // (`problem_digest`, `task`, `limits`, `machine`, `build`) while measuring different
+        // computations. #507: a board row that cannot say which route produced it is not a board
+        // row the default can be decided on.
+        let route = if self.f4_options.interreduce_by_matrix {
+            "on"
+        } else {
+            "off"
+        };
+        Ok(ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION")).with_build(format!(
+            "in-process, same build as the harness; interreduce_by_matrix={}",
+            route
+        )))
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
@@ -977,6 +991,32 @@ mod tests {
         let version = ZeebraSolver::new().probe_version().expect("in-process");
         assert_eq!(version.tool, "zeebra");
         assert_eq!(version.version, env!("CARGO_PKG_VERSION"));
+    }
+
+    /// The version probe records the effective `interreduce_by_matrix`, so two rows taken at one
+    /// commit on either side of that flag are distinguishable in the board file.
+    #[test]
+    fn test_the_version_probe_records_the_interreduction_route() {
+        use crate::grobner::F4Options;
+
+        let off = ZeebraSolver::new()
+            .with_f4_options(F4Options {
+                interreduce_by_matrix: false,
+                ..F4Options::default()
+            })
+            .probe_version()
+            .expect("in-process");
+        let on = ZeebraSolver::new()
+            .with_f4_options(F4Options {
+                interreduce_by_matrix: true,
+                ..F4Options::default()
+            })
+            .probe_version()
+            .expect("in-process");
+
+        assert_eq!(off.build.as_deref(), Some("in-process, same build as the harness; interreduce_by_matrix=off"));
+        assert_eq!(on.build.as_deref(), Some("in-process, same build as the harness; interreduce_by_matrix=on"));
+        assert_ne!(off.to_string(), on.to_string());
     }
 
     /// No memory figure unless the caller declares this process is doing one row.

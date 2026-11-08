@@ -9,7 +9,15 @@
 //!     --characteristic 32003 --list                                   # the small-prime identity
 //! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
 //!     --row katsura-6 --task reduced-grobner-basis --measure --write
+//! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
+//!     --row mq-random-10 --task reduced-grobner-basis \
+//!     --interreduce-by-matrix on --measure --write    # the A/B as board rows
 //! ```
+//!
+//! `--interreduce-by-matrix on|off` overrides F4's final-interreduction route for the Zeebra side
+//! only; absent, the row is taken at whatever `F4Options::default()` says. The effective value is
+//! recorded in the row's `library_version`, because the commit does not determine it and two rows
+//! that differ only in it agree on every field a ratio is checked against (#507).
 //!
 //! # Two modes, and only one of them produces a publishable figure
 //!
@@ -92,6 +100,22 @@ fn main() {
     let only_engines: Option<Vec<String>> =
         value("--engines").map(|list| list.split(',').map(|e| e.trim().to_string()).collect());
     let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(600));
+    // Override F4's interreduction route for the Zeebra side. Takes `on`/`off` rather than being a
+    // bare presence flag so that the request stays legible after the default moves: once
+    // `recommended()` carries the matrix route, `--interreduce-by-matrix off` is how the division
+    // route is still reachable, and a bare `--interreduce-by-matrix` would then mean nothing.
+    // Absent, the row is taken at whatever `F4Options::default()` says, which is the state every
+    // historical row was taken in.
+    let interreduce_by_matrix: Option<bool> = value("--interreduce-by-matrix").map(|v| match v
+        .as_str()
+    {
+        "on" => true,
+        "off" => false,
+        other => {
+            eprintln!("--interreduce-by-matrix wants `on` or `off`, got {:?}", other);
+            std::process::exit(2);
+        }
+    });
     // Which corpus identity to sweep. A *published* characteristic only: a row at a field with no
     // frozen digest would be a figure whose problem nothing pins. See `PUBLISHED_CHARACTERISTICS`.
     let characteristic: u64 = value("--characteristic")
@@ -217,6 +241,7 @@ fn main() {
                 &environment,
                 measure,
                 only_engines.as_deref(),
+                interreduce_by_matrix,
             );
         }
     }
@@ -256,16 +281,21 @@ fn run_one(
     environment: &Environment,
     measure: bool,
     only: Option<&[String]>,
+    interreduce_by_matrix: Option<bool>,
 ) {
     let wanted = |engine: &str| only.is_none_or(|list| list.iter().any(|e| e == engine));
 
     // Zeebra, with the wall limit pushed into F4's own cooperative budget so that a stop
     // *returns* and carries its statistics, rather than being abandoned.
     if wanted("zeebra") {
-        let mut zeebra = ZeebraSolver::new().with_f4_options(F4Options {
+        let mut options = F4Options {
             max_wall_time: Some(limits.wall),
             ..F4Options::default()
-        });
+        };
+        if let Some(route) = interreduce_by_matrix {
+            options.interreduce_by_matrix = route;
+        }
+        let mut zeebra = ZeebraSolver::new().with_f4_options(options);
         if measure {
             zeebra = zeebra.measuring_one_row();
         }
