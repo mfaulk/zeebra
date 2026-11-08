@@ -14,9 +14,9 @@ pub(crate) use univariate::multiply_dense;
 pub use univariate::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
-    is_permutation_polynomial, lagrange_interpolate, lcm, permutation_exponents, pow_mod,
-    resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, GraeffeError,
-    GraeffeStats, Polynomial, PolynomialParams, PowerPermutation, SubgroupRoute,
+    is_permutation_polynomial, lagrange_interpolate, lcm, partial_bezout, permutation_exponents,
+    pow_mod, resultant, resultant_at_formal_degrees, resultant_from_coefficients, roots, xgcd,
+    GraeffeError, GraeffeStats, Polynomial, PolynomialParams, PowerPermutation, SubgroupRoute,
     UnivariatePolynomial,
 };
 #[doc(hidden)]

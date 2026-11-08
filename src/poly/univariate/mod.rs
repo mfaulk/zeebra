@@ -28,7 +28,7 @@ pub use dense_polynomial::{DensePolynomial as UnivariatePolynomial, PolynomialPa
 #[cfg(test)]
 pub(crate) use factorize::trace_to_gf2;
 pub use factorize::{factorize, is_irreducible};
-pub use gcd::{gcd, lcm};
+pub use gcd::{gcd, lcm, partial_bezout, xgcd};
 pub use graeffe::{
     graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
     graeffe_root_with_stats, GraeffeError, GraeffeStats, SubgroupRoute,

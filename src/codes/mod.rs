@@ -22,7 +22,6 @@
 //! that case and is not dispatched to automatically (#375), so a prime block length is a choice to
 //! make deliberately rather than one to stumble into.
 
-mod euclidean;
 mod reed_solomon;
 
 pub use reed_solomon::{CodeError, Correction, ReedSolomon};
