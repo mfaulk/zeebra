@@ -8,7 +8,7 @@ cargo run --release --example f4_degrees
 ```
 
 under `F4Options::recommended()` with `profile_degrees` and `measure_stages` set,
-`max_matrix_columns = 60_000` and `max_live_bytes = 400 MB`, grevlex throughout. Machine: 64-core
+`max_matrix_columns = 60_000` and `max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), grevlex throughout. Machine: 64-core
 x86-64, `-C target-cpu=x86-64-v3`, fat LTO. Times are single runs and are quoted to one decimal
 only because the program prints them that way — they are not repeated measurements, and nothing
 below rests on a difference under about 20%.

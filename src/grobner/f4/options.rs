@@ -470,6 +470,35 @@ impl F4Options {
         self.live_entry_allowance::<F>() < self.max_live_nonzeros
     }
 
+    /// The live-memory allowance that binds over `F`, as prose for a provenance record.
+    ///
+    /// **A record has to quote the budget that bound, not whichever of the pair was written down.**
+    /// The effective limit is the `min` of the two (#322), so a run configured with
+    /// `max_live_bytes: 400_000_000` and `max_live_nonzeros` left at 20 000 000 is bounded at 320 MB
+    /// over a 16-byte entry and the 400 MB is slack that never binds. A scoreboard row that
+    /// recorded the slack figure overstated its own budget by 25%, and a reader reconciling a
+    /// `stopped_at_limit` against it got the wrong number to compare with (#469).
+    ///
+    /// Derived rather than written out at the call site, which is what stops the text and the
+    /// allowance drifting apart a second time. Names the field that bound, the same name
+    /// [`F4Error::limit_name`] reports, so a record and the refusal it explains agree.
+    ///
+    /// Megabytes are powers of ten, matching how the budgets themselves are written.
+    pub fn live_budget_policy<F: FiniteField>(&self) -> String {
+        let entries = self.live_entry_allowance::<F>();
+        format!(
+            "{} MB live ({} entries at {} bytes; {} binds)",
+            entries.saturating_mul(Self::bytes_per_entry::<F>()) / 1_000_000,
+            entries,
+            Self::bytes_per_entry::<F>(),
+            if self.bytes_bind_first::<F>() {
+                "max_live_bytes"
+            } else {
+                "max_live_nonzeros"
+            }
+        )
+    }
+
     /// The error for a live-entry count that crossed whichever budget binds over `F`.
     pub(crate) fn entry_budget_error<F: FiniteField>(&self, nonzeros: usize) -> F4Error {
         if self.bytes_bind_first::<F>() {
@@ -1030,6 +1059,66 @@ mod tests {
             ..F4Options::default()
         };
         assert_eq!(starved.live_entry_allowance::<Narrow>(), 0);
+    }
+
+    /// The policy prose states the allowance that binds, and names the budget it came from.
+    ///
+    /// The #469 configuration is the case: `max_live_bytes: 400_000_000` with `max_live_nonzeros`
+    /// left at the default is **320 MB** over a 16-byte entry, and a record that quoted the
+    /// 400 MB overstated its own budget by 25%.
+    #[test]
+    fn test_the_policy_prose_states_the_budget_that_binds() {
+        let scoreboard = F4Options {
+            max_live_bytes: 400_000_000,
+            ..F4Options::default()
+        };
+        assert_eq!(F4Options::bytes_per_entry::<Narrow>(), 16);
+        assert_eq!(
+            scoreboard.live_budget_policy::<Narrow>(),
+            "320 MB live (20000000 entries at 16 bytes; max_live_nonzeros binds)"
+        );
+        assert!(!scoreboard.live_budget_policy::<Narrow>().contains("400"));
+
+        // When the byte budget is the one that binds, the prose says so and quotes what it pays
+        // for rather than the entry count that did not apply.
+        let wide = F4Options {
+            max_live_bytes: 400_000_000,
+            ..F4Options::default()
+        };
+        assert!(wide.bytes_bind_first::<Bn254Fr>());
+        assert_eq!(
+            wide.live_budget_policy::<Bn254Fr>(),
+            "400 MB live (10000000 entries at 40 bytes; max_live_bytes binds)"
+        );
+    }
+
+    /// The prose and the error cannot disagree about which budget bound.
+    ///
+    /// They are two renderings of one fact, and the failure #469 records is a record whose policy
+    /// text names a different budget from the refusal it is supposed to explain.
+    #[test]
+    fn test_the_policy_prose_and_the_error_name_the_same_budget() {
+        for options in [
+            F4Options::default(),
+            F4Options {
+                max_live_bytes: 400_000_000,
+                ..F4Options::default()
+            },
+            F4Options {
+                max_live_nonzeros: usize::MAX,
+                max_live_bytes: 1_600,
+                ..F4Options::default()
+            },
+        ] {
+            let crossed = options.live_entry_allowance::<Narrow>() + 1;
+            let name = options.entry_budget_error::<Narrow>(crossed).limit_name();
+            assert!(
+                options.live_budget_policy::<Narrow>().contains(name),
+                "the policy prose {:?} does not name {}",
+                options.live_budget_policy::<Narrow>(),
+                name
+            );
+        }
     }
 
     /// A crossing reports the budget that bound, and converts to bytes only when that was the one.

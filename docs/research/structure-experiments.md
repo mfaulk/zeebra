@@ -8,7 +8,7 @@ cargo run --release --example cryptanalysis_ladder
 ```
 
 under `F4Options::recommended()` with `profile_degrees`, `max_matrix_columns = 60_000`,
-`max_live_bytes = 400 MB`, grevlex throughout. Solving uses `SolvePolicy::AutoWithFallback`, which
+`max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), grevlex throughout. Solving uses `SolvePolicy::AutoWithFallback`, which
 is what M21-D's measurements selected — a bare `SolveOptions::default()` is `DirectLexF4`, and that
 route crosses both the row and the column budget on every Poseidon system here.
 

@@ -74,9 +74,35 @@ fn f4_options() -> F4Options {
     }
 }
 
+/// Every row this runner records is over a `PrimeFieldElement64`, so the live allowance is one
+/// number for the whole board and [`policy`] can be a single string.
+///
+/// Only honest while that holds: the effective live budget is `min(max_live_nonzeros,
+/// max_live_bytes / size_of::<(usize, F)>())`, so a wider field on the board would have a
+/// *smaller* allowance than the one the policy quotes. The assertion below is a compile error
+/// rather than a test, because a stale policy string is exactly the defect #469 records and it
+/// must not be skippable.
+type PolicyField = Q;
+
+const _: () = assert!(
+    size_of::<(usize, K)>() == size_of::<(usize, PolicyField)>(),
+    "every field on this board must have the entry width `policy()` is rendered at"
+);
+
+/// The resource policy as prose, **derived from [`f4_options`]** rather than written beside it.
+///
+/// It used to be written out, and said "400 MB live" where the effective cap was 320 MB — the byte
+/// budget was set and the entry budget left at its default, and the limit is the `min` of the two
+/// (#322), so the 400 MB was slack that never bound. Every record carried the overstatement, and a
+/// reader reconciling a `stopped_at_limit` row against it got the wrong number to compare with
+/// (#469). Deriving it is what stops that recurring.
 fn policy() -> String {
-    "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
-        .to_string()
+    let options = f4_options();
+    format!(
+        "grevlex F4 then FGLM then univariate search; {} columns, {}, degree profiling on",
+        options.max_matrix_columns,
+        options.live_budget_policy::<PolicyField>()
+    )
 }
 
 /// How many rows this process has recorded, so that a measured peak says what it covers.

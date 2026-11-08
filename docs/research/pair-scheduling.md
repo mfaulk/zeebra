@@ -10,7 +10,7 @@ cargo run --release --example f4_schedule -- mq3-n15     # one instance per proc
 ```
 
 under `F4Options::recommended()` with `profile_degrees` set, `max_matrix_columns = 60_000`,
-`max_live_bytes = 400 MB`, `max_batches = 20_000`, grevlex throughout. **Every row in every table
+`max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), `max_batches = 20_000`, grevlex throughout. **Every row in every table
 returned the identical reduced Gröbner basis** — asserted by the program on each row, not reported
 in a column.
 

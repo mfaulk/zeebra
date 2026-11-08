@@ -63,7 +63,7 @@ already thrown away 69–89% of its pairs.** Any new criterion operates on the 1
 
 `cargo run --release --example f4_degrees` — the M22 instrument, which reports this per instance
 alongside the rank the pair rows added on top of the reducer block. Configuration:
-`F4Options::recommended()`, grevlex, `max_matrix_columns = 60_000`, `max_live_bytes = 400 MB`.
+`F4Options::recommended()`, grevlex, `max_matrix_columns = 60_000`, `max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469).
 
 Rank attribution is exact and the example says why: reducer rows have distinct leading monomials and
 so span a space of dimension exactly `reducer_rows`, which makes `rank − reducer_rows` the pair rows'
