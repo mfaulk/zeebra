@@ -4043,6 +4043,65 @@ let entries = F4Options::default().with_live_entries::<Bn254Fr>(200_000_000);
 assert_eq!(entries.max_live_bytes, 200_000_000 * 40);  // a wide entry, costed as one
 ```
 
+#### Learning the budgets without a refusal
+
+The coupling above was discovered one refusal at a time, and that — rather than the refusals
+themselves — is what cost the Anemoi `N = 6` run three re-runs: `max_live_nonzeros` by a refusal,
+`max_live_bytes` by reading the source, `max_matrix_rows` by a second refusal four seconds in, and
+`max_matrix_columns` lifted pre-emptively to avoid a third
+([#468](https://github.com/mfaulk/zeebra/issues/468)). Two reports close that, and neither is
+FGLM's pre-flight, because F4's row and column counts are *discovered* by symbolic preprocessing
+rather than being a function of the input the way the quotient dimension is.
+
+**`F4Options::budget_report::<F>()`** is the configuration talking about itself. Every budget F4 can
+refuse on, the allowance as written, and — for the live pair alone — which of the two binds over
+`F`:
+
+```rust
+use zeebra::{fields::{Bn254Fr, Zp13}, grobner::{Allowance, F4Options}};
+
+let narrow = F4Options::recommended().budget_report::<Zp13>();
+assert_eq!(narrow.bytes_per_entry(), 16);
+assert_eq!(narrow.live_entry_allowance(), 20_000_000);
+assert!(narrow.line("max_live_nonzeros").unwrap().binding);      // the two are equal, so
+assert!(!narrow.line("max_live_bytes").unwrap().binding);        // the older one is reported
+
+let wide = F4Options::recommended().budget_report::<Bn254Fr>();
+assert_eq!(wide.live_entry_allowance(), 8_000_000);              // a 40-byte entry
+assert!(wide.line("max_live_bytes").unwrap().binding);
+
+// An unset budget is unlimited, which is not a limit of zero.
+assert_eq!(narrow.line("max_batches").unwrap().allowance, Allowance::Unlimited);
+```
+
+`BudgetLine::budget` is the option's own field name and the same string `F4Error::limit_name`
+reports, so a report and the refusal it anticipates name the budget identically. `max_wall_time` is
+in the report and carries `StopKind::Time`, which is how a consumer keeps a fact about one busy
+machine out of a ranking of reproducible resource budgets. `max_pairs_per_batch` is deliberately
+absent: it shapes the work rather than refusing it, so there is no crossing to report.
+
+**`F4Statistics::budget_pressure(&options)`** is the run talking about itself, worst first. Every
+figure it divides is a high-water mark the batch loop already keeps, so it costs no new traversal
+and is available from the statistics `f4_reported` returns whether the run finished or was refused:
+
+```rust,ignore
+let (result, statistics) = f4_reported(&system, order, &options);
+for approach in statistics.near_budget(&options, 0.8) {
+    eprintln!("warning: {approach}");       // e.g. max_live_nonzeros at 99.0% (19800000 of 20000000 entries)
+}
+```
+
+On a refused run the high-water marks are the batches that *completed* — the crossing batch has no
+statistics to fold in — so this answers "batch 39 was already at 98%" for a run that was refused at
+batch 41. That is the warning the refusal alone cannot give, and it is the closest thing to a
+pre-flight F4's discovered shapes admit; a dry run that performed symbolic preprocessing without
+eliminating would answer the stronger question, at a cost that is a real fraction of the
+computation. The live pair reports under whichever name bound and in that budget's own unit, so the
+figure and the name agree. Unlimited budgets are omitted, since a fraction of no limit is not a
+number a caller can act on, and `max_wall_time` is omitted because the statistics hold no elapsed
+time unless `measure_stages` is set. `cargo run --release --example f4_memory` prints both reports
+for every system it measures.
+
 `FglmOptions` is the same *shape* — `max_operator_bytes` beside `max_operator_entries`, and
 `max_span_bytes` beside `max_span_entries`, at the same two numbers — and deliberately **not** the
 same coupling: each is a separate comparison against its own requirement in its own unit, so a lift

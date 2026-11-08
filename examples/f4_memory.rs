@@ -402,6 +402,11 @@ fn report<const N: usize, F: FiniteField>(
         N,
         system.len()
     );
+    // The pre-flight, printed before the outcome because that is when it is available: every
+    // budget this configuration enforces over F, and which of the coupled live pair binds. No run
+    // is needed for any of it, which is the point — #468 was filed because the second live budget
+    // was found by reading the source after the first lift did nothing.
+    print!("{}", options.budget_report::<F>());
     match &result {
         Ok(basis) => println!(
             "- finished in {:.1} s with {} basis elements",
@@ -429,6 +434,22 @@ fn report<const N: usize, F: FiniteField>(
         mb(before_rss as usize),
         mb(after_rss as usize)
     );
+
+    // How close the batches that *completed* came to each budget. On a refused run this is the
+    // approach the refusal alone cannot report: the crossing batch has no statistics, so the
+    // figures below are the batch before it, and a run at 98% is one the caller should have been
+    // warned about rather than refused (#468).
+    let pressure = statistics.budget_pressure(options);
+    if !pressure.is_empty() {
+        println!(
+            "- budget pressure, worst first: {}",
+            pressure
+                .iter()
+                .map(|approach| approach.to_string())
+                .collect::<Vec<_>>()
+                .join("; ")
+        );
+    }
 
     if let Some(worst) = probe.worst() {
         println!(

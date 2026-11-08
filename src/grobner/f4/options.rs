@@ -475,8 +475,24 @@ impl F4Options {
     /// Never divides by zero: an entry carries a `usize` whatever `F` is, so the divisor is at
     /// least 8.
     pub fn live_entry_allowance<F: FiniteField>(&self) -> usize {
+        self.live_entry_allowance_for(Self::bytes_per_entry::<F>())
+    }
+
+    /// [`live_entry_allowance`](Self::live_entry_allowance) for a caller holding the entry width
+    /// rather than the field type.
+    ///
+    /// A [`F4Statistics`](super::F4Statistics) record outlives the type parameter it was produced
+    /// under and carries
+    /// [`bytes_per_entry`](super::F4Statistics::bytes_per_entry) instead, so the budget
+    /// arithmetic has to be reachable from the number. Delegated to rather than duplicated, which
+    /// is what keeps the two from drifting apart.
+    ///
+    /// `bytes_per_entry` of zero — a statistics record from a run that built no matrix — is read
+    /// as one rather than dividing by zero. [`budget_pressure`](super::F4Statistics::budget_pressure)
+    /// rejects that case before it gets here.
+    pub fn live_entry_allowance_for(&self, bytes_per_entry: usize) -> usize {
         self.max_live_nonzeros
-            .min(self.max_live_bytes / Self::bytes_per_entry::<F>())
+            .min(self.max_live_bytes / bytes_per_entry.max(1))
     }
 
     /// Both live budgets set to the same quantity of memory, stated in bytes.
@@ -511,7 +527,13 @@ impl F4Options {
     /// Strictly smaller, so that when the two budgets describe the same quantity the older error
     /// is the one reported and a figure recorded against it keeps its meaning.
     pub fn bytes_bind_first<F: FiniteField>(&self) -> bool {
-        self.live_entry_allowance::<F>() < self.max_live_nonzeros
+        self.bytes_bind_first_for(Self::bytes_per_entry::<F>())
+    }
+
+    /// [`bytes_bind_first`](Self::bytes_bind_first) for a caller holding the entry width rather
+    /// than the field type. See [`live_entry_allowance_for`](Self::live_entry_allowance_for).
+    pub fn bytes_bind_first_for(&self, bytes_per_entry: usize) -> bool {
+        self.live_entry_allowance_for(bytes_per_entry) < self.max_live_nonzeros
     }
 
     /// The live-memory allowance that binds over `F`, as prose for a provenance record.
