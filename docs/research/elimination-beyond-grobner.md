@@ -2,11 +2,20 @@
 
 **Measured at:** publication bound `f2135cce`…`03b419f7` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+The bound is unchanged by the 2026-11-08 re-scoring (§0.1, §5.1, §7.1): **nothing was measured for
+it.** Every Zeebra figure it quotes is cited to the document that took it —
+[`resultant-elimination.md`](resultant-elimination.md),
+[`graeffe-root-finding.md`](graeffe-root-finding.md),
+[`fast-univariate.md`](fast-univariate.md) and
+[`MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](../MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md) — each
+carrying its own declaration.
 
 Reference for #68. A decision record in the style of #58 — the question answered once with the
 measurements attached — covering D1 (#82), D2 (#83), D3 (#84) and D4 (#85).
 
 **#68's deliverable is an assessment, not an implementation, and nothing was implemented for it.**
+Much has since been implemented *because* of it, under M23 and M24; §5.1 and §7.1 score the
+assessment against that tree rather than claiming it as this epic's work.
 
 ### Revision history
 
@@ -28,8 +37,17 @@ instead of from what the implementations actually do.
    CICO-k at **k ≥ 3**, not k = 2. §4.
 4. **This version** rests on six sources, all read, including two that describe the actual solutions
    to two of the three registered targets, and one with public code.
+5. **This re-scoring keeps §5 and §7 and adds the scores beside them** (2026-11-08). §5 and §7 were
+   written `03b419f7`…`8b343139` and not revised since, and in the three days after, every one of
+   §5's four items landed and D4 took its measurement. They are not edited away, in
+   [`resultant-elimination.md`](resultant-elimination.md)'s style: what one reading supported and
+   what the next one changed is the useful artifact, which is what the two retractions above are
+   for. §0.1, §5.1, §7.1.
 
 ## 0. Recommendation
+
+> **§0.1 supersedes this list.** Everything below was carried out; one item was reversed by the
+> carrying out. Read §0.1 for the current recommendation and this list as the plan it was.
 
 1. **The direction is real, published, and implemented.** Two of Zeebra's three registered 2026
    CICO-2 targets now have public technical disclosures, and one has public code. This is no longer a
@@ -56,6 +74,28 @@ instead of from what the implementations actually do.
 #68's go/no-go — "decline the direction if D4 shows the resultant path is not competitive" — is now
 answerable in the other direction: §4's Table 3 shows the Gröbner path is the uncompetitive one on
 CICO-2. What is still missing is any Zeebra measurement. §7.
+
+### 0.1 The recommendation above, carried out — and one item reversed by carrying it out
+
+Re-scored 2026-11-08. The list reads as a plan and is now a record.
+
+| §0 item | state | what settles it |
+|---|---|---|
+| 1. the direction is real, published, implemented | **unchanged** | §1, §2 |
+| 2. first priority is the univariate route, with NTT multiplication its only missing primitive | **done** | the primitive landed (#185); the three attack-specific components landed (#209, #210); one family measured end to end over 17 838 families with three verified witnesses — [`graeffe-root-finding.md`](graeffe-root-finding.md) §9.6. §5.1 scores each item |
+| 3. second priority is to benchmark the public implementation **rather than build a resultant** | **reversed** | M24 built the Sylvester machinery and it moved the verified frontier from two rounds to six — [`MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](../MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md) §7.8. #85's closing comment records the reversal in those terms |
+| 4. Gröbner's remaining territory is CICO-`k` at `k ≥ 3` | **unchanged, and no longer only somebody else's measurement** | §4 is 2026/1905's; [`resultant-elimination.md`](resultant-elimination.md) §2 is Zeebra's own on a registered slice, and agrees |
+| 5. do not chase `R_P = 10` | **unchanged** | §2.3 |
+| 6.4's `method_disclosed` field | **landed** | `challenge.rs` carries `DisclosedMethod`, with `poseidon31-cico-rf6-rp10` set to `Unknown`; README's challenge-registry section pins it |
+
+**The current recommendation.** The elimination direction is **accepted**, it is implemented, and the
+measured leverage is about the **formulation and not the engine**: three orders of magnitude separate
+two ways of writing the same CICO slice, and F4 is on the expensive side of it
+([`resultant-elimination.md`](resultant-elimination.md) §7). What remains is engineering with issues
+already against it — #194 (half-GCD), #297 (a structured Sylvester determinant, the one axis left
+with an asymptotic improvement in it), #371 (M26) — not a feasibility question. That is why #68
+closes here rather than staying open as §7 directed; §7.1 is the scoring, the four caveats the
+closure has to carry, and the three issues this epic's own residue became.
 
 ## 1. The method map
 
@@ -376,6 +416,72 @@ For the **resultant route**, additionally: Sylvester/Villard machinery, fast mul
 evaluation–interpolation, and `gcd.rs` is plain Euclid where the literature uses half-gcd. §6.3
 argues against building these.
 
+### 5.1 The gap list, scored against the tree — every item has landed
+
+Re-scored 2026-11-08. §5 above was written at `03b419f7` and calls item 1 "the only *foundational*
+gap… a prerequisite for every other route here, which is why it is first regardless of what follows
+it." Everything in the list, including that item, is now implemented, measured and tested. Each line
+is settled by code or by a committed figure, **not** by an issue being closed.
+
+| §5 item | state | what settles it |
+|---|---|---|
+| 1. NTT-based multiplication and squaring | **landed** | `src/fft/multiply.rs` — `multiply_over_domain`, `try_multiply_via_fft`, and a `multiply` dispatcher over a crossover measured per element width (#185). Reachability and the measured exponent below, because neither is what §5 assumed |
+| 2. the Graeffe transform and Graeffe-based root finding | **landed** | `src/poly/univariate/graeffe.rs` — `graeffe_2`, `graeffe_l`, `graeffe_root`, `graeffe_all_roots`, with `deflation_agrees_with_the_gcd_finder_on_random_polynomials` as the differential oracle. Still a *different algorithm* from `roots.rs`, as §5 required rather than hoped: `roots.rs` carries no reference to it, and `graeffe.rs` calls `roots` only to finish inside the small odd subgroup |
+| 3. a round-skipping parametrization for the initial linear layer | **landed, #209** | `src/grobner/research/univariate_cico.rs` — `parametrize` and `CicoFamily`, the `(1,[1])` skip derived for Zeebra's hybrid `permutation_plus_linear` in [`graeffe-root-finding.md`](graeffe-root-finding.md) §9.5.2 |
+| 4. family construction, candidate reconstruction and verification | **landed, #209 and #210** | the same file — `cico_univariate_family` and `CicoFamily::lift`, with both invariants asserted (`the_family_holds_the_input_constraints_at_every_point`, `the_family_polynomial_agrees_with_the_permutation`); `examples/graeffe_cico.rs` runs parametrization through verification and §9.6 measures it over **17 838 families** |
+| "only for `R_P = 10`: a mixed-radix FFT" | **landed, and already stale when written** | `src/fft/prime_factor.rs`'s `transform_any` is the *sole* transform path for `evaluate` and `interpolate`: power-of-two → radix-2, coprime → Good–Thomas, prime power → Bluestein above a measured crossover (#125, #375). `2^24 · 127` over KoalaBear splits as `(2^24, 127)` |
+| "not needed by this route at all: subproduct trees" | landed anyway, and load-bearing elsewhere | `src/poly/univariate/subproduct_tree.rs` (#162). [`resultant-elimination.md`](resultant-elimination.md) §6.1 credits #162's interpolation, not the subgroup route, with the resultant's four-round rows |
+
+**Item 1 is closed for the route it was blocking, and two narrower things are true in its place.**
+
+- **The transform is not reachable from the operator, and will not become so.** `&a * &b` dispatches
+  to `multiply_dense` — schoolbook below the Karatsuba base case, Karatsuba above (#231). The reason
+  is a type bound, not an omission: a domain needs `KnownOrder` and a source of randomness, neither
+  of which `Mul`'s signature can carry, and the Gröbner core deliberately does not require
+  `KnownOrder` of a coefficient type — `test_the_grobner_stack_needs_no_field_cardinality` fails to
+  compile if it starts to. So everything built on the operator (`pow_mod`, `lcm`, `from_zeros`,
+  `Polynomial::pow`, `compose`, `shift`) tops out at Karatsuba. This is **not** #375's pattern of a
+  standalone entry point nothing dispatches to; it is a dispatcher that `Mul` is the wrong signature
+  to host.
+- **The dispatcher has no in-crate callers, and the consumer it was built for reaches past it.**
+  `fft::multiply` is public API exercised by its tests and `examples/multiplication_dispatch.rs`.
+  `multiply_over_domain` has exactly one real caller in `src/` — `graeffe.rs`, building one domain
+  and reusing it across a subproduct-tree level. That is the right shape here, since the domain is
+  the expensive part, and it is why the Graeffe route is not subject to `try_multiply_via_fft`'s
+  `next_power_of_two`, which does inherit the two-adicity ceiling rather than the smooth-part one.
+
+**The measured exponent, since §5's "Schoolbook today, measured exponent 2.00" is now three separate
+numbers.** From [`fast-univariate.md`](fast-univariate.md)'s stage table and its re-take after #189:
+the **transform** route measures **1.03 – 1.27** from `n = 256` up, reaching operand `2^22` in
+1.60 s over KoalaBear in a `u64`; **Karatsuba** measures **1.584 – 1.613** by least squares over
+`2^9`…`2^14` against `log2 3 = 1.585`; and the **2.00 is still in the tree as a deliberate quadratic
+control** — `examples/univariate_scaling.rs`'s `mul` row calls `karatsuba_unstable(.., usize::MAX)`,
+a base case the recursion never passes, precisely so that the baseline every crossover is quoted
+against did not drift to 1.59 when #231 moved the operator. §5's 2.00 is therefore no longer a
+description of what multiplication does.
+
+`2^22` is the transform size §3.1's `R_P = 8` row needs, where §3.1 estimated 2.64 s for one NTT
+multiply from a per-element rate. **The 1.60 s is not that quantity** — operand rather than transform
+size, and KoalaBear in a `u64` rather than the 4-byte one — so it corroborates §3.1's order of
+magnitude and does not replace its extrapolation. No exponent sweep of `fft::multiply`'s *dispatched*
+path exists; §4.1.2 of `fast-univariate.md` measures the dispatcher as ratios and crossover brackets
+instead.
+
+**What is genuinely still open on this route, none of it foundational:**
+
+1. The Bluestein dispatch is **wired but dormant.** It fires only for a domain carrying a prepared
+   convolution domain, and `with_bluestein` has no non-test caller in `src/`. An unprepared domain
+   takes the quadratic `dft` on its prime-power factors, giving up the 3.55x `prime_factor.rs`
+   records for KoalaBear's 127.
+2. `with_bluestein` cannot be used at `size = 2^24 · 127` over KoalaBear at all — the convolution
+   length comes out `2^32` against a two-adicity of 24. The 127 axis reaches Bluestein only through a
+   factor-sized `bluestein_convolution_domain(127, ..)` attached by hand. Unverified whether any
+   caller wants that today; no code path asks for a `2^24 · 127` domain.
+3. **The memory-access hypothesis was never tested.** 2025/950's 4/3-power FFT lower bound is half of
+   #68's own framing of this regime — "reportedly bound by memory *access* rather than arithmetic" —
+   and `examples/ntt_access.rs`, specified in [`graeffe-root-finding.md`](graeffe-root-finding.md)
+   §6.3 and listed as row 2 of its §10 plan, does not exist. Filed as #591.
+
 ## 6. Per-child recommendation
 
 ### 6.1 D3 (#84) — promote to first
@@ -438,6 +544,71 @@ instances and against Gröbner-derived security estimates, not against deployed 
 **#68 stays open.** The single step that moves it furthest is §5 item 1, NTT-based multiplication:
 it unlocks the Graeffe route, it is independently the largest missing piece of the univariate layer
 D2 measured, and it is a prerequisite for every other item here.
+
+### 7.1 Re-scored: all three criteria are met, and #68 closes
+
+Re-scored 2026-11-08. §7 directs that #68 stay open on one reason — "every number about the attacks
+is somebody else's" — and **that reason stopped being true the day after §7 was written**. The
+instrument it nominated was not the one that settled it: §6.3 recommended running Bak–Hostettler's
+`PoseidonCicoTwo` against Zeebra's F4, and that external head-to-head was never done. M23-E built
+Zeebra's own resultant instead and measured it against Zeebra's own F4, which is a stronger answer to
+the same question.
+
+- [x] "D1 and D3 each state, for one concrete published instance, what the method computes and what
+      it would cost in Zeebra." Unchanged: D1 in §2.2 and §6.2, D3 in §2.1 and §3.1.
+- [x] "**D4 produces a measured comparison on a problem solvable both ways.**"
+      [`resultant-elimination.md`](resultant-elimination.md) §2, on
+      `poseidon31-cico-t16-rf2-rp0` at `slice(12 fixed, seed 1)` — two rounds, challenge digest
+      `56ccc99d85e0…` on both sides: **F4/FGLM 30 142 ms against a resultant total of 52.2 ms,
+      578x**, and the resultant returns all three base-field witnesses where F4's search returns the
+      first one it finds. Both outcomes are `verified_witness`, both checked by running
+      `permutation_plus_linear` through `CicoInstance::is_solution`; nothing in the resultant code
+      decides that a candidate is a solution. Both sides are committed scoreboard run records, not
+      only prose. §5 there revises the factor to 4 306x on a later resultant run.
+- [x] "The epic closes with a written recommendation, including the option of declining." §0 is the
+      recommendation and §0.1 its current state. The direction is **accepted**. What makes that not a
+      decline is a Zeebra measurement rather than a complexity estimate, which is the thing §7 was
+      holding out for.
+
+**Four things the closure carries, or it overstates itself.**
+
+1. **One row, two rounds.** `rf2-rp0` is the *only* instance both methods completed, and two rounds
+   is as far as F4 reaches on these slices. The resultant reaches four
+   ([`resultant-elimination.md`](resultant-elimination.md) §6.1) and six
+   ([`MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md`](../MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md)
+   §7.8 — witness `x = 941710918, y = 475196876`, verified through the permutation), but F4 is not
+   there to be compared against: on every other registered row it is `stopped_at_limit`, and its
+   runs there are on slice seed 0 rather than seed 1, so those pairings are not even the same
+   instance. A result at two rounds does not extrapolate to ten, which is what #85 required be said.
+2. **The two factors are not equally clean.** The **578x** is machine-matched — both sides on fedora,
+   8 logical cores, affinity 0–7, concurrency 1 — but across commits (`7e333fb` against `744fdf9`).
+   The **4 306x** in §5 there is **cross-machine**: the 30 142 ms F4 figure is the 8-core box and the
+   later resultant figure is the 128-core workstation. The machine-matched number is the one to
+   quote; the larger one is a resultant improvement measured elsewhere, not a widened comparison.
+3. **The criterion is met by the resultant route, not by the one §0 ranked first.** The
+   univariate/Graeffe route has no head-to-head against F4 and **cannot get one on any reduction** —
+   [`graeffe-root-finding.md`](graeffe-root-finding.md) §9.6.3 is the finding, not the gap: families
+   per witness is `≈ p / (roots per family)`, `p` is fixed by the field, and cutting `R_F` and `R_P`
+   cuts the per-family cost while leaving the family count at `2^31`. `δ` spans 6 561x across the
+   ladder and the mean root count does not move off 1.0 (0.9997 pooled over 17 838 families), so no
+   `k = 2` row produces a witness and none was expected. The three witnesses that exist are on the
+   `k = 1` planted row, where F4 itself stops at `max_matrix_columns`. That is an argument rather than
+   an omission — but it is an asymmetry in the evidence, and §0's ranking of the routes rests on
+   published figures where the resultant's rests on Zeebra's own.
+4. **The result is about the formulation, not the engine.**
+   [`resultant-elimination.md`](resultant-elimination.md) §7: three orders of magnitude separate two
+   ways of writing the same CICO slice, and the expensive one is the one the literature uses by
+   default because it bounds the degree. F4 pays 32 variables to hold the degree at 3; the resultant
+   pays degree `3^rounds` to hold the variables at two. Neither #179's 17.96x nor #227's 92–95%
+   scaling moved a frontier on its own — §13.1 of the M24 milestone records that explicitly. Nothing
+   here says F4 or FGLM are wrong; §4 and §1's table still put Gröbner's best-known territory at
+   `k ≥ 3`, and every registered target is `k = 2`.
+
+**The epic's residue, filed rather than left as prose.** Three items of #68's own scope had no issue
+and now do: **#591** the memory-access hypothesis (§5.1 item 3), **#593** `graeffe_root` over a field
+with a large odd part, **#594** scoreboard records for §9.6's family economics. Already tracked
+elsewhere: #194 (half-GCD), #297 (a structured Sylvester determinant — the one axis left with an
+asymptotic improvement in it), #367 and #371 (M26, still *planned*).
 
 ## 8. Sources and verification status
 

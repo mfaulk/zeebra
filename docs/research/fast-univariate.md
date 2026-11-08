@@ -1505,11 +1505,14 @@ two of the three official 2026 CICO-2 solutions. Three things change for this se
   needs neither it nor Newton division nor a subproduct tree;
 - the `R_P = 8` challenge was solved by interpolation plus Graeffe root finding at degree `3^13`,
   which needs a `2^22` transform — **inside** the ceiling this document measured. That named an
-  NTT-based multiply as the single blocker; #124 built it, so §5 of that document is the current
-  gap list. Two caveats carry over to the multiply: it rounds up to a power-of-two domain, so it
-  inherits the two-adicity ceiling rather than the smooth-part one until #125 lands mixed-radix
-  sizes, and §4.1's crossover means it is the slower route below degree ~460 to ~12000 depending
-  on the field.
+  NTT-based multiply as the single blocker; #124 built it, and §5.1 of that document — not §5 — is
+  the current gap list, every item of which has since landed. Two caveats carry over to the
+  multiply, and the first outlived its stated reason: `try_multiply_via_fft` rounds up to a
+  power-of-two domain, so it inherits the two-adicity ceiling rather than the smooth-part one —
+  **#125 landed the mixed-radix sizes and that function was never changed to use them**, so a caller
+  wanting `2^24 · 127` must build the domain and call `multiply_over_domain`. Second, §4.1's
+  crossover means the transform is the slower route below degree ~460 to ~12000 depending on the
+  field.
 
 **Not a no-go, but the governing constraint is not where the epic placed it.** #68 assumed the
 univariate stage would be "FFT/NTT-dominated, and reportedly bound by memory access". On this
