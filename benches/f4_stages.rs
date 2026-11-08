@@ -18,9 +18,18 @@
 //! matrix is wide, tall, a few entries per row, with leading entries colliding in low columns, and
 //! a density sweep does not reproduce that shape.
 //!
+//! - `interreduction` — the final pass, over the basis F4 actually produced.
+//!
 //! The groups are directly comparable to each other, because every one iterates over the same
-//! batches in the same order. Summing a system's four group medians is *not* the whole computation:
-//! pair selection, basis bookkeeping, and interreduction are outside every stage.
+//! batches in the same order. Summing a system's group medians is *not* the whole computation:
+//! pair selection and basis bookkeeping are outside every stage.
+//!
+//! `interreduction` is the odd one out and is here because it was missing. It runs **once** per
+//! computation rather than per batch, so it is not comparable to the per-batch groups — and it is
+//! the stage `docs/research/groebner-jl-gap.md` §3 measures at **80.69%** of `mq-random-10` and
+//! **13 871x** Groebner.jl's, which had no Criterion coverage at all. Its input is the basis before
+//! interreduction, taken from a real run, because the shape that makes the stage expensive is a
+//! basis of a few hundred elements whose entire monomial support is a few hundred monomials.
 
 use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
@@ -35,7 +44,7 @@ use zeebra::{
             reduce_batch,
             symbolic::{symbolic_preprocessing_with, ReducerCache},
         },
-        trace_batches, F4Options, ReducerSelection,
+        interreduce_for_benchmark, trace_batches, F4Options, ReducerSelection,
     },
     linalg::{echelon::row_echelon_with, Backend, DenseRows},
     MonomialOrder, MultivariatePolynomial,
@@ -285,6 +294,38 @@ fn bench_batch<const N: usize>(
     });
 }
 
+/// The final interreduction, over the basis F4 produced before it.
+///
+/// The input is the last traced batch's basis plus that batch's candidates — i.e. exactly what
+/// `f4_into` hands the stage — cloned per iteration, because the stage consumes it.
+fn bench_interreduction<const N: usize>(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    label: &str,
+    batches: &[TracedBatch<N, F>],
+    order: MonomialOrder,
+) {
+    // The basis as it stood entering the last batch, which is the largest any batch saw and the
+    // closest this trace gets to the pre-interreduction basis.
+    let Some(last) = batches.last() else {
+        return;
+    };
+    let basis: Vec<_> = (0..last.basis.len())
+        .map(|i| MultivariatePolynomial::new(&last.basis.element(i).terms))
+        .collect();
+    if basis.len() < 2 {
+        // One element is already reduced, so there is nothing to time.
+        return;
+    }
+
+    group.bench_function(BenchmarkId::new("interreduction", label), |bencher| {
+        bencher.iter_batched(
+            || basis.clone(),
+            |basis| black_box(interreduce_for_benchmark(basis, order)),
+            BatchSize::LargeInput,
+        )
+    });
+}
+
 fn stages(c: &mut Criterion) {
     let mut group = c.benchmark_group("f4_stages");
     // Every iteration replays a whole computation's worth of one stage, so the defaults would run
@@ -300,6 +341,7 @@ fn stages(c: &mut Criterion) {
                 bench_elimination(&mut group, &label, batches, order);
                 bench_conversion(&mut group, &label, batches, order);
                 bench_batch(&mut group, &label, batches, order);
+                bench_interreduction(&mut group, &label, batches, order);
             }
             Batches::Six(batches) => {
                 group.throughput(Throughput::Elements(rows(batches, order)));
@@ -308,6 +350,7 @@ fn stages(c: &mut Criterion) {
                 bench_elimination(&mut group, &label, batches, order);
                 bench_conversion(&mut group, &label, batches, order);
                 bench_batch(&mut group, &label, batches, order);
+                bench_interreduction(&mut group, &label, batches, order);
             }
         }
     }

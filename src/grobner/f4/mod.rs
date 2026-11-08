@@ -52,7 +52,10 @@ use std::time::Instant;
 
 use crate::{
     grobner::{
-        buchberger::reduce_grobner_basis_until,
+        buchberger::{
+            reduce_grobner_basis_counted, reduce_grobner_basis_measured,
+            reduce_grobner_basis_until, InterreductionReport,
+        },
         pairs::{CriterionCounts, PairQueue},
     },
     poly::MonomialOrder,
@@ -522,13 +525,44 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     drop(term_counts);
 
     let mut interreduction_clock = StageClock::new(options.measure_stages);
-    let interreduction = reduce_grobner_basis_until(basis, order, || {
-        match (wall_clock.as_ref(), options.max_wall_time) {
-            (Some(clock), Some(budget)) => clock.elapsed() >= budget,
-            _ => false,
-        }
-    });
+    let should_stop = || match (wall_clock.as_ref(), options.max_wall_time) {
+        (Some(clock), Some(budget)) => clock.elapsed() >= budget,
+        _ => false,
+    };
+    // The measured variant is the same code behind a const-generic flag, so the split and the
+    // operation counters cannot drift from the path that runs when nothing is being measured.
+    let mut report = InterreductionReport::default();
+    let interreduction = if options.count_interreduction {
+        reduce_grobner_basis_counted(basis, order, should_stop, &mut report)
+    } else if options.measure_stages {
+        reduce_grobner_basis_measured(basis, order, should_stop, &mut report)
+    } else {
+        reduce_grobner_basis_until(basis, order, should_stop)
+    };
     statistics.stages.interreduction = interreduction_clock.lap();
+    // The stage clock is the authority on the total; the report refines it. They are measured by
+    // different instruments over the same code, so they agree to clock granularity rather than
+    // exactly, and the invariant asserted in tests is over the report's own two halves.
+    statistics.stages.interreduction_minimize = report.minimize;
+    statistics.stages.interreduction_reduce = report.reduce;
+    // Two instruments over the same code: the stage clock brackets the call, the report times the
+    // two halves inside it. The clock therefore reads at least the report's total and not much
+    // more, and a split that drifted from the total it refines would be worse than no split.
+    debug_assert!(
+        !(options.measure_stages || options.count_interreduction)
+            || report.total() <= statistics.stages.interreduction,
+        "the interreduction split ({:?}) cannot exceed the stage clock ({:?})",
+        report.total(),
+        statistics.stages.interreduction
+    );
+    debug_assert!(
+        !(options.measure_stages || options.count_interreduction)
+            || report.elements == 0
+            || (0.0..=1.0).contains(&report.reduce_share()),
+        "a share is a fraction"
+    );
+    statistics.interreduction = report.counts;
+    statistics.interreduction_elements = report.elements;
     let reduced = match interreduction {
         Ok(reduced) => reduced,
         Err(stopped) => {

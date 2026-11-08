@@ -7,7 +7,9 @@
 
 use std::time::{Duration, Instant};
 
-use crate::{grobner::pairs::CriterionCounts, linalg::sparse::EliminationStatistics};
+use crate::{
+    grobner::pairs::CriterionCounts, linalg::sparse::EliminationStatistics, poly::NormalFormCounts,
+};
 
 /// Where the time in a batch, or in a whole computation, went.
 ///
@@ -38,6 +40,23 @@ pub struct StageTimings {
     /// instance builds 59 matrices and returns a six-element basis, so the cost is neither in the
     /// matrices nor in the answer but in the reduction between them.
     pub interreduction: Duration,
+
+    /// [`minimize_grobner_basis`]'s half of `interreduction`: monic scaling, deduplication, the
+    /// divisibility prune, and the ascending sort.
+    ///
+    /// Split out because #436 measured the two halves at **0.06% / 99.94%** on `mq-random-10` and
+    /// that figure existed only in a commit message — this field is one `Duration`, so nothing in
+    /// the tree could re-derive which half the stage was in. `interreduction_minimize +
+    /// interreduction_reduce == interreduction`, asserted by
+    /// `test_the_interreduction_split_sums_to_the_stage`.
+    pub interreduction_minimize: Duration,
+
+    /// The reduction loop's half of `interreduction`: one `normal_form` per basis element.
+    ///
+    /// This is the one `docs/research/groebner-jl-gap.md` §4 is about, and the stage share it
+    /// carries is why: 24 136 ms over 247 elements against a comparand's 1.74 ms for the same
+    /// stage.
+    pub interreduction_reduce: Duration,
 }
 
 impl StageTimings {
@@ -47,6 +66,9 @@ impl StageTimings {
     /// outside every stage. The difference is left visible rather than folded into one of them,
     /// which is what [`F4Statistics::stage_coverage`] reports.
     pub fn sum(&self) -> Duration {
+        // `interreduction_minimize` and `interreduction_reduce` are deliberately **not** added:
+        // they refine `interreduction` rather than extending it, and adding them would double
+        // every interreduction millisecond in the coverage figure.
         self.symbolic + self.construction + self.elimination + self.extraction + self.interreduction
     }
 
@@ -57,6 +79,8 @@ impl StageTimings {
         self.elimination += other.elimination;
         self.extraction += other.extraction;
         self.interreduction += other.interreduction;
+        self.interreduction_minimize += other.interreduction_minimize;
+        self.interreduction_reduce += other.interreduction_reduce;
     }
 }
 
@@ -477,6 +501,22 @@ pub struct F4Statistics {
     /// Summed over every batch: basis elements examined across those tests.
     pub divisor_scan_steps: usize,
 
+    /// What the **final interreduction** cost in operations, as opposed to in time.
+    ///
+    /// `divisor_queries` and `divisor_scan_steps` above cover the *batch* path only, so the stage
+    /// `docs/research/groebner-jl-gap.md` §3 measures at 13 871x the comparand's had no operation
+    /// counters at all — and §4's attribution of it to intermediate swell was explicitly recorded
+    /// as inferred rather than measured. This is the measurement.
+    ///
+    /// Zero unless [`F4Options::measure_stages`](super::F4Options::measure_stages) is set.
+    pub interreduction: NormalFormCounts,
+
+    /// Elements in the minimized basis that final interreduction reduced.
+    ///
+    /// Not [`Self::elements_added`]: minimization runs first and drops the subsumed ones, so this
+    /// is the loop's actual trip count and the denominator for a per-element cost.
+    pub interreduction_elements: usize,
+
     /// Summed over every batch: monomials symbolic preprocessing offered to its queue, before the
     /// deduplication test.
     ///
@@ -709,6 +749,31 @@ impl F4Statistics {
         } else {
             self.divisor_scan_steps as f64 / self.divisor_queries as f64
         }
+    }
+
+    /// The reduction loop's share of the final interreduction stage, as a fraction in `[0, 1]`.
+    ///
+    /// Zero unless [`F4Options::measure_stages`](super::F4Options::measure_stages) is set. #436
+    /// measured **0.9994** on `mq-random-10`, against `minimize_grobner_basis`'s 0.0006: the
+    /// stage's cost is a statement about `normal_form`, not about the duplicated basis storage
+    /// #304 removed.
+    pub fn interreduction_reduce_share(&self) -> f64 {
+        let total = self.stages.interreduction_minimize + self.stages.interreduction_reduce;
+        if total.is_zero() {
+            0.0
+        } else {
+            self.stages.interreduction_reduce.as_secs_f64() / total.as_secs_f64()
+        }
+    }
+
+    /// Terms `normal_form` popped per term of the final reduced basis, over the whole stage.
+    ///
+    /// The swell factor, and the number `docs/research/groebner-jl-gap.md` §4 inferred rather than
+    /// measured. One means every term the stage looked at survived into the answer; a hundred
+    /// means it built and destroyed ninety-nine for every one it kept, which is the cost a matrix
+    /// formulation does not pay.
+    pub fn interreduction_swell_factor(&self) -> f64 {
+        self.interreduction.swell_factor()
     }
 
     /// The share of the computation's wall clock the four stages account for.
@@ -1008,8 +1073,16 @@ mod tests {
             elimination: Duration::from_micros(30),
             extraction: Duration::from_micros(40),
             interreduction: Duration::from_micros(50),
+            interreduction_minimize: Duration::from_micros(2),
+            interreduction_reduce: Duration::from_micros(48),
         };
+        // The two halves refine `interreduction` rather than extending it, so the sum is still
+        // 150 and not 200. A coverage figure that double-counted the stage would exceed 1.0.
         assert_eq!(one.sum(), Duration::from_micros(150));
+        assert_eq!(
+            one.interreduction_minimize + one.interreduction_reduce,
+            one.interreduction
+        );
 
         let mut total = StageTimings::default();
         total.add(&one);
@@ -1070,6 +1143,7 @@ mod tests {
                 elimination: Duration::from_millis(1),
                 extraction: Duration::from_millis(1),
                 interreduction: Duration::from_millis(0),
+                ..Default::default()
             },
             total: Duration::from_millis(5),
             ..Default::default()

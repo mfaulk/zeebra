@@ -1,0 +1,258 @@
+# Inside final interreduction: which half, and what the reductions actually cost
+
+Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
+repository had neither a sub-stage split, a benchmark, nor an operation counter.
+
+Pinned: Zeebra at the commit recorded beside each figure. Instance `mq-random-10` from the external
+corpus at `REFERENCE_CHARACTERISTIC = 2147483647` under grevlex, identity digest
+`72d0ad315fc25409…`, asserted by `examples/f4_profile.rs` against the one in the retained
+`reduced-grobner-basis` record. `F4Options::default()`, because that is what
+`examples/competitive_sweep.rs` builds its solver from and therefore what the competitive record
+describes — under `baseline()` this instance does not finish, refusing at 20 000 277 live nonzero
+entries against the 20 000 000 budget both configurations share.
+
+Machine: AMD Ryzen Threadripper PRO 5995WX, 128 hardware threads, 503 GB RAM. Every timing under
+`tools/benchlock.sh`, `taskset -c 0-7`, one worker, `RUSTFLAGS` unset, `RUSTC_WRAPPER=""`, a
+per-worktree `CARGO_TARGET_DIR`, and the `-C target-cpu=x86-64-v3` floor **verified in the artifact**
+by `tools/vec_census.sh` rather than inferred from a build log.
+
+**Durations here are shared-machine durations.** Other agents build concurrently on this box;
+`benchlock` excludes other *measurements* and does nothing about shared L3 or memory bandwidth. The
+**counts are not affected at all** — they are exact, deterministic, and machine-independent, which
+is the whole reason this note treats them as the result and the durations as context.
+
+---
+
+## 0. What was missing, and why it mattered
+
+#436 measured final interreduction's two halves on this instance:
+
+| part of `reduce_grobner_basis_until` | time | share |
+|---|---:|---:|
+| `minimize_grobner_basis` | 14.03 ms / 14.11 ms | 0.06% |
+| the `normal_form` reduction loop | 23.95 s / 24.29 s | **99.94%** |
+
+**That figure existed only in the commit message of `92a262d`.** The string `#436` appeared nowhere
+in the tree, and nothing in it could re-derive the split: `StageTimings::interreduction` is one
+`Duration`, and `benches/f4_stages.rs:23` stated in its own header that "pair selection, basis
+bookkeeping, and **interreduction are outside every stage**" — so the stage
+`docs/research/groebner-jl-gap.md` §3 measures at **80.69%** of the run and **13 871x**
+Groebner.jl's was the one stage with no Criterion coverage at all.
+
+It also had no operation counters. `F4Statistics::divisor_queries` and `divisor_scan_steps` cover
+the **batch** path only. So `groebner-jl-gap.md` §4, arguing that the stage's cost is intermediate
+expression swell, had to label its own argument:
+
+> **Labelled as inference, with the measurement that would settle it.** The per-element arithmetic
+> above is a plausibility argument, not a measurement: nothing counts terms processed or
+> `checked_div` calls inside `normal_form`. … **Not taken here.**
+
+This note takes it.
+
+---
+
+## 1. The instrument
+
+`NormalFormCounts`, filled by `SparseMultiPoly::normal_form_counted`. The counting is a
+**const-generic parameter on one function**, not a second implementation:
+`normal_form_counting::<COUNT>` is what both entry points call, so the uncounted path compiles the
+increments away and the counted path cannot drift from the code it is describing. A proptest over
+three fields (GF(13), GF(7), GF(2^31−1)), three arities and all three monomial orders asserts the
+two agree —
+`sparse_multivariate_polynomial_arithmetic::tests::test_counting_does_not_change_the_normal_form`.
+
+### 1.1 Timing and counting are separate runs, and this was measured rather than assumed
+
+The first version tied the counters to `measure_stages`. On this instance that run reported
+**41 752.79 ms** total with **35 487.60 ms** in interreduction, against the ~29 913 ms the same
+configuration had been recording — because the divisor-test counter increments **once per reducer
+per term popped**, which is the innermost loop in F4.
+
+`measure_stages`' own overhead is 3.8%–11.5% (#349). A counter that costs a third of the stage
+cannot share a flag with one that costs a tenth of the run, because then the stage split could only
+ever be read off a run that was substantially slower than the one being described. So
+`F4Options::count_interreduction` is a separate flag with a separate entry point
+(`reduce_grobner_basis_counted`), and
+`interreduction_stop_tests::test_measuring_times_the_stage_without_counting_operations` pins that
+measuring does **not** count.
+
+**Consequence for anyone reading a counted run:** its durations are not quotable. The counts are.
+
+---
+
+## 2. The split, confirmed — and a baseline that does not reproduce
+
+Six runs, **interleaved** between this change and its parent commit `a1867a7`, in one session on
+cores 0-7 under the lock. Both binaries built from one tree into separate target directories with
+the AVX2 floor verified in each artifact. `base` is the parent; `mine` is this change.
+
+| rep | side | total/ms | symbolic | construction | elimination | extraction | **interreduction** | other |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | base | 42 203.16 | 419.67 | 1 062.14 | 4 267.87 | 112.76 | **36 241.70** | 99.01 |
+| 1 | mine | 41 646.55 | 409.40 | 1 024.33 | 4 153.60 | 112.07 | **35 852.14** | 95.01 |
+| 2 | base | 42 980.32 | 390.80 | 1 019.85 | 4 103.45 | 107.85 | **37 265.31** | 93.06 |
+| 2 | mine | 43 583.02 | 425.46 | 1 093.18 | 4 308.61 | 118.25 | **37 536.45** | 101.07 |
+| 3 | base | 46 085.88 | 436.10 | 1 112.64 | 4 343.78 | 116.11 | **39 973.35** | 103.90 |
+| 3 | mine | 44 877.78 | 435.74 | 1 110.26 | 4 470.20 | 120.87 | **38 636.89** | 103.81 |
+
+Counts identical on every run: 10 batches, 1 777 pairs reduced, 247 basis elements.
+
+**First result — the instrumentation is free when it is off.** Median total 42 980 ms against
+43 583 ms, a ratio of **1.014**, inside each side's own run-to-run spread of **1.08x–1.09x**. The
+const-generic gate does what it claims: a build that is not counting does not pay for the counters.
+
+**Second result, which was not what this issue set out to find.** Against
+`groebner-jl-gap.md` §3's figures for the same configuration on the same instance:
+
+| stage | here (base median) | §3 | ratio |
+|---|---:|---:|---:|
+| symbolic | 419.67 | 403.16 | 1.041x |
+| construction | 1 062.14 | 1 025.21 | 1.036x |
+| elimination | 4 267.87 | 4 159.19 | 1.026x |
+| extraction | 112.76 | 108.04 | 1.044x |
+| **interreduction** | **37 265.31** | **24 136.08** | **1.544x** |
+
+**Four stages reproduce within 4.4%. Interreduction is 54% higher.** Uniform machine load cannot
+produce that pattern — it would move all five. So one of the following holds, and this note does not
+establish which:
+
+1. Interreduction is the one stage that walks a multi-thousand-term working polynomial 534 135
+   times (§3), so it is the one whose working set leaves cache and the one exposed to L3 contention
+   from the concurrent builds that run constantly on this box. The other four stages are small.
+2. Something between `25e10fe` (§3's pin) and `a1867a7` made the stage slower. Nothing in that
+   range touches `normal_form`; the interleaved A/B above rules out *this* change as the cause.
+
+**What it means for the conclusions either way.** The share is **86.70%**, not 80.69%, and the
+Amdahl ceiling is **7.52x**, not 5.10x. Both move in the direction that makes replacing this stage
+more valuable, not less. But **no ratio should be computed across the two sessions** — this is M26's
+Rule 3, and #318/#319 are the standing instances of it. Figures quoted against each other must come
+from one session, which is why the A/B above is interleaved.
+
+---
+
+## 3. The counts, and the verdict: rewrite-bound, not swell-bound
+
+One `mq-counts` run. Durations from a counting run are not quotable (§1.1); the counts are exact.
+
+| quantity | value |
+|---|---:|
+| elements reduced | 247 |
+| reduction loop's share of the stage | **99.97%** (10.71 ms / 35 438.62 ms) |
+| reduction steps | 534 135 |
+| terms popped | 602 377 |
+| terms in the answer | 68 242 (~276 an element) |
+| divisor tests | 22 587 181 |
+| reducers per call | 246 |
+| divisor-tail terms merged | 18 296 667 (~34.3 a step) |
+| **terms rewritten** | **1 174 314 651** (~2 199 a step) |
+| largest working polynomial | 7 283 terms |
+| **swell** — popped / answer | **8.8x** |
+| **scan** — tests / popped | **37.5** |
+| **rewrite** — rewritten / tail merged | **64.2x** |
+
+**The 99.94% split is confirmed**, at 99.97% here: `minimize_grobner_basis` is 10.71 ms against the
+reduction loop's 35 438.62 ms. #436's figure now has a source in the tree.
+
+**And §4's inference about swell is wrong, in the direction that matters.** It argued:
+
+> At roughly a nanosecond per `checked_div` that is of order **10⁸ divisor tests for one element** —
+> several hundred thousand terms passing through a working polynomial whose answer has a few
+> hundred. **That is intermediate expression swell.**
+
+Measured: **22.6 million divisor tests for all 247 elements**, about 91 000 per element — three
+orders of magnitude below the inference. And the answer is not "a few hundred" terms but **68 242**
+across 247 elements, i.e. ~276 terms each; §4 read the 604 figure as terms when it is Groebner.jl's
+*column* count, which is distinct monomials. So the swell factor is **8.8x**, which is real but
+modest, and 22.6 M divisor tests cannot be 35 seconds at any plausible cost per test.
+
+**The cost is the per-step rewrite.** `subtract_shifted` is linear in the whole working polynomial
+on every reduction step, whether or not the divisor's tail reaches it. Each step merges **34.3**
+tail terms into a working polynomial of mean length **2 199** — an amplification of **64.2x** — and
+over 534 135 steps that is **1 174 314 651 terms rewritten**. Nothing else in the counters is within
+an order of magnitude of it.
+
+### 3.0a And the per-term cost says *which part* of the rewrite is expensive
+
+1 174 314 651 rewrites in 35 438.62 ms is **30.2 ns a term**. A term here is
+`(Monomial<10>, Zp2147483647)` — 48 bytes — so if the rewrite were the `extend_from_slice` memcpy
+it mostly looks like, it would be moving 56.4 GB in 35.4 s, i.e. **1.59 GB/s** on a machine whose
+single-core streaming bandwidth is more than an order of magnitude above that.
+
+So it is **not** memory bandwidth. 30 ns a term is about right for what
+`subtract_shifted`'s *merge* region does per element: one `Monomial` multiply (`:491`, ten `u32`
+additions, recomputed per call rather than per surviving term) plus one `MonomialOrder::cmp`
+(`:492`), which under grevlex recomputes `degree()` on both operands by summing `[u32; N]` and then
+walks the exponents in reverse.
+
+**That is the single most actionable thing in this note.** The expensive part of the 64.2x is the
+comparison region, not the copy region — and the comparison region is exactly what #440 stage 2
+removes, by binary-searching for the smallest shifted tail term and memcpy-ing everything below it
+wholesale. The cheap stage is aimed at the expensive half.
+
+It also explains why `maxwrk` matters less than it looks: the peak working polynomial is 7 283 terms
+against a 2 199-term mean, so the cost is the *typical* step rather than a few large ones.
+
+### 3.1 The verdict, keyed to the fix each answer implies
+
+#440 asks for one of four verdicts. It is **copy-bound**:
+
+| verdict | measured | the fix it would imply |
+|---|---|---|
+| compare-bound | no — 22.6 M tests cannot be 35 s | a cheaper monomial comparison (#317) |
+| search-bound | no — 37.5 of 246 reducers scanned, and the same 22.6 M bound applies | a leading-monomial index (#331, #436 candidate 1) |
+| **copy-bound** | **yes — 64.2x amplification, 1.17e9 terms rewritten** | **windowing the merge (#440 stage 2), or not building the intermediates at all (#471)** |
+| none of them | no | the issue would have closed cheaply |
+
+So **#440 stage 2 is funded, and §3.0a says it is aimed at the right half.** It removes the
+comparison work over terms the tail never reaches, and the comparison work — not the copying — is
+what the 30.2 ns a term is made of. Stage 2's own acceptance criteria say it keeps the `Θ(R·W)` in
+term *copies*; at 1.59 GB/s implied, those copies are not what is costing the time, so keeping them
+is acceptable and **stage 3's heap division stays unfunded** — which is the outcome #440's own
+staging said it preferred.
+
+**And this is the strongest available argument for #471.** A matrix formulation neither windows the
+rewrite nor makes it cheaper: it does not perform it. 1.17 billion term rewrites, for a final basis
+of 68 242 terms reached in 534 135 steps, is the signature of exactly the intermediate growth F4's
+matrix formulation exists to avoid — which Zeebra avoids in every batch and then pays once, at the
+end, for six sevenths of the run.
+
+### 3.2 What these counters do not settle
+
+* **How the 64.2x splits between the two regions.** §3.0a infers from the per-term cost that the
+  comparison region dominates; it does not measure the split. #440 stage 1 asks for exactly that
+  — terms below `pos(q·tail_min)`, between it and `pos(q·tail_max)`, and above — and one more
+  counter pair settles it. The inference is strong enough to fund stage 2 and not strong enough to
+  predict how much of the 64.2x it recovers.
+* **Whether the baseline discrepancy in §2 is contention or a change.** Stated as an open question
+  rather than resolved; see the two candidates there.
+* **Nothing about any other instance.** Every figure here is `mq-random-10` grevlex at one digest.
+  katsura and cyclic have very different interreduction shapes — `buchberger.rs:294-314` records
+  katsura-6 under lex going from 2.5 s to a millisecond on the sort alone — and none of this
+  transfers to them.
+
+---
+
+## 4. Reproducing
+
+```sh
+# Build flags verified in the artifact, not inferred. `tools/vec_census.sh` counts vector
+# instructions under `zeebra::`; a build that lost `-C target-cpu=x86-64-v3` has none.
+export CARGO_TARGET_DIR=/path/outside/the/worktree RUSTC_WRAPPER=""
+unset RUSTFLAGS
+cargo build --release --example f4_profile
+tools/vec_census.sh "$CARGO_TARGET_DIR/release/examples/f4_profile"
+
+# The stage split. Cheap instrumentation; durations are comparable.
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example f4_profile -- mq
+
+# The operation counts. ~36% slower for the per-reducer counter, so this run's
+# durations must not be quoted beside the one above.
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example f4_profile -- mq-counts
+
+# The stage in isolation, over a basis from a real trace.
+cargo bench --bench f4_stages -- interreduction
+```
