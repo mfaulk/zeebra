@@ -23,7 +23,7 @@ use crate::{
         pairs::{PairCriteria, PairSchedule},
     },
     linalg::echelon::Backend,
-    FiniteField,
+    FiniteField, MonomialOrder,
 };
 
 /// How the rows of a Macaulay matrix are eliminated.
@@ -57,6 +57,128 @@ pub enum ReductionStrategy {
     /// asserted. What is **not** comparable across the two paths is the trajectory: different
     /// candidates make different later batches, so `batches` and `pairs_reduced` differ.
     Structured,
+}
+
+/// How final interreduction reduces each basis element against the others.
+///
+/// Both routes return the **same object**: a reduced Gröbner basis is determined by its leading
+/// monomials, so the choice is purely a cost one, and
+/// `interreduce::tests::test_the_matrix_route_reproduces_the_division_route` asserts exact equality
+/// over three orders and two fields.
+///
+/// # Why a route is worth conditioning on the order
+///
+/// `docs/research/groebner-jl-gap.md` §3 measured the division route at **13 871x** Groebner.jl's
+/// on `mq-random-10`, against 11.6x–97.1x for every other stage, and §4 attributes the outlier to
+/// the stage computing the right thing the wrong way. The matrix route is the same computation
+/// Groebner.jl's `f4_autoreduce!` performs — and #507 measured it across the whole corpus ladder,
+/// where it splits cleanly on the order (`docs/research/interreduction-cost.md` §3e):
+///
+/// | order | over the rungs above the noise floor | worst rung |
+/// |---|---|---|
+/// | grevlex | **1.01x–3.78x faster** | katsura-6, a wash at 1.01x |
+/// | grlex | **1.15x–1.71x faster** | katsura-5 at 1.15x |
+/// | lex | **1.59x–6.25x slower** | katsura-6 at 6.25x |
+///
+/// "Above the noise floor" is the thirteen rungs taking 0.5 ms or more. The four that run in
+/// 25–170 µs are excluded because their ratios cross 1.00x between runs of identical work — see
+/// §3e.2, which quotes the case.
+///
+/// The mechanism is shape position, and the matrix shape shows it: katsura-6 under lex builds a
+/// **7 983 × 8 015** matrix for a **six-element** basis, where grevlex builds 217 × 249 for
+/// twenty-two, and that shape is exact and reproduces to the digit across trees. A lex basis in
+/// shape position — linear elements over one univariate of high degree
+/// — is the **best** case for iterated division, because the ascending-order sort leaves every
+/// substituted tail already in normal form, and the **worst** case for a matrix, which must carry
+/// columns spanning the univariate's whole degree range.
+///
+/// So the criterion is the order, which is free to read. Shape position is the *explanation* and
+/// would be the finer criterion; `fglm::shape` ships a tested detector that is deliberately
+/// unwired, and choosing a route from the instance as well as the order is **#273**'s.
+///
+/// # Why [`InterreductionRoute::ByOrder`] is nevertheless **not** the default
+///
+/// Because the time is not the whole cost, and the other half is unbudgeted. #507 measured peak
+/// RSS beside every wall time, one row per process, and the matrix route's memory does not scale
+/// with its speedup:
+///
+/// | rung | division | matrix | memory | time |
+/// |---|---:|---:|---:|---:|
+/// | `mq-random-10` | 163.4 MB | 600.8 MB | 3.68x | 3.74x faster |
+/// | `katsura-11` | **534.6 MB** | **13 148.3 MB** | **24.59x** | 2.29x faster |
+///
+/// **No budget refused the katsura-11 pass.** The matrix route's refusal tests rows, columns and
+/// live *entries*, and the entries are not where the memory goes: `mq-random-10`'s matrix holds
+/// 893 531 nonzeros — on the order of ten megabytes — against a 437 MB increase in process peak.
+/// The cost is in building the closure, which is #477's mechanism, and it is invisible to the
+/// quantity being budgeted. That is the defect `docs/research/f4-resource-scaling.md` §10 records
+/// for symbolic preprocessing before #305, in a different stage: **the budget sees a fraction of
+/// what the run costs.**
+///
+/// A default that can take a 535 MB computation to 13.1 GB with every budget satisfied is not a
+/// default, however much faster it is — it converts a working computation into an OOM on any
+/// machine smaller than this one. So the route ships *selectable and measured*, and the default
+/// stays where every published figure was taken. Flipping it is gated on the matrix pass's working
+/// set becoming a budgeted quantity, which is **#536**.
+///
+/// Siting a size threshold instead would need a measured crossover, and two points — 3.68x and
+/// 24.59x — do not locate one.
+///
+/// # When the matrix route falls back
+///
+/// The matrix is subject to the same row, column and entry budgets as any batch's — a stage exempt
+/// from them would be a way to exceed the computation's budgets by waiting until the end. If any
+/// budget would be crossed, the division route runs instead, and the fallback is recorded in
+/// [`super::F4Statistics::interreduction_matrix`] rather than being silent.
+///
+/// **The entry budget covers the elimination and not only the construction**, which is #536:
+/// back-substitution clears every pivot column out of every row holding one, and on `katsura-11`
+/// under grevlex that takes 9.18x the entries the matrix was built with and 5.19x the allowance
+/// that admitted the construction. Until the budget looked at that number, the route could take a
+/// 533.0 MB computation to 13 144.3 MB with every limit satisfied. So a rung whose interreduction
+/// working set exceeds [`live_entry_allowance`](Self::live_entry_allowance) now **falls back by
+/// default**, and running it by matrix is a matter of raising the allowance deliberately — see
+/// [`with_live_budget`](Self::with_live_budget).
+///
+/// Note what that does to the ladder table above: it was taken **before** #536, so every rung in it
+/// ran the route to completion. Which of them still do is #575's first question.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum InterreductionRoute {
+    /// One division per basis element, whatever the order.
+    ///
+    /// The default, and the configuration every published figure was taken in. Kept nameable
+    /// separately from [`F4Options::default`] so that an ablation against it stays possible after
+    /// the default moves — the same reason [`F4Options::baseline`] exists. It is also the fallback
+    /// when a budget refuses the matrix, and the oracle the matrix route is tested against.
+    #[default]
+    Division,
+
+    /// One Macaulay matrix under a graded order, one division per basis element under lex.
+    ///
+    /// **Measured ahead of the default on every graded rung of the ladder and behind it on every
+    /// lex one** (the table above), and not the default only because of the memory the table
+    /// after it reports. This is the route to select when the working set is known to fit.
+    ByOrder,
+
+    /// One Macaulay matrix, whatever the order.
+    ///
+    /// Needed to measure the lex regression [`InterreductionRoute::ByOrder`] exists to avoid: a
+    /// route no option can ask for is a route no A/B can reach.
+    Matrix,
+}
+
+impl InterreductionRoute {
+    /// Whether this route builds a matrix under `order`.
+    ///
+    /// The one place the order criterion is written down, so the dispatch and anything reporting
+    /// which route will run cannot disagree about it.
+    pub fn builds_a_matrix(self, order: MonomialOrder) -> bool {
+        match self {
+            Self::Division => false,
+            Self::Matrix => true,
+            Self::ByOrder => !matches!(order, MonomialOrder::Lexicographic),
+        }
+    }
 }
 
 /// How symbolic preprocessing chooses which basis element reduces a monomial.
@@ -347,43 +469,8 @@ pub struct F4Options {
     /// Setting this implies the split that `measure_stages` records, so it does not need both.
     pub count_interreduction: bool,
 
-    /// Perform final interreduction as **one Macaulay matrix** rather than as one division per
-    /// basis element.
-    ///
-    /// Off by default until the A/B is on record, which is the discipline every other strategy
-    /// flag in this struct follows.
-    ///
-    /// # What it changes, and what it cannot change
-    ///
-    /// `docs/research/groebner-jl-gap.md` §3 measured the division route at **13 871x**
-    /// Groebner.jl's on `mq-random-10`, against 11.6x–97.1x for every other stage, and §4
-    /// attributes the outlier to the stage computing the right thing the wrong way. The matrix
-    /// route is the same computation Groebner.jl's `f4_autoreduce!` performs.
-    ///
-    /// It **cannot** change the answer: a reduced Gröbner basis is determined by its leading
-    /// monomials, so both routes return the same unique object, and
-    /// `interreduce::tests::test_the_matrix_route_reproduces_the_division_route` asserts exact
-    /// equality over three orders and two fields.
-    ///
-    /// # When it falls back
-    ///
-    /// The matrix is subject to the same row, column and entry budgets as any batch's — a stage
-    /// exempt from them would be a way to exceed the computation's budgets by waiting until the
-    /// end. If any budget would be crossed, the division route runs instead, which always
-    /// terminates within the same memory the old default used. The fallback is recorded in
-    /// [`super::F4Statistics::interreduction_matrix`] rather than being silent.
-    ///
-    /// **The entry budget covers the elimination and not only the construction**, which is #536:
-    /// back-substitution clears every pivot column out of every row holding one, and on
-    /// `katsura-11` under grevlex that takes 9.18x the entries the matrix was built with and 5.19x
-    /// the allowance that admitted the construction. Until the budget looked at that number, the
-    /// route could take a 533.0 MB computation to 13 144.3 MB with every limit satisfied. So a rung
-    /// whose interreduction working set exceeds
-    /// [`live_entry_allowance`](Self::live_entry_allowance) now **falls back by default**, and
-    /// running it by matrix is a matter of raising the allowance deliberately — see
-    /// [`with_live_budget`](Self::with_live_budget) — which is what makes the cost visible to a
-    /// limit rather than to the machine.
-    pub interreduce_by_matrix: bool,
+    /// How final interreduction is performed. See [`InterreductionRoute`].
+    pub interreduction: InterreductionRoute,
 
     /// Leave each batch's rows in **reduced** row echelon form rather than merely echelon.
     ///
@@ -453,7 +540,7 @@ impl F4Options {
             reducer_cache: CacheMode::Off,
             measure_stages: false,
             count_interreduction: false,
-            interreduce_by_matrix: false,
+            interreduction: InterreductionRoute::Division,
             reduce_batch_rows: false,
             profile_degrees: false,
         }

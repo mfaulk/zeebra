@@ -35,8 +35,8 @@ use zeebra::{
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         external::{instance, REFERENCE_CHARACTERISTIC},
-        f4_with_options, CacheMode, F4Options, F4Statistics, PairCriteria, ReducerSelection,
-        ReductionStrategy,
+        f4_with_options, CacheMode, F4Options, F4Statistics, InterreductionRoute, PairCriteria,
+        ReducerSelection, ReductionStrategy,
     },
     linalg::Backend,
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -493,7 +493,7 @@ fn interreduction<const N: usize>(
 /// Echelon against reduced batch rows, over both interreduction routes, on one build.
 ///
 /// #477's question, as four arms rather than two. The payoff it claims is a smaller final
-/// autoreduce matrix, and that matrix only exists when `interreduce_by_matrix` is on — but that
+/// autoreduce matrix, and that matrix only exists when the matrix route is selected — but that
 /// flag is **off by default** (#507 is the issue that decides it), so measuring only the matrix
 /// route would answer a question about a path no board row describes. The division arms are what
 /// say whether this flag pays on the path that ships today.
@@ -515,17 +515,19 @@ fn compare_batch_row_forms() {
         .collect();
 
     let order = MonomialOrder::GradedReverseLexicographic;
-    let arm = |interreduce_by_matrix: bool, reduce_batch_rows: bool| F4Options {
+    let arm = |interreduction: InterreductionRoute, reduce_batch_rows: bool| F4Options {
         measure_stages: true,
-        interreduce_by_matrix,
+        interreduction,
         reduce_batch_rows,
         ..F4Options::default()
     };
+    // Named routes rather than `ByOrder`, because this table is a 2x2 over the two flags and
+    // `ByOrder` would make one axis depend on the order the other arm is also measured under.
     let arms = [
-        ("div+echelon", arm(false, false)),
-        ("div+reduced", arm(false, true)),
-        ("mat+echelon", arm(true, false)),
-        ("mat+reduced", arm(true, true)),
+        ("div+echelon", arm(InterreductionRoute::Division, false)),
+        ("div+reduced", arm(InterreductionRoute::Division, true)),
+        ("mat+echelon", arm(InterreductionRoute::Matrix, false)),
+        ("mat+reduced", arm(InterreductionRoute::Matrix, true)),
     ];
 
     println!(
@@ -746,7 +748,7 @@ fn compare_interreduction_routes() {
     };
     let matrix = F4Options {
         measure_stages: true,
-        interreduce_by_matrix: true,
+        interreduction: InterreductionRoute::Matrix,
         ..F4Options::default()
     };
 

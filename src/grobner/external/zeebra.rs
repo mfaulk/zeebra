@@ -80,7 +80,7 @@ use crate::{
         f4_reported,
         fglm::{classify_ideal, fglm_to_lex_with_options, FglmOptions, QuotientBasis},
         research::{ANEMOI_64_PRIME, KOALABEAR_PRIME},
-        F4Error, F4Options, IdealClass,
+        F4Error, F4Options, IdealClass, InterreductionRoute,
     },
     util::peak_resident_bytes,
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -601,8 +601,37 @@ impl ExternalSolver for ZeebraSolver {
         // reproducible. `CARGO_PKG_VERSION` is a compile-time constant, so there is nothing to
         // fail — but the signature keeps the `Result` so that no caller has to special-case
         // Zeebra, which is the whole point of putting it behind the contract.
-        Ok(ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION"))
-            .with_build("in-process, same build as the harness"))
+        //
+        // The build string also names the interreduction route the options select. The commit does
+        // not determine it — `InterreductionRoute` is a caller's option, so two rows taken at one
+        // commit on either side of it agree on every field a ratio is checked against
+        // (`problem_digest`, `task`, `limits`, `machine`, `build`) while measuring different
+        // computations. #507: a board row that cannot say which route produced it is not a board
+        // row the default can be decided on.
+        //
+        // The *option* is reported rather than the route it resolves to, because `ByOrder` resolves
+        // per order and the row already carries its order. Resolving it here would mean a version
+        // string that can disagree with the options the caller set.
+        let route = match self.f4_options.interreduction {
+            InterreductionRoute::ByOrder => "by-order",
+            InterreductionRoute::Division => "division",
+            InterreductionRoute::Matrix => "matrix",
+        };
+        // `reduce_batch_rows` is named for the same reason and is not independent of the route:
+        // with batches left reduced the autoreduce matrix falls to a few hundred columns, so the
+        // route's cost is a different quantity. A row naming one flag and not the other would be a
+        // row whose configuration cannot be reconstructed.
+        Ok(
+            ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION")).with_build(format!(
+                "in-process, same build as the harness; interreduction={}, batch-rows={}",
+                route,
+                if self.f4_options.reduce_batch_rows {
+                    "reduced"
+                } else {
+                    "echelon"
+                }
+            )),
+        )
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
@@ -977,6 +1006,59 @@ mod tests {
         let version = ZeebraSolver::new().probe_version().expect("in-process");
         assert_eq!(version.tool, "zeebra");
         assert_eq!(version.version, env!("CARGO_PKG_VERSION"));
+    }
+
+    /// The version probe records the selected `InterreductionRoute`, so two rows taken at one
+    /// commit on either side of it are distinguishable in the board file.
+    #[test]
+    fn test_the_version_probe_records_the_interreduction_route() {
+        use crate::grobner::{F4Options, InterreductionRoute};
+
+        let probe = |route| {
+            ZeebraSolver::new()
+                .with_f4_options(F4Options {
+                    interreduction: route,
+                    ..F4Options::default()
+                })
+                .probe_version()
+                .expect("in-process")
+        };
+
+        for (route, expected) in [
+            (InterreductionRoute::ByOrder, "by-order"),
+            (InterreductionRoute::Division, "division"),
+            (InterreductionRoute::Matrix, "matrix"),
+        ] {
+            assert_eq!(
+                probe(route).build.as_deref(),
+                Some(
+                    format!(
+                        "in-process, same build as the harness; \
+                         interreduction={expected}, batch-rows=echelon"
+                    )
+                    .as_str()
+                )
+            );
+        }
+
+        // The second flag is named too, because the two interact: with batches left reduced the
+        // autoreduce matrix the route chooses over is a few hundred columns rather than ~8 000.
+        let reduced = ZeebraSolver::new()
+            .with_f4_options(F4Options {
+                reduce_batch_rows: true,
+                ..F4Options::default()
+            })
+            .probe_version()
+            .expect("in-process");
+        assert_eq!(
+            reduced.build.as_deref(),
+            Some("in-process, same build as the harness; interreduction=division, batch-rows=reduced")
+        );
+
+        assert_ne!(
+            probe(InterreductionRoute::Division).to_string(),
+            probe(InterreductionRoute::Matrix).to_string()
+        );
     }
 
     /// No memory figure unless the caller declares this process is doing one row.

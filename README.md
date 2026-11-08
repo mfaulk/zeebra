@@ -881,6 +881,17 @@ tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
     --characteristic 32003 --row katsura-6 --task reduced-grobner-basis --measure --write
                                                    # the same rung at the corpus's other identity;
                                                    #   only a PUBLISHED characteristic is accepted
+tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
+    --row mq-random-10 --task reduced-grobner-basis \
+    --interreduction matrix --measure --write      # a row under a non-default F4 route; the route
+                                                   #   lands in the row's library_version, because
+                                                   #   the commit does not determine it (#507)
+cargo run --release --example interreduction_routes            # both interreduction routes per
+                                                   #   ladder rung, interleaved in one process,
+                                                   #   with the matrix route's own verdict
+cargo run --release --example interreduction_routes -- --orders --wall 60 katsura-6
+                                                   # the same rung under grevlex, grlex and lex —
+                                                   #   where the two routes disagree (#507 §3e.2)
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
@@ -3257,9 +3268,21 @@ when a ratio carries the #318/#319 systematic. **Cite it rather than re-deriving
 things it establishes that are easy to get wrong: a ratio formed *within* one cohort carries no
 systematic while one spanning a pre-M25 record carries +26%/−8%; `mq-random-10`'s interreduction
 share is unchanged at ~80% after #437 and is **still ~80% on the default path**, because
-`interreduce_by_matrix` is off in `F4Options::recommended()`; and the interreduction A/B measures
-**3.63x** end to end on a box whose division side matches the board row, against the 4.18x measured
-on one 1.40x slower than it.
+`F4Options::recommended()` still selects `InterreductionRoute::Division`; and the interreduction A/B
+measures **3.63x** end to end on a box whose division side matches the board row, against the 4.18x
+measured on one 1.40x slower than it.
+
+#507 then took that A/B as a **five-engine board cohort** rather than a projection, and
+[`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) §3e is the result:
+**8 333.1 ms** measured against 7 999 ms projected, **1.07x behind Singular** on
+`reduced-grobner-basis` and **parity on `lex-basis-by-conversion`** (1.09x ahead, inside the box's
+spread), with the matrix route ahead on
+every graded rung of the ladder above the timer's noise floor (1.01x–3.78x) and behind on every lex
+one (up to 6.25x, because a shape-position lex basis makes katsura-6 build 7 983 × 8 015 for a
+six-element basis). The default
+nevertheless stays on the division route, and the reason is **memory that no budget sees**:
+`katsura-11` goes 534.6 MB → 13 148.3 MB with every limit satisfied, because the refusal counts
+matrix entries and the entries are not where the memory goes. That gate is **#536**.
 
 **Two strategy flags now sit off by default in that position, not one.** #477 found that the 80%
 interreduction share is a debt the *main loop* accrues — candidates are extracted from an echelon
@@ -3271,7 +3294,14 @@ six columns, and the stage from 2 400 ms to **16.4 ms**. On the shipping divisio
 are **6.54x**. Unlike that flag it regresses no classical rung, including the katsura-5 lex case
 that costs the matrix route 25x. Both defaults are #507's to move, on a cohort rather than on one
 instance; §3c of [`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) has
-the four-arm table and says why the figures do not move the default by themselves.
+the four-arm table and says why the figures do not move the default by themselves. #507 moved the
+route's and left this one to **#575**, because the two are not independent in the direction that
+matters: with batches left reduced the autoreduce matrix is 252 x 606 rather than 7 642 x 7 996, and
+that closure is where the route's memory went before #536 budgeted it — so `matrix` + `reduced` may
+cost neither the 13.1 GB nor the 437 MB, and both defaults then move together at 6.54x. **One arm of
+that 2x2 is already a board row**: `division` + `reduced` on `mq-random-10` is **6 115.6 ms against
+its own cohort's Singular at 7 507.9 ms — 1.23x ahead**, the first `mq-random-10` basis row Zeebra
+is not behind Singular on.
 
 ### Solving zero-dimensional systems
 

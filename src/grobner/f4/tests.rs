@@ -19,8 +19,8 @@ use crate::{
         f4::{
             f4, f4_observed_reported, f4_reported, f4_with_options,
             symbolic::symbolic_preprocessing_pop_deduplicated, symbolic_preprocessing_with,
-            BatchObserver, F4Error, F4Options, MatrixRefusal, MonicBasis, Preprocessed,
-            ReducerCache,
+            BatchObserver, F4Error, F4Options, InterreductionRoute, MatrixRefusal, MonicBasis,
+            Preprocessed, ReducerCache,
         },
         reference::buchberger_reference,
         s_polynomial, CriticalPair,
@@ -3766,7 +3766,7 @@ fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
     let system = katsura::<6, G>();
 
     let unbounded = F4Options {
-        interreduce_by_matrix: true,
+        interreduction: InterreductionRoute::Matrix,
         max_live_nonzeros: usize::MAX,
         max_live_bytes: usize::MAX,
         ..F4Options::default()
@@ -3793,7 +3793,7 @@ fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
     // One entry below what the pass needs. Everything else in the computation fits.
     let entries = matrix.peak_nonzeros - 1;
     let bounded = F4Options {
-        interreduce_by_matrix: true,
+        interreduction: InterreductionRoute::Matrix,
         max_live_nonzeros: entries,
         max_live_bytes: entries * F4Options::bytes_per_entry::<G>(),
         ..F4Options::default()
@@ -3819,5 +3819,91 @@ fn test_the_matrix_interreduction_falls_back_on_its_elimination_working_set() {
     assert_eq!(
         fallback, basis,
         "the fallback is the division route over the same basis, so the answer is unchanged"
+    );
+}
+
+/// The default interreduction route is division, whatever the order.
+///
+/// `interreduction_matrix` is recorded only on the matrix route, so its absence is the observable
+/// that says division ran. The default does **not** move to the measured winner: #507 found the
+/// matrix route ahead on every graded rung and behind on every lex one. #536 has since made the
+/// pass's elimination working set a budgeted quantity, so the memory is no longer taken silently —
+/// but a budget that now refuses it is a reason to measure which rungs still engage the route
+/// before moving the default, not a reason to move it. See #575.
+#[test]
+fn test_the_default_interreduction_route_is_division_under_every_order() {
+    type G = Zp2147483647;
+    let options = F4Options::default();
+
+    for order in ALL_ORDERS {
+        let (_, statistics) = f4_reported(&katsura::<4, G>(), order, &options);
+        assert!(
+            statistics.interreduction_matrix.is_none(),
+            "katsura-4 under {} built an interreduction matrix by default",
+            order.name()
+        );
+    }
+}
+
+/// `ByOrder` builds a matrix under the graded orders and divides under lex.
+///
+/// The order criterion lives in one function so the dispatch and anything reporting which route
+/// will run cannot disagree; this checks the dispatch actually consults it.
+#[test]
+fn test_by_order_builds_a_matrix_under_the_graded_orders_only() {
+    type G = Zp2147483647;
+    let options = F4Options {
+        interreduction: InterreductionRoute::ByOrder,
+        ..F4Options::default()
+    };
+
+    for order in [
+        MonomialOrder::GradedReverseLexicographic,
+        MonomialOrder::GradedLexicographic,
+    ] {
+        let (_, statistics) = f4_reported(&katsura::<4, G>(), order, &options);
+        assert!(
+            statistics.interreduction_matrix.is_some(),
+            "ByOrder took the division route under {}",
+            order.name()
+        );
+    }
+
+    let (_, statistics) = f4_reported(&katsura::<4, G>(), MonomialOrder::Lexicographic, &options);
+    assert!(
+        statistics.interreduction_matrix.is_none(),
+        "ByOrder built a matrix under lex, which #507 measured as a regression of up to 6.25x"
+    );
+}
+
+/// Either route can still be demanded explicitly, whatever the order says.
+#[test]
+fn test_an_explicit_route_overrides_the_order() {
+    type G = Zp2147483647;
+
+    let (_, forced_matrix) = f4_reported(
+        &katsura::<4, G>(),
+        MonomialOrder::Lexicographic,
+        &F4Options {
+            interreduction: InterreductionRoute::Matrix,
+            ..F4Options::default()
+        },
+    );
+    assert!(
+        forced_matrix.interreduction_matrix.is_some(),
+        "an explicit Matrix was overridden by the order"
+    );
+
+    let (_, forced_division) = f4_reported(
+        &katsura::<4, G>(),
+        MonomialOrder::GradedReverseLexicographic,
+        &F4Options {
+            interreduction: InterreductionRoute::Division,
+            ..F4Options::default()
+        },
+    );
+    assert!(
+        forced_division.interreduction_matrix.is_none(),
+        "an explicit Division was overridden by the order"
     );
 }

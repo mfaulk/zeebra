@@ -9,7 +9,16 @@
 //!     --characteristic 32003 --list                                   # the small-prime identity
 //! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
 //!     --row katsura-6 --task reduced-grobner-basis --measure --write
+//! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
+//!     --row mq-random-10 --task reduced-grobner-basis \
+//!     --interreduction division --measure --write     # the pre-#478 route, as a board row
 //! ```
+//!
+//! `--interreduction by-order|division|matrix` and `--reduce-batch-rows on|off` override F4's two
+//! interreduction-related strategy flags for the Zeebra side only; absent, the row is taken at
+//! whatever `F4Options::default()` says. Both values are recorded in the row's `library_version`,
+//! because the commit does not determine them and two rows that differ only in them agree on every
+//! field a ratio is checked against (#507).
 //!
 //! # Two modes, and only one of them produces a publishable figure
 //!
@@ -40,7 +49,7 @@ use zeebra::grobner::{
         SingularSolver, Task, ZeebraSolver,
     },
     research::{Environment, Json},
-    F4Options,
+    F4Options, InterreductionRoute,
 };
 
 const ROOT: &str = "research/competitive";
@@ -92,6 +101,36 @@ fn main() {
     let only_engines: Option<Vec<String>> =
         value("--engines").map(|list| list.split(',').map(|e| e.trim().to_string()).collect());
     let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(600));
+    // Override F4's interreduction route for the Zeebra side. Named for the option rather than
+    // for one of its values, so the request stays legible as the default moves: `division` is how
+    // the pre-#478 route stays reachable now that `by-order` ships, and a bare presence flag could
+    // not ask for it at all. Absent, the row is taken at `F4Options::default()`.
+    let interreduction: Option<InterreductionRoute> =
+        value("--interreduction").map(|v| match v.as_str() {
+            "by-order" => InterreductionRoute::ByOrder,
+            "division" => InterreductionRoute::Division,
+            "matrix" => InterreductionRoute::Matrix,
+            other => {
+                eprintln!(
+                    "--interreduction wants `by-order`, `division` or `matrix`, got {:?}",
+                    other
+                );
+                std::process::exit(2);
+            }
+        });
+    // Pay the main loop's interreduction debt where it is incurred (#477). Its own default is
+    // also #507's to move, and the two flags interact: with batches left reduced the autoreduce
+    // matrix falls from 7 642 x 7 996 to 252 x 606, which is the closure whose construction is
+    // where `interreduction=matrix`'s memory goes. So the decision needs the 2x2, not two 1x2s.
+    let reduce_batch_rows: Option<bool> = value("--reduce-batch-rows").map(|v| match v.as_str() {
+        "on" => true,
+        "off" => false,
+        other => {
+            eprintln!("--reduce-batch-rows wants `on` or `off`, got {:?}", other);
+            std::process::exit(2);
+        }
+    });
+
     // Which corpus identity to sweep. A *published* characteristic only: a row at a field with no
     // frozen digest would be a figure whose problem nothing pins. See `PUBLISHED_CHARACTERISTICS`.
     let characteristic: u64 = value("--characteristic")
@@ -217,6 +256,8 @@ fn main() {
                 &environment,
                 measure,
                 only_engines.as_deref(),
+                interreduction,
+                reduce_batch_rows,
             );
         }
     }
@@ -256,16 +297,25 @@ fn run_one(
     environment: &Environment,
     measure: bool,
     only: Option<&[String]>,
+    interreduction: Option<InterreductionRoute>,
+    reduce_batch_rows: Option<bool>,
 ) {
     let wanted = |engine: &str| only.is_none_or(|list| list.iter().any(|e| e == engine));
 
     // Zeebra, with the wall limit pushed into F4's own cooperative budget so that a stop
     // *returns* and carries its statistics, rather than being abandoned.
     if wanted("zeebra") {
-        let mut zeebra = ZeebraSolver::new().with_f4_options(F4Options {
+        let mut options = F4Options {
             max_wall_time: Some(limits.wall),
             ..F4Options::default()
-        });
+        };
+        if let Some(route) = interreduction {
+            options.interreduction = route;
+        }
+        if let Some(reduced) = reduce_batch_rows {
+            options.reduce_batch_rows = reduced;
+        }
+        let mut zeebra = ZeebraSolver::new().with_f4_options(options);
         if measure {
             zeebra = zeebra.measuring_one_row();
         }
