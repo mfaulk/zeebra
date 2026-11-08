@@ -449,7 +449,7 @@ struct Point {
     core: f64,
     /// Spread of the core-time draws as a fraction of the median.
     spread: f64,
-    /// Highest one-minute load average seen across this point's draws.
+    /// The one-minute load average read at the start of this arm, before its own workers existed.
     ///
     /// Per point rather than per run: a sweep is a measurement **of** contention, so the ambient
     /// load at the moment of each arm is part of that arm's provenance and a single figure for the
@@ -501,9 +501,13 @@ fn sweep(
         let at: Vec<K> = (0..samples).map(|i| K::new(i as u64 + 7)).collect();
         let mut cores = Vec::new();
         let mut walls = Vec::new();
-        let mut load = one_minute_load();
+        // Read once, before this arm's own workers exist. A 32-wide arm that runs for seconds
+        // raises the one-minute average by about 32 all on its own — the dense kernel at order
+        // 1 458 took its own load from 3.5 to 13.3 — so sampling the average *during* an arm
+        // measures the measurement, and gating on that figure would refuse every wide arm of
+        // every expensive kernel on a box that was in fact quiet.
+        let load = one_minute_load();
         for _ in 0..repeats {
-            load = load.max(one_minute_load());
             let wall = match (subject, pair) {
                 (Subject::Clock, _) => time_clock_control(operations, samples, width),
                 (Subject::Determinant(kernel), Some((f, g))) => {
@@ -528,7 +532,6 @@ fn sweep(
             let core = wall * width as f64;
             walls.push(wall);
             cores.push(core);
-            load = load.max(one_minute_load());
         }
         let core = median(&cores);
         let lo = cores.iter().fold(f64::MAX, |a, b| a.min(*b));
@@ -552,23 +555,32 @@ fn report(subject: Subject, points: &[Point]) {
     println!("\n**{subject}**\n");
     println!(
         "| workers | wall/sample | core-time/sample | penalty vs this run's 1 worker | parallel \
-         efficiency | spread | peak load |"
+         efficiency | spread | load at arm start |"
     );
     println!("|---:|---:|---:|---:|---:|---:|---:|");
     let mut dirty = Vec::new();
+    let mut noisy = Vec::new();
     for point in points {
         let penalty = point.core / base.core;
         if point.load > DIRTY_LOAD {
             dirty.push(point.width);
         }
+        if point.spread > NOISY_SPREAD {
+            noisy.push(point.width);
+        }
         println!(
-            "| {} | {} | **{}** | {:.3}x | **{:.1}%** | {:.1}% | {:.1}{} |",
+            "| {} | {} | **{}** | {:.3}x | **{:.1}%** | {:.1}%{} | {:.1}{} |",
             point.width,
             human(point.wall),
             human(point.core),
             penalty,
             100.0 / penalty,
             100.0 * point.spread,
+            if point.spread > NOISY_SPREAD {
+                " **NOISY**"
+            } else {
+                ""
+            },
             point.load,
             if point.load > DIRTY_LOAD {
                 " **DIRTY**"
@@ -579,10 +591,19 @@ fn report(subject: Subject, points: &[Point]) {
     }
     if !dirty.is_empty() {
         println!(
-            "\n**Do not publish this curve.** Width{} {dirty:?} ran at a one-minute load above \
+            "\n**Do not publish this curve.** Width{} {dirty:?} started at a one-minute load above \
              {DIRTY_LOAD:.0}, and a sweep whose subject *is* contention cannot be taken while the \
              box contends for other reasons. Re-take the affected points.",
             if dirty.len() == 1 { "" } else { "s" }
+        );
+    }
+    if !noisy.is_empty() {
+        println!(
+            "\n**Width{} {noisy:?} is not a point.** Its draws spread by more than {:.0}% of the \
+             median, which at this draw count says the arm caught a transient rather than that it \
+             measured one. Raise `--repeats` and re-take it.",
+            if noisy.len() == 1 { "" } else { "s" },
+            100.0 * NOISY_SPREAD
         );
     }
 }
@@ -593,6 +614,13 @@ fn report(subject: Subject, points: &[Point]) {
 /// load that has peaked at 687 on 128 cores. A scaling curve is a measurement of contention, so
 /// ambient contention is not noise around it — it is the same quantity, from a different source.
 const DIRTY_LOAD: f64 = 8.0;
+
+/// Draw spread, as a fraction of the median, above which an arm is reported as not a point.
+///
+/// A quiet box gave 0.1–3% on every arm long enough to amortize its own thread spawn, and 33–44%
+/// on three arms taken in the same minutes. A spread an order of magnitude above the rest of the
+/// sweep is a transient inside the arm, and the median of three draws does not remove it.
+const NOISY_SPREAD: f64 = 0.15;
 
 /// The one-minute load average, or zero where `/proc` does not carry one.
 fn one_minute_load() -> f64 {
@@ -772,8 +800,8 @@ fn count_allocations(
 /// Degree of `p` in variable `index`.
 fn degree_in(p: &MultivariatePolynomial<2, K>, index: usize) -> u32 {
     p.terms()
-        .iter()
-        .map(|(monomial, _)| monomial.exponents()[index])
+        .keys()
+        .map(|monomial| monomial.exponents()[index])
         .max()
         .unwrap_or(0)
 }
