@@ -1175,45 +1175,79 @@ selected.
 The `mul/{arity}` Criterion arms are the regression control, and they top out at 256 × 256 = 65 536
 term-products — about a megabyte of transient, four orders below the regime this is about.
 
-The A/B is a timing measurement, so unlike the peak above it **does** need the lock. The
-`origin/main` baseline half is taken, on one pinned core under the lock, through Criterion's
-`--save-baseline`:
+The A/B is a timing measurement, so unlike the peak above it **does** need the lock.
 
-| arm | `origin/main` (1777c8e) |
-|---|---:|
-| `mul/n3/16` | 17.018 µs |
-| `mul/n3/64` | 148.63 µs |
-| `mul/n3/256` | 1.4037 ms |
-| `mul/n6/16` | 20.251 µs |
-| `mul/n6/64` | 344.22 µs |
-| `mul/n6/256` | 6.9636 ms |
-| `mul/n10/16` | 24.772 µs |
-| `mul/n10/64` | 395.43 µs |
-| `mul/n10/256` | 13.106 ms |
-
-**The branch half is still queued** and is the one measurement in this subsection not yet taken;
-the machine's lock has been held by other agents for the greater part of an hour at a time. To
-finish it, with the same `CRITERION_HOME` so the baseline above is the comparand:
-
-```sh
-tools/benchlock.sh <tag> env CRITERION_HOME=<dir> \
-  taskset --cpu-list <core> target/release/deps/sparse_polynomial-<hash> \
-  --bench --baseline before 'sparse_poly/mul(_by_term)?/n(3|6|10)'
-```
-
-What it is expected to show, stated in advance so that the measurement can contradict it: **no
-regression on any shared arm, and a modest improvement throughout.** That is not a guess. The
-per-route table above measures the same operation at the same sizes, on the same core, under the
-same lock, and finds the selected route faster than the materialising one at *every* point —
-including 36 term-products, two orders below the smallest Criterion arm. The `n3` arms sit between
-the trivariate 100-product and 27 225-product rows, where `Accumulate` measured **0.49x** and
-**0.59x** of materialising. A Criterion result slower than `main` on a shared arm would contradict
-that sweep, and would be filed as the contradiction it is rather than explained away.
+**What was predicted, stated before the measurement so that it could contradict it: no regression on
+any shared arm, and a modest improvement throughout.** That was not a guess. The per-route table
+above measures the same operation at the same sizes, on the same core, under the same lock, and
+finds the selected route faster than the materialising one at *every* point — including 36
+term-products, two orders below the smallest Criterion arm. The `n3` arms sit between the trivariate
+100-product and 27 225-product rows, where `Accumulate` measured **0.49x** and **0.59x** of
+materialising. A Criterion result slower than `main` on a shared arm would contradict that sweep,
+and would be filed as the contradiction it is rather than explained away.
 
 The reason to expect no small-operand regression at all is structural, not statistical, and is worth
 separating from the numbers: `SparseMultiPoly::new` is itself a monomial-keyed hash accumulate, so
 the route that replaced materialising does strictly less work than it — the same merge, without the
 `Vec` of every product in front. There is no size at which the removed `Vec` was paying for itself.
+
+**Taken (#363). No arm regressed, and "modest" was the wrong word: every arm is 1.5x to 3.8x
+faster.** Both halves were retaken in one session rather than the branch half alone, because the
+`CRITERION_HOME` holding the original baseline did not survive — and retaking both is the stronger
+protocol anyway: one lock acquisition, one core, the two binaries back to back, so no cross-session
+drift sits inside the comparison. `1777c8e8` against `1a4ecc79`, which is #243's branch tip, on core
+2 under `tools/benchlock.sh`, with `CRITERION_HOME` shared and `--save-baseline before` then
+`--baseline before`:
+
+| arm | `1777c8e8` before | `1a4ecc79` after | ratio |
+|---|---:|---:|---:|
+| `mul/n3/16` | 19.09 µs | 5.757 µs | **0.302** |
+| `mul/n3/64` | 189.1 µs | 73.55 µs | **0.389** |
+| `mul/n3/256` | 1.507 ms | 1.031 ms | **0.684** |
+| `mul/n6/16` | 22.27 µs | 10.90 µs | **0.489** |
+| `mul/n6/64` | 350.9 µs | 182.8 µs | **0.521** |
+| `mul/n6/256` | 6.944 ms | 3.328 ms | **0.479** |
+| `mul/n10/16` | 26.28 µs | 12.09 µs | **0.460** |
+| `mul/n10/64` | 427.0 µs | 204.5 µs | **0.479** |
+| `mul/n10/256` | 13.87 ms | 3.653 ms | **0.263** |
+| `mul_by_term/n3/16` | 1.551 µs | 495.0 ns | **0.319** |
+| `mul_by_term/n3/64` | 6.788 µs | 2.078 µs | **0.306** |
+| `mul_by_term/n3/256` | 19.95 µs | 6.732 µs | **0.337** |
+| `mul_by_term/n6/16` | 1.535 µs | 764.2 ns | **0.498** |
+| `mul_by_term/n6/64` | 5.951 µs | 3.194 µs | **0.537** |
+| `mul_by_term/n6/256` | 22.43 µs | 11.57 µs | **0.516** |
+| `mul_by_term/n10/16` | 1.780 µs | 852.3 ns | **0.479** |
+| `mul_by_term/n10/64` | 6.915 µs | 3.220 µs | **0.466** |
+| `mul_by_term/n10/256` | 27.57 µs | 13.08 µs | **0.474** |
+
+Criterion reported "Performance has improved" on all eighteen, at −31.6% to −73.7%. The nine
+`mul_by_term` arms are shared too and are reported here because they are the inner operation of
+every reduction step — the row the per-route table singled out as deciding the dispatch predicate.
+
+**The prediction's direction is confirmed and its magnitude was understated**, which is worth
+recording as plainly as a contradiction would have been. The per-route sweep measured `Accumulate`
+at 0.38x–0.66x materialising, and the Criterion arms land at 0.26x–0.68x: the same band. What was
+wrong was reading "four orders below the regime this is about" as implying the effect would be
+small there. It is not — the `Vec` of every product is a cost proportional to the products, and the
+products outnumber the output terms at every size, small ones included.
+
+**How much of this the instrument can resolve.** The `1777c8e8` half is the same commit, build and
+core as the figures this subsection recorded earlier, so the two baselines are a cross-session
+reproducibility check on the harness and they differ by **+5.8% to +12.2%** (`mul/n3/16` 17.018 →
+19.09 µs; `mul/n10/256` 13.106 → 13.87 ms). That is the drift this machine carries across sessions
+at a fixed commit, and the effect above is 4x to 30x it — so the conclusion does not depend on which
+session took the baseline. It is also why both halves were retaken rather than the new half compared
+against the old table: a 12% instrument offset inside a 4% claim would have been undetectable.
+
+**One deviation from the recorded command, and why it is not in the measured path.** The branch tip
+cannot run its own benchmark: `1a4ecc79` added an `n2` arity, and `bench_arity` builds every arity's
+operands before any filter applies, so `random_poly::<2>(48, 4, …)` fires its own assert — 48
+distinct monomials requested, 25 available. That is the defect `14f69182` fixed on `main`
+afterwards, and it is cherry-picked onto the measured tree here. It changes one literal in the
+**`normal_form`** group's setup, no `src/` line and no arm in the table above. Worth noting what let
+it happen at all: the Benchmarks job is gated `if: github.event_name != 'pull_request'`, so a branch
+that breaks a benchmark is green until it merges — which is also why this A/B was the thing that
+found it rather than CI.
 
 Two arms were missing and are added in `benches/sparse_polynomial.rs`: an **`n2` arity**, which the
 file did not have although N = 2 is the arity the whole resultant route runs at, and a
