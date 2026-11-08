@@ -796,7 +796,16 @@ cargo bench --bench fglm                 # order conversion: stages, pipeline, s
                                          # dependence, the shipped configuration, verification
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
 cargo bench --bench sparse_polynomial    # multivariate arithmetic, four arities
+cargo bench --bench monomial_order       # MonomialOrder::cmp, three arms, two tie regimes
 ```
+
+`monomial_order` is #317's gate rather than a coverage benchmark, and it has **three** arms where an
+A/B would have two. It prices one change — storing a monomial's total degree instead of summing
+`[u32; N]` on every graded comparison — and a two-arm first cut reported `lex` at 3.32x, on an order
+that never reads the degree. So `production` is `MonomialOrder::cmp` on the real `Monomial<N>`,
+`summed` is a bench-local transcription of it, and `stored` is that transcription with the degree in
+a field; `summed` against `production` is the fidelity check, and the `lex` rows of `summed` against
+`stored` are the control. See `docs/research/interreduction-cost.md` §3e.
 
 `sparse_polynomial`'s `mul_dense` arm is separate from `mul` because they are different shapes, not
 just different sizes. `mul` draws monomials independently, which is sparse in the total-degree sense
