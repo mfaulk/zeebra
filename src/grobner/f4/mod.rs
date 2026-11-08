@@ -20,6 +20,7 @@
 //! Journal of Pure and Applied Algebra 139, 61-88, and `docs/MILESTONE-F4.md` for the invariants
 //! this implementation is built on.
 
+pub mod budget;
 pub mod certify;
 pub mod degrees;
 pub mod hilbert_driven;
@@ -35,6 +36,7 @@ pub mod symbolic;
 #[cfg(test)]
 mod tests;
 
+pub use budget::{Allowance, BudgetApproach, BudgetLine, BudgetReport};
 pub use certify::{certify_f4_output, certify_submitted_basis, CertificationReport, Provenance};
 pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
