@@ -732,6 +732,12 @@ So the figure that may now be published is a row and not an arithmetic step, and
 > M27's 2x minimum is met with room; Singular parity is **not** reached, and stops about 1.1x
 > short — which is what §2.4 predicted at 1.14x.
 
+One further row, at `b4dbb51a` and under `--interreduction by-order`, confirms the route resolution
+end to end: **9 601.5 ms at 599.3 MB** under grevlex. The time is a single rep on a more loaded box
+and is not quoted against the table above; the **599.3 MB against the division route's 162.7 MB** is
+the signature that says `ByOrder` resolved to the matrix route, since the two routes differ in peak
+RSS by 3.70x and in nothing else observable from a board row.
+
 Two things the division side corroborates. Its **minimum**, 29 623.8 ms, is **1.021x** the retained
 board row's 29 011.4 ms, so this cohort composes with §1.1's ratios. Its **spread** is wide — 18%
 across three reps against the matrix route's 3.7% — because other agents were building on the box
