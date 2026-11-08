@@ -1481,6 +1481,132 @@ ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=8 tools/benchlock.sh era \
   taskset -c 8 /tmp/era-target/release/examples/determinant_era --workers 1 --determinants 13123
 ```
 
+### 6.14 The budget guard costed one term of five, and #350 made that the wrong one (#410)
+
+Everything above this subsection costs **determinants**. So did the guard: `RowCost::of` took the
+sample count times one per-determinant figure and `--wall-budget` was checked against that and
+nothing else. That was defensible while determinants were ~99% of a four-round row — line 139 of
+this document says so in as many words — and §6.13 is the last place it is true.
+
+**#350 and #351 inverted the composition, and the guard did not move with it.** #367's authorized
+`rf4-rp2` row re-costed, measured except where noted:
+
+| term | seconds | share | modelled by the pre-#410 guard? |
+|---|---:|---:|:---:|
+| symbolic build | 324.0 | **73%** | no |
+| determinants, Euclidean, 1 core | 65.5 | 15% | **yes** |
+| interpolation | 36.0 | 8% | no |
+| off-domain validation, 8 dense | 18.6 | 4% | no |
+| root finding, deflation | 0.5 | 0.1% | no |
+
+And on `rf6-rp0` the error runs the other way: `structured-sylvester.md` §7.1 puts that row at 78%
+root finding after axis 4, so the guard would have waved it through on a term it had never looked
+at. **Not claimed: that the guard ever passed a row it should have refused.** The budgets have been
+generous relative to the rows attempted — #367's row was inside its ceiling by 19.9x — which is
+exactly why this is fixed before a row whose margin is thinner.
+
+#### The model, and what each term's number is worth
+
+The cost model moved out of the example into **`src/grobner/research/row_cost.rs`**, which is pure
+and has unit tests over the race it exists to prevent: the determinant laws of §6.9 and of `structured-sylvester.md` §5.6 are
+there unchanged, and five terms are built on top of them. Every term carries a `TermBasis` and the
+printed budget line prints it, because a budget line that silently covers 15% of a row reads as
+though it covers the row.
+
+| term | law | basis |
+|---|---|---|
+| symbolic build | a **recorded constant per round count** — 2.9 ms at `R = 2`, 419.3 ms at `R = 4` (§6.1), **324.0 s at `R = 6`** (`MILESTONE-COMPETITIVE-ALGEBRA.md` §8.4.2, on the lock, post-#243) | **measured** |
+| determinants | §6.9's dense law or `structured-sylvester.md` §5.6's Euclidean one, times the measured width penalty | fitted to order 4 374 / 1 458 |
+| interpolation | **5.1 ms at `S = 730`** (§6.7) and **31.7 s at `S = 59 050`** (#367), log-log between them, `O(S²)` above | **measured anchors** |
+| off-domain validation | eight **dense** determinants — `off_domain_check` calls `sylvester_determinant_at` whatever `--kernel` says — over `min(8, workers)` | fitted |
+| root finding | a **band**: `graeffe-root-finding.md` §9.7.4's doubling sweep, its §9.7.2 and §6.1's real resultants as the gcd envelope; §9.7.2's deflation points as the other edge | fitted to degree 65 536 / 59 049 |
+
+Three things in that table are the point rather than bookkeeping.
+
+**The build is a constant and not a model.** It is 73% of a six-round row and the cheapest term to
+get right, because every row at a round count shares the same word degrees — §6.1's two four-round
+rows measure 419.3 ms and 397.7 ms, and §8.4.2's six-round figure is "identical for every six-round
+row". Round counts with **no** measurement return no figure rather than an extrapolation: the growth
+per two rounds is 145x then 772x, which no law covers, and `structured-sylvester.md` §7.3 predicts a ~1 TB transient at
+`R = 7`. So `rf4-rp4`, `rf6-rp2` and `rf6-rp4` are refused as **unbounded** — an unmodelled term is
+not a zero term, and a guard that totalled around one would admit a row on the strength of what it
+had not looked at.
+
+**Interpolation was never extrapolated; the figures were just never wired in.** #410 listed it as
+worth measuring. It had been measured twice — §6.7's 5.1 ms at 730 samples and the 31.7 s in #367's
+own stage table at 59 050 — and the implied exponent between them is **1.99**, which confirms the
+`O(S²)` the quadratic `lagrange_interpolate` of #162 derives. Inside `[730, 59 050]` the term is
+therefore a measurement and not a projection; above 59 050 it is an extrapolation and is labelled
+one. No new benchmark was needed and none was taken.
+
+**Root finding is a band because its cost is a property of the problem.** Deflation pays
+`(roots + 1)` Graeffe searches (`graeffe-root-finding.md` §9.7.1), so it is a bet on the eliminant's base-field root count —
+`O(1)` on all three registered rows that have one, and **unmeasured on exactly the rows nobody has
+attempted**. The gcd route is one quasi-quadratic pass and does not care. The guard carries both
+edges and refuses on the pessimistic one; the band's width *is* that assumption, and a guard sitting
+on its narrow edge would be assuming the thing it cannot check.
+
+The anchor tables are **monotone upper envelopes** — the running maximum of every measurement at or
+below a degree — rather than fits. That is not fussiness: §6.1's real `rf4-rp0` resultant takes
+**3 933.3 ms** at degree 6 561 where `graeffe-root-finding.md` §9.7.4's planted degree-8 192 polynomial takes **3 161.2 ms**,
+so a law fitted through the planted sweep alone under-predicts the row it exists to cost. Between
+anchors the law interpolates in log-log using only the local exponent, which stops a small anchor's
+fixed per-call overhead from being projected forward as a growth rate.
+
+**Every gcd anchor predates #193**, which landed while this was being written: it dispatched division
+to Newton inversion and measured `roots` **1.32x–1.67x faster over KoalaBear** at degrees 256–2 048,
+doubling its reachable degree from 4 096 to 8 192 (`fast-univariate.md` §4.5). So the pessimistic
+edge over-predicts the gcd route by roughly that factor on top of whatever else. That is the safe
+direction for an edge a guard refuses on, and the constants are **not** scaled down by a factor
+nobody measured at these degrees: re-anchoring honestly means re-running the doubling sweep in one
+session post-#193, which is **#552** and a measurement rather than an edit. §6.13 is the precedent —
+lowering a prefactor without re-fitting the exponent leaves the two in different sessions.
+
+#### The band against a row that was actually run
+
+`rf4-rp2`, Euclidean, 32 workers — the configuration #367 ran:
+
+| | predicted | **measured (#367)** |
+|---|---:|---:|
+| symbolic build | 5.4 min | 320.8 s |
+| determinants | 6.6 s | 6.57 s |
+| interpolation | 31.7 s | 31.7 s |
+| off-domain validation | 3.5 s | 2.76 s |
+| root finding, pessimistic / optimistic | 2.6 min / 0.5 s | 0.19 s (deflation) |
+| **row** | **6.1 min to 8.6 min** | **6.03 min** |
+
+Every term is at or above what the run measured and the optimistic edge is **1.2% above** the row,
+so the model is conservative throughout without being loose. A unit test pins both halves of that,
+which is the only way the property survives the next re-anchoring.
+
+A full ladder run at the default budget, under `tools/benchlock.sh` (`elapsed=133s`, `end=exited`,
+**`load=121.38`**), confirms the behaviour rather than the figures: the same three rows are admitted
+and return the same verified witnesses, and `rf4-rp0`'s **26 627.9 ms** total falls inside its
+predicted **24.7–28.6 s** band. The load was high — this box runs many agents — so the stage
+timings in that run are upper bounds and **nothing in this document is re-anchored on them**; §6.13
+is the reason that sentence is here.
+
+#### What the six-round rows cost once the whole row is costed
+
+| | `rf2-rp4` | `rf4-rp2` | `rf6-rp0` |
+|---|---:|---:|---:|
+| band, Euclidean, 32 workers | 5.5 min – 5.5 min | 6.1 min – 8.6 min | **49.3 min – 3.61 h** |
+| determinants' share of the pessimistic row | 0.2% | 1.3% | **0.5%** |
+
+`rf6-rp0` is the row this changes. `structured-sylvester.md` §7.1 totalled it at **7.2 h** after
+axis 4, of which 5.63 h was root finding extrapolated from §6.3's two points; #351's eight-point
+sweep moves the pessimistic edge to **2.79 h** and #243 takes the build from 48.4 min to 5.4 min, so
+the row is **0.82–3.61 h** and its largest *modelled* term is the 42.8 min of interpolation. Both
+edges are inside the §9 ceiling. That is **not** an authorization — §8.4 requires the owner's
+decision taken against a costing before execution, and the pessimistic edge rests on two
+extrapolated terms — but it is the first time the row has been costed with every stage in the total.
+
+**What this does not change.** The default `--wall-budget` is still 1 800 s and the same three rows
+are admitted: as whole rows at the pessimistic edge they cost 0.0 s, 3.2 s and 28.6 s, so none of
+them crosses it. The determinant laws are untouched, `DETERMINANT_MS_AT_162` is still 3.624, and
+§6.13's two findings — the ~1.2x era gap and the 1.4x of ambient contention the law deliberately
+excludes — apply to the determinant term of this model exactly as they did before it had any others.
+
 ## 7. The deeper consequence
 
 It is about the **formulation**, not the algorithm. Three orders of magnitude separate two ways of

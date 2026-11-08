@@ -18,6 +18,7 @@ pub mod poseidon;
 pub mod record;
 pub mod reorder;
 pub mod resultant;
+pub mod row_cost;
 pub mod scoreboard;
 pub mod slices;
 pub mod specialization;
@@ -57,6 +58,12 @@ pub use resultant::{
     predicted_resultant_degree, random_bivariate, sylvester_determinant_at,
     time_sylvester_determinants, DegreeSource, DeterminantBatch, DeterminantKernel, PowerLawFit,
     ResultantError, ResultantOptions, ResultantRoute, ResultantStages,
+};
+pub use row_cost::{
+    determinant_core_ms, euclidean_core_ms, kernel_core_ms, width_penalty, CostTerm,
+    ResultantRowCost, RowVerdict, TermBasis, ABOVE_L2_EXPONENT, CORE_TIME_PER_DOUBLING,
+    DETERMINANT_MS_AT_162, EUCLID_EXPONENT, EUCLID_MEASURED_ORDER, EUCLID_MS_AT_1458,
+    MEASURED_ORDER,
 };
 pub use scoreboard::{
     colliding_run_file, wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit,
