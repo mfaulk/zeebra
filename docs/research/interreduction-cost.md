@@ -1,7 +1,10 @@
 # Inside final interreduction: which half, and what the reductions actually cost
 
-**Measured at:** publication bound `530816cb`…`d412374c` — the commits that published these figures,
-recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Measured at:** publication bound `530816cb`…`d412374c` for §0–§3b — the commits that published
+those figures, recovered from git rather than recorded at the time
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§3c was
+taken at `489ccbd6` plus the change it measures**, recorded at the time rather than recovered,
+which is what #335 asked for.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -295,6 +298,12 @@ the end of the computation — where this stage pays it.
 ceiling on it is Groebner.jl's own 1.74 ms for the same stage. Filed separately; it is not this
 change's to fix, and this change does not need it to be worth 4.18x.
 
+> **Fixed by #477; see §3c.** Making each batch's candidates come out reduced takes this matrix
+> from 7 642 x 7 996 to **252 x 606** — Groebner.jl's 250 x 604 to within six columns — and the
+> stage from 2 400 ms to **16.4 ms**, which is 9.4x the comparand rather than 2 353x. The
+> attribution in this paragraph was correct: the cost was the main loop's, and paying it there
+> costs 2.4% of the elimination stage.
+
 ### 3a.1b The small instances, which say the matrix route must **not** become the default
 
 `cargo bench --bench f4_stages -- interreduction`, on the lock, pinned. Both routes over the **same**
@@ -402,6 +411,131 @@ and is the honest remaining item on #440.
 
 ---
 
+## 3c. #477: the debt, paid where it is incurred
+
+**Measured at `489ccbd6` plus the change itself.** Both arms of every table below are flags on one
+build, so there is no before-side tree to name and nothing merged after `489ccbd6` can have moved
+one arm relative to the other. `489ccbd6` is a merge commit on `main` and so stays resolvable
+(#505). ISA floor and instance digest are printed in the run's own header by
+`f4_profile -- mq-rows`, measured as `x86-64-v3 or better (AVX2)` and
+`72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2`.
+
+§3a.1 attributed the autoreduce matrix's 405x cell count to the **main loop** rather than to
+interreduction, filed it separately, and said it was "not this change's to fix". This is that fix,
+and it is worth more than the change that found it.
+
+`F4Options::reduce_batch_rows` back-substitutes each batch's pivot columns out of every other row
+after the plan's elimination, so a candidate leaves a batch already in normal form with respect to
+everything above it — which is what Groebner.jl's `linalg_main!` does and what Zeebra's candidate
+extraction, reading an echelon form that was never back-substituted, did not.
+
+### The matrix is Groebner.jl's, to within six columns
+
+| | Groebner.jl | Zeebra, echelon | Zeebra, reduced |
+|---|---:|---:|---:|
+| rows | 250 | 7 642 | **252** |
+| columns | 604 | 7 996 | **606** |
+| cells | 151 000 | 61 105 432 | **152 712** |
+| nonzeros | — | 893 531 | **68 325** |
+| the stage | 1.74 ms | 2 400 ms | **16.4 ms** |
+
+§3a.1 said "Groebner.jl's 604 columns is almost exactly `247 leading monomials + 354 standard
+monomials = 601`, i.e. the only monomials in its basis entering autoreduce are the leading
+monomials and the standard monomials". Zeebra's reduced basis now enters autoreduce with 252 rows
+and 606 columns against that 250 and 604 — a **400x** reduction in cells, landing on the comparand's
+shape rather than near it. The remaining two rows and two columns are not explained here and are
+small enough that nothing in this section rests on them.
+
+The stage falls from 2 400 ms to **16.4 ms**, which is 9.4x Groebner.jl's 1.74 ms — inside the
+11.6x–97.1x per-operation representation constant `groebner-jl-gap.md` §0 measures for every other
+stage. **Interreduction is no longer an outlier**: the 13 871x of §3 and the 2 353x of §3a.1 were
+both the shape, not the kernel, and with the shape fixed the stage behaves like the rest of the
+engine.
+
+### Four arms, because the default is the division route
+
+The payoff lands in a different place on each interreduction route — a smaller autoreduce matrix on
+the matrix route, fewer term rewrites on the division one — and the division route is what ships
+(§3a.1b, and #507). So the cross is measured rather than one half of it:
+
+| arm | total | elimination | interreduction | against the default |
+|---|---:|---:|---:|---:|
+| `div` + echelon — **ships today** | 31 713 ms | 4 483 ms | 25 744 ms | — |
+| `div` + reduced | **6 441 ms** | 4 590 ms | 1 415 ms | **4.92x** |
+| `mat` + echelon — #478's route | 8 467 ms | 4 590 ms | 2 400 ms | 3.75x |
+| `mat` + reduced | **4 851 ms** | 4 531 ms | **16.4 ms** | **6.54x** |
+
+Medians of three interleaved repetitions in one process on one build. Two things in that table are
+worth saying out loud:
+
+- **This flag alone beats #478's flag alone**, 6 441 ms against 8 467 ms, on the path that ships.
+  The two are not alternatives — together they are 6.54x — but if only one were taken, it is this
+  one.
+- **The price is 2.4%.** Elimination goes from 4 483 ms to 4 590 ms while 2 058 195 rows are
+  back-substituted. That is the finding that contradicts the prior: §3a.1b's
+  `InterreducedBlock` was measured and *rejected* for filling in the reducer block, and this pass
+  is the same fill-in paid after the elimination instead of before it. It is cheap here because the
+  pass is output-sensitive — it indexes the pivot columns and visits only the rows that hold one —
+  and because back-substitution at the end of a batch touches rows that are already as dense as
+  they will get, where interreducing the block beforehand makes every later row operation longer.
+
+### The classical rungs do not regress, which is the difference from #478's flag
+
+§3a.1b is the standing warning against reading a default off one instance: the matrix interreduction
+route is 1.07x–1.72x faster on three rungs and **25x slower** on katsura-5 under lex, because a
+basis in shape position is the best case for iterated division and the worst case for a matrix.
+That exposure was the reason its default did not move. Measured for this flag, with division
+interreduction on both arms and the minimum of seven interleaved repetitions:
+
+| instance / order | echelon | reduced | |
+|---|---:|---:|---|
+| katsura-5 lex | 0.5981 ms | 0.5892 ms | 1.02x — **the rung that breaks the matrix route** |
+| katsura-5 grevlex | 0.4620 ms | 0.3595 ms | 1.29x faster |
+| katsura-6 grevlex | 2.5268 ms | 1.6777 ms | 1.51x faster |
+| cyclic-5 grevlex | 1.0336 ms | 0.8729 ms | 1.18x faster |
+| cyclic-4 lex | 0.0348 ms | 0.0383 ms | 0.91x — **slower** |
+
+No rung regresses materially, and the shape-position case that costs the matrix route 25x is
+**neutral** here — because this flag does not change how interreduction is performed, only how much
+there is left to do. The one loss is 3.5 µs on the smallest instance in the corpus, where a per-batch
+pass has 35 rows to examine and nothing to save.
+
+### Why the default does not move in this change
+
+On this evidence it probably should, and that is a separate decision from this one:
+
+- Every figure above is `mq-random-10` grevlex at one digest, plus five rungs. **A board row is not
+  a projection**, and #507 is the issue that establishes the rule: the figure quoted against the
+  board must be measured against the board, in a cohort with the other four engines.
+- Flipping this changes every recorded Zeebra row, so it is a cohort re-take rather than a flag
+  edit, and #507 already owns that work for `interreduce_by_matrix`. There are now two flags in the
+  same position and one cohort run should settle both.
+- #507's projection is superseded by this change and in Zeebra's favour. It projected ~7 999 ms for
+  `mq-random-10` with `interreduce_by_matrix` on, putting the row **1.14x behind Singular**; with
+  this flag as well the measurement is 4 851 ms, and the 2 306 ms #507 called "the difference
+  between leading Singular and trailing it" is now 16.4 ms.
+
+So the flag ships off, on the same discipline `interreduce_by_matrix` follows, and the decision
+moves to #507 with better evidence than it had.
+
+### What this does not establish
+
+* **The answer.** Asserted equal on every rep here, and asserted equal against the echelon route
+  over the correctness corpus under all three orders and over cyclic-4, katsura-4 and katsura-5 by
+  `tests::test_reducing_batch_rows_returns_the_same_basis_on_the_corpus` and
+  `tests::test_reducing_batch_rows_agrees_on_the_benchmark_families`. Both of those also assert
+  that a candidate's *tail* differs somewhere in the sweep, so neither can pass vacuously.
+* **That candidate selection is unchanged.** Back-substitution cannot move a row's leading column,
+  so the selection is identical; §3a.1 called that an argument rather than a test, and
+  `reduction::tests::test_the_row_form_does_not_change_candidate_selection` is now the test.
+* **The two extra rows and columns.** 252 x 606 against Groebner.jl's 250 x 604 is unexplained.
+* **Any other board row's cost.** Five rungs and one MQ instance are not the cohort.
+* **The 7 395 reducer multiples.** §3a.1 attributed the row count to reducible tails in the basis;
+  removing them took the autoreduce matrix to the comparand's shape, which is consistent with that
+  attribution but does not separately measure the closure.
+
+---
+
 ## 4. Reproducing
 
 ```sh
@@ -427,6 +561,13 @@ ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
 ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
   tools/benchlock.sh <tag> taskset -c 0-7 \
   cargo run --release --example f4_profile -- mq-matrix
+
+# #477's A/B: both batch row forms crossed with both interreduction routes, interleaved in
+# one process on one build, then the same flag over the classical rungs. Prints the ISA floor
+# and the instance digest in its header. See §3c.
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example f4_profile -- mq-rows
 
 # The stage in isolation, over a basis from a real trace. Both routes, same input.
 tools/benchlock.sh <tag> taskset -c 0-7 cargo bench --bench f4_stages -- interreduction
