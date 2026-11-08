@@ -723,6 +723,11 @@ accept).
 - **Not provisioned, deliberately:** Sage, Magma, Macaulay2, CoCoA, OpenF4, MathicGB, GBLA,
   M4RI. Magma is commercial; the rest are out of M25's scope as stated in #259/#260. Singular
   is not rebuilt because a working install exists.
+  **Settled for Magma and Macaulay 2 (#430, owner, 2026-11-08):** there is **no Magma access**, so
+  the question is not cost or scope but availability — Magma cannot be a comparand here at any
+  priority, and every Magma figure in this repository is read at source and quoted
+  (`classical-benchmarks.md` §2.3). **Macaulay 2 is deprioritized** by the same decision; the roster
+  stays Singular, msolve, Groebner.jl and Sagebrush.
 - **CI is unchanged.** The shellcheck step in `.github/workflows/rust.yml:206` is an explicit
   file list (`scripts/agent/*.sh scripts/agent/test/*.sh`), not a glob reaching `tools/`, so
   adding these scripts to it was out of scope; and a CI job that builds GMP, MPFR and FLINT
