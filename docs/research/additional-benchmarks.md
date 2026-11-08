@@ -418,6 +418,10 @@ Challenge, <https://lowmcchallenge.github.io/>:
 - The deliverable is **the fastest attack**, scored by "the biggest gain in efficiency over
   exhaustive search", with prizes in EUR. There are no challenge files to download and solve, and
   no submitted runtimes — the results tables report `log₂ T` in bit operations and `log₂ M` in bits.
+- **The prizes are expired, and that is not why it is declined.** The third round ran "until
+  April 27 2021" and the site's latest news entry is 19 October 2021 reporting its results; read
+  2026-11-08, classified `expired` in `prize-ledger.md` §2 along with its "EUR 22k … in this
+  current round". The rejection below stands on expressibility and executability alone.
 - Data complexity is **1** — a single plaintext/ciphertext pair — which is what makes the setting
   interesting and also means there is no data to distribute.
 - The two winning methods after the third round are "Linearization + G&D + MITM" (Banik, Barooti,

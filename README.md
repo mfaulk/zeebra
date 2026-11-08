@@ -123,6 +123,9 @@ As the saying goes, you can either make software so simple that it obviously has
       equal exhaustively and the saving stated as an operation count rather than a timing
 - [x] Reed-Solomon codes over an FFT domain: encoding, erasure recovery, and a Euclidean
       decoder that verifies its correction rather than returning the nearest codeword
+- [x] A prize ledger that keeps *claimable* apart from *solved*: five dated states per programme,
+      and a test that refuses a registered reward figure carrying no claimability state and no read
+      date — the three unsolved Poseidon rows stay unsolved and their rewards expired in 2025
 
 ## Building and Testing
 Zeebra builds on stable Rust; no nightly toolchain or feature gates are required.

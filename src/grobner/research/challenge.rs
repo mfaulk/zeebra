@@ -1861,6 +1861,12 @@ pub fn registry() -> Vec<ChallengeManifest> {
     // leading ones — and two of the three are over fields this crate has no coefficient type for.
     // Registered and refused by the constructor, because a scoreboard that lists only what it can
     // run hides exactly the problems that are open.
+    //
+    // Unsolved and unclaimable are both true here, and they are different facts (#200). The
+    // program's window closed 2025-12-01, so the `reward` figures are EXPIRED — said in `version`,
+    // because `ExternalStatus` answers "has anyone solved this" and nothing about a funding
+    // program's calendar. These rows stay the most interesting in the registry on the strength of
+    // the first fact alone.
     for (id, program_field, prime, alpha, t, r_f, r_p, reward, notes) in [
         (
             "poseidon256-cico-2025-rf6-rp11",
@@ -1872,7 +1878,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             11usize,
             "$10,000",
             "Perm(X_1, X_2, 0) = (Y_1, Y_2, 0), a 32-bit tier of the 2025 program, listed as \
-             unsolved on 2026-11-05. A 255-bit field, which this generator is not wired for.",
+             unsolved on 2026-11-08. A 255-bit field, which this generator is not wired for.",
         ),
         (
             "poseidon256-cico-2025-rf6-rp16",
@@ -1883,7 +1889,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             6,
             16,
             "$15,000",
-            "The 40-bit tier of the same family, listed as unsolved on 2026-11-05 and the hardest \
+            "The 40-bit tier of the same family, listed as unsolved on 2026-11-08 and the hardest \
              offered there.",
         ),
         (
@@ -1896,7 +1902,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             13,
             "$15,000",
             "Perm(X_1..X_7, 0) = (Y_1..Y_7, 0) over 2^64 - 2^32 + 1 with a degree-7 S-box, the \
-             40-bit tier, listed as unsolved on 2026-11-05. The lower tiers of this family were \
+             40-bit tier, listed as unsolved on 2026-11-08. The lower tiers of this family were \
              claimed in April and May 2025.",
         ),
     ] {
@@ -1904,7 +1910,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
         // *unsolved* tiers of the 2025 program, so there is no external solution whose method
         // could be disclosed.
         let external = ExternalStatus::NoneRecorded {
-            as_of: "2026-11-05",
+            as_of: "2026-11-08",
         };
         challenges.push(ChallengeManifest {
             id,
@@ -1921,7 +1927,9 @@ pub fn registry() -> Vec<ChallengeManifest> {
             },
             objective: Objective::CicoExactTrailing,
             program: ChallengeProgram {
-                version: "2025 bounty program, read 2026-11-05",
+                version: "2025 bounty program, ran till 2025-12-01, read 2026-11-08; the reward \
+                          is EXPIRED — the window closed and the tier is still listed as \
+                          unclaimed. See docs/research/prize-ledger.md",
                 reward: Some(reward),
                 ..INITIATIVE
             },
@@ -2430,6 +2438,52 @@ mod tests {
         }
     }
 
+    /// Every row carrying a reward figure states the program's claimability and the date it was
+    /// read, so no dollar amount in the registry can be read as a live opportunity on its own.
+    #[test]
+    fn test_a_reward_is_never_recorded_without_its_claimability_and_a_read_date() {
+        // The prize-ledger vocabulary of `docs/research/prize-ledger.md` §1. A reward figure is
+        // meaningless without one of these beside it: `ExternalStatus` says whether anyone solved
+        // the problem, which is a different fact and moves on a different schedule.
+        let states = ["open", "paused", "finished", "expired", "unverified"];
+
+        let mut checked = 0;
+        for challenge in registry() {
+            let Some(reward) = challenge.program.reward else {
+                continue;
+            };
+            checked += 1;
+            let version = challenge.program.version.to_ascii_lowercase();
+
+            assert!(
+                states.iter().any(|state| version.contains(state)),
+                "{}: reward {} names none of the claimability states {:?} in {:?}",
+                challenge.id,
+                reward,
+                states,
+                challenge.program.version
+            );
+
+            let read = version
+                .split_once("read ")
+                .map(|(_, rest)| rest)
+                .unwrap_or_else(|| panic!("{}: reward {} has no read date", challenge.id, reward));
+            let date: String = read.chars().take(10).collect();
+            assert!(
+                date.len() == 10
+                    && date.as_bytes()[4] == b'-'
+                    && date.as_bytes()[7] == b'-'
+                    && date.chars().filter(char::is_ascii_digit).count() == 8,
+                "{}: reward {} is read as of {:?}, which is not an ISO date",
+                challenge.id,
+                reward,
+                date
+            );
+        }
+
+        assert_eq!(checked, 6, "the six registered rows that carry a reward");
+    }
+
     /// Every registered id and identity digest, pinned.
     ///
     /// This is what "frozen" means operationally: redefining a registered problem — different
@@ -2617,7 +2671,7 @@ mod tests {
         assert_eq!(
             open.significance(true),
             Significance::NoPublicSolutionRecorded {
-                as_of: "2026-11-05"
+                as_of: "2026-11-08"
             }
         );
         assert!(open

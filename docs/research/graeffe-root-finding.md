@@ -716,7 +716,10 @@ as future work." The GCD step itself: "a few hours of computation on a single CP
 instance and around 3 days for 6_9", with exact timings "no longer available" ([PC] §4.2).
 
 Dollar cost, [P937] §5.3: `P_6_8` $185 against a $4 000 prize; `P_6_9` $1 101 against $6 000;
-`P2_6_8` $133 against $4 000.
+`P2_6_8` $133 against $4 000. **Those prizes were claimed, and the programme behind them is
+`expired`** — the 2025 bounty programme "runs till December 1st, 2025", read 2026-11-08
+(`prize-ledger.md` §2). The figures are a published cost-versus-reward ratio, quoted; none of them
+is available.
 
 ### 4.3 Where the time went, per the authors
 
@@ -1468,8 +1471,9 @@ that gets misquoted:
 - **A successful Graeffe benchmark is not a successful attack.** No figure in this document may be
   quoted as progress on a registered challenge, and nothing here changes
   `MILESTONE-CRYPTANALYSIS-SCOREBOARD.md` §1's position: the three 2026 CICO targets are solved
-  externally, the best available outcome there is a reproduction, and the three open 2025 rows are
-  `2^35`–`2^51` in required transform size against a `2^32` ceiling.
+  externally, the best available outcome there is a reproduction, and the three **unsolved** 2025
+  rows are `2^35`–`2^51` in required transform size against a `2^32` ceiling. Unsolved, not
+  claimable: that programme's window closed 2025-12-01 (`prize-ledger.md` §0).
 - Per the scoreboard's own class discipline (§3), a Graeffe benchmark is
   `BenchmarkClass::Engineering { why }` — evidence about the implementation — and could not be
   anything else until it produces a witness verified through the permutation.

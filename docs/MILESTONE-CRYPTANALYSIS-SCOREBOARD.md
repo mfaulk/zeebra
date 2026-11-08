@@ -33,7 +33,16 @@ The three 2026 CICO targets are **solved, externally, and the program is closed.
 
 with "THE PROGRAM IS FINISHED" on the page, and the separate Poseidon1 partial-collision prize
 "PAUSED STARTING 1 AUG 2026 AoE" though it nominally runs to 2029-01-01.
-Source: <https://www.poseidon-initiative.info/>, read 2026-11-05.
+Source: <https://www.poseidon-initiative.info/>, read 2026-11-05 and re-read 2026-11-08 with both
+readings identical.
+
+**Those three rewards were claimed and are not claimable.** The tiers sit inside a programme that
+"runs till January 1st, 2027", but the CICO problem itself is `finished` in the sense
+`docs/research/prize-ledger.md` §1 defines: the organizer declares it complete and every tier is
+verified. The amounts above are historical record, which is why §1's position is a *reproduction*
+and not an opportunity. Claimability for every programme this repository tracks — window, budget,
+verbatim status, read date — is `prize-ledger.md` §2, and no reward figure belongs in this document
+without them.
 
 Two consequences, and they are the reason this section is first.
 

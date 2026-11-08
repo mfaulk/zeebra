@@ -166,15 +166,16 @@ gap is not incremental, and **no result on a reduced instance says anything abou
 reason: a result that did not say what it reduced would be misleading, and the field makes omitting
 it a deliberate act rather than an oversight.
 
-## 5a. Two programs, two objectives, and three targets still open (M23-D)
+## 5a. Two programs, two objectives, and three targets still unsolved (M23-D)
 
 The initiative has run **two** bounty programs, and they do not state the same problem. Read
-2026-11-05 from <https://www.poseidon-initiative.info/>:
+2026-11-05 and re-read 2026-11-08 from <https://www.poseidon-initiative.info/>, with both readings
+identical:
 
-| program | objective, in its own words | status |
-|---|---|---|
-| 2026 CICO | `Perm(0xc09de4,0xee6282,X1,...,X14)= (0,0,Y1,...,Y14)` | "THE PROGRAM IS FINISHED"; all three tiers verified in 2026 |
-| 2025 bounty | `Perm(X1,..., X14,0,0)= (Y1,...,Y14,0,0)` | tiers claimed from Nov 2024 to Nov 2025 |
+| program | objective, in its own words | window | status | claimability |
+|---|---|---|---|---|
+| 2026 CICO | `Perm(0xc09de4,0xee6282,X1,...,X14)= (0,0,Y1,...,Y14)` | within a program that "runs till January 1st, 2027" | "THE PROGRAM IS FINISHED"; all three tiers verified in 2026 | **finished** |
+| 2025 bounty | `Perm(X1,..., X14,0,0)= (Y1,...,Y14,0,0)` | "runs till December 1st, 2025" | tiers claimed from Nov 2024 to Nov 2025; three never claimed | **expired** |
 
 **The constrained words are at opposite ends**, and that is a different problem rather than the
 same one with variables renamed: the MDS layer couples all `t` words, so constraining the leading
@@ -187,11 +188,22 @@ wearing that row's identity, and nothing about the result would look wrong.
 
 Three tiers of the 2025 program are listed as unsolved and are registered for that reason:
 
-| id | field | `alpha` | `t` | `R_F` | `R_P` | reward |
-|---|---|---:|---:|---:|---:|---|
-| `poseidon256-cico-2025-rf6-rp11` | BLS12-381 scalar field | 5 | 3 | 6 | 11 | $10,000 |
-| `poseidon256-cico-2025-rf6-rp16` | BLS12-381 scalar field | 5 | 3 | 6 | 16 | $15,000 |
-| `poseidon64-cico-2025-rf6-rp13` | Goldilocks `2^64 − 2^32 + 1` | 7 | 8 | 6 | 13 | $15,000 |
+| id | field | `alpha` | `t` | `R_F` | `R_P` | solution status | stated reward | claimable? |
+|---|---|---:|---:|---:|---:|---|---|---|
+| `poseidon256-cico-2025-rf6-rp11` | BLS12-381 scalar field | 5 | 3 | 6 | 11 | **no public solution recorded**, 2026-11-08 | $10,000 | **no — expired** |
+| `poseidon256-cico-2025-rf6-rp16` | BLS12-381 scalar field | 5 | 3 | 6 | 16 | **no public solution recorded**, 2026-11-08 | $15,000 | **no — expired** |
+| `poseidon64-cico-2025-rf6-rp13` | Goldilocks `2^64 − 2^32 + 1` | 7 | 8 | 6 | 13 | **no public solution recorded**, 2026-11-08 | $15,000 | **no — expired** |
+
+**The last three columns hold two different facts apart, and those facts moved apart.** The 2025 program's own
+window — "Bounty program runs till December 1st, 2025", read 2026-11-08 — **closed on 2025-12-01**,
+so the dollar figures are historical record and none of them is a live opportunity. The solution
+status is unchanged and is the reason these rows are registered: they are still the only rows in
+the registry with no public solution recorded, re-verified 2026-11-08 against the organizer's table
+and corroborated by ePrint 2026/150, whose authors claimed the *lower* Poseidon-256 tiers and not
+these. Solving one would still be a first public solution of a registered instance, which is the
+research result; the prize is not part of it. Every programme's window, budget, verbatim status and
+read date are in [`prize-ledger.md`](prize-ledger.md) §2, and no reward figure belongs in this
+document without them.
 
 Registered and deliberately not implemented: the first two are over a 255-bit scalar field and the
 third over Goldilocks, neither of which this generator is wired for, and all three use the trailing
