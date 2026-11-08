@@ -89,6 +89,17 @@ impl<F: FiniteField> SparseRow<F> {
         self.entries.len()
     }
 
+    /// Entries the row's buffer is *allocated* for, which is what the allocator holds.
+    ///
+    /// Apart from [`SparseRow::nonzeros`] because the two diverge and the difference is paid in
+    /// resident memory: [`SparseRow::subtract_scaled`] reserves the merge's worst case and swaps
+    /// the buffer in, so a row whose entries cancelled down to a handful keeps the capacity the
+    /// merge might have needed, and nothing shrinks it. Measured at **7.77x** the payload across one
+    /// interreduction matrix on `katsura-10` and 11.44x on `katsura-11` — see `docs/research/f4-resource-scaling.md` §11.
+    pub fn capacity(&self) -> usize {
+        self.entries.capacity()
+    }
+
     /// True if every coefficient is zero, i.e. no entry is stored.
     pub fn is_zero(&self) -> bool {
         self.entries.is_empty()

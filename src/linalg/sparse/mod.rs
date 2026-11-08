@@ -11,8 +11,9 @@ mod matrix;
 mod row;
 
 pub use elimination::{
-    back_substitute_pivots_within, reduced_row_echelon, reduced_row_echelon_within, row_echelon,
-    row_echelon_within, EliminationStatistics,
+    back_substitute_pivots_within, reduced_row_echelon, reduced_row_echelon_tracked,
+    reduced_row_echelon_within, row_echelon, row_echelon_within, EliminationStatistics,
+    EntryBufferPeak,
 };
 pub use matrix::SparseMatrix;
 pub use row::{NotCanonical, SparseRow};
