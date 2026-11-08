@@ -19,6 +19,7 @@
 //! cargo run --release --example f4_profile -- divmask     # #331: the divisor-mask counters
 //! cargo run --release --example f4_profile -- mq-matrix    # #471: the two interreduction routes
 //! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
+//! cargo run --release --example f4_profile -- construction # #330: construction, split four ways
 //! ```
 //!
 //! `mq-instance` emits the digest-pinned instance rather than a measurement, so that an external
@@ -36,8 +37,9 @@ use zeebra::{
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         external::{instance, REFERENCE_CHARACTERISTIC},
-        f4_with_options, CacheMode, F4Options, F4Statistics, InterreductionRoute, PairCriteria,
-        ReducerSelection, ReductionStrategy,
+        f4::{symbolic_preprocessing, MacaulayMatrix},
+        f4_with_options, trace_batches, CacheMode, ConstructionTimings, F4Options, F4Statistics,
+        InterreductionRoute, PairCriteria, ReducerSelection, ReductionStrategy,
     },
     linalg::Backend,
     FiniteField, MonomialOrder, MultivariatePolynomial,
@@ -721,6 +723,273 @@ fn compare_batch_row_forms_on_the_rungs() {
     );
 }
 
+/// #330: where matrix construction's time actually goes, split four ways.
+///
+/// The split is the measurement #330's kill criterion was stated on before anything was
+/// implemented. Handing out column indices during symbolic interning can only remove the column
+/// collection and the map build; the scatter is paid either way. So if `set+sort` plus `map` is
+/// under a third of construction, the restructuring is refuted and the issue closes.
+///
+/// Two configurations, because they build different matrices and the recorded §8.5 figure was
+/// taken under only one of them. `recommended` is what §8.5 reports and is what this re-measures
+/// against; `default` is what ships, and a conclusion about the shipping engine has to be taken
+/// there. Repeated and min-reduced, because this box's run-to-run spread is wide.
+fn construction_split() {
+    const REPETITIONS: usize = 9;
+    let configurations = [
+        (
+            "recommended",
+            configuration("recommended").expect("a named configuration"),
+        ),
+        (
+            "default",
+            F4Options {
+                measure_stages: true,
+                ..F4Options::default()
+            },
+        ),
+    ];
+
+    println!(
+        "{:<12} {:<8} {:<12} {:>9} {:>8} {:>8} {:>7} {:>7} {:>8} {:>7} {:>9} {:>9}",
+        "system",
+        "order",
+        "config",
+        "total/ms",
+        "con/ms",
+        "collect",
+        "sort",
+        "map",
+        "scatter",
+        "con%",
+        "criterion",
+        "removable"
+    );
+
+    for (config_name, options) in &configurations {
+        for (name, order, run) in systems_of_interest() {
+            // The fastest of several runs: the floor is the run least disturbed by the rest of the
+            // box, and a mean over a shared machine measures the neighbours.
+            let mut best: Option<F4Statistics> = None;
+            for _ in 0..REPETITIONS {
+                let Some(statistics) = run(order, options) else {
+                    continue;
+                };
+                if best.as_ref().is_none_or(|b| statistics.total < b.total) {
+                    best = Some(statistics);
+                }
+            }
+            let Some(s) = best else {
+                println!(
+                    "{:<12} {:<8} {:<12} refused",
+                    name,
+                    order.name(),
+                    config_name
+                );
+                continue;
+            };
+            let split = s.stages.construction_split;
+            println!(
+                "{:<12} {:<8} {:<12} {:>9.2} {:>8.2} {:>8.2} {:>7.2} {:>7.2} {:>8.2} {:>6.0}% {:>8.0}% {:>8.0}%",
+                name,
+                order.name(),
+                config_name,
+                millis(s.total),
+                millis(s.stages.construction),
+                millis(split.collect),
+                millis(split.sort),
+                millis(split.map),
+                millis(split.scatter),
+                100.0 * millis(s.stages.construction) / millis(s.total),
+                100.0 * split.handout_share(),
+                100.0 * split.removable_share()
+            );
+        }
+    }
+}
+
+/// #330's A/B: the column handout against the rehashing it replaces, in one process on one build.
+///
+/// Every batch of a real computation is replayed and built both ways, interleaved so that a drift
+/// in the machine's state lands on both arms. The matrices are asserted **equal** — construction
+/// is not an approximation, and two routes that built different matrices would make the ratio
+/// meaningless. Only `collect` should move: the sort, the map and the scatter are the same code on
+/// both arms, so they double as a control on the measurement itself.
+fn construction_routes() {
+    const REPETITIONS: usize = 5;
+
+    println!(
+        "{:<12} {:<8} {:<9} {:>8} {:>8} {:>8} {:>7} {:>7} {:>8} {:>9} {:>8}",
+        "system",
+        "order",
+        "route",
+        "batches",
+        "build/ms",
+        "collect",
+        "sort",
+        "map",
+        "scatter",
+        "criterion",
+        "speedup"
+    );
+
+    macro_rules! arm {
+        ($name:expr, $order:expr, $system:expr) => {{
+            let order = $order;
+            let system = $system;
+            let traced = F4Options {
+                measure_stages: true,
+                ..configuration("recommended").expect("a named configuration")
+            };
+            let trace = match trace_batches(&system, order, &traced) {
+                Ok((_, _, trace)) => Some(trace),
+                Err(_) => {
+                    println!("{:<12} {:<8} did not finish", $name, order.name());
+                    None
+                }
+            };
+            if let Some(trace) = trace {
+                // Preprocess once per batch, outside the timing: the handout's saving is in
+                // construction, and charging preprocessing to either arm would bury it.
+                let batches: Vec<_> = trace
+                    .batches()
+                    .iter()
+                    .map(|batch| {
+                        let preprocessed = symbolic_preprocessing(&batch.basis, &batch.pairs);
+                        (batch.basis.clone(), preprocessed)
+                    })
+                    .collect();
+
+                let mut rehash = Duration::MAX;
+                let mut handout = Duration::MAX;
+                let mut rehash_split = ConstructionTimings::default();
+                let mut handout_split = ConstructionTimings::default();
+                let mut columns = 0usize;
+                for _ in 0..REPETITIONS {
+                    let mut a = Duration::ZERO;
+                    let mut b = Duration::ZERO;
+                    let mut a_split = ConstructionTimings::default();
+                    let mut b_split = ConstructionTimings::default();
+                    let mut seen = 0usize;
+                    for (basis, preprocessed) in &batches {
+                        let started = Instant::now();
+                        let (old, old_split) = MacaulayMatrix::build_rehashing_for_benchmark(
+                            basis,
+                            preprocessed,
+                            order,
+                            true,
+                        );
+                        a += started.elapsed();
+                        a_split.add(&old_split);
+
+                        let started = Instant::now();
+                        let (new, new_split) = MacaulayMatrix::build_measured(
+                            basis,
+                            preprocessed,
+                            order,
+                            usize::MAX,
+                            usize::MAX,
+                            true,
+                        )
+                        .expect("an unbounded construction cannot exceed its budget");
+                        b += started.elapsed();
+                        b_split.add(&new_split);
+
+                        assert_eq!(old, new, "the two routes must build the same matrix");
+                        seen += new.num_columns();
+                    }
+                    if a < rehash {
+                        rehash = a;
+                        rehash_split = a_split;
+                    }
+                    if b < handout {
+                        handout = b;
+                        handout_split = b_split;
+                    }
+                    columns = seen;
+                }
+
+                let _ = columns;
+                // The rehashing row is the pre-#330 construction stage, so its `criterion` column
+                // is the quantity the issue stated its kill criterion on, measured on the same
+                // build as the route that replaces it.
+                for (route, split, elapsed) in [
+                    ("rehashing", rehash_split, rehash),
+                    ("handout", handout_split, handout),
+                ] {
+                    println!(
+                        "{:<12} {:<8} {:<9} {:>8} {:>8.2} {:>8.2} {:>7.2} {:>7.2} {:>8.2} {:>8.0}% {:>7.2}x",
+                        $name,
+                        order.name(),
+                        route,
+                        batches.len(),
+                        millis(elapsed),
+                        millis(split.collect),
+                        millis(split.sort),
+                        millis(split.map),
+                        millis(split.scatter),
+                        100.0 * split.handout_share(),
+                        rehash.as_secs_f64() / elapsed.as_secs_f64()
+                    );
+                }
+            }
+        }};
+    }
+
+    arm!("cyclic-5", MonomialOrder::Lexicographic, cyclic::<5, F>());
+    arm!("katsura-5", MonomialOrder::Lexicographic, katsura::<5, F>());
+    arm!("katsura-6", MonomialOrder::Lexicographic, katsura::<6, F>());
+    arm!(
+        "katsura-6",
+        MonomialOrder::GradedReverseLexicographic,
+        katsura::<6, F>()
+    );
+    arm!(
+        "katsura-7",
+        MonomialOrder::GradedLexicographic,
+        katsura::<7, F>()
+    );
+}
+
+/// The instances §8.5 reports construction as the dominant stage on, plus the graded controls.
+///
+/// Boxed closures because the systems have different variable counts, so they are different types
+/// and cannot share a slice.
+#[allow(clippy::type_complexity)]
+fn systems_of_interest() -> Vec<(
+    &'static str,
+    MonomialOrder,
+    Box<dyn Fn(MonomialOrder, &F4Options) -> Option<F4Statistics>>,
+)> {
+    macro_rules! entry {
+        ($name:expr, $order:expr, $system:expr) => {{
+            let runner: Box<dyn Fn(MonomialOrder, &F4Options) -> Option<F4Statistics>> =
+                Box::new(move |order, options| {
+                    f4_with_options(&$system, order, options)
+                        .ok()
+                        .map(|(_, statistics)| statistics)
+                });
+            ($name, $order, runner)
+        }};
+    }
+
+    vec![
+        entry!("cyclic-5", MonomialOrder::Lexicographic, cyclic::<5, F>()),
+        entry!("katsura-5", MonomialOrder::Lexicographic, katsura::<5, F>()),
+        entry!("katsura-6", MonomialOrder::Lexicographic, katsura::<6, F>()),
+        entry!(
+            "katsura-6",
+            MonomialOrder::GradedReverseLexicographic,
+            katsura::<6, F>()
+        ),
+        entry!(
+            "katsura-7",
+            MonomialOrder::GradedLexicographic,
+            katsura::<7, F>()
+        ),
+    ]
+}
+
 /// The division and matrix interreduction routes, measured against each other on one build.
 ///
 /// Interleaved and repeated, because this box's run-to-run spread is wide enough that a single
@@ -1024,7 +1293,11 @@ fn main() {
     if argument == "list" {
         println!("configurations: {}", CONFIGURATIONS.join(", "));
         println!(
-            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation\n             counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's\n             batch row form A/B), mq-instance (its canonical text), divmask\n             (#331's divisor-mask counters)"
+            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation
+             counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's
+             batch row form A/B), mq-instance (its canonical text), divmask
+             (#331's divisor-mask counters), construction (#330's four-way split of
+             the construction stage)"
         );
         return;
     }
@@ -1041,6 +1314,30 @@ fn main() {
             ..F4Options::default()
         };
         competitive_mq(&options);
+        return;
+    }
+
+    if argument == "construction" {
+        // #330's measurement, and its refutation condition: the two phases a column-index handout
+        // would remove, priced against the scatter it would not.
+        println!();
+        println!("## #330: matrix construction, split four ways");
+        println!();
+        println!("ISA: {}", zeebra::util::isa_floor());
+        println!(
+            "`collect` is the distinct-monomial set, `sort` the column order, `map` the\n\
+             monomial-to-column map, `scatter` writing the rows through it. `criterion` is\n\
+             (collect+sort+map)/construction, the quantity #330 stated its kill criterion on:\n\
+             under 33% the issue closes. `removable` is (collect+map)/construction — what a\n\
+             column-index handout would actually remove, since interning with an index does not\n\
+             remove anybody's column sort."
+        );
+        println!();
+        construction_split();
+        println!();
+        println!("### The handout against the rehashing it replaces, one process, one build");
+        println!();
+        construction_routes();
         return;
     }
 

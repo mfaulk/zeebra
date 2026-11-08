@@ -1,5 +1,9 @@
 # msolve 0.11.0: what it actually does, and which of it Zeebra may reimplement
 
+**Measured at:** `dbab79eb`, reproduced at `3139025d` — the only Zeebra timings published here are
+§4.1's settlement of H1. Every other figure is read from msolve's source or quoted from a cited
+paper.
+
 Source-grounded study for #264, a child of epic #256. The companion documents are
 `docs/research/external-comparands.md` (how msolve is provisioned and invoked) and
 `docs/research/external-provenance-policy.md` (what may be reused — the binding constraint here).
@@ -744,6 +748,76 @@ no advantage. **Refutation condition stated up front**, because this is the hypo
 to be wrong: the `HashMap` already uses `BuildMonomialHasher` (`src/poly/multivariate/monomial_hash.rs`),
 a multiplicative FxHash chosen over SipHash for exactly this reason, so the lookup may already be
 cheap.
+
+#### Settled (#330): the criterion cleared, the named cause wrong, the fix narrower
+
+The split was built before anything was implemented, as the criterion required.
+`ConstructionTimings` partitions `MacaulayMatrix::build` four ways rather than three — the set and
+the sort separately, because they have different fates under a handout and lumping them would have
+charged the sort to a hypothesis that cannot remove it. `examples/f4_profile construction` is the
+harness; `dbab79eb`, `taskset -c 0-7`, `load=5.45`, `env -u RUSTFLAGS`, under `tools/benchlock.sh`.
+
+**Reproduced at `3139025d`** — the same tables after H2's divmask (#331) landed underneath, at a
+dirtier `load=13.31`. Every speedup below lands within 0.03x and every share within four points, so
+neither the ambient load nor the faster `symbolic` stage moves this conclusion. That matters
+specifically because #331 makes `symbolic` cheaper and so can only *raise* construction's share of
+the instance: it did not, measurably.
+
+The pre-handout route, measured against the one that replaced it in one process on one build
+(`MacaulayMatrix::build_rehashing_for_benchmark`, matrices asserted equal), over every batch of a
+real computation:
+
+| system | order | batches | build | set | sort | map | scatter | (1)+(2) |
+|---|---|---|---|---|---|---|---|---|
+| cyclic-5 | lex | 24 | 1.13 ms | 0.56 | 0.07 | 0.02 | 0.48 | **57%** |
+| katsura-5 | lex | 21 | 0.28 ms | 0.14 | 0.01 | 0.01 | 0.12 | **58%** |
+| katsura-6 | lex | 107 | 6.71 ms | 3.36 | 0.12 | 0.08 | 3.15 | **53%** |
+| katsura-6 | grevlex | 6 | 0.86 ms | 0.41 | 0.06 | 0.01 | 0.37 | **56%** |
+| katsura-7 | grlex | 7 | 5.67 ms | 2.75 | 0.18 | 0.03 | 2.71 | **52%** |
+
+**The kill criterion did not fire.** (1)+(2) is 52–58%, not under a third, so the hypothesis was not
+refuted. But the criterion passing and the *proposal* being right are different things, and the
+split separates them:
+
+- **The `HashMap` the issue names is 1% of construction** — 0.08 ms of 6.71 on katsura-6 lex. The
+  issue's own suspicion was correct: `BuildMonomialHasher` had already made the lookup cheap, and
+  there was never a map worth removing. Replacing the map with an index handout would have bought
+  ~1%.
+- **The cost was the set, and the reason is duplication rather than hashing.** Symbolic
+  preprocessing already interns every row monomial in its `examined` set to deduplicate its work
+  queue, and that set is *exactly* the column set — the queue is fed from row terms and nothing
+  else, and every row's terms are fed to it (`macaulay.rs`'s
+  `test_preprocessing_interns_exactly_the_column_set`). Construction was hashing all of them again
+  to rediscover a set it was being handed.
+
+So what shipped is narrower than #330 proposed and lands in the same place: `Preprocessed` carries
+`monomials`, construction reads it, and `reduce_batch_in` releases it the moment the columns exist
+so elimination's working set is not carrying it (#536's lesson). No column index is handed out and
+no `idx` field was added — the sort still has to happen, and a rank written during interning would
+be invalidated by it.
+
+| system | order | handout build | speedup | set | (1)+(2) after |
+|---|---|---|---|---|---|
+| cyclic-5 | lex | 0.58 ms | **1.97x** | 0.01 | 17% |
+| katsura-5 | lex | 0.14 ms | **1.98x** | 0.00 | 17% |
+| katsura-6 | lex | 3.54 ms | **1.90x** | 0.02 | 10% |
+| katsura-6 | grevlex | 0.49 ms | **1.76x** | 0.00 | 23% |
+| katsura-7 | grlex | 3.00 ms | **1.89x** | 0.02 | 10% |
+
+**The sort got slower, and the four-way split is the only reason that is visible.** On katsura-6 lex
+it goes 0.12 ms to 0.27 ms. The old route sorted a vector in first-appearance order, which is
+partially ordered because monomials arrive row by row, and `sort_by` is adaptive; the new one sorts
+a vector drained from a hash set, which is not ordered at all. The regression is real and is
+swamped — 0.15 ms against 3.34 ms — but a three-way split would have hidden it inside phase (1) and
+left the next reader unable to find it.
+
+**What this says about msolve.** Its `sht`-entries-are-columns design removes two things, and only
+one of them was worth anything here. The shared-table half — not interning the same monomials twice
+— is where the 1.9x was. The `idx`-field half, which is the part §4.1 was written about and the part
+the issue proposed, is worth ~1% against a multiplicative hash. Zeebra's remaining construction
+cost is **89% scatter** on katsura-6 lex, which is the one phase msolve has no structural advantage
+in, exactly as the refutation condition anticipated. Construction is no longer the largest stage on
+the lex instances; see `MILESTONE-F4-OPTIMIZATION.md` §8.5.
 
 ### H2 — A divmask would cut the reducer search, and Zeebra has no equivalent
 

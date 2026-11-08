@@ -767,11 +767,32 @@ pub struct Preprocessed<const N: usize> {
     /// relation the batch already represented, and only a pivot outside it is new.
     pub leading_monomials: MonomialSet<N>,
 
+    /// Every distinct monomial appearing in any row — which is exactly the matrix's column set.
+    ///
+    /// Preprocessing has to intern these anyway to deduplicate its own work queue, so handing the
+    /// set on saves [`MacaulayMatrix::build`](super::macaulay::MacaulayMatrix::build) hashing
+    /// every row monomial a second time. That the two sets coincide is not an accident of the
+    /// implementation: the queue is fed from row terms and nothing else, and every row's terms are
+    /// fed to it, so the set of monomials examined and the set of columns are the same set.
+    /// `macaulay.rs`'s `test_preprocessing_interns_exactly_the_column_set` is what keeps that true.
+    pub monomials: MonomialSet<N>,
+
     /// What finding those rows cost.
     pub counts: SymbolicCounts,
 }
 
 impl<const N: usize> Preprocessed<N> {
+    /// Drop [`Preprocessed::monomials`], which nothing needs once the matrix has its columns.
+    ///
+    /// Called by the reduction step the moment construction returns. Without it the set would stay
+    /// live for the rest of the batch — through elimination, where the dense backend's buffer is —
+    /// and the handout would have traded a hash pass for a working-set increase. #536 is the
+    /// precedent for not leaving that to be argued about: the set is released at the point the
+    /// old code freed its own copy, so the peak is no worse than before the handout.
+    pub fn release_monomials(&mut self) {
+        self.monomials = MonomialSet::default();
+    }
+
     /// The leading monomial of the row at `index`.
     pub fn leading_monomial<F: FiniteField>(
         &self,
@@ -1040,6 +1061,7 @@ fn close_over_rows<const N: usize, F: FiniteField>(
     Ok(Preprocessed {
         rows,
         leading_monomials: covered,
+        monomials: examined,
         counts,
     })
 }
@@ -1143,6 +1165,7 @@ pub(crate) fn symbolic_preprocessing_pop_deduplicated<const N: usize, F: FiniteF
     Ok(Preprocessed {
         rows,
         leading_monomials: covered,
+        monomials: examined,
         counts,
     })
 }

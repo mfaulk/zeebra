@@ -1098,6 +1098,49 @@ fn test_stage_measurement() {
     );
 }
 
+/// Construction's three-way split is populated when stages are measured, and is bounded by the
+/// stage it refines rather than adding to it.
+#[test]
+fn test_the_construction_split_refines_its_stage() {
+    type G = Zp2147483647;
+    let order = MonomialOrder::Lexicographic;
+    let f = katsura::<5, G>();
+
+    let off = f4_with_options(&f, order, &F4Options::baseline())
+        .expect("within limits")
+        .1;
+    assert_eq!(
+        off.stages.construction_split,
+        Default::default(),
+        "the default path has no construction timing"
+    );
+
+    let (_, on) = f4_with_options(
+        &f,
+        order,
+        &F4Options {
+            measure_stages: true,
+            ..F4Options::baseline()
+        },
+    )
+    .expect("within limits");
+    let split = on.stages.construction_split;
+    assert!(
+        split.total() > std::time::Duration::ZERO,
+        "no construction phase was timed"
+    );
+    // The split is laps taken strictly inside `build_measured`, which the stage's own lap encloses.
+    assert!(
+        split.total() <= on.stages.construction,
+        "the split {:?} exceeds the stage {:?}",
+        split.total(),
+        on.stages.construction
+    );
+    // `sum` must not double-count: the split refines `construction` rather than extending it.
+    assert!(on.stages.sum() <= on.total);
+    assert!((0.0..=1.0).contains(&split.handout_share()));
+}
+
 /// Measuring the stages does not change the basis.
 #[test]
 fn test_stage_measurement_does_not_change_the_result() {

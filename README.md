@@ -934,12 +934,15 @@ candidate extraction, and the final interreduction, with the remainder shown as 
 unattributed cost cannot hide. It takes the name of a configuration — `baseline` by default,
 `recommended` for what `F4Options::default()` is — so the effect of one optimization can be read
 off against another's. The timing comes from
-`F4Options::measure_stages`, which reads a clock four times per batch and is off by default. Two
-modes take no configuration: `mq` is the digest-pinned `mq-random-10` stage split (#349), and
+`F4Options::measure_stages`, which reads a clock four times per batch and is off by default. Three
+modes take no configuration: `mq` is the digest-pinned `mq-random-10` stage split (#349),
 `mq-instance` prints that instance's canonical text — field, order, variables and generators, the
 bytes the identity digest is taken over — so an external engine's own counters can be taken on the
-same ideal and compared against these columns. `docs/research/groebner-jl-gap.md` is what that
-comparison produced.
+same ideal and compared against these columns, and `construction` splits the construction stage
+four ways (#330): the distinct-monomial set, the column sort, the monomial-to-column map, and the
+row scatter, then measures the current route against the one it replaced in one process on one
+build. `docs/research/groebner-jl-gap.md` is what the `mq-instance` comparison produced;
+`docs/research/msolve-implementation.md` §4.1 is what the `construction` split settled.
 
 A third configuration-free mode answers a question rather than reporting a cost. `f4_profile --
 divmask` is #331's counter-only experiment: `F4Options::measure_divmask` builds a 32-bit divisor

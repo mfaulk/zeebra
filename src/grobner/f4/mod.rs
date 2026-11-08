@@ -49,8 +49,8 @@ pub use options::{
 };
 pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
 pub use statistics::{
-    BatchStatistics, F4Statistics, HilbertCounts, MatrixInterreduction, MatrixRefusal, StageClock,
-    StageTimings,
+    BatchStatistics, ConstructionTimings, F4Statistics, HilbertCounts, MatrixInterreduction,
+    MatrixRefusal, StageClock, StageTimings,
 };
 pub use symbolic::{
     symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
