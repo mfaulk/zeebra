@@ -1,5 +1,8 @@
 # Inside final interreduction: which half, and what the reductions actually cost
 
+**Measured at:** publication bound `530816cb`…`d412374c` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
 

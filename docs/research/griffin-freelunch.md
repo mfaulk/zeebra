@@ -1,5 +1,8 @@
 # Griffin and the Algebraic FreeLunch: what a free Gröbner basis costs Zeebra
 
+**Measured at:** publication bound `63180dcf`…`5ebb5165` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 M25-D deliverable 1, for [#202](https://github.com/mfaulk/zeebra/issues/202). The question is
 architectural rather than competitive: FreeLunch chooses a monomial order in which the natural
 Griffin CICO system **already is** a Gröbner basis, so there is no F4 step at all. Zeebra is an

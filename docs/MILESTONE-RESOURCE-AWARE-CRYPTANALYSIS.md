@@ -1,5 +1,8 @@
 # Milestone: Resource-Aware Solving and Cryptanalysis Research Infrastructure
 
+**Measured at:** publication bound `70fd8c8c`…`cb02bc27` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** M21-0, M21-A, M21-B, M21-C, M21-D, M21-E and M21-I landed. M20-C landed as a
 prerequisite (see §2). Every measurement in this document is reproducible from a committed
 example; §12 is the milestone report.

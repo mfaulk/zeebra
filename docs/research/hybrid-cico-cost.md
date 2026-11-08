@@ -1,5 +1,8 @@
 # A `k = 3` family, and a hybrid: the arithmetic, and why both are dead
 
+**Measured at:** publication bound `b6c241c6` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 M25-D deliverable 2, for [#287](https://github.com/mfaulk/zeebra/issues/287). The issue frames the
 two directions as "the only way left out of the `2^31` trade" and insists on a derivation before an
 implementation. This is the derivation. **Both directions close, and the mechanisms that close them

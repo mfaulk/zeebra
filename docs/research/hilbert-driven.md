@@ -1,5 +1,8 @@
 # A Hilbert-driven cap, against a cap chosen without one
 
+**Measured at:** publication bound `c98f8f7b` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for M22-C (#74). Every figure comes from
 
 ```sh

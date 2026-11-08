@@ -1,5 +1,8 @@
 # M22 — Degree-Aware F4 and Cryptanalytic Matrix-Growth Control
 
+**Measured at:** publication bound `20e87e24` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** complete
 **Prerequisite:** M21, merged
 **Research issues:** #74 (Hilbert-driven and mutant F4), #81 (solving-degree measurement)

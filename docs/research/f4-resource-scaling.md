@@ -1,5 +1,8 @@
 # F4 resource scaling: what a larger live-entry budget buys, and what it does not
 
+**Measured at:** publication bound `9d05baa2`…`cede98ac` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Deliverable for M24-D (#215). One question, which no amount of argument could settle: when a
 registered problem stops at `max_live_nonzeros`, is it **out of reach** or merely **out of this
 budget**?

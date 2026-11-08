@@ -1,5 +1,8 @@
 # Courtois MinRank challenges A–F: the parameters, and the instances that never existed
 
+**Measured at:** not measured here — every figure is quoted from the literature or from a challenge record
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for F1 (#205) and F1b (#382), under the MinRank epic #195. Consumes the provenance
 conventions of `docs/research/external-provenance-policy.md` §9 and the redistribution discipline of
 `docs/research/fukuoka-mq.md` §3.

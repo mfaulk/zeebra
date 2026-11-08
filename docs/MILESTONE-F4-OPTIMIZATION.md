@@ -1,5 +1,8 @@
 # Milestone: F4 Computational Efficiency
 
+**Measured at:** publication bound `914f1ef8`…`ca0b3dad` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Status: complete, in review. Baseline commit `b19eefc` (`origin/main`, the merge of PR #19),
 653 tests passing in debug at the start; 754 at the close, passing in debug **and** release.
 passing in debug.

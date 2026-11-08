@@ -1,5 +1,8 @@
 # The first competitive baseline: where Zeebra leads, lags, and cannot be compared
 
+**Measured at:** publication bound `80855572`…`abb5f806` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Decision gate for #263, and the deliverable that decides which of H12–H17 (#268–#273) is worth
 engineering effort. Every figure elsewhere in `docs/` is stated against Zeebra's own past; this is
 the first statement of where Zeebra stands against other software on the same machine.

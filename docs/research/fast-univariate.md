@@ -1,5 +1,8 @@
 # Fast univariate algorithms: the wide-field root of unity, and what each stage costs
 
+**Measured at:** publication bound `29ce42b4`…`b9c104be` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
 Both routes into #68 end in the same place: one univariate polynomial of very large degree over a

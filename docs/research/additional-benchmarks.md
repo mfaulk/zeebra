@@ -1,5 +1,8 @@
 # Additional research benchmarks: the shortlist, what was rejected, and why
 
+**Measured at:** not measured here — every figure is quoted from the cited papers, which carry their own machines and eras
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Deliverable for A3 (#72), a child of the benchmark-corpus epic #65. A1 (#70) covered the Fukuoka MQ
 Challenge — see [`fukuoka-mq.md`](fukuoka-mq.md) — and A2 (#71) the Ethereum Foundation challenges.
 This issue surveys the rest of the published landscape and answers one question: **which instances

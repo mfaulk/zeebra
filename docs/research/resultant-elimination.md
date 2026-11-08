@@ -1,5 +1,8 @@
 # Elimination that is not a Gröbner basis: a resultant on the registered CICO slices
 
+**Measured at:** publication bound `2b8aa354`…`43ff9fa4` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for M23-E (#141), which consumes #82 and #85, continued by M24-B (#179, #211). **§1–§5
 are M23-E, with the figures it took; §6 supersedes §4 and amends §2 and §5; §6.7 supersedes §6.4's
 ranked list. Each says so inline. Nothing is overwritten.**

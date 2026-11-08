@@ -1,5 +1,8 @@
 # M23 — Cryptanalysis Scoreboard and Structural Attack Development
 
+**Measured at:** publication bound `9c8b80d6`…`14baabac` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** complete
 **Prerequisite:** M22, merged
 **Research issues:** #65, #71, #73 (registry and schema), #77 (methodology), #78, #81 (full-width

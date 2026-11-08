@@ -1,5 +1,8 @@
 # EF cryptanalysis programmes: parameters, objectives, and what is already solved
 
+**Measured at:** not measured here — every figure is a published attack's own reported time, quoted from its source
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for #71 (A2), under the cryptographic-corpus epic #67. Consumes the provenance
 conventions of `docs/research/external-provenance-policy.md` §9 and the four-claim ledger of
 `docs/research/minrank.md`. `docs/research/poseidon.md` is the implementation record for the one

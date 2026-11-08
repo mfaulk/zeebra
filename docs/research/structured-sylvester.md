@@ -1,5 +1,8 @@
 # Structured Sylvester computation: five axes, and the one with an exponent in it
 
+**Measured at:** publication bound `5ebb5165`…`c19e8c12` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 M25-D deliverable 3. `docs/research/resultant-elimination.md` §6.7 ranks "the determinant's
 per-sample cost" first among what is left and calls it "the only axis left with an asymptotic
 improvement in it". This document separates that into five distinct things, prices each against the

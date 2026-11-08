@@ -1,5 +1,8 @@
 # M25 — Competitive Algebra Baselines and Verified Frontier Improvements
 
+**Measured at:** publication bound `9b87d868`…`4c8b5e6b` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** in progress.
 **Parent issue:** #292. **Integration issue:** #299.
 **Prerequisite:** M24, complete and merged — #217 (report), #281 (close), #291 (the `RUSTFLAGS`

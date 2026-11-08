@@ -1,5 +1,8 @@
 # Reduced-round Poseidon: what is faithful, what is reduced, and where the frontier is
 
+**Measured at:** publication bound `ec83bc79` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for M21-B (#93), which consumes #71, #78 and the measurement half of #79.
 
 Reference implementation: <https://github.com/khovratovich/poseidon-tools>, commit

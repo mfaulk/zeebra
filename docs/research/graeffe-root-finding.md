@@ -1,5 +1,8 @@
 # Graeffe root finding: the published algorithm, the degree it consumes, and whether Zeebra's NTT is access-bound
 
+**Measured at:** publication bound `bc8778cc`…`bfec9d71` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for D3 (#84), a child of the #68 epic. This is the **reading and scoping half**; the
 implementation half is blocked on #124 (polynomial multiplication through the transform).
 

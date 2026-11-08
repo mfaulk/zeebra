@@ -1,5 +1,8 @@
 # Milestone: Sparse Linear Algebra and F4 Gröbner Bases
 
+**Measured at:** publication bound `5e17db39`…`6c845653` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Status: complete, in review. Baseline commit `9d7f3d9` (tree-identical to `main` at `bf73532`, the
 merge of PR #14), 544 tests passing; 642 at the close of the milestone.
 

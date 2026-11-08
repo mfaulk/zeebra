@@ -1,5 +1,8 @@
 # Batch inversion: what Montgomery's trick is worth, and where it does not apply
 
+**Measured at:** publication bound `c951cc1f` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for #118.
 
 Inversion is the most expensive operation a prime field has: `montgomery_256` reaches it through

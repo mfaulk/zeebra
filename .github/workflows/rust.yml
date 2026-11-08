@@ -234,6 +234,14 @@ jobs:
           bash tools/test/rss-guard-test.sh
           bash tools/test/merge-base-age-test.sh
           bash tools/test/benchlock-test.sh
+          bash tools/test/check-measurement-provenance-test.sh
+
+      # Every document that publishes a measurement says which commit it came from (#335). Separate
+      # from the unit tests above because this one reads the repository's own documents: a finding
+      # here is a document to fix, not a script that is broken.
+      - name: Measurement provenance
+        if: ${{ !cancelled() }}
+        run: bash tools/check-measurement-provenance.sh
 
   # How stale the base of this run's merge is, and whether the gap touches the same files the pull
   # request does (#339).

@@ -1,5 +1,8 @@
 # Anemoi: what was taken unchanged, what was verified, and what is a reconstruction dependency
 
+**Measured at:** publication bound `bda7ed44`…`7aa9a9be` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 M24-C. The implementation half of candidate 1 of [`additional-benchmarks.md`](additional-benchmarks.md)
 §1, which ranks it first of four against a cap of five. This document records the sources actually
 read, the oracle each claim rests on, and the one choice that is a convention rather than a

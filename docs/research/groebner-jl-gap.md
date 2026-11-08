@@ -1,5 +1,8 @@
 # The 348x against Groebner.jl, decomposed: three factors, and only one of them is §6's
 
+**Measured at:** publication bound `4527b3b7` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Measurement record for #447, following #265's source study
 (`docs/research/groebner-jl-implementation.md`) and #349's stage split
 (`docs/research/competitive-baseline.md` §6b). **#265 is not reopened and nothing here re-reads
