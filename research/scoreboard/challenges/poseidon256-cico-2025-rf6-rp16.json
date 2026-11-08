@@ -19,7 +19,7 @@
   "equations": 35,
   "program": {
     "name": "Poseidon Cryptanalysis Initiative",
-    "version": "2025 bounty program, read 2026-11-05",
+    "version": "2025 bounty program, ran till 2025-12-01, read 2026-11-08; the reward is EXPIRED — the window closed and the tier is still listed as unclaimed. See docs/research/prize-ledger.md",
     "url": "https://www.poseidon-initiative.info/",
     "reward": "$15,000",
     "redistribution": "parameters and objective are published on the program's page; the round constants are derived, not redistributed"
@@ -29,9 +29,9 @@
   },
   "external_status": {
     "state": "none_recorded",
-    "as_of": "2026-11-05"
+    "as_of": "2026-11-08"
   },
   "reference_points": [],
   "verifier": "the program's own verifier; this crate generates no system for this objective and so has nothing to check",
-  "notes": "The 40-bit tier of the same family, listed as unsolved on 2026-11-05 and the hardest offered there."
+  "notes": "The 40-bit tier of the same family, listed as unsolved on 2026-11-08 and the hardest offered there."
 }

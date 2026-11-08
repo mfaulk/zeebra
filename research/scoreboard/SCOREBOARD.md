@@ -11,9 +11,9 @@ The externally specified problems, unmodified. A witness here is a witness for t
 | `poseidon31-cico-rf6-rp6` | `f36d914ee7d2` | 116 | 104 | not attempted | solved externally, verified 2026-04-10 | Villard-style bivariate resultant, one full round skipped — 1 d 17 h on 128 CPU cores [eprint 2026/1905, Bak and Hostettler, Table 4], not attributed to the verified submission |
 | `poseidon31-cico-rf6-rp8` | `dfc1041fc131` | 118 | 106 | not attempted | solved externally, verified 2026-05-06 | round skip, interpolation, Graeffe root finding; no resultant — 7 h on 96 RTX 5090 GPUs [eprint 2026/1254, Sanso and Vitto, Section 4.2 and Table 1], not attributed to the verified submission |
 | `poseidon31-cico-rf6-rp10` | `cf06393b5cd6` | 120 | 108 | not attempted | solved externally, verified 2026-07-06 | no public method |
-| `poseidon256-cico-2025-rf6-rp11` | `341728ee0a3d` | 31 | 30 | not attempted | no public solution recorded as of 2026-11-05 | — |
-| `poseidon256-cico-2025-rf6-rp16` | `d63ef953e886` | 36 | 35 | not attempted | no public solution recorded as of 2026-11-05 | — |
-| `poseidon64-cico-2025-rf6-rp13` | `442f473600ad` | 68 | 62 | not attempted | no public solution recorded as of 2026-11-05 | — |
+| `poseidon256-cico-2025-rf6-rp11` | `341728ee0a3d` | 31 | 30 | not attempted | no public solution recorded as of 2026-11-08 | — |
+| `poseidon256-cico-2025-rf6-rp16` | `d63ef953e886` | 36 | 35 | not attempted | no public solution recorded as of 2026-11-08 | — |
+| `poseidon64-cico-2025-rf6-rp13` | `442f473600ad` | 68 | 62 | not attempted | no public solution recorded as of 2026-11-08 | — |
 | `anemoi64-cico-n1-fcico` | `8228cbc3d18e` | 2 | 2 | not attempted | published with its answer | — |
 | `anemoi64-cico-n1-pcico` | `ce10ff6c5750` | 2 | 2 | not attempted | published with its answer | — |
 | `anemoi64-cico-n2-fcico` | `ef9b02569e32` | 4 | 4 | not attempted | published with its answer | — |

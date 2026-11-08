@@ -142,7 +142,7 @@ Three separate prize programmes run concurrently, and they are easy to conflate.
 | instance | Poseidon-31: Poseidon1, KoalaBear `p = 2^31 − 2^24 + 1 = 2130706433`, `d = 3`, `t = 16`, `R_F = 8`, `R_P = 20`, compression mode, 16-element output |
 | task | find 15-element `X ≠ Y` with `H(0xc09de4, X) = H(0xc09de4, Y)` on the first `q` elements |
 | MDS | "arbitrary but satisfying no-invariant-subspace-trail conditions"; `initiative` names the Plonky3 circulant matrix as an example |
-| status | **PAUSED from 1 Aug 2026 AoE**; the prize program itself runs to 2029-01-01 |
+| status | **PAUSED from 1 Aug 2026 AoE**; the prize program itself runs to 2029-01-01. `paused`, not claimable, re-read 2026-11-08 — `prize-ledger.md` §2, and §6 there records once and for all why the objective is not a target here |
 | budget | $992 000 |
 | tiers | `q = 3` **$32K, claimed 6 April 2026**; `q = 4` $64K; `q = 5` $128K; `q = 6` $256K; `q = 7` $512K |
 
@@ -163,6 +163,11 @@ The claimed `q = 3` solution is in the repository and verifies; §7.
 ### 3.2 Bounty Program 2025 — preimage/CICO over three Poseidon families
 
 Ran to 2025-12-01, budget $130 000. Objective: **CICO**, phrased as "find a preimage of 0".
+
+**Window closed; the three unclaimed tiers are `expired`, not open.** "Bounty program runs till
+December 1st, 2025", read 2026-11-08. The bounty column below is historical record: the three tiers
+with no claim date are still *unsolved*, which is a separate fact that still holds, and the money
+behind them does not. `prize-ledger.md` §0 is the distinction and §2 the ledger.
 
 | family | source | field | `d` | `t` | task |
 |---|---|---|---:|---:|---|
@@ -221,6 +226,11 @@ there is checkable. §8.
 
 Runs to 2027-01-01, budget $150 000. All over Poseidon-31: Poseidon1, KoalaBear, `d = 3`, `t = 16`.
 Verifiers and sample solvers at `tools`.
+
+**The container's window outlives all four of its problems.** Read 2026-11-08: CICO and zero-test
+are `finished`, density is `paused`, and the partial collision is `paused` — so none of the
+$150 000 is claimable despite the programme nominally running to 2027-01-01. Quoting the container
+alone would misstate that. `prize-ledger.md` §2.
 
 #### CICO — **FINISHED**, all three instances solved
 
@@ -357,7 +367,10 @@ resultants' recent use against Anemoi, Jarvis and Rescue-Prime — which is
 
 `bounties21`, with the complete parameter tables on `hm2021` and the instances in `zoo`. Deadline
 2022-11-30; technical reports public by 2022-12-01; `bounties21` states a total budget of $200 000
-while `hm2021` states 30 ETH (§11). Field for all of Rescue-Prime, Poseidon and Feistel-MiMC:
+while `hm2021` states 30 ETH (§11). **The window ended 2022-11-30 and the page carries no closing
+statement, so this programme is `expired` by its own terms rather than declared finished** — read
+2026-11-08, `prize-ledger.md` §2. Every bounty figure in §4 is historical record. Field for all of
+Rescue-Prime, Poseidon and Feistel-MiMC:
 
 > `p = 18446744073709551557 ≈ 2^64`
 
@@ -504,6 +517,11 @@ attack cost is published for any of the three. **Rejected**, and not for want of
 `mimc`, run jointly by the Ethereum Foundation and Protocol Labs. MiMCSponge is a sponge
 instantiated with the MiMC-Feistel permutation over a prime field.
 
+**Claimability `unverified`, not open and not closed.** Re-read 2026-11-08: the page states a
+$20,000 reward and **no window, no deadline and no status at all**, which `prize-ledger.md` §1
+classifies as `unverified` — a state that is never read as open. Nothing below depends on it; the
+rejection is on the objective.
+
 | parameter | BN254 | BLS12-381 |
 |---|---|---|
 | field prime | `21888242871839275222246405745257275088548364400416034343698204186575808495617` | `52435875175126190479447740508185965837690552500527637822603658699938581184513` |
@@ -612,7 +630,7 @@ Ordered by what a result would be worth divided by what it would cost. Every ent
 | # | candidate | field | objective | why | why not |
 |---|---|---|---|---|---|
 | **1** | 2026 CICO relaxed, `R_F = 6`, `R_P = 6`, `m` small | KoalaBear | CICO(2) | an official verifier accepts or rejects it, the ladder is reproducible by seed (§7), and `m` tunes the difficulty continuously from trivial upward. The only candidate where correctness is checkable before difficulty is attempted | not a record; a relaxed variant is not the bounty |
-| **2** | 2026 CICO exact, `R_F = 6`, `R_P = 6` | KoalaBear | CICO(2) | **already solved and verified, 2026-04-10**, so a result reproduces a known one; `poseidon.md` has the port and the test vectors; `$6 000` tier | the organizers expect a resultant attack to win (§3.3); `hybrid-cico-cost.md` closes two routes already |
+| **2** | 2026 CICO exact, `R_F = 6`, `R_P = 6` | KoalaBear | CICO(2) | **already solved and verified, 2026-04-10**, so a result reproduces a known one; `poseidon.md` has the port and the test vectors; the `$6 000` tier, `finished` and paid out (§3.3, `prize-ledger.md` §2) | the organizers expect a resultant attack to win (§3.3); `hybrid-cico-cost.md` closes two routes already |
 | **3** | 2025 Poseidon-31 KoalaBear, `R_F = 4`, `R_P = 1` | KoalaBear | CICO(2) | **the one instance where the organizers' own estimate makes Gröbner the cheaper route** — 32 bits against interpolation's 37 (§3.2) — and the tier is claimed, so checkable | `R_P = 1` is a very reduced instance; the claim is an interpolation attack, so there is no Gröbner figure to match |
 | **4** | 2021 Poseidon, `t = 3`, `R_F = 8`, `R_P ∈ {3, 8, 13}` | `2^64 − 59` | CICO(1) | **three published executed attacks with wall-clock times** (1 s, 13 min, 36 hr) — the only such ladder in the survey — on a `t = 3` system over a field this crate has | no hardware published (§11), so a difficulty ladder and not a comparand; `t = 3` is far from the deployed `t = 16` |
 | **5** | 2021 Feistel-MiMC, `r ∈ {14, 18}` (the **OLD** set) | `2^64 − 59` | CICO(1) | two published executed attacks (3 min, 6 hr) at `2^33`/`2^40`; the simplest construction in the survey — a Feistel with `x^3` and no MDS | the parameters are retired, so a result is a reproduction of a break of a withdrawn instance |
@@ -672,6 +690,19 @@ instance, which have no hardest member (§3.3) and are not solving targets.
 12. **`initiative`'s own changelog records a corrected prime**: "29 Nov 2024 — a typo in the Koala
     Bear prime definition was fixed (`2^32` → `2^31`)". Anything quoting that page before that date
     may carry the wrong field.
+13. **The survey is not ePrint 2024/886, and it is reachable here.** §11 records *Survey of attacks
+    on Poseidon and Poseidon2* as `https://eprint.iacr.org/2024/886.pdf`, `403`. Read 2026-11-08:
+    `initiative`'s own "Survey of attacks" link is a Google Drive file, which downloads and reads
+    with `pdftotext -layout`; the survey is Grassi, Rechberger, Schofnegger and Khovratovich,
+    **22 November 2024**. ePrint 2024/886 is a different paper — Yang, Zheng, Yang, Liu and Tang,
+    *A New Security Evaluation Method Based on Resultant for Arithmetic-Oriented Algorithms*. The
+    `403` was real and the citation behind it was wrong, which is why a failed fetch is not
+    evidence about a document's contents. What `initiative` linked *before* 2026-11-08 is not
+    established. This matters because the survey is the *Attack Reward Program*'s eligibility
+    reference; `docs/research/prize-ledger.md` §5 reads it. (§11)
+14. **ePrint abstract pages answer here; only the PDFs `403`.** `/<id>` landing pages for 2024/886,
+    2026/150 and 2026/1905 all returned normally on 2026-11-08, so a citation can be checked
+    against its own abstract without the PDF. §11's host-wide block is a block on `/<id>.pdf`.
 
 ---
 
