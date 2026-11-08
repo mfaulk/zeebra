@@ -16,15 +16,24 @@
 
 use crate::{
     fields::{
-        BinaryFieldElement, ExtensionFieldElement, IrreduciblePolynomial, PrimeFieldElement128,
-        PrimeFieldElement256, PrimeFieldElement32, PrimeFieldElement64, PrimeModulus256,
+        BinaryFieldElement, ExtensionFieldElement, IrreduciblePolynomial, PrimeFieldElement256,
+        PrimeFieldElement32, PrimeFieldElement64, PrimeModulus256,
     },
     impl_left_scalar_mul,
 };
 
 impl_left_scalar_mul!([const P: u32], PrimeFieldElement32<P>);
 impl_left_scalar_mul!([const P: u64], PrimeFieldElement64<P>);
-impl_left_scalar_mul!([const P: u128], PrimeFieldElement128<P>);
+// `PrimeFieldElement128` is deprecated in favour of `PrimeFieldElement256` (#163), and the impl
+// stays while the type does: a deprecated type that silently lost `c * p` would break a caller for
+// a reason unrelated to the deprecation. The allow is on the invocation rather than the module, so
+// the next deprecated field type is a new decision rather than an inherited one.
+#[allow(deprecated)]
+mod deprecated_128 {
+    use crate::{fields::PrimeFieldElement128, impl_left_scalar_mul};
+
+    impl_left_scalar_mul!([const P: u128], PrimeFieldElement128<P>);
+}
 impl_left_scalar_mul!([M: PrimeModulus256], PrimeFieldElement256<M>);
 impl_left_scalar_mul!([const P: u64], BinaryFieldElement<P>);
 impl_left_scalar_mul!(
@@ -33,6 +42,7 @@ impl_left_scalar_mul!(
 );
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use crate::{
         fields::{Bn254Fr, Gf13Pow4, Gf256, KoalaBear, Zp13, Zp221360928884514619393},
