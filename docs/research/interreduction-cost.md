@@ -276,6 +276,12 @@ deterministic construction should be and is a check on the instrument as much as
 by Zeebra's own 97.1x per-operation constant. The measured pass is **4 094 ms**, twenty-four times
 that — and the error is not in the constant. It is in the **shape**:
 
+> **The 4 094 ms is this run's and is the high end of the range.** §2.4 of `m27-baseline.md`
+> measures the same stage at **2 306.2 ms** at `53fbf50` and §3c.4 at **2 085.9 ms**, on boxes whose
+> division side matches the board row where this one's is 1.40x it. The honest range is
+> **2 086–4 094 ms**; the ratios below use the cell counts, which are exact and reproduce to the
+> digit, so none of them moves.
+
 | | Groebner.jl | Zeebra | ratio |
 |---|---:|---:|---:|
 | rows | 250 | **7 642** | 30.6x |
@@ -300,9 +306,11 @@ with respect to everything above it. Zeebra's candidate extraction takes rows fr
 that has not been back-substituted, so candidates carry reducible tails and the debt accumulates to
 the end of the computation — where this stage pays it.
 
-**So the remaining 4 094 ms is a measured, attributable, and separately addressable cost**, and the
-ceiling on it is Groebner.jl's own 1.74 ms for the same stage. Filed separately; it is not this
-change's to fix, and this change does not need it to be worth 4.18x.
+**So the remaining pass is a measured, attributable, and separately addressable cost** — 2 086 ms at
+§3c.4's instrument, 4 094 ms here — and the ceiling on it is Groebner.jl's own 1.74 ms for the same
+stage. Filed separately as #477; it is not this change's to fix, and this change does not need it to
+be worth 4.18x. #477's own text quotes the 4 094 ms, so its arithmetic about the 405x cell count is
+built on a figure **1.78x–1.96x too large**; §3c.4 records the correction.
 
 > **Fixed by #477; see §3c.** Making each batch's candidates come out reduced takes this matrix
 > from 7 642 x 7 996 to **252 x 606** — Groebner.jl's 250 x 604 to within six columns — and the
