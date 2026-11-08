@@ -51,6 +51,15 @@ mod fixtures;
 #[cfg(test)]
 mod fixtures_gf256;
 
+/// The Fukuoka MQ Challenge's GF(2^8), recorded by its own sweep.
+///
+/// A third table for the reason there is a second: a generated header's regeneration command is
+/// only true of the sweep that wrote it. It is a *different field* from `fixtures_gf256`'s, not a
+/// second sample of it — `0x57 * 0x83` is `0xc1` modulo `0x11B` and `0x52` modulo `0x11D` — so the
+/// answers here are not derivable from those there (#421).
+#[cfg(test)]
+mod fixtures_gf256mq;
+
 pub use check::{
     check_generated, check_system, verify_recorded, verify_recorded_with, SystemOutcome,
 };
@@ -73,13 +82,14 @@ mod tests {
 
     use super::{
         check::{
-            check_generated, verify_recorded, verify_recorded_with, GF256_MODULUS,
+            check_generated, verify_recorded, verify_recorded_with, GF256MQ_MODULUS, GF256_MODULUS,
             SUPPORTED_FIELDS, SUPPORTED_VARIABLES,
         },
         comparison::{verify_case, Check, DifferentialCase},
         field::CaseField,
         fixtures::FIXTURES,
         fixtures_gf256::FIXTURES_GF256,
+        fixtures_gf256mq::FIXTURES_GF256MQ,
         generator::{GeneratedSystem, SystemShape},
         run_sweep,
         singular::{Oracle, OracleError, OracleQuery},
@@ -96,6 +106,9 @@ mod tests {
     /// GF(2^8) modulo the AES polynomial — the field the second fixture table is recorded over.
     const GF256: CaseField = CaseField::binary(GF256_MODULUS);
 
+    /// GF(2^8) modulo `x^8+x^4+x^3+x^2+1` — the Fukuoka modulus, and the third table's field.
+    const GF256MQ: CaseField = CaseField::binary(GF256MQ_MODULUS);
+
     /// The six primes the first fixture table was swept over, in the sweep's own order.
     const PRIME_FIELDS: [CaseField; 6] = [
         CaseField::prime(2),
@@ -108,11 +121,15 @@ mod tests {
 
     /// Every committed fixture, over both fields' tables.
     ///
-    /// The two tables exist because each is reproducible by the one command in its own header; the
-    /// tests that are about *coverage* of the corpus want them joined, and nothing should have to
-    /// remember to add a new table to each such test by hand.
+    /// The three tables exist because each is reproducible by the one command in its own header;
+    /// the tests that are about *coverage* of the corpus want them joined, and nothing should have
+    /// to remember to add a new table to each such test by hand.
     fn all_fixtures() -> Vec<&'static DifferentialFixture> {
-        FIXTURES.iter().chain(FIXTURES_GF256).collect()
+        FIXTURES
+            .iter()
+            .chain(FIXTURES_GF256)
+            .chain(FIXTURES_GF256MQ)
+            .collect()
     }
 
     /// An oracle that answers from a recorded table and refuses anything else.
@@ -196,6 +213,10 @@ mod tests {
     fn test_every_committed_fixture_agrees() {
         assert!(!FIXTURES.is_empty(), "the fixture table is empty");
         assert!(!FIXTURES_GF256.is_empty(), "the GF(2^8) table is empty");
+        assert!(
+            !FIXTURES_GF256MQ.is_empty(),
+            "the Fukuoka GF(2^8) table is empty"
+        );
 
         for fixture in all_fixtures() {
             let case = fixture.to_case();
@@ -879,6 +900,51 @@ mod tests {
         );
     }
 
+    /// A Fukuoka GF(2^8) case checked modulo the *AES* polynomial is rejected.
+    ///
+    /// The mirror of the test above, and #421's acceptance criterion. The two tables are over two
+    /// fields of the same characteristic and the same order, so if the modulus were not part of
+    /// what `verify_case` checks, each table would be silently checkable against the other's
+    /// arithmetic — and the failure would be reported against Zeebra rather than against the
+    /// harness.
+    #[test]
+    fn test_a_gf256mq_case_checked_modulo_the_other_polynomial_is_rejected() {
+        let case = FIXTURES_GF256MQ
+            .iter()
+            .find(|fixture| fixture.variables.len() == 2)
+            .expect("a two-variable Fukuoka GF(2^8) fixture")
+            .to_case();
+        assert_eq!(case.field, GF256MQ, "the fixture is not over 0x11D");
+
+        verify_case::<2, Gf256Mq>(&case, &FglmOptions::unbounded())
+            .expect("the case agrees over the field it was recorded in");
+        assert_eq!(
+            verify_case::<2, Gf256>(&case, &FglmOptions::unbounded())
+                .expect_err("a case recorded modulo 0x11D must not be checked modulo 0x11B")
+                .check,
+            Check::Field
+        );
+    }
+
+    /// Both degree-8 binary fields are supported, and they are two fields rather than two
+    /// spellings of one.
+    ///
+    /// `SUPPORTED_FIELDS` is what `check_generated`'s dispatch falls through to, so a field listed
+    /// there with no arm would be reported `Unsupported` while claiming to be supported — and a
+    /// field whose modulus duplicated another's would make the dispatch's two arms unreachable from
+    /// each other. Asserted rather than left to the pair of moduli being eyeballed (#421).
+    #[test]
+    fn test_both_degree_eight_binary_fields_are_supported_and_distinct() {
+        assert!(SUPPORTED_FIELDS.contains(&GF256));
+        assert!(SUPPORTED_FIELDS.contains(&GF256MQ));
+        assert_ne!(GF256, GF256MQ);
+        assert_ne!(
+            (Gf256::new(0x57) * Gf256::new(0x83)).coefficients(),
+            (Gf256Mq::new(0x57) * Gf256Mq::new(0x83)).coefficients(),
+            "the two moduli agree on this product, so the harness is sweeping one field twice"
+        );
+    }
+
     /// A GF(2) case is not checkable over GF(2^8), although the two share a characteristic.
     ///
     /// The second half of #378's naming gap: before a case named a field rather than a
@@ -1297,6 +1363,71 @@ mod tests {
         assert!(
             report.agreed_cases.iter().all(|case| case.field == GF256),
             "a case in a GF(2^8) sweep is not over GF(2^8)"
+        );
+        let _ = std::fs::remove_dir_all(&work_dir);
+    }
+
+    /// A live sweep over the Fukuoka GF(2^8) against a local Singular.
+    ///
+    /// `#[ignore]`d for the same reason as its two neighbours: CI has no Singular. The offline half
+    /// is `test_every_committed_fixture_agrees` over `FIXTURES_GF256MQ`.
+    ///
+    /// ```text
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::differential::tests::test_a_live_gf256mq_sweep_against_singular_agrees
+    /// ```
+    ///
+    /// What this exercises that the `0x11B` sweep cannot: that the `minpoly` the Singular side
+    /// declares is read off the *case's* modulus rather than being a constant, which a harness with
+    /// one hard-coded degree-8 polynomial would pass while computing in the wrong field (#421).
+    #[test]
+    #[ignore = "needs a local Singular installation"]
+    fn test_a_live_gf256mq_sweep_against_singular_agrees() {
+        use super::{SingularOracle, SweepOptions};
+        use std::time::Duration;
+
+        let work_dir = std::env::temp_dir().join(format!(
+            "zeebra-differential-gf256mq-{}",
+            std::process::id()
+        ));
+        let mut oracles =
+            SingularOracle::fleet("Singular", &work_dir, Duration::from_secs(60), false, 1)
+                .expect("a writable scratch directory");
+        let version = oracles[0].version().expect("Singular runs");
+
+        let options = SweepOptions {
+            seed: 94_000,
+            systems: 8,
+            variables: SUPPORTED_VARIABLES.to_vec(),
+            fields: vec![GF256MQ],
+            max_degree: 3,
+            max_terms: 4,
+            minimize_attempts: 0,
+            minimize_budget: Duration::from_secs(0),
+            jobs: 1,
+            fglm: FglmOptions::unbounded(),
+            f4: F4Options::default(),
+        };
+        let report = run_sweep(&options, &mut oracles, &mut |_, _, _| {});
+
+        assert!(
+            report.clean(),
+            "Singular build {}: {} disagreements, {} oracle failures {:?}, {} Zeebra failures {:?}",
+            version,
+            report.failures.len(),
+            report.oracle_failures.len(),
+            report.oracle_failures,
+            report.zeebra_failures.len(),
+            report.zeebra_failures,
+        );
+        assert_eq!(report.agreed, 8);
+        assert!(
+            report.zero_dimensional > 0,
+            "the sweep found no zero-dimensional ideal, so it checked no operator column"
+        );
+        assert!(
+            report.agreed_cases.iter().all(|case| case.field == GF256MQ),
+            "a case in a Fukuoka GF(2^8) sweep is not over 0x11D"
         );
         let _ = std::fs::remove_dir_all(&work_dir);
     }

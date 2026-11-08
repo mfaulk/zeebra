@@ -2786,8 +2786,27 @@ cargo run --release --bin zeebra-differential -- --seed 777 --systems 240 \
     --fixtures src/grobner/differential/fixtures.rs   # regenerate the committed cases
 cargo run --release --bin zeebra-differential -- --fields 2^8/283 --seed 3780 --systems 40 \
     --max-degree 4 --max-terms 5 --fixture-table FIXTURES_GF256 \
-    --fixtures src/grobner/differential/fixtures_gf256.rs   # the GF(2^8) table
+    --fixtures src/grobner/differential/fixtures_gf256.rs   # the AES-modulus GF(2^8) table
+cargo run --release --bin zeebra-differential -- --fields 2^8/285 --seed 4210 --systems 40 \
+    --max-degree 4 --max-terms 5 --timeout 300 --fixture-table FIXTURES_GF256MQ \
+    --fixtures src/grobner/differential/fixtures_gf256mq.rs   # the Fukuoka-modulus table
 ```
+
+**Three committed tables, over eight fields.** The split is per sweep rather than per field: a
+generated header's regeneration command is only true of the sweep that wrote it, so adding a field
+to an existing sweep's `--fields` list would change which field every later seed is generated over
+and replace every answer already recorded. The two GF(2^8) tables are the two *moduli* — `0x11B`,
+which HFE is posed over, and `0x11D`, which the **Fukuoka MQ Challenge** is posed over — and they
+are not two samples of one field: `test_both_degree_eight_binary_fields_are_supported_and_distinct`
+asserts the moduli differ *and* that `0x57 * 0x83` differs under them, so a harness sweeping one
+field twice fails rather than looking like coverage. Each table is checkable only against its own
+modulus, which
+`test_a_gf256mq_case_checked_modulo_the_other_polynomial_is_rejected` pins in both directions.
+
+`--timeout` appears in the third header because it had to: at the default 30 s one five-variable
+system in that seed's range outruns Singular and the sweep records 39 fixtures instead of 40, so a
+header omitting it would not reproduce its own table. It is the one flag echoed into a header that
+does not change *which* systems are generated — only which of them get an answer.
 
 **`--fields` names a field and not a characteristic**, because a characteristic does not determine
 one: `GF(2)` and `GF(2^8)` share it, and `2^8/283` and `2^8/285` are two fields of the same order in

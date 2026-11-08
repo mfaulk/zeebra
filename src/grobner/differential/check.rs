@@ -12,7 +12,7 @@
 //! table that paired a spec with the wrong type would fail rather than compare.
 
 use crate::{
-    fields::{Gf256, PrimeFieldElement64},
+    fields::{Gf256, Gf256Mq, PrimeFieldElement64},
     grobner::{
         f4_with_options,
         fglm::{BorderIndex, FglmError, FglmOptions, QuotientBasis},
@@ -36,9 +36,13 @@ pub const SUPPORTED_VARIABLES: &[usize] = &[2, 3, 4, 5];
 ///
 /// Two and three are here because they are where an implementation that assumed an odd
 /// characteristic, or that `2` is invertible, goes wrong. The largest prime is the biggest
-/// Singular's prime fields accept. GF(2^8) modulo the AES polynomial is
-/// [`Gf256`](crate::fields::Gf256), the coefficient field of the GF(2^8) half of the Fukuoka MQ
-/// challenges and of HFE.
+/// Singular's prime fields accept.
+///
+/// **Both degree-8 binary fields are here, and that is not redundancy.** GF(2^8) modulo the AES
+/// polynomial is [`Gf256`](crate::fields::Gf256), the field HFE is posed over; GF(2^8) modulo
+/// `x^8+x^4+x^3+x^2+1` is [`Gf256Mq`](crate::fields::Gf256Mq), the field the **Fukuoka MQ
+/// Challenge** is posed over. They have the same characteristic and the same order and are not the
+/// same field, so a harness that supported one would silently decline the other's systems.
 pub const SUPPORTED_FIELDS: &[CaseField] = &[
     CaseField::prime(2),
     CaseField::prime(3),
@@ -47,6 +51,7 @@ pub const SUPPORTED_FIELDS: &[CaseField] = &[
     CaseField::prime(65537),
     CaseField::prime(2147483647),
     CaseField::binary(GF256_MODULUS),
+    CaseField::binary(GF256MQ_MODULUS),
 ];
 
 /// `x^8 + x^4 + x^3 + x + 1`, which is [`Gf256`](crate::fields::Gf256)'s modulus.
@@ -55,6 +60,15 @@ pub const SUPPORTED_FIELDS: &[CaseField] = &[
 /// two different degree-8 polynomials — which would be a field mismatch the dispatch could not
 /// see, since both are GF(2^8).
 pub const GF256_MODULUS: u64 = 0x11B;
+
+/// `x^8 + x^4 + x^3 + x^2 + 1`, which is [`Gf256Mq`](crate::fields::Gf256Mq)'s modulus.
+///
+/// **The Fukuoka MQ Challenge's**, and a different field from [`GF256_MODULUS`] rather than a
+/// different spelling of it: `0x57 * 0x83` is `0xc1` modulo `0x11B` and `0x52` modulo `0x11D`
+/// (`docs/research/boolean-solving.md` §4). Named for the same reason its neighbour is — two
+/// degree-8 polynomials are indistinguishable by characteristic and order, so a dispatch that
+/// inlined them could not see a mismatch between the arm and the supported-field list.
+pub const GF256MQ_MODULUS: u64 = 0x11D;
 
 /// What checking one system found.
 #[derive(Clone, Debug)]
@@ -232,6 +246,9 @@ macro_rules! by_field {
             CaseField::Binary {
                 modulus: GF256_MODULUS,
             } => $body::<$n, Gf256>($system, $oracle, $options, $f4),
+            CaseField::Binary {
+                modulus: GF256MQ_MODULUS,
+            } => $body::<$n, Gf256Mq>($system, $oracle, $options, $f4),
             other => SystemOutcome::Unsupported {
                 detail: format!("GF({}) is not one of {:?}", other, SUPPORTED_FIELDS),
             },
@@ -288,6 +305,9 @@ macro_rules! verify_by_field {
             CaseField::Binary {
                 modulus: GF256_MODULUS,
             } => verify_case_with::<$n, Gf256>($case, $options, $f4),
+            CaseField::Binary {
+                modulus: GF256MQ_MODULUS,
+            } => verify_case_with::<$n, Gf256Mq>($case, $options, $f4),
             other => Err(Disagreement {
                 check: super::comparison::Check::Field,
                 detail: format!("GF({}) is not one of {:?}", other, SUPPORTED_FIELDS),
