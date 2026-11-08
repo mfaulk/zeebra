@@ -751,7 +751,12 @@ impl MqInstance {
         Ok(system)
     }
 
-    /// One file coefficient as a field element, or `None` if it is not one.
+    /// One value from this instance's file as a field element, or `None` if it is not one.
+    ///
+    /// Public because a *coefficient* is not the only thing a file holds: an answer vector is
+    /// parsed by [`Self::parse_answer`] into the same `u64` tokens, and a consumer that is generic
+    /// over the coefficient type — the scoreboard's MQ visitors are, since #510 — has no other way
+    /// to read one at the field the header names.
     ///
     /// **Not `FiniteField::new`, which over an extension is the prime-subfield embedding.**
     /// `Gf256Mq::new(0xa7)` is `1`, so a byte-wise read through `new` collapses every coefficient
@@ -761,7 +766,7 @@ impl MqInstance {
     ///
     /// A prime field still goes through `new`, because the published GF(31) files carry the literal
     /// token `31` — congruent to zero, and so outside `element_at`'s `0..q`.
-    fn element<F: KnownOrder>(&self, value: u64) -> Option<F> {
+    pub fn element<F: KnownOrder>(&self, value: u64) -> Option<F> {
         match self.field {
             MqField::Gf2 | MqField::Gf31 => Some(F::new(value)),
             MqField::Gf256 => F::element_at(u128::from(value)),

@@ -39,7 +39,7 @@ use std::{
 use rand::{prelude::StdRng, SeedableRng};
 
 use zeebra::{
-    fields::PrimeFieldElement64,
+    fields::{Gf256Mq, PrimeFieldElement64},
     grobner::{
         classify_ideal,
         f4::symbolic::MonicBasis,
@@ -47,7 +47,7 @@ use zeebra::{
         research::{
             challenge, colliding_run_file, dispatch_cico, eliminate_affine, registry, Campaign,
             ChallengeManifest, ChallengeParameters, CicoVisitor, Comparison, Environment,
-            GrobnerFrontier, Json, Limit, MqInstance, MqVisitor, RoundLayout, RunOutcome,
+            GrobnerFrontier, Json, Limit, MqField, MqInstance, MqVisitor, RoundLayout, RunOutcome,
             RunRecord, Scoreboard, Specialization, Stage, StageCost, BEST_CONTRACT,
             HISTORY_CONTRACT, KOALABEAR_PRIME, SOLVED_CONTRACT,
         },
@@ -55,7 +55,7 @@ use zeebra::{
         SolveOptions, SolveOutcome,
     },
     util::peak_resident_bytes,
-    FiniteField, MonomialOrder, MultivariatePolynomial, Zero,
+    MonomialOrder, MultivariatePolynomial,
 };
 
 type K = PrimeFieldElement64<KOALABEAR_PRIME>;
@@ -86,6 +86,15 @@ type PolicyField = Q;
 
 const _: () = assert!(
     size_of::<(usize, K)>() == size_of::<(usize, PolicyField)>(),
+    "every field on this board must have the entry width `policy()` is rendered at"
+);
+
+// And GF(2^8), since #510 put a type V row on the board: an extension field is a *narrower*
+// element than either prime field, so a sparse entry pads to the same 16 bytes and the live
+// allowance `policy()` quotes is the one that binds. If a field ever lands here that does not,
+// this stops the build rather than letting every record carry the wrong policy string.
+const _: () = assert!(
+    size_of::<(usize, Gf256Mq)>() == size_of::<(usize, PolicyField)>(),
     "every field on this board must have the entry width `policy()` is rendered at"
 );
 
@@ -1021,16 +1030,23 @@ fn run_mq_rows(
     let at = Instant::now();
 
     for seed in 0..if underdetermined { seeds } else { 1 } {
-        let mut record = instance
-            .dispatch::<Q, _>(SolveMqSliced {
-                manifest,
-                instance: &instance,
-                published: &published,
-                slice: underdetermined.then_some(seed),
-                fixed: campaign.fixed,
-                wall,
-            })
-            .expect("a supported dimension");
+        let solve = || SolveMqSliced {
+            manifest,
+            instance: &instance,
+            published: &published,
+            slice: underdetermined.then_some(seed),
+            fixed: campaign.fixed,
+            wall,
+        };
+        // On the instance's own field rather than on one chosen here. Type V and type VI publish
+        // the same n = 24 at m = 16 and differ only in the field, so a runner hardwired to GF(31)
+        // could import the type V challenge and not run it (#510).
+        let mut record = match instance.field {
+            MqField::Gf31 => instance.dispatch::<Q, _>(solve()),
+            MqField::Gf256 => instance.dispatch::<Gf256Mq, _>(solve()),
+            MqField::Gf2 => return Vec::new(),
+        }
+        .expect("a supported dimension");
         record.environment = Environment {
             policy: frontier_policy(),
             ..environment.clone()
@@ -1189,10 +1205,13 @@ struct SolveMqSliced<'a> {
     wall: Duration,
 }
 
-impl MqVisitor<Q> for SolveMqSliced<'_> {
+/// Generic over the coefficient type, so one visitor serves both signature families: type VI is
+/// GF(31) and type V is GF(2^8) at the very same `n = 24` (#510). The field comes from the
+/// instance's own header, not from this file.
+impl<F: zeebra::KnownOrder + Send + 'static> MqVisitor<F> for SolveMqSliced<'_> {
     type Output = RunRecord;
 
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, Q>]) -> RunRecord {
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> RunRecord {
         let mut record = RunRecord::new(
             self.manifest,
             match self.slice {
@@ -1204,11 +1223,11 @@ impl MqVisitor<Q> for SolveMqSliced<'_> {
         let at = Instant::now();
         // The slice fixes the surplus variables — the ones that make a signature instance
         // positive-dimensional — at values drawn from a precommitted seed.
-        let system: Vec<MultivariatePolynomial<N, Q>> = match self.slice {
+        let system: Vec<MultivariatePolynomial<N, F>> = match self.slice {
             Some(seed) => {
                 let variables: Vec<usize> = (N - self.fixed..N).collect();
                 let specialization =
-                    Specialization::<N, Q>::seeded(&variables, seed).expect("distinct indices");
+                    Specialization::<N, F>::seeded(&variables, seed).expect("distinct indices");
                 record.transformations.push(format!(
                     "specialize variables {}..{} at seed {}",
                     N - self.fixed,
@@ -1230,14 +1249,24 @@ impl MqVisitor<Q> for SolveMqSliced<'_> {
         // answer and a unique solution, against that answer too.
         let reconstructed = self
             .instance
-            .system::<N, Q>()
+            .system::<N, F>()
             .expect("the same instance parses twice");
-        let published: Vec<Q> = self.published.iter().map(|v| Q::new(*v)).collect();
+        // Through the instance's own conversion, not `F::new`: over GF(2^8) the file's token is a
+        // bit pattern and `new` is the prime-subfield embedding, which would collapse it to a bit.
+        let published: Vec<F> = self
+            .published
+            .iter()
+            .map(|v| {
+                self.instance
+                    .element::<F>(*v)
+                    .expect("the published answer is in the field")
+            })
+            .collect();
         let (outcome, stages, frontier) =
             supervised_solve(system, self.wall, self.slice.is_some(), |point| {
                 let vanishes = reconstructed
                     .iter()
-                    .all(|polynomial| polynomial.eval(point) == Q::zero());
+                    .all(|polynomial| polynomial.eval(point) == F::zero());
                 if vanishes && published.len() == N {
                     let matches: Vec<bool> = (0..N).map(|i| point[i] == published[i]).collect();
                     println!(
@@ -1283,14 +1312,20 @@ fn run_mq(manifest: &ChallengeManifest, environment: &Environment) -> Option<Run
     let (instance, published) = read_mq(kind, n, m, seed)?;
     let generation = at.elapsed();
 
-    let mut record = instance
-        .dispatch::<Q, _>(SolveMq {
-            manifest,
-            instance: &instance,
-            published: &published,
-            generation,
-        })
-        .expect("a supported dimension");
+    let solve = || SolveMq {
+        manifest,
+        instance: &instance,
+        published: &published,
+        generation,
+    };
+    let mut record = match instance.field {
+        MqField::Gf31 => instance.dispatch::<Q, _>(solve()),
+        MqField::Gf256 => instance.dispatch::<Gf256Mq, _>(solve()),
+        // GF(2) is types I and IV, which the importer itself refuses: the field exists two ways
+        // here and which one to read these files under is #197's decision, not this runner's.
+        MqField::Gf2 => return None,
+    }
+    .expect("a supported dimension");
     record.environment = environment.clone();
     record.reproduce = format!(
         "tools/fetch-mq-challenge.sh && cargo run --release --example scoreboard -- stable  # {}",
@@ -1307,10 +1342,10 @@ struct SolveMq<'a> {
     generation: Duration,
 }
 
-impl MqVisitor<Q> for SolveMq<'_> {
+impl<F: zeebra::KnownOrder> MqVisitor<F> for SolveMq<'_> {
     type Output = RunRecord;
 
-    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, Q>]) -> RunRecord {
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) -> RunRecord {
         let mut record = RunRecord::new(self.manifest, "as published");
         record.stages.push(
             StageCost::new(Stage::Generation, self.generation)
@@ -1322,12 +1357,12 @@ impl MqVisitor<Q> for SolveMq<'_> {
         // the file rather than from the system that was solved.
         let reconstructed = self
             .instance
-            .system::<N, Q>()
+            .system::<N, F>()
             .expect("the same instance parses twice");
         let (outcome, stages, frontier) = staged_solve(system, false, |point| {
             reconstructed
                 .iter()
-                .all(|polynomial| polynomial.eval(point) == Q::zero())
+                .all(|polynomial| polynomial.eval(point) == F::zero())
         });
         record.outcome = outcome;
         record.stages.extend(stages);
