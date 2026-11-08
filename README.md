@@ -820,6 +820,8 @@ cargo run --release --example accumulator_span     # whether a vectorizable inne
 cargo run --release --example accumulator_span -- list
 cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
 cargo run --release --example boolean_density -- 6 8
+cargo run --release --example xl_dimensions        # XL's matrix at the degree it needs, against F4's
+cargo run --release --example xl_dimensions -- 38  # the published record's instance
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -1047,6 +1049,18 @@ already cheaper in memory — by entry count, not entry size. It also runs all t
 backends over characteristic-two matrices and asserts they agree, which
 [`docs/research/boolean-solving.md`](docs/research/boolean-solving.md) §15 explains had never been
 checked.
+
+`xl_dimensions` prices XL's matrix without building one, which is what #76's go/no-go asks for — "a
+result obtainable from construction alone, without a solver". XL's shape at a degree is three
+binomial coefficients and a term count, so every figure is an exact integer that reproduces
+bit-for-bit and needs no benchmark lock; the operating degree comes from the semiregular model's
+degree of regularity and is labelled a prediction. It is **self-validating against the published
+record-holder**: predicting the degree for type III `n = 38` from the model and then counting columns
+combinatorially reproduces eprint 2026/2641's reported `N = 45 379 620` exactly, and the term count
+reproduces the published `n = 10` file's 66 coefficients. The finding is a crossover —
+XL's matrix is *smaller* than F4's measured peak at `n = 10` and `n = 15`, 1.34x at `n = 20`, 22.3x
+at `n = 24`, and 850 GiB at `n = 38`. See
+[`docs/research/xl-block-wiedemann.md`](docs/research/xl-block-wiedemann.md).
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
