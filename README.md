@@ -3271,12 +3271,13 @@ measured on one 1.40x slower than it.
 
 #507 then took that A/B as a **five-engine board cohort** rather than a projection, and
 [`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) §3c is the result:
-**8 159.6 ms** measured against 7 999 ms projected, **1.08x behind Singular** on
-`reduced-grobner-basis` and **parity on `lex-basis-by-conversion`**, with the matrix route ahead on
+**8 333.1 ms** measured against 7 999 ms projected, **1.07x behind Singular** on
+`reduced-grobner-basis` and **parity on `lex-basis-by-conversion`** (1.09x ahead, inside the box's
+spread), with the matrix route ahead on
 every graded rung of the ladder (0.99x–3.78x) and behind on every lex one (up to 6.20x, because a
 shape-position lex basis makes katsura-6 build 7 983 × 8 015 for a six-element basis). The default
 nevertheless stays on the division route, and the reason is **memory that no budget sees**:
-`katsura-11` goes 535.8 MB → 13 144.9 MB with every limit satisfied, because the refusal counts
+`katsura-11` goes 534.6 MB → 13 148.3 MB with every limit satisfied, because the refusal counts
 matrix entries and the entries are not where the memory goes. That gate is **#536**.
 
 **Two strategy flags now sit off by default in that position, not one.** #477 found that the 80%

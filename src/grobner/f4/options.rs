@@ -99,25 +99,25 @@ pub enum ReductionStrategy {
 ///
 /// | rung | division | matrix | memory | time |
 /// |---|---:|---:|---:|---:|
-/// | `mq-random-10` | 162.7 MB | 602.1 MB | 3.70x | 3.92x faster |
-/// | `katsura-11` | **535.8 MB** | **13 144.9 MB** | **24.54x** | 2.28x faster |
+/// | `mq-random-10` | 163.4 MB | 600.8 MB | 3.68x | 3.74x faster |
+/// | `katsura-11` | **534.6 MB** | **13 148.3 MB** | **24.59x** | 2.29x faster |
 ///
 /// **No budget refused the katsura-11 pass.** The matrix route's refusal tests rows, columns and
 /// live *entries*, and the entries are not where the memory goes: `mq-random-10`'s matrix holds
-/// 893 531 nonzeros — on the order of ten megabytes — against a 439 MB increase in process peak.
+/// 893 531 nonzeros — on the order of ten megabytes — against a 437 MB increase in process peak.
 /// The cost is in building the closure, which is #477's mechanism, and it is invisible to the
 /// quantity being budgeted. That is the defect `docs/research/f4-resource-scaling.md` §10 records
 /// for symbolic preprocessing before #305, in a different stage: **the budget sees a fraction of
 /// what the run costs.**
 ///
-/// A default that can take a 536 MB computation to 13.1 GB with every budget satisfied is not a
+/// A default that can take a 535 MB computation to 13.1 GB with every budget satisfied is not a
 /// default, however much faster it is — it converts a working computation into an OOM on any
 /// machine smaller than this one. So the route ships *selectable and measured*, and the default
 /// stays where every published figure was taken. Flipping it is gated on the matrix pass's working
 /// set becoming a budgeted quantity, which is **#536**.
 ///
-/// Siting a size threshold instead would need a measured crossover, and two points — 3.70x and
-/// 24.54x — do not locate one.
+/// Siting a size threshold instead would need a measured crossover, and two points — 3.68x and
+/// 24.59x — do not locate one.
 ///
 /// # When the matrix route falls back
 ///

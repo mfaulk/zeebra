@@ -313,16 +313,17 @@ again.
 must be re-taken with the flag on before any of it is published.
 
 > **Re-taken, and the projection held.** #507 took the row as a five-engine cohort at one commit on
-> the pinned digest — `docs/research/interreduction-cost.md` §3c.0. Measured: **8 159.6 ms** mean of
-> three against the 7 999 ms projected here, **2.0% out**, and **1.08x behind Singular** against the
-> 1.14x projected. End to end the cohort gives 3.92x on the means and **3.68x on the minima**, the
-> latter 1.4% from the 3.627x applied above. The division side's minimum is 1.021x the board row, so
-> the cohort composes with §1.1.
+> the pinned digest — `docs/research/interreduction-cost.md` §3c.0. Measured: **8 333.1 ms** mean of
+> three against the 7 999 ms projected here, **4.2% out**, and **1.07x behind Singular** against the
+> 1.14x projected. End to end the cohort gives 3.74x on the means and **3.69x on the minima**, the
+> latter 1.8% from the 3.627x applied above. The division side's ratio against this cohort's own
+> Singular is 4.01x–4.02x against the retained 4.126x, so the cohort composes with §1.1 to about 5%
+> — this box's run-to-run spread, not a disagreement.
 >
 > Two things §2.4 could not have said. On `lex-basis-by-conversion` the matrix route reaches
-> **8 777.7 ms against Singular's 9 074.1 ms** — parity, and the first `mq-random-10` row not behind
+> **8 827.7 ms against Singular's 9 643.7 ms** — parity, and the first `mq-random-10` row not behind
 > Singular. And **the default did not move anyway**: peak RSS, which `f4_profile` does not report,
-> goes 162.7 MB → 602.1 MB here and **535.8 MB → 13 144.9 MB on katsura-11**, with every budget
+> goes 163.4 MB → 600.8 MB here and **534.6 MB → 13 148.3 MB on katsura-11**, with every budget
 > satisfied, because the refusal counts matrix entries and the entries are not where the memory
 > goes. §3c.3 and **#536**.
 

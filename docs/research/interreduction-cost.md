@@ -706,11 +706,14 @@ moves to #507 with better evidence than it had.
   attribution but does not separately measure the closure.
 ## 3e. #507: the decision, on a cohort rather than on a single-instance A/B
 
-Pinned at `b89d68b7`, except the board rows, which are at `f153c59` — the commit that added
-`competitive_sweep --interreduce-by-matrix on|off`, whose `off` and `on` are exactly
-`InterreductionRoute::Division` and `::Matrix` under the name they had before the enum. Every
-figure under `tools/benchlock.sh`, `taskset -c 0-7`, `ZEEBRA_MACHINE=workstation`,
-`ZEEBRA_AFFINITY=0-7`, `RUSTC_WRAPPER=""`, a private `CARGO_TARGET_DIR`, one worker. Board rows
+Pinned at `0840207f`, whose #505 stamp is base `9746b4ce` and patch id `e5476c47…`. All 55 board
+rows here carry that stamp and no other, so they are a single cohort — and the stamp stays
+resolvable through any later rebase of this branch, because a merge base is an ancestor of `main`
+and a patch id hashes the diff rather than the history.
+
+Every figure under `tools/benchlock.sh`, `taskset -c 0-7`, `ZEEBRA_MACHINE=workstation`,
+`ZEEBRA_AFFINITY=0-7`, `RUSTC_WRAPPER=""`, a private `CARGO_TARGET_DIR`, one worker, `--wall 60`
+except `katsura-11` at 600. Board rows
 `--measure --write`, one row per process, so their peak-RSS figures are attributable.
 
 ### 3e.0 What #451 projected, and what the board actually says
@@ -722,16 +725,18 @@ Here is the row, as a five-engine cohort at one commit on one digest (`72d0ad315
 
 | engine | mean | min | max | peak RSS |
 |---|---:|---:|---:|---:|
-| **zeebra, division** | **31 950.9 ms** | 29 623.8 | 35 069.4 | 162.7 MB |
-| **zeebra, matrix** | **8 159.6 ms** | 8 056.7 | 8 351.4 | **602.1 MB** |
-| singular | 7 524.4 ms | 7 207.8 | 8 153.4 | 23.5 MB |
-| sagebrush | 357.8 ms | 344.6 | 364.5 *(not authoritative)* | 31.4 MB |
-| msolve | 256.6 ms | 243.4 | 263.5 | 12.5 MB |
-| groebner.jl | 90.5 ms | 87.5 | 92.8 | 729.5 MB |
+| **zeebra, division** | **31 202.4 ms** | 30 505.8 | 31 679.7 | 163.4 MB |
+| **zeebra, matrix** | **8 333.1 ms** | 8 263.0 | 8 400.6 | **600.8 MB** |
+| singular | 7 760.5 ms | 7 615.3 | 8 209.0 | 23.5 MB |
+| sagebrush | 377.7 ms | 354.5 | 405.1 *(not authoritative)* | 31.4 MB |
+| msolve | 266.5 ms | 263.5 | 273.6 | 12.4 MB |
+| groebner.jl | 90.6 ms | 85.1 | 93.2 | 730.4 MB |
 
-**The projection was good.** Measured end to end: **3.92x** on the means, **3.68x** on the minima —
-and 3.68x is 1.4% from §2.4's 3.627x, taken by a different instrument. The projected 7 999 ms lands
-against a measured 8 159.6 ms, 2.0% out.
+Three reps of each Zeebra route, seven of each comparand.
+
+**The projection was good.** Measured end to end: **3.74x** on the means, **3.69x** on the minima —
+and 3.69x is 1.8% from §2.4's 3.627x, taken by a different instrument. The projected 7 999 ms lands
+against a measured 8 333.1 ms, **4.2% out**.
 
 So the figure that may now be published is a row and not an arithmetic step, and it says:
 
@@ -740,11 +745,11 @@ So the figure that may now be published is a row and not an arithmetic step, and
 > M27's 2x minimum is met with room; Singular parity is **not** reached, and stops about 1.1x
 > short — which is what §2.4 predicted at 1.14x.
 
-One further row, at `b4dbb51a` and under `--interreduction by-order`, confirms the route resolution
-end to end: **9 601.5 ms at 599.3 MB** under grevlex. The time is a single rep on a more loaded box
-and is not quoted against the table above; the **599.3 MB against the division route's 162.7 MB** is
-the signature that says `ByOrder` resolved to the matrix route, since the two routes differ in peak
-RSS by 3.70x and in nothing else observable from a board row.
+One further row, under `--interreduction by-order`, confirms the route resolution end to end:
+**8 461.0 ms at 602.0 MB** under grevlex — inside the three matrix reps' range on memory and 0.7%
+above their maximum on time. The **602.0 MB against the division route's 163.4 MB** is the signature
+that says `ByOrder` resolved to the matrix route, since the two routes differ in peak RSS by 3.68x
+and in nothing else a board row observes.
 
 Two things the division side corroborates. Its **minimum**, 29 623.8 ms, is **1.021x** the retained
 board row's 29 011.4 ms, so this cohort composes with §1.1's ratios. Its **spread** is wide — 18%
@@ -756,16 +761,19 @@ statistic and both are quoted.
 
 One rep each, same cohort:
 
-| engine | `lex-basis-by-conversion` |
-|---|---:|
-| zeebra, division | 31 637.9 ms |
-| **zeebra, matrix** | **8 777.7 ms** |
-| singular | 9 074.1 ms (mean of two) |
-| sagebrush | 441.0 ms *(not authoritative)* |
+| engine | `lex-basis-by-conversion` | peak RSS |
+|---|---:|---:|
+| zeebra, division | 32 177.5 ms | 162.2 MB |
+| **zeebra, matrix** | **8 827.7 ms** | **602.6 MB** |
+| singular | 9 643.7 ms (mean of two; 9 267.3–10 020.2) | 36.1 MB |
+| sagebrush | 480.8 ms *(not authoritative)* | 31.7 MB |
 
-**8 777.7 against 9 074.1 is 1.034x ahead**, which is inside this box's noise and so is parity
-rather than a lead — but it is the first `mq-random-10` row on which Zeebra's figure is not behind
-Singular's. msolve and Groebner.jl are `unsupported` on this task, so the column has two operands.
+**8 827.7 against 9 643.7 is 1.09x ahead**, and against Singular's own fastest of the two reps
+(9 267.3 ms) still **1.05x ahead**. At a 5–9% margin on a box whose spread is of that order this is
+**parity rather than a lead** — but it is the first `mq-random-10` row on which Zeebra's figure is
+not behind Singular's, and the division route on the same task is 3.34x behind. The route is worth
+3.645x end to end here, within 2.7% of its value on the basis task. msolve and Groebner.jl are
+`unsupported` on this task, so the column has two operands.
 
 ### 3e.2 The ladder, interleaved: the matrix route wins under every graded order and loses under lex
 
@@ -832,30 +840,32 @@ yet:
 
 | rung | division | matrix | memory | time |
 |---|---:|---:|---:|---:|
-| `mq-random-10` | 162.7 MB | 602.1 MB | 3.70x | 3.92x faster |
-| **`katsura-11`** | **535.8 MB** | **13 144.9 MB** | **24.54x** | 2.28x faster |
+| `mq-random-10` | 163.4 MB | 600.8 MB | 3.68x | 3.74x faster |
+| **`katsura-11`** | **534.6 MB** | **13 148.3 MB** | **24.59x** | 2.29x faster |
 
-`katsura-11` finished both ways at a 600 s budget — 258 487 ms by division against 113 298 ms by
-matrix — so 13.1 GB is what the pass costs and not a stopped run's partial footprint.
+`katsura-11` finished both ways at a 600 s budget — 274 003 ms by division against 119 460 ms by
+matrix — so 13.1 GB is what the pass costs and not a stopped run's partial footprint. It is also
+**reproducible to 0.03%**: an earlier cohort on the pre-rebase tree measured 13 144.9 MB against
+13 148.3 MB here, so this is a property of the computation and not of one run.
 
 **And every budget was satisfied.** The matrix route's refusal tests rows, columns and live
 *entries* (`mod.rs:546` into `interreduce::interreduce_by_matrix`, against `max_matrix_rows`,
 `max_matrix_columns` and `live_entry_allowance::<F>()`), and the entries are not where the memory
 goes. `mq-random-10` shows the gap directly: **893 531 nonzeros**, on the order of ten megabytes of
-entries, against a **439 MB** increase in process peak. The quantity being budgeted is a small
+entries, against a **437 MB** increase in process peak. The quantity being budgeted is a small
 fraction of the quantity that binds — which is precisely the defect `f4-resource-scaling.md` §10
 records for symbolic preprocessing before #305 (88.4% of peak RSS in one `VecDeque<Monomial<20>>`
 while the budget saw 1.3%), in a different stage. The suspected site is the one #477 names: the
 closure is built as polynomials before it becomes rows, and `mq-random-10`'s closure adds **7 395**
 reducer multiples where Groebner.jl's adds about three.
 
-> **A default must not be able to take a 536 MB computation to 13.1 GB with every limit
+> **A default must not be able to take a 535 MB computation to 13.1 GB with every limit
 > satisfied**, however much faster it is, because that converts a working computation into an OOM on
 > any machine smaller than this one. So `ByOrder` ships selectable and measured, `Division` stays
 > the default and stays the configuration every published figure was taken in, and the flip is
 > gated on **#536** making the matrix pass's working set a budgeted quantity.
 
-Siting a size threshold instead was considered and rejected: two points, 3.70x and 24.54x, do not
+Siting a size threshold instead was considered and rejected: two points, 3.68x and 24.59x, do not
 locate a crossover, and an unmeasured threshold is the thing this file exists not to produce.
 
 **This supersedes §3a.1b's consequence and not its measurement.** §3a.1b concluded "the default
@@ -882,15 +892,15 @@ budget-relative and is stated that way. The cohort:
 
 | engine | katsura-11, `reduced-grobner-basis` | peak RSS |
 |---|---:|---:|
-| zeebra, division | 258 487.3 ms | 535.8 MB |
-| **zeebra, matrix** | **113 297.8 ms** | **13 144.9 MB** |
-| singular | 51 545–52 153 ms | 41.8 MB |
-| sagebrush | 2 735–2 777 ms *(not authoritative)* | 114.0 MB |
-| msolve | 1 762–1 771 ms | 22.7 MB |
-| groebner.jl | 514–526 ms | 873.8 MB |
+| zeebra, division | 274 002.9 ms | 534.6 MB |
+| **zeebra, matrix** | **119 460.2 ms** | **13 148.3 MB** |
+| singular | 54 836.1 ms (mean of two) | 41.7 MB |
+| sagebrush | 2 808.6 ms *(not authoritative)* | 114.1 MB |
+| msolve | 1 792.0 ms | 22.7 MB |
+| groebner.jl | 524.3 ms | 861.5 MB |
 
-All five engines agree on quotient dimension **1 024**. Zeebra's division route is **4.96x** behind
-Singular here and its matrix route **2.19x** — the same shape as `mq-random-10`, one rung further
+All five engines agree on quotient dimension **1 024**. Zeebra's division route is **5.00x** behind
+Singular here and its matrix route **2.18x** — the same shape as `mq-random-10`, one rung further
 up, and the first `katsura-11` row the board has had at any characteristic.
 
 
