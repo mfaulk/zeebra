@@ -558,8 +558,8 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
         let instance = corpus::instance(entry.name, corpus::REFERENCE_CHARACTERISTIC, order)
             .unwrap_or_else(|| panic!("{} is on the ladder and must build", entry.name));
         assert_eq!(
-            instance.digest(),
-            entry.digest,
+            Some(instance.digest().as_str()),
+            entry.digest_at(instance.field.characteristic),
             "{} is not the problem the corpus froze",
             entry.name
         );

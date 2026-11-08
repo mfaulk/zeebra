@@ -62,7 +62,7 @@
 //! cost. [`ladder`] is that selection, and [`manifest`] freezes each rung's digest.
 
 use crate::{
-    fields::PrimeFieldElement64,
+    fields::{PrimeFieldElement64, Zp32003},
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         differential::{polynomial_to_string, GeneratedSystem, SystemShape},
@@ -84,6 +84,60 @@ use super::{FieldSpec, Instance};
 /// its cryptanalysis scoreboard, where there is no comparand to lose.
 pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 
+/// The corpus's **small-prime** reference characteristic: `GF(32003)`.
+///
+/// A second corpus identity, not a parameter — see [`PUBLISHED_CHARACTERISTICS`] for why the corpus
+/// cannot publish at a characteristic it has not frozen a digest for. Every rung of a family whose
+/// field varies therefore carries two frozen digests, and a row taken here is a row about a
+/// different ideal from the same rung at [`REFERENCE_CHARACTERISTIC`].
+///
+/// Three reasons for this prime.
+///
+/// **It is the field the published record is written in.** Allan Steel's whole modular column —
+/// Magma 2.11-8/2.11-1/2.10, Singular 2-0-5, Macaulay 2 — runs over `GF(32003)`, and his own note
+/// says why: the comparands "handle small primes only up to 16 bits". msolve's distributed
+/// `cyclic5-16.ms` is a 16-bit prime for the same reason.
+///
+/// **It makes the eliminant a two-engine task where it was one.** msolve's eliminant stops below
+/// [`ceilings::MSOLVE_ELIMINANT`] = `1515531529` and the reference prime is **above** it, so at
+/// `2^31 − 1` the eliminant has exactly one external engine — Singular — and nothing to triangulate
+/// it. `32003` is five orders of magnitude below that bound and msolve joins.
+/// `test_the_small_prime_adds_msolve_to_the_eliminant_task` is the assertion. Note this is a gain in
+/// corroborating an *invariant* and not a Zeebra ranking: Zeebra's own adapter refuses the task, on
+/// a stated premise that is false (#465).
+///
+/// **It measures a different arithmetic regime.** 15 bits is where a coefficient and its reduction
+/// stay in registers, which is what Singular's "highly optimized Buchberger algorithm over small
+/// finite fields" was tuned for, and Zeebra reaches it through
+/// [`Zp32003`] — a 32-bit Montgomery field rather than the 64-bit one the
+/// reference prime uses.
+pub const SMALL_PRIME_CHARACTERISTIC: u64 = 32_003;
+
+/// The characteristics the corpus **publishes** at: every rung has a frozen digest at each.
+///
+/// **A characteristic the corpus publishes at is part of its identity, not an argument to it**, and
+/// that is the decision this constant records. Varying the characteristic does not produce another
+/// measurement of one problem — it produces another problem, with another digest, which
+/// [`RunReport::speedup_over`](super::RunReport::speedup_over) will refuse to compare against the
+/// first. What makes a corpus row publishable at all is that its generated system is *pinned*:
+/// `test_the_manifest_is_frozen` is the test that catches a generator drifting under the figures. A
+/// row at a characteristic with no frozen digest would be a published figure whose identity nothing
+/// pins, which is the exact hole the `digest` field exists to close.
+///
+/// So the corpus has three tiers rather than two, and [`CorpusEntry::digest_at`] is the boundary:
+///
+/// | tier | list | frozen digest | may a figure be published? |
+/// |---|---|---|---|
+/// | published | `PUBLISHED_CHARACTERISTICS` | yes, one per rung | **yes** |
+/// | generated | [`GENERATED_CHARACTERISTICS`] | no | no — the instance is honest, its identity is not pinned |
+/// | neither | — | n/a | `instance` returns `None` |
+///
+/// [`ALTERNATE_CHARACTERISTIC`] is the middle tier: `msolve.rs`'s eliminant tests need an instance
+/// there, and those tests check msolve's *behaviour* rather than quote a timing, so the instance
+/// must be correct but need not be frozen.
+pub const PUBLISHED_CHARACTERISTICS: [u64; 2] =
+    [SMALL_PRIME_CHARACTERISTIC, REFERENCE_CHARACTERISTIC];
+
 /// A second prime the const-generic families are compiled over: `2^30 + 3`.
 ///
 /// **Not a second corpus identity.** The manifest, every frozen digest and every published row
@@ -92,7 +146,7 @@ pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 /// This prime rather than an arbitrary one for two independent reasons. It is the characteristic
 /// msolve's own distributed `input_files/kat6-31.ms` declares, so it is the field the Katsura
 /// equivalence evidence was shipped over. And it is **below**
-/// [`ceilings::MSOLVE_ELIMINANT`](ceilings::MSOLVE_ELIMINANT) where the reference prime is above
+/// [`ceilings::MSOLVE_ELIMINANT`] where the reference prime is above
 /// it, which is why `msolve.rs`'s eliminant tests ask the corpus for rungs here — those tests were
 /// the live victims of this label-only `characteristic`, having been handed systems reduced mod
 /// `2^31 − 1` and declared mod this prime.
@@ -108,8 +162,11 @@ pub const ALTERNATE_CHARACTERISTIC: u64 = 1_073_741_827;
 /// Random MQ is not listed here because it does not need to be: its generator reduces at run time
 /// through [`CaseField`](crate::grobner::differential::CaseField), so every prime is available to
 /// it. Poseidon and Anemoi carry the registry's own field and ignore the argument entirely.
-pub const GENERATED_CHARACTERISTICS: [u64; 2] =
-    [ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC];
+pub const GENERATED_CHARACTERISTICS: [u64; 3] = [
+    SMALL_PRIME_CHARACTERISTIC,
+    ALTERNATE_CHARACTERISTIC,
+    REFERENCE_CHARACTERISTIC,
+];
 
 /// Run `$body` with `$field` bound to the compiled field for `$characteristic`, or yield `None`.
 ///
@@ -126,6 +183,13 @@ pub const GENERATED_CHARACTERISTICS: [u64; 2] =
 macro_rules! over_prime {
     ($characteristic:expr, |$field:ident| $body:block) => {
         match $characteristic {
+            // A 32-bit Montgomery field, so the small-prime rows measure the narrow regime they
+            // exist for. The *rendered text* is the same either way — a residue is a residue — so
+            // the representation is invisible to the digest and visible only in Zeebra's timing.
+            SMALL_PRIME_CHARACTERISTIC => {
+                type $field = Zp32003;
+                Some($body)
+            }
             ALTERNATE_CHARACTERISTIC => {
                 type $field = PrimeFieldElement64<ALTERNATE_CHARACTERISTIC>;
                 Some($body)
@@ -188,12 +252,36 @@ pub struct CorpusEntry {
     /// How this family's ideal equivalence was established. **The gate on publishing a timing.**
     pub equivalence: Equivalence,
 
-    /// The frozen identity digest at [`REFERENCE_CHARACTERISTIC`] under grevlex.
+    /// The frozen identity digest at each [published characteristic](PUBLISHED_CHARACTERISTICS),
+    /// under grevlex, keyed by the characteristic the built instance **declares**.
     ///
     /// Pinned by `test_the_manifest_is_frozen`. A change here means the generated system changed,
     /// which means every figure taken against the old digest is a figure about a different
     /// problem — so the test failing is the point of the field.
-    pub digest: &'static str,
+    ///
+    /// Two entries for a family whose field varies, and **one** for a registry row: Poseidon and
+    /// Anemoi derive their round constants from the prime, so they ignore the requested
+    /// characteristic and have one identity whatever is asked (§5 of
+    /// `docs/research/cross-library-corpus.md`). Keying on the declared rather than the requested
+    /// characteristic is what makes that fall out instead of needing a special case.
+    pub digests: &'static [(u64, &'static str)],
+}
+
+impl CorpusEntry {
+    /// The frozen digest for the instance this rung builds at `characteristic`.
+    ///
+    /// `characteristic` is the one the built instance **declares**, which for a registry row is the
+    /// registry's own prime and not the one that was asked for.
+    ///
+    /// # Errors
+    /// `None` where the corpus does not publish the rung at that field — which is the gate on
+    /// quoting a figure there, not an accident.
+    pub fn digest_at(&self, characteristic: u64) -> Option<&'static str> {
+        self.digests
+            .iter()
+            .find(|(field, _)| *field == characteristic)
+            .map(|(_, digest)| *digest)
+    }
 }
 
 /// Build one corpus instance by name, at `characteristic`, under `order`.
@@ -406,9 +494,17 @@ pub mod ceilings {
     /// Singular's prime-field bound, which is also its `fglm` bound.
     pub use crate::grobner::differential::MAX_CHARACTERISTIC as SINGULAR;
 
-    /// Sagebrush's own gate at `lib.rs:1552`. Its *basis* bound — `fglm.rs:329` caps the FGLM
-    /// route an eighth lower, which is moot while the driver exposes no FGLM at all.
+    /// Sagebrush's own gate at `lib.rs:1552`. Its **basis** bound.
     pub use crate::grobner::external::sagebrush::MAX_CHARACTERISTIC as SAGEBRUSH;
+
+    /// Sagebrush's **FGLM** bound, `fglm.rs:329` — an eighth of its basis bound.
+    ///
+    /// Not moot, as an earlier comment here said: the driver does expose the `fglm` route, and the
+    /// board holds fourteen completed Sagebrush conversion rows. Declaring only the basis bound
+    /// would let a sweep run a worker to its wall limit above `2^31` and record a limit stop where
+    /// the truth is a capability gap — and worse, past the cap `fglm.rs` returns the *same*
+    /// `Ok(None)` it returns for an ideal that is not zero-dimensional.
+    pub use crate::grobner::external::sagebrush::FGLM_MAX_CHARACTERISTIC as SAGEBRUSH_FGLM;
 
     /// Groebner.jl accepts `< typemax(UInt64)`, measured computing correctly at `2^31 - 1`,
     /// `2^32 - 5`, Goldilocks, `2^64 - 353` and `2^64 - 59`, with **no** task-specific ceiling.
@@ -477,9 +573,15 @@ impl Corroboration {
 /// The highest characteristic at which `engine` performs `task`, or `None` if it has no route.
 ///
 /// **Ceilings are task-specific, and the differences are large.** msolve's eliminant bound is
-/// below a tenth of its basis bound; Sagebrush exposes no conversion route at all. Declaring only
-/// a basis bound is what lets a sweep run a worker into its wall limit and record a limit stop
-/// where the truth is a capability gap.
+/// below a tenth of its basis bound and Sagebrush's FGLM bound is an eighth of its basis bound.
+/// Declaring only a basis bound is what lets a sweep run a worker into its wall limit and record a
+/// limit stop where the truth is a capability gap.
+///
+/// **An absent arm means an absent task, not an unlimited one.** Three of the four engines have no
+/// route for some task at any field, each refused by name in the engine's own `supports`:
+/// msolve has no lex order, Groebner.jl 0.10.11 has no FGLM, and neither Sagebrush nor Groebner.jl
+/// has an eliminant. Every arm here was checked against the adapter that implements it; the three
+/// that were wrong are recorded in `test_the_conversion_comparands_are_singular_and_sagebrush`.
 fn ceiling_for(engine: &str, task: super::Task) -> Option<u64> {
     use super::Task::*;
     match (engine, task) {
@@ -489,16 +591,20 @@ fn ceiling_for(engine: &str, task: super::Task) -> Option<u64> {
         ("sagebrush", ReducedGrobnerBasis | LexBasis) => Some(ceilings::SAGEBRUSH),
         ("groebner.jl", ReducedGrobnerBasis | LexBasis) => Some(ceilings::GROEBNER_JL),
 
-        // Conversion. **Sagebrush is absent, not merely limited** — its driver exposes no FGLM,
-        // so this is a missing task rather than a field ceiling.
-        ("msolve", LexBasisByConversion) => Some(ceilings::MSOLVE),
+        // Conversion. **msolve is absent, not merely limited**: it has no lex order at all — `-g`
+        // is grevlex only, `-e` is a two-block degrevlex elimination order, and the parametrization
+        // is not a basis — so `msolve.rs` refuses the task by name before looking at the field.
+        // Sagebrush *does* convert, through `fglm.rs`, and pays a cap an eighth of its basis bound.
         ("singular", LexBasisByConversion) => Some(ceilings::SINGULAR),
-        ("groebner.jl", LexBasisByConversion) => Some(ceilings::GROEBNER_JL),
+        ("sagebrush", LexBasisByConversion) => Some(ceilings::SAGEBRUSH_FGLM),
 
-        // Eliminant: msolve's own far-lower bound.
+        // Eliminant: msolve's own far-lower bound, and Singular. **Neither Sagebrush nor
+        // Groebner.jl has the task** — `names(Groebner)` at 0.10.11 contains no eliminant and
+        // Sagebrush's driver has no entry point, so both refuse it by name. This is the task where
+        // the small-prime characteristic earns its place: the reference prime is above msolve's
+        // bound, so at `2^31 − 1` the eliminant has **one** engine.
         ("msolve", UnivariateEliminant) => Some(ceilings::MSOLVE_ELIMINANT),
         ("singular", UnivariateEliminant) => Some(ceilings::SINGULAR),
-        ("groebner.jl", UnivariateEliminant) => Some(ceilings::GROEBNER_JL),
 
         // Nothing offers the solution tasks or the witness task at any field.
         _ => None,
@@ -510,9 +616,10 @@ pub const ENGINES: [&str; 4] = ["msolve", "singular", "sagebrush", "groebner.jl"
 
 /// The corroboration available for `task` at `characteristic`.
 ///
-/// Task-aware, because the ceilings are. The case that matters most for #263: the **conversion**
-/// task, where Zeebra's only measured cross-library deficit lies, has Sagebrush missing entirely
-/// — so above `2^31` it has **one** corroborator where the basis task has two.
+/// Task-aware, because the rosters are. The case that matters most for #263: the **conversion**
+/// task, where Zeebra's only measured cross-library deficit lies, is missing **msolve** (no lex
+/// order) and **Groebner.jl** (no FGLM in 0.10.11) at every field — so it has two engines below
+/// `2^31` where the basis task has four, and none at all above, where the basis task has two.
 pub fn corroboration_for(task: super::Task, characteristic: u64) -> Corroboration {
     let engines = ENGINES
         .iter()
@@ -735,7 +842,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
             },
-            digest: "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "c5fb073f5c9aceaab7d83d9c24de42c24eaa083777748dda50104b24347e2682",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "825a3aa54e152da5f2abac4a0b863430addacb4d8920aab3dac571cc681853fd",
+                ),
+            ],
         },
         CorpusEntry {
             name: "katsura-5",
@@ -746,7 +862,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
             },
-            digest: "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "8be0a39d2d8c64ffe73333c312ba3838bc7eef73d714b42c80d8aaec1dfea969",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "6f305e37b2cc4ade59370c27a0bc6ac8e4ebd78030d13795f91f0e345a29ab58",
+                ),
+            ],
         },
         CorpusEntry {
             name: "katsura-6",
@@ -757,7 +882,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
             },
-            digest: "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "a7bd9edf654af9e9361f99ffd699974e5f5d9e352c42492097e200662262b33f",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "aa992992dfe29a23237fe2cfbbb83ad2822313dbde1b19363b9476bd92109e8d",
+                ),
+            ],
         },
         CorpusEntry {
             name: "katsura-7",
@@ -768,7 +902,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
             },
-            digest: "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "c56bf75048b0fbae11fba90e894ad33b8404481f17c49d2cdb482925dcfeca9d",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "545cef6185ed10e413141585464f8f72e8d3a1783d3a66a441f1dcb7d1edb4e6",
+                ),
+            ],
         },
         CorpusEntry {
             name: "cyclic-4",
@@ -780,7 +923,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/cyclic5-16.ms",
             },
-            digest: "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "e5a49df27c74d4d71ef13c67b3681ae76f0af89b8cb96432e05fedda71e0c80f",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "e1d8d59448b3d648fdb8fb730dc4451c59979453749f9e4f11cf47900336770e",
+                ),
+            ],
         },
         CorpusEntry {
             name: "cyclic-5",
@@ -791,7 +943,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/cyclic5-16.ms",
             },
-            digest: "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "e80b7d8a6432b7d3f47ae162b60680e6a10d60a9e928ed95afca28aa38edfb3b",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "3274d14b224664ae83dc6fb5381a4e476e7d5aed2368fae4bfa436c4b5eaf037",
+                ),
+            ],
         },
         CorpusEntry {
             name: "cyclic-6",
@@ -802,7 +963,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 tool: "msolve 0.11.0",
                 file: "input_files/cyclic5-16.ms",
             },
-            digest: "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "bf3bb57af08fcc94d7f5c8bf01b6f4a90557dad0a41c7ce12464ea90ad93a895",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "ed89afe173d160244138c66448351e7c002bafc27df18981ba09674a6d801354",
+                ),
+            ],
         },
         CorpusEntry {
             name: "mq-random-6",
@@ -813,7 +983,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
             // `test_every_zero_dimensional_claim_is_checked`.
             zero_dimensional: true,
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
-            digest: "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "bbfecd7f5522e203280a71ddf9bbde148de60007a618e26cf4b2892942241fcb",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "d98e5e5bf82b46187967148b54ada7884376faf5c0f88926524b625e9f21987d",
+                ),
+            ],
         },
         CorpusEntry {
             name: "mq-random-10",
@@ -821,7 +1000,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Intermediate,
             zero_dimensional: true,
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
-            digest: "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "16422dafcdb6487ea541f976f7754112b811c85af2b3537ed10fe4ef9c8f3d7f",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2",
+                ),
+            ],
         },
         CorpusEntry {
             name: "mq-random-14",
@@ -829,7 +1017,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Challenging,
             zero_dimensional: true,
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
-            digest: "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "4e440cfac84262260736a2368f43c7a96181986ca5bc108517299520d56f8795",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "029def705543e29b9f0648d3fa21a87be32358b79c3e64bb6dd222fa432c439d",
+                ),
+            ],
         },
         CorpusEntry {
             name: "mq-planted-6",
@@ -837,7 +1034,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Easy,
             zero_dimensional: true,
             equivalence: Equivalence::KnownSolution,
-            digest: "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "26932613e8ca565c3734be81c465560ed3eb194cba51edc0dee434373a3952f6",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "55fb9b0622b6217a40d9b3918b59caf25b303c19db0d229827ad092ffefa8ccf",
+                ),
+            ],
         },
         CorpusEntry {
             name: "mq-planted-10",
@@ -845,7 +1051,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Intermediate,
             zero_dimensional: true,
             equivalence: Equivalence::KnownSolution,
-            digest: "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "74fc86970c3e5658f38065768c977561deda4877aa2173b45002611fba4cd814",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "0eef4b55bce6fdc6e909f9bbd211ec5c8074ceadc77b45fea76b9fcff2b6c2cc",
+                ),
+            ],
         },
         CorpusEntry {
             name: "mq-planted-14",
@@ -853,7 +1068,16 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Challenging,
             zero_dimensional: true,
             equivalence: Equivalence::KnownSolution,
-            digest: "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "132bc0b85ac22d67b2f6b25e913b901060e7acf53abfafde8747515437574946",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "063f5b1ddbab6ef1651507e069d2796f2db1d3edff6f0ae31b8cdcc210749912",
+                ),
+            ],
         },
         CorpusEntry {
             name: "poseidon-t2-rf2-rp0-planted",
@@ -861,7 +1085,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Easy,
             zero_dimensional: true,
             equivalence: Equivalence::KnownSolution,
-            digest: "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+            digests: &[(
+                KOALABEAR_PRIME,
+                "f4cf6699cee835a673d3ae77ea0b8a4545bd31411215371b3f4b61d4573ffe94",
+            )],
         },
         CorpusEntry {
             name: "poseidon-t2-rf2-rp2-planted",
@@ -869,7 +1096,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Intermediate,
             zero_dimensional: true,
             equivalence: Equivalence::KnownSolution,
-            digest: "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+            digests: &[(
+                KOALABEAR_PRIME,
+                "3b3bfb037ceb32deab1eb043fcba3d7c3fc7322eede81747a8a3ab1138fb466b",
+            )],
         },
         CorpusEntry {
             name: "poseidon-t2-rf4-rp0-planted",
@@ -877,7 +1107,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
             rung: Rung::Challenging,
             zero_dimensional: true,
             equivalence: Equivalence::KnownSolution,
-            digest: "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+            digests: &[(
+                KOALABEAR_PRIME,
+                "95cec79371a8751a37d0a639a81ea3d7a8f5ca927d523f9e46af2492c5753ffb",
+            )],
         },
         CorpusEntry {
             name: "anemoi64-cico-n1-fcico",
@@ -893,7 +1126,10 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
                          2^31, so Groebner.jl is the only external engine that reaches it",
             },
-            digest: "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+            digests: &[(
+                ANEMOI_64_PRIME,
+                "c053c6ff0186e3b48a17699c1e244ed173218571b42dd64ad4acd13fea02f299",
+            )],
         },
         CorpusEntry {
             name: "anemoi64-cico-n2-fcico",
@@ -905,29 +1141,37 @@ pub fn ladder() -> Vec<CorpusEntry> {
                 reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
                          2^31, so Groebner.jl is the only external engine that reaches it",
             },
-            digest: "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
+            digests: &[(
+                ANEMOI_64_PRIME,
+                "e3a6312e85c486b046e062a8da1c6335934415efa10de54d55186c67409d1e94",
+            )],
         },
     ]
 }
 
-/// The ladder as a machine-checkable manifest: one line per rung.
+/// The ladder as a machine-checkable manifest: one line per rung **per published characteristic**.
 ///
-/// `name family rung zero-dimensional variables digest`, space-separated ASCII, sorted by name.
-/// Line-oriented so that another language's harness can read it, and so that a digest can be
+/// `name family rung equivalence dimension variables characteristic digest`, space-separated ASCII,
+/// sorted. Line-oriented so that another language's harness can read it, and so that a digest can be
 /// reproduced by hand — the same reason
 /// [`Instance::canonical`](super::Instance::canonical) is line-oriented.
+///
+/// The characteristic is a **column** rather than a document per field, so one sorted table carries
+/// the whole corpus and a reader can see at a glance which rungs have two identities and which have
+/// one. Rows are deduplicated by their own text, which is what keeps a Poseidon or Anemoi rung — the
+/// same instance whatever is asked for — to a single line.
 pub fn manifest() -> String {
-    let mut lines: Vec<String> = ladder()
-        .into_iter()
-        .map(|entry| {
+    let mut lines: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for characteristic in PUBLISHED_CHARACTERISTICS {
+        for entry in ladder() {
             let built = instance(
                 entry.name,
-                REFERENCE_CHARACTERISTIC,
+                characteristic,
                 MonomialOrder::GradedReverseLexicographic,
             )
-            .expect("every ladder entry is buildable");
-            format!(
-                "{} {} {} {} {} {} {}",
+            .expect("every ladder entry is buildable at every published characteristic");
+            lines.insert(format!(
+                "{} {} {} {} {} {} {} {}",
                 entry.name,
                 entry.family,
                 entry.rung.tag(),
@@ -938,15 +1182,15 @@ pub fn manifest() -> String {
                     "positive-dimensional"
                 },
                 built.variable_count(),
+                built.field.characteristic,
                 built.digest()
-            )
-        })
-        .collect();
-    lines.sort();
+            ));
+        }
+    }
     let mut text = format!(
-        "# zeebra cross-library corpus, characteristic {} order grevlex\n\
-         # name family rung equivalence dimension variables digest\n",
-        REFERENCE_CHARACTERISTIC
+        "# zeebra cross-library corpus, characteristics {:?} order grevlex\n\
+         # name family rung equivalence dimension variables characteristic digest\n",
+        PUBLISHED_CHARACTERISTICS
     );
     for line in lines {
         text.push_str(&line);
@@ -960,6 +1204,7 @@ mod tests {
     use super::{
         ceilings, corroboration, corroboration_for, instance, ladder, manifest, CorpusEntry,
         Corroboration, Equivalence, Rung, ALTERNATE_CHARACTERISTIC, REFERENCE_CHARACTERISTIC,
+        SMALL_PRIME_CHARACTERISTIC,
     };
     use crate::{
         fields::Zp2147483647,
@@ -1558,50 +1803,59 @@ mod tests {
         assert_eq!(corroboration(ANEMOI_64_PRIME).engines(), 1);
     }
 
-    /// Corroboration is **task-specific**, and the conversion task is the narrowest.
+    /// Corroboration is **task-specific**, and only the basis task is wide.
     ///
     /// The case that matters most for #263: the conversion stage is where Zeebra's only measured
-    /// cross-library deficit lies, and **Sagebrush exposes no FGLM route at all** — a missing task
-    /// rather than a field ceiling. So above `2^31` conversion has one corroborator where a basis
-    /// has two, and reading a basis band as a conversion band would overstate what can check a
-    /// future Anemoi conversion row.
+    /// cross-library deficit lies, and it has **two** external engines below `2^31` and **none**
+    /// above. Reading a basis band as a conversion band would overstate what can check a future
+    /// Anemoi conversion row by four engines to zero.
+    ///
+    /// The roster this pins, each from the engine's own `supports`:
+    ///
+    /// | task | engines | why the others are out |
+    /// |---|---|---|
+    /// | basis | all four | — |
+    /// | conversion | Singular, Sagebrush | msolve has **no lex order**; Groebner.jl 0.10.11 has **no FGLM** |
+    /// | eliminant | msolve, Singular | neither Sagebrush nor Groebner.jl has the task at all |
     #[test]
-    fn test_corroboration_is_task_specific_and_conversion_is_narrowest() {
-        // Below 2^31 every engine does a basis; only three do a conversion.
+    fn test_corroboration_is_task_specific_and_only_the_basis_is_wide() {
+        // Below 2^31 every engine does a basis; only two do a conversion.
         assert_eq!(
             corroboration_for(Task::ReducedGrobnerBasis, REFERENCE_CHARACTERISTIC),
             Corroboration::FourWay
         );
         assert_eq!(
             corroboration_for(Task::LexBasisByConversion, REFERENCE_CHARACTERISTIC),
-            Corroboration::ThreeWay,
-            "Sagebrush exposes no FGLM route"
+            Corroboration::TwoWay,
+            "Singular and Sagebrush convert; msolve has no lex order and Groebner.jl no FGLM"
         );
 
-        // Above 2^31 a basis keeps two engines; a conversion drops to one.
+        // Above 2^31 a basis keeps two engines; a conversion has none at all. Sagebrush's FGLM cap
+        // is `2^31`, an eighth of its basis bound, and Singular stops there too.
         assert_eq!(
             corroboration_for(Task::ReducedGrobnerBasis, 1 << 40),
             Corroboration::TwoWay
         );
         assert_eq!(
             corroboration_for(Task::LexBasisByConversion, 1 << 40),
-            Corroboration::SoleEngine,
-            "only Groebner.jl converts above msolve's and Singular's 2^31"
+            Corroboration::None,
+            "no external engine converts above 2^31"
         );
         assert!(!corroboration_for(Task::LexBasisByConversion, 1 << 40).can_triangulate());
 
-        // At Anemoi's field both tasks are sole-engine, for two different reasons.
+        // At Anemoi's field the basis is sole-engine and the conversion has nothing — which is a
+        // stronger statement than the band alone, and the reason the two are separate functions.
         assert_eq!(
             corroboration_for(Task::ReducedGrobnerBasis, ANEMOI_64_PRIME),
             Corroboration::SoleEngine
         );
         assert_eq!(
             corroboration_for(Task::LexBasisByConversion, ANEMOI_64_PRIME),
-            Corroboration::SoleEngine
+            Corroboration::None
         );
 
         // The eliminant collapses earlier still: msolve's bound is below a tenth of its basis one,
-        // and the corpus reference prime is already above it.
+        // and the corpus reference prime is already above it — leaving Singular alone.
         const {
             assert!(
                 ceilings::MSOLVE_ELIMINANT < ceilings::MSOLVE,
@@ -1610,8 +1864,8 @@ mod tests {
         };
         assert_eq!(
             corroboration_for(Task::UnivariateEliminant, REFERENCE_CHARACTERISTIC),
-            Corroboration::TwoWay,
-            "msolve is out at 2^31 - 1; Singular and Groebner.jl remain"
+            Corroboration::SoleEngine,
+            "msolve is out above its eliminant bound and only Singular has the task"
         );
 
         // Nothing offers the solution tasks at any field — the unanimous gap #263 reports.
@@ -1780,18 +2034,233 @@ mod tests {
     /// intended before updating the constant.
     #[test]
     fn test_the_manifest_is_frozen() {
+        let mut drift: Vec<String> = Vec::new();
+        for characteristic in super::PUBLISHED_CHARACTERISTICS {
+            for entry in ladder() {
+                let built = instance(entry.name, characteristic, GREVLEX).expect("builds");
+                let frozen = entry.digest_at(built.field.characteristic);
+                if frozen != Some(built.digest().as_str()) {
+                    // Collected rather than asserted one at a time: a generator change moves every
+                    // rung at once, and a reader fixing it needs the whole list.
+                    drift.push(format!(
+                        "  {} at {}: frozen {:?}, built {}",
+                        entry.name,
+                        built.field.characteristic,
+                        frozen,
+                        built.digest()
+                    ));
+                }
+            }
+        }
+        assert!(
+            drift.is_empty(),
+            "generated systems no longer match their frozen digests:\n{}",
+            drift.join("\n")
+        );
+    }
+
+    /// Every published characteristic has a frozen digest for every rung, and no rung has a stray.
+    ///
+    /// The gate [`PUBLISHED_CHARACTERISTICS`] records: a figure may be quoted at a characteristic
+    /// only where the rung's identity is pinned there. A rung with a digest at a field the corpus
+    /// does not publish would be an identity nothing checks, and a published field with no digest
+    /// would be a figure nothing pins — so both directions are asserted.
+    #[test]
+    fn test_every_published_characteristic_is_frozen_for_every_rung() {
         for entry in ladder() {
-            let built = instance(entry.name, REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+            let declared: BTreeSet<u64> = super::PUBLISHED_CHARACTERISTICS
+                .iter()
+                .map(|characteristic| {
+                    instance(entry.name, *characteristic, GREVLEX)
+                        .expect("builds")
+                        .field
+                        .characteristic
+                })
+                .collect();
+            let frozen: BTreeSet<u64> = entry.digests.iter().map(|(field, _)| *field).collect();
             assert_eq!(
-                built.digest(),
-                entry.digest,
-                "{}'s generated system no longer matches its frozen digest",
+                frozen, declared,
+                "{}'s frozen fields and the fields it actually builds over disagree",
                 entry.name
             );
         }
     }
 
-    /// The manifest is line-oriented ASCII, one line per rung, with the digests it claims.
+    /// A registry rung has **one** identity across both published characteristics.
+    ///
+    /// Poseidon's and Anemoi's round constants are derived from the prime, so asking for another
+    /// one does not produce another instance — and the single-entry `digests` list is a consequence
+    /// of keying on the declared characteristic rather than a special case for them.
+    #[test]
+    fn test_a_registry_rung_has_one_identity_at_both_published_characteristics() {
+        for name in ["poseidon-t2-rf2-rp0-planted", "anemoi64-cico-n1-fcico"] {
+            let digests: BTreeSet<String> = super::PUBLISHED_CHARACTERISTICS
+                .iter()
+                .map(|characteristic| {
+                    instance(name, *characteristic, GREVLEX)
+                        .expect("builds")
+                        .digest()
+                })
+                .collect();
+            assert_eq!(digests.len(), 1, "{} changed identity with the field", name);
+            let entry = ladder()
+                .into_iter()
+                .find(|entry| entry.name == name)
+                .expect("in the ladder");
+            assert_eq!(entry.digests.len(), 1, "{} should carry one digest", name);
+        }
+        // And a family whose field does vary carries two, which is the contrast.
+        let katsura = ladder()
+            .into_iter()
+            .find(|entry| entry.name == "katsura-4")
+            .expect("in the ladder");
+        assert_eq!(katsura.digests.len(), 2);
+    }
+
+    /// `GF(32003)` is a published characteristic, and its rungs are a different ideal.
+    ///
+    /// The corpus-identity half of #426: a small-prime row is not the same problem measured under
+    /// another parameter, it is another problem — which is why it needs its own frozen digest and
+    /// why `speedup_over` refuses to compare the two.
+    #[test]
+    fn test_the_small_prime_is_a_second_published_identity() {
+        assert!(super::PUBLISHED_CHARACTERISTICS.contains(&SMALL_PRIME_CHARACTERISTIC));
+        for name in ["katsura-6", "cyclic-6", "mq-planted-10", "mq-random-10"] {
+            let small = instance(name, SMALL_PRIME_CHARACTERISTIC, GREVLEX).expect("builds");
+            let reference = instance(name, REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
+            assert_eq!(small.field.characteristic, SMALL_PRIME_CHARACTERISTIC);
+            assert_ne!(
+                small.digest(),
+                reference.digest(),
+                "{} has one identity at two fields, so the digest is not field-sensitive",
+                name
+            );
+            let entry = ladder()
+                .into_iter()
+                .find(|entry| entry.name == name)
+                .expect("in the ladder");
+            assert_eq!(
+                entry.digest_at(SMALL_PRIME_CHARACTERISTIC),
+                Some(small.digest().as_str())
+            );
+        }
+    }
+
+    /// A narrower field does **not** narrow a sparse entry, which is why the small-prime rows are
+    /// not faster.
+    ///
+    /// The measured result #426 expected to be a difference and is not: `GF(32003)` and
+    /// `GF(2^31 − 1)` are within noise for every engine on the one rung clear of every process floor
+    /// (`docs/research/cross-library-corpus.md` §4b-i). This is the mechanism for Zeebra's half of
+    /// it. What F4 allocates and streams is a `SparseRow` entry, `(usize, F)`, and the `usize`
+    /// forces 8-byte alignment — so a `u32` field is spent entirely on padding and the entry costs
+    /// the same bytes either way. The entry budget admits the same count, the elimination moves the
+    /// same bytes, and only a multiply got cheaper.
+    #[test]
+    fn test_a_narrow_field_does_not_narrow_a_sparse_entry() {
+        use crate::fields::{PrimeFieldElement64, Zp32003};
+        assert_eq!(std::mem::size_of::<Zp32003>(), 4);
+        assert_eq!(
+            std::mem::size_of::<PrimeFieldElement64<REFERENCE_CHARACTERISTIC>>(),
+            8
+        );
+        assert_eq!(
+            std::mem::size_of::<(usize, Zp32003)>(),
+            std::mem::size_of::<(usize, PrimeFieldElement64<REFERENCE_CHARACTERISTIC>)>(),
+            "a narrow field would make the small-prime rows cheaper only if it narrowed the entry"
+        );
+        assert_eq!(std::mem::size_of::<(usize, Zp32003)>(), 16);
+    }
+
+    /// `GF(32003)` is what adds msolve to the eliminant task.
+    ///
+    /// The measurement argument for #426, stated as arithmetic over the engine ceilings rather than
+    /// as prose. msolve's eliminant stops below `1515531529` and the reference prime is above it, so
+    /// at `2^31 − 1` the eliminant has one external engine and nothing to triangulate it. At `32003`
+    /// it has two. Only Singular and msolve have the task at all, so two is its maximum.
+    #[test]
+    fn test_the_small_prime_adds_msolve_to_the_eliminant_task() {
+        const {
+            assert!(
+                SMALL_PRIME_CHARACTERISTIC < ceilings::MSOLVE_ELIMINANT
+                    && REFERENCE_CHARACTERISTIC > ceilings::MSOLVE_ELIMINANT,
+                "the whole eliminant argument rests on the two primes straddling msolve's bound"
+            )
+        };
+        assert_eq!(
+            corroboration_for(Task::UnivariateEliminant, REFERENCE_CHARACTERISTIC),
+            Corroboration::SoleEngine,
+            "msolve is out above its eliminant bound, and only Singular else has the task"
+        );
+        assert_eq!(
+            corroboration_for(Task::UnivariateEliminant, SMALL_PRIME_CHARACTERISTIC),
+            Corroboration::TwoWay,
+            "at 32003 msolve's sparse-FGLM is available, so the eliminant gains a second opinion"
+        );
+        assert!(
+            corroboration_for(Task::UnivariateEliminant, SMALL_PRIME_CHARACTERISTIC)
+                .can_triangulate()
+        );
+        // The basis task is unaffected: it was already four-way at the reference prime.
+        assert_eq!(
+            corroboration_for(Task::ReducedGrobnerBasis, SMALL_PRIME_CHARACTERISTIC),
+            Corroboration::FourWay
+        );
+    }
+
+    /// The conversion task's **comparands** are Singular and Sagebrush — not msolve, not Groebner.jl.
+    ///
+    /// A correction with teeth, because #426 was filed believing `GF(32003)` would add msolve here.
+    /// It does not: msolve has **no lex order at all** (`-g` is grevlex only, `-e` is a two-block
+    /// degrevlex elimination order, and the parametrization is not a basis), so `msolve.rs`
+    /// refuses the task by name before any field is looked at. Sagebrush is the opposite error —
+    /// `corpus.rs` recorded it as having no FGLM route when `fglm.rs` has one, capped at `2^31`,
+    /// and the board holds fourteen completed Sagebrush conversion rows. The two mistakes cancelled
+    /// in the *count*, which is why neither was caught by a corroboration assertion.
+    #[test]
+    fn test_the_conversion_comparands_are_singular_and_sagebrush() {
+        let converts = |characteristic: u64| -> Vec<&'static str> {
+            super::ENGINES
+                .iter()
+                .copied()
+                .filter(|engine| {
+                    super::ceiling_for(engine, Task::LexBasisByConversion)
+                        .is_some_and(|ceiling| characteristic < ceiling)
+                })
+                .collect()
+        };
+        assert_eq!(
+            converts(SMALL_PRIME_CHARACTERISTIC),
+            vec!["singular", "sagebrush"]
+        );
+        assert_eq!(
+            converts(REFERENCE_CHARACTERISTIC),
+            vec!["singular", "sagebrush"]
+        );
+        for (engine, why) in [
+            ("msolve", "no lex order at any field"),
+            ("groebner.jl", "no FGLM in 0.10.11"),
+        ] {
+            assert!(
+                super::ceiling_for(engine, Task::LexBasisByConversion).is_none(),
+                "{} has {}; this is a missing task, not a ceiling",
+                engine,
+                why
+            );
+        }
+        // Above Sagebrush's FGLM cap nothing converts, which is why an Anemoi conversion row has
+        // no comparand rather than one.
+        assert!(
+            converts(1 << 40).is_empty(),
+            "Sagebrush's FGLM cap is 2^31, an eighth of its basis bound, and Singular stops there"
+        );
+    }
+
+    /// The manifest is line-oriented ASCII, one line per rung per identity, with its digest.
+    ///
+    /// The row count is the sum over rungs of how many identities each has — two for a family whose
+    /// field varies and one for a registry row — which is exactly `digests.len()` summed, so the
+    /// manifest and the frozen table cannot disagree about how many problems the corpus holds.
     #[test]
     fn test_the_manifest_lists_every_rung_with_its_digest() {
         let text = manifest();
@@ -1801,12 +2270,17 @@ mod tests {
             .filter(|line| !line.starts_with('#'))
             .filter(|line| !line.is_empty())
             .collect();
-        assert_eq!(rows.len(), ladder().len());
+        let identities: usize = ladder().iter().map(|entry| entry.digests.len()).sum();
+        assert_eq!(rows.len(), identities);
+        let mut digests: BTreeSet<&str> = BTreeSet::new();
         for row in &rows {
             let columns: Vec<&str> = row.split(' ').collect();
-            assert_eq!(columns.len(), 7, "{}", row);
-            assert_eq!(columns[6].len(), 64, "a full sha256 digest: {}", row);
-            assert!(columns[6].chars().all(|c| c.is_ascii_hexdigit()));
+            assert_eq!(columns.len(), 8, "{}", row);
+            // The characteristic column, which is what makes a two-identity rung legible.
+            assert!(columns[6].parse::<u64>().is_ok(), "{}", row);
+            assert_eq!(columns[7].len(), 64, "a full sha256 digest: {}", row);
+            assert!(columns[7].chars().all(|c| c.is_ascii_hexdigit()));
+            assert!(digests.insert(columns[7]), "a repeated digest: {}", row);
         }
         // Sorted, so the file is diffable across runs.
         let mut sorted = rows.clone();

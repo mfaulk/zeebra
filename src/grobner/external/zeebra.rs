@@ -43,7 +43,7 @@ use super::{
         Answer, ExternalSolver, Instance, Invariants, LimitStop, Limits, Measurement, RunFailure,
         RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
     },
-    corpus::REFERENCE_CHARACTERISTIC,
+    corpus::{REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC},
     process::{CpuBasis, RssBasis},
 };
 /// The quotient dimension this adapter will enumerate to **report an invariant**.
@@ -56,7 +56,7 @@ use super::{
 const INVARIANT_DIMENSION_CEILING: usize = 1 << 20;
 
 use crate::{
-    fields::PrimeFieldElement64,
+    fields::{PrimeFieldElement64, Zp32003},
     grobner::{
         differential::polynomial_to_string,
         f4_reported,
@@ -137,6 +137,10 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
     match characteristic {
         // Katsura 4–7, Cyclic 4–6, random and planted MQ at 6, 10, 14.
         REFERENCE_CHARACTERISTIC => &[4, 5, 6, 7, 10, 14],
+        // The same rungs at the corpus's small-prime identity. Over `Zp32003`, a 32-bit
+        // Montgomery field — so a small-prime row measures the narrow arithmetic regime rather
+        // than the 64-bit path at a small modulus.
+        SMALL_PRIME_CHARACTERISTIC => &[4, 5, 6, 7, 10, 14],
         // The three planted Poseidon rows.
         KOALABEAR_PRIME => &[5, 7, 9],
         // Anemoi FCICO at N = 1 and 2.
@@ -411,6 +415,19 @@ impl ZeebraSolver {
     /// Parse and solve, dispatching on the characteristic and then the variable count.
     fn dispatch(&self, instance: &Instance, task: Task) -> Result<Solved, RunFailure> {
         match instance.field.characteristic {
+            SMALL_PRIME_CHARACTERISTIC => dispatch!(
+                Zp32003,
+                instance,
+                task,
+                &self.f4_options,
+                &self.fglm_options,
+                4,
+                5,
+                6,
+                7,
+                10,
+                14
+            ),
             REFERENCE_CHARACTERISTIC => dispatch!(
                 PrimeFieldElement64<REFERENCE_CHARACTERISTIC>,
                 instance,
@@ -551,7 +568,7 @@ impl ExternalSolver for ZeebraSolver {
 mod tests {
     use super::{compiled_dimensions, ZeebraSolver};
     use crate::grobner::external::{
-        corpus::{instance, REFERENCE_CHARACTERISTIC},
+        corpus::{instance, REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC},
         ExternalSolver, Limits, RssBasis, RunStatus, Support, Task, Unsupported,
     };
     use crate::MonomialOrder;
@@ -657,6 +674,33 @@ mod tests {
                 answer.invariants.quotient_dimension,
                 Some(published),
                 "{}'s quotient dimension disagrees with the published value",
+                name
+            );
+        }
+    }
+
+    /// The small-prime corpus identity solves, and reports the **same** published invariants.
+    ///
+    /// Two things at once. Zeebra reaches `GF(32003)` through `Zp32003`, a 32-bit Montgomery field
+    /// rather than the 64-bit path the reference prime uses, so this is the only test that the
+    /// adapter's new dispatch arm is wired at all. And the quotient dimension is an invariant of
+    /// the *ideal's geometry*, which does not depend on the prime for these families — so a
+    /// small-prime row disagreeing with the reference row's `D` would mean a generator, not a
+    /// field, had changed.
+    #[test]
+    fn test_the_small_prime_rungs_solve_and_report_the_same_invariants() {
+        for (name, published) in [("katsura-5", 16), ("katsura-6", 32), ("cyclic-5", 70)] {
+            let built = instance(name, SMALL_PRIME_CHARACTERISTIC, GREVLEX).expect("builds");
+            assert_eq!(built.field.characteristic, SMALL_PRIME_CHARACTERISTIC);
+            let report = ZeebraSolver::new().run(&built, Task::ReducedGrobnerBasis, &limits());
+            let answer = match &report.status {
+                RunStatus::Complete(answer) => answer,
+                other => panic!("{} over GF(32003) gave {:?}", name, other),
+            };
+            assert_eq!(
+                answer.invariants.quotient_dimension,
+                Some(published),
+                "{} over GF(32003) disagrees with the published quotient dimension",
                 name
             );
         }

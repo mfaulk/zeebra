@@ -5,6 +5,8 @@
 //! cargo run --release --example competitive_sweep -- --list          # what would run
 //! cargo run --release --example competitive_sweep -- \
 //!     --engines zeebra,singular --write                              # populate the board in parts
+//! cargo run --release --example competitive_sweep -- \
+//!     --characteristic 32003 --list                                   # the small-prime identity
 //! tools/benchlock.sh runner cargo run --release --example competitive_sweep -- \
 //!     --row katsura-6 --task reduced-grobner-basis --measure --write
 //! ```
@@ -32,7 +34,7 @@ use std::{fs, path::Path, time::Duration};
 
 use zeebra::grobner::{
     external::{
-        corpus::{instance, ladder},
+        corpus::{instance, ladder, PUBLISHED_CHARACTERISTICS, REFERENCE_CHARACTERISTIC},
         CompetitiveBoard, CompetitiveRecord, ExternalSolver, GroebnerJlSolver, Instance, Limits,
         Measurement, MsolveSolver, RunFailure, RunReport, RunStatus, SagebrushSolver,
         SingularSolver, Task, ZeebraSolver,
@@ -90,6 +92,22 @@ fn main() {
     let only_engines: Option<Vec<String>> =
         value("--engines").map(|list| list.split(',').map(|e| e.trim().to_string()).collect());
     let wall = Duration::from_secs(value("--wall").and_then(|s| s.parse().ok()).unwrap_or(600));
+    // Which corpus identity to sweep. A *published* characteristic only: a row at a field with no
+    // frozen digest would be a figure whose problem nothing pins. See `PUBLISHED_CHARACTERISTICS`.
+    let characteristic: u64 = value("--characteristic")
+        .map(|s| {
+            s.parse()
+                .unwrap_or_else(|_| panic!("--characteristic wants an integer, got {:?}", s))
+        })
+        .unwrap_or(REFERENCE_CHARACTERISTIC);
+    if !PUBLISHED_CHARACTERISTICS.contains(&characteristic) {
+        eprintln!(
+            "GF({}) is not a published corpus characteristic; one of {:?}. A row at an \
+             unfrozen field is a figure whose identity nothing pins.",
+            characteristic, PUBLISHED_CHARACTERISTICS
+        );
+        std::process::exit(2);
+    }
 
     let rows: Vec<String> = match &only_row {
         Some(name) => vec![name.clone()],
@@ -133,6 +151,7 @@ fn main() {
     println!("- commit:  {}", environment.commit);
     println!("- build:   {}", environment.build);
     println!("- policy:  {}", environment.policy);
+    println!("- field:   GF({})", characteristic);
     println!(
         "- mode:    {}\n",
         if measure {
@@ -146,11 +165,11 @@ fn main() {
     let limits = Limits::wall(wall).with_workers(1);
 
     for name in &rows {
-        // The characteristic argument is the corpus reference; Poseidon and Anemoi rows override
-        // it with the registry's own field, because their constants are derived from the prime.
+        // Poseidon and Anemoi rows override the characteristic with the registry's own field,
+        // because their round constants are derived from the prime.
         let built = match instance(
             name,
-            zeebra::grobner::external::corpus::REFERENCE_CHARACTERISTIC,
+            characteristic,
             zeebra::MonomialOrder::GradedReverseLexicographic,
         ) {
             Some(built) => built,
@@ -159,6 +178,19 @@ fn main() {
                 continue;
             }
         };
+        // A rung that ignored the request is the *same instance* as at the other published
+        // characteristic, with the same digest. Running it again would append a duplicate row
+        // rather than a second data point, so it is skipped and says so.
+        if built.field.characteristic != characteristic
+            && characteristic != REFERENCE_CHARACTERISTIC
+        {
+            eprintln!(
+                "- {} keeps its registry field GF({}) whatever is asked, so it is already covered \
+                 by the GF({}) sweep",
+                built.name, built.field.characteristic, REFERENCE_CHARACTERISTIC
+            );
+            continue;
+        }
 
         for task in &tasks {
             // Refused rather than asked and timed out. See `MSOLVE_ELIMINANT_CEILING`: above it

@@ -2942,8 +2942,8 @@ rational param(cpu)             0.75 sec
             // Checked for every rung, including the ones with no oracle: a row is only the problem
             // the corpus pinned if its digest is the frozen one.
             assert_eq!(
-                instance.digest(),
-                entry.digest,
+                Some(instance.digest().as_str()),
+                entry.digest_at(instance.field.characteristic),
                 "{}: the corpus digest must be frozen",
                 entry.name
             );

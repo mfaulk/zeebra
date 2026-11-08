@@ -110,9 +110,9 @@ not failures of any engine:
 
 ---
 
-## 4. The reference field, and why it is not wider
+## 4. The two reference fields, and why neither is wider
 
-`REFERENCE_CHARACTERISTIC = 2^31 − 1`.
+`REFERENCE_CHARACTERISTIC = 2^31 − 1` and `SMALL_PRIME_CHARACTERISTIC = 32003`.
 
 msolve caps at `p ≤ 2^31 − 1` and Singular is identical (`MAX_CHARACTERISTIC = 1 << 31`, checked
 `>=`). So `2^31 − 1` is the **largest prime every engine in the comparison accepts**, and a corpus
@@ -121,6 +121,8 @@ keyed on anything wider would render most of the table `Unsupported` and measure
 This is a constraint on the comparison, not on Zeebra, and the protocol document's §3 records what
 it costs: Zeebra's 32–64-bit fields have only Groebner.jl and Sagebrush as comparands, and its
 254/255-bit fields have none at any size. Those rows say so rather than being omitted.
+
+`GF(32003)` is the **second** reference field, and §4b is the decision and the argument for it.
 
 ### 4a. The declared field is the generated field
 
@@ -157,12 +159,144 @@ every frozen digest in `ladder()`, retroactively re-identifying every published 
 over the declared field leaves the reference-prime text byte-identical, which
 `test_the_manifest_is_frozen` confirms.
 
-`ALTERNATE_CHARACTERISTIC = 2^30 + 3 = 1073741827` is the second compiled prime. It is **not** a
-second corpus identity — the manifest, the frozen digests and every published row stay at the
-reference prime. It is that prime rather than an arbitrary one because it is the characteristic
-msolve's own `input_files/kat6-31.ms` declares, so it is the field the Katsura equivalence evidence
-was shipped over, and because it sits below `ceilings::MSOLVE_ELIMINANT` where the reference prime
-does not.
+`ALTERNATE_CHARACTERISTIC = 2^30 + 3 = 1073741827` is a compiled prime that is **not** a corpus
+identity: no frozen digest, no published row. It is that prime rather than an arbitrary one because
+it is the characteristic msolve's own `input_files/kat6-31.ms` declares, so it is the field the
+Katsura equivalence evidence was shipped over, and because it sits below
+`ceilings::MSOLVE_ELIMINANT` where the reference prime does not — which is what `msolve.rs`'s
+eliminant tests need.
+
+### 4b. `GF(32003)` is a second corpus identity, not a sweep axis
+
+**The decision, and why it could not have gone the other way.** §1 says identity is the digest and
+the name is for humans. A rung at `GF(32003)` and the same rung at `GF(2^31 − 1)` have **different
+digests**, and `RunReport::speedup_over` refuses to compare rows whose digests differ. So varying
+the characteristic does not produce another measurement of one problem; it produces another problem.
+"Sweep axis" is the wrong word for what happens — a parameter is something a figure is taken *at*,
+and this is something a figure is taken *of*.
+
+That settles it, because of what makes a corpus row publishable at all: its generated system is
+**pinned**. `test_the_manifest_is_frozen` is the test that catches a generator drifting out from
+under the figures, and it can only do that where a digest was frozen. A `GF(32003)` row with no
+frozen digest would be a published figure whose problem nothing pins — the exact hole the `digest`
+field exists to close, and in the exact place #426 wanted a *regenerable* record rather than a
+number carried in prose.
+
+So the corpus has **three tiers**, and `CorpusEntry::digest_at` is the boundary:
+
+| tier | constant | frozen digest | may a figure be published? |
+|---|---|---|---|
+| published | `PUBLISHED_CHARACTERISTICS` = `[32003, 2^31 − 1]` | yes, one per rung | **yes** |
+| generated | `GENERATED_CHARACTERISTICS`, which adds `2^30 + 3` | no | no — the instance is honest, its identity is not pinned |
+| neither | — | n/a | `corpus::instance` returns `None` |
+
+`CorpusEntry::digests` is therefore `&[(characteristic, digest)]`, keyed on the characteristic the
+built instance **declares**. Two consequences fall out instead of needing special cases:
+
+- A family whose field varies carries **two** digests.
+- A registry row carries **one**. Poseidon's and Anemoi's round constants are derived from the
+  prime, so asking for another one does not produce another instance (§5) — keying on the declared
+  rather than the requested characteristic is what makes that automatic.
+  `test_a_registry_rung_has_one_identity_at_both_published_characteristics` asserts both halves,
+  and the sweep skips such a rung at the small prime rather than appending a duplicate row.
+
+**Why `32003` and not some other small prime.** Three reasons.
+
+1. **It is the field the published record is written in.** Steel's entire modular column — Magma
+   2.11-8/2.11-1/2.10, Singular 2-0-5, Macaulay 2 — runs over `GF(32003)`, and his own note says
+   why: the comparands "handle small primes only up to 16 bits". msolve ships a 16-bit
+   `cyclic5-16.ms` for the same reason. `classical-benchmarks.md` §6 scoped the field itself and
+   this implements it.
+2. **It makes the eliminant a two-engine task where it was one.** msolve's eliminant stops below
+   `1515531529` and the reference prime is above it, so at `2^31 − 1` `UnivariateEliminant` has
+   exactly **one** external engine, Singular. At `32003` msolve joins.
+   `test_the_small_prime_adds_msolve_to_the_eliminant_task` is that, as arithmetic over the engine
+   ceilings rather than as prose.
+3. **It measures a different arithmetic regime, and Zeebra's 32-bit path at all.** Zeebra reaches it
+   through `Zp32003 = PrimeFieldElement32<32003>`, a 32-bit Montgomery field, where the reference
+   prime uses the 64-bit one. The *rendered text* is identical either way — a residue is a residue —
+   so the representation is invisible to the digest and visible only in Zeebra's own timing.
+
+### 4b-i. Measured: no engine on the board is faster at 15 bits than at 31
+
+#426 expected "Zeebra's 32-bit field path to differ from its 64-bit one by more than noise; if it
+does not, that is itself worth recording." **It does not, and neither does any other engine's.**
+
+130 measured rows at `GF(32003)` — 13 rungs × 2 tasks × 5 engines, one row per process under
+`tools/benchlock.sh`, 60 s wall, `taskset -c 0-7` — in `research/competitive/`. Against the existing
+`GF(2^31 − 1)` rows, basis task, both measured the same way:
+
+| rung | Zeebra | Singular | msolve | Groebner.jl | Sagebrush |
+|---|---:|---:|---:|---:|---:|
+| katsura-7 | 1.04 | 1.00 | 1.00 | 0.97 | 1.00 |
+| cyclic-6 | 1.02 | 1.11 | 1.00 | 1.01 | 0.99 |
+| mq-random-10 | 1.01 | 0.99 | 1.09 | 0.98 | 1.04 |
+| mq-planted-14 | 1.00 | 0.88 | 1.00 | 0.80 | 1.00 |
+
+Each cell is `GF(2^31 − 1)` wall over `GF(32003)` wall, **and it is not a speedup**: the two are
+different ideals with different digests, and the two sets of rows carry different commits, so
+`CompetitiveRecord::comparable_with` refuses the pair and the board computes no ratio. They are
+printed side by side as an observation about an arithmetic regime, which is what #426 asked for, and
+nothing stronger may be read off them.
+
+Read carefully, almost every row above is a floor rather than a measurement: msolve and Sagebrush sit
+at their ~10.4 ms process startup on every classical rung and Singular at ~36–51 ms, so their `1.00`s
+say "startup did not change" and nothing else. The one rung clear of every floor is
+**`mq-random-10`**, where all five engines are within 1.09 — Zeebra 28.69 s vs 29.01 s, Singular
+7.07 s vs 7.00 s, msolve 222.78 ms vs 243.14 ms, Groebner.jl 84.82 ms vs 83.41 ms, Sagebrush
+323.49 ms vs 334.88 ms, `GF(32003)` first — with **no consistent direction**. If a 15-bit prime were
+cheaper to reduce in, this is the row where it would show.
+
+**Why, for Zeebra, and it is mechanical rather than mysterious.** `Zp32003` stores a `u32` where the
+reference field stores a `u64`, but the quantity F4 allocates and streams is a
+`SparseRow` entry, `(usize, F)` — and `(usize, u32)` is **16 bytes**, exactly what `(usize, u64)` is,
+because the `usize` forces 8-byte alignment and the narrower field is spent entirely on padding.
+`test_a_narrow_field_does_not_narrow_a_sparse_entry` asserts it. So the entry budget admits the same
+number of entries, the elimination moves the same bytes, and the only thing that got cheaper is a
+multiply that was never the bottleneck at these sizes. `F4Options::max_live_bytes` makes the same
+point in the other direction for BN254, where an entry is 40 bytes.
+
+This does not retire the field. Reasons 1 and 2 above — it is the field the published record is
+written in, and it is what makes the eliminant a two-engine task — are the reasons that survive, and
+they were never speed claims. What it retires is reason 3's *expectation*.
+
+**The machine was shared, and that is disclosed rather than assumed away.** Two other agents were
+working on this workstation throughout, and a `benchlock` run excludes other *benchmarks* under the
+lock — not other builds. All rows above were taken under the lock with nothing of this agent's own
+running; **an earlier complete set of 130 rows, taken while this agent was itself compiling, was
+discarded rather than published.** The `stopped-by-limit` rows on `mq-random-14` rest on a 60 s wall
+and should be read as "did not finish in 60 s on a shared box", not as a ceiling — except Zeebra's,
+which crossed `max_live_nonzeros` at 20 005 445 entries, a bound reproducible on any machine.
+
+### 4c. What `GF(32003)` does not buy, against the expectation it was filed on
+
+#426's strongest stated argument was that msolve answers no `lex-basis-by-conversion` row at the
+corpus characteristic *because* `2^31 − 1` is above its eliminant non-termination bound, and that
+`32003` would therefore hand the conversion task its most informative comparand. **That is not why
+msolve refuses, and `GF(32003)` does not change it.**
+
+`msolve.rs`'s `supports` refuses `LexBasisByConversion` with `Unsupported::Task` before any field is
+looked at, because msolve has **no lex order at all**: `-g` is grevlex only, `-e` builds a two-block
+degrevlex elimination order, and the rational parametrization is not a basis. So msolve is not a
+conversion comparand at **any** field, and the ~30x deficit `competitive-baseline.md` §1 reports —
+measured against msolve on Anemoi at `p = 65537` — cannot become a `lex-basis-by-conversion` board
+row for that reason rather than for a field reason. What `GF(32003)` gives that task is nothing; what
+it gives the *eliminant* task is a second engine, which is reason 2 above and is the narrower true
+claim.
+
+Checking that turned up two more errors in `corpus::ceiling_for`, each the opposite of the other and
+each now fixed against the adapter that implements it:
+
+| arm | was | is | source |
+|---|---|---|---|
+| msolve, conversion | `MSOLVE` (`2^31`) | **absent** | `msolve.rs` refuses the task by name |
+| Sagebrush, conversion | **absent** | `FGLM_MAX_CHARACTERISTIC` (`2^31`) | `fglm.rs:329`; the board holds 14 completed Sagebrush conversion rows |
+| Groebner.jl, eliminant | `GROEBNER_JL` | **absent** | `names(Groebner)` at 0.10.11 has no eliminant |
+
+The first two **cancelled in the count** — three engines either way at the reference prime — which is
+why no corroboration assertion caught them, and why
+`test_the_conversion_comparands_are_singular_and_sagebrush` now asserts the *roster* and not only
+the tally. The corrected numbers are in §5a.
 
 ---
 
@@ -250,6 +384,25 @@ The capability boundary, derived from four engine ceilings rather than written d
 | `2^62 ≤ p < 2^64` | Groebner.jl only | **none** |
 | 254/255-bit | none | none |
 
+**That table is the _basis_ table, and the other two tasks are narrower for reasons that are missing
+tasks rather than field ceilings.** `corroboration_for(task, p)` is the task-aware form and
+`corroboration(p)` is the basis shorthand; reading the second as the first overstates what can check
+a conversion row by four engines to zero.
+
+| task | engines that have it at all | why the others do not | `p = 32003` | `p < 2^31` | `p ≥ 2^31` |
+|---|---|---|---|---|---|
+| basis | all four | — | four-way | four-way | two-way |
+| **conversion** | Singular, Sagebrush | msolve has no lex order; Groebner.jl 0.10.11 has no FGLM | **two-way** | **two-way** | **none** |
+| eliminant | msolve, Singular | neither Sagebrush nor Groebner.jl has the task | **two-way** | sole engine above `1515531529` | none |
+
+Two notes a reader needs before using the eliminant row. msolve's eliminant bound is `1515531529`,
+below a tenth of its basis bound, which is what makes `32003` and `2^31 − 1` land in different cells.
+And **Zeebra's own adapter refuses `UnivariateEliminant`**, so that column has no in-crate operand at
+any field: the gain there is corroboration of an invariant between two external engines, not a
+Zeebra ranking. The refusal's stated reason — "no comparand offers the task at all" — is false, and
+#465 is the fix; the eliminant is the only task the board defines with two external engines and no
+in-crate answer.
+
 The ceilings, each from the engine's own gate:
 
 | engine | ceiling | source |
@@ -321,33 +474,54 @@ exercises `StoppedByLimit`, the outcome the protocol spends the most care on.
 
 ## 8. The manifest
 
-`corpus::manifest()` emits line-oriented ASCII, sorted, one row per rung:
+`corpus::manifest()` emits line-oriented ASCII, sorted, one row per rung **per identity** — so a
+rung whose field varies appears twice and a registry rung once (§4b):
 
 ```
-# zeebra cross-library corpus, characteristic 2147483647 order grevlex
-# name family rung equivalence dimension variables digest
-anemoi64-cico-n1-fcico anemoi easy sole-comparand zero-dimensional 2 c053c6ff0186e3b4…
-anemoi64-cico-n2-fcico anemoi intermediate sole-comparand zero-dimensional 4 e3a6312e85c486b0…
-cyclic-4 cyclic easy comparand-file positive-dimensional 4 e1d8d59448b3d648…
-cyclic-5 cyclic easy comparand-file zero-dimensional 5 3274d14b224664ae…
-cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 ed89afe173d16024…
-katsura-4 katsura easy comparand-file zero-dimensional 4 825a3aa54e152da5…
-katsura-5 katsura easy comparand-file zero-dimensional 5 6f305e37b2cc4ade…
-katsura-6 katsura intermediate comparand-file zero-dimensional 6 aa992992dfe29a23…
-katsura-7 katsura challenging comparand-file zero-dimensional 7 545cef6185ed10e4…
-mq-planted-10 mq-planted intermediate known-solution zero-dimensional 10 0eef4b55bce6fdc6…
-mq-planted-14 mq-planted challenging known-solution zero-dimensional 14 063f5b1ddbab6ef1…
-mq-planted-6 mq-planted easy known-solution zero-dimensional 6 55fb9b0622b6217a…
-mq-random-10 mq-random intermediate live-oracle zero-dimensional 10 72d0ad315fc25409…
-mq-random-14 mq-random challenging live-oracle zero-dimensional 14 029def705543e29b…
-mq-random-6 mq-random easy live-oracle zero-dimensional 6 d98e5e5bf82b4618…
-poseidon-t2-rf2-rp0-planted poseidon easy known-solution zero-dimensional 5 f4cf6699cee835a6…
-poseidon-t2-rf2-rp2-planted poseidon intermediate known-solution zero-dimensional 7 3b3bfb037ceb32de…
-poseidon-t2-rf4-rp0-planted poseidon challenging known-solution zero-dimensional 9 95cec79371a8751a…
+# zeebra cross-library corpus, characteristics [32003, 2147483647] order grevlex
+# name family rung equivalence dimension variables characteristic digest
+anemoi64-cico-n1-fcico anemoi easy sole-comparand zero-dimensional 2 18446744073709551263 c053c6ff0186e3b4…
+anemoi64-cico-n2-fcico anemoi intermediate sole-comparand zero-dimensional 4 18446744073709551263 e3a6312e85c486b0…
+cyclic-4 cyclic easy comparand-file positive-dimensional 4 2147483647 e1d8d59448b3d648…
+cyclic-4 cyclic easy comparand-file positive-dimensional 4 32003 e5a49df27c74d4d7…
+cyclic-5 cyclic easy comparand-file zero-dimensional 5 2147483647 3274d14b224664ae…
+cyclic-5 cyclic easy comparand-file zero-dimensional 5 32003 e80b7d8a6432b7d3…
+cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 2147483647 ed89afe173d16024…
+cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 32003 bf3bb57af08fcc94…
+katsura-4 katsura easy comparand-file zero-dimensional 4 2147483647 825a3aa54e152da5…
+katsura-4 katsura easy comparand-file zero-dimensional 4 32003 c5fb073f5c9aceaa…
+katsura-5 katsura easy comparand-file zero-dimensional 5 2147483647 6f305e37b2cc4ade…
+katsura-5 katsura easy comparand-file zero-dimensional 5 32003 8be0a39d2d8c64ff…
+katsura-6 katsura intermediate comparand-file zero-dimensional 6 2147483647 aa992992dfe29a23…
+katsura-6 katsura intermediate comparand-file zero-dimensional 6 32003 a7bd9edf654af9e9…
+katsura-7 katsura challenging comparand-file zero-dimensional 7 2147483647 545cef6185ed10e4…
+katsura-7 katsura challenging comparand-file zero-dimensional 7 32003 c56bf75048b0fbae…
+mq-planted-10 mq-planted intermediate known-solution zero-dimensional 10 2147483647 0eef4b55bce6fdc6…
+mq-planted-10 mq-planted intermediate known-solution zero-dimensional 10 32003 74fc86970c3e5658…
+mq-planted-14 mq-planted challenging known-solution zero-dimensional 14 2147483647 063f5b1ddbab6ef1…
+mq-planted-14 mq-planted challenging known-solution zero-dimensional 14 32003 132bc0b85ac22d67…
+mq-planted-6 mq-planted easy known-solution zero-dimensional 6 2147483647 55fb9b0622b6217a…
+mq-planted-6 mq-planted easy known-solution zero-dimensional 6 32003 26932613e8ca565c…
+mq-random-10 mq-random intermediate live-oracle zero-dimensional 10 2147483647 72d0ad315fc25409…
+mq-random-10 mq-random intermediate live-oracle zero-dimensional 10 32003 16422dafcdb6487e…
+mq-random-14 mq-random challenging live-oracle zero-dimensional 14 2147483647 029def705543e29b…
+mq-random-14 mq-random challenging live-oracle zero-dimensional 14 32003 4e440cfac8426226…
+mq-random-6 mq-random easy live-oracle zero-dimensional 6 2147483647 d98e5e5bf82b4618…
+mq-random-6 mq-random easy live-oracle zero-dimensional 6 32003 bbfecd7f5522e203…
+poseidon-t2-rf2-rp0-planted poseidon easy known-solution zero-dimensional 5 2130706433 f4cf6699cee835a6…
+poseidon-t2-rf2-rp2-planted poseidon intermediate known-solution zero-dimensional 7 2130706433 3b3bfb037ceb32de…
+poseidon-t2-rf4-rp0-planted poseidon challenging known-solution zero-dimensional 9 2130706433 95cec79371a8751a…
 ```
 
-Nineteen rungs across six families. Digests are abbreviated above; the manifest carries all 64
-hex digits.
+**Eighteen rungs across six families, thirty-one identities.** Thirteen rungs carry two
+(the two published characteristics) and five carry one (the registry rows, whose field is their
+own). `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
+`digests.len()` summed over the ladder, so the manifest and the frozen table cannot disagree about
+how many problems the corpus holds, and asserts every digest in it is distinct. Digests are
+abbreviated above; the manifest carries all 64 hex digits.
+
+The characteristic is a **column** rather than a document per field, so one sorted table carries the
+whole corpus and a reader can see at a glance which rungs have two identities and which have one.
 
 Line-oriented and ASCII so another language's harness can read it and a digest can be reproduced by
 hand — the same property that makes `Instance::canonical` reproducible outside Rust.
