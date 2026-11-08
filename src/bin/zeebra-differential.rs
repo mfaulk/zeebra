@@ -29,6 +29,12 @@ use zeebra::grobner::differential::{
     SweepOptions, SweepReport, SystemOutcome,
 };
 
+/// Per-system Singular time limit when `--timeout` is not given.
+///
+/// Named so that [`sweep_flags`] can tell a given value from the default and echo only the former
+/// into a committed fixture header.
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// What the command was asked to do.
 struct Arguments {
     sweep: SweepOptions,
@@ -215,9 +221,15 @@ fn run(arguments: Arguments) -> Result<SweepReport, String> {
 ///
 /// Spelled out rather than taken from `std::env::args`, so that a table regenerated through a
 /// wrapper script still records flags the tool itself accepts. Only the ones that change which
-/// systems are generated: the oracle's path, the scratch directory and `--jobs` do not, and
-/// including any of them would make the committed fixture header turn over on a change that
-/// cannot alter a single recorded answer.
+/// systems are generated, *plus `--timeout`*: the oracle's path, the scratch directory and
+/// `--jobs` do not, and including any of them would make the committed fixture header turn over on
+/// a change that cannot alter a single recorded answer.
+///
+/// `--timeout` is the exception because it does not change which systems are **generated** and does
+/// change which are **recorded**: `FIXTURES_GF256MQ`'s seed yields 39 fixtures at the default 30 s
+/// and 40 at 300 s, because one five-variable system takes Singular longer than the default allows.
+/// A header that omitted it would not reproduce its own table (#421). Echoed only when it differs
+/// from the default, so the existing headers do not turn over.
 fn sweep_flags(arguments: &Arguments) -> String {
     let sweep = &arguments.sweep;
     let fields: Vec<String> = sweep.fields.iter().map(|f| f.to_string()).collect();
@@ -232,6 +244,9 @@ fn sweep_flags(arguments: &Arguments) -> String {
         sweep.max_terms,
         fields.join(","),
     );
+    if arguments.timeout != DEFAULT_TIMEOUT {
+        flags.push_str(&format!(" --timeout {}", arguments.timeout.as_secs()));
+    }
     if arguments.fixture_table != "FIXTURES" {
         flags.push_str(&format!(" --fixture-table {}", arguments.fixture_table));
     }
@@ -346,7 +361,7 @@ fn parse_arguments() -> Result<Option<Arguments>, String> {
         f4: F4Options::default(),
     };
     let mut singular = "Singular".to_string();
-    let mut timeout = Duration::from_secs(30);
+    let mut timeout = DEFAULT_TIMEOUT;
     let mut work_dir = default_work_dir();
     let mut keep_files = false;
     let mut fixtures: Option<PathBuf> = None;
