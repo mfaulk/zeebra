@@ -4081,10 +4081,11 @@ stop, not a comparison with the published 5 280 s, and not a completion attempt.
 **And the same size over the other field.** Type V publishes `m = 16` too, so `fukuoka-mq-V-n24-seed0`
 is the same `n = 24` over GF(2^8) — registered, and runnable since the scoreboard's MQ visitors
 became generic over the coefficient type and started dispatching on the instance's own field
-rather than on a hardwired GF(31) (#510). The two slices, re-measured at one commit, **stop
-identically**: degree 6, the same 13 602 x 19 132 matrix, 4 967 pairs against 4 968, and
-20 010 753 live entries against 20 011 556 — a difference of 803 entries in 20 million. The wall is
-42.1 s against **105.1 s**, so with the computation held fixed the field alone is **2.49x**. That is
+rather than on a hardwired GF(31) (#510). The two slices **stop identically**, and did so
+in three pairs at three commits: degree 6, the same 13 602 x 19 132 matrix, 4 967 pairs against
+4 968, and 20 010 753 live entries against 20 011 556 — a difference of 803 entries in 20 million.
+The wall is 44.3 s against **111.1 s**, so with the computation held fixed the field alone is about
+**2.5x**. That is
 the pair's value: §4.4's type VI-against-type III comparison varied the shape, and this one holds
 the shape fixed and prices the arithmetic.
 [`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §4.4 has the figures and the slice
