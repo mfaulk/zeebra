@@ -113,6 +113,11 @@ if command -v sagebrush-gb-driver > /dev/null 2>&1; then
       "$(grep -m1 '^#seconds:' "$OUT/sagebrush.gb" | sed 's/^#seconds: *//;s/^/inner /;s/$/s/')" \
       "$(wc -l < "$OUT/sagebrush.canon")" \
       "${SAGEBRUSH_THREADS:-unset (all cores)}"
+    # The comparand's own build configuration, from the binary that just ran rather than from the
+    # script that asked for it (#385). An operator comparing timings sees the floor here first.
+    floor="$(sed -n 's/^#isa floor: *//p' "$OUT/sagebrush.gb" | head -1)"
+    printf '              built for %s\n' \
+      "${floor:-unreported: a driver predating contract 3; re-run provision.sh}"
   else
     ABSENT+=("Sagebrush (ran but failed)")
     sed -n '1,12p' "$OUT/sagebrush.err"

@@ -13,6 +13,15 @@ The adapter is `src/grobner/external/sagebrush.rs`; the driver it goes through i
 `tools/external/sagebrush-driver`; what it is like to provision is
 `docs/research/external-comparands.md` §5.
 
+**Every timing quoted in this note was taken against a baseline `x86-64` build of the driver**, and
+should be read as a lower bound on the comparand. #385 found that the provisioning built it outside
+Zeebra's worktree, where it inherited no ISA floor and no LTO, and resolved it by matching Zeebra's
+`x86-64-v3` floor at fat LTO. The one place that interacts with the analysis below is §8.2's note
+that `reduce_auto` dispatches on `is_x86_feature_detected!("avx2")` at *runtime*: that kernel was
+already taking its AVX2 path, so what the raised floor changes is the surrounding code — the scalar
+arithmetic, the packing, the heap traffic — and not Sagebrush's own hand-dispatched elimination.
+Re-measuring the board at the matched floor is #520.
+
 ---
 
 ## 1. There is a Gröbner engine and there is no Gröbner CLI

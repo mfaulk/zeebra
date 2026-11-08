@@ -3058,6 +3058,26 @@ only when it happened to be present would silently stop checking against an olde
 which is worse than not checking at all. A driver predating the marker fails with
 `RunFailure::Incomplete` naming `tools/external/provision.sh`, so the remedy is in the error.
 
+**That same prefix is a third way to lose the ISA floor, and it had lost it.** The driver is built
+by `cd`-ing into the prefix, so cargo resolved config from there upward and the comparand was
+compiled at baseline `x86-64` with no LTO while Zeebra's side of every comparison ran at
+`x86-64-v3` under fat LTO at one codegen unit (#385) — "a comparison between a tool built for its
+distribution's baseline and one built for the host is not a comparison of algorithms", as
+`docs/research/external-comparison-protocol.md` puts it. For a comparand this repository builds
+from source, the fix is to **match the floor** rather than record the gap, and raising it makes the
+*comparand* faster, so it is not a self-serving change. `provision.sh` now passes
+`-C target-cpu=x86-64-v3` (overridable with `ZEEBRA_EXT_DRIVER_TARGET_CPU`) and the driver's own
+`Cargo.toml` restates `lto = "fat"` and `codegen-units = 1`.
+
+The part that makes it checkable is that **the comparand reports its own floor**: the driver prints
+`#isa floor:` from a compile-time `cfg!(target_feature = ..)` — the only sound instrument, since a
+census of the artifact cannot separate a raised floor from an explicitly dispatched
+`#[target_feature]` kernel — and the adapter records it in the row's `ToolVersion` as
+`<pinned sha>, built for x86-64-v3 or better (AVX2)`. The marker arrived with contract 3, so an
+older installed driver is refused rather than measured against a configuration it was not built
+with. The board's existing Sagebrush rows predate the change, say so through their own build
+identity, and are re-taken by #520.
+
 The agreement checks are live tests, `#[ignore]`d because CI has neither tool installed and a test
 that silently passed when the tool is absent would be worse than no test:
 

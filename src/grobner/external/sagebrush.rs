@@ -324,7 +324,13 @@ const LEADING_SEPARATOR: &str = "--- leading monomials ---";
 /// |---|---|
 /// | 1 | the degrevlex basis, its leading monomials, and the echoed characteristic, variable order and monomial order |
 /// | 2 | `--order` / `--route`, `#route:`, `#quotient dimension:`, and the `#gen` generator echo |
-pub const DRIVER_CONTRACT: u32 = 2;
+/// | 3 | `#isa floor:`, the comparand's own compile-time ISA floor (#385) |
+///
+/// Contract 3 is also what stops a **stale binary** being measured against the matched build
+/// configuration #385 introduced: a driver installed before that change reports no floor and is
+/// refused here, rather than producing a row that reads as `x86-64-v3` because the script now says
+/// so. Re-run `tools/external/provision.sh`.
+pub const DRIVER_CONTRACT: u32 = 3;
 
 /// Sagebrush's name for one of Zeebra's monomial orders, which is what the driver's `--order`
 /// takes and what its `#monomial order:` header echoes.
@@ -748,6 +754,40 @@ impl SagebrushSolver {
             .map(Duration::from_secs_f64)
     }
 
+    /// The finer build identifier a record carries: the pinned commit **and** the ISA floor.
+    ///
+    /// # Why the floor belongs in the record
+    ///
+    /// `docs/research/external-comparison-protocol.md` requires each side's build configuration to
+    /// travel with the figure, because a comparison between a tool built for its distribution's
+    /// baseline and one built for the host is not a comparison of algorithms. Until #385 the
+    /// driver was built at baseline `x86-64` against Zeebra's `x86-64-v3`, and — this being the
+    /// part that made it a defect rather than a documented asymmetry — **a row gave no way to tell
+    /// which**: the version string was the engine name and the commit, both of which are identical
+    /// across the two builds.
+    ///
+    /// So the floor is read from the driver's own `#isa floor:`, which is a compile-time
+    /// `cfg!(target_feature = ..)` inside the binary that ran. Not inferred from
+    /// `provision.sh`: the script states what it asks for, and an installed binary can predate it.
+    /// Not probed from the artifact either — #385 measured that instruction censuses cannot
+    /// separate a raised floor from an explicitly dispatched `#[target_feature]` kernel, and that
+    /// rustc emits no GNU property note.
+    ///
+    /// # Errors
+    /// [`RunFailure::MissingMarker`] when the driver reports no floor, which means a binary older
+    /// than driver contract 3 and is the operator's cue to re-provision.
+    fn build_identity(output: &str) -> Result<String, RunFailure> {
+        let floor = output
+            .lines()
+            .find_map(|line| line.strip_prefix("#isa floor:"))
+            .map(str::trim)
+            .filter(|floor| !floor.is_empty())
+            .ok_or(RunFailure::MissingMarker {
+                marker: "#isa floor:".to_string(),
+            })?;
+        Ok(format!("{PROVISIONED_COMMIT}, built for {floor}"))
+    }
+
     /// The driver's error message, if it printed one.
     ///
     /// `main` returns `Result<(), String>`, so a failure is `Error: "..."` on stderr and a
@@ -811,7 +851,7 @@ impl ExternalSolver for SagebrushSolver {
                 marker: "#engine:".to_string(),
             })?;
         let version = ToolVersion::new("sagebrush", engine)
-            .with_build(PROVISIONED_COMMIT)
+            .with_build(Self::build_identity(&output)?)
             .with_raw(output.clone());
         self.version = Some(version.clone());
         Ok(version)
@@ -1034,7 +1074,7 @@ impl ExternalSolver for SagebrushSolver {
 mod tests {
     use super::{
         SagebrushSolver, DRIVER_CONTRACT, FGLM_MAX_CHARACTERISTIC, MAX_CHARACTERISTIC,
-        MAX_VARIABLES, MAX_VARIABLES_LEX, PINNED_SWITCHES,
+        MAX_VARIABLES, MAX_VARIABLES_LEX, PINNED_SWITCHES, PROVISIONED_COMMIT,
     };
     use crate::{
         grobner::external::{
@@ -1383,7 +1423,8 @@ mod tests {
     #[test]
     fn test_the_driver_output_parses_into_invariants() {
         let solver = solver("sagebrush-gb-driver", "parse");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
+                      #isa floor:            x86-64-v3 or better (AVX2)\n\
                       #generators:           2\n\
                       #gen 1*x1^2 + 1*x2\n#gen 1*x2^2 + 65520\n\
                       #engine:               sagebrush-mpoly f4::groebner_p\n\
@@ -1464,7 +1505,7 @@ mod tests {
     #[test]
     fn test_echoed_generators_matching_the_sent_system_parse() {
         let solver = solver("sagebrush-gb-driver", "gen-ok");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #generators:           2\n\
@@ -1488,7 +1529,7 @@ mod tests {
     fn test_an_echoed_generator_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "gen-mismatch");
         // The instance sends `x1^2+x2` and `x2^2-1`; the driver echoes a different constant.
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #generators:           2\n\
@@ -1520,7 +1561,7 @@ mod tests {
         let mut wide = instance(1_073_741_827, MonomialOrder::GradedReverseLexicographic);
         wide.variables = (1..=10).map(|i| format!("x{}", i)).collect();
         wide.system = vec!["x1*x10-1".to_string()];
-        let header = "#driver contract:      2\n\
+        let header = "#driver contract:      3\n\
                       #field characteristic: 1073741827\n\
                       #variable order:       x1, x2, x3, x4, x5, x6, x7, x8, x9, x10\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
@@ -1589,11 +1630,54 @@ mod tests {
         }
     }
 
+    /// The build identity carries both the pinned commit and the driver's own reported ISA floor.
+    #[test]
+    fn test_the_build_identity_records_the_drivers_isa_floor() {
+        let output = "#driver contract:      3\n\
+                      #isa floor:            x86-64-v3 or better (AVX2)\n\
+                      #engine:               sagebrush-mpoly f4::groebner_p\n";
+        let identity = SagebrushSolver::build_identity(output).expect("the floor is reported");
+        assert!(identity.contains(PROVISIONED_COMMIT), "{}", identity);
+        assert!(
+            identity.contains("x86-64-v3 or better (AVX2)"),
+            "{}",
+            identity
+        );
+    }
+
+    /// A driver that reports no ISA floor yields no build identity rather than an assumed one.
+    ///
+    /// The whole point of #385's marker: the script's intent is not evidence about the binary that
+    /// is installed, so an absent floor is a missing marker and not "presumably the configured one".
+    #[test]
+    fn test_a_driver_reporting_no_isa_floor_is_a_missing_marker() {
+        let output = "#driver contract:      2\n\
+                      #engine:               sagebrush-mpoly f4::groebner_p\n";
+        match SagebrushSolver::build_identity(output) {
+            Err(RunFailure::MissingMarker { marker }) => assert_eq!(marker, "#isa floor:"),
+            other => panic!("expected a missing floor marker, got {:?}", other),
+        }
+    }
+
+    /// A build below the floor is still recorded, verbatim, rather than silently normalized.
+    ///
+    /// Refusing it here would be the wrong place: `#isa floor:` is *provenance*, and a figure taken
+    /// against a baseline comparand is publishable as long as the record says so. What must never
+    /// happen is the record claiming the floor the script asked for.
+    #[test]
+    fn test_a_baseline_build_is_recorded_rather_than_refused() {
+        let output = "#driver contract:      3\n\
+                      #isa floor:            baseline x86-64, NO AVX2 — this build is below \
+                      Zeebra's floor; re-run provision.sh\n";
+        let identity = SagebrushSolver::build_identity(output).expect("a floor is reported");
+        assert!(identity.contains("NO AVX2"), "{}", identity);
+    }
+
     /// An echoed generator count that disagrees with the lines printed is a truncated run.
     #[test]
     fn test_an_echoed_generator_count_mismatch_is_unparsable() {
         let solver = solver("sagebrush-gb-driver", "gen-count");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #generators:           2\n#gen 1*x1^2 + 1*x2\n\
@@ -1617,7 +1701,7 @@ mod tests {
     #[test]
     fn test_an_echoed_route_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo-route");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       lex\n#route:                f4 (direct)\n\
                       #length of basis:      1 elements\n\
@@ -1638,7 +1722,7 @@ mod tests {
     #[test]
     fn test_an_echoed_order_mismatch_names_the_requested_order() {
         let solver = solver("sagebrush-gb-driver", "echo-order");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #length of basis:      1 elements\n\
@@ -1662,7 +1746,7 @@ mod tests {
     #[test]
     fn test_an_echoed_variable_order_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n\
                       #variable order:       x2, x1\n\
                       #monomial order:       degrevlex\n\
@@ -1685,7 +1769,7 @@ mod tests {
     #[test]
     fn test_an_echoed_characteristic_mismatch_is_self_inconsistent() {
         let solver = solver("sagebrush-gb-driver", "echo-char");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65519\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #length of basis:      1 elements\n\
@@ -1704,7 +1788,7 @@ mod tests {
     #[test]
     fn test_a_truncated_basis_is_unparsable_rather_than_short() {
         let solver = solver("sagebrush-gb-driver", "truncated");
-        let output = "#driver contract:      2\n\
+        let output = "#driver contract:      3\n\
                       #field characteristic: 65521\n#variable order:       x1, x2\n\
                       #monomial order:       degrevlex\n#route:                f4\n\
                       #generators:           2\n\

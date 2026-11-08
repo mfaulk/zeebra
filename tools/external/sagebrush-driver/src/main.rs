@@ -371,7 +371,42 @@ const USAGE: &str =
 /// * 1 — the degrevlex basis, its leading monomials, and the echoed characteristic, variable order
 ///   and monomial order.
 /// * 2 — `--order` / `--route`, `#route:`, `#quotient dimension:`, and the `#gen` echo.
-const DRIVER_CONTRACT: u32 = 2;
+/// * 3 — `#isa floor:`, so a record says what the comparand was compiled for (#385).
+const DRIVER_CONTRACT: u32 = 3;
+
+/// The vector instruction set **this binary** was compiled for, for the measurement header.
+///
+/// The comparand's half of #385. Zeebra's side of every comparison is built at `x86-64-v3` under
+/// fat LTO at one codegen unit, and until #385 this driver was built at its distribution's
+/// baseline — because `tools/external/provision.sh` builds it outside Zeebra's worktree, where
+/// cargo inherits neither `.cargo/config.toml` nor the workspace's `[profile.release]`. Both sides
+/// now carry the floor, and this is the line that proves it for the side that does not link
+/// `zeebra`.
+///
+/// Compile-time, through `cfg!(target_feature = ..)`, which is what `-C target-cpu` sets — so it
+/// reports what the compiler was told rather than what the CPU can do, which is the quantity a
+/// figure's comparability depends on. A census of the built artifact cannot answer this: #385
+/// measured that the AVX2 and BMI2 instructions in Sagebrush's and dashu's explicitly dispatched
+/// `#[target_feature]` kernels are present in a baseline build too, and that rustc emits no GNU
+/// property note to read instead.
+///
+/// Deliberately the same vocabulary as `zeebra::util::isa_floor`, so the two sides of a comparison
+/// are read in the same words. Duplicated rather than imported: this crate links Sagebrush and
+/// nothing of Zeebra's, which is the property that keeps the comparand independent.
+fn isa_floor() -> &'static str {
+    if cfg!(not(target_arch = "x86_64")) {
+        return "not x86_64; the x86-64-v3 floor does not apply";
+    }
+    if cfg!(target_feature = "avx512f") {
+        "x86-64-v4 or better (AVX-512)"
+    } else if cfg!(target_feature = "avx2") {
+        "x86-64-v3 or better (AVX2)"
+    } else if cfg!(target_feature = "avx") {
+        "AVX but not AVX2 — below the x86-64-v3 floor the comparison is configured for"
+    } else {
+        "baseline x86-64, NO AVX2 — this build is below Zeebra's floor; re-run provision.sh"
+    }
+}
 
 /// The command line: the input path, the order and the route.
 ///
@@ -462,6 +497,7 @@ fn main() -> Result<(), String> {
     // Rendered in degrevlex whatever `--order` is, so the echo does not depend on the route and
     // stays comparable across tasks; the adapter compares as a set of canonical terms anyway.
     println!("#driver contract:      {DRIVER_CONTRACT}");
+    println!("#isa floor:            {}", isa_floor());
     println!("#generators:           {}", sys.len());
     for f in &sys {
         println!("#gen {}", render(&from_qpoly(f, Order::DegRevLex), &vars));

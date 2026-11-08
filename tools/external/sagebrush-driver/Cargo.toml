@@ -15,5 +15,11 @@ publish = false
 sagebrush-mpoly = { path = "../src/sagebrush/engine/mpoly" }
 sagebrush-bigint = { path = "../src/sagebrush/engine/bigint" }
 
+# Zeebra's own `[profile.release]`, restated here because profiles live in `Cargo.toml` and this
+# crate is built outside Zeebra's worktree, where it inherits neither that profile nor
+# `.cargo/config.toml`. The ISA floor is the other half and cannot be set here — it is a rustflag,
+# passed by `tools/external/provision.sh` and echoed back by the driver's `#isa floor:` line (#385).
 [profile.release]
 opt-level = 3
+lto = "fat"
+codegen-units = 1

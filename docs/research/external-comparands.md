@@ -451,11 +451,21 @@ conversion from a degrevlex basis, and it accepts only a lex or invlex target an
 (§5.1.1 of `sagebrush-implementation.md`). Unknown flags and unknown values are refused rather
 than ignored.
 
-Every run echoes what it actually did — `#driver contract:`, `#generators:`, one `#gen` per
-generator, `#engine:`, `#field characteristic:`, `#variable order:`, `#monomial order:`, `#route:`,
-`#quotient dimension:`, `#length of basis:`, `#seconds:` — and the adapter checks the
+Every run echoes what it actually did — `#driver contract:`, `#isa floor:`, `#generators:`, one
+`#gen` per generator, `#engine:`, `#field characteristic:`, `#variable order:`, `#monomial order:`,
+`#route:`, `#quotient dimension:`, `#length of basis:`, `#seconds:` — and the adapter checks the
 characteristic, the variable order, the order, the route **and the generators** against the
 request, reporting a mismatch as `RunFailure::SelfInconsistent`.
+
+`#isa floor:` is the comparand's own build configuration, and it is there because until #385 there
+was no way to tell from a row which configuration produced it. The driver is built inside the
+prefix, so it inherited neither Zeebra's `-C target-cpu=x86-64-v3` nor its `[profile.release]`, and
+the comparand ran at its distribution's baseline against Zeebra's raised floor. `provision.sh` now
+passes the flag and the driver's `Cargo.toml` restates the profile; the marker is what proves it
+for the binary that actually ran, since it is a compile-time `cfg!(target_feature = ..)` rather
+than a census of the artifact — #385 measured that explicitly dispatched `#[target_feature]`
+kernels make such a census unable to tell the two builds apart. The adapter stores it in the row's
+`ToolVersion` as `<pinned sha>, built for <floor>`.
 
 The `#gen` echo (#329) is the one input fact the other checks do not cover, and it follows msolve's
 own discipline (§3.2: an adapter should assert on what the tool says it did rather than trusting
@@ -476,7 +486,10 @@ is installed into the prefix and can therefore be older than the adapter reading
 echo only if it is present" is a check that silently stops checking — the failure mode being one
 that produces a well-formed answer to a different question. A driver below the required contract
 fails with `RunFailure::Incomplete` naming `provision.sh`. Bumping the marker in the driver and
-`sagebrush::DRIVER_CONTRACT` in the adapter is one change, not two. The route line matters more than it looks:
+`sagebrush::DRIVER_CONTRACT` in the adapter is one change, not two. Contract **3** is the ISA floor
+above, and the requirement earns its keep there twice over: a driver installed before #385 reports
+no floor *and* was built without one, so refusing it is what stops a baseline binary producing rows
+that read as `x86-64-v3` because the provisioning script now asks for it. The route line matters more than it looks:
 the two lex routes return the **same basis**, so nothing else in the output distinguishes a direct
 lex F4 from an FGLM conversion, and a column that mixed them would compare two complexities under
 one heading. `#quotient dimension:` is the driver's own count of the monomials no leading monomial
