@@ -1002,10 +1002,13 @@ fn run_mq_rows(
     seeds: u64,
     wall: Duration,
 ) -> Vec<RunRecord> {
-    let ChallengeParameters::MqSystem { kind, n, m, .. } = manifest.parameters else {
+    let ChallengeParameters::MqSystem {
+        kind, n, m, seed, ..
+    } = manifest.parameters
+    else {
         return Vec::new();
     };
-    let Some((instance, published)) = read_mq(kind, n) else {
+    let Some((instance, published)) = read_mq(kind, n, m, seed) else {
         return Vec::new();
     };
 
@@ -1133,20 +1136,46 @@ fn report_campaign(campaign: &Campaign) {
     }
 }
 
-/// Read a published instance and its answer, if both are on disk.
-fn read_mq(kind: &str, n: usize) -> Option<(MqInstance, Vec<u64>)> {
+/// Read a published instance and its answer, if the instance is on disk.
+///
+/// Two naming schemes, because the site has two. A toy example is `ToyExample-typeT-nN-seedS` and
+/// ships an answer file; a real challenge is `challenge-T-S-SEED`, indexed by `n` for the
+/// encryption types and by `m` for the signature ones, and ships **no answer** — nobody publishes
+/// the solution to an instance that is still a challenge. So a missing answer is ordinary here and
+/// returns an empty vector rather than `None`; a present answer that does not parse is not
+/// ordinary and still panics.
+fn read_mq(kind: &str, n: usize, m: usize, seed: u64) -> Option<(MqInstance, Vec<u64>)> {
     let directory = std::env::var("ZEEBRA_MQ_DIR").unwrap_or("research/instances/mq".to_string());
-    let name = format!(
-        "ToyExample-type{}-n{}-seed0",
-        if kind == "III" { 3 } else { 6 },
-        n
-    );
-    let text = fs::read_to_string(Path::new(&directory).join(&name)).ok()?;
-    let answer = fs::read_to_string(Path::new(&directory).join(format!("{}-answer", name))).ok()?;
+    let encryption = kind == "II" || kind == "III";
+    let type_number = match kind {
+        "I" => 1,
+        "II" => 2,
+        "III" => 3,
+        "IV" => 4,
+        "V" => 5,
+        _ => 6,
+    };
+    let names = [
+        format!("ToyExample-type{}-n{}-seed{}", type_number, n, seed),
+        format!(
+            "challenge-{}-{}-{}",
+            type_number,
+            if encryption { n } else { m },
+            seed
+        ),
+    ];
+    let (name, text) = names.iter().find_map(|name| {
+        let text = fs::read_to_string(Path::new(&directory).join(name)).ok()?;
+        Some((name, text))
+    })?;
     let instance = MqInstance::parse(&text).expect("a published instance");
-    let published = instance
-        .parse_answer(&answer)
-        .expect("the published answer parses");
+    let published = match fs::read_to_string(Path::new(&directory).join(format!("{}-answer", name)))
+    {
+        Ok(answer) => instance
+            .parse_answer(&answer)
+            .expect("the published answer parses"),
+        Err(_) => Vec::new(),
+    };
     Some((instance, published))
 }
 
@@ -1225,33 +1254,33 @@ impl MqVisitor<Q> for SolveMqSliced<'_> {
         record.outcome = outcome;
         record.stages.extend(stages);
         record.frontier = Some(frontier);
-        record.verification = format!(
-            "evaluated against the published coefficient vectors; the published answer starts {:?}",
-            &self.published[..self.published.len().min(4)]
-        );
+        // A real challenge publishes no answer, so there is nothing to start with and saying so is
+        // not the same claim as having checked against one.
+        record.verification = if self.published.is_empty() {
+            "evaluated against the published coefficient vectors; this instance publishes no \
+             answer vector, so the witness check is the only check"
+                .to_string()
+        } else {
+            format!(
+                "evaluated against the published coefficient vectors; the published answer starts \
+                 {:?}",
+                &self.published[..self.published.len().min(4)]
+            )
+        };
         record
     }
 }
 
 /// Run one registered MQ problem, if its file is present.
 fn run_mq(manifest: &ChallengeManifest, environment: &Environment) -> Option<RunRecord> {
-    let ChallengeParameters::MqSystem { kind, n, .. } = manifest.parameters else {
+    let ChallengeParameters::MqSystem {
+        kind, n, m, seed, ..
+    } = manifest.parameters
+    else {
         return None;
     };
-    let directory = std::env::var("ZEEBRA_MQ_DIR").unwrap_or("research/instances/mq".to_string());
-    let name = format!(
-        "ToyExample-type{}-n{}-seed0",
-        if kind == "III" { 3 } else { 6 },
-        n
-    );
-    let text = fs::read_to_string(Path::new(&directory).join(&name)).ok()?;
-    let answer = fs::read_to_string(Path::new(&directory).join(format!("{}-answer", name))).ok()?;
-
     let at = Instant::now();
-    let instance = MqInstance::parse(&text).expect("a published instance");
-    let published = instance
-        .parse_answer(&answer)
-        .expect("the published answer parses");
+    let (instance, published) = read_mq(kind, n, m, seed)?;
     let generation = at.elapsed();
 
     let mut record = instance
