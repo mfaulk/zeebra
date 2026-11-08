@@ -310,7 +310,7 @@ any of it be believed.
 | #415 | M27-B | `parse_answer` has no error channel at all, so a hex answer yields nine wrong coordinates silently |
 | #421 | M27-B | A `Gf256Mq` arm in the oracle dispatch. **Not a one-line change**, see §5.3 |
 | #420 | M27-B | Generate from `(type, n, seed)` rather than retaining bytes. Achievable exactly for types I–III |
-| #70, #197 | M27-B | The Fukuoka parents. #70 is **claimed and live** at the time of writing, with its F4 baseline deferred; #197 is its successor and names #414/#415 as blockers of its GF(2^8) half |
+| #70, #197 | M27-B | The Fukuoka parents. **#70 closed 2026-11-08**: its F4 baseline is recorded in `fukuoka-mq.md` §4 — 111 ms on the published type III `n = 10`, `D = 1`, the published answer recovered — and the "deferred" note described the M26 freeze window, not the state. #197 is its successor and names #414/#415 as blockers of its GF(2^8) half, both since merged |
 | #425 | **M27-C, first** | `text_instance` labels an instance with a characteristic it did not generate over. Blocks #426, and affects **three** constructors, not the two the issue names — §5.4 |
 | #426 | M27-C | GF(32003). Larger than it looks: it is what makes msolve an **eliminant** comparand for the first time — §5.4 |
 | #424 | M27-C | Extend the Katsura and Cyclic ladders to the published rungs |
@@ -1031,7 +1031,7 @@ writers.
 | **#447** | **live**, `agent:claimed` | M27-A's gate 0 is **already being worked**. NORMALFORM must `verify` before claiming it and should start from #440 stage 1 if it is still held |
 | **#425** | **live**, `agent:claimed` | M27-C's first step is **already being worked**. CORPUS starts from #426's preparation and waits |
 | #369 | live | `goofy-questing-lagoon@feat/369-populate-competitive-board` — this is PR #435. **M27 does not touch it** |
-| #70 | live | `zb-r3-prov@docs/70-fukuoka-mq-provenance`, with "F4 baseline deferred (machine frozen for M26)". FUKUOKA treats #70 as a parent, not as work |
+| #70 | **closed** | was `zb-r3-prov@docs/70-fukuoka-mq-provenance`, with "F4 baseline deferred (machine frozen for M26)". That lease went stale and the branch was never pushed; the baseline it deferred had meanwhile landed in `fukuoka-mq.md` §4, so #70 closed on evidence rather than being re-worked. FUKUOKA treated it as a parent, not as work |
 
 A board-membership audit at `d9121c0` suggested several open issues were missing project rows.
 **That reading was wrong, and the cause is now fixed:** #448 was `orient`'s open-issue read not

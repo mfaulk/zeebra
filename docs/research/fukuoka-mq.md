@@ -17,6 +17,15 @@ If you are here for one question — *can an instance be reproduced without down
 answer is **yes, from three integers and a published file of π**, and §7 has the recipe, the
 verification, and the two ways the challenge's own verifiers get it wrong.
 
+> **Superseded, 2026-11-08 (#70).** The paragraph below was true when it was written — the machine
+> was frozen for M26 — and was falsified by §4.1 (M23-D), §4.4 (#454) and §4.5 (#510), which were
+> appended afterwards. **The F4 baseline half of #70 is here**, in §4: §4.1 solves the published
+> type III `n = 10` in **111 ms** by grevlex F4 then FGLM, reports `D = 1`, and recovers the
+> published answer without being told it; §4.4 and §4.5 import and run the first *real* challenges
+> at `m = 16`. Kept rather than deleted because the sentence after it is still true and is the more
+> useful claim: §7–§10 are about provenance and published results, not about this crate's
+> performance.
+
 **The F4 baseline half of #70 is not here.** No run, no timing, no estimate. §4 holds measurements
 other work recorded; nothing in §7–§10 is a measurement of this crate.
 
@@ -686,9 +695,13 @@ also what every published type V and type VI solve did.
   0.98x to 1.04x — because a sparse entry is `(usize, F)` and the index's alignment pads it to 16
   bytes at either width. Measured in `docs/MILESTONE-SIMD-PARALLELISM.md` §8; the importer is
   unaffected either way.
-- **The F4 baseline #70 asks for is not recorded**, deliberately. No run, no timing, no estimate;
-  the machine was frozen for M26's recorded measurements while #70 was worked. §8.2 is the published
-  substitute and is not a measurement of this crate.
+- **The F4 baseline #70 asks for is recorded, in §4** — this bullet previously said it was not, and
+  that was true only for the window in which #70 was worked, when the machine was frozen for M26's
+  recorded measurements. §4.1 is the baseline on a published instance: type III `n = 10`, **111 ms**,
+  grevlex F4 then FGLM, 6 batches, largest matrix 1468x859, `D = 1`, and the published answer
+  recovered without being told it. §4.4 and §4.5 extend it to the first real challenges at `m = 16`,
+  over GF(31) and GF(2^8). §8.2 remains the published comparand and remains *not* a measurement of
+  this crate — that distinction is what the old bullet was protecting and it still holds.
 
 ---
 
