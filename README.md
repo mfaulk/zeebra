@@ -2999,6 +2999,13 @@ tools/external/provision.sh          # ~5 min cold, 0.2 s warm; no root needed
 tools/external/smoke/smoke.sh        # all four on one system; non-zero exit on disagreement
 ```
 
+**The roster stops there, and Magma is the reason to say so** (#430). Magma is the fastest engine in
+every column of the published comparisons and it cannot be provisioned: it is commercial and there
+is no licence here, so every Magma figure in this repository is read from a page or a paper and
+quoted, never measured — `docs/research/classical-benchmarks.md` §2.3 is the current one, V2.27 on an
+i7-7700. Macaulay 2 is free and provisionable and is deliberately not provisioned, being a
+Buchberger-era engine that would measure little.
+
 Nothing is linked and nothing is vendored: every one of them is run as a **separate process**,
 which is what makes a GPL engine usable from an MIT crate at all. The rules are
 `docs/research/external-provenance-policy.md`; what got installed, how to invoke each tool for a

@@ -96,8 +96,9 @@ The page's HFE rows are A6's and are reported in #198, not here. The rationals r
 
 `https://magma.maths.usyd.edu.au/magma/info/topic_gb` returns **HTTP 401** to this machine and still
 does; it is behind Magma's subscriber login, which is why #430 was filed as an owner action. The
-owner supplied it as a PDF on **2026-11-08**. It is Magma's own copyrighted page — quoted here, not
-committed.
+owner supplied it as a PDF on **2026-11-08**: sha256
+`39b69365d58dc0e71fd54f5218941433af6a89638f4f883bedd891005f240886`, 115 897 B, 3 pp., printed from
+the live page. It is Magma's own copyrighted page — quoted here, not committed.
 
 **#430's first question is answered, and the answer is better than expected: it carries maintained
 timings, not just documentation.** The machine line, verbatim:

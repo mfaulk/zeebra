@@ -7,14 +7,17 @@ Reference for F1 (#205) and F1b (#382), under the MinRank epic #195. Consumes th
 conventions of `docs/research/external-provenance-policy.md` §9 and the redistribution discipline of
 `docs/research/fukuoka-mq.md` §3.
 
-#382 added §5.4 and rewrote §9. If you are here for one question — *did anyone ever actually run a
-solve of challenge C?* — the answer is **yes, once: Allan Steel, 23 August 2014, on a generated
-same-parameter instance, in about 30 hours on one CPU core and one GPU**, reported at PASCO 2015.
-§5.4 has the evidence and the three ways that sentence is usually got wrong.
+#382 added §5.4 and rewrote §9; #404 added §5.5 and read both closed-access papers at source. If
+you are here for one question — *did anyone ever actually run a solve of challenge C?* — the answer
+is **yes, once: Allan Steel, 23 August 2014, on a generated same-parameter instance, in about 25
+hours on one CPU core and one GPU**, reported at PASCO 2015, where the same system is also reported
+at 15.1 h on a better GPU and 202.2 h with none. §5.4 has the evidence and the three ways that
+sentence is usually got wrong.
 
 **Sources of record.** Each read in place rather than through a search summary, with the bytes
-pinned. The first four are primary and were read in full; the last two are reachable only in part,
-and every claim resting on them says so.
+pinned. All but the last are primary and were read in full — `Steel15` and `FLP08` since 2026-11-08,
+from PDFs the owner supplied because no route from this machine reaches either (#404). `MinRank2.0`
+is still reachable only in part, and every claim resting on it says so.
 
 | short name | what it is | how it was obtained | sha256 | accessed |
 |---|---|---|---|---|
@@ -22,7 +25,8 @@ and every claim resting on them says so.
 | **`phd`** | Courtois, *La sécurité des primitives cryptographiques basées sur des problèmes algébriques multivariables : MQ, IP, MinRank, HFE*, thèse de doctorat, Université Paris 6, soutenue 25 septembre 2001 | the scheme's own host still serves it over plain HTTP (§3.1): [`http://www.minrank.org/phd.pdf`](http://www.minrank.org/phd.pdf) | `b907bced0836298381e22dc025758296a40da57def87f50c7cb84e41e7a02e9d` (1 490 144 B, 221 pp.) | 2026-11-07 |
 | **`FauSafSpa10`** | Faugère, Safey El Din, Spaenlehauer, *Computing Loci of Rank Defects of Linear Matrices using Gröbner Bases and Applications to Cryptology*, ISSAC 2010 | author mirror, [`members.loria.fr/PJSpaenlehauer/data/papers/FauSafSpa10a.pdf`](https://members.loria.fr/PJSpaenlehauer/data/papers/FauSafSpa10a.pdf) | `eeb0330b0490c6296c5b33d2515b84b072358ca7a883e141b548bff0fda201ad` (146 591 B, 8 pp.) | 2026-11-07 |
 | **`Steel14`** | Allan Steel, *A Dense Variant of the F4 Gröbner Basis Algorithm* (December 2013), carrying the update *Minrank Challenge C Solved Directly* (August 2014) and a further update of July 2015 — the author's own page on the Magma site, linked from his homepage | [`http://magma.maths.usyd.edu.au/users/allan/densef4/`](http://magma.maths.usyd.edu.au/users/allan/densef4/) | `7eb1b3566bcb002f2ead1bc8626116a10123a30c646002d7f6f6bcfbf6fd4c71` (16 854 B of HTML) | 2026-11-07 |
-| **`Steel15`** | Allan Steel, *Direct solution of the (11,9,8)-MinRank problem by the block Wiedemann algorithm in magma with a tesla GPU*, PASCO '15, Bath, 10 July 2015, pp. 2–6, [doi:10.1145/2790282.2791392](https://doi.org/10.1145/2790282.2791392) | **abstract only.** Closed access; `dl.acm.org` 403s here and Unpaywall reports no OA copy. Bibliographic record from Crossref and from Sydney's own publication list; abstract text from OpenAlex (§9) | — | 2026-11-07 |
+| **`Steel15`** | Allan Steel, *Direct solution of the (11,9,8)-MinRank problem by the block Wiedemann algorithm in magma with a tesla GPU*, PASCO '15, Bath, 10 July 2015, pp. 2–6, [doi:10.1145/2790282.2791392](https://doi.org/10.1145/2790282.2791392) | **full text, read 2026-11-08.** Closed access — `dl.acm.org` 403s here, Unpaywall reports no OA copy — so the PDF came from the owner (#404). Not redistributable and not committed. Bibliographic record independently from Crossref and Sydney's publication list | `ac2d0bcb03ec2eff12f09e5285d0b7b79f78973b0c6990bd4ddcc5c1e538d341` (471 198 B, 5 pp.) | 2026-11-08 |
+| **`FLP08`** | Faugère, Levy-dit-Vehel, Perret, *Cryptanalysis of MinRank*, CRYPTO 2008, LNCS 5157 pp. 280–296 | **full text, read 2026-11-08.** Closed access by every route tried from here (§9), so the PDF came from the owner (#404). Not redistributable and not committed | `6f4a5b295a87eecf1a92e656b08d2e6a228969636ca125f99e1f6d6f4d82b038` (305 634 B, 17 pp.) | 2026-11-08 |
 | **`MinRank2.0`** | Aragon, Bros, Perlner, Smith-Tone, Verbel, *Cryptanalysis of MinRank 2.0*, IACR ePrint 2026/2733 | **abstract page only**; the PDF still 403s and Wayback has no capture (§9) | — | 2026-11-07 |
 
 Licensing, per `external-provenance-policy.md` §4: `MinRank2.0` is **CC BY** (stated on its ePrint
