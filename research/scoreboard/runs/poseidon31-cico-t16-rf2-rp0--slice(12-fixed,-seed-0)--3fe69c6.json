@@ -51,6 +51,8 @@
   "campaign": null,
   "environment": {
     "commit": "3fe69c6",
+    "base_commit": "3fe69c6",
+    "patch_id": "",
     "machine": "fedora",
     "cpu": "8 logical, affinity 0-7",
     "build": "release, RUSTFLAGS=default",

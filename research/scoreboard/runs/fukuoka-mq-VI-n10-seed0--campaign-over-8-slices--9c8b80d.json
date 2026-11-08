@@ -49,6 +49,8 @@
   },
   "environment": {
     "commit": "9c8b80d",
+    "base_commit": "9c8b80d",
+    "patch_id": "",
     "machine": "fedora",
     "cpu": "8 logical, affinity 0-7",
     "build": "release, RUSTFLAGS=default",

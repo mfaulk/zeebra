@@ -43,6 +43,8 @@
   "measured_peak_rows_in_process": 2,
   "environment": {
     "commit": "1409a48",
+    "base_commit": "1985504",
+    "patch_id": "192cc8e1e16035446f8ec6701885c051fbe4c90d",
     "machine": "fedora",
     "cpu": "8 logical, affinity 0-7",
     "concurrency": 1,

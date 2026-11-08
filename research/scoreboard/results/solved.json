@@ -71,6 +71,8 @@
       "campaign": null,
       "environment": {
         "commit": "744fdf9",
+        "base_commit": "744fdf9",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -150,6 +152,8 @@
       "campaign": null,
       "environment": {
         "commit": "744fdf9",
+        "base_commit": "744fdf9",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -210,6 +214,8 @@
       },
       "environment": {
         "commit": "9c8b80d",
+        "base_commit": "9c8b80d",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -289,6 +295,8 @@
       "campaign": null,
       "environment": {
         "commit": "86aaa53",
+        "base_commit": "86aaa53",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -368,6 +376,8 @@
       "campaign": null,
       "environment": {
         "commit": "86aaa53",
+        "base_commit": "86aaa53",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -447,6 +457,8 @@
       "campaign": null,
       "environment": {
         "commit": "86aaa53",
+        "base_commit": "86aaa53",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -522,6 +534,8 @@
       "campaign": null,
       "environment": {
         "commit": "bf0528e",
+        "base_commit": "bf0528e",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -597,6 +611,8 @@
       "campaign": null,
       "environment": {
         "commit": "bf0528e",
+        "base_commit": "bf0528e",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -671,6 +687,8 @@
       "measured_peak_resident_bytes": 56990154752,
       "environment": {
         "commit": "86aaa53",
+        "base_commit": "86aaa53",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "32 logical, affinity 0-31",
         "concurrency": 32,
@@ -746,6 +764,8 @@
       "campaign": null,
       "environment": {
         "commit": "bf0528e",
+        "base_commit": "bf0528e",
+        "patch_id": "",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,
@@ -821,6 +841,8 @@
       "measured_peak_resident_bytes": 825307136,
       "environment": {
         "commit": "ad7ec4a",
+        "base_commit": "ad7ec4a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "32 logical, affinity 0-31",
         "concurrency": 32,

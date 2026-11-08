@@ -64,6 +64,8 @@
   "measured_peak_resident_bytes": 825307136,
   "environment": {
     "commit": "ad7ec4a",
+    "base_commit": "ad7ec4a",
+    "patch_id": "",
     "machine": "workstation",
     "cpu": "32 logical, affinity 0-31",
     "concurrency": 32,

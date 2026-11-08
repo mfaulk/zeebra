@@ -68,6 +68,8 @@
   "campaign": null,
   "environment": {
     "commit": "ea5f554",
+    "base_commit": "ea5f554",
+    "patch_id": "",
     "machine": "fedora",
     "cpu": "8 logical, affinity 0-7",
     "concurrency": 1,

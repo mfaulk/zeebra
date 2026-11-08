@@ -1113,6 +1113,8 @@ impl CostRow {
             source: source.into(),
             environment: Environment {
                 commit: String::new(),
+                base_commit: String::new(),
+                patch_id: String::new(),
                 machine: String::new(),
                 cpu: String::new(),
                 concurrency: 1,
@@ -1883,6 +1885,8 @@ fn environment_from_json(value: &Json) -> Environment {
     };
     Environment {
         commit: text("commit"),
+        base_commit: text("base_commit"),
+        patch_id: text("patch_id"),
         machine: text("machine"),
         cpu: text("cpu"),
         concurrency: value
@@ -2287,6 +2291,8 @@ pub fn transcribed_rows() -> Vec<CostRow> {
     // The documents state the machine and the policy and never a commit. Recorded as stated.
     let workstation = |policy: &str| Environment {
         commit: String::new(),
+        base_commit: String::new(),
+        patch_id: String::new(),
         machine: "workstation".to_string(),
         cpu: "64 logical".to_string(),
         concurrency: 1,
@@ -3165,6 +3171,8 @@ mod tests {
     fn environment() -> Environment {
         Environment {
             commit: "deadbeef".to_string(),
+            base_commit: "deadbeef".to_string(),
+            patch_id: String::new(),
             machine: "workstation".to_string(),
             cpu: "64 logical, taskset 0-7".to_string(),
             concurrency: 1,

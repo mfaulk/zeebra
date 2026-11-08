@@ -3532,6 +3532,18 @@ there could claim.
 `grobner::research::Scoreboard` collects what runs established about registered problems, and its
 job is to refuse three specific mistakes.
 
+**A recorded commit is not by itself a reproducible stamp.** A sweep is run on a branch and the
+branch is merged, so `Environment::commit` names something that a history rewrite can leave
+unreachable from `main` — which is what happened to 315 of the 387 competitive rows, and to two
+cryptanalysis runs. `Environment` therefore records two more fields: `base_commit`, the merge base
+against `origin/main`, which is an ancestor of `main` and stays one; and `patch_id`, `git patch-id
+--stable` over `base_commit..commit`, which identifies the measured delta by its *diff* rather than
+by a commit name and so survives the rebase or squash that invalidated the commit.
+`Environment::stamp_is_resolvable` is the criterion — a base equal to the commit, or a base plus a
+patch id — `Environment::from_git` fills all three, and one test per board asserts every committed
+row passes. Records written before the fields existed read back with both empty, which reports as
+unresolvable; that is the fact about them and not a defect in the reader.
+
 **Comparing different problems.** A `RunRecord` references its problem by identity *digest*, not by
 name. `Scoreboard::add` looks the problem up in the registry and refuses a run whose digest no
 longer matches — the problem was redefined after the run, so the measurement is about something

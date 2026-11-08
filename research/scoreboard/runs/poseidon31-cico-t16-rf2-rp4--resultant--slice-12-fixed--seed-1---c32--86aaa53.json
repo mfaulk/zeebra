@@ -63,6 +63,8 @@
   "measured_peak_resident_bytes": 56990154752,
   "environment": {
     "commit": "86aaa53",
+    "base_commit": "86aaa53",
+    "patch_id": "",
     "machine": "fedora",
     "cpu": "32 logical, affinity 0-31",
     "concurrency": 32,

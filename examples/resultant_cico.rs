@@ -1240,7 +1240,6 @@ fn record(
             .with("off_domain_checks", pass.off_domain_checks as i64),
     ];
     record.environment = Environment {
-        commit: commit(),
         machine: std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| "unknown".to_string()),
         cpu: format!(
             "{} logical, affinity {}",
@@ -1271,6 +1270,9 @@ fn record(
                 ),
             }
         ),
+        // The commit, the merge base it was cut from and the patch id of the delta, so the stamp
+        // is still resolvable after a merge rewrites this branch's history (#505).
+        ..Environment::from_git()
     };
     // Name the row and every non-default flag it ran under. Naming the row alone was enough while
     // the default budgets admitted every affordable row; `rf4-rp2` is refused by the default
@@ -1344,16 +1346,6 @@ fn off_domain_check(
 }
 
 /// The commit this was built from.
-fn commit() -> String {
-    std::process::Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string())
-}
-
 /// The second coordinates that extend `first` to a common root of `f` and `g`.
 ///
 /// Substituting a resultant root leaves two univariate polynomials; their common roots are the
