@@ -56,6 +56,7 @@ The externally specified problems, unmodified. A witness here is a witness for t
 | `fukuoka-mq-VI-n10-seed0` | `2558f4bccd7d` | 10 | 7 | **verified witness** in 577.8 ms (slice(3 fixed, seed 7)) | published with its answer | — |
 | `fukuoka-mq-VI-n15-seed0` | `0345980a26d8` | 15 | 10 | stopped: campaign reached no verdict | published with its answer | — |
 | `fukuoka-mq-III-n55-seed0` | `f3ac89821637` | 55 | 110 | not attempted | no public solution recorded as of 2026-11-05 | — |
+| `fukuoka-mq-VI-n24-seed0` | `e97e852ee8f0` | 24 | 16 | stopped: campaign reached no verdict | solved externally, verified 2015-04-01 | no public method |
 
 ## Faithful reductions
 
@@ -123,9 +124,11 @@ A higher degree is **not** nearer a solution: this table is a diagnostic, not a 
 | `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 5) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
 | `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 6) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.9 |
 | `fukuoka-mq-VI-n15-seed0` | slice(5 fixed, seed 7) | stopped: max_live_nonzeros at degree 9 | 9 | 8 | 20146 | 217.8 |
-| `fukuoka-mq-VI-n15-seed0` | campaign over 8 slices | stopped: campaign reached no verdict | 0 | none | 0 | 0.0 |
+| `fukuoka-mq-VI-n15-seed0` | campaign over 8 slices | stopped: campaign reached no verdict | — | — | — | — |
 | `fukuoka-mq-III-n20-seed0` | as published | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 10147 | 195.5 |
 | `poseidon-t3-rf2-rp1-planted` | as generated | stopped: max_matrix_columns at degree 11 | 11 | 10 | 42229 | 155.3 |
 | `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 1) | the slice is empty, which says nothing about the problem | 9 | 9 | 5103 | 4.7 |
 | `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 3) | the slice is empty, which says nothing about the problem | 9 | 9 | 5104 | 4.6 |
+| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 |
+| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — |
 

@@ -18,7 +18,7 @@
   "equations": 20,
   "program": {
     "name": "Fukuoka MQ Challenge",
-    "version": "toy examples, retrieved 2026-11-05",
+    "version": "toy examples retrieved 2026-11-05; type VI m = 16 challenge file retrieved 2026-11-07",
     "url": "https://www.mqchallenge.org/",
     "reward": null,
     "redistribution": "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved; instance files are not redistributed here and are fetched by tools/fetch-mq-challenge.sh"
@@ -31,5 +31,5 @@
   },
   "reference_points": [],
   "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
-  "notes": "The overdetermined encryption family. Published with its answer so an implementation can check itself; 45 variables short of the smallest real challenge."
+  "notes": "The overdetermined encryption family. Published with its answer so an implementation can check itself; 24 variables short of the smallest type III challenge and 14 short of the smallest importable one."
 }

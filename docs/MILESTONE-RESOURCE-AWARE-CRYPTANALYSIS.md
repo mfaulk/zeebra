@@ -1151,13 +1151,19 @@ unsolved challenges is not incremental: Fukuoka's smallest is `n = 55`, and the 
 | Poseidon CICO at `t = 3`, 9 variables | **matrix column growth** — 60,000 columns crossed after 19.3 s |
 | katsura-7 under direct lex | **live-entry growth** — 20,003,295 entries, a 7320x33792 matrix |
 | planted-12 under FGLM | **span storage**, 41,945,088 cells at `D = 4096` |
-| Fukuoka `n = 55`+ | not attempted; `SUPPORTED_DIMENSIONS` is `[10, 15, 20]` |
+| Fukuoka `n = 55`+ | not attempted at the time; `SUPPORTED_DIMENSIONS` was `[10, 15, 20]` |
 
 The Poseidon row is the most informative, and it is the milestone's second-most useful finding:
 **nine variables solve at `t = 2` and fail at `t = 3`**. Same variable count, different reach,
 because the MDS layer couples three words rather than two and every S-box equation is degree 3.
 **Variable count does not predict reach** — arrived at independently of §6.1's cyclic-4
 counterexample and on real cryptographic structure.
+
+The Fukuoka row is left as this milestone recorded it, and it is no longer the current state: #454
+extended `SUPPORTED_DIMENSIONS` to `[10, 15, 20, 24]` and ran the smallest real challenge in an
+importable type — type VI `m = 16`, so `n = 24`. It stops on live-entry growth too, at degree 6 with
+a 13 602 x 19 132 matrix. Measured after this milestone and recorded where it was measured:
+`docs/research/fukuoka-mq.md` §4.4.
 
 No complexity lower bound is inferred from any of these. A single failed execution bounds nothing.
 

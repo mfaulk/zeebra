@@ -143,6 +143,7 @@ every id and digest, so redefining a row fails a test; adding one is a deliberat
 | `fukuoka-mq-VI-n10-seed0` | official | 10 | 7 | published with answer |
 | `fukuoka-mq-VI-n15-seed0` | official | 15 | 10 | published with answer |
 | `fukuoka-mq-III-n55-seed0` | official | 55 | 110 | none recorded, 2026-11-05 |
+| `fukuoka-mq-VI-n24-seed0` | official | 24 | 16 | solved externally, 2015-04-01 |
 
 `N − E = t − 2k = 12` on every Poseidon row with `k = 2`, whatever the rounds — the underdetermined
 direction M22-E found to matter more than state width does not shrink along the ladder, which is
@@ -156,9 +157,20 @@ lists as unsolved. Their objective constrains the *trailing* words rather than t
 registry with no public solution recorded, and both `cico_instance` and `dispatch_cico` refuse them
 by name. See `docs/research/poseidon.md` §5a.
 
-The last row is registered and deliberately not implemented. `SUPPORTED_DIMENSIONS` stops at 20,
-its file checksum is empty because this repository does not hold those bytes, and its purpose is to
-keep the distance between a toy example and the real challenge visible in the same table.
+`fukuoka-mq-III-n55-seed0` is registered and deliberately not implemented: its file checksum is
+empty because this repository does not hold those bytes, and its purpose is to keep the distance
+between a toy example and the real challenge visible in the same table. Note that `n = 55` is type
+I's range and not type III's, which publishes `n = 34..=53`, so the row names a size the challenge
+does not offer — #501.
+
+M27-B (#454) added `fukuoka-mq-VI-n24-seed0`, and it is the **first row in this family that is not a
+toy example**. Type VI publishes `m = 16..=35` and the generator truncates `n = m * 1.5`, so `m = 16`
+is `n = 24`; `SUPPORTED_DIMENSIONS` reaches `[10, 15, 20, 24]` and the row's checksum names real
+challenge bytes. Its status is `solved externally` rather than `none recorded` — the hall of fame
+records this exact instance as Faugère's 2015 F5-FGb submission, 5 280 s — so a witness here would
+be a reproduction, which is the weaker and the honest reading. One diagnostic slice stops on
+live-entry growth at degree 6; `docs/research/fukuoka-mq.md` §4.4 has the figures and the slice
+policy.
 
 Two families are registered as `Official` with very different difficulty, and the status column is
 what separates them: the Fukuoka toy examples are published *with* their answers so an

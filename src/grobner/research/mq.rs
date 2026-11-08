@@ -408,11 +408,18 @@ impl std::error::Error for MqError {}
 
 /// Variable counts this build can turn into polynomials.
 ///
-/// The toy-example sizes. The published challenges run from `n = 55` to `n = 100`, which is far
-/// beyond what the solvers reach — adding them here would compile code that cannot be used, and
-/// the honest statement is this list plus
-/// [`MqError::UnsupportedDimension`](MqError::UnsupportedDimension).
-pub const SUPPORTED_DIMENSIONS: &[usize] = &[10, 15, 20];
+/// The three toy-example sizes plus **24**, which is where the real challenge starts in a type this
+/// crate can import: both signature families publish `m = 16..=35`, the generator computes
+/// `n = m * 1.5`, and `m = 16` therefore gives `n = 24`. So one arm serves two fields — type VI over
+/// GF(31) and type V over GF(2^8). Below it every importable instance is a toy example published so
+/// an implementation can check itself.
+///
+/// The list stops there rather than covering the published ranges. Type III's real range is
+/// `n = 34..=53` and type I's is `n = 55..=100`, both far past anything the solvers reach; compiling
+/// a dimension that cannot be used would be worse than
+/// [`MqError::UnsupportedDimension`](MqError::UnsupportedDimension) naming it. Each entry costs a
+/// monomorphization of the whole multivariate stack at that `N`.
+pub const SUPPORTED_DIMENSIONS: &[usize] = &[10, 15, 20, 24];
 
 /// A parsed instance, before a compile-time dimension is chosen.
 ///
@@ -784,6 +791,7 @@ impl MqInstance {
             10 => Ok(visitor.visit(&self.system::<10, F>()?)),
             15 => Ok(visitor.visit(&self.system::<15, F>()?)),
             20 => Ok(visitor.visit(&self.system::<20, F>()?)),
+            24 => Ok(visitor.visit(&self.system::<24, F>()?)),
             variables => Err(MqError::UnsupportedDimension {
                 variables,
                 supported: SUPPORTED_DIMENSIONS,
@@ -1383,6 +1391,67 @@ Order : graded reverse lex order
         assert_eq!(instance.dispatch::<F, _>(Count), Ok((10, 2)));
     }
 
+    /// Every dimension `SUPPORTED_DIMENSIONS` advertises has a dispatch arm behind it.
+    ///
+    /// The failure this is against is a one-sided edit: adding a size to the list without adding
+    /// the arm leaves a build that promises a dimension and then returns
+    /// `UnsupportedDimension` for it, and the error message itself would name the size it had just
+    /// refused.
+    #[test]
+    fn test_every_advertised_dimension_dispatches() {
+        struct Count;
+        impl MqVisitor<F> for Count {
+            type Output = (usize, usize);
+            fn visit<const N: usize>(
+                self,
+                system: &[MultivariatePolynomial<N, F>],
+            ) -> Self::Output {
+                (N, system.len())
+            }
+        }
+
+        for &n in SUPPORTED_DIMENSIONS {
+            let row = vec![0u64; MqInstance::coefficients_per_polynomial(n)];
+            let instance = MqInstance {
+                field: MqField::Gf31,
+                modulus: None,
+                variables: n,
+                polynomials: 2,
+                seed: None,
+                order: "graded reverse lex order".to_string(),
+                coefficients: vec![row.clone(), row],
+            };
+            assert_eq!(
+                instance.dispatch::<F, _>(Count),
+                Ok((n, 2)),
+                "{} is advertised and has no arm",
+                n
+            );
+        }
+    }
+
+    /// `n = 24` is reachable, which is the smallest real challenge in an importable type.
+    ///
+    /// Type VI at `m = 16`: the generator's `n = m * 1.5` truncates to 24, so this is the first
+    /// dimension at which an imported instance is challenge data rather than a toy example.
+    #[test]
+    fn test_the_smallest_real_challenge_dimension_is_compiled() {
+        assert!(
+            SUPPORTED_DIMENSIONS.contains(&24),
+            "type VI m = 16 is n = 24"
+        );
+        assert_eq!(MqInstance::coefficients_per_polynomial(24), 325);
+        let layout = MqInstance::monomial_layout::<24>();
+        assert_eq!(layout.len(), 325);
+        let distinct: std::collections::BTreeSet<_> = layout.iter().collect();
+        assert_eq!(distinct.len(), 325, "the layout repeats a monomial");
+        let order = MonomialOrder::GradedReverseLexicographic;
+        assert!(
+            layout.windows(2).all(|w| order.cmp(&w[0], &w[1]).is_gt()),
+            "the layout is descending grevlex"
+        );
+    }
+
     /// A genuine Fukuoka instance is imported, solved, and verified against its published answer.
     ///
     /// **`#[ignore]`d because it needs data this repository does not redistribute.** The Fukuoka
@@ -1468,6 +1537,86 @@ Order : graded reverse lex order
             .next()
             .expect("the conversion ran");
         assert_eq!(conversion.quotient_dimension, 1);
+    }
+
+    /// Both real `n = 24` challenge files import at the dimension #454 compiled.
+    ///
+    /// **`#[ignore]`d for the reason [`test_a_published_instance_is_reproduced`] gives.**
+    ///
+    /// ```sh
+    /// tools/fetch-mq-challenge.sh
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::research::mq::tests::test_the_real_n24_challenges_import
+    /// ```
+    ///
+    /// `m = 16` is `n = 24` in both signature families, so one arm serves two fields: type VI over
+    /// GF(31) and type V over GF(2^8) with the challenge's `0x11D` modulus and hex coefficients.
+    /// Not solved — these are open-sized instances and §4.4 of `docs/research/fukuoka-mq.md` is
+    /// where the resource diagnostic lives. What is asserted is the import: the header, the shape,
+    /// 325 coefficients per polynomial, and a system that reaches the compiled dimension through
+    /// `dispatch` rather than through a hand-written `N`.
+    #[test]
+    #[ignore = "needs tools/fetch-mq-challenge.sh; the instance data is not redistributable"]
+    fn test_the_real_n24_challenges_import() {
+        /// Reports the shape without mentioning `N`.
+        struct Shape;
+        impl MqVisitor<F> for Shape {
+            type Output = (usize, usize, usize);
+            fn visit<const N: usize>(
+                self,
+                system: &[MultivariatePolynomial<N, F>],
+            ) -> Self::Output {
+                (N, system.len(), system[0].terms().len())
+            }
+        }
+        impl MqVisitor<Gf256Mq> for Shape {
+            type Output = (usize, usize, usize);
+            fn visit<const N: usize>(
+                self,
+                system: &[MultivariatePolynomial<N, Gf256Mq>],
+            ) -> Self::Output {
+                (N, system.len(), system[0].terms().len())
+            }
+        }
+
+        let directory =
+            std::env::var("ZEEBRA_MQ_DIR").unwrap_or_else(|_| "research/instances/mq".to_string());
+        let read = |name: &str| {
+            let path = format!("{}/{}", directory, name);
+            std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                panic!("run tools/fetch-mq-challenge.sh first: {}: {}", path, e)
+            })
+        };
+
+        // Type VI over GF(31). The dimension the registry row names.
+        let six =
+            MqInstance::parse(&read("challenge-6-16-0")).expect("a published instance parses");
+        assert_eq!(six.field, MqField::Gf31);
+        assert_eq!((six.variables, six.polynomials), (24, 16));
+        assert_eq!(six.seed, Some(0));
+        assert_eq!(six.coefficients[0].len(), 325, "binomial(26, 2)");
+        let (n, equations, terms) = six.dispatch::<F, _>(Shape).expect("n = 24 is compiled");
+        assert_eq!((n, equations), (24, 16));
+        assert!(terms > 0 && terms <= 325);
+
+        // Type V over GF(2^8), the same dimension and a different field. The header names the
+        // modulus, so the coefficient type is verified against it rather than assumed; `Gf256`
+        // (AES, 0x11B) would be refused here and `Gf256Mq` (0x11D) is accepted.
+        let five =
+            MqInstance::parse(&read("challenge-5-16-0")).expect("a published instance parses");
+        assert_eq!(five.field, MqField::Gf256);
+        assert_eq!(five.modulus, Some(MqField::PUBLISHED_GF256_MODULUS));
+        assert_eq!((five.variables, five.polynomials), (24, 16));
+        assert_eq!(five.coefficients[0].len(), 325);
+        assert!(
+            five.check_coefficient_field::<Gf256>().is_err(),
+            "the AES modulus is not the challenge's"
+        );
+        let (n, equations, terms) = five
+            .dispatch::<Gf256Mq, _>(Shape)
+            .expect("n = 24 is compiled over GF(2^8) too");
+        assert_eq!((n, equations), (24, 16));
+        assert!(terms > 0 && terms <= 325);
     }
 
     /// An instance header with no coefficients, for the answer parser's sake.

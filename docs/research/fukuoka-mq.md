@@ -6,7 +6,7 @@ Reference for #70 (A1), M21-A (#92) and #197 (A5). Consumes the provenance conve
 
 #70 added §0, §2.5 and §7–§13, and rewrote §2, §3 and §6. The numbering of §1–§6 is unchanged from
 the previous revision, because ten other files cite it; the new material is appended rather than
-interleaved.
+interleaved. #454 appended §4.4 and rewrote §6's dimension bullet.
 
 If you are here for one question — *can an instance be reproduced without downloading it?* — the
 answer is **yes, from three integers and a published file of π**, and §7 has the recipe, the
@@ -432,6 +432,87 @@ For contrast with M22-E: its two type VI `n = 10` slices finished at degree 9 wi
 Five surplus variables at `n = 15` is past the wall, and the degree is the same 9 either way — what
 grows is the width at that degree.
 
+### 4.4 Type VI `m = 16`: the first real challenge, imported (M27-B, #454)
+
+`SUPPORTED_DIMENSIONS` now reaches **24**, and `fukuoka-mq-VI-n24-seed0` is the first row in this
+family that is **challenge data rather than a toy example**. Type VI publishes `m = 16..=35`, and the
+generator computes `n = m * 1.5` into an `int`, so the smallest of those is `n = 24`. The file's own
+header confirms it:
+
+```text
+Galois Field : GF(31)
+Number of variables (n) : 24
+Number of polynomials (m) : 16
+Seed : 0
+```
+
+`sha256 354de307fa5524d01c8a6ece3c712c27119cf3388bdd7a3e1c84095ed6cc43de`, 325 coefficients per
+polynomial (`binomial(26, 2)`), fetched by `tools/fetch-mq-challenge.sh`. **No instance bytes, no
+answer vector and no coefficient are committed** — §3 is unchanged by this, and a real challenge
+publishes no answer at all, so the witness check here is evaluation against the imported
+coefficient vectors and nothing else.
+
+`m = 16` happens to be exact — `1.5 * 16` is 24 on the nose — and **the next size up is where the
+truncation bites**: `m = 17` is `n = 25`, not 26, because the `double` is assigned to an `int`
+(§7.1). So 24 and 25 are consecutive dimensions and not a step of two, which is what a reader
+extrapolating `1.5m` would expect.
+
+Everything below the dimension is still a toy example. Type III's smallest real instance is
+`n = 34`; `n = 24` is the smallest real instance in **any** type this crate can import.
+
+#### The slice policy at the larger dimension
+
+Unchanged in kind and worse in degree. Type VI is a signature family, `n > m`, so it is
+positive-dimensional as published and a run of it is a run of a **slice**:
+
+- `n − m = 8` of the 24 variables are fixed, at values drawn from a precommitted seed. Eight, not
+  some tuned number: it is the count that squares the system, and the published route is also a
+  guessing one (§8.4), so slicing is the challenge's own approach rather than a workaround.
+- The formulation string stays `slice(8 fixed, seed s)` and the transformation is recorded as
+  `specialize variables 16..24 at seed s`. The fixed variables are the last eight, which is a
+  choice and is recorded as one.
+- **A slice result is a result about the slice.** A witness lifts — `Specialization::apply` appends
+  the pinning forms `x_i − a_i`, so a recovered point is a point of the original variety and is
+  re-evaluated against the published coefficient vectors — but an empty or stopped slice says
+  nothing about the instance. `Campaign::decided()` is the denominator and
+  `success_rate_basis_points` is `None` when nothing was decided (§4.2).
+- The slice is **not** registered as its own challenge row. `fukuoka-mq-VI-n24-seed0` is the
+  published instance; the slice is a formulation of it, which is what the `transformations` field
+  is for.
+
+#### One diagnostic run, and it is a diagnostic
+
+`tools/scoreboard.sh mq fukuoka-mq-VI-n24-seed0 --seeds 1`, frontier budget, cores 0–7, under
+`tools/benchlock.sh`. **Not a completion attempt**: one slice, to find out where the wall is.
+
+| | |
+|---|---|
+| shape after slicing | 24 generators in 24 variables — 16 substituted quadratics plus 8 pinning linear forms |
+| outcome | **`stopped_at_limit`**, `max_live_nonzeros` |
+| stop | 20 010 753 live nonzero entries needed against the 20 000 000 cap |
+| degree | **6** reached; highest completed degree **5** |
+| largest matrix | **13 602 × 19 132** |
+| peak live nonzeros | 14 329 816 (≈229 MB estimated; 1.38 GB process `VmHWM`) |
+| pairs reduced / elements added | 4 967 / 503 |
+| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs |
+
+The stop is **deterministic and the wall clock is not**. All three runs stopped at the same degree
+on the same entry count, 20 010 753, with the same 13 602 x 19 132 matrix and the same 14 329 816
+peak — and spread 53% in time on a machine running other agents' work. Everything above the wall
+row is a property of the instance; the wall row is a property of the afternoon. The committed
+record is the run under `tools/benchlock.sh` that got the lock uncontended.
+
+Note the degree. Type VI `n = 15` crossed the same cap at **degree 9**; `n = 24` crosses it at
+**degree 6**, with a matrix 13 602 × 19 132 against that run's 20 315 × 20 146. Eight surplus
+variables rather than five does not push the wall out by three degrees of headroom — it pulls the
+wall in, because what grows is the width at every degree. Faugère solved this instance in 2015 in
+5 280 s with F5-FGb (§8.1); that is a published fact about the instance and **not** a comparison
+with the row above, which is a 43-second resource stop under a deliberate cap.
+
+So the honest statement after #454 is narrower than "Zeebra reaches the challenge": the **importer**
+reaches it, the registry names its bytes, and the solver stops at degree 6 under this budget. What
+changed is that the gap is now measured rather than merely stated.
+
 ---
 
 ## 5. What type VI is for
@@ -452,7 +533,14 @@ also what every published type V and type VI solve did.
   it (#414). The third, `parse_answer` mis-parsing a hex answer without erroring, is closed (#415):
   it reads base 16 over GF(2^8) and refuses a short or unreadable file by name. The modulus
   question is settled: `Gf256Mq` (`0x11D`), verified against a published answer in §2.4. #197 owns
-  the import path.
+  the import path. **#454's gate on #414 and #415 turned out to be already lifted**: both are
+  closed, so GF(2^8) imports, and type V's smallest real instance is `m = 16` — the *same* `n = 24`
+  the type VI row needed. One dispatch arm therefore serves two fields, and
+  `mq::tests::test_the_real_n24_challenges_import` asserts both genuine files parse, carry 325
+  coefficients per polynomial, reach the compiled dimension, and refuse the AES modulus. Type II
+  starts at `n = 35` and is still out of reach. **Registering and running the type V row is not
+  done**: the scoreboard's MQ path is hardwired to `PrimeFieldElement64<31>`, so it needs a field
+  dispatch first — #510.
 - **The exported-module story is finished and is no longer a reason for anything.** The previous
   revision of §1 still said "the binary and extension field modules exist and are not publicly
   exported" two paragraphs after correcting exactly that claim. Both modules have been public since
@@ -482,11 +570,14 @@ also what every published type V and type VI solve did.
   III and type VI instances in §4, so for the families this importer actually reaches today the
   answer is no. Types I and IV will want them; types III and VI will not.
 - **The smallest published challenge is `n = 34` (type III) or `m = 16` (types V and VI)**, not
-  `n = 55`; the `n = 55` figure in the previous revision was type I's range. `SUPPORTED_DIMENSIONS`
-  is `[10, 15, 20]` and an unsupported size is `MqError::UnsupportedDimension` rather than a panic.
-  Compiling dimensions that cannot be used would be worse than saying so. **Type VI `m = 16` is
-  `n = 24`**, which is the smallest real challenge in any of the four types here and the natural
-  next dimension to compile if one is added.
+  `n = 55`; the `n = 55` figure in the previous revision was type I's range. **Type VI `m = 16` is
+  `n = 24`**, and #454 compiled it: `SUPPORTED_DIMENSIONS` is now `[10, 15, 20, 24]` and §4.4 is the
+  diagnostic. The list stops there rather than covering `n = 34..=53` and `n = 55..=100`, and an
+  unsupported size is still `MqError::UnsupportedDimension` rather than a panic — compiling
+  dimensions that cannot be used would be worse than saying so, and each entry costs a
+  monomorphization of the whole multivariate stack. **The registry row `fukuoka-mq-III-n55-seed0`
+  still carries the old error**: `n = 55` is not a type III size, so it names an instance the
+  challenge does not publish. #501.
 - **A 32-bit prime field** (#62) landed, as `Zp31`. It halves the bytes a *dense* elimination moves
   and is worth 2.8x there, but the solver's default `Backend::Adaptive` gains nothing measurable —
   0.98x to 1.04x — because a sparse entry is `(usize, F)` and the index's alignment pads it to 16
