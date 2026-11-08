@@ -719,22 +719,33 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
     }
 }
 
-/// Sagebrush refuses Anemoi's field; **Groebner.jl does not**, which the corpus's reason understates.
+/// Sagebrush refuses Anemoi's field; **Groebner.jl does not**, so the rung is a sole comparand.
 ///
-/// `corpus::anemoi_instance` is over `2^64 − 353` and the ladder records
-/// `Equivalence::NoComparand { reason: "msolve and Singular both stop below 2^31" }`. That reason
-/// is true and incomplete: Groebner.jl's native range is every prime below `typemax(UInt64)`
-/// (`src/groebner/parameters.jl:175`), so it **can** represent the field, and measured directly it
-/// returns a correct basis there — six leading monomials and `vdim = 12` on the reference system,
-/// identical to the same system at `2^30 + 3`.
+/// `corpus::anemoi_instance` is over `2^64 − 353`. Groebner.jl's native range is every prime below
+/// `typemax(UInt64)` (`src/groebner/parameters.jl:175`), so it **can** represent the field, and
+/// measured directly it returns a correct basis there — six leading monomials and `vdim = 12` on
+/// the reference system, identical to the same system at `2^30 + 3`. Sagebrush stops at `2^62`,
+/// msolve and Singular at `2^31`.
 ///
 /// So `supports()` says yes, because [`ExternalSolver::supports`] is a statement about the tool's
 /// declared capability and nothing else. Whether a *cross-library timing* may be published is a
-/// different question, and `Equivalence::licenses_timing()` is where it belongs — claiming a
-/// capability gap that does not exist would be the "cannot versus slower" confusion run backwards.
+/// different question, and `Equivalence` is where it belongs — but the two halves of that question
+/// are also different from each other, which is what `1d17b6e` corrected and #386 resolves:
+///
+/// - **Representability** licenses the figure. One engine at one field on one machine still gives a
+///   valid ratio against a checkable invariant, so `licenses_timing()` is **true** here. Recording
+///   it as `NoComparand` would claim a capability gap that does not exist — the "cannot versus
+///   slower" confusion run backwards, which is the error this whole module is built to refuse.
+/// - **Corroboration** is what is actually missing, and `is_corroborated()` is **false**. With two
+///   opinions a disagreement says one of them is wrong without saying which; a third would usually
+///   name the odd one out. That limit is discharged by validating a second 64-bit-capable engine,
+///   not by finding one that can represent the prime.
+///
+/// Nothing downstream widened as a result: `board.rs` never consults either method, and the
+/// Anemoi rows carry no published ratio on the board at either cohort (#518).
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
-fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it() {
+fn test_anemoi_is_representable_only_by_groebner_jl_so_its_timing_is_uncorroborated() {
     let order = MonomialOrder::GradedReverseLexicographic;
     let anemoi = corpus::instance(
         "anemoi64-cico-n1-fcico",
@@ -767,14 +778,18 @@ fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it()
         );
     }
 
-    // The corpus's own gate is the thing that stops a timing being published, not `supports()`.
+    // The corpus's own record is what decides what may be claimed, not `supports()`.
     let entry = corpus::ladder()
         .into_iter()
         .find(|e| e.name == "anemoi64-cico-n1-fcico")
         .expect("the rung is on the ladder");
     assert!(
-        !entry.equivalence.licenses_timing(),
-        "Anemoi must remain unpublishable as a cross-library timing"
+        entry.equivalence.licenses_timing(),
+        "Groebner.jl reaches 2^64 - 353, so a timing against it is a figure that may be published"
+    );
+    assert!(
+        !entry.equivalence.is_corroborated(),
+        "one engine in range is not a cross-library comparison, so the row stays uncorroborated"
     );
 }
 
