@@ -3768,7 +3768,8 @@ again.
 cargo run --release --example cost_model                  # render research/cost-model/COST-MODEL.md
 cargo run --release --example cost_model -- --write       # regenerate the register from its records
 cargo run --release --example cost_model -- --write --seed  # append any transcribed row not yet held
-cargo run --release --example cost_model -- --from-runs      # emit a row per retained scoreboard run
+cargo run --release --example cost_model -- --list-runs      # the retained runs a row can be emitted from
+cargo run --release --example cost_model -- --write --from-runs <run-file-stem>
 ```
 
 `grobner::research::cost_model` keeps one row per **claim** about what a stage would cost, against
@@ -3786,10 +3787,33 @@ batch" cannot be written in the same field. **Prediction error is derived** — 
 `research/cost-model/results/history.json` is an error column, and `CostRow::prediction_errors`
 computes it from the predicted and measured fields. **A row is emitted by a run rather than
 transcribed from one.** `CostRow::from_run` reads a retained `RunRecord` — its stage runtimes, its
-total, its measured peak, its frontier's work counts — and `--from-runs` appends one row per
-retained run the register does not already hold, idempotently and append-only. Transcription was how
-#294 got twenty rows of history onto the board and the wrong way to keep it there: the next figure
-reaches the board only if somebody remembers to copy it.
+total, its measured peak, its frontier's work counts — and `--from-runs <run-file-stem>` appends a
+row for each **named** run the register does not already hold, idempotently and append-only.
+Transcription was how #294 got twenty rows of history onto the board and the wrong way to keep it
+there: the next figure reaches the board only if somebody remembers to copy it.
+
+**The register is curated, and the emission has no sweep** (#532). `select_runs_by_stem` refuses a
+`--from-runs` with no run named, and `--list-runs` is the read-only way to find a stem, because
+emitting a row per retained run is both undesirable and not expressible:
+
+- An emitted row carries **no prediction**, so `CostModelBoard::open_predictions` — "the register's
+  most useful view", and the one §10.1's finding is about — ignores it, while `to_markdown` still
+  renders it in the per-algorithm table. Sweeping the addressable runs would add nothing to the
+  view the register exists for and swamp its 23 curated rows several times over. `research/scoreboard/` is
+  already the complete measured record; this board is about whether the predictions held.
+- A row's `source` is its only link back to evidence, and for an emitted row that is
+  `research/scoreboard/runs/<stem>.json`. The stem is `challenge--formulation--commit` with no
+  timestamp, and `colliding_run_file` documents that a re-run of one problem at one commit
+  legitimately *replaces* its predecessor's file. So the committed history holds **more runs than
+  record files** — sixteen runs share a stem with another — and the three
+  `poseidon-t2-rf4-rp0-planted` runs at `86aaa53` measured 369.4 ms, 360.9 ms and 369.3 ms in
+  Gröbner, of which the one file they would all cite holds the third. A `measured_`
+  figure whose source does not contain it is the defect the basis vocabulary exists to refuse, so
+  those runs get no row and `--from-runs` says so on stderr. The emitter's idempotence check is on
+  `(key, source)` — both functions of `(challenge, formulation, commit)` — so it also could not tell
+  such a run from its own previous output: **idempotence and completeness are not simultaneously
+  available** under this identity. #540 is the run-identity problem; until it lands, a row per run is
+  blocked rather than declined.
 
 What an emitted row **may not** claim is the more interesting half, and all three rules are code:
 
@@ -3804,9 +3828,11 @@ What an emitted row **may not** claim is the more interesting half, and all thre
 - **No peak it cannot attribute.** `VmHWM` from a process that ran several rows is a ceiling over
   all of them, so the figure is emitted only when `RunRecord::measured_peak_is_attributable` holds.
 
-Two runs of one problem at one commit are indistinguishable in the record — the same limitation
-`run_file_stem` has — so `--from-runs` prints how many runs it skipped as already-held rather than
-letting 96 runs quietly become 80 rows.
+`tools/scoreboard.sh --write` deliberately does **not** call the emission. #334's complaint was that
+a new measurement reaches the register only if somebody remembers; the answer to that under a
+curated register is that a new measurement reaches `research/scoreboard/` automatically and reaches
+*this* board when a prediction wants checking against it, which is a judgement the runner cannot
+make.
 
 The history is append-only: a re-measurement is
 a new row with a new commit, which is what keeps #318's three figures for the same measurement all
