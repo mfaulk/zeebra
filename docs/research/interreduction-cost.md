@@ -10,7 +10,9 @@ against the hoist (`132d20b8`) for the A/B, two builds from one tree. The rebase
 `922deeb6`, which adds `F4Options::reduce_batch_rows` **off by default**, so it changes neither the
 path these figures describe nor their comparability with §3a and §3b. **§3e was taken at
 `0840207f`, base `9746b4ce`**, also recorded at the time; its board rows carry their own resolvable
-#505 stamp, so that one is checkable from the data and not only from this header.
+#505 stamp, so that one is checkable from the data and not only from this header. **§3f was taken at
+`6c1eeb18` plus the benchmark it introduces**, recorded at the time; it is a microbenchmark of a
+comparison and touches no part of the F4 path, so it is independent of every other section here.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -555,6 +557,10 @@ measured inside the noise** — stage 2's window took the 14.2% prefix for ~7%, 
 down to. Only two things touch those: a cheaper comparison (#317), or a structure that never
 materializes the working polynomial.
 
+**The first of those two is now priced — see §3f.** #317's gate was run, and the degree sum is not
+free: storing it instead of summing `[u32; N]` makes a graded comparison materially cheaper at every
+arity measured. That funds #317's step 2 and does not predict what it returns end to end.
+
 That is Monagan–Pearce heap division, #440 stage 3. Reference of record under
 `docs/research/external-provenance-policy.md` §6: **Monagan and Pearce, *Sparse polynomial division
 using a heap*, J. Symbolic Comput. 46 (2011) 807–822**, and *Polynomial division using dynamic
@@ -584,6 +590,204 @@ shape-position bases where #478 measured division **25x** better than the matrix
 wrote ("only if stage 2 leaves the copies dominant") is met and then some; the *priority* is lower
 than when it was written, because the instance that motivated it no longer runs this code by
 default.
+
+---
+
+## 3f. #317's gate: the comparison, priced — and two ways this benchmark measured itself first
+
+#317 is a three-step issue whose first step is a decision: microbenchmark `MonomialOrder::cmp`
+before touching `Monomial`, "because `Monomial` is serialized, so adding a field is a format change,
+and LLVM may already hoist the degree sum out of the comparison loop for a fully unrolled small-`N`
+array. **If it does, the whole issue dies here.**" This is that step. `benches/monomial_order.rs`
+is the instrument.
+
+**What it is aimed at, and it is not a stage.** §3d.3 left 893 610 377 `MonomialOrder::cmp` calls in
+the merge span with only two things able to touch them. The external framing is sharper:
+`groebner-jl-gap.md` decomposes the 344x against Groebner.jl into factor A (4.89x, randomized linear
+algebra, declined by policy), factor B (5.03x, the matrix interreduction #471 took at 4.18x) and
+**factor C — 14.0x, a per-operation constant uniform at 11.6x–25.5x across every remaining stage**,
+which §7 there assigns to the monomial representation and to nothing else, noting that **"factor C
+has no measured decomposition yet at all."** This section is the first piece of that decomposition.
+It prices one component of it — the degree sum — and claims nothing about the rest.
+
+### 3f.0 Two defects in this benchmark, found by its own control, before any number was believed
+
+Both would have produced a confident wrong answer, and the second is subtle enough to be worth more
+than the measurement.
+
+**`lex` is the control, by construction.** Lexicographic order never reads a total degree, so on a
+lex row an A/B between a summed and a stored degree must read ~1.0. Anything else it reads is
+something other than the change under test. That is the whole reason the orders are not collapsed
+into one average.
+
+**Defect 1 — comparing across call sites, worth 3.32x on lex.** The first cut registered the real
+`MonomialOrder::cmp` on `Monomial<N>` directly against a bench-local prototype. The lex control read
+**3.32x**. The two arms differed not only in the degree but in which crate their comparison was
+compiled in, through which accessor, behind which `match`; the prototype was winning on inlining.
+The fix is a *transcription* arm: a bench-local struct at the production layout whose comparison is
+copied line for line from `monomial_order.rs`, so that `production`-against-transcription is a
+fidelity check and the transcription is what the prototype is compared to.
+
+**Defect 2 — unequal struct size, worth 3.555x on lex at `N = 7`.** With the transcription in place
+the control was clean at `N = 5` (0.906–0.951) and then read **3.555x at `N = 7`**. The cause is
+layout, not the degree:
+
+| | `N = 5` | `N = 7` | `N = 8` | `N = 10` |
+|---|---:|---:|---:|---:|
+| `[u32; N]` alone | 20 B | **28 B** | 32 B | 40 B |
+| `[u32; N]` + a `u64` degree | 32 B | **40 B** | 40 B | 48 B |
+| trailing padding behind the array | 4 B | **4 B** | 0 B | 0 B |
+
+`[u32; 7]` is **exactly** 28 bytes, so a 32-byte load over it reads past the end of the object and
+the compiler may not emit one. Put the same array in a 40-byte struct ahead of a `u64` and there are
+four bytes of padding behind it, all of it inside the object — so the wider aligned load becomes
+legal. The stored arm was faster at `N = 7` because its *padding* permitted a load its comparand
+could not use. **At that arity the artifact was larger than the effect being measured.**
+
+The fix separates the two by construction, with four arms:
+
+| arm | layout | `degree()` | what it establishes |
+|---|---|---|---|
+| `production` | `Monomial<N>` | sums the array | the tree as it stands |
+| `tight` | `[u32; N]` alone | sums the array | fidelity against `production` |
+| `summed` | `[u32; N]` + a **dead** `u64` | sums the array | the comparand for `stored` |
+| `stored` | `[u32; N]` + a `u64` degree | reads the field | the change under test |
+
+`summed` carries a `u64` it never reads, purely to reproduce the padding and alignment a stored
+degree forces. So `summed`-against-`stored` differs in exactly one expression at byte-identical
+layout, and `tight`-against-`summed` prices the layout change on its own rather than letting it hide
+inside the degree's number. The equality is **asserted rather than assumed**: `assert_layouts_match`
+checks `size_of` *and* `align_of` of the two arms at every arity, and
+`assert_arms_agree` checks that all four arms return the same `Ordering` on all 2 048 measured pairs
+under all three orders — on the measured inputs, because an arm that is fast for the wrong reason is
+exactly what that catches.
+
+**The generalization, which is this repository's own lesson arriving from a new direction.** #517 and
+#496 recorded that a harness parameterized over the thing it compares measures the harness. These
+two defects are the same failure without any parameterization: the arms were hand-written and still
+differed in something other than the hypothesis. A control row whose answer is known *a priori* —
+here, an order that cannot read the field being added — is what caught both, and neither would have
+been caught by repetition, by more samples, or by a quieter machine.
+
+### 3f.1 The measurement
+
+Two reps, interleaved arms registered adjacently inside one process from one build, `taskset -c
+0-7`, one worker, `RUSTFLAGS` unset, `RUSTC_WRAPPER=""`, per-worktree `CARGO_TARGET_DIR`, private
+`CRITERION_HOME`, AVX2 floor verified in the artifact by `tools/vec_census.sh` (25 vector
+multiplies, 21 659 `ymm` references). Both reps under `tools/benchlock.sh` with a **load gate inside
+the lock**: rep 1 began at `load=8.70`, rep 2 at `load=9.25`. That placement is not decoration — this
+run first acquired the lock at **`load=503.73`** after gating on `load < 8` *before* queueing, so a
+pre-lock reading is stale by the time it matters.
+
+Each figure is 2 048 comparisons between two independent 2 048-element arrays; µs per 2 048.
+`DEGREE` is `summed/stored` at byte-identical layout, `layout` is `tight/summed`, `fidelity` is
+`production/tight`. Two reps, so **ranges are given rather than a median with a spread.**
+
+| config | `summed` | `stored` | **DEGREE** | layout | fidelity |
+|---|---:|---:|---:|---:|---:|
+| **N=5** lex/distinct | 1.72 | 1.69 | **1.00–1.04** ← control | 1.01 | 0.99 |
+| **N=5** lex/tied | 1.89 | 1.87 | **1.01** ← control | 1.00 | 1.00 |
+| N=5 grlex/distinct | 3.76 | 1.91 | **1.95–1.98** | 1.00 | 1.02 |
+| N=5 grevlex/distinct | 3.81 | 1.76 | **2.14–2.19** | 0.97 | 1.01 |
+| N=5 grlex/tied | 3.97 | 2.07 | **1.89–1.94** | 0.98 | 1.02 |
+| N=5 grevlex/tied | 3.63 | 2.07 | **1.70–1.81** | 1.02 | 0.97 |
+| **N=7** lex | 4.89–5.03 | 2.23–2.45 | **2.03–2.28** ← control | 0.97 | 1.21–1.25 |
+| N=7 grlex/grevlex | 7.14–8.85 | 1.76–2.14 | **3.30–5.77** | 0.83–1.01 | 1.00–1.03 |
+| **N=8** lex | 5.25–5.51 | 1.68–2.07 | **2.60–3.18** ← control | 0.98–1.02 | 0.98–1.00 |
+| N=8 grlex/grevlex | 7.24–8.15 | 1.84–2.25 | **3.49–4.48** | 0.98–1.01 | 0.98–1.01 |
+| **N=10** lex | 5.10–5.92 | 2.09–2.36 | **2.44–2.55** ← control | 1.00–1.01 | 0.97–1.00 |
+| N=10 grlex/grevlex | 9.09–9.81 | 2.31–3.45 | **2.49–4.10** | 0.97–1.05 | 1.00–1.02 |
+
+`layout` sits at 1.00 throughout, which is the matched-layout assertion doing its job. `fidelity` is
+within 3% on every graded row, so the transcription *is* the production comparison where it matters.
+
+**And the lex control is clean at N = 5 and not at N ≥ 7.** 1.00–1.04 at N = 5; 2.03–3.18 above it.
+So the N = 5 rows are the gate's answer and the higher arities are measuring something else as well.
+§3f.2 says what, and it is not a third defect — it is a finding.
+
+### 3f.2 Why the control breaks above N = 5: the inliner, read off the symbol table
+
+No extra measurement was needed. `nm -C` on the measured artifact:
+
+| symbol | N=5 | N=7 | N=8 | N=10 |
+|---|---|---|---|---|
+| `monomial_order::stored_cmp::<N>` | absent | absent | absent | absent |
+| `monomial_order::summed_cmp::<N>` | absent | **present** | **present** | **present** |
+| `monomial_order::tight_cmp::<N>` | absent | **present** | **present** | **present** |
+
+A symbol survives only for a function that was **not** inlined. So `stored_cmp` is inlined at every
+arity, while `summed_cmp` and `tight_cmp` are inlined at N = 5 and left out of line from N = 7
+upward. The degree-summing loop is what makes the difference: it is the only thing those two bodies
+carry that `stored_cmp` does not, and as `N` grows it pushes the function past the inliner's cost
+threshold. Replacing it with a field read keeps the function under.
+
+That accounts for the control exactly. At N = 5 every arm is inlined and the lex rows compare
+identical inlined code, so they read 1.00. From N = 7 the lex rows compare an inlined body against
+an out-of-line call, and the ~1.7 ns a comparison that buys is most of the 2.03x–3.18x they show.
+It also accounts for the one odd `fidelity` cell — N = 7 lex at 1.21–1.25, the only fidelity figure
+outside 3% — which is the same threshold landing differently either side of the crate boundary.
+
+**So there are two mechanisms, both real consequences of storing the degree, and they must not be
+quoted as one number:**
+
+1. **The arithmetic.** Not summing `[u32; N]` twice per graded comparison. Measured cleanly at
+   N = 5, where inlining is not a variable: **1.70x–2.19x**.
+2. **The code size.** A smaller `cmp` gets inlined where the current one does not, from N = 7
+   upward. Visible in the lex control at **2.03x–3.18x**, mechanically attributed by the symbol
+   table, and **not separately measured** — the experiment that would separate it is
+   `#[inline(always)]` on both comparisons, two builds from one tree, and it was **not taken here**.
+
+Mechanism 2 is the more interesting of the two, because it is larger than mechanism 1 at exactly
+the arities Zeebra's corpus uses, and because nothing about it is specific to the degree: *any*
+change that shrinks `MonomialOrder::cmp` below the threshold would collect it. That is a hypothesis
+about the production type, not a measurement of it, and §3f.3 keeps it on the right side of that
+line.
+
+### 3f.3 The verdict
+
+**The gate clears, and it clears on its own stated terms.** #317 asked whether LLVM already hoists
+the degree sum out of a fully unrolled small-`N` array comparison, and said that if it does, the
+issue dies. It does not: at N = 5, with every arm inlined and the lex control at 1.00–1.04, storing
+the degree makes a graded comparison **1.70x–2.19x** cheaper. At N = 7, 8 and 10 the measured
+advantage is larger still, 2.49x–5.77x, with the split between the two mechanisms of §3f.2
+attributed but not measured apart.
+
+**What that funds, and what it does not.** It funds #317's step 2 — caching the total degree in
+`Monomial<N>` — as worth building and measuring end to end. It forecasts nothing about what step 2
+returns, and §3d.2 is the standing reason to say so out loud: two changes aimed at counted
+operations in this very merge each predicted a large reduction in a count and each delivered a ratio
+inside the noise, one of them removing 875 935 418 monomial multiplies for ~1.6% because the machine
+was not performing them. **A per-operation ratio in a microbenchmark is not a stage ratio**, and the
+comparison it speeds up is 893 610 377 calls inside a stage that #471 has since replaced in F4's
+default path — so step 2's end-to-end value now accrues to the division route that survives, not to
+the instance that motivated the issue.
+
+Four things the next agent should carry into step 2, all established here or while auditing for it:
+
+1. **The wire format need not change, and should not.** A stored degree is redundant, so a derived
+   `Deserialize` would accept an inconsistent one off the wire. Deserializing `[u32; N]` and
+   recomputing through `Monomial::new` keeps the serialized form byte-identical and makes staleness
+   unrepresentable at the boundary — which retires #317's own "adding a field is a format change"
+   objection.
+2. **Field order is load-bearing for `Ord`.** `Monomial` derives `Ord`/`PartialOrd`, which compares
+   fields in declaration order. With `exponents` first the derived order is decided by the exponents
+   alone and is unchanged; with the degree first it silently becomes a graded order everywhere the
+   derived `Ord` is used. Assert it, do not assume it.
+3. **The staleness surface is one module.** `Monomial::exponents` is `pub(crate)` and is written only
+   inside `src/poly/multivariate/`; the `.exponents` hits in `src/grobner/differential/` are
+   `GeneratedTerm`'s `Vec<u32>`, a different type. Privatizing the field leaves one module holding
+   the invariant.
+4. **The monomial gets bigger either way.** `degree()` returns `u64` and casts before summing
+   specifically to avoid overflow, so `u64` preserves semantics exactly at +8 bytes; a `u32` degree
+   with the checked-add discipline `monomial_arithmetic.rs` already uses costs +4 and changes the
+   overflow contract. §3e measured the `u64` layout. Growth cuts against #237/#304, so step 2's A/B
+   has to carry **peak RSS** beside the time.
+
+**Scheduling, which is why step 2 is not in this change.**
+`MILESTONE-COMPETITIVE-MQ-SOLVING.md` requires the monomial type to be "sequenced inside
+NORMALFORM's checkout, never parallelized" and "never concurrent with anything", over a blast radius
+of 53 files mentioning `exponents`. Six agents were live while this gate ran and the one-minute load
+average peaked at 687. The gate's job was to decide whether that window is worth booking; it is.
 
 ---
 
