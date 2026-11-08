@@ -2283,6 +2283,13 @@ code that is generic over `F`, which none of this is reachable from.
 
 It covers `UnivariatePolynomial`, `MultivariatePolynomial`, `Matrix` and `Vector`.
 
+`Matrix` and `Vector` scale the same way: `Matrix::scale_assign` and `Vector::scale_assign` scale
+the dense element buffer in place, and `m * &c`, `m * c`, `c * &m` and `c * m` on an owned `m` route
+through them rather than collecting a second buffer. `&m * &c` and `&m * c` still allocate, which is
+the borrowed contract. Unlike the polynomial's, these forms maintain no sparsity — a dense buffer
+keeps its zeroed entries — and the saved allocation has not been benchmarked, since `Matrix`/`Vector`
+scaling is on no recorded hot path (the dense F4 kernels work on `DenseRows`).
+
 So an accumulator you own grows in place:
 
 ```rust
