@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf2-rp0",
+  "challenge_digest": "56ccc99d85e099ce212311850170489f95b86495dc36d3823cdc9f14f24f7dad",
+  "class": "faithful-reduction",
+  "formulation": "slice(12 fixed, seed 0)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 0 (12 values)"
+  ],
+  "outcome": "basis_only",
+  "significance": "no verified witness",
+  "verification": "no candidate was produced, so nothing was verified",
+  "elapsed_nanos": 30316801503,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 54459856,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 46,
+        "equations": 46,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 30262341647,
+      "estimated_peak_bytes": 102778752,
+      "detail": {
+        "max_matrix_rows": 20866,
+        "max_matrix_columns": 17424,
+        "max_pair_degree": 4,
+        "pairs_considered": 5815,
+        "pairs_reduced": 5815,
+        "elements_added": 545
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 4,
+    "max_matrix_rows": 20866,
+    "max_matrix_columns": 17424,
+    "peak_live_nonzeros": 6414960,
+    "peak_estimated_bytes": 102778752,
+    "pairs_reduced": 5815,
+    "elements_added": 545,
+    "quotient_dimension": null
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "3fe69c6",
+    "base_commit": "3fe69c6",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 120 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=120 tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp0 --slice 0"
+}

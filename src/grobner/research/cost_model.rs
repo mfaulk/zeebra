@@ -43,9 +43,11 @@
 //! [`select_runs_by_stem`] takes the runs **by name** and there is no way to ask for all of them
 //! (#532). Two reasons, and the second is the harder one: an emitted row carries no prediction, so
 //! [`CostModelBoard::open_predictions`] ignores it while [`CostModelBoard::to_markdown`] still
-//! renders it; and a run that shares a `run_file_stem` with another has no record file that holds
-//! its figures, so a row emitted for it would cite a source that does not contain it. Sixteen
-//! retained runs are in that position. #540 is that identity problem.
+//! renders it; and — until #540 — a run that shared a `run_file_stem` with another had no record
+//! file holding its figures, so a row emitted for it would cite a source that did not contain it.
+//! Sixteen retained runs were in that position. **#540 closed it**: the stem carries a digest over
+//! the record, so every retained run has its own file and the citation always resolves. The first
+//! reason stands on its own and is why the register is still curated.
 //!
 //! Prediction error is **derived** by [`CostRow::prediction_errors`] and never authored. The stored
 //! form carries it for a machine consumer's convenience and [`CostRow::from_json`] ignores what is
@@ -2325,15 +2327,18 @@ impl std::fmt::Display for RunSelectionError {
 /// per-algorithm table. Sweeping the retained history would therefore add nothing to the view the
 /// register exists for and dilute its table four to one.
 ///
-/// The second reason is that a row per run is **not expressible** in the record tree. Identity
-/// comes from [`RunRecord::run_file_stem`], which is `challenge--formulation--commit` and carries
-/// no timestamp; `colliding_run_file` documents that a re-run of one problem at one commit
-/// legitimately *replaces* its predecessor's record file. Sixteen committed runs share a stem with
-/// another, and the three `poseidon-t2-rf4-rp0-planted` runs at `86aaa53` measured 369.4 ms,
-/// 360.9 ms and 369.3 ms in Gröbner — only the last of which is in the file all three would have
-/// to cite. A `measured_` figure whose source does not hold it is the defect the basis vocabulary
-/// exists to refuse, so the earlier runs are reported through [`SelectedRuns::shadowed`] and not
-/// emitted.
+/// The second reason **used to be** that a row per run is not expressible in the record tree:
+/// identity was `challenge--formulation--commit`, so a re-run of one problem at one commit
+/// replaced its predecessor's record file, and sixteen committed runs shared a stem with another —
+/// the three `poseidon-t2-rf4-rp0-planted` runs at `86aaa53` measured 369.4 ms, 360.9 ms and
+/// 369.3 ms in Gröbner, and only the last was in the one file all three would have cited.
+///
+/// **#540 closed that.** [`RunRecord::run_file_stem`] now carries [`RunRecord::short_digest`], so
+/// every retained run has its own file and a `source` always holds the figures it cites.
+/// [`SelectedRuns::shadowed`] is kept and is now empty on the committed history: it can only fire
+/// for records that are byte-identical, which are interchangeable rather than shadowed. So this
+/// function's refusal to sweep rests on the first reason alone, which is a judgement about what
+/// the register is for; revisiting it is #532's decision and not a consequence of #540.
 ///
 /// # Errors
 /// [`RunSelectionError::NoSelector`] if `stems` is empty, [`RunSelectionError::UnknownRun`] if a
@@ -2376,8 +2381,13 @@ pub fn select_runs_by_stem<'a>(
 /// runs share it.
 ///
 /// A count above one is a run the record tree cannot cite, which is what makes the stem set the
-/// honest measure of how much of the history is addressable. Linear scan rather than a map because
-/// first-appearance order is the history's order and the set is a few dozen entries.
+/// honest measure of how much of the history is addressable. Since #540 put the record's digest in
+/// the stem, every count on the committed history is **one**, and a count above one could only mean
+/// two byte-identical records — interchangeable, so one file holding both is the right answer.
+/// `test_every_retained_run_is_addressable_by_its_own_record_file` is where that is asserted.
+///
+/// Linear scan rather than a map because first-appearance order is the history's order and the set
+/// is a few dozen entries.
 pub fn retained_run_stems(runs: &[RunRecord]) -> Vec<(String, usize)> {
     let mut stems: Vec<(String, usize)> = Vec::new();
     for run in runs {
@@ -4227,35 +4237,43 @@ mod tests {
         );
     }
 
-    /// Where several retained runs share a stem, the selection takes the one the record file holds
-    /// and reports the repeats it cannot address.
+    /// Each re-measurement of one problem at one commit is separately selectable — #540.
     ///
-    /// The register's `source` is its only link back to evidence, and the run-file scheme lets a
-    /// re-run of one problem at one commit replace its predecessor's file (see
-    /// [`colliding_run_file`](crate::grobner::research::colliding_run_file)). So the earlier run's
-    /// figures have no addressable source, and a row emitted for them would cite a file that does
-    /// not contain them. Reported rather than dropped silently.
+    /// The register's `source` is its only link back to evidence. Before the stem carried a
+    /// digest, a re-run replaced its predecessor's record file, so the earlier run's figures had
+    /// no addressable source and `SelectedRuns::shadowed` existed to report them. Now the two runs
+    /// are two files and two stems, and `shadowed` stays empty: a row may be emitted for either,
+    /// and each cites a file that holds it.
     #[test]
-    fn test_a_repeated_stem_selects_the_run_its_record_file_holds_and_reports_the_rest() {
+    fn test_each_remeasurement_of_one_problem_is_separately_selectable() {
         let mut first = measured_run();
         first.stages[1] = crate::grobner::research::StageCost::new(
             crate::grobner::research::Stage::Grobner,
             Duration::from_millis(360),
         );
         let second = measured_run();
-        let stem = second.run_file_stem();
-        assert_eq!(first.run_file_stem(), stem, "same problem, same commit");
+        let (first_stem, second_stem) = (first.run_file_stem(), second.run_file_stem());
+        assert_ne!(
+            first_stem, second_stem,
+            "two measurements of one problem at one commit are two records"
+        );
 
         let runs = vec![first, second];
-        let selection =
-            select_runs_by_stem(&runs, std::slice::from_ref(&stem)).expect("the stem matches");
-        assert_eq!(selection.runs.len(), 1, "one row per addressable record");
-        assert_eq!(
-            selection.runs[0].stages[1].elapsed,
-            Duration::from_millis(331),
-            "the record file holds the last run written under the stem"
-        );
-        assert_eq!(selection.shadowed, vec![(stem, 2)]);
+        for (stem, expected) in [(&first_stem, 360), (&second_stem, 331)] {
+            let selection =
+                select_runs_by_stem(&runs, std::slice::from_ref(stem)).expect("the stem matches");
+            assert_eq!(selection.runs.len(), 1);
+            assert_eq!(
+                selection.runs[0].stages[1].elapsed,
+                Duration::from_millis(expected),
+                "the stem selects the run whose record file holds it"
+            );
+            assert!(
+                selection.shadowed.is_empty(),
+                "nothing is shadowed once every run has its own file: {:?}",
+                selection.shadowed
+            );
+        }
     }
 
     /// Naming one stem twice selects it once, so a repeated selector cannot double-append.
@@ -4275,7 +4293,7 @@ mod tests {
     /// per stem. If a
     /// run identity lands (#540) these numbers change and this test is where that shows up.
     #[test]
-    fn test_sixteen_retained_runs_share_a_stem_with_another() {
+    fn test_every_retained_run_is_addressable_by_its_own_record_file() {
         use crate::grobner::research::{registry, Scoreboard};
 
         let history = Json::parse(include_str!(
@@ -4292,9 +4310,14 @@ mod tests {
             scoreboard.runs().len(),
             "every retained run is either a stem or a repeat of one"
         );
+        // #540: the stem carries the measurement's digest, so two runs of one problem at one
+        // commit are different names. A repeat here would be two runs that are byte-identical as
+        // records, which are interchangeable and so genuinely one addressable thing — but there
+        // are none in the committed history, and this asserts the stronger statement.
         assert_eq!(
-            repeats, 16,
-            "the runs no record file can be cited for; see #540"
+            repeats, 0,
+            "every retained run has a record file that holds it; see #540"
         );
+        assert_eq!(addressable, scoreboard.runs().len(), "one stem per run");
     }
 }

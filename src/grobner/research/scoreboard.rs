@@ -28,12 +28,15 @@ use std::{
     time::Duration,
 };
 
-use crate::grobner::{
-    f4::{DegreeProfile, F4Statistics},
-    research::{
-        challenge::{BenchmarkClass, ChallengeManifest, Significance},
-        record::{ExperimentRecord, Json},
+use crate::{
+    grobner::{
+        f4::{DegreeProfile, F4Statistics},
+        research::{
+            challenge::{BenchmarkClass, ChallengeManifest, Significance},
+            record::{ExperimentRecord, Json},
+        },
     },
+    util::sha256_hex,
 };
 
 /// Where a run stopped, when it stopped without an answer.
@@ -809,20 +812,35 @@ impl RunRecord {
 
     /// The filename stem this run's own record is written under, without the extension.
     ///
-    /// `<challenge>--<formulation with spaces hyphenated>--<commit>`.
+    /// `<challenge>--<formulation slug>--<commit>--<twelve hex digits of [`Self::digest`]>`.
     ///
-    /// **Its uniqueness comes entirely from the formulation string.** Nothing in the name carries
-    /// the slice index or the seed, so two runs of one problem are distinguishable only because
-    /// every slice formulation happens to spell its seed out — `slice(3 fixed, seed 1)`. That is a
-    /// property of prose, not of the scheme, and `"a b"` against `"a-b"` already breaks it. The
-    /// dependency is checked rather than trusted: see [`colliding_run_file`], which the writer
-    /// calls before writing anything.
+    /// **Uniqueness comes from the digest, and from nothing else in the name** (#540). The three
+    /// readable components are there to be read; they are not what distinguishes one run from
+    /// another, so the scheme no longer depends on prose spelling a slice index out.
+    ///
+    /// What that fixes, measured on the committed tree before the change:
+    ///
+    /// * **Sixteen retained runs had no record file that held them.** Identity was
+    ///   `challenge--formulation--commit`, so a re-measurement at one commit overwrote its
+    ///   predecessor's file — three `poseidon-t2-rf4-rp0-planted` runs at `86aaa53` measured
+    ///   369.4 ms, 360.9 ms and 369.3 ms in Gröbner and only the last was on disk. The digest
+    ///   covers the measurement, so those are now three names.
+    /// * **Seven stems named a file that did not exist, and seven files matched no stem.** Both
+    ///   sets numbered 89 and were not the same set: the slug rule had changed under the committed
+    ///   names, leaving `…--resultant--slice-12-fixed--seed-1---c32--86aaa53.json` beside a
+    ///   history row whose stem was `…--resultant,-slice(12-fixed,-seed-1)--86aaa53`. A stem
+    ///   derived from prose through a rule that is free to change is a citation that can rot.
+    ///
+    /// Two byte-identical records still share a stem, and that is correct: they are
+    /// interchangeable, so one file holds both. [`colliding_run_file`] is what asserts that a
+    /// shared stem means exactly that.
     pub fn run_file_stem(&self) -> String {
         format!(
-            "{}--{}--{}",
+            "{}--{}--{}--{}",
             self.challenge,
-            self.formulation.replace(' ', "-"),
-            self.environment.commit
+            formulation_slug(&self.formulation),
+            self.environment.commit,
+            self.short_digest()
         )
     }
 
@@ -1107,6 +1125,29 @@ impl RunRecord {
 
     /// The record as JSON.
     pub fn to_json(&self, manifest: &ChallengeManifest) -> Json {
+        let mut fields = self.json_fields();
+        // `significance` is the one field the record cannot compute alone, and it is inserted
+        // rather than appended so the key order is unchanged from when it was written inline.
+        let at = fields
+            .iter()
+            .position(|(key, _)| *key == "verification")
+            .expect("`verification` is always emitted");
+        fields.insert(
+            at,
+            (
+                "significance",
+                Json::string(self.significance(manifest).to_string()),
+            ),
+        );
+        Json::object(fields)
+    }
+
+    /// Every field of the record except `significance`, which is derived from the registry.
+    ///
+    /// Split out so that [`Self::canonical`] covers the whole record without a second field list
+    /// to keep in step: a field added here is in the digest, and therefore in the identity, by
+    /// construction rather than by remembering.
+    fn json_fields(&self) -> Vec<(&'static str, Json)> {
         let mut fields = vec![
             ("schema", Json::int(self.schema)),
             ("challenge", Json::string(&self.challenge)),
@@ -1139,10 +1180,6 @@ impl RunRecord {
                 ]),
             ));
         }
-        fields.push((
-            "significance",
-            Json::string(self.significance(manifest).to_string()),
-        ));
         fields.push(("verification", Json::string(&self.verification)));
         fields.push(("elapsed_nanos", Json::nanos(self.elapsed())));
         fields.push((
@@ -1180,8 +1217,51 @@ impl RunRecord {
             },
         ));
         fields.push(("reproduce", Json::string(&self.reproduce)));
-        Json::object(fields)
+        fields
     }
+
+    /// The record as canonical JSON: every field except the registry-derived `significance`.
+    ///
+    /// `Json`'s serializer is deterministic and its objects keep insertion order, so this is the
+    /// same bytes for the same record on any machine — which is what lets [`Self::digest`] stand
+    /// in for the record's content.
+    ///
+    /// `significance` is excluded because it is a function of the manifest and the outcome, so two
+    /// runs of one challenge with one outcome cannot differ in it, and including it would make the
+    /// identity depend on a file this record does not carry.
+    pub fn canonical(&self) -> String {
+        Json::object(self.json_fields()).to_json()
+    }
+
+    /// SHA-256 of [`Self::canonical`], lowercase hex: this *run's* identity, as
+    /// [`ChallengeManifest::digest`] is its problem's.
+    pub fn digest(&self) -> String {
+        sha256_hex(self.canonical().as_bytes())
+    }
+
+    /// The first twelve hex digits of [`Self::digest`], which is what the filename carries.
+    pub fn short_digest(&self) -> String {
+        self.digest()[..12].to_string()
+    }
+}
+
+/// A formulation as a filename component: anything outside `[A-Za-z0-9._-]` becomes `-`, and runs
+/// of `-` collapse.
+///
+/// Previously the rule was `replace(' ', "-")`, which left `(`, `)` and `,` in 41 of the committed
+/// filenames and — because the rule itself changed over time — orphaned seven files whose names no
+/// longer matched any stem the code produces. Sanitizing is not what makes a name unique; the
+/// digest is. This only keeps the readable part of the name a filename.
+fn formulation_slug(formulation: &str) -> String {
+    let mut slug = String::with_capacity(formulation.len());
+    for character in formulation.chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-') {
+            slug.push(character);
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    slug.trim_matches('-').to_string()
 }
 
 /// Why a run could not be added to a scoreboard, or two runs could not be compared.
@@ -1504,21 +1584,28 @@ impl Display for RunFileCollision {
     }
 }
 
-/// The first pair of runs in `runs` that differ but would share a per-run filename.
+/// The first pair of runs in `runs` that differ in content but would share a per-run filename.
 ///
 /// The failure this detects is **silent**: one record overwrites another and the directory simply
-/// has one fewer file than there were runs, with nothing to notice. `RunRecord::run_file_stem`
-/// explains why the scheme is vulnerable; this is the check that keeps it honest, and the writer
-/// calls it before writing anything so a collision stops the run instead of losing a record.
+/// has one fewer file than there were runs, with nothing to notice. The writer calls it before
+/// writing anything, so a collision stops the run instead of losing a record.
 ///
-/// Two records with the **same** formulation are not a collision: that is one row rerun, and the
-/// later record legitimately replaces the earlier file.
+/// Since #540 the stem carries [`RunRecord::short_digest`], so **a shared stem means the two
+/// records are the same content** — interchangeable, and one file legitimately holds both. What
+/// this function now checks is that the digest is doing that job: a shared stem whose canonical
+/// forms differ is a twelve-hex-digit collision, or a bug in [`RunRecord::canonical`], and either
+/// way it must stop the write rather than silently drop a record.
+///
+/// The comparison is on [`RunRecord::canonical`] and not on the formulation, which is what it used
+/// to be: the formulation alone could not see two runs that differed only in their measurement,
+/// which is exactly the sixteen runs #540 was filed for.
 pub fn colliding_run_file(runs: &[RunRecord]) -> Option<RunFileCollision> {
-    let mut seen: BTreeMap<String, &str> = BTreeMap::new();
+    let mut seen: BTreeMap<String, (&str, String)> = BTreeMap::new();
     for run in runs {
         let stem = run.run_file_stem();
+        let canonical = run.canonical();
         match seen.get(&stem) {
-            Some(first) if *first != run.formulation.as_str() => {
+            Some((first, first_canonical)) if *first_canonical != canonical => {
                 return Some(RunFileCollision {
                     stem,
                     first: first.to_string(),
@@ -1527,7 +1614,7 @@ pub fn colliding_run_file(runs: &[RunRecord]) -> Option<RunFileCollision> {
             }
             Some(_) => {}
             None => {
-                seen.insert(stem, run.formulation.as_str());
+                seen.insert(stem, (run.formulation.as_str(), canonical));
             }
         }
     }
@@ -2184,27 +2271,130 @@ mod tests {
         );
     }
 
-    /// Two formulations that differ, but whose filenames would not, are reported as a collision.
+    /// Two formulations whose slugs are the same no longer share a filename — #540.
     ///
-    /// The per-run filename is `<challenge>--<formulation>--<commit>.json`, and its uniqueness
-    /// comes entirely from the formulation string — nothing in the name carries the slice or the
-    /// seed. That works today only because every slice formulation happens to spell its seed out.
-    /// `"a b"` and `"a-b"` are enough to break it, and the failure mode is a silent overwrite: one
-    /// run's record replaces another's and the directory simply has one fewer file than runs.
+    /// `"slice 3"` and `"slice-3"` slug identically, and under the old scheme that was a silent
+    /// overwrite: one record replaced the other and the directory simply had one fewer file than
+    /// there were runs. The digest closes it from both sides, and that is worth asserting
+    /// explicitly because the collision check can no longer demonstrate it: `canonical` covers the
+    /// formulation, so two records that slug the same still digest differently.
     #[test]
-    fn test_two_runs_that_would_share_a_filename_are_reported() {
+    fn test_formulations_that_slug_alike_no_longer_share_a_filename() {
         let one = witness("poseidon31-cico-t16-rf2-rp4", "slice 3", 1_000, 1 << 20);
         let other = witness("poseidon31-cico-t16-rf2-rp4", "slice-3", 2_000, 1 << 20);
-        assert_eq!(
+
+        assert_ne!(
             one.run_file_stem(),
             other.run_file_stem(),
-            "the premise of this test: the two stems are the same"
+            "two runs that slug alike must not share a record file"
+        );
+        assert!(
+            one.run_file_stem().contains("slice-3"),
+            "the readable part is still readable: {}",
+            one.run_file_stem()
+        );
+        assert_eq!(
+            super::colliding_run_file(&[one, other]).map(|c| c.stem),
+            None,
+            "distinct stems are not a collision"
+        );
+    }
+
+    /// Two runs of one problem at one commit, differing only in what they measured, are two names.
+    ///
+    /// This is #540's sixteen runs in miniature: identity used to be
+    /// `challenge--formulation--commit`, so the second record overwrote the first's file and the
+    /// first was retained in the history with nothing on disk holding it.
+    #[test]
+    fn test_a_rerun_that_measured_something_else_gets_its_own_file() {
+        let first = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant",
+            3_274_316,
+            1 << 20,
+        );
+        let second = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant",
+            3_301_004,
+            1 << 20,
         );
 
-        let collision = super::colliding_run_file(&[one, other]).expect("a collision");
-        assert!(collision.stem.contains("slice-3"), "{}", collision.stem);
-        assert_eq!(collision.first, "slice 3");
-        assert_eq!(collision.second, "slice-3");
+        assert_ne!(
+            first.run_file_stem(),
+            second.run_file_stem(),
+            "a re-measurement is a different run and needs a different file"
+        );
+        assert_eq!(
+            first
+                .run_file_stem()
+                .rsplit_once("--")
+                .map(|(head, _)| head),
+            second
+                .run_file_stem()
+                .rsplit_once("--")
+                .map(|(head, _)| head),
+            "and everything before the digest is the same, so the two sort together"
+        );
+        assert_eq!(super::colliding_run_file(&[first, second]), None);
+    }
+
+    /// The same record twice is one file, and that is not a collision.
+    ///
+    /// Two byte-identical records are interchangeable, so collapsing them is correct rather than
+    /// lossy — it is the one case where a shared stem is the right answer.
+    #[test]
+    fn test_byte_identical_records_share_one_file() {
+        let run = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant",
+            3_274_316,
+            1 << 20,
+        );
+        let copy = run.clone();
+
+        assert_eq!(run.run_file_stem(), copy.run_file_stem());
+        assert_eq!(run.canonical(), copy.canonical());
+        assert_eq!(super::colliding_run_file(&[run, copy]), None);
+    }
+
+    /// The slug keeps a filename a filename: no parentheses, commas or spaces.
+    ///
+    /// 41 of the committed run files carried literal `(` and `)` before #540, and the rule that
+    /// produced them had changed at least once — which is what orphaned seven of them from the
+    /// history. The digest is what makes a name unique; this only keeps the readable part portable.
+    #[test]
+    fn test_the_formulation_slug_is_filename_safe() {
+        assert_eq!(
+            super::formulation_slug("resultant, slice(12 fixed, seed 1)"),
+            "resultant-slice-12-fixed-seed-1"
+        );
+        assert_eq!(super::formulation_slug("as published"), "as-published");
+        assert_eq!(
+            super::formulation_slug("a  b"),
+            "a-b",
+            "runs of separators collapse"
+        );
+        assert_eq!(
+            super::formulation_slug("--edge--"),
+            "edge",
+            "and do not dangle"
+        );
+
+        let run = witness(
+            "poseidon31-cico-t16-rf2-rp4",
+            "resultant, slice(12 fixed, seed 1)",
+            1_000,
+            1 << 20,
+        );
+        let stem = run.run_file_stem();
+        assert!(
+            !stem.contains('(')
+                && !stem.contains(')')
+                && !stem.contains(',')
+                && !stem.contains(' '),
+            "{stem}"
+        );
     }
 
     /// Runs whose filenames differ are not reported, and nor is the same run recorded twice.

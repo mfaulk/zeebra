@@ -26,6 +26,7 @@
 //! solved, so no bug in a generator or a transformation can make a verification pass.
 
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -1588,22 +1589,6 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
     // silently map to one file and the directory ends up with fewer records than there were runs,
     // with nothing to notice. Stopping is the right response: a lost record is worse than a
     // failed write, and the message names both formulations so the fix is obvious.
-    if let Some(collision) = colliding_run_file(board.runs()) {
-        panic!("two runs would share a per-run filename: {}", collision);
-    }
-    for run in board.runs() {
-        let name = format!("{}.json", run.run_file_stem());
-        let manifest = registry
-            .iter()
-            .find(|c| c.id == run.challenge)
-            .expect("checked on add");
-        fs::write(
-            root.join("runs").join(name),
-            run.to_json(manifest).to_json() + "\n",
-        )
-        .expect("a writable file");
-    }
-
     // History accumulates: read what is there, append, write it back. A writer with no reader
     // would mean losing every earlier milestone's results on each run.
     //
@@ -1629,6 +1614,69 @@ fn write_tree(root: &Path, board: &Scoreboard, registry: &[ChallengeManifest]) {
             .unwrap_or_default(),
     );
     let entries_for_history = entries.clone();
+
+    // One record file per run in the **accumulated** history, not per run added this pass (#540).
+    //
+    // Before, the loop wrote only the new runs and relied on every earlier file still being
+    // correct. That holds exactly as long as `run_file_stem` never changes — and it had changed,
+    // leaving seven committed files whose names no stem produced and seven stems with no file.
+    // Writing from the accumulation makes `runs/` a function of the history, so a stem change
+    // migrates the whole directory instead of stranding the part of it nobody re-ran.
+    let accumulated: Vec<RunRecord> = entries_for_history
+        .iter()
+        .map(|entry| {
+            let challenge = entry
+                .get("challenge")
+                .and_then(Json::as_str)
+                .expect("a retained run names its challenge");
+            let manifest = registry
+                .iter()
+                .find(|c| c.id == challenge)
+                .expect("a retained run's challenge is registered");
+            RunRecord::from_json(entry, manifest).expect("the history this program wrote")
+        })
+        .collect();
+    // Checked over the accumulated history, which is what gets written, and before any of it is.
+    // A shared stem now means two records of identical content, so a collision here is a digest
+    // collision or a bug in `RunRecord::canonical`; either way stopping beats losing a record.
+    if let Some(collision) = colliding_run_file(&accumulated) {
+        panic!("two runs would share a per-run filename: {}", collision);
+    }
+    let mut written: BTreeSet<String> = BTreeSet::new();
+    for run in &accumulated {
+        let manifest = registry
+            .iter()
+            .find(|c| c.id == run.challenge)
+            .expect("a retained run's challenge is registered");
+        let name = format!("{}.json", run.run_file_stem());
+        fs::write(
+            root.join("runs").join(&name),
+            run.to_json(manifest).to_json() + "\n",
+        )
+        .expect("a writable file");
+        written.insert(name);
+    }
+    // A `runs/` entry this pass did not write is a record of nothing: a file left behind when the
+    // stem that named it changed. Removing it is what keeps the directory equal to the history
+    // rather than a superset of every naming scheme the tree has had.
+    //
+    // Safe only because the loop above covers the whole accumulated history. It must stay that
+    // way: pruning against the runs *added* this pass would delete every earlier milestone's
+    // records, and `render` adds none at all.
+    for entry in fs::read_dir(root.join("runs")).expect("a readable directory") {
+        let path = entry.expect("a readable entry").path();
+        let is_orphan = path
+            .extension()
+            .is_some_and(|extension| extension == "json")
+            && path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| !written.contains(name));
+        if is_orphan {
+            fs::remove_file(&path).expect("a removable file");
+            println!("- removed {}, which no retained run names", path.display());
+        }
+    }
     fs::write(
         &history_path,
         Json::object([

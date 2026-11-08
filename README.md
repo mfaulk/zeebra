@@ -3989,18 +3989,17 @@ emitting a row per retained run is both undesirable and not expressible:
   view the register exists for and swamp its 23 curated rows several times over. `research/scoreboard/` is
   already the complete measured record; this board is about whether the predictions held.
 - A row's `source` is its only link back to evidence, and for an emitted row that is
-  `research/scoreboard/runs/<stem>.json`. The stem is `challenge--formulation--commit` with no
-  timestamp, and `colliding_run_file` documents that a re-run of one problem at one commit
-  legitimately *replaces* its predecessor's file. So the committed history holds **more runs than
-  record files** — sixteen runs share a stem with another — and the three
-  `poseidon-t2-rf4-rp0-planted` runs at `86aaa53` measured 369.4 ms, 360.9 ms and 369.3 ms in
-  Gröbner, of which the one file they would all cite holds the third. A `measured_`
-  figure whose source does not contain it is the defect the basis vocabulary exists to refuse, so
-  those runs get no row and `--from-runs` says so on stderr. The emitter's idempotence check is on
-  `(key, source)` — both functions of `(challenge, formulation, commit)` — so it also could not tell
-  such a run from its own previous output: **idempotence and completeness are not simultaneously
-  available** under this identity. #540 is the run-identity problem; until it lands, a row per run is
-  blocked rather than declined.
+  `research/scoreboard/runs/<stem>.json`. **#540 has since made that citation always resolve**: the
+  stem is now `challenge--formulation--commit--<digest>`, where the digest is SHA-256 over the
+  record, so a re-measurement no longer replaces its predecessor's file and
+  `research/scoreboard/runs/` holds one file per retained run — 105 files for 105 runs, where before
+  it held 89 for 105 and the two sets of 89 were not even the same set. So the second reason above
+  no longer holds: a row per run **is** expressible, and the emitter's idempotence check on
+  `(key, source)` can now distinguish a second run from its own previous output.
+
+  The register stays curated anyway, on the first reason alone, which is a judgement about what the
+  board is *for* rather than a limit of the record tree. Reconsidering that is #532's decision to
+  revisit, not something #540 changed by itself.
 
 What an emitted row **may not** claim is the more interesting half, and all three rules are code:
 

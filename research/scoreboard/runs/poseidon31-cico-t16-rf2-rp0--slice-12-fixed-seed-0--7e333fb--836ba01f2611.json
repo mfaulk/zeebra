@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "challenge": "poseidon31-cico-t16-rf2-rp0",
+  "challenge_digest": "56ccc99d85e099ce212311850170489f95b86495dc36d3823cdc9f14f24f7dad",
+  "class": "faithful-reduction",
+  "formulation": "slice(12 fixed, seed 0)",
+  "transformations": [
+    "specialize free inputs 2..14 at seed 0 (12 values)"
+  ],
+  "outcome": "slice_established_nothing",
+  "significance": "no verified witness",
+  "verification": "no candidate was produced, so nothing was verified",
+  "elapsed_nanos": 30994736182,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 80769635,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 46,
+        "equations": 46,
+        "free_inputs": 14
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 30766583669,
+      "estimated_peak_bytes": 102778752,
+      "detail": {
+        "max_matrix_rows": 20866,
+        "max_matrix_columns": 17424,
+        "max_pair_degree": 4,
+        "pairs_considered": 5815,
+        "pairs_reduced": 5815,
+        "elements_added": 545
+      }
+    },
+    {
+      "stage": "conversion",
+      "elapsed_nanos": 129947950,
+      "estimated_peak_bytes": 1891792,
+      "detail": {
+        "quotient_dimension": 81
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 17434928,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "lex_basis_elements": 46
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 4,
+    "max_matrix_rows": 20866,
+    "max_matrix_columns": 17424,
+    "peak_live_nonzeros": 6414960,
+    "peak_estimated_bytes": 102778752,
+    "pairs_reduced": 5815,
+    "elements_added": 545,
+    "quotient_dimension": 81
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "7e333fb",
+    "base_commit": "7e333fb",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, wall clock 180 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "ZEEBRA_WALL_SECONDS=180 tools/scoreboard.sh row poseidon31-cico-t16-rf2-rp0 --slice 0"
+}

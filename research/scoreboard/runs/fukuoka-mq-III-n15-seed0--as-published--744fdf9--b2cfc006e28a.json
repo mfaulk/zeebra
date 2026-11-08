@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "challenge": "fukuoka-mq-III-n15-seed0",
+  "challenge_digest": "0552d3b510706810f893bc902ed97316d02a679684fc38c1f74a46639c8f2bc5",
+  "class": "official",
+  "formulation": "as published",
+  "transformations": [],
+  "outcome": "verified_witness",
+  "significance": "reproduction of a challenge solved externally on publication",
+  "verification": "evaluated against the published coefficient vectors; the published answer is [25, 17, 12, 28]",
+  "elapsed_nanos": 8420366191,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 34255,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 15,
+        "equations": 30
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 8419804968,
+      "estimated_peak_bytes": 34303736,
+      "detail": {
+        "max_matrix_rows": 4589,
+        "max_matrix_columns": 3573,
+        "max_pair_degree": 4,
+        "pairs_reduced": 3596
+      }
+    },
+    {
+      "stage": "conversion",
+      "elapsed_nanos": 51989,
+      "estimated_peak_bytes": 496,
+      "detail": {
+        "quotient_dimension": 1
+      }
+    },
+    {
+      "stage": "univariate",
+      "elapsed_nanos": 268418,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "lex_basis_elements": 15
+      }
+    },
+    {
+      "stage": "verification",
+      "elapsed_nanos": 206561,
+      "estimated_peak_bytes": null,
+      "detail": {}
+    }
+  ],
+  "grobner_frontier": {
+    "completed": true,
+    "max_pair_degree": 4,
+    "highest_completed_degree": 4,
+    "max_matrix_rows": 4589,
+    "max_matrix_columns": 3573,
+    "peak_live_nonzeros": 2142707,
+    "peak_estimated_bytes": 34303736,
+    "pairs_reduced": 3596,
+    "elements_added": 928,
+    "quotient_dimension": 1
+  },
+  "campaign": null,
+  "environment": {
+    "commit": "744fdf9",
+    "base_commit": "744fdf9",
+    "patch_id": "",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 then FGLM then univariate search; 60000 columns, 400 MB live, degree profiling on"
+  },
+  "experiment": null,
+  "reproduce": "tools/fetch-mq-challenge.sh && cargo run --release --example scoreboard -- stable  # fukuoka-mq-III-n15-seed0"
+}
