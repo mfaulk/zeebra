@@ -292,6 +292,36 @@ the end of the computation — where this stage pays it.
 ceiling on it is Groebner.jl's own 1.74 ms for the same stage. Filed separately; it is not this
 change's to fix, and this change does not need it to be worth 4.18x.
 
+### 3a.1b The small instances, which say the matrix route must **not** become the default
+
+`cargo bench --bench f4_stages -- interreduction`, on the lock, pinned. Both routes over the **same**
+basis from the same trace, so each pair is an A/B rather than two numbers over two inputs.
+
+| instance / order | division | matrix | |
+|---|---:|---:|---|
+| katsura-6 grevlex | 2.0725 ms | 1.9373 ms | 1.07x faster |
+| katsura-6 grlex | 1.5841 ms | 0.99858 ms | 1.59x faster |
+| **katsura-5 lex** | **89.168 µs** | **2.2249 ms** | **25.0x slower** |
+| cyclic-5 grevlex | 237.53 µs | 138.20 µs | 1.72x faster |
+
+Three rungs favour the matrix route by 1.07x–1.72x. **The fourth is a 25x regression**, and it is
+the case `buchberger.rs:294-314` already documents:
+
+> On katsura-6 under lex — whose basis is in shape position, five linear elements over one
+> univariate of degree 32 — that is the difference between 2.5 seconds and a millisecond.
+
+A basis in shape position is the **best** case for iterated division — the ascending-order sort means
+every substituted tail is already in normal form — and the **worst** case for a matrix, which must
+carry columns spanning the univariate's whole degree range. So the matrix route's advantage is not
+uniform, and the measured spread across one flag is from **+4.18x end-to-end** to **−25x on a
+stage**, separated by the monomial order.
+
+**Consequence.** The default stays on the division route, on evidence rather than on caution. The
+right shape is not a global default but a route chosen from the instance and the order, which is the
+"order-specific default rather than a global one" that M22-A's and M22-E's measurements jointly
+implied and which **#273** owns. `fglm::shape` already ships a tested shape-position detector that
+is deliberately unwired; it would serve as the criterion here.
+
 ### 3a.2 What the matrix route does not change
 
 * **The answer.** Asserted equal on every rep here, and asserted equal against the division route
@@ -300,10 +330,11 @@ change's to fix, and this change does not need it to be worth 4.18x.
 * **Any other instance's cost.** Every figure above is `mq-random-10` grevlex at one digest. The
   stage's shape on katsura under lex is completely different — `buchberger.rs:294-314` records the
   ascending sort alone taking it from 2.5 s to a millisecond — and nothing here transfers.
-* **The division route's existence.** It remains the default in this change, remains the fallback
-  when a budget refuses the matrix, and remains the oracle the matrix route is tested against. It is
-  also still on the critical path of FGLM border reduction, the differential oracles and
-  `multi_div_rem`, so #440 stage 2's windowed merge remains worth taking for those callers.
+* **The division route's existence.** It remains the default — see §3a.1b, where it wins by 25x —
+  remains the fallback when a budget refuses the matrix, and remains the oracle the matrix route is
+  tested against. It is also still on the critical path of FGLM border reduction, the differential
+  oracles and `multi_div_rem`, which is why #440 stage 2's windowed merge is worth taking
+  independently of this change.
 
 ---
 
