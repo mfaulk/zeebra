@@ -16,9 +16,11 @@
 //! is why the same index serves the per-column reference path and every deduplicated one: an
 //! ablation between them then differs in the reduction and in nothing else.
 
-use std::collections::{HashMap, HashSet};
-
-use crate::{grobner::fglm::QuotientBasis, Monomial};
+use crate::{
+    grobner::fglm::QuotientBasis,
+    poly::{MonomialMap, MonomialSet},
+    Monomial,
+};
 
 /// Where multiplication by a variable sends a standard monomial.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -66,7 +68,7 @@ impl<const N: usize> BorderIndex<N> {
         // `N * D` products and lookups being done twice.
         let mut classified: Vec<Result<usize, Monomial<N>>> = Vec::with_capacity(N * dimension);
         let mut monomials: Vec<Monomial<N>> = Vec::new();
-        let mut seen: HashSet<Monomial<N>> = HashSet::new();
+        let mut seen: MonomialSet<N> = MonomialSet::default();
 
         for i in 0..N {
             for monomial in quotient.monomials() {
@@ -86,7 +88,7 @@ impl<const N: usize> BorderIndex<N> {
         }
 
         monomials.sort_by(|a, b| order.cmp(b, a));
-        let position: HashMap<Monomial<N>, usize> = monomials
+        let position: MonomialMap<N, usize> = monomials
             .iter()
             .enumerate()
             .map(|(index, monomial)| (*monomial, index))

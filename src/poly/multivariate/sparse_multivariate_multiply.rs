@@ -11,13 +11,12 @@
 //! coefficients cancel is not a term of the product, and a surviving zero would make a polynomial
 //! unequal to its own canonical form.
 
-use std::collections::HashMap;
-
 use crate::{
     poly::multivariate::{
         dense_index::{
             box_cells, collect_box, collect_simplex, simplex_len, BoxIndex, SimplexIndex,
         },
+        monomial_hash::{BuildMonomialHasher, MonomialMap},
         sparse_multivariate_polynomial::SparseMultiPoly,
     },
     FiniteField, Monomial,
@@ -361,7 +360,8 @@ fn multiply_dense_triangle<const N: usize, F: FiniteField>(
     // Counted before the map is built so that it is sized once, which is the whole point of having
     // come this far without hashing.
     let occupied = slots.iter().filter(|c| !c.is_zero()).count();
-    let mut terms: HashMap<Monomial<N>, F> = HashMap::with_capacity(occupied);
+    let mut terms: MonomialMap<N, F> =
+        MonomialMap::with_capacity_and_hasher(occupied, BuildMonomialHasher);
     for total in 0..=degree {
         let base = (total * (total + 1) / 2) as usize;
         for y in 0..=total {
@@ -541,8 +541,8 @@ fn dense_box_bounds<const N: usize, F: FiniteField>(
 fn new_accumulator<const N: usize, F: FiniteField>(
     a: &SparseMultiPoly<N, F>,
     b: &SparseMultiPoly<N, F>,
-) -> HashMap<Monomial<N>, F> {
-    HashMap::with_capacity(accumulator_capacity(a, b))
+) -> MonomialMap<N, F> {
+    MonomialMap::with_capacity_and_hasher(accumulator_capacity(a, b), BuildMonomialHasher)
 }
 
 /// An upper bound on the number of distinct monomials in `a * b`, capped.
@@ -578,7 +578,7 @@ fn triangle_index(i: u32, j: u32) -> usize {
 /// Add one term to the accumulator, merging it with a monomial already present.
 #[inline]
 fn merge<const N: usize, F: FiniteField>(
-    accumulator: &mut HashMap<Monomial<N>, F>,
+    accumulator: &mut MonomialMap<N, F>,
     monomial: Monomial<N>,
     coefficient: F,
 ) {
@@ -592,7 +592,7 @@ fn merge<const N: usize, F: FiniteField>(
 
 /// Fold a block of products into the accumulator and empty the buffer, keeping its capacity.
 fn drain_into<const N: usize, F: FiniteField>(
-    accumulator: &mut HashMap<Monomial<N>, F>,
+    accumulator: &mut MonomialMap<N, F>,
     buffer: &mut Vec<(Monomial<N>, F)>,
 ) {
     for (monomial, coefficient) in buffer.drain(..) {
@@ -602,7 +602,7 @@ fn drain_into<const N: usize, F: FiniteField>(
 
 /// Drop the monomials that cancelled and hand back a canonical polynomial.
 fn finish<const N: usize, F: FiniteField>(
-    mut accumulator: HashMap<Monomial<N>, F>,
+    mut accumulator: MonomialMap<N, F>,
 ) -> SparseMultiPoly<N, F> {
     accumulator.retain(|_monomial, c| !c.is_zero());
     SparseMultiPoly { terms: accumulator }

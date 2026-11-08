@@ -3,6 +3,7 @@
 use crate::{
     poly::{
         multivariate::{
+            monomial_hash::MonomialMap,
             monomial_order::MonomialOrder,
             multi_poly_parser::{parse_multivariate_polynomial, Rule},
             term::Term,
@@ -19,7 +20,6 @@ use proptest::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     fmt::{Display, Formatter},
     hash::{Hash, Hasher},
 };
@@ -31,7 +31,7 @@ pub struct SparseMultiPoly<const N: usize, F: FiniteField> {
     /// The zero polynomial may be represented as an empty set of terms, or by the single
     /// term 0 * Monomial:one(). Otherwise, terms should not contain any monomials with zero coefficient.  
     #[serde(bound = "F: FiniteField")]
-    pub(crate) terms: HashMap<Monomial<N>, F>,
+    pub(crate) terms: MonomialMap<N, F>,
 }
 
 impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
@@ -48,7 +48,7 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     where
         T: Into<Term<N, F>> + Clone,
     {
-        let mut terms_map: HashMap<Monomial<N>, F> = HashMap::default();
+        let mut terms_map: MonomialMap<N, F> = MonomialMap::default();
         for term in terms.iter() {
             let term: Term<N, F> = term.clone().into();
             // Omit terms with zero coefficient.
@@ -171,7 +171,7 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         self.terms.keys().all(|monomial| monomial.is_one())
     }
 
-    pub fn terms(&self) -> &HashMap<Monomial<N>, F> {
+    pub fn terms(&self) -> &MonomialMap<N, F> {
         &self.terms
     }
 

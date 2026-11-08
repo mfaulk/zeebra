@@ -741,7 +741,7 @@ stage. Instrument the current path to split `construction` into (a) the `HashSet
 `HashMap` build, (c) the row scatter, on katsura-6 lex and cyclic-5 lex. If (a)+(b) is under a
 third of `construction`, the hypothesis is refuted and the cost is in the scatter, where msolve has
 no advantage. **Refutation condition stated up front**, because this is the hypothesis most likely
-to be wrong: the `HashMap` already uses `BuildMonomialHasher` (`src/grobner/f4/symbolic.rs:53-66`),
+to be wrong: the `HashMap` already uses `BuildMonomialHasher` (`src/poly/multivariate/monomial_hash.rs`),
 a multiplicative FxHash chosen over SipHash for exactly this reason, so the lookup may already be
 cheap.
 

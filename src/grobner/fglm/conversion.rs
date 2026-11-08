@@ -18,7 +18,7 @@
 
 use std::{
     cmp::{Ordering, Reverse},
-    collections::{BinaryHeap, HashSet},
+    collections::BinaryHeap,
 };
 
 use crate::{
@@ -31,7 +31,7 @@ use crate::{
         },
         s_polynomial,
     },
-    FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
+    FiniteField, Monomial, MonomialOrder, MonomialSet, MultivariatePolynomial,
 };
 
 /// The target order. Not a parameter: the back-substitution that consumes the result is specific
@@ -175,7 +175,7 @@ pub fn fglm_to_lex_with_options<const N: usize, F: FiniteField>(
     let mut leading: Vec<Monomial<N>> = Vec::new();
 
     let mut frontier: BinaryHeap<(Reverse<ByTargetOrder<N>>, Origin)> = BinaryHeap::new();
-    let mut seen: HashSet<Monomial<N>> = HashSet::from([Monomial::one()]);
+    let mut seen: MonomialSet<N> = MonomialSet::from_iter([Monomial::one()]);
     frontier.push((Reverse(ByTargetOrder(Monomial::one())), Origin::Identity));
 
     while let Some((Reverse(ByTargetOrder(monomial)), origin)) = frontier.pop() {
