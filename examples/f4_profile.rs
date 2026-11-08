@@ -469,6 +469,24 @@ fn interreduction<const N: usize>(
             c.divisor_tests_per_term(),
             c.rewrite_amplification()
         );
+        // The per-step region split #440 stage 1 asked for. The merge span is the expensive
+        // region — one monomial multiply and one `MonomialOrder::cmp` an element — and the two
+        // window regions are `extend_from_slice`, so the shares say whether the rewrite is
+        // comparison work or bandwidth, and therefore whether a heap can pay.
+        println!(
+            "    regions: below {} ({:.1}%), span {} ({:.1}%), above {} ({:.1}%) of {} rewritten",
+            c.terms_below_window,
+            100.0 * c.below_window_share(),
+            c.terms_in_merge_span,
+            100.0 * c.merge_span_share(),
+            c.terms_above_window,
+            100.0 * c.above_window_share(),
+            c.terms_rewritten,
+        );
+        println!(
+            "    merge ops: {} monomial multiplies, {} order comparisons over {} steps",
+            c.merge_monomial_multiplies, c.merge_comparisons, c.reduction_steps,
+        );
     }
 }
 
