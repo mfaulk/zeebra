@@ -1553,6 +1553,15 @@ so a law fitted through the planted sweep alone under-predicts the row it exists
 anchors the law interpolates in log-log using only the local exponent, which stops a small anchor's
 fixed per-call overhead from being projected forward as a growth rate.
 
+**Every gcd anchor predates #193**, which landed while this was being written: it dispatched division
+to Newton inversion and measured `roots` **1.32x–1.67x faster over KoalaBear** at degrees 256–2 048,
+doubling its reachable degree from 4 096 to 8 192 (`fast-univariate.md` §4.5). So the pessimistic
+edge over-predicts the gcd route by roughly that factor on top of whatever else. That is the safe
+direction for an edge a guard refuses on, and the constants are **not** scaled down by a factor
+nobody measured at these degrees: re-anchoring honestly means re-running the doubling sweep in one
+session post-#193, which is **#552** and a measurement rather than an edit. §6.13 is the precedent —
+lowering a prefactor without re-fitting the exponent leaves the two in different sessions.
+
 #### The band against a row that was actually run
 
 `rf4-rp2`, Euclidean, 32 workers — the configuration #367 ran:

@@ -375,6 +375,14 @@ fn validation_term(matrix_order: usize, workers: usize) -> CostTerm {
 ///
 /// Above 65 536 the exponent is **1.933**, the §9.7.4 fit that superseded the two-point one and
 /// survived it on eight points.
+///
+/// **Every anchor here predates #193**, which dispatched division to Newton inversion and measured
+/// `roots` **1.32x–1.67x faster over KoalaBear** at degrees 256–2 048 (`fast-univariate.md` §4.5).
+/// This envelope is therefore conservative by about that factor on top of whatever else, which is
+/// the safe direction for a pessimistic edge and the wrong direction for a figure anyone quotes.
+/// It is **not** scaled down by 1.5x: re-anchoring honestly means re-running §9.7.4's doubling
+/// sweep in one session post-#193, which is a measurement rather than an edit — the same reasoning
+/// `resultant-elimination.md` §6.13 applies to [`DETERMINANT_MS_AT_162`]. #552.
 fn gcd_root_term(degree: usize) -> CostTerm {
     // Monotone envelope: the running maximum, so no entry is below any measurement at or under its
     // degree. 8 192 carries 6 561's real-resultant figure for exactly that reason.
