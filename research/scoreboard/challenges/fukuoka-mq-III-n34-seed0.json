@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "fukuoka-mq-III-n34-seed0",
+  "digest": "9c2033d49ecbb71fed32a8e2b7a8fb2d25ce1b186e3188d7b32270247b73823a",
+  "class": "official",
+  "family": "fukuoka-mq",
+  "objective": "mq-root",
+  "objective_statement": "find any x over the published field with F(x) = 0",
+  "parameters": [
+    "field GF(31)",
+    "type III",
+    "n 34",
+    "m 68",
+    "seed 0",
+    "file-sha256 "
+  ],
+  "variables": 34,
+  "equations": 68,
+  "program": {
+    "name": "Fukuoka MQ Challenge",
+    "version": "toy examples retrieved 2026-11-05; type VI m = 16 challenge file retrieved 2026-11-07",
+    "url": "https://www.mqchallenge.org/",
+    "reward": null,
+    "redistribution": "COPYRIGHT © 2015 FUKUOKA MQ CHALLENGE All Right Reserved; instance files are not redistributed here and are fetched by tools/fetch-mq-challenge.sh"
+  },
+  "disclosed_method": {
+    "state": "unknown"
+  },
+  "external_status": {
+    "state": "solved_externally",
+    "verified": "2015-08-04"
+  },
+  "reference_points": [
+    {
+      "source": "Fukuoka MQ Challenge submission details, details/details_III_20150804.html, accessed 2026-11-07",
+      "parameters": "type III, n = 34, m = 68, seed 0",
+      "step": "whole solve, wall-clock total",
+      "reported_time": "2831160 seconds (32 days 18 hours 26 minutes)",
+      "reported_memory": null,
+      "hardware": "4 x AMD Opteron 6282 SE",
+      "software": "XL with block Wiedemann"
+    }
+  ],
+  "verifier": "evaluate the imported coefficient vectors of the original published file at the candidate, inverting any specialization first",
+  "notes": "Registered to show the gap in the family this crate has actually measured, and deliberately not implemented: 14 variables past the largest toy example, with no dispatch arm and no bytes held here, so its file checksum is empty. The smallest real instance this crate can import is fukuoka-mq-VI-n24-seed0, in a different type."
+}

@@ -575,9 +575,9 @@ also what every published type V and type VI solve did.
   diagnostic. The list stops there rather than covering `n = 34..=53` and `n = 55..=100`, and an
   unsupported size is still `MqError::UnsupportedDimension` rather than a panic — compiling
   dimensions that cannot be used would be worse than saying so, and each entry costs a
-  monomorphization of the whole multivariate stack. **The registry row `fukuoka-mq-III-n55-seed0`
-  still carries the old error**: `n = 55` is not a type III size, so it names an instance the
-  challenge does not publish. #501.
+  monomorphization of the whole multivariate stack. The registry row carried the old error until
+  #501 and is now `fukuoka-mq-III-n34-seed0`, at the real smallest type III size; §8.1 records that
+  size as solved, so the row is `solved externally` and not open.
 - **A 32-bit prime field** (#62) landed, as `Zp31`. It halves the bytes a *dense* elimination moves
   and is worth 2.8x there, but the solver's default `Backend::Adaptive` gains nothing measurable —
   0.98x to 1.04x — because a sparse entry is `(usize, F)` and the index's alignment pads it to 16

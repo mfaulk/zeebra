@@ -55,7 +55,7 @@ The externally specified problems, unmodified. A witness here is a witness for t
 | `fukuoka-mq-III-n20-seed0` | `434135c809f6` | 20 | 40 | stopped: max_live_nonzeros at degree 5 | published with its answer | — |
 | `fukuoka-mq-VI-n10-seed0` | `2558f4bccd7d` | 10 | 7 | **verified witness** in 577.8 ms (slice(3 fixed, seed 7)) | published with its answer | — |
 | `fukuoka-mq-VI-n15-seed0` | `0345980a26d8` | 15 | 10 | stopped: campaign reached no verdict | published with its answer | — |
-| `fukuoka-mq-III-n55-seed0` | `f3ac89821637` | 55 | 110 | not attempted | no public solution recorded as of 2026-11-05 | — |
+| `fukuoka-mq-III-n34-seed0` | `9c2033d49ecb` | 34 | 68 | not attempted | solved externally, verified 2015-08-04 | no public method |
 | `fukuoka-mq-VI-n24-seed0` | `e97e852ee8f0` | 24 | 16 | stopped: campaign reached no verdict | solved externally, verified 2015-04-01 | no public method |
 
 ## Faithful reductions
