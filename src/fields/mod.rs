@@ -22,10 +22,12 @@ pub use finite_field::{
     trim_limbs, FiniteField, KnownOrder, ParseFieldElementError, RootOfUnityError,
 };
 pub use irreducible_polynomials::{Modulus13Pow4, X5_X2_1, X8_X4_X3_X2_1, X8_X4_X3_X_1};
+#[allow(deprecated)]
 pub use prime_field_128::PrimeFieldElement128;
 pub use prime_field_256::{
     Bls12_381Fr, Bls12_381FrModulus, Bn254Fr, Bn254FrModulus, PrimeFieldElement256,
-    PrimeModulus256, BLS12_381_FR_MODULUS_DECIMAL, BN254_FR_MODULUS_DECIMAL,
+    PrimeModulus256, Proth68Fr, Proth68FrModulus, BLS12_381_FR_MODULUS_DECIMAL,
+    BN254_FR_MODULUS_DECIMAL,
 };
 pub use prime_field_32::PrimeFieldElement32;
 pub use prime_field_64::PrimeFieldElement64;
@@ -124,6 +126,17 @@ pub type Zp18446744073709551557 = PrimeFieldElement64<18446744073709551557>;
 pub type Zp18446744073709551263 = PrimeFieldElement64<18446744073709551263>;
 
 // === 128-bit prime fields ===
+//
+// Deprecated as a family: see `PrimeFieldElement128`. Any prime between 2^64 and 2^128 is a
+// two-limb `PrimeModulus256`, which `PrimeFieldElement256` serves faster at every operation.
 
 /// Z mod 221360928884514619393, Proth prime 3*2^66 + 1
+///
+/// Deprecated with its backing type. [`Proth68Fr`] is the same field over
+/// [`PrimeFieldElement256`].
+#[deprecated(
+    since = "0.1.0",
+    note = "use `Proth68Fr`, the same field over PrimeFieldElement256. See #163."
+)]
+#[allow(deprecated)]
 pub type Zp221360928884514619393 = PrimeFieldElement128<221360928884514619393>;

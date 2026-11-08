@@ -82,7 +82,7 @@ mod tests {
 
     use super::{batch_inverse, batch_invert};
     use crate::{
-        fields::{Bls12_381Fr, Bn254Fr, PrimeFieldElement128, Zp13, Zp2147483647},
+        fields::{Bls12_381Fr, Bn254Fr, Proth68Fr, Zp13, Zp2147483647},
         FiniteField, One, Zero,
     };
 
@@ -113,10 +113,14 @@ mod tests {
 
     /// Batch inversion agrees with elementwise inversion over every prime field in the crate.
     #[test]
+    #[allow(deprecated)]
     fn test_agrees_with_elementwise_inverse() {
         agrees_with_elementwise_inverse::<Zp13>(1);
         agrees_with_elementwise_inverse::<Zp2147483647>(2);
-        agrees_with_elementwise_inverse::<PrimeFieldElement128<221360928884514619393>>(3);
+        agrees_with_elementwise_inverse::<crate::fields::PrimeFieldElement128<221360928884514619393>>(
+            3,
+        );
+        agrees_with_elementwise_inverse::<Proth68Fr>(6);
         agrees_with_elementwise_inverse::<Bn254Fr>(4);
         agrees_with_elementwise_inverse::<Bls12_381Fr>(5);
     }

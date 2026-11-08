@@ -1,6 +1,11 @@
-//! Prime-order finite field.
+//! Prime-order finite field, deprecated in favour of `PrimeFieldElement256`.
 //!
 //! For each prime p, the finite field F_p is defined to be the quotient ring Z/pZ.
+//!
+//! See [`PrimeFieldElement128`] for why this type is deprecated rather than converted to
+//! Montgomery form. The module allows the deprecation lint throughout, since every impl and test
+//! below necessarily names the deprecated type.
+#![allow(deprecated)]
 
 use std::{
     fmt::{Display, Formatter},
@@ -24,6 +29,29 @@ use crate::{
 
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, Deserialize, Serialize)]
 /// Element of a prime field with prime modulus P.
+///
+/// # Deprecated in favour of [`PrimeFieldElement256`](crate::fields::PrimeFieldElement256)
+///
+/// This type reduces a 256-bit product by 256-bit software long division, one `__udivti3` per
+/// multiplication, which makes it the slowest multiply in the crate — slower than the 254-bit
+/// field that is four times its width. See the README's field-arithmetic table for the measured
+/// factors.
+///
+/// Converting it to Montgomery form was considered and declined (#163): `PrimeModulus256` takes
+/// its modulus as `[u64; 4]`, so any prime between 2^64 and 2^128 is just the low two limbs with
+/// the top two zero, and `PrimeFieldElement256` already serves that range faster. The deciding
+/// question was whether a modulus in this range exists that `PrimeFieldElement256` does not serve
+/// better, and the answer was no — including for the one candidate, an NTT-friendly prime, since
+/// `two_adicity` is a property of the order rather than of the backing width.
+///
+/// [`Proth68Fr`](crate::fields::Proth68Fr) is the same field as the
+/// [`Zp221360928884514619393`](crate::fields::Zp221360928884514619393) alias of this type, backed
+/// by `PrimeFieldElement256`. Deprecated rather than deleted because the type is `pub`.
+#[deprecated(
+    since = "0.1.0",
+    note = "use PrimeFieldElement256 with a two-limb PrimeModulus256; it is faster at every \
+            operation. The 68-bit prime this type was declared over is `Proth68Fr`. See #163."
+)]
 pub struct PrimeFieldElement128<const P: u128> {
     /// The element's representative integer in [0,p-1].
     ///

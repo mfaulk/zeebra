@@ -1033,16 +1033,18 @@ Two consequences worth knowing:
 - `P = 2` is supported and keeps the wide-remainder path, because `2^64` is not invertible modulo
   an even number. The branch is on a const generic, so it is resolved at compile time.
 
-`PrimeFieldElement128<P>` still reduces a 256-bit product by allocating software long division. It
-is not yet converted, and is measurably the slowest field in the crate as a result — slower than
-one four times as wide. `cargo bench --bench field_arithmetic`, per operation:
+`PrimeFieldElement128<P>` reduces a 256-bit product by allocating software long division, which
+made it the slowest field in the crate — slower than one four times as wide. It is **deprecated**
+rather than converted (#163); the paragraph after the table says why, and
+[`Proth68Fr`](src/fields/prime_field_256.rs) is the replacement.
+`cargo bench --bench field_arithmetic`, per operation:
 
 | field | width | mul | add | sub | inverse |
 |---|---:|---:|---:|---:|---:|
 | `Mersenne31` | 31, in 4 bytes | 1.35 ns | 0.75 ns | 0.75 ns | **100 ns** |
 | `Zp2147483647` | 31 | 1.76 ns | 1.10 ns | 0.95 ns | **124 ns** |
 | `Zp18446744073709551557` | 64 | 1.71 ns | 1.05 ns | 0.97 ns | **236 ns** |
-| `PrimeFieldElement128` | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
+| `PrimeFieldElement128` — deprecated | 68 | **130.6 ns** | 2.10 ns | 1.90 ns | **17.84 µs** |
 | `Bn254Fr` | 254 | 18.71 ns | 3.69 ns | 3.41 ns | 3.77 µs |
 | `Bls12_381Fr` | 255 | 19.34 ns | 3.52 ns | 3.27 ns | 3.97 µs |
 
@@ -1057,6 +1059,43 @@ Read the last three rows together: a 254-bit multiply is **7.0x faster** than th
 10.9x slower than the 64-bit one. A claim about what field width costs has to say which baseline
 it means. Inversion over a wide field is 202 multiplies, so pivot normalization should multiply by
 a precomputed inverse rather than divide per entry.
+
+#### Why the 128-bit field is deprecated rather than converted
+
+#163 asked whether to put `PrimeFieldElement128` into Montgomery form, and the question it asked
+be settled first was: *is there a modulus between 2^64 and 2^128 that this crate wants to compute
+over, which `PrimeFieldElement256` does not already serve better?* The answer is no.
+
+The type has **no non-test caller** — its only consumers are the field conformance tests, the
+`for_each_field!` arm, and the benchmark that measures how slow it is. And `PrimeModulus256` takes
+its modulus as `[u64; 4]`, so any prime in that range is simply the low two limbs with the top two
+zero. The one candidate justification was an NTT-friendly prime in the range, since `two_adicity`
+is a property of the order rather than of the backing width; `Proth68Fr` is exactly that prime
+(3*2^66 + 1, two-adicity 66) over `PrimeFieldElement256`.
+
+Measured at `ece0d05`, `cargo bench --bench field_arithmetic` under `tools/benchlock.sh` with
+`taskset --cpu-list 0-7`, one criterion process, 256 operations per iteration divided out. The
+same modulus on both 68-bit rows, so the comparison is the representation alone:
+
+| field | backing | mul | inverse |
+|---|---|---:|---:|
+| `Zp18446744073709551557` | 64-bit Montgomery | 1.81 ns | 274 ns |
+| `PrimeFieldElement128` — deprecated | `u128`, long division | **136.8 ns** | **18.36 µs** |
+| `Proth68Fr` — the replacement | 2-limb CIOS | **14.01 ns** | **847 ns** |
+| `Bn254Fr` | 4-limb CIOS | 19.78 ns | 3.825 µs |
+
+Same field, same modulus: **9.8x on multiplication and 21.7x on inversion**, for declaring it as
+two limbs of a `PrimeModulus256` instead of a `u128`. `Proth68Fr` also beats `Bn254Fr` by 1.4x and
+4.5x, which is what two CIOS limbs against four should do — so the "cost of width" really is a
+cost of limbs, and the 68-bit field was never paying it.
+
+The outer rows are **controls**: nothing in this change touches them, and they reproduce the table
+above to within this machine's noise (1.81 against 1.71 ns, 19.78 against 18.71 ns), which is what
+licenses reading the two middle rows against each other.
+
+Deprecated rather than deleted, because the type is `pub`. The field laws still run over it, and
+the `p68` bench row is kept beside the new `p68_mont` so the cost of a dividing multiply stays
+visible as recorded history.
 
 Two other field types gained the same treatment, each measured on the operation rather than on a
 whole computation, because at the time both modules were private and no bench target could reach

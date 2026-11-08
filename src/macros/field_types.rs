@@ -35,11 +35,14 @@ macro_rules! for_each_field {
             $crate::for_each_field_test!(body, zp13, $crate::fields::Zp13);
             $crate::for_each_field_test!(body, zp65537, $crate::fields::Zp65537);
             $crate::for_each_field_test!(body, goldilocks, $crate::fields::Zp18446744069414584321);
-            $crate::for_each_field_test!(
-                body,
-                prime_field_128,
-                $crate::fields::Zp221360928884514619393
-            );
+            // Expanded by hand rather than through `for_each_field_test!` so the deprecation
+            // allow sits on this one test alone. `PrimeFieldElement128` is deprecated (#163) but
+            // still `pub`, so the field laws must still hold over it.
+            #[test]
+            #[allow(deprecated)]
+            fn prime_field_128() {
+                body::<$crate::fields::Zp221360928884514619393>()
+            }
             $crate::for_each_field_test!(body, bn254_fr, $crate::fields::Bn254Fr);
             $crate::for_each_field_test!(body, bls12_381_fr, $crate::fields::Bls12_381Fr);
             $crate::for_each_field_test!(body, gf256, $crate::fields::Gf256);

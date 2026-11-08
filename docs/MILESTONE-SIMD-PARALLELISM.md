@@ -190,6 +190,9 @@ required to name which bound it hit.
 | Each measurement states whether it was ALU-bound or bandwidth-bound | met — §4.4 |
 
 Outstanding: `PrimeFieldElement128` is unconverted, and the six remaining sub-milestones are open.
+It stays unconverted: #163 resolved it by deprecating the type in favour of `PrimeFieldElement256`,
+on the grounds that it had no non-test caller. `Proth68Fr` is the same 68-bit prime over the
+converted 256-bit field, and measures 9.8x faster at multiplication.
 
 
 ## 5. The field work, M19-B through M19-D
@@ -376,7 +379,9 @@ order-18 determinants are 8.6 µs each and get **slower** at 32 workers.
 | Each measurement states its bound | met — §4.4, §5.3 |
 
 Outstanding: `PrimeFieldElement128` is unconverted. #62 landed afterwards and is recorded in §8;
-it changed two of this milestone's conclusions.
+it changed two of this milestone's conclusions. The unconverted field was later deprecated rather
+than converted (#163), so the `__udivti3` this milestone leaves behind stays in the binary and is
+no longer tracked as outstanding work.
 
 ## 8. The 32-bit prime field (#62), and what it corrected
 

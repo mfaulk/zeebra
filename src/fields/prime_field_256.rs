@@ -490,8 +490,28 @@ impl PrimeModulus256 for Bls12_381FrModulus {
     ];
 }
 
+/// The Proth prime 3*2^66 + 1 = 221360928884514619393, 68 bits.
+///
+/// Occupies the low two limbs, which is the whole point: a modulus between 2^64 and 2^128 is
+/// served here rather than by the deprecated [`PrimeFieldElement128`](crate::fields::PrimeFieldElement128).
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Proth68FrModulus;
+
+impl PrimeModulus256 for Proth68FrModulus {
+    // 3*2^66 + 1 = 12*2^64 + 1, checked against its decimal and its two-adicity in the tests.
+    const MODULUS: [u64; LIMBS] = [1, 12, 0, 0];
+}
+
 /// The BN254 curve's scalar field, of 254-bit prime order.
 pub type Bn254Fr = PrimeFieldElement256<Bn254FrModulus>;
+
+/// The field of order 3*2^66 + 1, the NTT-friendly 68-bit prime of two-adicity 66.
+///
+/// The replacement for the deprecated
+/// [`Zp221360928884514619393`](crate::fields::Zp221360928884514619393), which is the same field
+/// over a `u128` that reduces by software long division. Same modulus, same arithmetic, and
+/// multiplication and inversion are faster by the factors recorded in the README's field table.
+pub type Proth68Fr = PrimeFieldElement256<Proth68FrModulus>;
 
 /// The BLS12-381 curve's scalar field, of 255-bit prime order.
 pub type Bls12_381Fr = PrimeFieldElement256<Bls12_381FrModulus>;
@@ -1250,5 +1270,96 @@ mod tests {
             .filter(|&c| f.eval(&F7::new(c)).is_zero())
             .collect();
         assert_eq!(found, by_evaluation);
+    }
+
+    // === the 68-bit Proth prime, the migration target for the deprecated 128-bit field ===
+    //
+    // `PrimeFieldElement128` is deprecated in favour of this type (#163). The deprecation is only
+    // honest if the replacement actually serves the one modulus the 128-bit field was declared
+    // for, so these three tests pin that: the modulus, agreement with the type being retired, and
+    // the two-adic structure that was the sole argument for keeping a 68-bit field at all.
+
+    /// The migration target is the same prime the deprecated 128-bit alias was declared over.
+    #[test]
+    fn test_the_proth_68_modulus_is_three_times_two_to_the_66_plus_one() {
+        // 3*2^66 + 1 = 12*2^64 + 1, so the limbs are exactly [1, 12, 0, 0].
+        assert_eq!(Proth68FrModulus::MODULUS, [1, 12, 0, 0]);
+        assert_eq!(
+            Proth68Fr::order_u128(),
+            Some(221_360_928_884_514_619_393u128)
+        );
+        assert_eq!(3 * (1u128 << 66) + 1, 221_360_928_884_514_619_393u128);
+
+        // Two limbs, so it exercises the narrow-modulus paths rather than the 4-limb ones.
+        assert_eq!(Proth68Fr::order_limbs().len(), 2);
+    }
+
+    /// Arithmetic over the migration target agrees with the deprecated 128-bit field it replaces.
+    #[test]
+    #[allow(deprecated)]
+    fn test_proth_68_agrees_with_the_deprecated_128_bit_field() {
+        use crate::fields::PrimeFieldElement128;
+
+        type Old = PrimeFieldElement128<221_360_928_884_514_619_393>;
+
+        // Operands are drawn once and handed to both fields through their decimal form, so the two
+        // sides are the same mathematical element however each represents it internally.
+        let mut rng = StdRng::seed_from_u64(163);
+        for _ in 0..500 {
+            let a_old = <Old as FiniteField>::random(&mut rng);
+            let b_old = <Old as FiniteField>::random(&mut rng);
+            let a_new = <Proth68Fr as FiniteField>::from_str(&a_old.to_string()).expect("decimal");
+            let b_new = <Proth68Fr as FiniteField>::from_str(&b_old.to_string()).expect("decimal");
+
+            assert_eq!((a_old + b_old).to_string(), (a_new + b_new).to_string());
+            assert_eq!((a_old - b_old).to_string(), (a_new - b_new).to_string());
+            assert_eq!((a_old * b_old).to_string(), (a_new * b_new).to_string());
+            if !a_old.is_zero() {
+                assert_eq!(a_old.inverse().to_string(), a_new.inverse().to_string());
+                assert_eq!((b_old / a_old).to_string(), (b_new / a_new).to_string());
+            }
+        }
+    }
+
+    /// The migration target serves the two-adic structure that justified a 68-bit field.
+    ///
+    /// `two_adicity` is a property of the order, not of the backing width, so an NTT-friendly
+    /// prime in the 68-127 bit range was the only candidate caller #163 identified. A 256-bit
+    /// backing serves it: p - 1 = 3*2^66, and a root of unity of each order has that exact order.
+    #[test]
+    fn test_proth_68_serves_its_two_adic_orders() {
+        assert_eq!(Proth68Fr::two_adicity(), 66);
+
+        // 2^log_n as little-endian limbs, which is how orders above 2^64 have to be expressed.
+        fn two_to_the(log_n: u32) -> Vec<u64> {
+            if log_n < 64 {
+                vec![1u64 << log_n]
+            } else {
+                vec![0, 1u64 << (log_n - 64)]
+            }
+        }
+
+        let mut rng = StdRng::seed_from_u64(1663);
+        for log_n in [1u32, 2, 8, 32, 63, 64, 65, 66] {
+            let w: Proth68Fr = crate::fields::two_adic::two_adic_root_of_unity(log_n, &mut rng);
+
+            // Order exactly 2^log_n: w^(2^log_n) = 1 and w^(2^(log_n-1)) != 1, which for a
+            // power-of-two order is the whole condition — every proper divisor divides the half.
+            assert!(
+                w.pow_limbs(&two_to_the(log_n)).is_one(),
+                "w^(2^{log_n}) should be 1"
+            );
+            assert!(
+                !w.pow_limbs(&two_to_the(log_n - 1)).is_one(),
+                "w^(2^{log_n} / 2) should not be 1"
+            );
+        }
+
+        // `root_of_unity` takes `n: u64`, so it reaches the orders up to 2^63 only; the two-adic
+        // constructor above is what serves 2^64 through 2^66.
+        let mut rng = StdRng::seed_from_u64(1664);
+        let w = Proth68Fr::root_of_unity(1u64 << 32, &mut rng);
+        assert!(w.pow_limbs(&two_to_the(32)).is_one());
+        assert!(!w.pow_limbs(&two_to_the(31)).is_one());
     }
 }

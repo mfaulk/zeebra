@@ -24,8 +24,8 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::{
-        batch_invert, Bls12_381Fr, Bn254Fr, Mersenne31, PrimeFieldElement128,
-        Zp18446744073709551557, Zp2147483647,
+        batch_invert, Bls12_381Fr, Bn254Fr, Mersenne31, Proth68Fr, Zp18446744073709551557,
+        Zp2147483647,
     },
     FiniteField,
 };
@@ -183,8 +183,12 @@ fn bench_field<F: FiniteField>(c: &mut Criterion, name: &str) {
     group.finish();
 }
 
-/// 3 * 2^66 + 1, a 68-bit Proth prime.
-type Zp128 = PrimeFieldElement128<221360928884514619393>;
+/// 3 * 2^66 + 1, a 68-bit Proth prime, over the deprecated 128-bit field.
+///
+/// Kept after that type's deprecation (#163) so the cost of its dividing multiply stays visible
+/// next to `p68_mont`, which is the same field over `PrimeFieldElement256`.
+#[allow(deprecated)]
+type Zp128 = zeebra::fields::PrimeFieldElement128<221360928884514619393>;
 
 fn benches(c: &mut Criterion) {
     bench_field::<Zp2147483647>(c, "p31");
@@ -193,6 +197,9 @@ fn benches(c: &mut Criterion) {
     bench_field::<Mersenne31>(c, "p31_u32");
     bench_field::<Zp18446744073709551557>(c, "p64");
     bench_field::<Zp128>(c, "p68");
+    // The same 68-bit modulus as two limbs of a `PrimeModulus256`. `p68` against `p68_mont` is
+    // the representation alone, with the field held fixed — the measurement #163 turns on.
+    bench_field::<Proth68Fr>(c, "p68_mont");
     // The cryptographic scalar fields. Named by width so the ordering in the report matches the
     // ordering of the moduli.
     bench_field::<Bn254Fr>(c, "p254_bn254");
