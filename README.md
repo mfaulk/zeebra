@@ -1331,6 +1331,47 @@ What the representation means for a caller:
   through the two-adic construction below, and refuses any other — that order is the one that
   needs the factorization.
 
+### A generator under an explicit effort budget
+
+`try_primitive_element` has nowhere to put an effort bound, so it still declines. The opt-in entry
+point is `try_primitive_element_with_budget::<F>(&EcmBudget, rng)`, which factors `q - 1` with
+Lenstra ECM (`integers::factor_with_budget`) and either returns a generator certified against the
+**complete** factorization or reports the cofactors the budget could not split:
+
+```rust
+use zeebra::{
+    fields::{try_primitive_element_with_budget, Bls12_381Fr, Bn254Fr, GeneratorSearchError},
+    integers::EcmBudget,
+};
+use rand::{prelude::StdRng, SeedableRng};
+
+let mut rng = StdRng::seed_from_u64(5);
+
+// BLS12-381's r - 1 = 2^32 * 3 * 11 * 19 * 10177 * 125527 * 859267 * 906349^2 * 2508409
+//                     * 2529403 * 52437899 * 254760293^2 — nine decimal digits at worst.
+let g = try_primitive_element_with_budget::<Bls12_381Fr, _>(&EcmBudget::for_digits(9), &mut rng);
+assert!(g.is_ok());
+
+// BN254's r - 1 has a 29-digit prime factor, past what this ECM reaches. The honest answer names
+// what a larger budget would have to split.
+let refused = try_primitive_element_with_budget::<Bn254Fr, _>(&EcmBudget::for_digits(9), &mut rng);
+assert!(matches!(
+    refused,
+    Err(GeneratorSearchError::IncompleteFactorization { .. })
+));
+```
+
+**The cost is not a function of the field's width.** Both fields above are 255 bits and they land on
+opposite sides of this, because what the search pays for is the largest prime factor of `q - 1` and
+not the size of `q`. So the budget is the caller's to choose, and a budget that does not finish is
+an error rather than a weaker guarantee — a partial factorization cannot certify a generator,
+since an untested prime divisor is one whose quotient the candidate might fix.
+
+The search itself is HAC Algorithm 4.80, the same one `KnownOrder::try_primitive_element`'s default
+runs, lifted off `u128` exponents onto `FiniteField::pow_limbs` so that it reaches a field whose
+order a `u128` cannot hold. It is generic over `KnownOrder`, so it is not limited to the 256-bit
+fields; it is simply the only place the refusal was load-bearing.
+
 The whole stack works over these fields, not just the arithmetic:
 `grobner::mod`'s `test_the_whole_pipeline_over_bn254_fr` and its BLS12-381 twin take a planted
 zero-dimensional system through F4, check the basis against Buchberger's criterion, convert to lex
@@ -1366,9 +1407,12 @@ that covers 64-, 128- and 256-bit orders without allocating — plus `order_u128
 order and the characteristic are genuinely different; both are reported.
 
 Constructing a generator or a root of unity **fails as a value**. Whether `n` divides `q - 1`, and
-whether a field has a generator this crate will look for, are facts about the field and the
-requested order rather than programmer errors, so `try_primitive_element`, `try_root_of_unity` and
-`try_two_adic_root_of_unity` return `Result<Self, RootOfUnityError>`:
+whether a field has a generator this crate will look for **without being asked**, are facts about
+the field and the requested order rather than programmer errors, so `try_primitive_element`,
+`try_root_of_unity` and `try_two_adic_root_of_unity` return `Result<Self, RootOfUnityError>`.
+`NoKnownGenerator` is a statement about what the trait method will start unprompted, not about the
+field: `try_primitive_element_with_budget` is the opt-in route, and the 256-bit-field section above
+has the two cases it separates. The failures as values:
 
 ```rust
 use zeebra::{fields::{RootOfUnityError, Zp13}, KnownOrder};
