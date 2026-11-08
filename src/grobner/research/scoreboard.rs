@@ -1737,18 +1737,28 @@ impl Scoreboard {
                  |---|---|---|---:|---:|---:|---:|\n",
             );
             for run in unfinished {
-                let frontier = run.frontier.clone().unwrap_or_default();
+                // A campaign summary is a tally over its slices and has no matrix of its own, so
+                // there is nothing to put in these four columns. An em dash rather than a zero
+                // from `unwrap_or_default`: a row that measured nothing must not read as a row
+                // that measured zero in a table whose other rows are measurements.
+                let figures = match &run.frontier {
+                    Some(frontier) => format!(
+                        "{} | {} | {} | {:.1}",
+                        frontier.max_pair_degree,
+                        frontier
+                            .highest_completed_degree
+                            .map_or("none".to_string(), |d| d.to_string()),
+                        frontier.max_matrix_columns,
+                        frontier.peak_estimated_bytes as f64 / 1e6,
+                    ),
+                    None => "— | — | — | —".to_string(),
+                };
                 out.push_str(&format!(
-                    "| `{}` | {} | {} | {} | {} | {} | {:.1} |\n",
+                    "| `{}` | {} | {} | {} |\n",
                     run.challenge,
                     run.formulation,
                     run.outcome.short(),
-                    frontier.max_pair_degree,
-                    frontier
-                        .highest_completed_degree
-                        .map_or("none".to_string(), |d| d.to_string()),
-                    frontier.max_matrix_columns,
-                    frontier.peak_estimated_bytes as f64 / 1e6,
+                    figures,
                 ));
             }
             out.push('\n');
@@ -2539,6 +2549,44 @@ mod tests {
         assert!(markdown.contains("Where the unfinished runs stopped"));
         assert!(markdown.contains("not** nearer a solution"));
         assert!(markdown.contains("stopped: max_matrix_columns at degree 11"));
+    }
+
+    /// A record with no Gröbner frontier renders dashes, not zeros.
+    ///
+    /// A campaign summary is a tally over its slices and has no matrix of its own, so
+    /// `unwrap_or_default` put `0` in the degree, column and memory columns of a table whose other
+    /// rows are measurements — a run that measured nothing reading as one that measured zero. The
+    /// campaign row of the #454 diagnostic at Fukuoka VI `n = 24` is where this showed up.
+    #[test]
+    fn test_a_run_without_a_frontier_renders_no_figures() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+        let manifest = challenge("fukuoka-mq-VI-n24-seed0").expect("registered");
+        let mut run = RunRecord::new(&manifest, "campaign over 1 slices");
+        run.outcome = RunOutcome::StoppedAtLimit(Limit {
+            resource: "campaign reached no verdict".to_string(),
+            detail: "all 1 slices stopped at a resource limit".to_string(),
+            degree: None,
+            last_completed_stage: Stage::Generation,
+        });
+        run.stages = vec![StageCost::new(
+            Stage::Grobner,
+            Duration::from_millis(50_922),
+        )];
+        run.frontier = None;
+        run.environment = environment();
+        board.add(run, &registry).expect("registered");
+
+        let markdown = board.to_markdown(&registry);
+        let row = markdown
+            .lines()
+            .find(|l| l.contains("campaign over 1 slices"))
+            .expect("the campaign row is rendered");
+        assert!(
+            row.ends_with("| — | — | — | — |"),
+            "a row with no frontier must not report figures: {}",
+            row
+        );
     }
 
     /// The fastest verified witness wins, and classes get separate tables.
