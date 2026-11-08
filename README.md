@@ -3294,8 +3294,11 @@ instance; §3c of [`docs/research/interreduction-cost.md`](docs/research/interre
 the four-arm table and says why the figures do not move the default by themselves. #507 moved the
 route's and left this one to **#575**, because the two are not independent in the direction that
 matters: with batches left reduced the autoreduce matrix is 252 x 606 rather than 7 642 x 7 996, and
-that closure is where the route's unbudgeted memory goes — so `matrix` + `reduced` may cost neither
-the 13.1 GB nor the 437 MB, and both defaults then move together at 6.54x.
+that closure is where the route's memory went before #536 budgeted it — so `matrix` + `reduced` may
+cost neither the 13.1 GB nor the 437 MB, and both defaults then move together at 6.54x. **One arm of
+that 2x2 is already a board row**: `division` + `reduced` on `mq-random-10` is **6 115.6 ms against
+its own cohort's Singular at 7 507.9 ms — 1.23x ahead**, the first `mq-random-10` basis row Zeebra
+is not behind Singular on.
 
 ### Solving zero-dimensional systems
 

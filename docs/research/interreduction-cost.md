@@ -957,16 +957,33 @@ possible and equally unmeasured.
 
 `competitive_sweep --reduce-batch-rows on|off` exists for that measurement, and the Zeebra row's
 `library_version` now names **both** flags, because a row naming one is a row whose configuration
-cannot be reconstructed. What is missing is the 2×2 itself, with peak RSS per arm. It was attempted
-and abandoned rather than published: the box reached a one-minute load average of **39.97** from
-other agents' builds partway through, and this cohort's Singular came in at **9 426.5 ms** against
-the clean cohort's 7 760.5 ms mean — 1.21x, which is larger than several of the ratios the table
-would have had to resolve. One arm completed before that and corroborates §3e.0 rather than adding
-to it: `division` + `echelon` at **29 988.1 ms / 163.1 MB**, inside the three-rep range of
-30 505.8–31 679.7 ms and on 163.4 MB.
+cannot be reconstructed. The 2×2 itself was attempted and **abandoned mid-table** rather than
+published: the box reached a one-minute load average of **39.97** from other agents' builds, and the
+`division` + `echelon` arm's Singular came in at **9 426.5 ms** against the clean cohort's
+7 760.5 ms mean — 1.21x, larger than several of the ratios the table has to resolve. **#575** is the
+2×2, re-taken on a quiet box.
 
-**#575** is the 2×2, and it is the gate on `reduce_batch_rows`'s default as #536 is the gate on the
-route's.
+**Two arms did complete, as five-engine cohorts, and one of them is a result.** They are at
+different base commits, so no ratio spans them; each is read inside itself.
+
+| arm | zeebra | its Singular | zeebra vs Singular | peak RSS |
+|---|---:|---:|---:|---:|
+| `division` + `echelon` | 29 988.1 ms | 9 426.5 ms *(contended)* | 3.18x behind | 163.1 MB |
+| **`division` + `reduced`** | **6 115.6 ms** | **7 507.9 ms** | **1.23x ahead** | 413.8 MB |
+
+> **`reduce_batch_rows` alone puts `mq-random-10` ahead of Singular on `reduced-grobner-basis`** —
+> 6 115.6 ms against 7 507.9 ms in its own cohort, with msolve at 273.5 ms and Groebner.jl at
+> 89.8 ms unchanged. That is the row M27 measured the 4.13x deficit on, and it is **the first
+> `mq-random-10` basis row on which Zeebra's figure is not behind Singular's**. §3e.1's conversion
+> parity was the first row of either task; this is the first on the task the comparison rests on.
+
+Two cautions on it. The Singular figure in that arm is **7 507.9 ms against the clean cohort's
+7 760.5 ms mean**, 3.2% low rather than 21% high, so this arm was not taken under the contention
+that spoiled the other — but it is one rep, where §3e.0's figures are three. And the memory is
+**413.8 MB against `echelon`'s 163.1 MB**, a 2.5x rise: smaller than the matrix route's 3.68x, in
+the same direction, and now subject to #536's budget like everything else. Neither caution is a
+reason to doubt a 1.23x; both are reasons #575 takes the table rather than quoting these two rows as
+one.
 
 
 ---
