@@ -504,7 +504,7 @@ positive-dimensional as published and a run of it is a run of a **slice**:
 | largest matrix | **13 602 × 19 132** |
 | peak live nonzeros | 14 329 816 (≈229 MB estimated; 1.38 GB process `VmHWM`) |
 | pairs reduced / elements added | 4 967 / 503 |
-| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs — all at `1409a48`, and **42.1 s** re-measured at `a3e5d66` for the comparison in §4.5 |
+| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs — all at `1409a48`, and re-measured at **43.4 s** for the comparison in §4.5 |
 
 The stop is **deterministic and the wall clock is not**. All three runs stopped at the same degree
 on the same entry count, 20 010 753, with the same 13 602 x 19 132 matrix and the same 14 329 816
@@ -547,10 +547,12 @@ that slice.
 
 #### The two fields at one size
 
-One diagnostic slice each, `--seeds 1`, under `tools/benchlock.sh` on cores 0-7, **both re-measured
-at the same commit** `a3e5d66` so the two walls are comparable — the type VI figures in §4.4 were
-taken at `1409a48`, and the monomial hasher, in-place scaling and the 2x8 matrix tiling have landed
-in the measured paths since.
+One diagnostic slice each, `--seeds 1`, under `tools/benchlock.sh` on cores 0-7, **both measured at
+the same commit** so the two walls are comparable — the type VI figures in §4.4 were taken at
+`1409a48`, and the monomial hasher, in-place scaling and the 2x8 matrix tiling have landed in the
+measured paths since. The committed pair is at `269095c3`; an earlier pair at `a3e5d66` was
+discarded because the squash merge of #530 left its stamp unresolvable (#505's defect, in the
+scoreboard's own records), and its figures are quoted below only as the wall's spread.
 
 | | type VI, GF(31) | type V, GF(2^8) |
 |---|---|---|
@@ -559,20 +561,23 @@ in the measured paths since.
 | degree reached / highest completed | **6** / 5 | **6** / 5 |
 | largest matrix | **13 602 x 19 132** | **13 602 x 19 132** |
 | peak live nonzeros | 14 329 816 (~229 MB estimated) | 14 762 419 (~236 MB estimated) |
-| process `VmHWM` | 1.383 GB | 1.394 GB |
+| process `VmHWM` | 1.382 GB | 1.394 GB |
 | pairs reduced / elements added | 4 967 / 503 | 4 968 / 504 |
-| wall | **42.1 s** | **105.1 s** (105.1 and 106.4 over two runs) |
+| wall | **43.4 s** (42.1 and 43.4 over two runs) | **113.8 s** (105.1, 106.4 and 113.8 over three) |
 
 **The combinatorics are the same and only the arithmetic differs.** Same stopping degree, the same
 13 602 x 19 132 matrix to the row, 4 967 pairs against 4 968 and 20 010 753 entries against
 20 011 556 — a difference of one pair and 803 entries out of 20 million, which is incidental
-cancellation over a different field and not a different computation. The wall is **2.49x**, and
-with the computation held fixed that factor is the field's arithmetic. The two routes, for the
+cancellation over a different field and not a different computation. Every row above the wall is
+identical to the digit or within 0.01% of it, across four runs at two commits — so the wall is the
+only thing the field moves, and it moves it by **2.6x**: 2.62x at the committed pair and 2.49x at
+the discarded one, on a machine running other agents' work. With the computation held fixed that
+factor is the field's arithmetic. The two routes, for the
 record: GF(31) multiplies with one Montgomery step, and `BinaryFieldElement` multiplies with a
 `PCLMULQDQ` behind a cached feature probe — this machine has the instruction — followed by a
 Barrett reduction. Both fields invert by Fermat exponentiation, so inversion is a wash in kind —
 the exponents differ (`q - 2` at `q = 2^8` against `q = 31`) and so does the cost of each
-multiplication inside it. Which part of the multiply dominates the 2.49x is not measured here, and
+multiplication inside it. Which part of the multiply dominates the 2.6x is not measured here, and
 the figure does not rest on an answer: it is a wall ratio at a fixed matrix, not an attribution. No
 table-lookup route exists for this field in the crate.
 
@@ -580,7 +585,7 @@ That is the useful reading of the pair. Where §4.4's type VI and type III compa
 *shape* — eight surplus variables pull the wall in rather than pushing it out — this one holds the
 shape fixed and prices the field. It also says where a GF(2^8) optimization would and would not
 help: nothing here is bound by the entry count, which the two fields reach within 0.004% of each
-other, so a narrower element would not move the stopping degree at all. It would move the 2.49x.
+other, so a narrower element would not move the stopping degree at all. It would move the 2.6x.
 
 Faugère solved this instance in 2015 in 24 648 s with F5-FGb (§8.1), and the 370-second figure the
 same size carries at **seed 2** is per subsystem of a hybrid attack (§8.4) rather than a total.

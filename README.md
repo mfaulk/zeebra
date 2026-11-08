@@ -3954,7 +3954,7 @@ became generic over the coefficient type and started dispatching on the instance
 rather than on a hardwired GF(31) (#510). The two slices, re-measured at one commit, **stop
 identically**: degree 6, the same 13 602 x 19 132 matrix, 4 967 pairs against 4 968, and
 20 010 753 live entries against 20 011 556 — a difference of 803 entries in 20 million. The wall is
-42.1 s against **105.1 s**, so with the computation held fixed the field alone is **2.49x**. That is
+43.4 s against **113.8 s**, so with the computation held fixed the field alone is **2.6x**. That is
 the pair's value: §4.4's type VI-against-type III comparison varied the shape, and this one holds
 the shape fixed and prices the arithmetic.
 [`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §4.4 has the figures and the slice

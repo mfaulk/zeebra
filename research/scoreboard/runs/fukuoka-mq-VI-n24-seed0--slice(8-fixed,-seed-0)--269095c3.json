@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "challenge": "fukuoka-mq-VI-n24-seed0",
+  "challenge_digest": "e97e852ee8f09b4bf755001451cd456a6ebe126f174c77175ee2cc6dba820b80",
+  "class": "official",
+  "formulation": "slice(8 fixed, seed 0)",
+  "transformations": [
+    "specialize variables 16..24 at seed 0"
+  ],
+  "outcome": "stopped_at_limit",
+  "limit": {
+    "resource": "max_live_nonzeros",
+    "detail": "20010753 live nonzero entries were needed, over the limit of 20000000",
+    "degree": 6,
+    "last_completed_stage": "generation"
+  },
+  "significance": "no verified witness",
+  "verification": "evaluated against the published coefficient vectors; this instance publishes no answer vector, so the witness check is the only check",
+  "elapsed_nanos": 43405718683,
+  "stages": [
+    {
+      "stage": "generation",
+      "elapsed_nanos": 2467191,
+      "estimated_peak_bytes": null,
+      "detail": {
+        "variables": 24,
+        "equations": 24
+      }
+    },
+    {
+      "stage": "grobner",
+      "elapsed_nanos": 43403251492,
+      "estimated_peak_bytes": 229430112,
+      "detail": {
+        "max_matrix_rows": 13602,
+        "max_matrix_columns": 19132,
+        "max_pair_degree": 6,
+        "pairs_considered": 4967,
+        "pairs_reduced": 4967,
+        "elements_added": 503
+      }
+    }
+  ],
+  "grobner_frontier": {
+    "completed": false,
+    "max_pair_degree": 6,
+    "highest_completed_degree": 5,
+    "max_matrix_rows": 13602,
+    "max_matrix_columns": 19132,
+    "peak_live_nonzeros": 14329816,
+    "peak_estimated_bytes": 229430112,
+    "pairs_reduced": 4967,
+    "elements_added": 503,
+    "quotient_dimension": null
+  },
+  "campaign": null,
+  "measured_peak_resident_bytes": 1381519360,
+  "measured_peak_rows_in_process": 1,
+  "environment": {
+    "commit": "269095c3",
+    "base_commit": "6cf1e3db",
+    "patch_id": "dcf1661aad771804c1ff801dc0346c01b0e215e1",
+    "machine": "fedora",
+    "cpu": "8 logical, affinity 0-7",
+    "concurrency": 1,
+    "build": "release, RUSTFLAGS=default",
+    "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, F4 max_wall_time 540 s cooperative, supervisor wall clock 600 s as a backstop"
+  },
+  "experiment": null,
+  "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n24-seed0 --seeds 1"
+}

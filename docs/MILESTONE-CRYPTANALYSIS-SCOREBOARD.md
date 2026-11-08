@@ -184,7 +184,7 @@ since #414/#415. The visitors are generic over the coefficient type now and disp
 constant `"GF(31)"` it was at every call site — it is in the identity digest, so that constant
 would have made the first GF(2^8) row a GF(31) row carrying type V's `kind`. Both slices
 re-measured at one commit stop identically at degree 6 on the same 13 602 x 19 132 matrix, and the
-wall is 42.1 s against 105.1 s: **2.49x for the field alone**, with the computation held fixed.
+wall is 43.4 s against 113.8 s: **2.6x for the field alone**, with the computation held fixed.
 `docs/research/fukuoka-mq.md` §4.5.
 
 Two families are registered as `Official` with very different difficulty, and the status column is
