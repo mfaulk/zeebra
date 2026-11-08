@@ -2,6 +2,8 @@
 
 **Measured at:** publication bound `54205923`…`35083579` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Except §4.5**, whose pair was measured at `b7847824` and records it: a bound recovered later is
+the weaker form, and a figure taken after the convention existed should not need one.
 
 Reference for #70 (A1), M21-A (#92) and #197 (A5). Consumes the provenance conventions of
 `docs/research/external-provenance-policy.md` §9 and the four-claim ledger of
@@ -507,7 +509,7 @@ positive-dimensional as published and a run of it is a run of a **slice**:
 | largest matrix | **13 602 × 19 132** |
 | peak live nonzeros | 14 329 816 (≈229 MB estimated; 1.38 GB process `VmHWM`) |
 | pairs reduced / elements added | 4 967 / 503 |
-| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs — all at `1409a48`, and **42.1 s** re-measured at `a3e5d66` for the comparison in §4.5 |
+| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs — all at `1409a48`, and 42.1, 43.4 and 44.3 s re-measured at three later commits for the comparison in §4.5 |
 
 The stop is **deterministic and the wall clock is not**. All three runs stopped at the same degree
 on the same entry count, 20 010 753, with the same 13 602 x 19 132 matrix and the same 14 329 816
@@ -550,10 +552,19 @@ that slice.
 
 #### The two fields at one size
 
-One diagnostic slice each, `--seeds 1`, under `tools/benchlock.sh` on cores 0-7, **both re-measured
-at the same commit** `a3e5d66` so the two walls are comparable — the type VI figures in §4.4 were
-taken at `1409a48`, and the monomial hasher, in-place scaling and the 2x8 matrix tiling have landed
-in the measured paths since.
+One diagnostic slice each, `--seeds 1`, under `tools/benchlock.sh` on cores 0-7, **always measured
+as a pair at one commit** so the two walls are comparable — §4.4's type VI figures were taken at
+`1409a48`, a day and several F4 changes earlier (the monomial hasher, in-place scaling, the 2x8
+matrix tiling). The committed figures are the pair at **`b7847824`**, which is a
+commit on `main` rather than a branch commit — so `Environment::stamp_is_resolvable` holds by its
+first route, with nothing to reconstruct.
+
+Three pairs exist because the first was taken at `a3e5d66`, which #530's squash merge did not
+preserve (#547), and the second at a branch commit of the fix for that, which its own merge would
+not have preserved either. `research/scoreboard/runs/` holds the records for the `a3e5d66` and
+`b7847824` pairs; the middle pair's records were discarded with the branch, so only its two wall
+figures survive, below, as part of the spread. What all three agree on is the point of quoting
+them.
 
 | | type VI, GF(31) | type V, GF(2^8) |
 |---|---|---|
@@ -562,20 +573,27 @@ in the measured paths since.
 | degree reached / highest completed | **6** / 5 | **6** / 5 |
 | largest matrix | **13 602 x 19 132** | **13 602 x 19 132** |
 | peak live nonzeros | 14 329 816 (~229 MB estimated) | 14 762 419 (~236 MB estimated) |
-| process `VmHWM` | 1.383 GB | 1.394 GB |
+| process `VmHWM` | 1.382 GB | 1.395 GB |
 | pairs reduced / elements added | 4 967 / 503 | 4 968 / 504 |
-| wall | **42.1 s** | **105.1 s** (105.1 and 106.4 over two runs) |
+| wall | **44.3 s** (42.1, 43.4, 44.3) | **111.1 s** (105.1, 106.4, 113.8, 111.1) |
 
 **The combinatorics are the same and only the arithmetic differs.** Same stopping degree, the same
 13 602 x 19 132 matrix to the row, 4 967 pairs against 4 968 and 20 010 753 entries against
 20 011 556 — a difference of one pair and 803 entries out of 20 million, which is incidental
-cancellation over a different field and not a different computation. The wall is **2.49x**, and
-with the computation held fixed that factor is the field's arithmetic. The two routes, for the
-record: GF(31) multiplies with one Montgomery step, and `BinaryFieldElement` multiplies with a
+cancellation over a different field and not a different computation. Every row above the wall
+reproduced **to the digit across three pairs at three commits**, which is a stronger statement than
+one pair could make: the entry count, the matrix and the pair count are properties of the instance
+and the field, and nothing in the F4 work between those commits — the monomial hasher, in-place
+scaling, the 2x8 tiling — changes them at this size.
+
+The wall is the only thing the field moves, and it moves it by about **2.5x** — 2.51x at the
+committed pair, 2.49x and 2.62x at the other two, on a machine running other agents' work under the
+bench lock. With the computation held fixed that factor is the field's arithmetic. The two routes,
+for the record: GF(31) multiplies with one Montgomery step, and `BinaryFieldElement` multiplies with a
 `PCLMULQDQ` behind a cached feature probe — this machine has the instruction — followed by a
 Barrett reduction. Both fields invert by Fermat exponentiation, so inversion is a wash in kind —
 the exponents differ (`q - 2` at `q = 2^8` against `q = 31`) and so does the cost of each
-multiplication inside it. Which part of the multiply dominates the 2.49x is not measured here, and
+multiplication inside it. Which part of the multiply dominates the 2.5x is not measured here, and
 the figure does not rest on an answer: it is a wall ratio at a fixed matrix, not an attribution. No
 table-lookup route exists for this field in the crate.
 
@@ -583,11 +601,11 @@ That is the useful reading of the pair. Where §4.4's type VI and type III compa
 *shape* — eight surplus variables pull the wall in rather than pushing it out — this one holds the
 shape fixed and prices the field. It also says where a GF(2^8) optimization would and would not
 help: nothing here is bound by the entry count, which the two fields reach within 0.004% of each
-other, so a narrower element would not move the stopping degree at all. It would move the 2.49x.
+other, so a narrower element would not move the stopping degree at all. It would move the 2.5x.
 
 Faugère solved this instance in 2015 in 24 648 s with F5-FGb (§8.1), and the 370-second figure the
 same size carries at **seed 2** is per subsystem of a hybrid attack (§8.4) rather than a total.
-Neither is a comparison with the row above, which is a 105-second resource stop under a deliberate
+Neither is a comparison with the row above, which is a 111-second resource stop under a deliberate
 cap.
 
 ---

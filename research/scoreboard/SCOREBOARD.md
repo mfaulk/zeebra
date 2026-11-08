@@ -130,8 +130,8 @@ One row per distinct rendering, not per run: repeated runs of the same problem d
 | `fukuoka-mq-III-n20-seed0` | as published | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 10147 | 195.5 | 2 | b166e56, 96bf1969 |
 | `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 1) | the slice is empty, which says nothing about the problem | 9 | 9 | 5103 | 4.7 | 1 | 9c8b80d |
 | `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 3) | the slice is empty, which says nothing about the problem | 9 | 9 | 5104 | 4.6 | 1 | 9c8b80d |
-| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 | 2 | 1409a48, a3e5d66 |
-| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 2 | 1409a48, a3e5d66 |
-| `fukuoka-mq-V-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 236.4 | 1 | a3e5d66 |
-| `fukuoka-mq-V-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 1 | a3e5d66 |
+| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 | 3 | 1409a48, a3e5d66, b7847824 |
+| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 3 | 1409a48, a3e5d66, b7847824 |
+| `fukuoka-mq-V-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 236.4 | 2 | a3e5d66, b7847824 |
+| `fukuoka-mq-V-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 2 | a3e5d66, b7847824 |
 
