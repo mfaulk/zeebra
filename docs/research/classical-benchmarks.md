@@ -9,6 +9,14 @@ match published values exactly, which is a real anchor and a stronger one than a
 *timings* on the one page that publishes them are not comparable to Zeebra's, for three independent
 reasons. §5 states the correction this forces on #65, including on a claim I made there myself.
 
+> **Updated after #424.** Two of this document's recommendations have since been carried out and the
+> text says so where they were made. The invariants are now **asserted** rather than reported
+> (`corpus::CorpusEntry::quotient_dimension`, §6), and the ladder reaches Steel's three Katsura rows
+> and `cyclic-7` — so "the rows that match are out of reach" in §4 is now true of the Cyclic rows
+> only. **§4's prohibition on comparing wall clocks against the 2004 figures is untouched and
+> stands.** What reaching those rungs bought is an instance list and a set of checkable invariants,
+> not a comparison.
+
 ## 1. What #65 says, and how far it is wrong
 
 #65's motivation:
@@ -97,6 +105,14 @@ reports `D = dim_F(R/I)`.
 | katsura-5 | 5 | zero-dim | 16 | 0.52 |
 | katsura-6 | 6 | zero-dim | 32 | 3.41 |
 | katsura-7 | 7 | zero-dim | **64** | 32.45 |
+| katsura-8 | 8 | zero-dim | **128** | 216 |
+| katsura-9 | 9 | zero-dim | **256** | 2 128 |
+| katsura-10 | 10 | zero-dim | **512** | 21 781 |
+| katsura-11 | 11 | zero-dim | **1024** | 277 129 |
+| cyclic-7 | 7 | zero-dim | **924** | 1 366 |
+| cyclic-8 | 8 | **positive** | — | 21 344 |
+| cyclic-9 | 9 | **positive** (Backelin; unverified here) | — | refuses after 10 600 |
+| cyclic-10 | 10 | zero-dim (Steel) | **34940** published, unverified here | refuses after 24 300 |
 | planted-4 / 6 / 8 | 4 / 6 / 8 | zero-dim | 16 / 64 / 256 | 0.02–0.04 |
 
 ### 3.1 Cyclic agrees with the published solution counts
@@ -105,7 +121,10 @@ The cyclic-`n` roots system's solution count is a classical result (Björck and 
 cyclic `n`-roots for `5 ≤ n ≤ 8` in 1991–92; Backelin and Fröberg proved cyclic-7 has exactly 924).
 The published counts for the first few `n` are 70 for `n = 5`, 156 for `n = 6` and 924 for `n = 7`.
 
-**Zeebra measures 70 and 156.** Those are the two rungs it reaches, and both agree exactly.
+**Zeebra measures 70, 156 and — since #424 — 924.** `cyclic-7` is now on the ladder and reaches a
+grevlex basis in 1.4 s, and its quotient dimension is **exactly the 924 Backelin and Fröberg
+proved**. That is a third published count confirmed, and the first one this document listed as
+reachable-in-principle rather than reached.
 
 And the dimension class agrees for the right reason. Backelin's theorem: if `n` has a square divisor
 — `d² | n` for some `d ≥ 2` — there are **infinitely many** cyclic `n`-roots. `4 = 2²`, so cyclic-4
@@ -114,13 +133,21 @@ already flagged cyclic-4 as the exception ("A square system is not zero-dimensio
 square"); what is new here is that the flag is **externally correct and for the published reason**,
 not a local observation.
 
-Steel's page supplies a third, independent agreement in kind: Cyclic-10 over GF(32003) at dimension
-**34940**. Out of reach, but it is a value Zeebra could one day be checked against.
+And the dimension class now agrees at **three** rungs rather than one. Backelin's theorem predicts
+`cyclic-8` and `cyclic-9` positive-dimensional too — `4 | 8` and `9 = 3²` — and `cyclic-8`'s basis
+confirms it (`classify_ideal` reports `PositiveDimensional` after 21.3 s). `cyclic-9` is beyond
+Zeebra's reach, so there the theorem is the record and the corpus says so. Asserted as arithmetic
+rather than per rung, in `corpus::test_a_cyclic_rung_is_zero_dimensional_exactly_where_n_is_squarefree`.
+
+Steel's page supplies a further, independent agreement in kind: Cyclic-10 over GF(32003) at dimension
+**34940**. Still out of reach — Zeebra's F4 crosses its live-entry budget after 24.3 s — so it is
+recorded in the ladder as the published value that rung exists to one day be checked against.
 
 ### 3.2 Katsura's dimensions are exactly `2^n`, which pins a naming offset
 
 The measured dimensions are 4, 8, 16, 32, 64 for `katsura::<3>` through `katsura::<7>` — exactly
-`2^(N-1)` across five consecutive rungs. `benchmark_systems::katsura` sets `n = N - 1`, so that is
+`2^(N-1)` across five consecutive rungs, and since #424 across **eight**: `katsura-8` through
+`katsura-11` measure 128, 256, 512 and 1024. `benchmark_systems::katsura` sets `n = N - 1`, so that is
 `D = 2^n`.
 
 **This resolves a naming trap, and it is the main practical finding of §3.** The literature's
@@ -128,10 +155,14 @@ The measured dimensions are 4, 8, 16, 32, 64 for `katsura::<3>` through `katsura
 
 > **Zeebra's `katsura-N` is the literature's Katsura-(N − 1).**
 
-Zeebra's largest rung, `katsura-7`, is therefore the literature's **Katsura-6**. Steel's smallest row
-is **Katsura 8** = `katsura::<9>` — **two rungs above anything Zeebra has ever computed**, and
-`katsura-7` already fails direct-lex F4 here (`TooManyNonzeros { nonzeros: 20003295, limit:
-20000000 }`).
+Zeebra's largest rung was `katsura-7`, the literature's **Katsura-6**. Steel's smallest row is
+**Katsura 8** = `katsura::<9>`, which was then two rungs above anything Zeebra had computed.
+**#424 closed that gap and two more**: `katsura-9`, `katsura-10` and `katsura-11` are on the ladder
+and all three complete, so Steel's Katsura 8, 9 and 10 rows now name instances Zeebra computes. What
+that buys is the *instance list*, not a comparison — §4 still forbids the wall-clock one, and these
+rungs were reached so that this machine's own run of the comparands has somewhere decisive to stand.
+Note that `katsura-7` already fails **direct-lex** F4 here (`TooManyNonzeros { nonzeros: 20003295,
+limit: 20000000 }`); the rungs above it are reached by grevlex F4 and FGLM, never by direct lex.
 
 A comparison drawn without noticing the offset would have matched Zeebra's `katsura-7` against
 Steel's `Katsura 8` — two different systems, a factor of four in quotient dimension apart — and
@@ -148,10 +179,14 @@ as a quoted theorem.
    — the homogenized systems. `benchmark_systems::cyclic` generates the **affine** system: `n - 1`
    cyclic elementary symmetric polynomials plus `x_0 ⋯ x_{n-1} - 1`, an inhomogeneous last generator.
    Different ideal, different Hilbert function, not comparable. Cyclic 9 and Cyclic 10 carry no
-   "(Hom)" suffix and so match Zeebra's formulation — and they cost 1453.6 s and 17.6 days against
-   Zeebra's cyclic-6 at 13.16 ms. **So the rows that match are out of reach, and the rows in reach do
-   not match.**
-2. **The Katsura rows are two to four rungs above Zeebra's ceiling**, per §3.2.
+   "(Hom)" suffix and so match Zeebra's formulation — and Cyclic 9 is **the rung Zeebra's ceiling
+   falls at**: its grevlex F4 crosses the live-entry budget after 10.6 s (#424), and Cyclic 10 after
+   24.3 s. **So for Cyclic the rows that match are still out of reach, and the rows in reach still do
+   not match.** For Katsura that sentence no longer holds: Steel's Katsura 8, 9 and 10 are
+   `katsura-9`, `katsura-10` and `katsura-11`, and all three are on the ladder and complete.
+2. **The Katsura rows were two to four rungs above Zeebra's ceiling**, per §3.2. No longer true
+   after #424 — all three are reachable — which removes this reason for the Katsura rows and leaves
+   reason 3, which is sufficient on its own.
 3. **The hardware is twenty-two years old and the comparison is unnormalizable.** A 2.087 GHz
    single-core Athlon XP with 1.5 GB, against a 2026 workstation, spans orders of magnitude in clock,
    width, cache and memory before any algorithmic difference. Even where an instance matched, a
@@ -161,6 +196,15 @@ as a quoted theorem.
 be reported: the invariants of §3, and *ratios between systems under one implementation* — Steel's own
 Katsura 9/Katsura 8 ratio of 5.7× against Zeebra's katsura-6/katsura-5 of 6.6×, for instance, which
 is a statement about how the family scales and not about whose code is faster.
+
+That last licence is now exercisable on matching instances, which is the one thing #424's rungs
+change here. Steel's Katsura 9/Katsura 8 is 5.7x (1.7 s / 0.3 s, Magma 2.11-8); Zeebra's
+`katsura-10`/`katsura-9` — the same two problems — is **10.2x** (21.78 s / 2.13 s), and
+`katsura-11`/`katsura-10` is 12.7x. Both operands of each ratio are one implementation on one
+machine, so these are statements about how the family scales under each engine and **not** about
+whose code is faster. The two scaling factors differ by about 2x; nothing here attributes that to
+anything, because doing so would need the two engines on one machine, which is what the competitive
+board is for.
 
 ## 5. The correction to #65, and to a claim of mine in it
 
@@ -194,9 +238,17 @@ the finding in the direction of making the epic look unnecessary, and the epic i
   it. A generator that drifted — an off-by-one in the cyclic window, a sign in Katsura — would change
   `D` and currently nothing would notice. This is the cheapest external-correctness check available
   to the crate and it is the one concrete follow-up this document recommends.
+  **Done (#424):** `CorpusEntry::quotient_dimension` records it per rung and four tests assert it —
+  `2^(N−1)` for Katsura across eight consecutive rungs, the published cyclic counts including 924 and
+  34940, Backelin's squarefree criterion for the cyclic dimension class, and `2^N` for planted MQ.
+  Two further tests compare the record against a computed basis rather than against a formula, so a
+  transcription error cannot hide. `docs/research/cross-library-corpus.md` §9 is the table.
 - **Rename, or document, the Katsura offset.** `katsura-7` meaning the literature's Katsura-6 is a
   trap that will be fallen into again. Renaming touches every milestone document; a prominent note in
   `benchmark_systems` is the cheap option. Either way it should not stay implicit.
+  **Done (#261):** resolved empirically against msolve's own `kat6-31.ms` and documented in
+  `cross-library-corpus.md` §2, with a test asserting every generated rung is named by its variable
+  count — so a future rung cannot reintroduce the ambiguity by being named carelessly.
 - **Do not add a homogenized Cyclic generator for comparability.** It would make Cyclic 7/8 (Hom)
   comparable in kind, and both are still 2004 Athlon figures on a different machine — §4 item 3
   applies regardless. Not worth it for that reason alone.
@@ -234,11 +286,15 @@ to be quoted; see #198 for why that rule exists.
 
 - **No timing comparison was drawn**, by design. §4 is the argument for why none is available.
 - **No regression test was added.** §6 recommends one; it is a change to the test suite and belongs in
-  its own commit.
-- **`D = 2^n` for Katsura is measured, not cited.** No primary source was located for the closed form.
+  its own commit. **Added in #424**, in `corpus.rs` rather than here, because the corpus is where a
+  rung's identity is frozen and an invariant belongs beside it.
+- **`D = 2^n` for Katsura is measured, not cited.** No primary source was located for the closed
+  form. Still true after #424, which extended the evidence from five consecutive rungs to **eight**
+  — strong, and still not a citation.
 - **The cyclic solution counts were confirmed from the secondary literature**, not from
-  Björck–Fröberg or Backelin–Fröberg directly. The agreement is exact at both rungs Zeebra reaches
-  and Steel's independent Cyclic-10 figure is consistent, but the primary papers were not read.
+  Björck–Fröberg or Backelin–Fröberg directly. The agreement is exact at all three rungs Zeebra now
+  reaches — 70, 156 and, since #424, **924** — and Steel's independent Cyclic-10 figure is
+  consistent, but the primary papers were not read.
 - **Nothing was measured over GF(2) or GF(32003)**, so the GF(2) Cyclic rows of §2.2 have no Zeebra
   comparand yet. #218 has since made characteristic two work, so that is now possible.
   **`GF(32003)` has since been measured (#426)**: it is a published corpus characteristic, and

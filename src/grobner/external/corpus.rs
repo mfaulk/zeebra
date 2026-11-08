@@ -54,6 +54,37 @@
 //! yields `None`. `test_every_rendered_coefficient_is_a_residue_of_the_declared_characteristic` is
 //! the property, asserted on the rendered text rather than on the polynomials.
 //!
+//! # Where the ceiling is, and which stage sets it
+//!
+//! Measured, at [`REFERENCE_CHARACTERISTIC`] under grevlex at `F4Options::default()`, and the
+//! answer is not where the family index is largest:
+//!
+//! | rung | basis | `D` | conversion |
+//! |---|---:|---:|---:|
+//! | `katsura-8` | 0.22 s | 128 | 13 ms |
+//! | `katsura-9` | 2.1 s | 256 | 84 ms |
+//! | `katsura-10` | 21.8 s | 512 | 0.62 s |
+//! | `katsura-11` | 277 s | 1024 | 5.2 s |
+//! | `cyclic-7` | 1.4 s | 924 | 0.16 s |
+//! | `cyclic-8` | 21.3 s | — (positive-dimensional) | n/a |
+//! | `cyclic-9` | **refuses after 10.6 s** | — | — |
+//! | `cyclic-10` | **refuses after 24.3 s** | — | — |
+//!
+//! **The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, which crosses the
+//! live-entry budget — `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura
+//! ladder is reachable to `katsura-11`, four rungs above the old ceiling, at roughly 10x per rung.
+//!
+//! That the refusal is a **resource** stop and not a wall-clock one is the point rather than a
+//! detail: an entry count crosses at the same counter on any machine, so the ceiling can be written
+//! down, where a time stop would make it a fact about how busy the box was.
+//! `test_the_ceiling_is_cyclic_9_and_the_basis_stage_sets_it` asserts all of it.
+//!
+//! A refusal is a **result**, so `cyclic-9` and `cyclic-10` are on the ladder rather than left off.
+//! Their dimension class comes from Backelin's theorem rather than from a computation, and
+//! `cyclic-10`'s `D = 34940` is Steel's published value this rung exists to one day be checked
+//! against. The timings above are from the development workstation with other agents at work on it;
+//! they bound reachability, and no cross-engine ratio is taken from them.
+//!
 //! # The ladder
 //!
 //! Rungs are chosen to be easy, intermediate and genuinely challenging rather than uniformly
@@ -102,9 +133,9 @@ pub const REFERENCE_CHARACTERISTIC: u64 = 2_147_483_647;
 /// [`ceilings::MSOLVE_ELIMINANT`] = `1515531529` and the reference prime is **above** it, so at
 /// `2^31 − 1` the eliminant has exactly one external engine — Singular — and nothing to triangulate
 /// it. `32003` is five orders of magnitude below that bound and msolve joins.
-/// `test_the_small_prime_adds_msolve_to_the_eliminant_task` is the assertion. Note this is a gain in
-/// corroborating an *invariant* and not a Zeebra ranking: Zeebra's own adapter refuses the task, on
-/// a stated premise that is false (#465).
+/// `test_the_small_prime_adds_msolve_to_the_eliminant_task` is the assertion. Zeebra's own adapter
+/// refused the task until #465, on a premise that was false; it now serves it, so this band is one a
+/// Zeebra row can be ranked in rather than only one that corroborates an invariant.
 ///
 /// **It measures a different arithmetic regime.** 15 bits is where a coefficient and its reduction
 /// stay in registers, which is what Singular's "highly optimized Buchberger algorithm over small
@@ -249,6 +280,27 @@ pub struct CorpusEntry {
     /// needs a finite quotient does not apply to it.
     pub zero_dimensional: bool,
 
+    /// `dim_F(R/I)`, the quotient dimension — **the cheapest external-correctness check there is.**
+    ///
+    /// Machine-independent, library-independent and clock-independent, which is what makes it a
+    /// stronger anchor than any timing: `docs/research/classical-benchmarks.md` §5 is the argument,
+    /// and §6 recommended asserting it here. Three sources, all external to this crate:
+    ///
+    /// - **Katsura**: `2^(N-1)`, measured exact at eight consecutive rungs `N = 4 … 11` and
+    ///   recorded as *measured* rather than cited — no primary source for the closed form was
+    ///   located (`classical-benchmarks.md` §3.2, §9).
+    /// - **Cyclic**: the classical solution counts. 70 at `n = 5` and 156 at `n = 6`
+    ///   (Björck–Fröberg), **924 at `n = 7`** (Backelin–Fröberg, proved exactly), and **34940 at
+    ///   `n = 10`** from Steel's page, which states it verbatim as the dimension of the quotient as
+    ///   a vector space.
+    /// - **Planted MQ**: `2^N` by construction, two roots per coordinate pair.
+    ///
+    /// `None` means **absent, not zero**: a positive-dimensional ideal has no finite quotient, and
+    /// `Invariants::agree` compares only fields both sides carry, so an engine reporting no
+    /// dimension and an engine reporting none agree without either claiming anything. It is also
+    /// `None` for a rung no engine has ever completed, where the honest record is that nobody knows.
+    pub quotient_dimension: Option<u64>,
+
     /// How this family's ideal equivalence was established. **The gate on publishing a timing.**
     pub equivalence: Equivalence,
 
@@ -298,9 +350,17 @@ pub fn instance(name: &str, characteristic: u64, order: MonomialOrder) -> Option
         "katsura-5" => katsura_instance::<5>(characteristic, order),
         "katsura-6" => katsura_instance::<6>(characteristic, order),
         "katsura-7" => katsura_instance::<7>(characteristic, order),
+        "katsura-8" => katsura_instance::<8>(characteristic, order),
+        "katsura-9" => katsura_instance::<9>(characteristic, order),
+        "katsura-10" => katsura_instance::<10>(characteristic, order),
+        "katsura-11" => katsura_instance::<11>(characteristic, order),
         "cyclic-4" => cyclic_instance::<4>(characteristic, order),
         "cyclic-5" => cyclic_instance::<5>(characteristic, order),
         "cyclic-6" => cyclic_instance::<6>(characteristic, order),
+        "cyclic-7" => cyclic_instance::<7>(characteristic, order),
+        "cyclic-8" => cyclic_instance::<8>(characteristic, order),
+        "cyclic-9" => cyclic_instance::<9>(characteristic, order),
+        "cyclic-10" => cyclic_instance::<10>(characteristic, order),
         // Seeds are part of the name, so a rung is reproducible from the name alone.
         "mq-random-6" => Some(random_mq_instance(6, 6, characteristic, order)),
         "mq-random-10" => Some(random_mq_instance(10, 10, characteristic, order)),
@@ -838,6 +898,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Easy,
             zero_dimensional: true,
+            quotient_dimension: Some(8),
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
@@ -858,6 +919,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Easy,
             zero_dimensional: true,
+            quotient_dimension: Some(16),
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
@@ -878,6 +940,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "katsura",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(32),
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
@@ -896,8 +959,12 @@ pub fn ladder() -> Vec<CorpusEntry> {
         CorpusEntry {
             name: "katsura-7",
             family: "katsura",
-            rung: Rung::Challenging,
+            // Was `Challenging`, when it was the top rung. It exhausts no engine's limits — all
+            // five complete it, msolve and Sagebrush at their process floors — and `Challenging`
+            // has to keep meaning what it says, so #424's upper rungs took the label over.
+            rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(64),
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/kat6-31.ms",
@@ -914,11 +981,96 @@ pub fn ladder() -> Vec<CorpusEntry> {
             ],
         },
         CorpusEntry {
+            name: "katsura-8",
+            family: "katsura",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            quotient_dimension: Some(128),
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "94d8b158719bdb10bdaba9d1c8dcece9a00cf8949b3627586e16979741891fb7",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "b389774a0934503b86e4030d4ed00fa668cd789f0a11eee7eb2bca957c03144c",
+                ),
+            ],
+        },
+        CorpusEntry {
+            name: "katsura-9",
+            family: "katsura",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            quotient_dimension: Some(256),
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "4010a392ecf953ea7b835cffba98bf9aeebcbe1ec0fc27d2572d25334a278d4f",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "9373c952e86d4a7282348680adaacc2ca1dbe7346c0f268b99c43a5c8e7cb52a",
+                ),
+            ],
+        },
+        CorpusEntry {
+            name: "katsura-10",
+            family: "katsura",
+            rung: Rung::Challenging,
+            zero_dimensional: true,
+            quotient_dimension: Some(512),
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "c55e1bb74cf3e35c564555da504edc9f2ea37ff46d0930dc09a9fa75d2400d98",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "67d6a96fadd21cc7a295c7100c93d84d2d7be37d9b7927377e57f973ebbbc8b0",
+                ),
+            ],
+        },
+        CorpusEntry {
+            name: "katsura-11",
+            family: "katsura",
+            rung: Rung::Challenging,
+            zero_dimensional: true,
+            quotient_dimension: Some(1024),
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/kat6-31.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "c6802b0391f8394f38f2d5807f3c0d197cae6a592a875c3b65c38b41f949b378",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "03bf44d5d614a21cc8f56462aa873b7961641a2341892e3b2ef52b6cfec86a13",
+                ),
+            ],
+        },
+        CorpusEntry {
             name: "cyclic-4",
             family: "cyclic",
             rung: Rung::Easy,
             // Positive-dimensional, and in the corpus deliberately for that reason.
             zero_dimensional: false,
+            quotient_dimension: None,
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/cyclic5-16.ms",
@@ -939,6 +1091,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "cyclic",
             rung: Rung::Easy,
             zero_dimensional: true,
+            quotient_dimension: Some(70),
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/cyclic5-16.ms",
@@ -959,6 +1112,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "cyclic",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(156),
             equivalence: Equivalence::ComparandFile {
                 tool: "msolve 0.11.0",
                 file: "input_files/cyclic5-16.ms",
@@ -975,6 +1129,98 @@ pub fn ladder() -> Vec<CorpusEntry> {
             ],
         },
         CorpusEntry {
+            name: "cyclic-7",
+            family: "cyclic",
+            rung: Rung::Intermediate,
+            zero_dimensional: true,
+            quotient_dimension: Some(924),
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "18746449c45766c3ba73ab0417c2ea1bbe7f7842d88d8a1a55068c71e9aaa736",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "30ce3b4f54c7b30ef818a8750b4e61e51f3f8a1a6e4e49e384fbb5096c6eec17",
+                ),
+            ],
+        },
+        CorpusEntry {
+            name: "cyclic-8",
+            family: "cyclic",
+            rung: Rung::Challenging,
+            // 8 is divisible by 4, so Backelin's theorem gives infinitely many cyclic 8-roots:
+            // positive-dimensional, like cyclic-4 and for the same published reason.
+            zero_dimensional: false,
+            quotient_dimension: None,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "e2f6be738bd1f215766d7184e248663e1a03c4ded31db736fe1b57fb03fd8843",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "a5eda0f9e2642ffef042af19ca84e3b1b4997c3e3ce33e994172de3c8fdc0a96",
+                ),
+            ],
+        },
+        CorpusEntry {
+            name: "cyclic-9",
+            family: "cyclic",
+            rung: Rung::Challenging,
+            // 9 = 3^2, so Backelin's theorem applies again. **Unverified here**: Zeebra's own F4
+            // crosses the live-entry budget before producing a basis, so the class is the theorem's
+            // and not a measurement. The ceiling rung — see the module header.
+            zero_dimensional: false,
+            quotient_dimension: None,
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "ccffb9b3e5ca7b8239026012a16bcd0c8e294f29598881bd4b9b9fcc046c6857",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "ff4c2030a8f74d29de08c0edb94709648cd4108375943cc2dbb7875a85fff72f",
+                ),
+            ],
+        },
+        CorpusEntry {
+            name: "cyclic-10",
+            family: "cyclic",
+            rung: Rung::Challenging,
+            // Squarefree, and Steel's page states the quotient dimension verbatim. **Unverified
+            // here**: out of reach at the default budget, so 34940 is the published value this
+            // rung exists to one day be checked against.
+            zero_dimensional: true,
+            quotient_dimension: Some(34940),
+            equivalence: Equivalence::ComparandFile {
+                tool: "msolve 0.11.0",
+                file: "input_files/cyclic5-16.ms",
+            },
+            digests: &[
+                (
+                    SMALL_PRIME_CHARACTERISTIC,
+                    "538964ac3a891da65bb0eaada43b7ed3a6a5aa51f1fa608a6f4119a500ff0d34",
+                ),
+                (
+                    REFERENCE_CHARACTERISTIC,
+                    "df450bfc1886aa266a0f5a4ad5e0bef8d53822a079b9b7467e0b73d5a0a6ad75",
+                ),
+            ],
+        },
+        CorpusEntry {
             name: "mq-random-6",
             family: "mq-random",
             rung: Rung::Easy,
@@ -982,6 +1228,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             // construction. Asserted per rung rather than assumed; see
             // `test_every_zero_dimensional_claim_is_checked`.
             zero_dimensional: true,
+            quotient_dimension: Some(57),
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
             digests: &[
                 (
@@ -999,6 +1246,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "mq-random",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(354),
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
             digests: &[
                 (
@@ -1016,6 +1264,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "mq-random",
             rung: Rung::Challenging,
             zero_dimensional: true,
+            quotient_dimension: None,
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
             digests: &[
                 (
@@ -1033,6 +1282,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "mq-planted",
             rung: Rung::Easy,
             zero_dimensional: true,
+            quotient_dimension: Some(64),
             equivalence: Equivalence::KnownSolution,
             digests: &[
                 (
@@ -1050,6 +1300,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "mq-planted",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(1024),
             equivalence: Equivalence::KnownSolution,
             digests: &[
                 (
@@ -1067,6 +1318,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "mq-planted",
             rung: Rung::Challenging,
             zero_dimensional: true,
+            quotient_dimension: Some(16384),
             equivalence: Equivalence::KnownSolution,
             digests: &[
                 (
@@ -1084,6 +1336,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "poseidon",
             rung: Rung::Easy,
             zero_dimensional: true,
+            quotient_dimension: Some(9),
             equivalence: Equivalence::KnownSolution,
             digests: &[(
                 KOALABEAR_PRIME,
@@ -1095,6 +1348,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "poseidon",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(81),
             equivalence: Equivalence::KnownSolution,
             digests: &[(
                 KOALABEAR_PRIME,
@@ -1106,6 +1360,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "poseidon",
             rung: Rung::Challenging,
             zero_dimensional: true,
+            quotient_dimension: Some(81),
             equivalence: Equivalence::KnownSolution,
             digests: &[(
                 KOALABEAR_PRIME,
@@ -1121,6 +1376,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             // ceiling is typemax(UInt64) and it was measured correct at this very prime. What is
             // missing is a *second* external engine: Sagebrush stops at 2^62 and msolve and
             // Singular at 2^31, so there is one comparand and nothing to triangulate against.
+            quotient_dimension: Some(5),
             equivalence: Equivalence::SoleComparand {
                 tool: "Groebner.jl",
                 reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
@@ -1136,6 +1392,7 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "anemoi",
             rung: Rung::Intermediate,
             zero_dimensional: true,
+            quotient_dimension: Some(25),
             equivalence: Equivalence::SoleComparand {
                 tool: "Groebner.jl",
                 reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
@@ -1539,6 +1796,314 @@ mod tests {
         assert!(
             ladder().iter().any(|entry| entry.rung == Rung::Challenging),
             "the ladder has no challenging rung, so nothing exercises StoppedByLimit"
+        );
+    }
+
+    /// The trailing number of a generated rung's name, which is its variable count.
+    fn width(name: &str) -> u64 {
+        name.rsplit('-')
+            .next()
+            .expect("a trailing number")
+            .parse()
+            .expect("a trailing number")
+    }
+
+    /// Katsura's quotient dimension is `2^(N-1)` at every rung on the ladder.
+    ///
+    /// **The cheapest external-correctness check the crate has, and it was unimplemented until
+    /// #424.** `dim_F(R/I)` does not depend on the machine, the library or the clock, so a
+    /// generator that drifted — an off-by-one in the window, a sign — would move it where no timing
+    /// would notice. Eight consecutive exact powers of two, `N = 4 … 11`, is the evidence; it is
+    /// recorded as **measured** and not cited, because `classical-benchmarks.md` §9 located no
+    /// primary source for the closed form.
+    #[test]
+    fn test_katsuras_quotient_dimension_is_two_to_the_n_minus_one() {
+        let katsura: Vec<CorpusEntry> = ladder()
+            .into_iter()
+            .filter(|entry| entry.family == "katsura")
+            .collect();
+        assert_eq!(katsura.len(), 8, "N = 4 ..= 11");
+        for entry in katsura {
+            let n = width(entry.name);
+            assert_eq!(
+                entry.quotient_dimension,
+                Some(1u64 << (n - 1)),
+                "{} should have D = 2^{}",
+                entry.name,
+                n - 1
+            );
+            assert!(entry.zero_dimensional, "{} is zero-dimensional", entry.name);
+        }
+    }
+
+    /// Cyclic's quotient dimensions are the **published** solution counts, rung for rung.
+    ///
+    /// 70 at `n = 5` and 156 at `n = 6` (Björck–Fröberg), **924 at `n = 7`** (Backelin–Fröberg,
+    /// proved exactly), and **34940 at `n = 10`** from Steel's page, which states it verbatim as
+    /// the dimension of the quotient as a vector space. The table is written out rather than
+    /// derived, because there is no closed form — which is exactly why it is worth asserting.
+    #[test]
+    fn test_the_cyclic_quotient_dimensions_are_the_published_counts() {
+        let published: &[(&str, Option<u64>)] = &[
+            // Positive-dimensional: no finite quotient, so absent rather than zero.
+            ("cyclic-4", None),
+            ("cyclic-5", Some(70)),
+            ("cyclic-6", Some(156)),
+            ("cyclic-7", Some(924)),
+            ("cyclic-8", None),
+            ("cyclic-9", None),
+            ("cyclic-10", Some(34940)),
+        ];
+        let rungs: Vec<CorpusEntry> = ladder()
+            .into_iter()
+            .filter(|entry| entry.family == "cyclic")
+            .collect();
+        assert_eq!(rungs.len(), published.len(), "n = 4 ..= 10");
+        for (name, expected) in published {
+            let entry = rungs
+                .iter()
+                .find(|entry| entry.name == *name)
+                .unwrap_or_else(|| panic!("{} is not in the ladder", name));
+            assert_eq!(
+                entry.quotient_dimension, *expected,
+                "{}'s quotient dimension disagrees with the published count",
+                name
+            );
+        }
+    }
+
+    /// A cyclic rung is zero-dimensional exactly where `n` is **squarefree**.
+    ///
+    /// **Backelin's theorem**, as arithmetic rather than as a per-rung assertion: if `d² | n` for
+    /// some `d ≥ 2` there are infinitely many cyclic `n`-roots, so the ideal is positive-dimensional.
+    /// That is what makes `cyclic-4`, `cyclic-8` and `cyclic-9` positive-dimensional *for a
+    /// published reason* rather than as three local observations — and it is checkable without
+    /// computing a basis, which matters because `cyclic-9` is the rung Zeebra cannot reach.
+    ///
+    /// The converse direction is the published counts of
+    /// `test_the_cyclic_quotient_dimensions_are_the_published_counts`, not a theorem quoted here.
+    #[test]
+    fn test_a_cyclic_rung_is_zero_dimensional_exactly_where_n_is_squarefree() {
+        fn squarefree(n: u64) -> bool {
+            (2..)
+                .take_while(|d| d * d <= n)
+                .all(|d| !n.is_multiple_of(d * d))
+        }
+        // The premise, so a broken predicate cannot make the test vacuous.
+        assert_eq!(
+            (4..=10).filter(|n| !squarefree(*n)).collect::<Vec<u64>>(),
+            vec![4, 8, 9]
+        );
+
+        for entry in ladder().into_iter().filter(|e| e.family == "cyclic") {
+            let n = width(entry.name);
+            assert_eq!(
+                entry.zero_dimensional,
+                squarefree(n),
+                "cyclic-{} is recorded {}-dimensional, against Backelin's theorem",
+                n,
+                if entry.zero_dimensional {
+                    "zero"
+                } else {
+                    "positive"
+                }
+            );
+            assert_eq!(
+                entry.quotient_dimension.is_some(),
+                entry.zero_dimensional,
+                "{}'s dimension and its class disagree",
+                entry.name
+            );
+        }
+    }
+
+    /// Planted MQ's quotient dimension is `2^N`, which is a fact about the construction.
+    ///
+    /// Two roots per coordinate pair, so the count is exact rather than published — and asserting
+    /// it catches a `planted` that stopped planting, which the known-solution check alone would
+    /// not: a system with *more* solutions still vanishes at the planted point.
+    #[test]
+    fn test_planted_mqs_quotient_dimension_is_two_to_the_n() {
+        for entry in ladder().into_iter().filter(|e| e.family == "mq-planted") {
+            let n = width(entry.name);
+            assert_eq!(
+                entry.quotient_dimension,
+                Some(1u64 << n),
+                "{} should have D = 2^{}",
+                entry.name,
+                n
+            );
+        }
+    }
+
+    /// Every recorded quotient dimension is the one Zeebra computes, on the rungs it can reach.
+    ///
+    /// The other half of the check: the tests above compare the record against the *literature*,
+    /// and this compares it against the *code*, so a transcription error in the table cannot hide
+    /// behind a formula that was also written from the table. Restricted to rungs whose basis is
+    /// sub-second so the suite stays runnable; the heavier ones are covered by
+    /// `test_the_upper_rungs_quotient_dimensions_are_computed`, which is `#[ignore]`d.
+    #[test]
+    fn test_every_cheap_rungs_recorded_quotient_dimension_is_computed() {
+        for name in [
+            "katsura-4",
+            "katsura-5",
+            "katsura-6",
+            "cyclic-5",
+            "mq-planted-6",
+        ] {
+            check_recorded_dimension(name);
+        }
+    }
+
+    /// The upper rungs' recorded quotient dimensions, computed.
+    ///
+    /// `#[ignore]`d for cost, not for doubt: `katsura-11`'s grevlex basis alone is about 280 s and
+    /// `cyclic-8`'s about 21 s on the development machine, which is more than a test suite should
+    /// spend. Run with `cargo test --release -- --ignored`. `cyclic-9` and `cyclic-10` are absent
+    /// because Zeebra does not reach them at all — that is the ceiling, and the module header
+    /// records it.
+    #[test]
+    #[ignore = "minutes of F4; run with --ignored to check the upper rungs' dimensions"]
+    fn test_the_upper_rungs_quotient_dimensions_are_computed() {
+        for name in [
+            "katsura-7",
+            "katsura-8",
+            "katsura-9",
+            "katsura-10",
+            "katsura-11",
+            "cyclic-6",
+            "cyclic-7",
+            "cyclic-8",
+        ] {
+            check_recorded_dimension(name);
+        }
+    }
+
+    /// The ceiling is `cyclic-9`, it is set by the **basis** stage, and the stop is a
+    /// **resource** one.
+    ///
+    /// #424's deliverable, as a test rather than as a figure in a document. Three things are
+    /// asserted, and the third is what makes it a ceiling rather than an anecdote:
+    ///
+    /// 1. Every Katsura rung up to `katsura-11` completes at the default budget, so the ladder's
+    ///    ceiling is not where the family index is largest.
+    /// 2. `cyclic-9` and `cyclic-10` do **not** complete.
+    /// 3. They stop at [`StopKind::Resource`], not [`StopKind::Time`]. A wall-clock stop is a fact
+    ///    about one machine under one load and would make the ceiling depend on how busy the box
+    ///    was; an entry-count stop crosses at the same counter on any machine, which is what lets
+    ///    this be written down. `F4Options`' own documentation draws the same distinction, and the
+    ///    budget is `F4Options::default()` throughout.
+    ///
+    /// `#[ignore]`d for cost: `katsura-11`'s basis alone is about 280 s. Run with
+    /// `cargo test --release -- --ignored`.
+    #[test]
+    #[ignore = "minutes of F4; this is the measured ceiling, run with --ignored"]
+    fn test_the_ceiling_is_cyclic_9_and_the_basis_stage_sets_it() {
+        use crate::grobner::{f4_with_options, F4Options, StopKind};
+
+        fn basis<const N: usize>(name: &str) -> Result<usize, (StopKind, String)> {
+            let built = instance(name, REFERENCE_CHARACTERISTIC, GREVLEX).expect("in the ladder");
+            let parsed: Vec<MultivariatePolynomial<N, F>> = built
+                .system
+                .iter()
+                .map(|text| MultivariatePolynomial::parse(text, names::<N>()).expect("parses"))
+                .collect();
+            match f4_with_options(&parsed, GREVLEX, &F4Options::default()) {
+                Ok((basis, _)) => Ok(basis.len()),
+                Err(e) => Err((e.stop_kind(), format!("{e:?}"))),
+            }
+        }
+
+        // Reachable, including the rung four above the old ceiling.
+        assert!(basis::<8>("katsura-8").is_ok());
+        assert!(basis::<9>("katsura-9").is_ok());
+        assert!(basis::<10>("katsura-10").is_ok());
+        assert!(basis::<11>("katsura-11").is_ok(), "katsura-11 is reachable");
+        assert!(basis::<7>("cyclic-7").is_ok());
+        assert!(
+            basis::<8>("cyclic-8").is_ok(),
+            "positive-dimensional, but a basis exists"
+        );
+
+        // The ceiling, and the kind of bound that sets it.
+        for (name, stop) in [
+            ("cyclic-9", basis::<9>("cyclic-9")),
+            ("cyclic-10", basis::<10>("cyclic-10")),
+        ] {
+            match stop {
+                Ok(elements) => panic!(
+                    "{} now completes with {} elements — the ceiling moved, which is a result and \
+                     needs the ladder and the write-up updated, not this assertion relaxed",
+                    name, elements
+                ),
+                Err((kind, detail)) => assert_eq!(
+                    kind,
+                    StopKind::Resource,
+                    "{} stopped on a {:?} bound ({}), so the ceiling would depend on how busy the \
+                     machine was",
+                    name,
+                    kind,
+                    detail
+                ),
+            }
+        }
+    }
+
+    /// Compute `dim_F(R/I)` for `name` at the reference prime and compare it with the ladder's.
+    ///
+    /// Parses the rung's **own rendered text**, so what is checked is the problem every engine is
+    /// handed rather than this module's in-memory polynomials.
+    fn check_recorded_dimension(name: &str) {
+        use crate::grobner::{classify_ideal, f4, fglm::QuotientBasis, IdealClass};
+
+        fn computed<const N: usize>(built: &super::Instance) -> (IdealClass, Option<u64>) {
+            let parsed: Vec<MultivariatePolynomial<N, F>> = built
+                .system
+                .iter()
+                .map(|text| MultivariatePolynomial::parse(text, names::<N>()).expect("parses"))
+                .collect();
+            // A crossed limit is a real outcome, but not on these rungs: every caller names a
+            // rung Zeebra reaches, so a stop here is a regression and should say so loudly.
+            let basis = f4(&parsed, GREVLEX)
+                .unwrap_or_else(|e| panic!("F4 stopped on a rung that should be reachable: {e:?}"));
+            let class = classify_ideal(&basis, GREVLEX);
+            // Generous, and bounded: `cyclic-10`'s 34940 is the largest the ladder records.
+            let dimension = QuotientBasis::new(&basis, GREVLEX, 1 << 20)
+                .ok()
+                .map(|quotient| quotient.dimension() as u64);
+            (class, dimension)
+        }
+
+        let built = instance(name, REFERENCE_CHARACTERISTIC, GREVLEX).expect("in the ladder");
+        let entry = ladder()
+            .into_iter()
+            .find(|entry| entry.name == name)
+            .expect("in the ladder");
+        let (class, dimension) = match built.variable_count() {
+            4 => computed::<4>(&built),
+            5 => computed::<5>(&built),
+            6 => computed::<6>(&built),
+            7 => computed::<7>(&built),
+            8 => computed::<8>(&built),
+            9 => computed::<9>(&built),
+            10 => computed::<10>(&built),
+            11 => computed::<11>(&built),
+            other => panic!(
+                "{} has width {}, which this check does not compile",
+                name, other
+            ),
+        };
+        assert_eq!(
+            class.is_finite_dimensional(),
+            entry.zero_dimensional,
+            "{}'s computed class disagrees with its recorded one",
+            name
+        );
+        assert_eq!(
+            dimension, entry.quotient_dimension,
+            "{}'s computed quotient dimension disagrees with the ladder's record",
+            name
         );
     }
 

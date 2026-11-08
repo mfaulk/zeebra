@@ -373,7 +373,8 @@ Gröbner basis is unique given the ideal and the order. It agrees on:
 | a 14-variable system containing both `x1` and `x10` | the prefix-collision rung (§4 of the Groebner.jl study); a misread would collapse the ideal to `<1>` |
 
 **Ten distinct instances compared term for term, three families, two characteristics**, where the
-provisioning record had one. Across the full eighteen-rung ladder the adapter additionally
+provisioning record had one. Across the full ladder — eighteen rungs when this was written,
+twenty-six since #424 — the adapter additionally
 *completed* the six MQ rungs and three Poseidon rungs — including both fourteen-variable MQ rungs,
 with **no** `exponents too large to pack` — and cleanly refused both Anemoi rungs, whose field is
 above its 2^62 gate. One run in that sweep stopped at the wall limit, which is the expected

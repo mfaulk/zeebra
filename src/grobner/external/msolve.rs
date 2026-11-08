@@ -1676,12 +1676,12 @@ rational param(cpu)             0.75 sec
     /// already here is covered with no edit at all. Only a genuinely new width needs a line — and
     /// [`zeebra_oracle`] panics rather than silently reporting "no oracle" if this list and its
     /// match ever disagree.
-    const COMPILED_WIDTHS: &[usize] = &[4, 5, 6, 7, 10, 14];
+    const COMPILED_WIDTHS: &[usize] = &[4, 5, 6, 7, 8, 9, 10, 11, 14];
 
     /// Whether a rung can have an oracle at all, from its field and its width alone.
     ///
     /// Cheap by design: it runs no F4, so the ladder-wide coverage assertion can cover all
-    /// eighteen rungs without computing a fourteen-variable basis.
+    /// twenty-six rungs without computing a fourteen-variable basis.
     ///
     /// The field check is not a formality. Parsing a rung's text into [`Reference`] reduces its
     /// coefficients modulo [`REFERENCE_CHARACTERISTIC`], so an oracle built for a rung over any
@@ -1719,7 +1719,10 @@ rational param(cpu)             0.75 sec
             5 => zeebra_leading_parsed::<5>(instance),
             6 => zeebra_leading_parsed::<6>(instance),
             7 => zeebra_leading_parsed::<7>(instance),
+            8 => zeebra_leading_parsed::<8>(instance),
+            9 => zeebra_leading_parsed::<9>(instance),
             10 => zeebra_leading_parsed::<10>(instance),
+            11 => zeebra_leading_parsed::<11>(instance),
             14 => zeebra_leading_parsed::<14>(instance),
             // `has_compiled_pair` admitted this width, so a missing arm is a bug in this file and
             // not a rung without an oracle. Reporting it as the latter is how a rung quietly loses
@@ -1754,12 +1757,21 @@ rational param(cpu)             0.75 sec
     /// `test_a_real_msolve_agrees_with_zeebra_on_katsura_and_cyclic` is deliberately **not**
     /// `#[ignore]`d — it runs whenever msolve is installed.
     ///
-    /// Measured on the provisioning machine: the nine rungs at or below seven variables build
-    /// their oracles in **1.4 seconds in total**, while `mq-random-10` alone did not finish in ten
+    /// Measured on the provisioning machine: the rungs at or below seven variables built their
+    /// oracles in **1.4 seconds in total**, while `mq-random-10` alone did not finish in ten
     /// minutes. A test that takes ten minutes stops being run, and a test that stops being run
     /// stops being true.
     ///
-    /// `ZEEBRA_FULL_CORPUS_ORACLE=1` lifts it, for a machine that wants the ten- and
+    /// **That figure is now ~29 s, and the ceiling was kept at 7 anyway.** #424 added `cyclic-7`,
+    /// which is also seven variables and about fifteen times `katsura-7`'s cost — width is a crude
+    /// proxy for work, and this is where that shows. The trade was taken deliberately: `cyclic-7`
+    /// is the top of the *reachable* cyclic family and the rung whose `D = 924` is the one
+    /// externally published count the crate can check, so an oracle for it is worth having on every
+    /// `cargo test`. Twenty-nine seconds is still two orders of magnitude inside the threshold the
+    /// paragraph above sets. Lowering the ceiling to 6 would buy the time back and cost both
+    /// `katsura-7`'s and `cyclic-7`'s coverage, which is the worse half of the trade.
+    ///
+    /// `ZEEBRA_FULL_CORPUS_ORACLE=1` lifts it, for a machine that wants the eight- to
     /// fourteen-variable rungs covered. Rungs left out are **printed**, never silently dropped.
     const DEFAULT_ORACLE_WIDTH_CEILING: usize = 7;
 
@@ -1832,7 +1844,7 @@ rational param(cpu)             0.75 sec
     /// with no oracle until someone wrote a match arm.
     ///
     /// Deliberately checks the *decision* and not the oracle: `has_compiled_pair` reads the
-    /// instance's characteristic and width, so this covers all eighteen rungs without running
+    /// instance's characteristic and width, so this covers all twenty-six rungs without running
     /// Zeebra's F4 on a fourteen-variable system.
     #[test]
     fn test_every_reference_field_rung_has_a_compiled_oracle() {

@@ -818,8 +818,8 @@ and all ten rows still on the board.
 
    The eliminant row is why `GF(32003)` is a second corpus identity rather than a curiosity: msolve
    stops below `1515531529`, so at the reference prime the eliminant has **one** engine and at
-   `32003` it has two. Note that Zeebra's own adapter refuses `UnivariateEliminant`, so that column
-   has no in-crate operand at any field — tracked separately.
+   `32003` it has two. Zeebra's own adapter refused `UnivariateEliminant` when that was written, on
+   a premise that was false; #465 fixed it, so the cell now admits a Zeebra operand.
 
    This matters more than a refinement, because **conversion is the one stage where M25 measured a
    cross-library deficit at all.** Reading a basis band as a conversion band would overstate what can
@@ -1219,7 +1219,7 @@ Scored against the criteria as written before the work, including where they wer
 |---|---|---|
 | a standardized cross-library protocol | **met** | #257, `external-comparison-protocol.md`; the six-task taxonomy, each field with a stated measurement method, "cannot represent the input" distinguished from "slower" in the type system |
 | working adapters for ≥3 comparators, or documented blockers | **met** | **4** — msolve 0.11.0, Groebner.jl 0.10.11, Sagebrush `86d9f1c7`, Singular 4.4.1, all on one frozen contract |
-| a validated corpus of ≥6 families | **met** | #261 — six families, eighteen rungs, equivalence a **recorded field** with a `licenses_timing()` gate asserted per rung |
+| a validated corpus of ≥6 families | **met** | #261 — six families, eighteen rungs (twenty-six since #424), equivalence a **recorded field** with a `licenses_timing()` gate asserted per rung, and the quotient dimension asserted per rung since #424 |
 | a first competitive report, identical problems and hardware | **met** | #263, `competitive-baseline.md`; two measured deficits, four-way agreement, three cannot-be-compared results |
 | stage-attributed priorities for subsequent optimization | **met** | the six-axis ranking plus the Amdahl screen, which closed #269/#270/#271, held #272 and vindicated #273 |
 | a machine-readable record of measured RSS, separate from estimated | **met** | #288 — both populated, ratio recoverable from one record, `measured_peak_rows_in_process` labelling attributability, `RssBasis::AllocatorTracked` keeping allocated and resident apart |
