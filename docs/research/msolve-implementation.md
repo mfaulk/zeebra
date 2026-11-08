@@ -870,8 +870,9 @@ had to handle two of them.
    variable list against the instance's on every run.
 5. **`-v 1`'s advisory output goes to stderr, not stdout.** `neogb/streams.h:24-26` defines
    `OUTSTREAM stdout`, `VERBSTREAM stderr`, `ERRSTREAM stderr`; measured, `-v 1` puts zero bytes on
-   stdout. `external-comparands.md` §3.8 says stdout. Immaterial to the adapter (the supervisor
-   merges both streams) but it matters to anyone driving msolve by hand with `2>/dev/null`.
+   stdout. `external-comparands.md` §3.8 said stdout; corrected there by #332. Immaterial to the
+   adapter (the supervisor merges both streams) but it matters to anyone driving msolve by hand
+   with `2>/dev/null`.
 6. **`-C` can dereference NULL**: `nmod_fglm_guess_colon` returns `NULL` (`fglm_core.c:1808`) and
    `msolve/msolve.c:4406`'s caller never checks before `:4420` dereferences it.
 7. **`-l 43` is silently rewritten to `-l 2`** (`io.c:700-704`), so the `_2` probabilistic variants

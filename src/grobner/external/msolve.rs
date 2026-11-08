@@ -45,8 +45,10 @@
 //! ## 2. msolve's sparse-FGLM refuses a prime and then retries forever
 //!
 //! Worse than the first, and not recorded in the provisioning notes.
-//! [`MAX_CHARACTERISTIC_ELIMINANT`] is `1518500213`, hard-coded in `fglm_core.c:1385`; above it
-//! sparse-FGLM returns `NULL` with `Prime <p> is too large.` on stderr. The genericity handler
+//! msolve's own guard is `1518500213`, hard-coded in `fglm_core.c:1385`; at or above it
+//! sparse-FGLM returns `NULL` with `Prime <p> is too large.` on stderr.
+//! [`MAX_CHARACTERISTIC_ELIMINANT`] is lower — the kernels' *documented-safe* modulus rather than
+//! msolve's guard, see its own docs for the 2 968 684-wide window between the two. The genericity handler
 //! reads that `NULL` as a non-generic staircase and retries with a new random linear form, without
 //! bound — 25 353 retries and 1.37 million lines in eight seconds on katsura-5 over
 //! `GF(2^31 - 1)`, never exiting. [`MsolveSolver::supports`] therefore refuses the eliminant task
