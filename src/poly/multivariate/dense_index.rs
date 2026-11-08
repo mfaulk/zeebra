@@ -20,9 +20,10 @@
 //! measurement. Both enumerate their cells in exactly index order, which is what lets the output
 //! pass read the slots with a counter instead of inverting the rank.
 
-use std::collections::HashMap;
-
-use crate::{FiniteField, Monomial};
+use crate::{
+    poly::multivariate::monomial_hash::{BuildMonomialHasher, MonomialMap},
+    FiniteField, Monomial,
+};
 
 /// `C(m, k)` for every `m <= max_m` and every `k <= N`, by Pascal's rule.
 ///
@@ -177,11 +178,12 @@ pub(crate) fn box_cells<const N: usize>(bounds: &[u32; N]) -> Option<u64> {
 pub(crate) fn collect_simplex<const N: usize, F: FiniteField>(
     slots: &[F],
     degree: u64,
-) -> HashMap<Monomial<N>, F> {
+) -> MonomialMap<N, F> {
     // Counted first so the map is sized once, which is the whole point of having come this far
     // without hashing.
     let occupied = slots.iter().filter(|c| !c.is_zero()).count();
-    let mut terms: HashMap<Monomial<N>, F> = HashMap::with_capacity(occupied);
+    let mut terms: MonomialMap<N, F> =
+        MonomialMap::with_capacity_and_hasher(occupied, BuildMonomialHasher);
     let mut exponents = [0u32; N];
     let mut cursor = 0usize;
     for total in 0..=degree {
@@ -205,7 +207,7 @@ fn walk_simplex<const N: usize, F: FiniteField>(
     exponents: &mut [u32; N],
     cursor: &mut usize,
     slots: &[F],
-    terms: &mut HashMap<Monomial<N>, F>,
+    terms: &mut MonomialMap<N, F>,
 ) {
     if index == N - 1 {
         exponents[index] = remaining;
@@ -236,9 +238,10 @@ fn walk_simplex<const N: usize, F: FiniteField>(
 pub(crate) fn collect_box<const N: usize, F: FiniteField>(
     slots: &[F],
     index: &BoxIndex<N>,
-) -> HashMap<Monomial<N>, F> {
+) -> MonomialMap<N, F> {
     let occupied = slots.iter().filter(|c| !c.is_zero()).count();
-    let mut terms: HashMap<Monomial<N>, F> = HashMap::with_capacity(occupied);
+    let mut terms: MonomialMap<N, F> =
+        MonomialMap::with_capacity_and_hasher(occupied, BuildMonomialHasher);
     let mut exponents = [0u32; N];
     let mut cursor = 0usize;
     walk_box(
@@ -260,7 +263,7 @@ fn walk_box<const N: usize, F: FiniteField>(
     exponents: &mut [u32; N],
     cursor: &mut usize,
     slots: &[F],
-    terms: &mut HashMap<Monomial<N>, F>,
+    terms: &mut MonomialMap<N, F>,
 ) {
     if index == N {
         let coefficient = slots[*cursor];

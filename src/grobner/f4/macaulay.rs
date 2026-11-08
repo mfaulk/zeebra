@@ -6,12 +6,10 @@
 //! monomial, and the leftmost-first pivot rule of [`crate::linalg::sparse::row_echelon`] coincides
 //! with the monomial order. Nothing downstream has to translate between the two.
 
-use std::collections::{HashMap, HashSet};
-
 use crate::{
     grobner::f4::symbolic::{MonicBasis, Preprocessed, PreprocessedRow, RowKind},
     linalg::sparse::{SparseMatrix, SparseRow},
-    poly::MonomialOrder,
+    poly::{MonomialMap, MonomialOrder, MonomialSet},
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -69,7 +67,7 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
     ) -> Result<Self, BuildBudgetExceeded> {
         // The distinct monomials of every row, descending.
         let mut columns: Vec<Monomial<N>> = {
-            let mut distinct: HashSet<Monomial<N>> = HashSet::new();
+            let mut distinct: MonomialSet<N> = MonomialSet::default();
             let mut seen: Vec<Monomial<N>> = Vec::new();
             for row in &preprocessed.rows {
                 for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
@@ -85,7 +83,7 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         };
         columns.sort_by(|a, b| order.cmp(b, a));
 
-        let column_of: HashMap<Monomial<N>, usize> = columns
+        let column_of: MonomialMap<N, usize> = columns
             .iter()
             .enumerate()
             .map(|(index, monomial)| (*monomial, index))

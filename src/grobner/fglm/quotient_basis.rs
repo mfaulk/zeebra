@@ -8,7 +8,7 @@
 //!
 //! See `docs/MILESTONE-FGLM-SOLVING.md` §4 and §5 for the mathematics and the pseudocode.
 
-use std::collections::{HashMap, HashSet};
+use crate::poly::{MonomialMap, MonomialSet};
 
 use crate::{
     grobner::fglm::FglmError, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
@@ -111,7 +111,7 @@ pub struct QuotientBasis<const N: usize> {
     monomials: Vec<Monomial<N>>,
 
     /// The inverse of `monomials`, for the coordinate lookups that dominate M17-B and M17-C.
-    index: HashMap<Monomial<N>, usize>,
+    index: MonomialMap<N, usize>,
 
     order: MonomialOrder,
 }
@@ -197,7 +197,7 @@ fn enumerate_standard<const N: usize>(
     max_dimension: usize,
 ) -> Result<Vec<Monomial<N>>, FglmError> {
     let mut accepted: Vec<Monomial<N>> = Vec::new();
-    let mut seen: HashSet<Monomial<N>> = HashSet::from([Monomial::one()]);
+    let mut seen: MonomialSet<N> = MonomialSet::from_iter([Monomial::one()]);
     let mut frontier: Vec<Monomial<N>> = vec![Monomial::one()];
 
     while let Some(m) = frontier.pop() {

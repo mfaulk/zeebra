@@ -11,14 +11,15 @@
 //! growth the sum's own support needs. Addition being commutative, the borrowed/borrowed spelling
 //! clones the *larger* side and hashes the smaller.
 
-use std::{cmp::Ordering, collections::HashMap, ops, ops::Neg};
+use std::{cmp::Ordering, ops, ops::Neg};
 
 use crate::impl_mul_variants;
 
 use crate::{
     poly::{
         multivariate::{
-            sparse_multivariate_multiply, sparse_multivariate_polynomial::SparseMultiPoly,
+            monomial_hash::MonomialMap, sparse_multivariate_multiply,
+            sparse_multivariate_polynomial::SparseMultiPoly,
         },
         MonomialOrder,
     },
@@ -43,7 +44,7 @@ use crate::{
 /// entries, so the live set is bounded by the output; the same case then peaks at under a
 /// kilobyte. The amortised insert cost is unchanged, which is why this is not a trade.
 fn merge_terms<const N: usize, F: FiniteField>(
-    accumulator: &mut HashMap<Monomial<N>, F>,
+    accumulator: &mut MonomialMap<N, F>,
     terms: impl Iterator<Item = (Monomial<N>, F)>,
 ) {
     for (monomial, coefficient) in terms {

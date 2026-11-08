@@ -2209,6 +2209,20 @@ monomial whose coefficients cancel is dropped rather than kept at zero. Equality
 over that set, which is why the invariant is not cosmetic — a surviving zero term would make a
 polynomial unequal to its own canonical form.
 
+The map is keyed by `MonomialHasher`, not by the standard library's `SipHash-1-3`. A monomial is
+`[u32; N]` of small exponents produced by the computation itself, so resistance to adversarially
+chosen keys buys nothing and costs more per key than the arithmetic it guards; the replacement is a
+multiplicative word hash with a `splitmix64` finalizer, and `MonomialMap<N, V>` / `MonomialSet<N>`
+are the aliases that carry it. Two consequences worth stating. The finalizer is not optional —
+without it the low bits of a multiplicative accumulator depend only on the low bits of the key,
+which is exactly what `hashbrown` buckets on, and small exponent vectors collide in droves; the
+tests in `src/poly/multivariate/monomial_hash.rs` compare bucket spread and worst-case bucket load
+against the standard hasher on real Gröbner-basis supports so that cannot regress silently. And the
+hash carries no per-process seed, so iteration order of these maps is now a function of their keys
+alone. Nothing is supposed to depend on that order — the sites that must not sort instead — but a
+latent order-dependence that `RandomState` would have surfaced intermittently will now be
+reproducible rather than absent.
+
 ### Multiplication dispatches over four dense layouts and one hash route
 
 Multiplication collects as the products are formed, so the live set is bounded by the output rather

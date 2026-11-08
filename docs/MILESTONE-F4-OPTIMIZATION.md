@@ -948,8 +948,10 @@ Two details are load-bearing, and both were found by measuring rather than by re
 - **Without the finalizer it is twice as slow as SipHash.** The low bits of a multiplicative
   accumulator depend only on the low bits of the key, and `hashbrown` takes the bucket index from
   exactly those bits. Small exponent vectors collided enough to double the stage. Two shifts and a
-  multiply fix it. The tests in `src/poly/multivariate/monomial_hash.rs` compare bucket spread and
-  worst-case bucket load against the standard hasher so this cannot regress silently.
+  multiply fix it. The tests in `src/poly/multivariate/monomial_hash.rs` hold bucket spread and
+  worst-case bucket load to what a uniform hash would give, over real katsura supports and dense
+  simplices, so this cannot regress silently. The comparand is analytic rather than a live
+  `RandomState`, which is seeded per process and so makes the assertion itself random.
 - **A byte-at-a-time `write` is also slower than SipHash.** It is the hot path, because an integer
   array arrives as one byte slice: 28 rounds for a seven-variable monomial. Eight bytes at a time is
   the version that pays.

@@ -39,7 +39,7 @@
 //! * *An Algorithm for Splitting Polynomial Systems Based on F4*, PASCO 2017, for F4-style
 //!   preprocessing in support of quotient-algebra normal forms.
 
-use std::collections::HashMap;
+use crate::poly::MonomialMap;
 
 use crate::{
     grobner::{f4::MonicBasis, fglm::FglmError},
@@ -234,7 +234,7 @@ pub(super) struct Closure<const N: usize, F: FiniteField> {
     columns: Vec<Monomial<N>>,
 
     /// `column_of[m]` is `m`'s column index.
-    column_of: HashMap<Monomial<N>, usize>,
+    column_of: MonomialMap<N, usize>,
 
     /// For a reducible column, the reducer row leading at it, as `(column, coefficient)` pairs
     /// ascending by column. Monic at its leading column, which is the first entry.
@@ -297,7 +297,7 @@ pub(super) fn closure<const N: usize, F: FiniteField>(
 ) -> Result<Closure<N, F>, FglmError> {
     // Monomial -> the reducer multiple leading at it, before columns are numbered. A monomial with
     // no entry here is standard; a monomial absent from the map entirely has not been seen.
-    let mut reducer_of: HashMap<Monomial<N>, Option<Vec<(Monomial<N>, F)>>> = HashMap::new();
+    let mut reducer_of: MonomialMap<N, Option<Vec<(Monomial<N>, F)>>> = MonomialMap::default();
     let mut pending: Vec<Monomial<N>> = targets.to_vec();
     let mut rows = 0usize;
     let mut entries = 0usize;
@@ -363,7 +363,7 @@ pub(super) fn closure<const N: usize, F: FiniteField>(
     // a single forward pass suffices.
     let mut columns: Vec<Monomial<N>> = reducer_of.keys().copied().collect();
     columns.sort_by(|a, b| order.cmp(b, a));
-    let column_of: HashMap<Monomial<N>, usize> = columns
+    let column_of: MonomialMap<N, usize> = columns
         .iter()
         .enumerate()
         .map(|(index, monomial)| (*monomial, index))
