@@ -1793,6 +1793,17 @@ reaching parity in cache only to lose 7-11% out of it. Eight elements is exactly
 line at 8 bytes apiece, which is the obvious reading of why the wider tiles fall off and not one
 these measurements establish.
 
+**The `i` dimension is exhausted at 2.** Hand-written 4x8 and 4x4 tiles were measured against the
+shipped kernel and both lose: 4x8 by 0.977-1.012x in cache and **0.497x on the 128 MiB arm**, where
+32 live accumulators against 16 general-purpose registers spill and the halved right-operand traffic
+does not pay for it, and 4x4 by 0.969-1.015x — parity at best, 2.4% behind at square n=128. 4x4
+holds the row count and the operand walk fixed while halving the accumulators, so it is the control
+that pins the collapse on register pressure rather than on the extra rows.
+[`docs/research/matmul-register-tiling.md`](docs/research/matmul-register-tiling.md) collects every
+tile shape ever swept for this operator in one table, with the load each figure was taken under; it
+also records why a figure taken from a generically-indexed template measures the template and not
+the shape.
+
 The kernel is **ALU-bound at every footprint** — the §8.2 signature in
 [`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md), reached from the other
 side — though less perfectly than `ikj` was: 117-127 ms across a working set spanning three orders
