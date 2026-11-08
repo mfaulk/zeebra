@@ -50,6 +50,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -90,6 +92,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -147,6 +151,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -189,6 +195,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -224,6 +232,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -276,6 +286,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -321,6 +333,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -375,6 +389,8 @@
       "source": "MILESTONE-PUBLISHED-ATTACK-REPRODUCTION.md 10.1",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -447,6 +463,8 @@
       "source": "docs/research/resultant-elimination.md 6.8 (#243)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -492,6 +510,8 @@
       "source": "docs/research/resultant-elimination.md 6.8 (#243)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -552,6 +572,8 @@
       "source": "docs/research/resultant-elimination.md 6.8 (#243)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -654,6 +676,8 @@
       "source": "docs/research/f4-resource-scaling.md 9.2 (#237)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -701,6 +725,8 @@
       "source": "docs/research/f4-resource-scaling.md 9.2 (#237)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -775,6 +801,8 @@
       "source": "docs/research/f4-resource-scaling.md 9.3 (#237)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -847,6 +875,8 @@
       "source": "docs/research/resultant-elimination.md 6.9 (#289)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -908,6 +938,8 @@
       "source": "docs/research/resultant-elimination.md 6.9 (#289)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -970,6 +1002,8 @@
       "source": "docs/research/resultant-elimination.md 6.9 (#289)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -1023,6 +1057,8 @@
       "source": "docs/research/resultant-elimination.md 6.9 (#289)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -1077,6 +1113,8 @@
       "source": "docs/research/resultant-elimination.md 6.9 (#289)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -1135,6 +1173,8 @@
       "source": "docs/research/resultant-elimination.md 6.9 (#289)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 32,
@@ -1193,6 +1233,8 @@
       "source": "docs/research/resultant-elimination.md 6.12 (#243, merged)",
       "environment": {
         "commit": "",
+        "base_commit": "",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 logical",
         "concurrency": 1,
@@ -1246,6 +1288,8 @@
       "source": "docs/research/resultant-elimination.md 6.13 (#318, #319)",
       "environment": {
         "commit": "93bb1c2",
+        "base_commit": "93bb1c2",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 physical, 128 logical, 8 CCDs x 32 MB L3, 512 kB L2 a core",
         "concurrency": 1,
@@ -1307,6 +1351,8 @@
       "source": "docs/research/resultant-elimination.md 6.13 (#318, #319)",
       "environment": {
         "commit": "93bb1c2",
+        "base_commit": "93bb1c2",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "64 physical, 128 logical, 8 CCDs x 32 MB L3, 512 kB L2 a core",
         "concurrency": 32,

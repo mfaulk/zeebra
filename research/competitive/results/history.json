@@ -21,6 +21,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -79,6 +81,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -136,6 +140,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -199,6 +205,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -257,6 +265,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -321,6 +331,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -384,6 +396,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -448,6 +462,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -507,6 +523,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -580,6 +598,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -652,6 +672,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -717,6 +739,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -777,6 +801,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -869,6 +895,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -960,6 +988,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1026,6 +1056,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1087,6 +1119,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1140,6 +1174,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1196,6 +1232,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1238,6 +1276,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1283,6 +1323,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1354,6 +1396,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1424,6 +1468,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1494,6 +1540,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1559,6 +1607,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1655,6 +1705,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1750,6 +1802,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1826,6 +1880,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1897,6 +1953,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -1985,6 +2043,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2072,6 +2132,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2137,6 +2199,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2197,6 +2261,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2495,6 +2561,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2792,6 +2860,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2861,6 +2931,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2925,6 +2997,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -2967,6 +3041,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3003,6 +3079,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3045,6 +3123,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3081,6 +3161,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3141,6 +3223,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3200,6 +3284,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3265,6 +3351,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3325,6 +3413,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3391,6 +3481,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3456,6 +3548,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3525,6 +3619,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3589,6 +3685,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3661,6 +3759,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3732,6 +3832,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3778,6 +3880,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3846,6 +3950,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3908,6 +4014,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -3969,6 +4077,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4033,6 +4143,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4092,6 +4204,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4213,6 +4327,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4333,6 +4449,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4399,6 +4517,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4460,6 +4580,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4613,6 +4735,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4765,6 +4889,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4833,6 +4959,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4896,6 +5024,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4950,6 +5080,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -4986,6 +5118,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5047,6 +5181,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5083,6 +5219,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5146,6 +5284,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5182,6 +5322,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5245,6 +5387,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "663097a",
+        "base_commit": "663097a",
+        "patch_id": "",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5281,6 +5425,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5341,6 +5487,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5398,6 +5546,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5482,6 +5632,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5546,6 +5698,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5603,6 +5757,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5668,6 +5824,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5726,6 +5884,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5762,6 +5922,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5798,6 +5960,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5852,6 +6016,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5918,6 +6084,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -5981,6 +6149,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6071,6 +6241,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6141,6 +6313,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6204,6 +6378,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6270,6 +6446,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6329,6 +6507,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6365,6 +6545,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6401,6 +6583,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6456,6 +6640,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6531,6 +6717,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6603,6 +6791,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6702,6 +6892,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6781,6 +6973,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6853,6 +7047,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6920,6 +7116,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -6980,6 +7178,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7016,6 +7216,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7052,6 +7254,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7108,6 +7312,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7202,6 +7408,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7293,6 +7501,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7411,6 +7621,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7509,6 +7721,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7600,6 +7814,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7668,6 +7884,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7729,6 +7947,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7765,6 +7985,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7801,6 +8023,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7858,6 +8082,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7913,6 +8139,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -7969,6 +8197,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8053,6 +8283,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8116,6 +8348,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8172,6 +8406,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8216,6 +8452,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8252,6 +8490,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8288,6 +8528,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8324,6 +8566,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8363,6 +8607,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8436,6 +8682,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8506,6 +8754,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8603,6 +8853,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8680,6 +8932,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8750,6 +9004,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8822,6 +9078,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8887,6 +9145,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8923,6 +9183,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -8959,6 +9221,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9020,6 +9284,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9118,6 +9384,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9213,6 +9481,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9335,6 +9605,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9437,6 +9709,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9532,6 +9806,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9610,6 +9886,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9681,6 +9959,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9717,6 +9997,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9753,6 +10035,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9820,6 +10104,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9910,6 +10196,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -9997,6 +10285,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10111,6 +10401,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10205,6 +10497,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10292,6 +10586,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10359,6 +10655,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10419,6 +10717,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10455,6 +10755,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10491,6 +10793,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10547,6 +10851,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -10847,6 +11153,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -11144,6 +11452,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -11468,6 +11778,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -11772,6 +12084,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12069,6 +12383,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12140,6 +12456,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12204,6 +12522,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12240,6 +12560,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12276,6 +12598,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12336,6 +12660,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12380,6 +12706,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12416,6 +12744,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12454,6 +12784,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12493,6 +12825,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12532,6 +12866,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12576,6 +12912,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12612,6 +12950,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12648,6 +12988,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12684,6 +13026,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12723,6 +13067,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12785,6 +13131,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12844,6 +13192,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12930,6 +13280,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -12996,6 +13348,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13055,6 +13409,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13122,6 +13478,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13182,6 +13540,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13218,6 +13578,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13254,6 +13616,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13310,6 +13674,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13378,6 +13744,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13443,6 +13811,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13535,6 +13905,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13607,6 +13979,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13672,6 +14046,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13743,6 +14119,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13807,6 +14185,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13843,6 +14223,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13879,6 +14261,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -13939,6 +14323,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14013,6 +14399,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14084,6 +14472,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14182,6 +14572,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14260,6 +14652,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14331,6 +14725,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14379,6 +14775,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14447,6 +14845,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14483,6 +14883,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14519,6 +14921,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14583,6 +14987,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14647,6 +15053,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14708,6 +15116,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14796,6 +15206,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14864,6 +15276,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14925,6 +15339,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -14991,6 +15407,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15050,6 +15468,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15086,6 +15506,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15122,6 +15544,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15177,6 +15601,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15300,6 +15726,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15420,6 +15848,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15567,6 +15997,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15694,6 +16126,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15814,6 +16248,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15882,6 +16318,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15943,6 +16381,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -15979,6 +16419,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16015,6 +16457,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16072,6 +16516,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16227,6 +16673,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16379,6 +16827,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16558,6 +17008,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16717,6 +17169,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16869,6 +17323,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -16939,6 +17395,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17002,6 +17460,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17038,6 +17498,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17074,6 +17536,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17133,6 +17597,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17189,6 +17655,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17225,6 +17693,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17261,6 +17731,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17321,6 +17793,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17357,6 +17831,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17420,6 +17896,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17456,6 +17934,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17492,6 +17972,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17528,6 +18010,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17564,6 +18048,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17629,6 +18115,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17665,6 +18153,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17701,6 +18191,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17770,6 +18262,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17806,6 +18300,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17871,6 +18367,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17907,6 +18405,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17943,6 +18443,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -17979,6 +18481,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "7adb29e",
+        "base_commit": "7ab1e86",
+        "patch_id": "b2b959eaed689079fb7c88ff3095dbef54a4c756",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18015,6 +18519,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "a904145",
+        "base_commit": "6e67953",
+        "patch_id": "b0855cb27e701184ba38a030612d369fe12dc2d7",
         "machine": "fedora",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity unset",
         "concurrency": 1,
@@ -18059,6 +18565,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "a904145",
+        "base_commit": "6e67953",
+        "patch_id": "b0855cb27e701184ba38a030612d369fe12dc2d7",
         "machine": "fedora",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity unset",
         "concurrency": 1,
@@ -18095,6 +18603,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "a904145",
+        "base_commit": "6e67953",
+        "patch_id": "b0855cb27e701184ba38a030612d369fe12dc2d7",
         "machine": "fedora",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity unset",
         "concurrency": 1,
@@ -18131,6 +18641,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "a904145",
+        "base_commit": "6e67953",
+        "patch_id": "b0855cb27e701184ba38a030612d369fe12dc2d7",
         "machine": "fedora",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity unset",
         "concurrency": 1,
@@ -18167,6 +18679,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "a904145",
+        "base_commit": "6e67953",
+        "patch_id": "b0855cb27e701184ba38a030612d369fe12dc2d7",
         "machine": "fedora",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity unset",
         "concurrency": 1,
@@ -18203,6 +18717,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18263,6 +18779,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18320,6 +18838,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18404,6 +18924,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18468,6 +18990,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18525,6 +19049,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18590,6 +19116,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18648,6 +19176,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18684,6 +19214,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18720,6 +19252,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18774,6 +19308,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18840,6 +19376,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18903,6 +19441,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -18993,6 +19533,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19063,6 +19605,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19126,6 +19670,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19192,6 +19738,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19251,6 +19799,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19287,6 +19837,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19323,6 +19875,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19378,6 +19932,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19453,6 +20009,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19525,6 +20083,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19624,6 +20184,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19703,6 +20265,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19775,6 +20339,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19842,6 +20408,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19902,6 +20470,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19938,6 +20508,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -19974,6 +20546,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20030,6 +20604,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20124,6 +20700,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20215,6 +20793,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20333,6 +20913,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20431,6 +21013,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20522,6 +21106,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20590,6 +21176,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20651,6 +21239,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20687,6 +21277,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20723,6 +21315,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20780,6 +21374,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20835,6 +21431,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20891,6 +21489,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -20975,6 +21575,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21038,6 +21640,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21094,6 +21698,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21138,6 +21744,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21174,6 +21782,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21210,6 +21820,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21246,6 +21858,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21282,6 +21896,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21355,6 +21971,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21425,6 +22043,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21522,6 +22142,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21599,6 +22221,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21669,6 +22293,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21741,6 +22367,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21806,6 +22434,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21842,6 +22472,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21878,6 +22510,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -21939,6 +22573,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22037,6 +22673,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22132,6 +22770,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22254,6 +22894,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22356,6 +22998,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22451,6 +23095,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22529,6 +23175,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22600,6 +23248,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22636,6 +23286,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22672,6 +23324,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22739,6 +23393,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22829,6 +23485,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -22916,6 +23574,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23030,6 +23690,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23124,6 +23786,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23211,6 +23875,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23278,6 +23944,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23338,6 +24006,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23374,6 +24044,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23410,6 +24082,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23466,6 +24140,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -23766,6 +24442,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -24063,6 +24741,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -24387,6 +25067,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -24691,6 +25373,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -24988,6 +25672,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25059,6 +25745,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25123,6 +25811,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25159,6 +25849,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25195,6 +25887,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25255,6 +25949,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25299,6 +25995,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25335,6 +26033,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25373,6 +26073,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25412,6 +26114,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25451,6 +26155,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25495,6 +26201,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25531,6 +26239,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25567,6 +26277,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25603,6 +26315,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25642,6 +26356,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25704,6 +26420,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25763,6 +26481,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25849,6 +26569,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25915,6 +26637,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -25974,6 +26698,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26041,6 +26767,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26101,6 +26829,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26137,6 +26867,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26173,6 +26905,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26229,6 +26963,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26297,6 +27033,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26362,6 +27100,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26454,6 +27194,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26526,6 +27268,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26591,6 +27335,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26662,6 +27408,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26726,6 +27474,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26762,6 +27512,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26798,6 +27550,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26858,6 +27612,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -26932,6 +27688,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27003,6 +27761,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27101,6 +27861,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27179,6 +27941,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27250,6 +28014,8 @@
       "library_version": "zeebra 0.1.0 (in-process, same build as the harness)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27298,6 +28064,8 @@
       "library_version": "singular build 44105 (44105)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27366,6 +28134,8 @@
       "library_version": "msolve 0.11.0",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27402,6 +28172,8 @@
       "library_version": "groebner.jl 0.10.11 (julia 1.11.7)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,
@@ -27438,6 +28210,8 @@
       "library_version": "sagebrush sagebrush-mpoly f4::groebner_p (86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b)",
       "environment": {
         "commit": "87a807e",
+        "base_commit": "5398c83",
+        "patch_id": "a7f82d37d07003207b961cb1dbe37969d67f93c2",
         "machine": "workstation",
         "cpu": "AMD Ryzen Threadripper PRO 5995WX 64-Cores, affinity 0-7",
         "concurrency": 1,

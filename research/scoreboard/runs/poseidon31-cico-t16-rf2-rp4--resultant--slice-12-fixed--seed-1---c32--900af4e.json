@@ -62,6 +62,8 @@
   "campaign": null,
   "environment": {
     "commit": "900af4e",
+    "base_commit": "900af4e",
+    "patch_id": "",
     "machine": "fedora",
     "cpu": "32 logical, affinity 0-31",
     "concurrency": 32,

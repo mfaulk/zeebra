@@ -445,13 +445,6 @@ fn append(board: &CompetitiveBoard) {
 /// `Environment::policy` carries the limits summary, which is what makes two rows comparable or
 /// not: `Environment::comparable` is half of `CompetitiveRecord::comparable_with`.
 fn detect_environment(wall: Duration, measure: bool) -> Environment {
-    let commit = std::process::Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
     let machine = std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| {
         std::process::Command::new("hostname")
             .output()
@@ -472,7 +465,6 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
     let affinity = std::env::var("ZEEBRA_AFFINITY").unwrap_or_else(|_| "unset".to_string());
 
     Environment {
-        commit,
         machine,
         cpu: format!("{}, affinity {}", cpu, affinity),
         // One worker throughout. A cross-concurrency ratio is refused by the board, so a sweep
@@ -497,5 +489,9 @@ fn detect_environment(wall: Duration, measure: bool) -> Environment {
                 "many rows per process (no memory figure)"
             }
         ),
+        // The commit, the merge base it was cut from and the patch id of the delta between them.
+        // A sweep is run on a branch and merged, so the commit alone dangles — which is exactly
+        // what happened to three of this board's four cohorts (#505).
+        ..Environment::from_git()
     }
 }

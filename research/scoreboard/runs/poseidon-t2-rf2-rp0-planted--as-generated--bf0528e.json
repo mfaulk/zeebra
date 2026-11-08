@@ -68,6 +68,8 @@
   "campaign": null,
   "environment": {
     "commit": "bf0528e",
+    "base_commit": "bf0528e",
+    "patch_id": "",
     "machine": "fedora",
     "cpu": "8 logical, affinity 0-7",
     "build": "release, RUSTFLAGS=default",

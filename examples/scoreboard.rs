@@ -1495,13 +1495,6 @@ fn resource_of(error: &zeebra::grobner::F4Error) -> String {
 /// `git rev-parse` rather than a build-time constant: this is an example, and a comparison needs
 /// to know which tree produced the number more than it needs to avoid a subprocess.
 fn detect_environment() -> Environment {
-    let commit = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
     let machine = std::env::var("ZEEBRA_MACHINE").unwrap_or_else(|_| {
         Command::new("hostname")
             .output()
@@ -1511,7 +1504,6 @@ fn detect_environment() -> Environment {
             .unwrap_or_else(|| "unknown".to_string())
     });
     Environment {
-        commit,
         machine,
         cpu: format!(
             "{} logical, affinity {}",
@@ -1533,6 +1525,9 @@ fn detect_environment() -> Environment {
             std::env::var("RUSTFLAGS").unwrap_or_else(|_| "default".to_string())
         ),
         policy: policy(),
+        // The commit, the merge base it was cut from and the patch id of the delta between them,
+        // so the stamp outlives a merge that rewrites this branch's history (#505).
+        ..Environment::from_git()
     }
 }
 

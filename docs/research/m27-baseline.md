@@ -512,6 +512,35 @@ corroborates the zeebra and singular sides to 1.1% — but **"re-measure at `7ad
 instruction anyone can now carry out.** Filed as a follow-up; the fix is for the sweep to record a
 commit reachable from the branch it will merge to, or to re-stamp on merge.
 
+**Resolved (#505), and resolved for the rows already on record.** Every row now carries two more
+fields beside `commit`:
+
+| field | what it is | why it cannot dangle |
+|---|---|---|
+| `base_commit` | `git merge-base HEAD origin/main` | a merge base is an ancestor of `main` and nothing can make it stop being one |
+| `patch_id` | `git patch-id --stable` over `base_commit..commit` | a function of the **diff**, so a reader recomputes it over a candidate range rather than needing the object to have survived |
+
+`Environment::stamp_is_resolvable` is the criterion, and two tests assert it over the committed
+files — one per board — so a sweep cannot reintroduce the defect. The three unreachable cohorts were
+stamped retroactively, which was possible only because their commit objects still existed in a local
+checkout; `commit` was left exactly as recorded rather than overwritten:
+
+| cohort | base, on `main` | patch id |
+|---|---|---|
+| `7adb29e` | `7ab1e86` | `b2b959eaed68…` |
+| `87a807e` | `5398c83` | `a7f82d37d070…` |
+| `a904145` | `6e67953` | `b0855cb27e70…` |
+
+A **second instance** turned up on the cryptanalysis side while fixing this one: `1409a48`, two runs
+in `research/scoreboard/results/history.json`, likewise unreachable, base `1985504`. Both boards
+share one `Environment`, so both are fixed by the same change. The 23 cost-model rows #294
+transcribed carry an empty `commit` and remain unresolvable — that is #335's backlog, not this
+defect: nothing was lost by a merge, the commit was never written down.
+
+Note what a patch id does and does not buy. It identifies *what was measured*; it does not resurrect
+a deleted object. A reader who wants the exact tree checks out `base_commit` and then looks for the
+range on `main` whose patch id matches — which is a procedure, where before there was none.
+
 ---
 
 ## 6. The #318/#319 systematic, bounded — and narrowed by the competitive cohorts
