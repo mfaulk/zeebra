@@ -1730,12 +1730,23 @@ impl Scoreboard {
             out.push_str(
                 "A higher degree is **not** nearer a solution: this table is a diagnostic, not a \
                  progress bar. Each row names the bound that bound, the degree reached, and the \
-                 last stage that completed.\n\n",
+                 last stage that completed.\n\nOne row per distinct rendering, not per run: \
+                 repeated runs of the same problem differ in commit and elapsed time, and this \
+                 table has a column for neither, so `runs` says how many a row stands for and \
+                 `commits` says where they were taken. A row reading `3` is three runs that \
+                 agreed, not one run recorded three times.\n\n",
             );
             out.push_str(
-                "| problem | formulation | outcome | deg | last deg done | max cols | peak MB |\n\
-                 |---|---|---|---:|---:|---:|---:|\n",
+                "| problem | formulation | outcome | deg | last deg done | max cols | peak MB | \
+                 runs | commits |\n\
+                 |---|---|---|---:|---:|---:|---:|---:|---|\n",
             );
+            // Runs whose every rendered column agrees are one row carrying their count, and the
+            // commits they were taken at are what distinguishes them (#506). Repeats are real —
+            // three `poseidon-t3-rf2-rp1-planted` runs differ in commit and elapsed time, neither
+            // of which this table has a column for — so they are counted rather than dropped, and
+            // a reader tallying stopped runs off the table cannot overcount.
+            let mut rows: Vec<(String, usize, Vec<&str>)> = Vec::new();
             for run in unfinished {
                 // A campaign summary is a tally over its slices and has no matrix of its own, so
                 // there is nothing to put in these four columns. An em dash rather than a zero
@@ -1753,12 +1764,42 @@ impl Scoreboard {
                     ),
                     None => "— | — | — | —".to_string(),
                 };
-                out.push_str(&format!(
-                    "| `{}` | {} | {} | {} |\n",
+                let rendered = format!(
+                    "| `{}` | {} | {} | {} |",
                     run.challenge,
                     run.formulation,
                     run.outcome.short(),
                     figures,
+                );
+                let commit = run.environment.commit.trim();
+                match rows.iter_mut().find(|(text, _, _)| *text == rendered) {
+                    Some((_, count, commits)) => {
+                        *count += 1;
+                        if !commit.is_empty() && !commits.contains(&commit) {
+                            commits.push(commit);
+                        }
+                    }
+                    None => rows.push((
+                        rendered,
+                        1,
+                        if commit.is_empty() {
+                            Vec::new()
+                        } else {
+                            vec![commit]
+                        },
+                    )),
+                }
+            }
+            for (rendered, count, commits) in rows {
+                out.push_str(&format!(
+                    "{} {} | {} |\n",
+                    rendered,
+                    count,
+                    if commits.is_empty() {
+                        "—".to_string()
+                    } else {
+                        commits.join(", ")
+                    },
                 ));
             }
             out.push('\n');
@@ -2551,6 +2592,148 @@ mod tests {
         assert!(markdown.contains("stopped: max_matrix_columns at degree 11"));
     }
 
+    /// The data rows of the "where the unfinished runs stopped" table, and nothing else.
+    ///
+    /// Filtering the whole document on a challenge id would also match that problem's row in the
+    /// registry table above, so the section is sliced out first.
+    fn unfinished_rows(markdown: &str) -> Vec<&str> {
+        markdown
+            .split("## Where the unfinished runs stopped")
+            .nth(1)
+            .expect("the section renders")
+            .lines()
+            .take_while(|l| !l.starts_with("## "))
+            .filter(|l| l.starts_with("| `"))
+            .collect()
+    }
+
+    /// Repeated runs of one problem collapse to one row carrying the count and the commits.
+    ///
+    /// Three runs of `poseidon-t3-rf2-rp1-planted` rendered three byte-identical rows (#506),
+    /// because the table's columns omit the two fields that distinguish them — the commit and the
+    /// elapsed time — so a reader tallying stopped runs off the table overcounted. The runs are
+    /// real and must not be dropped: the row says how many there were and which commits they were
+    /// taken at.
+    #[test]
+    fn test_repeated_unfinished_runs_render_as_one_row_with_a_count() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+        for commit in ["744fdf9", "7e333fb", "7e333fb"] {
+            let manifest = challenge("poseidon-t3-rf2-rp1-planted").expect("registered");
+            let mut run = RunRecord::new(&manifest, "as generated");
+            run.outcome = RunOutcome::StoppedAtLimit(Limit {
+                resource: "max_matrix_columns".to_string(),
+                detail: "the column budget of 60000 was crossed".to_string(),
+                degree: Some(11),
+                last_completed_stage: Stage::Grobner,
+            });
+            run.frontier = Some(GrobnerFrontier {
+                max_pair_degree: 11,
+                highest_completed_degree: Some(10),
+                max_matrix_columns: 42_229,
+                peak_estimated_bytes: 155_300_000,
+                ..GrobnerFrontier::default()
+            });
+            run.environment = Environment {
+                commit: commit.to_string(),
+                ..environment()
+            };
+            board.add(run, &registry).expect("registered");
+        }
+        assert_eq!(board.unfinished().len(), 3, "three runs are retained");
+
+        let markdown = board.to_markdown(&registry);
+        let rows = unfinished_rows(&markdown);
+        assert_eq!(rows.len(), 1, "one row for three identical renderings");
+        assert!(
+            rows[0].contains("| 3 |"),
+            "the row states how many runs it stands for: {}",
+            rows[0]
+        );
+        // First-seen order, not sorted: it is the order the history holds them in.
+        assert!(
+            rows[0].contains("744fdf9, 7e333fb"),
+            "the row names the distinct commits: {}",
+            rows[0]
+        );
+    }
+
+    /// Two runs that disagree stay two rows, distinguished by the commit they were taken at.
+    ///
+    /// The other half of #506: `slice(12 fixed, seed 0)` on `poseidon31-cico-t16-rf2-rp0` appears
+    /// twice with identical matrix figures and **different outcomes** — `basis_only` at `3fe69c6`
+    /// and `slice_established_nothing` at `7e333fb`, the same computation under a later and more
+    /// precise verdict. Collapsing those would assert they were one run; leaving them unlabelled
+    /// left a reader with two contradictory rows and no way to order them.
+    #[test]
+    fn test_unfinished_runs_that_disagree_are_kept_apart_by_commit() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+        for (commit, resource) in [
+            ("3fe69c6", "basis only, no witness"),
+            (
+                "7e333fb",
+                "the slice is empty, which says nothing about the problem",
+            ),
+        ] {
+            let manifest = challenge("poseidon31-cico-t16-rf2-rp0").expect("registered");
+            let mut run = RunRecord::new(&manifest, "slice(12 fixed, seed 0)");
+            run.outcome = RunOutcome::StoppedAtLimit(Limit {
+                resource: resource.to_string(),
+                detail: "recorded verdict".to_string(),
+                degree: Some(4),
+                last_completed_stage: Stage::Grobner,
+            });
+            run.frontier = Some(GrobnerFrontier {
+                max_pair_degree: 4,
+                highest_completed_degree: Some(4),
+                max_matrix_columns: 17_424,
+                peak_estimated_bytes: 102_778_752,
+                ..GrobnerFrontier::default()
+            });
+            run.environment = Environment {
+                commit: commit.to_string(),
+                ..environment()
+            };
+            board.add(run, &registry).expect("registered");
+        }
+
+        let markdown = board.to_markdown(&registry);
+        let rows = unfinished_rows(&markdown);
+        assert_eq!(rows.len(), 2, "two verdicts are two rows");
+        assert!(rows[0].contains("3fe69c6") && rows[1].contains("7e333fb"));
+        assert!(
+            rows.iter().all(|r| r.contains("| 1 |")),
+            "each stands for one run: {:?}",
+            rows
+        );
+    }
+
+    /// A run whose environment records no commit renders an em dash rather than an empty cell.
+    #[test]
+    fn test_an_unfinished_run_without_a_commit_renders_a_dash() {
+        let registry = registry();
+        let mut board = Scoreboard::new();
+        let manifest = challenge("poseidon-t3-rf2-rp1-planted").expect("registered");
+        let mut run = RunRecord::new(&manifest, "as generated");
+        run.outcome = RunOutcome::StoppedAtLimit(Limit {
+            resource: "max_matrix_columns".to_string(),
+            detail: "crossed".to_string(),
+            degree: Some(11),
+            last_completed_stage: Stage::Grobner,
+        });
+        run.environment = Environment {
+            commit: String::new(),
+            ..environment()
+        };
+        board.add(run, &registry).expect("registered");
+
+        let markdown = board.to_markdown(&registry);
+        let rows = unfinished_rows(&markdown);
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].ends_with("| 1 | — |"), "got {}", rows[0]);
+    }
+
     /// A record with no Gröbner frontier renders dashes, not zeros.
     ///
     /// A campaign summary is a tally over its slices and has no matrix of its own, so
@@ -2582,8 +2765,9 @@ mod tests {
             .lines()
             .find(|l| l.contains("campaign over 1 slices"))
             .expect("the campaign row is rendered");
+        // The four figure columns, then the run count and the commit the run was taken at.
         assert!(
-            row.ends_with("| — | — | — | — |"),
+            row.ends_with("| — | — | — | — | 1 | deadbeef |"),
             "a row with no frontier must not report figures: {}",
             row
         );
