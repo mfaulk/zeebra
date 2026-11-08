@@ -1834,6 +1834,18 @@ What is left:
   small ones and construction's per-matrix cost (the monomial-to-column `HashMap`, the sort) does
   not shrink with the matrix.
 
+  **Superseded by #330** (at `dbab79eb`), which re-measured both shares and acted on them. The
+  share above survived #471, #477, #536 and #555: **derived** at ~46% of katsura-6 lex and ~48% of
+  cyclic-5 lex as #330 opened — the post-change stage table plus the A/B's construction delta, not
+  a pre-change end-to-end run — even though the absolute times had fallen. So the diagnosis held.
+  The attributed *cause* did not. Splitting the stage four ways put the
+  `HashMap` named above at **1%** of construction and the sort at 2%; the cost was the
+  distinct-monomial set, which was re-deriving a set symbolic preprocessing had already interned.
+  Construction now reads that set instead, which halves the stage (1.76x–1.98x, measured one
+  process one build) and leaves it at 33% of katsura-6 lex and 33% of cyclic-5 lex — no longer the
+  largest stage on either. 89% of what remains is the row scatter. The full split, both arms, and
+  the reason the sort got *slower* are in `research/msolve-implementation.md` §4.1 under H1.
+
 Both are consequences of succeeding elsewhere, which is the normal shape of a performance
 milestone and the reason the stage breakdown was built in M16-0 rather than inferred at the end.
 
