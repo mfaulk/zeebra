@@ -200,11 +200,7 @@ mod tests {
             &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(Zp65537::new),
         );
 
-        let expected = Matrix::new(
-            2,
-            4,
-            &[38, 44, 50, 56, 83, 98, 113, 128].map(Zp65537::new),
-        );
+        let expected = Matrix::new(2, 4, &[38, 44, 50, 56, 83, 98, 113, 128].map(Zp65537::new));
 
         assert_eq!(&a * &b, expected);
     }
