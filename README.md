@@ -2320,12 +2320,18 @@ the one case that would be ambiguous: `a += &a` does not compile, because `&mut 
 coexist. Self-assignment is therefore spelled through a clone — `a += a.clone()` doubles, and
 `a -= a.clone()` is the empty polynomial, not a map full of zeros.
 
-What this buys is measured in `tests/multivariate_add_memory.rs`, which asserts it rather than
-quoting it. Summing two 11 476-term triangles that cancel to a single term allocates **0 bytes**
-against **594 944** for the form that materialized every term, because every merge lands on a
-monomial already present and the table never grows — the live set is the output. Folding eight
-scaled words into one accumulator peaks at **43 312 bytes** against **84 448**; there the output
-has to be allocated, so the 2x is all there is to win.
+What this buys is measured in `tests/multivariate_add_memory.rs` and
+`tests/multivariate_mds_fold_memory.rs`, which assert it rather than quoting it. Summing two
+11 476-term triangles that cancel to a single term allocates **0 bytes** against **594 944** for
+the form that materialized every term, because every merge lands on a monomial already present and
+the table never grows — the live set is the output. Folding eight scaled words into one accumulator
+peaks at **43 312 bytes** against **84 448**; there the output has to be allocated, so the 2x is
+all there is to win.
+
+They are two binaries rather than two tests because the peak is read off a process-wide tracking
+`#[global_allocator]`: any allocation anywhere in the process raises it, so a second test's operand
+construction lands in the first test's measurement whatever lock guards the measured region. One
+test per binary is the only arrangement that makes the counters mean what they say.
 
 ### GCD, content, and squarefree decomposition
 
