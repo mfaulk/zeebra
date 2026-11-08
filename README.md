@@ -714,12 +714,16 @@ at every size; `mul_dense` builds the dense total-degree simplex, which is what 
 resultant build actually produces and what selects the specialised bivariate multiplication route.
 An arm of only the first kind cannot catch a wrong dispatch predicate.
 
-`sparse_linear_algebra` has two groups, and the difference between them matters. `sparse_linalg`
+`sparse_linear_algebra` has three groups, and the differences between them matter. `sparse_linalg`
 times sparse row echelon beside dense *reduced* row echelon, which performs a back-substitution
 pass the sparse side never does; it is indicative of nothing about storage and is kept only for
 continuity. `matched_echelon` runs the identical algorithm under each `linalg::echelon` backend on
 identical matrices, and times densification and sparsification in their own benchmark, so the
-comparison measures representation rather than algorithm or conversion.
+comparison measures representation rather than algorithm or conversion. `sparse_rref` times
+`linalg::sparse::reduced_row_echelon`, whose back-substitution pass neither of the others covers,
+on two shapes that answer different questions: a random square matrix, which at low density fills
+in until it is near-dense and leaves the pass nothing to skip, and a banded matrix, which stays
+sparse throughout and is where skipping is worth anything.
 
 `f4_stages` times F4's stages separately — symbolic preprocessing, matrix construction,
 elimination under each backend, representation conversion, and a whole batch — replaying the

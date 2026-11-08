@@ -7,11 +7,12 @@
 //!
 //! Matrices are generated from a fixed seed, so runs are comparable.
 //!
-//! Two groups, and the difference between them is the point. `sparse_linalg` compares sparse row
-//! echelon against dense *reduced* row echelon, which does a second back-substitution pass the
-//! sparse side never does — indicative, and not evidence about storage. `matched_echelon` runs the
-//! identical algorithm under each backend of `linalg::echelon` and times the representation
-//! conversion in its own benchmark, which is the comparison a crossover can be read off.
+//! Three groups. `sparse_linalg` compares sparse row echelon against dense *reduced* row echelon,
+//! which does a second back-substitution pass the sparse side never does — indicative, and not
+//! evidence about storage. `matched_echelon` runs the identical algorithm under each backend of
+//! `linalg::echelon` and times the representation conversion in its own benchmark, which is the
+//! comparison a crossover can be read off. `sparse_rref` measures the sparse reduced form, whose
+//! second pass neither of the others covers.
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use rand::{prelude::StdRng, Rng, SeedableRng};
@@ -19,7 +20,7 @@ use zeebra::{
     fields::Zp2147483647,
     linalg::{
         gauss_jordan_elimination, row_echelon_with,
-        sparse::{row_echelon, SparseMatrix, SparseRow},
+        sparse::{reduced_row_echelon, row_echelon, SparseMatrix, SparseRow},
         Backend, DenseRows, Matrix,
     },
     FiniteField,
@@ -122,7 +123,84 @@ fn benches(c: &mut Criterion) {
 }
 
 criterion_group!(sparse_linear_algebra, benches);
-criterion_main!(sparse_linear_algebra, matched);
+criterion_main!(sparse_linear_algebra, matched, rref);
+
+// ---------------------------------------------------------------------------------------------
+// The reduced form, which is a second pass the groups above do not measure.
+//
+// Back-substitution's cost is set by how many rows actually hold each pivot column, so the two
+// shapes below answer different questions. A random square matrix at low density fills in until it
+// is near-dense, by which point every row holds every pivot column and there is nothing to skip; a
+// banded matrix stays sparse through the elimination, and is where an index over the pivot columns
+// has something to save.
+// ---------------------------------------------------------------------------------------------
+
+/// A banded matrix: every entry within `bandwidth / 2` columns of the diagonal.
+///
+/// Gaussian elimination on a banded matrix fills in only inside the band, so the result is as
+/// sparse as the input and the rank is essentially full — the shape where `rank * num_rows` and the
+/// entries actually present are orders of magnitude apart.
+fn banded(n: usize, bandwidth: usize, seed: u64) -> SparseMatrix<F> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    let half = (bandwidth / 2) as isize;
+    let rows: Vec<SparseRow<F>> = (0..n)
+        .map(|index| {
+            let mut entries: Vec<(usize, F)> = Vec::with_capacity(bandwidth);
+            for offset in -half..=half {
+                let column = index as isize + offset;
+                if (0..n as isize).contains(&column) {
+                    entries.push((column as usize, F::random(&mut rng)));
+                }
+            }
+            SparseRow::new(&entries)
+        })
+        .collect();
+    SparseMatrix::new(n, rows)
+}
+
+fn reduced_forms(c: &mut Criterion) {
+    let mut group = c.benchmark_group("sparse_rref");
+    group.sample_size(20);
+
+    for n in [64usize, 128, 256] {
+        for density in DENSITIES {
+            let matrix = random_sparse(n, density, 7);
+            group.bench_with_input(
+                BenchmarkId::new(
+                    format!("square/{}pct", (density * 100.0).round() as usize),
+                    n,
+                ),
+                &matrix,
+                |bencher, matrix| {
+                    bencher.iter_batched_ref(
+                        || matrix.clone(),
+                        |matrix| black_box(reduced_row_echelon(matrix)),
+                        BatchSize::SmallInput,
+                    )
+                },
+            );
+        }
+    }
+
+    for n in [512usize, 2048, 4096] {
+        let matrix = banded(n, 8, 13);
+        group.bench_with_input(
+            BenchmarkId::new("banded/8", n),
+            &matrix,
+            |bencher, matrix| {
+                bencher.iter_batched_ref(
+                    || matrix.clone(),
+                    |matrix| black_box(reduced_row_echelon(matrix)),
+                    BatchSize::SmallInput,
+                )
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(rref, reduced_forms);
 
 // ---------------------------------------------------------------------------------------------
 // A matched-contract comparison.
