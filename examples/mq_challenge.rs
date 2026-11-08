@@ -311,7 +311,13 @@ fn main() {
     println!("published answer rules out a *wrong* monomial layout; the solver independently");
     println!("recovering that point rules out a layout that vanishes there by accident.");
     println!();
-    println!("These are toy examples, published so implementations can check themselves. n = 10");
-    println!("is 45 variables short of the smallest unsolved challenge, and nothing here is a");
-    println!("competitive result. See docs/research/fukuoka-mq.md.");
+    println!("These are toy examples, published so implementations can check themselves, and");
+    println!("nothing here is a competitive result. n = 10 is 24 variables short of the smallest");
+    println!("real type III challenge (n = 34) and 14 short of the smallest real instance this");
+    println!("crate can import at all: type VI at m = 16, which is n = 24. That one is compiled");
+    println!("and registered as fukuoka-mq-VI-n24-seed0; it is not run here because it publishes");
+    println!(
+        "no answer to check against. See docs/research/fukuoka-mq.md §4.4 for its diagnostic:"
+    );
+    println!("  tools/scoreboard.sh mq fukuoka-mq-VI-n24-seed0 --seeds 1");
 }

@@ -227,7 +227,14 @@ the same reason:
 tools/fetch-mq-challenge.sh
 cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_a_published_instance_is_reproduced
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_real_n24_challenges_import
 ```
+
+The second covers the two *real* challenge files at `m = 16` — type VI over GF(31) and type V over
+GF(2^8), both `n = 24` — and asserts the import rather than a solve: header, shape, 325
+coefficients per polynomial, the compiled dimension reached through `dispatch`, and the AES modulus
+refused in favour of the challenge's `0x11D`.
 
 Two other `#[ignore]`d tests are unimplemented placeholders — a `BigUInt` sampling distribution
 check and a rare division branch — and they panic if run. A bare `cargo test -- --ignored`
@@ -2849,6 +2856,8 @@ the same reason:
 tools/fetch-mq-challenge.sh
 cargo test --release --lib -- --ignored --exact \
     grobner::research::mq::tests::test_a_published_instance_is_reproduced
+cargo test --release --lib -- --ignored --exact \
+    grobner::research::mq::tests::test_the_real_n24_challenges_import
 ```
 
 ### Other external engines, for comparison
@@ -3765,6 +3774,25 @@ not also be solved to the same one. This is a *toy* example 24 variables short o
 published type III challenge, which starts at `n = 34` — not `n = 55`, which is type I's range —
 and is not a competitive result.
 
+**The importer now reaches the real challenge.** `SUPPORTED_DIMENSIONS` is `[10, 15, 20, 24]`, and
+24 is where the toy examples stop being the only thing it can read: types V and VI publish
+`m = 16..=35`, the generator truncates `n = m * 1.5`, and `m = 16` is `n = 24` in both — so one
+`const N` arm serves the smallest real instance over GF(31) *and* over GF(2^8).
+`fukuoka-mq-VI-n24-seed0` is registered with its file's SHA-256 and with the hall of fame's own
+figure for it (Faugère, F5-FGb, 5 280 s, 2015), which makes a witness there a **reproduction** and
+says so. The list stops at 24 deliberately: each entry monomorphizes the whole multivariate stack,
+and a dimension that cannot be used is worse than `MqError::UnsupportedDimension` naming it.
+
+One diagnostic slice of that instance — eight of the 24 variables fixed at a precommitted seed,
+which is the challenge's own route for a signature type — **stops on live-entry growth at degree
+6**: 20 010 753 entries against the 20 000 000 cap, largest matrix 13 602 x 19 132, 51 s. Type VI
+`n = 15` crossed the same cap at degree *9*, so eight surplus variables rather than five pulls the
+wall in rather than pushing it out; what grows is the width at every degree. A deliberate resource
+stop, not a comparison with the published 5 280 s, and not a completion attempt.
+[`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §4.4 has the figures and the slice
+policy: a slice result is a result about the slice, a witness lifts because the pinning forms are
+part of the system, and a stopped slice establishes nothing about the instance.
+
 Under one stated budget — 200,000 columns and 20,000,000 live entries, the bound that binds —
 `n = 15` **recovers the published answer** in 7.9 s, checked coordinate by coordinate against the
 answer file it was not given; `n = 20` crosses the entry cap at degree 5 after 67.5 s. So the
@@ -3775,9 +3803,10 @@ whether it contains a solution. `Campaign::decided()` is the rate's denominator 
 reason, and `success_rate_basis_points` returns nothing when nothing was decided.
 
 **The instance data is not redistributed here** — the files are "All Rights Reserved" with no
-stated licence. `tools/fetch-mq-challenge.sh` fetches them into `research/instances/mq/` and
-verifies the SHA-256 that `Provenance` pins; the test against a genuine instance is `#[ignore]`d
-for the same reason the Singular one is. `docs/research/fukuoka-mq.md` records the format, the
+stated licence. `tools/fetch-mq-challenge.sh` fetches them into `research/instances/mq/` (the toy
+examples, plus the two real `m = 16` challenges) and verifies the SHA-256 that `Provenance` and the
+registry pin; the tests against genuine instances are `#[ignore]`d for the same reason the Singular
+one is, and no instance bytes, answer vector or coefficient is committed. `docs/research/fukuoka-mq.md` records the format, the
 verification, and one quirk worth knowing: coefficients are uniform over `0..=31`, not `0..=30`, so
 **zero is twice as likely as any other coefficient** in the published GF(31) data.
 
