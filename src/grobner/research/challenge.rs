@@ -2878,6 +2878,67 @@ mod tests {
         }
     }
 
+    /// Every objective is permutation-level or root-finding, and none is mode-level.
+    ///
+    /// This pins `docs/research/poseidon.md` §7.3's scope line, which is #78's answer to its task 4:
+    /// a CICO problem constrains words of the *permutation*, while a sponge or compression preimage
+    /// is a function of the mode's rate, capacity, padding and squeeze schedule. No publisher
+    /// states a Poseidon preimage with those fixed, so generating one would mean inventing a mode —
+    /// and a challenge row whose system came from an invented mode is the §5a faithfulness hazard
+    /// in a new place.
+    ///
+    /// The `match` is the forcing function rather than the assertions. Adding a variant to
+    /// [`Objective`] fails to compile here until it is classified, so a mode-level objective cannot
+    /// arrive without someone confronting what specifies it.
+    #[test]
+    fn test_every_objective_is_permutation_level_or_root_finding() {
+        /// What an objective is stated in terms of, which decides whether this crate can build it.
+        enum Level {
+            /// Words of the permutation itself. Generated, or refused by name when the constrained
+            /// positions are ones `CicoInstance` does not produce.
+            Permutation,
+            /// A root of published coefficients. No mode and no permutation.
+            RootFinding,
+        }
+
+        for objective in [
+            Objective::CicoExact,
+            Objective::CicoExactTrailing,
+            Objective::MqRoot,
+        ] {
+            let level = match objective {
+                // Exhaustive by construction: a new variant stops compiling here.
+                Objective::CicoExact | Objective::CicoExactTrailing => Level::Permutation,
+                Objective::MqRoot => Level::RootFinding,
+            };
+            match level {
+                Level::Permutation => assert!(
+                    objective.statement().contains("permutation"),
+                    "{} is classified permutation-level but does not say so",
+                    objective.tag()
+                ),
+                Level::RootFinding => assert!(
+                    objective.statement().contains("F(x) = 0"),
+                    "{} is classified root-finding but does not say so",
+                    objective.tag()
+                ),
+            }
+        }
+
+        // And no registered row carries anything else, so the registry cannot drift past the
+        // classification without this failing.
+        for row in registry() {
+            assert!(
+                matches!(
+                    row.objective,
+                    Objective::CicoExact | Objective::CicoExactTrailing | Objective::MqRoot
+                ),
+                "{} carries an objective outside the classification",
+                row.id
+            );
+        }
+    }
+
     /// An MQ row cannot be dispatched as a CICO problem, and says which family it is.
     #[test]
     fn test_a_non_cico_row_is_refused_by_name() {
