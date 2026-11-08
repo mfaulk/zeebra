@@ -86,10 +86,10 @@ Two further results that are provenance rather than generation:
 | type | field | shape | published range | importable here |
 |---|---|---|---|---|
 | I | GF(2) | encryption, `m = 2n` | `n = 55…100` | **no** — no import path (§6) |
-| II | GF(2^8) | encryption, `m = 2n` | `n = 35…54` | **no** — no import path, and the header is unparsed (§2.5) |
+| II | GF(2^8) | encryption, `m = 2n` | `n = 35…54` | **no** — the GF(2^8) path exists (§2.5) but no compiled dimension reaches `n ≥ 35` |
 | III | GF(31) | encryption, `m = 2n` | `n = 34…53` | **yes** |
 | IV | GF(2) | signature, `n ≈ 1.5m` | `m = 55…100` | **no** — as type I |
-| V | GF(2^8) | signature, `n ≈ 1.5m` | `m = 16…35` | **no** — as type II |
+| V | GF(2^8) | signature, `n ≈ 1.5m` | `m = 16…35` | **yes at `m = 16`** — `n = 24`, the same arm type VI uses (§4.5) |
 | VI | GF(31) | signature, `n ≈ 1.5m` | `m = 16…35` | **yes** |
 
 The ranges are counted from `site`'s own download links: 100 instance files each for types II, III,
@@ -494,7 +494,7 @@ positive-dimensional as published and a run of it is a run of a **slice**:
 | largest matrix | **13 602 × 19 132** |
 | peak live nonzeros | 14 329 816 (≈229 MB estimated; 1.38 GB process `VmHWM`) |
 | pairs reduced / elements added | 4 967 / 503 |
-| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs |
+| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs — all at `1409a48`, and **42.1 s** re-measured at `a3e5d66` for the comparison in §4.5 |
 
 The stop is **deterministic and the wall clock is not**. All three runs stopped at the same degree
 on the same entry count, 20 010 753, with the same 13 602 x 19 132 matrix and the same 14 329 816
@@ -512,6 +512,70 @@ with the row above, which is a 43-second resource stop under a deliberate cap.
 So the honest statement after #454 is narrower than "Zeebra reaches the challenge": the **importer**
 reaches it, the registry names its bytes, and the solver stops at degree 6 under this budget. What
 changed is that the gap is now measured rather than merely stated.
+
+### 4.5 Type V `m = 16`: the same size over GF(2^8) (M27, #510)
+
+`m = 16` is `n = 24` in *both* signature families, so the arm #454 compiled serves type V as well —
+and since #414 and #415 the GF(2^8) import path is correct, modulus checked against the header
+rather than assumed. What was missing was the runner: the scoreboard's MQ visitors were written
+against `PrimeFieldElement64<31>`, so the type V challenge **imported and could not be run**. They
+are generic over the coefficient type now and the dispatch is on `MqInstance::field`, which comes
+from the file. `fukuoka-mq-V-n24-seed0` is registered alongside the type VI row:
+
+```text
+Galois Field : GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1
+Number of variables (n) : 24
+Number of polynomials (m) : 16
+Seed : 0
+```
+
+`sha256 fb4b6a3d27fb8263b1a9883745691f3836ad747a6a4052d28919ea5b1a213cc7`, 325 coefficients per
+polynomial, fetched by `tools/fetch-mq-challenge.sh`. No instance bytes, no answer vector and no
+coefficient are committed, and a real challenge publishes no answer at all. The slice policy is
+§4.4's unchanged: `n - m = 8` variables fixed at a precommitted seed, the result a result about
+that slice.
+
+#### The two fields at one size
+
+One diagnostic slice each, `--seeds 1`, under `tools/benchlock.sh` on cores 0-7, **both re-measured
+at the same commit** `a3e5d66` so the two walls are comparable — the type VI figures in §4.4 were
+taken at `1409a48`, and the monomial hasher, in-place scaling and the 2x8 matrix tiling have landed
+in the measured paths since.
+
+| | type VI, GF(31) | type V, GF(2^8) |
+|---|---|---|
+| outcome | `stopped_at_limit`, `max_live_nonzeros` | the same |
+| entries needed against the 20 000 000 cap | 20 010 753 | 20 011 556 |
+| degree reached / highest completed | **6** / 5 | **6** / 5 |
+| largest matrix | **13 602 x 19 132** | **13 602 x 19 132** |
+| peak live nonzeros | 14 329 816 (~229 MB estimated) | 14 762 419 (~236 MB estimated) |
+| process `VmHWM` | 1.383 GB | 1.394 GB |
+| pairs reduced / elements added | 4 967 / 503 | 4 968 / 504 |
+| wall | **42.1 s** | **105.1 s** (105.1 and 106.4 over two runs) |
+
+**The combinatorics are the same and only the arithmetic differs.** Same stopping degree, the same
+13 602 x 19 132 matrix to the row, 4 967 pairs against 4 968 and 20 010 753 entries against
+20 011 556 — a difference of one pair and 803 entries out of 20 million, which is incidental
+cancellation over a different field and not a different computation. The wall is **2.49x**, and
+with the computation held fixed that factor is the field's arithmetic. The two routes, for the
+record: GF(31) multiplies with one Montgomery step, and `BinaryFieldElement` multiplies with a
+`PCLMULQDQ` behind a cached feature probe — this machine has the instruction — followed by a
+Barrett reduction. Both fields invert by Fermat exponentiation, so inversion is a wash in kind —
+the exponents differ (`q - 2` at `q = 2^8` against `q = 31`) and so does the cost of each
+multiplication inside it. Which part of the multiply dominates the 2.49x is not measured here, and
+the figure does not rest on an answer: it is a wall ratio at a fixed matrix, not an attribution. No
+table-lookup route exists for this field in the crate.
+
+That is the useful reading of the pair. Where §4.4's type VI and type III comparison was about
+*shape* — eight surplus variables pull the wall in rather than pushing it out — this one holds the
+shape fixed and prices the field. It also says where a GF(2^8) optimization would and would not
+help: nothing here is bound by the entry count, which the two fields reach within 0.004% of each
+other, so a narrower element would not move the stopping degree at all. It would move the 2.49x.
+
+Faugère solved this instance in 2015 in 24 648 s with F5-FGb (§8.1), and the 370-second figure the
+same size carries at **seed 2** is per subsystem of a hybrid attack (§8.4) rather than a total.
+Neither is a comparison with the row above, which is a 105-second resource stop under a deliberate
+cap.
 
 ---
 
@@ -569,6 +633,12 @@ also what every published type V and type VI solve did.
   `n = 8`. **Over GF(31) it is degree 31**, against solving degrees of 4 to 9 measured on the type
   III and type VI instances in §4, so for the families this importer actually reaches today the
   answer is no. Types I and IV will want them; types III and VI will not.
+- **The GF(2^8) path is end to end, not just the importer.** #414 and #415 fixed the header and
+  the hex coefficients; #510 made the scoreboard's MQ visitors generic over the coefficient type
+  and dispatch on `MqInstance::field`, so `fukuoka-mq-V-n24-seed0` is registered and runnable and
+  §4.5 is its diagnostic. What remains out of reach in this family is **size, not field**: type V
+  publishes `m = 16..=35`, so the next size up is `m = 17` at `n = 25`, which no compiled dimension
+  reaches. Type II starts at `n = 35`.
 - **The smallest published challenge is `n = 34` (type III) or `m = 16` (types V and VI)**, not
   `n = 55`; the `n = 55` figure in the previous revision was type I's range. **Type VI `m = 16` is
   `n = 24`**, and #454 compiled it: `SUPPORTED_DIMENSIONS` is now `[10, 15, 20, 24]` and §4.4 is the

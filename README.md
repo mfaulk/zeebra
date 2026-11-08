@@ -3857,10 +3857,20 @@ and a dimension that cannot be used is worse than `MqError::UnsupportedDimension
 
 One diagnostic slice of that instance — eight of the 24 variables fixed at a precommitted seed,
 which is the challenge's own route for a signature type — **stops on live-entry growth at degree
-6**: 20 010 753 entries against the 20 000 000 cap, largest matrix 13 602 x 19 132, 43 s. Type VI
+6**: 20 010 753 entries against the 20 000 000 cap, largest matrix 13 602 x 19 132, 42 s. Type VI
 `n = 15` crossed the same cap at degree *9*, so eight surplus variables rather than five pulls the
 wall in rather than pushing it out; what grows is the width at every degree. A deliberate resource
 stop, not a comparison with the published 5 280 s, and not a completion attempt.
+
+**And the same size over the other field.** Type V publishes `m = 16` too, so `fukuoka-mq-V-n24-seed0`
+is the same `n = 24` over GF(2^8) — registered, and runnable since the scoreboard's MQ visitors
+became generic over the coefficient type and started dispatching on the instance's own field
+rather than on a hardwired GF(31) (#510). The two slices, re-measured at one commit, **stop
+identically**: degree 6, the same 13 602 x 19 132 matrix, 4 967 pairs against 4 968, and
+20 010 753 live entries against 20 011 556 — a difference of 803 entries in 20 million. The wall is
+42.1 s against **105.1 s**, so with the computation held fixed the field alone is **2.49x**. That is
+the pair's value: §4.4's type VI-against-type III comparison varied the shape, and this one holds
+the shape fixed and prices the arithmetic.
 [`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §4.4 has the figures and the slice
 policy: a slice result is a result about the slice, a witness lifts because the pinning forms are
 part of the system, and a stopped slice establishes nothing about the instance.

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "contract": "every run ever recorded, APPEND-ONLY and in the order recorded. Array position is the only record of when a run was taken, and results/solved.json's tie-break reads it: among verified witnesses tied on environment.concurrency it keeps the LAST, because the later record is the one later code wrote and so carries at least as many fields. Appending is safe; sorting, deduplicating or regenerating this file is not, and would silently change what solved.json claims. run_count must equal runs.length.",
-  "run_count": 96,
+  "run_count": 100,
   "runs": [
     {
       "schema": 1,
@@ -7041,6 +7041,252 @@
       "measured_peak_rows_in_process": 2,
       "environment": {
         "commit": "1409a48",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, F4 max_wall_time 540 s cooperative, supervisor wall clock 600 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/scoreboard.sh mq fukuoka-mq-VI-n24-seed0 --seeds 1"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-V-n24-seed0",
+      "challenge_digest": "540475b13ba8d95511eaafbc839693bda9b109e00b9c1556346db6aeeae39a86",
+      "class": "official",
+      "formulation": "slice(8 fixed, seed 0)",
+      "transformations": [
+        "specialize variables 16..24 at seed 0"
+      ],
+      "outcome": "stopped_at_limit",
+      "limit": {
+        "resource": "max_live_nonzeros",
+        "detail": "20011556 live nonzero entries were needed, over the limit of 20000000",
+        "degree": 6,
+        "last_completed_stage": "generation"
+      },
+      "significance": "no verified witness",
+      "verification": "evaluated against the published coefficient vectors; this instance publishes no answer vector, so the witness check is the only check",
+      "elapsed_nanos": 105069580374,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 2487153,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 24,
+            "equations": 24
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 105067093221,
+          "estimated_peak_bytes": 236351760,
+          "detail": {
+            "max_matrix_rows": 13602,
+            "max_matrix_columns": 19132,
+            "max_pair_degree": 6,
+            "pairs_considered": 4968,
+            "pairs_reduced": 4968,
+            "elements_added": 504
+          }
+        }
+      ],
+      "grobner_frontier": {
+        "completed": false,
+        "max_pair_degree": 6,
+        "highest_completed_degree": 5,
+        "max_matrix_rows": 13602,
+        "max_matrix_columns": 19132,
+        "peak_live_nonzeros": 14762419,
+        "peak_estimated_bytes": 236351760,
+        "pairs_reduced": 4968,
+        "elements_added": 504,
+        "quotient_dimension": null
+      },
+      "campaign": null,
+      "measured_peak_resident_bytes": 1393819648,
+      "measured_peak_rows_in_process": 1,
+      "environment": {
+        "commit": "a3e5d66",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, F4 max_wall_time 540 s cooperative, supervisor wall clock 600 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-V-n24-seed0 --seeds 1"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-V-n24-seed0",
+      "challenge_digest": "540475b13ba8d95511eaafbc839693bda9b109e00b9c1556346db6aeeae39a86",
+      "class": "official",
+      "formulation": "campaign over 1 slices",
+      "transformations": [
+        "1 slices, each fixing 8 of 24 variables at a seeded value"
+      ],
+      "outcome": "stopped_at_limit",
+      "limit": {
+        "resource": "campaign reached no verdict",
+        "detail": "all 1 slices stopped at a resource limit, so none of them tested whether it contains a solution",
+        "degree": null,
+        "last_completed_stage": "generation"
+      },
+      "significance": "no verified witness",
+      "verification": "every witness evaluated against the original published coefficient vectors",
+      "elapsed_nanos": 105071433816,
+      "stages": [
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 105071433816,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": null,
+      "campaign": {
+        "trials": 1,
+        "stopped_at_limit": 1,
+        "decided": 0,
+        "witnesses": 0,
+        "fixed_variables": 8,
+        "total_nanos": 105071433816,
+        "seeds": [
+          0
+        ],
+        "work_per_witness": null,
+        "success_rate_basis_points": null
+      },
+      "measured_peak_resident_bytes": 1393819648,
+      "measured_peak_rows_in_process": 2,
+      "environment": {
+        "commit": "a3e5d66",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, F4 max_wall_time 540 s cooperative, supervisor wall clock 600 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/scoreboard.sh mq fukuoka-mq-V-n24-seed0 --seeds 1"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n24-seed0",
+      "challenge_digest": "e97e852ee8f09b4bf755001451cd456a6ebe126f174c77175ee2cc6dba820b80",
+      "class": "official",
+      "formulation": "slice(8 fixed, seed 0)",
+      "transformations": [
+        "specialize variables 16..24 at seed 0"
+      ],
+      "outcome": "stopped_at_limit",
+      "limit": {
+        "resource": "max_live_nonzeros",
+        "detail": "20010753 live nonzero entries were needed, over the limit of 20000000",
+        "degree": 6,
+        "last_completed_stage": "generation"
+      },
+      "significance": "no verified witness",
+      "verification": "evaluated against the published coefficient vectors; this instance publishes no answer vector, so the witness check is the only check",
+      "elapsed_nanos": 42128005873,
+      "stages": [
+        {
+          "stage": "generation",
+          "elapsed_nanos": 2675409,
+          "estimated_peak_bytes": null,
+          "detail": {
+            "variables": 24,
+            "equations": 24
+          }
+        },
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 42125330464,
+          "estimated_peak_bytes": 229430112,
+          "detail": {
+            "max_matrix_rows": 13602,
+            "max_matrix_columns": 19132,
+            "max_pair_degree": 6,
+            "pairs_considered": 4967,
+            "pairs_reduced": 4967,
+            "elements_added": 503
+          }
+        }
+      ],
+      "grobner_frontier": {
+        "completed": false,
+        "max_pair_degree": 6,
+        "highest_completed_degree": 5,
+        "max_matrix_rows": 13602,
+        "max_matrix_columns": 19132,
+        "peak_live_nonzeros": 14329816,
+        "peak_estimated_bytes": 229430112,
+        "pairs_reduced": 4967,
+        "elements_added": 503,
+        "quotient_dimension": null
+      },
+      "campaign": null,
+      "measured_peak_resident_bytes": 1382776832,
+      "measured_peak_rows_in_process": 1,
+      "environment": {
+        "commit": "a3e5d66",
+        "machine": "fedora",
+        "cpu": "8 logical, affinity 0-7",
+        "concurrency": 1,
+        "build": "release, RUSTFLAGS=default",
+        "policy": "grevlex F4 only; 200000 columns, 20000000 live entries (the binding bound), 10000 batches, F4 max_wall_time 540 s cooperative, supervisor wall clock 600 s as a backstop"
+      },
+      "experiment": null,
+      "reproduce": "tools/fetch-mq-challenge.sh && tools/scoreboard.sh mq fukuoka-mq-VI-n24-seed0 --seeds 1"
+    },
+    {
+      "schema": 1,
+      "challenge": "fukuoka-mq-VI-n24-seed0",
+      "challenge_digest": "e97e852ee8f09b4bf755001451cd456a6ebe126f174c77175ee2cc6dba820b80",
+      "class": "official",
+      "formulation": "campaign over 1 slices",
+      "transformations": [
+        "1 slices, each fixing 8 of 24 variables at a seeded value"
+      ],
+      "outcome": "stopped_at_limit",
+      "limit": {
+        "resource": "campaign reached no verdict",
+        "detail": "all 1 slices stopped at a resource limit, so none of them tested whether it contains a solution",
+        "degree": null,
+        "last_completed_stage": "generation"
+      },
+      "significance": "no verified witness",
+      "verification": "every witness evaluated against the original published coefficient vectors",
+      "elapsed_nanos": 42129815091,
+      "stages": [
+        {
+          "stage": "grobner",
+          "elapsed_nanos": 42129815091,
+          "estimated_peak_bytes": null,
+          "detail": {}
+        }
+      ],
+      "grobner_frontier": null,
+      "campaign": {
+        "trials": 1,
+        "stopped_at_limit": 1,
+        "decided": 0,
+        "witnesses": 0,
+        "fixed_variables": 8,
+        "total_nanos": 42129815091,
+        "seeds": [
+          0
+        ],
+        "work_per_witness": null,
+        "success_rate_basis_points": null
+      },
+      "measured_peak_resident_bytes": 1382776832,
+      "measured_peak_rows_in_process": 2,
+      "environment": {
+        "commit": "a3e5d66",
         "machine": "fedora",
         "cpu": "8 logical, affinity 0-7",
         "concurrency": 1,

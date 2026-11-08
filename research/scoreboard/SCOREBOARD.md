@@ -57,6 +57,7 @@ The externally specified problems, unmodified. A witness here is a witness for t
 | `fukuoka-mq-VI-n15-seed0` | `0345980a26d8` | 15 | 10 | stopped: campaign reached no verdict | published with its answer | — |
 | `fukuoka-mq-III-n34-seed0` | `9c2033d49ecb` | 34 | 68 | not attempted | solved externally, verified 2015-08-04 | no public method |
 | `fukuoka-mq-VI-n24-seed0` | `e97e852ee8f0` | 24 | 16 | stopped: campaign reached no verdict | solved externally, verified 2015-04-01 | no public method |
+| `fukuoka-mq-V-n24-seed0` | `540475b13ba8` | 24 | 16 | stopped: campaign reached no verdict | solved externally, verified 2015-04-03 | no public method |
 
 ## Faithful reductions
 
@@ -129,6 +130,8 @@ One row per distinct rendering, not per run: repeated runs of the same problem d
 | `fukuoka-mq-III-n20-seed0` | as published | stopped: max_live_nonzeros at degree 5 | 5 | 4 | 10147 | 195.5 | 1 | b166e56 |
 | `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 1) | the slice is empty, which says nothing about the problem | 9 | 9 | 5103 | 4.7 | 1 | 9c8b80d |
 | `fukuoka-mq-VI-n10-seed0` | slice(3 fixed, seed 3) | the slice is empty, which says nothing about the problem | 9 | 9 | 5104 | 4.6 | 1 | 9c8b80d |
-| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 | 1 | 1409a48 |
-| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 1 | 1409a48 |
+| `fukuoka-mq-VI-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 229.4 | 2 | 1409a48, a3e5d66 |
+| `fukuoka-mq-VI-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 2 | 1409a48, a3e5d66 |
+| `fukuoka-mq-V-n24-seed0` | slice(8 fixed, seed 0) | stopped: max_live_nonzeros at degree 6 | 6 | 5 | 19132 | 236.4 | 1 | a3e5d66 |
+| `fukuoka-mq-V-n24-seed0` | campaign over 1 slices | stopped: campaign reached no verdict | — | — | — | — | 1 | a3e5d66 |
 
