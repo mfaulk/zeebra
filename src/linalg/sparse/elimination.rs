@@ -220,9 +220,10 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
 /// crossed the limit and `matrix` should not be read, exactly as [`row_echelon_within`].
 ///
 /// Added for F4's batch path (#477), which has a live-entry allowance to respect and so could not
-/// call the unbounded form. [`crate::grobner::f4`]'s final interreduction works around the same
-/// gap by budgeting at matrix *construction* instead, which bounds what is built rather than what
-/// elimination then makes of it.
+/// call the unbounded form. The final interreduction used to work around the same gap by budgeting
+/// at matrix *construction* instead — which bounds what is built rather than what elimination then
+/// makes of it, and let `katsura-11` reach 13 142.5 MB with every limit satisfied. It calls
+/// [`reduced_row_echelon_tracked`] since #536.
 pub fn reduced_row_echelon_within<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     max_nonzeros: usize,
