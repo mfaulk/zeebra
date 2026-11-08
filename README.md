@@ -3632,6 +3632,7 @@ again.
 cargo run --release --example cost_model                  # render research/cost-model/COST-MODEL.md
 cargo run --release --example cost_model -- --write       # regenerate the register from its records
 cargo run --release --example cost_model -- --write --seed  # append any transcribed row not yet held
+cargo run --release --example cost_model -- --from-runs      # emit a row per retained scoreboard run
 ```
 
 `grobner::research::cost_model` keeps one row per **claim** about what a stage would cost, against
@@ -3647,7 +3648,31 @@ share a column**, since #237 measured 21 674 MiB allocated against 13 996 MiB re
 **The resource-limiting stage is a closed set**, so "memory" and "the monomial queue of one refused
 batch" cannot be written in the same field. **Prediction error is derived** — nothing in
 `research/cost-model/results/history.json` is an error column, and `CostRow::prediction_errors`
-computes it from the predicted and measured fields. The history is append-only: a re-measurement is
+computes it from the predicted and measured fields. **A row is emitted by a run rather than
+transcribed from one.** `CostRow::from_run` reads a retained `RunRecord` — its stage runtimes, its
+total, its measured peak, its frontier's work counts — and `--from-runs` appends one row per
+retained run the register does not already hold, idempotently and append-only. Transcription was how
+#294 got twenty rows of history onto the board and the wrong way to keep it there: the next figure
+reaches the board only if somebody remembers to copy it.
+
+What an emitted row **may not** claim is the more interesting half, and all three rules are code:
+
+- **No predicted field, including `peak_estimated_bytes`.** That field is the predicted half of the
+  `accounted storage` pair, so filling it beside the measured RSS would make the row complete and
+  oblige the adapter to attribute the gap — and a defaulted attribution would make every emitted row
+  report that a prediction held, which inverts the register's purpose. The attribution stays
+  `NoMeasurementYet` and a later pass supplies the prediction it was checking.
+- **No limiting stage inferred from the budget that was crossed.** `LimitingStage::NotEstablished`,
+  always. #237 is why: `max_live_nonzeros` was the budget crossed and 88.4% of the peak was the
+  symbolic queue, which holds no matrix at all.
+- **No peak it cannot attribute.** `VmHWM` from a process that ran several rows is a ceiling over
+  all of them, so the figure is emitted only when `RunRecord::measured_peak_is_attributable` holds.
+
+Two runs of one problem at one commit are indistinguishable in the record — the same limitation
+`run_file_stem` has — so `--from-runs` prints how many runs it skipped as already-held rather than
+letting 96 runs quietly become 80 rows.
+
+The history is append-only: a re-measurement is
 a new row with a new commit, which is what keeps #318's three figures for the same measurement all
 visible — and that append-only rule is what let #318 be resolved, since the way to find out whether
 a figure still holds is to re-run the binary that produced it and record the answer beside the

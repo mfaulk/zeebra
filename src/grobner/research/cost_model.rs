@@ -42,7 +42,7 @@
 
 use std::{collections::BTreeMap, fmt::Write as _, time::Duration};
 
-use super::{Environment, Json};
+use super::{Environment, Json, RunRecord};
 
 /// What `research/cost-model/results/history.json` promises a consumer.
 ///
@@ -1130,6 +1130,88 @@ impl CostRow {
     /// is the row that proves it is needed — the same measurement months apart is 1.2x apart.
     pub fn key(&self) -> String {
         format!("{}|{}|{}", self.algorithm, self.subject, self.claim)
+    }
+
+    /// A row emitted from a retained run, carrying **only what the run measured**.
+    ///
+    /// #334: `RunRecord` and `CostRow` hold the same storage pair, and until now the register got
+    /// the second copy only if somebody remembered to transcribe it. This is the adapter, and three
+    /// things it deliberately does not do:
+    ///
+    /// 1. **It fills no predicted field, including [`Self::peak_estimated_bytes`].** That field is
+    ///    on the *prediction* side of the schema — [`Self::has_prediction`] counts it, and it is
+    ///    the predicted half of the `accounted storage` pair — so emitting the run's frontier
+    ///    accounting beside the measured RSS would make the row [`Self::is_complete`], which
+    ///    [`Self::check`] then requires an attribution for. The adapter has no basis for one, and a
+    ///    defaulted attribution would make every emitted row report that a prediction held. The
+    ///    estimate is therefore the one frontier figure a run may not emit; a later pass adds it
+    ///    together with the attribution it is claiming.
+    /// 2. **It never reads the crossed budget as the limiting structure.** [`LimitingStage::NotEstablished`]
+    ///    always. #237 is why: `max_live_nonzeros` was the budget crossed and 88.4% of the peak was
+    ///    the symbolic queue, which contains no matrix at all.
+    /// 3. **It drops a peak it cannot attribute.** `VmHWM` from a process that ran several rows is
+    ///    a ceiling over all of them, so a row only gets one when
+    ///    [`RunRecord::measured_peak_is_attributable`] holds. A bound copied into a `measured_`
+    ///    field is a bound published as a measurement.
+    ///
+    /// A **completed** run's `max_pair_degree` is its solving degree; a stopped run's is the degree
+    /// it reached, which is a different quantity, so that one is left absent.
+    ///
+    /// `algorithm` comes from the caller because the record does not carry it — the same run shape
+    /// is produced by the F4 route and by resultant elimination. Everything else is derived, and
+    /// the derived [`Self::claim`] is stable across re-runs so that [`Self::key`] joins a later
+    /// row about the same quantity to this one.
+    pub fn from_run(run: &RunRecord, algorithm: impl Into<String>) -> Self {
+        let source = format!("research/scoreboard/runs/{}.json", run.run_file_stem());
+        let mut row = Self::new(
+            format!("{}, cost as run", run.formulation),
+            algorithm,
+            run.challenge.clone(),
+            source.clone(),
+        )
+        .with_formulation(run.formulation.clone())
+        .with_environment(run.environment.clone())
+        .with_reproduce(run.reproduce.clone());
+
+        for stage in &run.stages {
+            row = row.with_stage(
+                stage.stage.name(),
+                stage.elapsed,
+                "std::time::Instant, as the run recorded it",
+                source.clone(),
+            );
+        }
+        if !run.stages.is_empty() {
+            row = row.with_measured_runtime(
+                run.elapsed(),
+                "sum of the run's recorded stages",
+                source.clone(),
+            );
+        }
+        if run.measured_peak_is_attributable() {
+            let bytes = run
+                .measured_peak_resident_bytes
+                .expect("attributable implies present");
+            row = row.with_measured_resident(bytes as u64, "VmHWM", source.clone());
+        }
+        if let Some(frontier) = &run.frontier {
+            if frontier.completed {
+                row = row.with_solving_degree(frontier.max_pair_degree as usize);
+            }
+            row = row
+                .with_largest_intermediate(Intermediate::new(
+                    "Macaulay matrix",
+                    frontier.max_matrix_columns as i128,
+                    "columns",
+                ))
+                .with_work("pairs reduced", frontier.pairs_reduced as i128)
+                .with_work("basis elements added", frontier.elements_added as i128)
+                .with_work("peak live nonzeros", frontier.peak_live_nonzeros as i128);
+            if let Some(dimension) = frontier.quotient_dimension {
+                row = row.with_parameter("quotient dimension", dimension as i128);
+            }
+        }
+        row
     }
 
     /// Set how the problem was posed.
@@ -3795,5 +3877,173 @@ mod tests {
         let markdown = CostModelBoard::new().to_markdown();
         assert!(markdown.contains("No rows yet"));
         assert!(!markdown.contains("| claim |"));
+    }
+
+    /// A completed run with an attributable peak, as the adapter's input.
+    fn measured_run() -> crate::grobner::research::RunRecord {
+        use crate::grobner::research::{
+            challenge, GrobnerFrontier, RunOutcome, RunRecord, Stage, StageCost,
+        };
+        let manifest = challenge("poseidon-t2-rf4-rp0-planted").expect("registered");
+        let mut run = RunRecord::new(&manifest, "as generated");
+        run.outcome = RunOutcome::VerifiedWitness;
+        run.verification = "through the permutation".to_string();
+        run.stages = vec![
+            StageCost::new(Stage::Generation, Duration::from_millis(12)),
+            StageCost::new(Stage::Grobner, Duration::from_millis(331)),
+            StageCost::new(Stage::Conversion, Duration::from_millis(9)),
+        ];
+        run.frontier = Some(GrobnerFrontier {
+            completed: true,
+            max_pair_degree: 7,
+            highest_completed_degree: Some(7),
+            max_matrix_rows: 1_024,
+            max_matrix_columns: 2_048,
+            peak_live_nonzeros: 410_000,
+            peak_estimated_bytes: 6_560_000,
+            pairs_reduced: 1_777,
+            elements_added: 247,
+            quotient_dimension: Some(81),
+        });
+        run.measured_peak_resident_bytes = Some(74_500_000);
+        run.measured_peak_rows_in_process = Some(1);
+        run.environment = environment();
+        run.reproduce = "cargo run --release --example scoreboard -- row \
+                         poseidon-t2-rf4-rp0-planted --write"
+            .to_string();
+        run
+    }
+
+    /// A run emits a cost row the register accepts, carrying only what the run measured.
+    ///
+    /// #334: `RunRecord` and `CostRow` compute the same storage pair in two places, and the board
+    /// gets the second one only if somebody remembers to transcribe it. The adapter removes the
+    /// remembering — and must not, in the process, invent the half a run cannot know.
+    #[test]
+    fn test_a_run_emits_a_row_carrying_only_its_measurements() {
+        let row = CostRow::from_run(&measured_run(), "f4");
+
+        assert_eq!(row.subject, "poseidon-t2-rf4-rp0-planted");
+        assert_eq!(row.algorithm, "f4");
+        assert_eq!(row.formulation, "as generated");
+        assert_eq!(row.solving_degree, Some(7), "the run completed at degree 7");
+
+        // Every stage the run reported, as a measured figure.
+        let stages: Vec<&str> = row
+            .stage_runtimes
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
+        assert_eq!(stages, ["generation", "grobner", "conversion"]);
+        assert!(row.stage_runtimes.iter().all(|(_, f)| f.is_measurement()));
+        assert_eq!(
+            row.measured_runtime.as_ref().map(|f| f.value),
+            Some(Duration::from_millis(352)),
+            "the total is the sum of the stages, as the run recorded them"
+        );
+        assert_eq!(
+            row.measured_peak_resident_bytes.as_ref().map(|f| f.value),
+            Some(74_500_000)
+        );
+        assert_eq!(row.environment.commit, "deadbeef");
+        assert!(row.reproduce.contains("--example scoreboard"));
+
+        // Requirement 1: the predicted half stays empty, so the row is open rather than closed.
+        assert!(
+            !row.has_prediction(),
+            "a run has no prediction to report: {:?}",
+            row
+        );
+        assert!(row.has_measurement());
+        assert!(!row.is_complete());
+        assert_eq!(row.attribution, Attribution::NoMeasurementYet);
+
+        // Requirement 2: the limiting stage is never guessed.
+        assert_eq!(row.limiting_stage, LimitingStage::NotEstablished);
+
+        // And the register takes it.
+        let mut board = CostModelBoard::new();
+        board.add(row).expect("an emitted row is schema-legal");
+        assert_eq!(
+            board.open_predictions().len(),
+            0,
+            "it has no prediction yet"
+        );
+    }
+
+    /// The adapter does not read the crossed budget as the limiting structure.
+    ///
+    /// #237 is the case: the entry budget was crossed and 88.4% of the peak was the symbolic
+    /// queue, which has no matrix in it at all. An adapter that mapped `max_live_nonzeros` to
+    /// `MatrixEntryStorage` would have recorded the wrong structure with the schema's full
+    /// authority.
+    #[test]
+    fn test_a_crossed_budget_does_not_become_a_limiting_stage() {
+        use crate::grobner::research::{Limit, RunOutcome, Stage};
+
+        let mut run = measured_run();
+        run.outcome = RunOutcome::StoppedAtLimit(Limit {
+            resource: "max_live_nonzeros".to_string(),
+            detail: "the entry budget of 20000000 was crossed".to_string(),
+            degree: Some(11),
+            last_completed_stage: Stage::Grobner,
+        });
+        run.frontier = Some(crate::grobner::research::GrobnerFrontier {
+            completed: false,
+            ..run.frontier.clone().expect("a frontier")
+        });
+
+        let row = CostRow::from_run(&run, "f4");
+        assert_eq!(row.limiting_stage, LimitingStage::NotEstablished);
+        assert_eq!(
+            row.solving_degree, None,
+            "a run that stopped did not establish a solving degree, it reached a degree"
+        );
+    }
+
+    /// A peak measured over a process that ran several rows is not emitted as this row's.
+    ///
+    /// `measured_peak_is_attributable` is false for a multi-row process: `VmHWM` is a ceiling over
+    /// all of them. Copying it into a `measured_` field would turn a bound into a measurement,
+    /// which is the error the whole memory vocabulary exists to refuse.
+    #[test]
+    fn test_a_shared_process_peak_is_not_emitted_as_a_measurement() {
+        let mut run = measured_run();
+        run.measured_peak_rows_in_process = Some(7);
+        let row = CostRow::from_run(&run, "f4");
+        assert!(
+            row.measured_peak_resident_bytes.is_none(),
+            "a seven-row process reports a ceiling, not this row's peak"
+        );
+        // The stage runtimes are still the row's own, so it is still worth emitting.
+        assert!(row.has_measurement());
+        CostModelBoard::new().add(row).expect("schema-legal");
+    }
+
+    /// A run that measured nothing emits a row that claims nothing, and is still legal.
+    #[test]
+    fn test_a_run_with_no_stages_emits_a_row_with_no_figures() {
+        use crate::grobner::research::{challenge, RunRecord};
+
+        let manifest = challenge("poseidon-t2-rf4-rp0-planted").expect("registered");
+        let mut run = RunRecord::new(&manifest, "as generated");
+        run.environment = environment();
+        let row = CostRow::from_run(&run, "f4");
+        assert!(row.stage_runtimes.is_empty());
+        assert!(row.measured_runtime.is_none());
+        assert!(!row.has_measurement());
+        assert_eq!(row.attribution, Attribution::NoMeasurementYet);
+        CostModelBoard::new()
+            .add(row)
+            .expect("a row that claims nothing is legal");
+    }
+
+    /// An emitted row round-trips through the register's JSON unchanged.
+    #[test]
+    fn test_an_emitted_row_round_trips() {
+        let row = CostRow::from_run(&measured_run(), "f4");
+        let text = row.to_json().to_json();
+        let back = CostRow::from_json(&Json::parse(&text).expect("valid")).expect("round trips");
+        assert_eq!(back, row);
     }
 }
