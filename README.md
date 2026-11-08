@@ -3222,6 +3222,18 @@ share is unchanged at ~80% after #437 and is **still ~80% on the default path**,
 **3.63x** end to end on a box whose division side matches the board row, against the 4.18x measured
 on one 1.40x slower than it.
 
+**Two strategy flags now sit off by default in that position, not one.** #477 found that the 80%
+interreduction share is a debt the *main loop* accrues — candidates are extracted from an echelon
+form that was never back-substituted, so every batch emits elements whose tails are still
+reducible — and `F4Options::reduce_batch_rows` pays it where it is incurred. That takes the final
+autoreduce matrix from 7 642 x 7 996 to **252 x 606**, which is Groebner.jl's 250 x 604 to within
+six columns, and the stage from 2 400 ms to **16.4 ms**. On the shipping division route it is
+**4.92x** end to end — more than `interreduce_by_matrix` is worth on its own — and the two together
+are **6.54x**. Unlike that flag it regresses no classical rung, including the katsura-5 lex case
+that costs the matrix route 25x. Both defaults are #507's to move, on a cohort rather than on one
+instance; §3c of [`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) has
+the four-arm table and says why the figures do not move the default by themselves.
+
 ### Solving zero-dimensional systems
 
 `grobner::solve_one` finds one solution and stops; `grobner::solve_zero_dimensional` finds every

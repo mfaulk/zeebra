@@ -163,15 +163,41 @@ pub fn reduced_row_echelon<F: FiniteField>(matrix: &mut SparseMatrix<F>) -> Elim
     reduced_row_echelon_counting_rows(matrix).0
 }
 
-/// [`reduced_row_echelon`], also reporting how many rows the back-substitution pass examined.
+/// As [`reduced_row_echelon`], but abandoned if more than `max_nonzeros` entries are ever live.
 ///
-/// The count is what the output-sensitivity test weighs against the entries the pivot columns
-/// actually hold; it is not part of the public contract, which is why it is not an
-/// [`EliminationStatistics`] field.
-fn reduced_row_echelon_counting_rows<F: FiniteField>(
+/// Both passes are bounded, which is the point: the back-substitution is where this form fills in,
+/// so budgeting only the echelon half would budget the cheaper one. `Err` carries the count that
+/// crossed the limit and `matrix` should not be read, exactly as [`row_echelon_within`].
+///
+/// Added for F4's batch path (#477), which has a live-entry allowance to respect and so could not
+/// call the unbounded form. [`crate::grobner::f4`]'s final interreduction works around the same
+/// gap by budgeting at matrix *construction* instead, which bounds what is built rather than what
+/// elimination then makes of it.
+pub fn reduced_row_echelon_within<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
-) -> (EliminationStatistics, usize) {
-    let mut statistics = row_echelon(matrix);
+    max_nonzeros: usize,
+) -> Result<EliminationStatistics, usize> {
+    let mut statistics = row_echelon_within(matrix, max_nonzeros)?;
+    back_substitute_pivots_within(matrix, max_nonzeros, &mut statistics)?;
+    Ok(statistics)
+}
+
+/// Clear every pivot column from every other row, so a pivot column holds one nonzero entry.
+///
+/// `matrix` must already be in row echelon form; the statistics must be that elimination's, since
+/// this pass extends them rather than starting its own. Returns how many rows it examined.
+///
+/// Separated from [`reduced_row_echelon`] so that a caller holding a matrix some *other* route
+/// left in echelon form — a block elimination that took its pivots as given, for instance — can
+/// reach the second pass without re-running the first.
+///
+/// # Errors
+/// The live entry count that crossed `max_nonzeros`.
+pub fn back_substitute_pivots_within<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+    max_nonzeros: usize,
+    statistics: &mut EliminationStatistics,
+) -> Result<usize, usize> {
     let mut scratch: Vec<(usize, F)> = Vec::new();
     let mut resident = statistics.final_nonzeros;
     let mut rows_examined = 0usize;
@@ -214,12 +240,29 @@ fn reduced_row_echelon_counting_rows<F: FiniteField>(
             resident += row.nonzeros();
             statistics.peak_nonzeros = statistics.peak_nonzeros.max(resident);
             matrix.rows_mut()[index] = row;
+            if resident > max_nonzeros {
+                return Err(resident);
+            }
         }
     }
 
     matrix.sort_rows_by_leading_column();
     statistics.final_nonzeros = resident;
     debug_assert_eq!(statistics.final_nonzeros, matrix.nonzeros());
+    Ok(rows_examined)
+}
+
+/// [`reduced_row_echelon`], also reporting how many rows the back-substitution pass examined.
+///
+/// The count is what the output-sensitivity test weighs against the entries the pivot columns
+/// actually hold; it is not part of the public contract, which is why it is not an
+/// [`EliminationStatistics`] field.
+fn reduced_row_echelon_counting_rows<F: FiniteField>(
+    matrix: &mut SparseMatrix<F>,
+) -> (EliminationStatistics, usize) {
+    let mut statistics = row_echelon(matrix);
+    let rows_examined = back_substitute_pivots_within(matrix, usize::MAX, &mut statistics)
+        .expect("an unbounded back-substitution cannot exceed its budget");
     (statistics, rows_examined)
 }
 
@@ -281,8 +324,8 @@ impl PivotColumnRows {
 #[cfg(test)]
 mod tests {
     use super::{
-        reduced_row_echelon, reduced_row_echelon_counting_rows, row_echelon, row_echelon_within,
-        EliminationStatistics,
+        back_substitute_pivots_within, reduced_row_echelon, reduced_row_echelon_counting_rows,
+        reduced_row_echelon_within, row_echelon, row_echelon_within, EliminationStatistics,
     };
     use crate::{
         fields::{Zp13, Zp2147483647, Zp541, Zp7},
@@ -1185,5 +1228,141 @@ mod tests {
         assert_eq!(rank_over::<Zp13>(), 2, "13 vanishes over GF(13)");
         assert_eq!(rank_over::<Zp541>(), 3);
         assert_eq!(rank_over::<Zp2147483647>(), 3);
+    }
+
+    /// A random sparse matrix, for the budget and agreement tests below.
+    fn random_sparse<G: FiniteField>(
+        rows: usize,
+        columns: usize,
+        density: f64,
+        rng: &mut StdRng,
+    ) -> SparseMatrix<G> {
+        let sparse_rows: Vec<SparseRow<G>> = (0..rows)
+            .map(|_| {
+                let mut entries: Vec<(usize, G)> = Vec::new();
+                for column in 0..columns {
+                    if rng.gen_bool(density) {
+                        entries.push((column, G::random(rng)));
+                    }
+                }
+                SparseRow::new(&entries)
+            })
+            .collect();
+        SparseMatrix::new(columns, sparse_rows)
+    }
+
+    /// An ample budget makes `reduced_row_echelon_within` the unbounded form exactly, statistics
+    /// included — so the bounded entry point is the same computation and not a second one.
+    #[test]
+    fn test_the_bounded_reduced_echelon_matches_the_unbounded_one() {
+        let mut rng = StdRng::seed_from_u64(0x0004_7701);
+        for (rows, columns) in [(4usize, 4usize), (6, 4), (4, 6), (8, 8), (12, 7), (20, 25)] {
+            for density in [0.1f64, 0.3, 0.6, 1.0] {
+                let matrix = random_sparse::<F>(rows, columns, density, &mut rng);
+                let mut unbounded = matrix.clone();
+                let expected = reduced_row_echelon(&mut unbounded);
+                let mut bounded = matrix.clone();
+                let actual = reduced_row_echelon_within(&mut bounded, usize::MAX)
+                    .expect("an unbounded budget cannot be exceeded");
+                assert_eq!(actual, expected, "{}x{} at {}", rows, columns, density);
+                assert_eq!(bounded, unbounded, "{}x{} at {}", rows, columns, density);
+            }
+        }
+    }
+
+    /// Back-substituting an already-echelon matrix reproduces the reduced form, which is what lets
+    /// a block elimination that took its pivots as given reach the second pass without re-running
+    /// the first.
+    #[test]
+    fn test_back_substitution_after_echelon_is_the_reduced_form() {
+        let mut rng = StdRng::seed_from_u64(0x0004_7702);
+        for (rows, columns) in [(4usize, 4usize), (6, 4), (4, 6), (8, 8), (12, 7), (20, 25)] {
+            for density in [0.1f64, 0.3, 0.6, 1.0] {
+                let matrix = random_sparse::<F>(rows, columns, density, &mut rng);
+                let mut reference = matrix.clone();
+                let expected = reduced_row_echelon(&mut reference);
+
+                let mut staged = matrix.clone();
+                let mut statistics = row_echelon(&mut staged);
+                back_substitute_pivots_within(&mut staged, usize::MAX, &mut statistics)
+                    .expect("an unbounded budget cannot be exceeded");
+
+                assert_eq!(staged, reference, "{}x{} at {}", rows, columns, density);
+                assert_eq!(statistics, expected, "{}x{} at {}", rows, columns, density);
+            }
+        }
+    }
+
+    /// The back-substitution half is budgeted too, which is the whole reason the bounded entry
+    /// point exists: a budget that admits the echelon pass can still be crossed by the fill-in the
+    /// second pass causes, and before #477 there was no way to say so.
+    ///
+    /// The fixture is explicit rather than random because the case is not generic — a dense random
+    /// matrix reduces without growing, and the first attempt at this test passed vacuously. What
+    /// causes the growth is a *late* pivot with a long tail outside every pivot column, held by
+    /// many earlier rows: clearing it copies that tail into each of them.
+    #[test]
+    fn test_the_budget_covers_the_back_substitution_pass() {
+        const COLUMNS: usize = 50;
+        const EARLY: usize = 20;
+        // Rows 0..20 each lead with their own column and also hold column 20.
+        let mut rows: Vec<Vec<(usize, u64)>> =
+            (0..EARLY).map(|i| vec![(i, 1u64), (EARLY, 1u64)]).collect();
+        // Row 20 leads with column 20 and carries a 20-entry tail no pivot column covers.
+        let mut tail: Vec<(usize, u64)> = vec![(EARLY, 1u64)];
+        tail.extend((30..COLUMNS).map(|c| (c, 1u64)));
+        rows.push(tail);
+        let borrowed: Vec<&[(usize, u64)]> = rows.iter().map(|r| r.as_slice()).collect();
+        let matrix = matrix_of(&borrowed, COLUMNS);
+
+        let mut echelon_only = matrix.clone();
+        let echelon = row_echelon(&mut echelon_only);
+        let mut reduced_copy = matrix.clone();
+        let reduced = reduced_row_echelon(&mut reduced_copy);
+        assert!(
+            reduced.peak_nonzeros > echelon.peak_nonzeros,
+            "this fixture does not exercise the case: echelon peaked at {} and reduced at {}",
+            echelon.peak_nonzeros,
+            reduced.peak_nonzeros
+        );
+
+        // A budget at the echelon form's own peak: the first pass fits, the second does not.
+        let budget = echelon.peak_nonzeros;
+        let mut bounded = matrix.clone();
+        assert!(
+            row_echelon_within(&mut bounded, budget).is_ok(),
+            "the echelon pass should fit in its own peak"
+        );
+        let mut bounded = matrix.clone();
+        let crossed = reduced_row_echelon_within(&mut bounded, budget)
+            .expect_err("the reduced form exceeds the echelon form's peak here");
+        assert!(
+            crossed > budget,
+            "the error should carry the count that crossed {}, got {}",
+            budget,
+            crossed
+        );
+
+        // And an ample budget reaches the same reduced form, so the refusal is the budget's doing
+        // and not the bounded path computing something else.
+        let mut bounded = matrix.clone();
+        assert_eq!(
+            reduced_row_echelon_within(&mut bounded, usize::MAX),
+            Ok(reduced)
+        );
+        assert_eq!(bounded, reduced_copy);
+    }
+
+    /// A budget below the input is refused before any work, by both passes alike.
+    #[test]
+    fn test_a_budget_below_the_input_is_refused() {
+        let mut rng = StdRng::seed_from_u64(0x0004_7704);
+        let matrix = random_sparse::<F>(8, 8, 1.0, &mut rng);
+        let initial = matrix.nonzeros();
+        let mut bounded = matrix.clone();
+        assert_eq!(
+            reduced_row_echelon_within(&mut bounded, initial - 1),
+            Err(initial)
+        );
     }
 }

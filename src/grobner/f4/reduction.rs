@@ -28,7 +28,7 @@ use crate::{
             macaulay::{BuildBudgetExceeded, MacaulayMatrix},
             options::{F4Error, F4Options, ReductionStrategy},
             statistics::{BatchStatistics, StageClock},
-            structured::{eliminate, BlockPlan},
+            structured::{eliminate_to, BlockPlan, RowForm},
             symbolic::{symbolic_preprocessing_with, MonicBasis, ReducerCache, RowKind},
         },
         pairs::CriticalPair,
@@ -161,7 +161,12 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         ReductionStrategy::Unstructured => BlockPlan::Baseline,
         ReductionStrategy::Structured => BlockPlan::ReducersFirstBlock,
     };
-    let block = eliminate(plan, options.elimination, &mut matrix, allowance)
+    let form = if options.reduce_batch_rows {
+        RowForm::Reduced
+    } else {
+        RowForm::Echelon
+    };
+    let block = eliminate_to(plan, form, options.elimination, &mut matrix, allowance)
         .map_err(|nonzeros| options.entry_budget_error::<F>(nonzeros))?;
     let elimination = block.statistics;
     stages.elimination = clock.lap();
@@ -233,6 +238,7 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         // for, so this is zero there. Zero is the honest answer to "how many pivots did this
         // elimination know in advance", not a missing measurement.
         free_pivots: block.free_pivots,
+        back_substituted_rows: block.back_substituted_rows,
         input_leading_monomials: preprocessed.leading_monomials.len(),
         batch_degree,
         min_candidate_degree,
@@ -280,6 +286,17 @@ mod tests {
     fn system(strings: &[&str]) -> Vec<MultivariatePolynomial<3, F>> {
         strings.iter().map(|s| parse(s)).collect()
     }
+
+    /// The systems the row-form tests sweep, chosen to include ones whose batches carry reducible
+    /// tails — a three-variable toy often has an echelon form that is already reduced, and a test
+    /// built only on those would pass without exercising anything.
+    const ROW_FORM_SYSTEMS: [&[&str]; 5] = [
+        &["x^2 + y", "x^2 + z"],
+        &["x^2 + y", "x^2 + z", "x^2 + y + z"],
+        &["x^2*y + z", "y^2*z + x", "x*z^2 + y", "x*y*z - 1"],
+        &["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+        &["x*y + z^2", "x*z + y^2", "y*z + x^2", "x + y + z"],
+    ];
 
     /// Every pair of a system, as one batch.
     fn all_pairs<const N: usize, G: FiniteField>(
@@ -661,5 +678,119 @@ mod tests {
         // Generous limits succeed on the same input, so the failures are the limits and not the
         // batch.
         assert!(reduce_batch(&basis, &pairs, order, &F4Options::default()).is_ok());
+    }
+
+    /// `reduce_batch_rows` cannot change which rows become candidates.
+    ///
+    /// Extraction keeps the rows whose leading column is not already a leading monomial of an
+    /// input row, and back-substitution never changes a row's leading column — so the selection is
+    /// the same either way. #477 called that an argument rather than a test; this is the test. What
+    /// the flag *is* allowed to change is each candidate's tail, and the final assertion pins that
+    /// the sweep actually reaches a case where it does, so the agreement above is not vacuous.
+    #[test]
+    fn test_the_row_form_does_not_change_candidate_selection() {
+        let echelon = F4Options {
+            reduce_batch_rows: false,
+            ..F4Options::default()
+        };
+        let reduced = F4Options {
+            reduce_batch_rows: true,
+            ..F4Options::default()
+        };
+
+        let mut tails_differed = 0;
+        for strings in ROW_FORM_SYSTEMS {
+            for order in ALL_ORDERS {
+                let polynomials = system(strings);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = all_pairs(&polynomials, order);
+
+                let left = reduce_batch(&basis, &pairs, order, &echelon).expect("within limits");
+                let right = reduce_batch(&basis, &pairs, order, &reduced).expect("within limits");
+
+                let what = format!("{:?} under {}", strings, order.name());
+                assert_eq!(
+                    left.candidates.len(),
+                    right.candidates.len(),
+                    "candidate count: {}",
+                    what
+                );
+                let leads = |outcome: &super::BatchOutcome<3, F>| -> Vec<_> {
+                    outcome
+                        .candidates
+                        .iter()
+                        .map(|c| c.leading_monomial(order))
+                        .collect()
+                };
+                assert_eq!(leads(&left), leads(&right), "leading monomials: {}", what);
+
+                // The statistic says which route ran, so a flag that silently did nothing would
+                // make this test pass while measuring the same thing twice.
+                assert_eq!(left.statistics.back_substituted_rows, None, "{}", what);
+                assert!(
+                    right.statistics.back_substituted_rows.is_some(),
+                    "the reduced route did not report a back-substitution: {}",
+                    what
+                );
+
+                if left.candidates != right.candidates {
+                    tails_differed += 1;
+                }
+            }
+        }
+        assert!(
+            tails_differed > 0,
+            "no system in the sweep produced a candidate whose tail the reduced form changed, so \
+             the agreement above is vacuous and the fixtures need to be harder"
+        );
+    }
+
+    /// The reduced route's candidates are in normal form with respect to the batch's own pivots:
+    /// no candidate's tail holds a monomial another candidate leads with.
+    ///
+    /// This is the property #477 wants and the one the echelon route does not have. Asserted
+    /// against the echelon route on the same input, so a system where both happen to be reduced
+    /// cannot make it look established.
+    #[test]
+    fn test_the_reduced_route_leaves_no_candidate_reducible_by_another() {
+        let reduced = F4Options {
+            reduce_batch_rows: true,
+            ..F4Options::default()
+        };
+
+        for strings in ROW_FORM_SYSTEMS {
+            for order in ALL_ORDERS {
+                let polynomials = system(strings);
+                let basis = MonicBasis::new(&polynomials, order);
+                let pairs = all_pairs(&polynomials, order);
+                let outcome = reduce_batch(&basis, &pairs, order, &reduced).expect("within limits");
+
+                let leads: Vec<_> = outcome
+                    .candidates
+                    .iter()
+                    .map(|c| c.leading_monomial(order))
+                    .collect();
+                for (index, candidate) in outcome.candidates.iter().enumerate() {
+                    for monomial in candidate.terms().keys() {
+                        if *monomial == leads[index] {
+                            continue;
+                        }
+                        for (other, lead) in leads.iter().enumerate() {
+                            if other == index {
+                                continue;
+                            }
+                            assert_ne!(
+                                monomial, lead,
+                                "candidate {} carries candidate {}'s leading monomial: {:?} under {}",
+                                index,
+                                other,
+                                strings,
+                                order.name()
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }

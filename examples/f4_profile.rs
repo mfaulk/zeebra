@@ -28,7 +28,7 @@
 //! Each configuration is one row of the milestone's ablation table. They are named here rather
 //! than assembled at each call site so that every workstream reports the same thing.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use zeebra::{
     fields::Zp2147483647,
@@ -472,6 +472,234 @@ fn interreduction<const N: usize>(
     }
 }
 
+/// Echelon against reduced batch rows, over both interreduction routes, on one build.
+///
+/// #477's question, as four arms rather than two. The payoff it claims is a smaller final
+/// autoreduce matrix, and that matrix only exists when `interreduce_by_matrix` is on — but that
+/// flag is **off by default** (#507 is the issue that decides it), so measuring only the matrix
+/// route would answer a question about a path no board row describes. The division arms are what
+/// say whether this flag pays on the path that ships today.
+///
+/// The price is the batch elimination stage, the payoff is the interreduction stage, and the only
+/// figure that decides it is the total. Interleaved and repeated for the same reason
+/// [`compare_interreduction_routes`] is, and every basis is asserted equal to the first.
+fn compare_batch_row_forms() {
+    let built = mq_instance();
+    let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
+    let mut compiled = [""; 10];
+    compiled.copy_from_slice(&names[..10]);
+    let system: Vec<MultivariatePolynomial<10, F>> = built
+        .system
+        .iter()
+        .map(|text| {
+            MultivariatePolynomial::parse(text, compiled).expect("this crate rendered this text")
+        })
+        .collect();
+
+    let order = MonomialOrder::GradedReverseLexicographic;
+    let arm = |interreduce_by_matrix: bool, reduce_batch_rows: bool| F4Options {
+        measure_stages: true,
+        interreduce_by_matrix,
+        reduce_batch_rows,
+        ..F4Options::default()
+    };
+    let arms = [
+        ("div+echelon", arm(false, false)),
+        ("div+reduced", arm(false, true)),
+        ("mat+echelon", arm(true, false)),
+        ("mat+reduced", arm(true, true)),
+    ];
+
+    println!(
+        "{:<4} {:<13} {:>10} {:>10} {:>10} {:>13} {:>6}",
+        "rep", "arm", "total/ms", "elim/ms", "inter/ms", "backsub rows", "basis"
+    );
+
+    let mut reference: Option<Vec<MultivariatePolynomial<10, F>>> = None;
+    for rep in 1..=3 {
+        for (label, options) in &arms {
+            let (basis, s) = match f4_with_options(&system, order, options) {
+                Ok(result) => result,
+                Err(error) => {
+                    println!("{rep:<4} {label:<13} {error}");
+                    continue;
+                }
+            };
+            match &reference {
+                None => reference = Some(basis.clone()),
+                Some(expected) => assert_eq!(
+                    &basis, expected,
+                    "{label} returned a different basis from the first run; a reduced \
+                     Grobner basis is unique, so this is a correctness failure"
+                ),
+            }
+            println!(
+                "{:<4} {:<13} {:>10.2} {:>10.2} {:>10.2} {:>13} {:>6}",
+                rep,
+                label,
+                millis(s.total),
+                millis(s.stages.elimination),
+                millis(s.stages.interreduction),
+                match s.back_substituted_rows {
+                    Some(rows) => rows.to_string(),
+                    None => "-".to_string(),
+                },
+                basis.len()
+            );
+            match s.interreduction_matrix {
+                Some(m) => println!(
+                    "     autoreduce matrix {} x {} = {} cells, {} nonzeros, {} elements{}",
+                    m.rows,
+                    m.columns,
+                    m.rows.saturating_mul(m.columns),
+                    m.nonzeros,
+                    m.elements,
+                    if m.fell_back {
+                        " -- FELL BACK to the division route, so this timing is not the matrix route's"
+                    } else {
+                        ""
+                    }
+                ),
+                None => println!("     autoreduce matrix: none built (division route)"),
+            }
+        }
+    }
+}
+
+/// `reduce_batch_rows` on the classical rungs, which is what a default flip would have to survive.
+///
+/// `mq-random-10` is one instance under one order, and §3a.1b of
+/// `docs/research/interreduction-cost.md` is the standing warning against reading a default off
+/// one: the matrix interreduction route is 1.07x–1.72x faster on three rungs and **25x slower** on
+/// katsura-5 under lex, because a basis in shape position is the best case for iterated division
+/// and the worst case for a matrix. This flag is a different lever — it changes the batch path, not
+/// the interreduction route — but it has the same exposure: the second pass is paid per batch
+/// whether or not the final stage was ever expensive, so an instance whose interreduction already
+/// costs a millisecond has nothing to win and a pass to pay for.
+///
+/// So katsura-5 under lex is in this table deliberately. The interreduction route is off on both
+/// arms, which is the shipping default.
+fn compare_batch_row_forms_on_the_rungs() {
+    /// Minimum of this many interleaved repetitions; these instances run in milliseconds, where
+    /// one pair of runs cannot separate a real change from this box's spread.
+    const REPETITIONS: usize = 7;
+
+    let echelon = F4Options::default();
+    let reduced = F4Options {
+        reduce_batch_rows: true,
+        ..F4Options::default()
+    };
+
+    println!(
+        "{:<13} {:<9} {:>12} {:>12} {:>8} {:>13} {:>6}",
+        "instance", "order", "echelon/ms", "reduced/ms", "ratio", "backsub rows", "basis"
+    );
+
+    fn row<const N: usize>(
+        label: &str,
+        system: &[MultivariatePolynomial<N, F>],
+        orders: &[MonomialOrder],
+        echelon: &F4Options,
+        reduced: &F4Options,
+        repetitions: usize,
+    ) {
+        for order in orders {
+            let mut best_echelon = f64::INFINITY;
+            let mut best_reduced = f64::INFINITY;
+            let mut rows_examined = None;
+            let mut length = 0usize;
+            let mut reference: Option<Vec<MultivariatePolynomial<N, F>>> = None;
+
+            for _ in 0..repetitions {
+                for (is_reduced, options) in [(false, echelon), (true, reduced)] {
+                    let start = Instant::now();
+                    let Ok((basis, statistics)) = f4_with_options(system, *order, options) else {
+                        println!("{label:<13} {:<9} refused its budgets", order.name());
+                        return;
+                    };
+                    let elapsed = start.elapsed().as_secs_f64() * 1e3;
+                    match &reference {
+                        None => reference = Some(basis.clone()),
+                        Some(expected) => assert_eq!(
+                            &basis,
+                            expected,
+                            "{label} under {} returned a different basis; a reduced Grobner \
+                             basis is unique, so this is a correctness failure",
+                            order.name()
+                        ),
+                    }
+                    length = basis.len();
+                    if is_reduced {
+                        best_reduced = best_reduced.min(elapsed);
+                        rows_examined = statistics.back_substituted_rows;
+                    } else {
+                        best_echelon = best_echelon.min(elapsed);
+                    }
+                }
+            }
+
+            println!(
+                "{:<13} {:<9} {:>12.4} {:>12.4} {:>8.2} {:>13} {:>6}",
+                label,
+                order.name(),
+                best_echelon,
+                best_reduced,
+                best_echelon / best_reduced,
+                match rows_examined {
+                    Some(rows) => rows.to_string(),
+                    None => "-".to_string(),
+                },
+                length
+            );
+        }
+    }
+
+    const LEX: [MonomialOrder; 1] = [MonomialOrder::Lexicographic];
+    const GREVLEX: [MonomialOrder; 1] = [MonomialOrder::GradedReverseLexicographic];
+
+    // The 25x-regression rung for the matrix route, under the order that causes it.
+    row(
+        "katsura-5",
+        &katsura::<5, F>(),
+        &LEX,
+        &echelon,
+        &reduced,
+        REPETITIONS,
+    );
+    row(
+        "katsura-5",
+        &katsura::<5, F>(),
+        &GREVLEX,
+        &echelon,
+        &reduced,
+        REPETITIONS,
+    );
+    row(
+        "katsura-6",
+        &katsura::<6, F>(),
+        &GREVLEX,
+        &echelon,
+        &reduced,
+        REPETITIONS,
+    );
+    row(
+        "cyclic-5",
+        &cyclic::<5, F>(),
+        &GREVLEX,
+        &echelon,
+        &reduced,
+        REPETITIONS,
+    );
+    row(
+        "cyclic-4",
+        &cyclic::<4, F>(),
+        &LEX,
+        &echelon,
+        &reduced,
+        REPETITIONS,
+    );
+}
+
 /// The division and matrix interreduction routes, measured against each other on one build.
 ///
 /// Interleaved and repeated, because this box's run-to-run spread is wide enough that a single
@@ -655,7 +883,7 @@ fn main() {
     if argument == "list" {
         println!("configurations: {}", CONFIGURATIONS.join(", "));
         println!(
-            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation\n             counts), mq-instance (its canonical text)"
+            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation\n             counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's\n             batch row form A/B), mq-instance (its canonical text)"
         );
         return;
     }
@@ -687,6 +915,33 @@ fn main() {
         println!("difference is in the comparison. Both bases asserted equal.");
         println!();
         compare_interreduction_routes();
+        return;
+    }
+
+    if argument == "mq-rows" {
+        // #477: does making each batch's candidates come out reduced pay for the second pass it
+        // costs? Crossed with the interreduction route, because the payoff lands in a different
+        // place on each — a smaller autoreduce matrix on the matrix route, fewer term rewrites on
+        // the division one — and the division route is what ships today.
+        println!();
+        println!("## #477: batch rows left echelon against left reduced");
+        println!();
+        println!("ISA: {}", zeebra::util::isa_floor());
+        println!("instance digest: {}", RECORDED_DIGEST);
+        println!();
+        println!("Four arms: both interreduction routes crossed with both batch row forms,");
+        println!("interleaved in one process on one build. The division arms are the ones that");
+        println!("describe the shipping default. Every basis asserted equal to the first.");
+        println!();
+        compare_batch_row_forms();
+        println!();
+        println!("### The classical rungs, where a default flip would have to survive");
+        println!();
+        println!("Division interreduction on both arms, which is the shipping default. Minimum of");
+        println!("7 interleaved repetitions. katsura-5 under lex is here deliberately: it is the");
+        println!("rung the matrix interreduction route regresses 25x on.");
+        println!();
+        compare_batch_row_forms_on_the_rungs();
         return;
     }
 

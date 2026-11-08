@@ -1610,6 +1610,123 @@ fn test_structured_elimination_agrees_batch_by_batch_on_the_benchmark_families()
     }
 }
 
+/// `reduce_batch_rows` returns the same basis as the echelon route, on the corpus and in every
+/// order.
+///
+/// The flag changes each batch's candidates — their tails are reduced — so this is not a tautology
+/// the way a flag that only reorders work would be. What makes the bases equal anyway is that a
+/// reduced Gröbner basis is determined by its leading monomials, which is the same argument
+/// `interreduce_by_matrix` rests on.
+#[test]
+fn test_reducing_batch_rows_returns_the_same_basis_on_the_corpus() {
+    let echelon = F4Options::default();
+    let reduced = F4Options {
+        reduce_batch_rows: true,
+        ..F4Options::default()
+    };
+    for order in ALL_ORDERS {
+        for strings in corpus() {
+            let f = system(&strings);
+            let (expected, _) = f4_with_options(&f, order, &echelon).expect("within limits");
+            let (actual, _) = f4_with_options(&f, order, &reduced).expect("within limits");
+            assert_eq!(actual, expected, "{:?} under {}", strings, order.name());
+        }
+    }
+}
+
+/// The same equality on the benchmark families, which is where the two row forms actually diverge.
+///
+/// The three-variable corpus is small enough that a batch's echelon form is often already reduced;
+/// these instances are where it is not, so this is the test that would catch a back-substitution
+/// that corrupted a candidate rather than merely normalizing it. The final assertion pins that the
+/// sweep reached such a batch, so the agreement cannot be vacuous.
+#[test]
+fn test_reducing_batch_rows_agrees_on_the_benchmark_families() {
+    use crate::grobner::f4::reduce_batch;
+    type G = Zp2147483647;
+
+    let echelon = F4Options::default();
+    let reduced = F4Options {
+        reduce_batch_rows: true,
+        ..F4Options::default()
+    };
+    let mut tails_differed = 0usize;
+
+    fn check<const N: usize>(
+        name: &str,
+        generators: &[MultivariatePolynomial<N, G>],
+        order: MonomialOrder,
+        echelon: &F4Options,
+        reduced: &F4Options,
+        tails_differed: &mut usize,
+    ) {
+        use crate::grobner::trace_batches;
+
+        let (expected, _) = f4_with_options(generators, order, echelon).expect("within limits");
+        let (actual, _) = f4_with_options(generators, order, reduced).expect("within limits");
+        assert_eq!(actual, expected, "{} under {}", name, order.name());
+
+        // Batch by batch: the selection must match exactly, and the tails are allowed to differ.
+        let (_, _, trace) = trace_batches(generators, order, echelon).expect("within limits");
+        for (index, batch) in trace.batches().iter().enumerate() {
+            let left =
+                reduce_batch(&batch.basis, &batch.pairs, order, echelon).expect("within limits");
+            let right =
+                reduce_batch(&batch.basis, &batch.pairs, order, reduced).expect("within limits");
+            let leads = |candidates: &[MultivariatePolynomial<N, G>]| -> Vec<_> {
+                candidates
+                    .iter()
+                    .map(|p| p.leading_monomial(order))
+                    .collect()
+            };
+            assert_eq!(
+                leads(&right.candidates),
+                leads(&left.candidates),
+                "{} under {}: batch {}",
+                name,
+                order.name(),
+                index
+            );
+            if left.candidates != right.candidates {
+                *tails_differed += 1;
+            }
+        }
+    }
+
+    for order in ALL_ORDERS {
+        check(
+            "cyclic-4",
+            &cyclic::<4, G>(),
+            order,
+            &echelon,
+            &reduced,
+            &mut tails_differed,
+        );
+        check(
+            "katsura-4",
+            &katsura::<4, G>(),
+            order,
+            &echelon,
+            &reduced,
+            &mut tails_differed,
+        );
+        check(
+            "katsura-5",
+            &katsura::<5, G>(),
+            order,
+            &echelon,
+            &reduced,
+            &mut tails_differed,
+        );
+    }
+
+    assert!(
+        tails_differed > 0,
+        "no batch in the sweep had a candidate whose tail the reduced form changed, so the \
+         agreement above is vacuous and the families need to be larger"
+    );
+}
+
 /// Structured elimination returns the baseline's basis on the benchmark systems, in every order.
 #[test]
 fn test_structured_elimination_agrees_on_the_benchmark_systems() {
