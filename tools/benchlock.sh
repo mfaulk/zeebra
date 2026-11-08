@@ -136,6 +136,7 @@ set -uo pipefail
 #
 # The path is a parameter so the tests can read a synthetic one, and an unreadable or malformed
 # `/proc/loadavg` renders `unknown` rather than a number nobody measured.
+# shellcheck disable=SC2120  # the path argument is passed only by the tests, which source this file
 bl_load() { # [loadavg-path]
   local path="${1:-/proc/loadavg}" first
   # Readability is checked before the redirection rather than after: a failed `<` is reported by
