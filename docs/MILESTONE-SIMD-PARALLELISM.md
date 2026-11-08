@@ -6,7 +6,8 @@ recovered from git rather than recorded at the time ([§10](research/external-co
 **Status:** complete — M19-0 through M19-D landed; M19-E, M19-F and M19-G closed won't-do on
 measurements recorded in §6; #62 landed afterwards and is recorded in §8, which corrects §5.3's
 bandwidth reading and reopens the SIMD question at eight lanes; #159 landed after that and is
-recorded in §9, which acts on the `HashMap` §4.4 named
+recorded in §9, which acts on the `HashMap` §4.4 named; and #149 closed the question §8.3 reopened
+won't-do in §10, on all three of its routes
 **Prerequisite:** M16 for the stage attribution this milestone targets; independent of M18, which
 runs in parallel on the quotient-algebra side and touches none of the same files
 **Objective:** remove the software division under every field multiplication, then vectorize and
@@ -44,6 +45,7 @@ division, nothing could be vectorized until that was gone.
 | [#52](https://github.com/mfaulk/zeebra/issues/52) M19-G | Parallel critical-pair criteria | **won't do** — §6.2 |
 | [#62](https://github.com/mfaulk/zeebra/issues/62) | A 32-bit prime field, which §5.3 identifies as the remaining lever | done — §8, and it reopens #49 |
 | [#159](https://github.com/mfaulk/zeebra/issues/159) | The pivot-of-column `HashMap` §4.4 names, indexed by column instead | done — §9, 28% of the default's elimination stage |
+| [#149](https://github.com/mfaulk/zeebra/issues/149) | Whether the 8-lane AVX2 kernel §8.3 reopened should ship | **won't do** — §10; it fits only a backend nothing selects, and the shipped backend's loop would cost 9.81x the cells to make contiguous |
 
 ## 3. What landed
 
@@ -450,6 +452,11 @@ Montgomery replica it runs over is checked against the shipped type before any t
 shipped version would have to answer where the cells come from, since `DenseRows` is generic over
 `FiniteField` and an intrinsic kernel is not.
 
+> That question became #149 and is answered in §10, in the negative. The representation problem
+> turned out not to be the binding one: the loop this kernel fits is `Backend::Dense`'s, no
+> configuration selects that backend, and a *perfect* 2.9x on it still leaves it 1.78x behind the
+> backend `F4Options::default()` does select on the largest instance measured here.
+
 ### 8.4 Where the width pays, per backend
 
 katsura-6 grevlex, F4's elimination stage, and two dense echelons over the same matrices:
@@ -651,3 +658,198 @@ Two shapes fall back to hashing rather than indexing, and both are tested at the
 `4 * num_columns` would be free. Nothing measured comes within four orders of magnitude of either.
 `Vec<Option<u32>>` was checked rather than assumed: a `u32` has no invalid bit pattern for a
 discriminant to occupy, so `Option<u32>` is eight bytes and the sentinel is what shipped.
+
+## 10. The 8-lane kernel, and the backend it cannot reach (#149)
+
+**Won't do.** §8.3 reopened #49 in the positive: eight lanes over a four-byte cell run 1.76x to
+2.90x against the autovectorized comparand. #149 asked whether that kernel should ship, and the
+answer is no — not because the lane win is not real, but because **the only loop it fits is in a
+backend nothing selects, and the backend that is selected has no contiguous loop to put it in.**
+This section is the measurement that decided it.
+
+Machine and protocol: as §4 — AMD Ryzen Threadripper PRO 5995WX, AVX2/BMI2/FMA, no AVX-512, 256 MB
+of L3. `rustc 1.97.0`, release profile, `taskset --cpu-list 0-7`, every run under
+`tools/benchlock.sh`. Taken at **`1695fb9f`**, which is stated because §9.1's figures are not
+comparable with these across the changes between the two and the commit is what says so.
+
+### 10.1 Nothing selects the dense backend, and a perfect lane win would not change that
+
+[`Backend`](../src/linalg/echelon.rs) is a *static* parameter, not a runtime policy:
+`F4Options::recommended()` — which is what `F4Options::default()` returns — names
+`Backend::Adaptive`, and `F4Options::baseline()` names `Backend::Sparse`. **No configuration in the
+repository selects `Backend::Dense`**, which exists so that a sparse/dense comparison measures
+storage rather than algorithm.
+
+`cargo run --release --example elimination_density`, every Macaulay matrix each instance builds,
+the mean of three runs (1-minute load average 4.1 to 7.6 at `START`; the lock serializes benchmarks
+and not builds):
+
+| instance | `Sparse` | `Dense` | `Adaptive` | dense conversion | `Dense` at a perfect 2.9x, conversion included | against `Adaptive` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cyclic-4/lex | 0.03 | 0.03 | 0.03 | 0.01 | 0.02 | too small to divide |
+| katsura-5/grevlex | 0.48 | 0.55 | 0.34 | 0.10 | 0.29 | 1.18x faster |
+| katsura-5/lex | 4.52 | 5.65 | 3.28 | 0.52 | 2.47 | **1.33x faster** |
+| katsura-6/grlex | 11.46 | 19.04 | 6.14 | 1.31 | 7.88 | 1.28x slower |
+| cyclic-5/grevlex | 13.04 | 21.92 | 7.43 | 1.14 | 8.70 | 1.17x slower |
+| katsura-6/grevlex | 14.85 | 40.01 | 8.87 | 1.95 | 15.75 | **1.78x slower** |
+
+Milliseconds, ordered by what the shipped backend costs. The `Dense` column is elimination alone;
+densifying and sparsifying is its own column because SIMD does not touch it and a caller pays it,
+so the sixth column divides only the elimination by the **best** ratio §8.2 measured — in cache, a
+ceiling and not a prediction — and adds the conversion back unchanged.
+
+The three runs reproduce to within **2.9%** on every backend and instance **except `Dense` on
+katsura-6 grevlex**, which spans 38.73 to 40.77 ms, a 5.0% spread — the one arm whose working set
+is a 1388 x 1410 dense matrix, and the one the conclusion rests on. Taken at its *fastest* run it
+is still 1.72x behind `Adaptive`, so the margin survives the spread rather than depending on which
+end of it is read.
+
+**The sign of the result tracks instance size, and it is negative where the time is.** A perfect
+2.9x on the dense kernel would beat the shipped backend on the two smallest instances measured, by
+1.18x and 1.33x on eliminations costing 0.34 ms and 3.28 ms; it loses on all three larger ones, by
+up to 1.78x on katsura-6 grevlex, the largest instance §8.4 and §9.1 both report. Tying `Adaptive`
+there needs **4.51x** on the kernel comparing elimination with elimination, and **5.78x** to cover
+the conversion as well — both above anything §8.2 measured at any working set.
+
+That is not a win worth a specialization mechanism. Realizing even the small end of it needs the
+`DenseRows` representation problem solved — a sealed trait or a `TypeId` path exposing raw
+Montgomery `u32` cells, with a guarantee that `P` is odd and at most 2^31 — **plus** a runtime
+policy to select `Backend::Dense`, which no configuration does today, and the reward is a fraction
+of a millisecond on instances that are not the bottleneck while the same policy loses 1.78x on the
+ones that are. This is the outcome #149 predicted from §8.4's pre-#159 figures; it is re-measured
+here because §9.1 moved all three backends, and the re-measurement moves the margin without
+changing the sign.
+
+Bound: `Dense`'s kernel is **ALU-bound** — §8.2 measured ns/entry flat to within 7% across a
+working set spanning four orders of magnitude, at 15.9 GB/s. That is why the lane win exists there,
+and it is the one place in this section where it does.
+
+### 10.2 The shipped backend's inner loop is a gather and a scatter
+
+`DenseAccumulator::subtract_scaled` walks the **pivot's** sparse entries and indexes
+`cells[*column]`. AVX2 has `vpgatherdd` and **no scatter at all** — that arrived with AVX-512,
+which this machine does not have — so the kernel cannot be dropped in. The only route to a
+contiguous span is to update `cells[pivot.lead .. pivot.tail)` whole, treating the pivot as dense
+within its own span, which does
+
+    span = trailing_column - leading_column + 1
+
+cell updates where the shipped loop does `support = nonzeros`. **`span / support` is the work
+multiplier a wide kernel must beat with its lane win**, and it is a property of the matrices rather
+than of a timing, so it reproduces exactly.
+
+`cargo run --release --example accumulator_span`, weighted by row operations because that is where
+the time is. **Both reduction strategies**, because they do not see the same matrices:
+`ReductionStrategy` changes which candidates come out of each batch and hence every later batch, so
+the unstructured plan is the instrument §9.1 used and the structured one is what
+`F4Options::default()` runs.
+
+| instance | plan | row operations | mean support | mean span | span / support | span < 8 cells | 2.9x / multiplier |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cyclic-4/lex | unstructured | 278 | 5.0 | 12.4 | 2.47x | 12.6% | 1.17x |
+| cyclic-5/grevlex | unstructured | 79 775 | 34.2 | 88.6 | 2.59x | 0.5% | 1.12x |
+| katsura-5/lex | unstructured | 27 922 | 30.8 | 64.7 | 2.10x | 0.0% | 1.38x |
+| katsura-5/grevlex | unstructured | 3 179 | 24.9 | 53.3 | 2.14x | 0.0% | 1.36x |
+| katsura-6/grlex | unstructured | 50 043 | 47.4 | 118.4 | 2.50x | 0.0% | 1.16x |
+| katsura-6/grevlex | unstructured | 44 023 | 73.5 | 221.3 | 3.01x | 0.0% | 0.96x |
+| katsura-7/grevlex | unstructured | 608 356 | 198.1 | 821.0 | **4.14x** | 0.0% | **0.70x** |
+| **all** | **unstructured** | **813 576** | 159.6 | 644.3 | **4.04x** | 0.1% | **0.72x** |
+| cyclic-4/lex | **structured** | 49 | 4.2 | 10.3 | 2.44x | 26.5% | 1.19x |
+| cyclic-5/grevlex | **structured** | 3 929 | 10.2 | 26.6 | 2.60x | 1.9% | 1.11x |
+| katsura-5/lex | **structured** | 551 | 16.8 | 25.0 | 1.49x | 0.0% | 1.95x |
+| katsura-5/grevlex | **structured** | 1 609 | 9.4 | 37.1 | 3.95x | 0.0% | 0.73x |
+| katsura-6/grlex | **structured** | 8 541 | 22.6 | 69.3 | 3.07x | 0.0% | 0.94x |
+| katsura-6/grevlex | **structured** | 11 885 | 14.1 | 96.7 | **6.85x** | 0.0% | **0.42x** |
+| katsura-7/grevlex | **structured** | 82 082 | 22.2 | 245.3 | **11.04x** | 0.0% | **0.26x** |
+| **all** | **structured** | **108 646** | 20.7 | 203.0 | **9.81x** | 0.1% | **0.30x** |
+
+**The multiplier grows with the instance, crosses the lane ceiling exactly where the time is, and is
+worst under the strategy that ships.** Unstructured it is 2.1x on the smallest instance and 4.14x on
+katsura-7 grevlex, which carries 75% of that half's row operations — a **28% loss** weighted the way
+the clock weights it. Structured it is **9.81x**, and **11.04x** on katsura-7: a contiguous rewrite
+would do eleven cell updates for each one the shipped loop does, against a kernel worth 2.9. That is
+a **3.3x to 3.8x loss**, an order of magnitude clear of the break-even, and the trend runs the wrong
+way on both axes — bigger instances are worse, and the shipped strategy is worse than the baseline.
+
+The reason the structured plan is worse is the reason it is fast. Its pivots are the reducer rows
+**as symbolic preprocessing produced them**, sparse and wide, rather than rows an echelon pass has
+already filled in; that is what takes katsura-7's peak live entries from 1 390 812 to 63 087
+(`docs/MILESTONE-F4-OPTIMIZATION.md` §7.1) and its accumulator traffic here from 156 M cells to
+1.9 M. Sparser pivots over the same spans is precisely a higher `span / support`.
+
+The loss is not a short-vector artifact. **0.1% of row operations have a span under one vector** and
+0.7% under one cache line, so the lanes would fill; the extra cells are simply extra cells. The
+occupancy histogram says where they come from:
+
+| | plan | 0-10% | 10-20% | 20-30% | 30-40% | 40-50% | 50-60% | 60-70% | 70-80% | 80-90% | 90-100% |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| katsura-7/grevlex | unstructured | **51.4%** | 3.5% | 4.7% | 2.5% | 4.1% | 2.8% | 5.8% | 13.2% | 11.2% | 0.8% |
+| **all** | unstructured | **41.9%** | 5.0% | 6.1% | 4.4% | 5.6% | 4.5% | 6.8% | 12.6% | 10.9% | 2.3% |
+| katsura-7/grevlex | **structured** | **71.3%** | 12.3% | 4.8% | 3.8% | 2.7% | 2.0% | 1.0% | 0.8% | 1.0% | 0.4% |
+| **all** | **structured** | **60.3%** | 14.2% | 7.5% | 5.3% | 3.9% | 2.9% | 1.8% | 1.5% | 1.6% | 1.0% |
+
+Share of row operations, by decile of the pivot's occupancy within its own span. Unstructured the
+distribution is **bimodal** — over 40% of row operations apply a pivot under 10% occupied in its
+span, against about 24% in the 70-90% band — so a density-keyed representation switch would have to
+predict which mode a pivot is in, which is the same negative result `Backend::Adaptive`'s own doc
+comment records for global density. Structured there is no second mode at all: **74.5% of row
+operations are under 20% occupied** and 4.1% are above 70%. Nothing is dense enough for a
+contiguous kernel to be the right shape, and that is the configuration that ships.
+
+Bound: the shipped path is **memory-bound, and specifically cache-footprint-bound**, which §9.4
+established on independent evidence — the pivot-lookup saving was proportional to the operation's
+own cost rather than constant, which a removed instruction cannot produce. A wider ALU has nothing
+to widen there, which is the second, independent reason this route does not pay.
+
+### 10.3 The loops that are already contiguous, and the strategy that shrinks them
+
+`normalize` and the gather in `take` both run over `[lead, tail)` **today**, so they could be
+widened with no restructuring at all, and that is the one route §10.2 does not close. Accounting
+for every cell the accumulator reads or writes:
+
+| instance | plan | cells touched | `subtract_scaled` | `normalize` | the gather in `take` |
+| --- | --- | ---: | ---: | ---: | ---: |
+| cyclic-5/grevlex | unstructured | 3 285 936 | 83.1% | 6.2% | 10.7% |
+| katsura-6/grevlex | unstructured | 4 866 144 | 66.5% | 7.8% | 25.7% |
+| katsura-7/grevlex | unstructured | 156 226 795 | 77.2% | 4.1% | 18.8% |
+| **all** | unstructured | **168 817 833** | **76.9%** | **4.4%** | **18.7%** |
+| cyclic-5/grevlex | **structured** | 48 047 | 83.4% | 5.0% | 11.6% |
+| katsura-6/grevlex | **structured** | 178 456 | 93.9% | 1.6% | 4.4% |
+| katsura-7/grevlex | **structured** | 1 894 168 | 96.2% | 1.3% | 2.5% |
+| **all** | **structured** | **2 353 693** | **95.5%** | **1.4%** | **3.1%** |
+
+**This route closes too, and on the same mechanism that closed §10.2.** Unstructured, 23.1% of the
+cell traffic is already in a contiguous loop and three quarters of that is the gather rather than
+the scale, which would have been worth costing. Under the strategy that ships it is **4.5%** —
+1.4% scale and 3.1% gather — because the structured plan reduces the accumulator's total traffic
+82-fold on katsura-7 and takes almost all of that out of the per-row loops rather than the
+per-row-operation one. Fewer, sparser rows reach the accumulator; each still pays one
+`subtract_scaled` per pivot.
+
+So the ceiling on widening both contiguous loops is **4.5% of the accumulator's cell traffic**, and
+that is an upper bound on a time share rather than an estimate of one — cells are not nanoseconds,
+the gather is a compaction rather than an axpy (a left-pack, which without AVX-512's `vpcompressd`
+costs a `movemask` and a `vpermd` through a lookup table), and §10.2's memory bound applies to it
+as well. A 4.5% ceiling is below the 5.0% run-to-run spread §10.1 measured on its own widest arm.
+**Won't do**, and #539 — filed from the unstructured figure before the structured one was taken —
+is closed with this table as the reason rather than left on the board at a premise its own
+instrument contradicts.
+
+### 10.4 Acceptance
+
+| Criterion | State |
+| --- | --- |
+| The decision recorded with the measurement that produced it | met — outcome 3 on all three routes: §10.1 for shipping it to `Dense`, §10.2 for restructuring the shipped loop, §10.3 for the loops that are contiguous already |
+| Each figure states whether it was ALU-bound or bandwidth-bound | met — §10.1 ALU-bound (§8.2), §10.2 and §10.3 memory-bound (§9.4) |
+| Measured on a workload that actually selects the backend | met — §10.2 and §10.3 report both reduction strategies, and the one `F4Options::default()` runs is the one the decision turns on |
+| If shipped: identical matrices and `EliminationStatistics`, runtime probe, exercised fallback | n/a — nothing ships |
+| If shipped: a specialization that cannot select the kernel for an even or above-2^31 modulus | n/a — nothing ships |
+| No regression on `Backend::Adaptive` | met — no `src/` change, and `examples/accumulator_span.rs` asserts per matrix that its replay applies the same pivots the backend does, by `row_operations` and `pivot_inversions` |
+
+What ships is the instrument. `examples/accumulator_span.rs` reports the span-against-support
+statistic, and it is **self-checking**: for every matrix it replays, it also runs
+`row_echelon_with(Backend::Adaptive, ..)` and asserts that its own pivot-application count and
+normalization count equal `EliminationStatistics::row_operations` and
+`EliminationStatistics::pivot_inversions`. A replay that drifted from the shipped loop would report
+a real histogram of the wrong population, and that assertion is what rules it out. The counts also
+match §9.1's independently — 44 023 on katsura-6 grevlex and 608 356 on katsura-7.
