@@ -111,7 +111,7 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     // Symbolic preprocessing discovers rows one at a time and matrix construction writes entries
     // one row at a time, so both can refuse to continue; checking afterwards would mean paying the
     // allocation in order to find out it was not allowed.
-    let preprocessed = symbolic_preprocessing_with(
+    let mut preprocessed = symbolic_preprocessing_with(
         basis,
         pairs,
         options.max_matrix_rows,
@@ -137,6 +137,10 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     })?;
     stages.construction = clock.lap();
     stages.construction_split = construction_split;
+
+    // The columns are in the matrix now, so the interned set has no reader left. Released here
+    // rather than at the end of the batch, so that elimination's working set is not carrying it.
+    preprocessed.release_monomials();
 
     let reducer_rows = preprocessed
         .rows

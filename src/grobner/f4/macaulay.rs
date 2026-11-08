@@ -633,6 +633,25 @@ mod tests {
         }
     }
 
+    /// Releasing the interned set empties it and leaves the rest of the batch's data intact.
+    #[test]
+    fn test_releasing_the_interned_set_keeps_the_rest_of_the_batch() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+        let basis = MonicBasis::new(&polynomials, order);
+        let pairs = vec![CriticalPair::new(&polynomials, 0, 1, order)];
+        let mut preprocessed = symbolic_preprocessing(&basis, &pairs);
+
+        let rows = preprocessed.rows.clone();
+        let leads = preprocessed.leading_monomials.clone();
+        assert!(!preprocessed.monomials.is_empty());
+
+        preprocessed.release_monomials();
+        assert!(preprocessed.monomials.is_empty());
+        assert_eq!(preprocessed.rows, rows);
+        assert_eq!(preprocessed.leading_monomials, leads);
+    }
+
     /// Measuring construction does not change the matrix, and the measured phases are all nonzero.
     #[test]
     fn test_the_construction_phases_partition_a_measured_build() {

@@ -782,6 +782,17 @@ pub struct Preprocessed<const N: usize> {
 }
 
 impl<const N: usize> Preprocessed<N> {
+    /// Drop [`Preprocessed::monomials`], which nothing needs once the matrix has its columns.
+    ///
+    /// Called by the reduction step the moment construction returns. Without it the set would stay
+    /// live for the rest of the batch — through elimination, where the dense backend's buffer is —
+    /// and the handout would have traded a hash pass for a working-set increase. #536 is the
+    /// precedent for not leaving that to be argued about: the set is released at the point the
+    /// old code freed its own copy, so the peak is no worse than before the handout.
+    pub fn release_monomials(&mut self) {
+        self.monomials = MonomialSet::default();
+    }
+
     /// The leading monomial of the row at `index`.
     pub fn leading_monomial<F: FiniteField>(
         &self,
