@@ -1,7 +1,8 @@
 # msolve 0.11.0: what it actually does, and which of it Zeebra may reimplement
 
-**Measured at:** `dbab79eb` — the only Zeebra timings published here are §4.1's settlement of H1.
-Every other figure is read from msolve's source or quoted from a cited paper.
+**Measured at:** `dbab79eb`, reproduced at `3139025d` — the only Zeebra timings published here are
+§4.1's settlement of H1. Every other figure is read from msolve's source or quoted from a cited
+paper.
 
 Source-grounded study for #264, a child of epic #256. The companion documents are
 `docs/research/external-comparands.md` (how msolve is provisioned and invoked) and
@@ -755,6 +756,12 @@ The split was built before anything was implemented, as the criterion required.
 the sort separately, because they have different fates under a handout and lumping them would have
 charged the sort to a hypothesis that cannot remove it. `examples/f4_profile construction` is the
 harness; `dbab79eb`, `taskset -c 0-7`, `load=5.45`, `env -u RUSTFLAGS`, under `tools/benchlock.sh`.
+
+**Reproduced at `3139025d`** — the same tables after H2's divmask (#331) landed underneath, at a
+dirtier `load=13.31`. Every speedup below lands within 0.03x and every share within four points, so
+neither the ambient load nor the faster `symbolic` stage moves this conclusion. That matters
+specifically because #331 makes `symbolic` cheaper and so can only *raise* construction's share of
+the instance: it did not, measurably.
 
 The pre-handout route, measured against the one that replaced it in one process on one build
 (`MacaulayMatrix::build_rehashing_for_benchmark`, matrices asserted equal), over every batch of a

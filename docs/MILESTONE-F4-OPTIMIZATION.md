@@ -1834,7 +1834,8 @@ What is left:
   small ones and construction's per-matrix cost (the monomial-to-column `HashMap`, the sort) does
   not shrink with the matrix.
 
-  **Superseded by #330** (at `dbab79eb`), which re-measured both shares and acted on them. The
+  **Superseded by #330** (at `dbab79eb`, reproduced at `3139025d` after #331), which re-measured
+  both shares and acted on them. The
   share above survived #471, #477, #536 and #555: **derived** at ~46% of katsura-6 lex and ~48% of
   cyclic-5 lex as #330 opened — the post-change stage table plus the A/B's construction delta, not
   a pre-change end-to-end run — even though the absolute times had fallen. So the diagnosis held.
