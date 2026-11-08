@@ -812,6 +812,8 @@ cargo run --release --example m22_ablation -- list
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
+cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
+cargo run --release --example accumulator_span -- list
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -976,6 +978,21 @@ per-operation cost a change inside a row operation has to move, and states the p
 storage at the instance's widest matrix. `-- list` names the instances; the largest are excluded by
 default, because a dense representation of katsura-7 grevlex is 374 MB for a matrix holding 112k
 entries.
+
+`accumulator_span` answers whether the shipped elimination backend has a loop a SIMD kernel could
+go in. `Backend::Adaptive`'s inner operation walks the *pivot's* sparse entries and indexes a dense
+buffer, which is a gather and a scatter; the only contiguous alternative updates the pivot's whole
+span `[leading_column, trailing_column]`, and `span / support` is the extra cell updates that would
+cost. The harness reports that multiplier weighted by row operations, the share of row operations
+whose span is too short to fill a vector, the occupancy of the pivot within its span by decile, and
+an accounting of all three of the accumulator's loops so the two that are *already* contiguous can
+be sized. Everything is reported for **both reduction strategies**, which matters more than it
+sounds: the two do not see the same matrices, and the multiplier is 4.04x under the baseline
+against **9.81x** under the one `F4Options::default()` runs. It is a property of the matrices rather
+than a timing, so it reproduces exactly and needs no exclusive lock — and it is self-checking: for
+every matrix it also runs the real backend, split form included, and asserts its replay applied the
+same pivots, by `row_operations` and `pivot_inversions`. The answer, measured, is **no** — see
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md) §10.
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
