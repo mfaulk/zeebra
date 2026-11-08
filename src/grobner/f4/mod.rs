@@ -43,7 +43,8 @@ pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{F4Error, F4Options, ReducerSelection, ReductionStrategy, StopKind};
 pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
 pub use statistics::{
-    BatchStatistics, F4Statistics, HilbertCounts, MatrixInterreduction, StageClock, StageTimings,
+    BatchStatistics, F4Statistics, HilbertCounts, MatrixInterreduction, MatrixRefusal, StageClock,
+    StageTimings,
 };
 pub use symbolic::{
     symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
@@ -59,7 +60,9 @@ use crate::{
             minimal_basis_for_interreduction, reduce_grobner_basis_counted,
             reduce_grobner_basis_measured, reduce_grobner_basis_until, InterreductionReport,
         },
-        f4::interreduce::interreduce_by_matrix,
+        f4::interreduce::{
+            interreduce_by_matrix, MatrixInterreductionAborted, MatrixInterreductionRefused,
+        },
         pairs::{CriterionCounts, PairQueue},
     },
     poly::MonomialOrder,
@@ -542,12 +545,17 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
         // computation obeyed — and the fallback is recorded, because a timing from a run that
         // fell back is a timing about the division route.
         let minimal = minimal_basis_for_interreduction(basis, order);
+        // `minimal` is **moved** in, and handed back by `Refused` if a budget crosses, so the
+        // fallback costs no clone. #304/#437 took this stage from three live copies of the basis
+        // to one, and a fallback written with `minimal.clone()` would put a second one back for
+        // the whole matrix pass.
         match interreduce_by_matrix(
-            minimal.clone(),
+            minimal,
             order,
             options.max_matrix_rows,
             options.max_matrix_columns,
             options.live_entry_allowance::<F>(),
+            should_stop,
         ) {
             Ok((reduced, matrix)) => {
                 statistics.interreduction_matrix = Some(MatrixInterreduction {
@@ -556,19 +564,39 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
                     nonzeros: matrix.nonzeros,
                     elements: matrix.elements,
                     fell_back: false,
+                    refused_by: None,
                 });
                 report.elements = matrix.elements;
                 Ok(reduced)
             }
-            Err(refused) => {
+            Err(MatrixInterreductionAborted::Refused(reason, minimal)) => {
                 statistics.interreduction_matrix = Some(MatrixInterreduction {
                     elements: minimal.len(),
                     fell_back: true,
+                    refused_by: Some(match reason {
+                        MatrixInterreductionRefused::Rows { limit } => {
+                            MatrixRefusal::Rows { limit }
+                        }
+                        MatrixInterreductionRefused::Columns { limit } => {
+                            MatrixRefusal::Columns { limit }
+                        }
+                        MatrixInterreductionRefused::Nonzeros { nonzeros } => {
+                            MatrixRefusal::Nonzeros { nonzeros }
+                        }
+                    }),
                     ..Default::default()
                 });
-                let _ = refused;
-                reduce_grobner_basis_until(minimal, order, should_stop)
+                // The division route always terminates inside the memory the old default used, so
+                // a refusal is a fallback rather than a failure. It takes its own stop predicate,
+                // at its own per-element granularity.
+                reduce_grobner_basis_until(minimal, order, || {
+                    match (wall_clock.as_ref(), options.max_wall_time) {
+                        (Some(clock), Some(budget)) => clock.elapsed() >= budget,
+                        _ => false,
+                    }
+                })
             }
+            Err(MatrixInterreductionAborted::Stopped(stopped)) => Err(stopped),
         }
     } else if options.count_interreduction {
         reduce_grobner_basis_counted(basis, order, should_stop, &mut report)

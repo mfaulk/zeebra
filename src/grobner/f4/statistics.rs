@@ -31,6 +31,25 @@ pub struct MatrixInterreduction {
     /// A run that fell back produces the same basis by the old mechanism, so its timings describe
     /// the division route and must not be quoted as the matrix route's.
     pub fell_back: bool,
+
+    /// Which budget refused, when one did.
+    ///
+    /// Recorded rather than discarded for the reason #322 exists: that issue is three of F4's four
+    /// budgets having been discovered one refusal at a time, because a refusal named a budget that
+    /// was not the binding one. A fallback that reported only *that* it happened would repeat the
+    /// mistake on a new path.
+    pub refused_by: Option<MatrixRefusal>,
+}
+
+/// Which budget refused a matrix interreduction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MatrixRefusal {
+    /// The closure needed more rows than `max_matrix_rows`.
+    Rows { limit: usize },
+    /// The matrix needed more distinct monomials than `max_matrix_columns`.
+    Columns { limit: usize },
+    /// The matrix needed more nonzero entries than the live-entry allowance.
+    Nonzeros { nonzeros: usize },
 }
 
 /// Where the time in a batch, or in a whole computation, went.

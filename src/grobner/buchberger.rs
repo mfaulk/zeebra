@@ -314,15 +314,18 @@ pub fn interreduce_by_matrix_for_benchmark<const N: usize, F: FiniteField>(
     order: MonomialOrder,
 ) -> Vec<MultivariatePolynomial<N, F>> {
     let minimal = minimal_basis_for_interreduction(g, order);
-    crate::grobner::f4::interreduce::interreduce_by_matrix(
+    match crate::grobner::f4::interreduce::interreduce_by_matrix(
         minimal,
         order,
         usize::MAX,
         usize::MAX,
         usize::MAX,
-    )
-    .expect("an unbounded interreduction cannot be refused")
-    .0
+        || false,
+    ) {
+        Ok((reduced, _)) => reduced,
+        // Unreachable: every budget is unbounded and the predicate is constant `false`.
+        Err(_) => unreachable!("an unbounded, never-stopping interreduction cannot abort"),
+    }
 }
 
 /// What final interreduction cost, split by the two things it does.

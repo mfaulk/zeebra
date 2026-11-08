@@ -24,8 +24,8 @@ pub use f4::{
     certify_f4_output, certify_submitted_basis, f4, f4_observed, f4_observed_reported, f4_reported,
     f4_with_options, trace_batches, BatchObserver, CacheMode, CertificationReport, DegreeProfile,
     DegreeStatistics, F4Error, F4Options, F4Statistics, HilbertCounts, HilbertSelection,
-    MatrixInterreduction, Provenance, ReducerSelection, ReductionStrategy, SelectionLimits,
-    StopKind, SymbolicCounts,
+    MatrixInterreduction, MatrixRefusal, Provenance, ReducerSelection, ReductionStrategy,
+    SelectionLimits, StopKind, SymbolicCounts,
 };
 pub use fglm::{
     classify_ideal, fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,
