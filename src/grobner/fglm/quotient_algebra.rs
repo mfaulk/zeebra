@@ -390,7 +390,13 @@ fn batched_border<const N: usize, F: FiniteField>(
     let mut shared: Vec<Vec<(usize, F)>> = Vec::with_capacity(targets.len());
 
     for group in targets.chunks(chunk) {
-        let outcome = batch::reduce_batch(group, &monic, order, &options.border_batch);
+        let outcome = batch::reduce_batch(
+            group,
+            &monic,
+            order,
+            &options.border_batch,
+            options.measure_stages,
+        );
         statistics.timings.border_symbolic += clock.lap();
 
         let remainders = match outcome {

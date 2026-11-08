@@ -380,6 +380,28 @@ concurrency 1. See [`docs/research/resultant-elimination.md`](research/resultant
 §6.6, which also records the granularity rule biting from the other side: the two-round row's
 order-18 determinants are 8.6 µs each and get **slower** at 32 workers.
 
+**And a fourth won't-do, outside F4, where the independence this section looked for does exist.**
+#167 took the batched border reduction in FGLM — whose target loop *is* per-iteration independent,
+the pivots being fixed before any target is touched, which is precisely what §6.1 failed to find in
+the block update. The granularity rule held anyway. The target loop's largest single batch is
+**210 µs on katsura-7 and 8 to 69 µs on every other system in the corpus** at the recommended batch
+size of 64, against a measured **21 µs per worker** for `std::thread::scope` on this machine — so
+one worker is the fastest row everywhere and the best multi-worker figure is 0.68x, the dispatch
+being paid once per batch. One *unbounded* batch on planted-10 is large enough to reach **7.73x at
+32 workers** at 24% efficiency; substituted back into the conversion that contains it, that route is
+1.25x on katsura-7, parity on planted-10 and **0.92x on planted-8** — not safe everywhere, which is
+the criterion the batch size itself was chosen against.
+§6.8 of [`MILESTONE-FGLM-SCALABILITY.md`](MILESTONE-FGLM-SCALABILITY.md) has the four tables, the
+projection, and the `dirty_from` accounting — including that the carry #167 named as the crux costs
+1.00x to 1.02x of the cells on the batches large enough to matter, and the dispatch it did not name
+costs everything.
+
+So the shared reason now reads with a correction rather than an exception: independence is
+necessary, the §6.4 rule is what decides, and the rule is about **the size of the unit of work** —
+not about where the work sits in the algorithm. It also names the one thing that would move every
+figure here, which neither this section nor #167 tested: 21 µs per worker is an OS thread spawn, and
+a persistent pool is a different floor.
+
 ## 7. Acceptance criteria, closed out
 
 | Criterion | State |

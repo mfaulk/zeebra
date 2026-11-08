@@ -834,6 +834,8 @@ cargo run --release --example fglm_conversion      # the FGLM pipeline against d
 cargo run --release --example fglm_profile         # where a conversion's time and memory go
 cargo run --release --example fglm_profile -- katsura-7   # one system per process
 cargo run --release --example fglm_border          # what deduplicating the border is worth
+cargo run --release --example fglm_parallel -- per-batch   # is the border reduction worth
+cargo run --release --example fglm_parallel -- sweep       # parallelizing? one table each
 cargo run --release --example fglm_storage         # operator representations, stored and applied
 cargo run --release --example fglm_shape           # shape position, and what that route would save
 cargo run --release --example fglm_ablation        # every strategy combination, one table
@@ -1092,6 +1094,21 @@ with its own measurement rather than by inference, whether the one-term polynomi
 reduction is worth avoiding: 0.07% to 0.38% of the reduction it precedes on the families where
 reduction dominates, so no. `cargo bench --bench fglm -- fglm_operator_construction` is the same
 comparison under Criterion.
+
+`fglm_parallel` is why the batched border reduction is **not** parallelized, measured rather than
+argued, and it is the entry point for anyone who wants to re-open that. Its target loop is the one
+loop in the project whose iterations are genuinely independent — the reducer pivots are fixed before
+any border monomial is touched — and that is not enough. Four tables, selected by name because they
+want different machine conditions: `per-batch` splits a batch's clock between the symbolic closure
+and the target loop (two single-threaded tables, one pinned core); `floor` prices one
+`std::thread::scope` dispatch on this machine; `carry` prices the `dirty_from` carry a split gives
+up, sequentially, so it is separated from the dispatch cost; and `sweep` runs the reduction on up to
+128 scoped threads with every row's remainders asserted bit-identical to the one-worker row's. At
+the recommended batch of 64 a batch's target loop is 8 to 210 µs against 21 µs per worker, so one
+worker is the fastest row on every system in the corpus. §6.8 of
+[`docs/MILESTONE-FGLM-SCALABILITY.md`](docs/MILESTONE-FGLM-SCALABILITY.md) has the figures and the
+decision; `BorderReduction::Grouped` is the decomposition without the threads, kept because the
+carry's cost is a measurement.
 
 `fglm_shape` is M18-4's research spike, measured. `grobner::fglm::shape` detects **shape
 position** — whether a single variable's powers `1, t, ..., t^{D-1}` are a basis of `R/I` — and
