@@ -2342,6 +2342,16 @@ mod tests {
     /// The scoreboard side of #505, which the competitive side is named for: one commit here —
     /// `1409a48`, two runs — was also unreachable from `main`. Its base `1985504` is an ancestor
     /// and stays one.
+    ///
+    /// **What this passing does not establish (#547).** The four `a3e5d66` runs were measured on
+    /// #530's branch, cut *before* the stamp fields existed, and their `base_commit` and `patch_id`
+    /// were reconstructed afterwards from the commit the records already named — following
+    /// [`Environment::capture`] exactly, `merge-base` then `git diff base..HEAD | git patch-id
+    /// --stable`. That makes them resolvable to the commit they name, which is what this asserts.
+    /// It does **not** make the delta recomputable from `main`: #530 was squash-merged onto a newer
+    /// base, so `30348938..8d6f0cfe` does not reproduce `9762e649…`. Any patch-id stamp from a
+    /// squash-merged branch has that gap, so read a pass here as "the stamp is well formed and its
+    /// base survives", not as "a later reader can rebuild this tree".
     #[test]
     fn test_every_committed_run_carries_a_resolvable_stamp() {
         let history = Json::parse(include_str!(
