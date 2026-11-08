@@ -119,12 +119,31 @@ it, which `claim` and `heartbeat` do for you.
 `claim` re-reads the issue afterwards and tells you whether you actually hold
 it. **Among claims inside the current lease window, the earliest `at=` wins** —
 two agents claiming in the same second both see their own comment land, so the
-tiebreak has to be a property of the data, not of who looked last. If `verify`
-exits 1 you lost: release and pick something else.
+tiebreak has to be a property of the data, not of who looked last.
 
 ```bash
 ./scripts/agent/zb-claim.sh verify 119      # rc 0 = yours, rc 1 = back off
 ```
+
+**If `verify` exits 1 you lost: `withdraw`, and do not `release`.**
+
+```bash
+./scripts/agent/zb-claim.sh withdraw 119    # retract your own claim only
+```
+
+The distinction is the whole of #544. The label, the assignee and the board row
+are **one each and belong to the winner**; `release` removes them, so the loser
+of a race — following the instruction this paragraph used to give — stripped the
+winner's claim while their lease was still live and their work still in flight.
+Nothing in the output said so, and `orient` reads the label, so the issue then
+presented as available to the next agent along. `withdraw` writes a marker the
+resolver reads and changes no shared state at all. `release` now refuses when
+another agent holds the claim and names `--force` for the cases that genuinely
+need it — a human cleaning up after a dead agent, mostly.
+
+A withdrawal also means something to the tiebreak: a withdrawn claim stops
+competing, so the next-earliest standing claim takes the issue. That is what
+makes conceding a race a real act rather than a comment.
 
 **A rename does not cost you the claim.** The tiebreak picks the earliest live
 claim; the token then decides whether that claim is yours, by any of three
@@ -183,11 +202,16 @@ salvage usable commits rather than silently dropping them.
 - **Finished** → open the PR with `Closes #NNN`. Merging closes the issue and
   moves the board to Done. Drop the working label:
   `./scripts/agent/zb-claim.sh release 119`. Leave the issue open until the PR
-  merges; the PR keeps it In Progress.
+  merges; the PR keeps it In Progress — and `orient` reads the open PR, not the
+  label, so dropping it does not put the work back in anyone's queue (#544).
 - **Abandoning or handing off** → never leave a silent dangling claim. Comment
   what was and was not done and why, then:
   `./scripts/agent/zb-claim.sh release 119 --abandon`, which also removes the
   assignee and returns the board row to Todo.
+- **Lost a race** → `withdraw`, never `release`. See §3.
+
+Both `release` forms refuse if another agent holds the claim, because both touch
+state there is only one of.
 
 **A green check is not a green merge.** CI tests your branch merged into `main`
 *as of when the run was queued*, and nothing re-runs when `main` moves — which is
