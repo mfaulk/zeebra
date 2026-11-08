@@ -1,7 +1,11 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
-**Measured at:** publication bound `aef9ab81`…`bcd2ec21` — the commits that published these figures,
-recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Measured at:** publication bound `aef9ab81`…`bcd2ec21` for §2 through §9 — the commits that
+published those figures, recovered from git rather than recorded at the time
+([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**§6.8 is measured at `a8f1cf63`** and its figures are not comparable with the rest of this
+document: the conversion totals there are 20% to 45% below §9's on the same systems, because M19
+and #159 landed in between.
 
 **Status:** complete — M18-0 through M18-5
 **Prerequisite:** M17, merged at `7c2fef7`
@@ -820,6 +824,214 @@ the whole border's scan is 0.76 ms of a 28.6 ms conversion, so even removing it 
 `BorderBatch::recommended()` is **unchanged** at 64. The ablation, not this, is where that size is
 chosen, and nothing above argues for moving it.
 
+### 6.8 Parallelism, refuted on the batch size the default uses (#167)
+
+§9.4 puts **52% of katsura-7's conversion** in the border stage, and §6.2's own argument says the
+target loop inside it is the one loop in this project whose iterations are genuinely independent:
+the pivots are fixed before any target is touched, so `NF(u_1)` cannot involve `u_2` and the loop
+may be split anywhere. That is exactly the property #50 looked for in F4's block update and did not
+find, which is why #167 asked whether this is where parallelism finally pays.
+
+It does not, and the measurement that says so is the one §6.4 of
+[`MILESTONE-SIMD-PARALLELISM.md`](MILESTONE-SIMD-PARALLELISM.md) asked anyone revisiting the
+question to start from: the size of a **batch's** parallelizable phase rather than a stage's share
+of the total. `FglmStageTimings::border_symbolic` could not answer it, because it charges the
+closure and the target loop together. So `BorderBatchStatistics` now splits them —
+`closure_time`, `reduction_time`, and `peak_reduction_time`, peaked rather than summed because a
+parallel reduction dispatches once per batch.
+
+`cargo run --release --example fglm_parallel -- per-batch`, pinned to one core, fastest of three,
+milliseconds:
+
+| system | size | batches | closure | reduce | reduce/batch | peak batch | conversion |
+|---|---|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 64 | 1 | 0.017 | 0.015 | 0.0152 | 0.0152 | 0.09 |
+| katsura-5 | unbounded | 1 | 0.015 | 0.013 | 0.0132 | 0.0132 | 0.08 |
+| katsura-6 | 64 | 2 | 0.068 | 0.061 | 0.0307 | 0.0482 | 0.32 |
+| katsura-6 | unbounded | 1 | 0.051 | 0.061 | 0.0609 | 0.0609 | 0.29 |
+| katsura-7 | 64 | 4 | 0.392 | 0.412 | 0.1031 | 0.2097 | 1.74 |
+| katsura-7 | unbounded | 1 | 0.218 | 0.422 | 0.4220 | 0.4220 | 1.56 |
+| cyclic-5 | 64 | 3 | 0.080 | 0.058 | 0.0193 | 0.0337 | 0.38 |
+| cyclic-5 | unbounded | 1 | 0.076 | 0.058 | 0.0578 | 0.0578 | 0.37 |
+| cyclic-6 | 64 | 7 | 0.339 | 0.257 | 0.0368 | 0.0693 | 1.80 |
+| cyclic-6 | unbounded | 1 | 0.260 | 0.307 | 0.3074 | 0.3074 | 1.76 |
+| planted-6 | 64 | 3 | 0.059 | 0.025 | 0.0082 | 0.0084 | 0.26 |
+| planted-6 | unbounded | 1 | 0.055 | 0.035 | 0.0350 | 0.0350 | 0.26 |
+| planted-8 | 64 | 16 | 0.362 | 0.136 | 0.0085 | 0.0158 | 1.87 |
+| planted-8 | unbounded | 1 | 0.364 | 0.522 | 0.5221 | 0.5221 | 2.28 |
+| planted-10 | 64 | 80 | 2.398 | 0.677 | 0.0085 | 0.0121 | 22.63 |
+| planted-10 | unbounded | 1 | 2.093 | 10.877 | 10.8774 | 10.8774 | 32.05 |
+
+**Half of the 52% is not the parallelizable half.** On katsura-7 at the default batch the closure is
+0.392 ms and the target loop 0.412 ms of a 1.74 ms conversion — 46% between them, which is §9.4's
+52% re-measured at a later commit, and **24% for the half that can be split**. §9.7's third
+recommendation, sharing closures between batches, is pointed at the other half and this does not
+touch it.
+
+More decisively, **the unit available to parallelize is a batch, and a batch is small.** At the
+recommended size of 64 the largest single batch's target loop is 210 µs on katsura-7 and **8 to 69
+µs on every other system in the corpus** — and a batch of 64 is 80 batches on planted-10, each
+dispatching separately.
+
+Against that, what one dispatch costs, with the same `std::thread::scope` over contiguous blocks
+that `sample_determinants` and the differential sweep use — not a thread pool, because this project
+has no thread pool:
+
+| workers | dispatch/ms | per worker/µs |
+|---:|---:|---:|
+| 1 | 0.0000 | 0.02 |
+| 2 | 0.0595 | 29.76 |
+| 4 | 0.1022 | 25.56 |
+| 8 | 0.1867 | 23.34 |
+| 16 | 0.3579 | 22.37 |
+| 32 | 0.6760 | 21.13 |
+| 64 | 1.3307 | 20.79 |
+| 128 | 2.6614 | 20.79 |
+
+**About 21 µs per worker, and linear in the worker count**, because each dispatch spawns and joins
+OS threads rather than waking a pool. This is the figure §6.3 of the parallelism milestone estimated
+at 0.52 ms for rayon; measured here for the construction actually available, two workers cost 59 µs
+and 32 cost 677 µs. Every row of the per-batch table above is at or below the two-worker row.
+
+#### The obstacle the issue named is not the obstacle
+
+#167 identified the `dirty_from` carry as the crux: `reduce_targets` keeps the previous target's
+leading column and zeroes only `[previous start, width)` before the next, the border descends so
+that region shrinks across a batch, and a split gives the chain up at each boundary.
+
+Two corrections, one of them measured. The first is that a group's first target does **not** have to
+clear a full buffer — a freshly allocated one is already zero — so what a split costs is one
+*allocated and zeroed* width per group rather than one clear per worker's first target. Same
+quantity of cells, paid by the allocator. `BorderBatchStatistics::buffer_cells_zeroed` counts both
+halves, and `test_a_split_costs_one_full_width_of_zeroing_per_group` pins the arithmetic against a
+model built from the targets' leading columns rather than from the implementation.
+
+The second is that it does not matter. `BorderReduction::Grouped` runs the split decomposition
+*sequentially*, so the only difference between its rows is the carry:
+
+| system | cells, 1 group | x at 8 groups | x at 32 | x at 128 | `x` on the clock |
+|---|---:|---:|---:|---:|---:|
+| katsura-5 | 1,677 | 1.104 | 1.280 | 1.574 | 0.80–0.98 |
+| katsura-6 | 7,998 | 1.049 | 1.160 | 1.663 | 0.90–0.96 |
+| katsura-7 | 38,126 | 1.023 | 1.102 | 1.368 | 0.86–0.99 |
+| cyclic-5 | 21,227 | 1.033 | 1.150 | 1.372 | 0.98–1.20 |
+| cyclic-6 | 119,837 | 1.014 | 1.057 | 1.187 | 0.91–1.08 |
+| planted-6 | 28,895 | 1.025 | 1.114 | 1.348 | 1.00–1.20 |
+| planted-8 | 731,917 | 1.005 | 1.024 | 1.098 | 0.88–0.96 |
+| planted-10 | 17,088,915 | 1.001 | 1.005 | 1.021 | 0.89–1.08 |
+
+**The carry costs 1.00x to 1.02x of the cells on the systems whose batches are large enough to
+parallelize at all**, and is not measurable in time — every `x time` cell is inside the ±2% to ±10%
+this harness repeats to, several of them below 1.00. It reaches 1.37x on katsura-5, where one width
+is 419 cells against a whole-border total of 1,677 and the absolute figure is 12 µs. The carry is a
+saving that scales with the *ratio* of the batch to the closure width, and the batches where
+parallelism could pay are exactly the ones where that ratio makes it negligible.
+
+So the obstacle is the dispatch, which the issue did not name, and not the carry, which it did.
+
+#### The sweep, and the one instance that parallelizes
+
+`measure_border_reduction` runs the groups on scoped threads. It carries `F: Send + Sync` itself
+rather than putting that bound on `fglm_to_lex`, `QuotientAlgebra::new`,
+`solve_zero_dimensional_with_options` and the differential harness — the whole public surface a
+border batch is reachable from — which is the API cost a shipped parallel path would have had to
+pay. Every row's remainders are asserted **bit-identical** to the one-worker row's by a digest over
+the remainders in target order, in the example and again in
+`test_the_parallel_reduction_is_bit_identical_at_every_worker_count` over nine worker counts, four
+batch sizes and six systems.
+
+| system | size | 1 worker | fastest | at | speedup | efficiency | 128 workers |
+|---|---|---:|---:|---:|---:|---:|---:|
+| katsura-5 | 64 | 0.012 / 0.013 | 0.012 / 0.013 | 1 / 1 | 1.21x / 1.10x | 121% / 110% | 1.00 / 0.98 |
+| katsura-5 | unbounded | 0.012 / 0.012 | 0.012 / 0.012 | 1 / 1 | 1.41x / 1.06x | 141% / 106% | 0.99 / 1.00 |
+| katsura-6 | 64 | 0.062 / 0.060 | 0.062 / 0.060 | 1 / 1 | 1.03x / 1.05x | 103% / 105% | 2.24 / 2.49 |
+| katsura-6 | unbounded | 0.062 / 0.062 | 0.062 / 0.062 | 1 / 1 | 1.04x / 1.02x | 104% / 102% | 2.22 / 2.28 |
+| katsura-7 | 64 | 0.423 / 0.410 | 0.423 / 0.410 | 1 / 1 | 0.99x / 1.00x | 99% / 100% | 5.21 / 5.18 |
+| katsura-7 | unbounded | 0.466 / 0.412 | 0.265 / 0.273 | 8 / 8 | 1.77x / 1.54x | 22% / 19% | 2.50 / 2.52 |
+| cyclic-5 | 64 | 0.047 / 0.048 | 0.047 / 0.048 | 1 / 1 | 1.06x / 1.06x | 106% / 106% | 3.58 / 3.61 |
+| cyclic-5 | unbounded | 0.055 / 0.057 | 0.055 / 0.057 | 1 / 1 | 1.03x / 1.00x | 103% / 100% | 1.79 / 1.98 |
+| cyclic-6 | 64 | 0.251 / 0.253 | 0.251 / 0.253 | 1 / 1 | 1.01x / 1.01x | 101% / 101% | 8.66 / 8.74 |
+| cyclic-6 | unbounded | 0.303 / 0.303 | 0.269 / 0.259 | 8 / 8 | 1.12x / 1.18x | 14% / 15% | 2.09 / 2.33 |
+| planted-6 | 64 | 0.024 / 0.024 | 0.024 / 0.024 | 1 / 1 | 1.04x / 1.03x | 104% / 103% | 4.37 / 4.43 |
+| planted-6 | unbounded | 0.034 / 0.034 | 0.034 / 0.034 | 1 / 1 | 1.09x / 1.09x | 108% / 109% | 2.18 / 2.28 |
+| planted-8 | 64 | 0.130 / 0.131 | 0.130 / 0.131 | 1 / 1 | 1.01x / 1.02x | 101% / 102% | 22.84 / 24.17 |
+| planted-8 | unbounded | 0.527 / 0.525 | 0.264 / 0.260 | 8 / 8 | 2.03x / 2.04x | 25% / 26% | 2.92 / 2.90 |
+| planted-10 | 64 | 0.697 / 0.677 | 0.697 / 0.677 | 1 / 1 | 0.99x / 1.02x | 99% / 102% | 117.68 / 118.72 |
+| planted-10 | unbounded | 11.470 / 11.028 | 1.262 / 1.512 | 32 / 32 | 8.84x / 7.29x | 28% / 23% | 3.25 / 3.16 |
+
+**At the batch size the default uses, one worker is the fastest row on every system in the corpus.**
+The best any multi-worker row reaches is 0.59x — katsura-7 at four workers — and 128 workers is
+0.01x to 0.19x, because the dispatch is per batch and the batches are microseconds. planted-10 at
+64 is the arithmetic in the open: 0.68 ms of target loop over 80 batches, against 80 dispatches of
+59 µs each at two workers, which is 4.8 ms of spawning for 0.68 ms of work and the 0.10x the table
+reports.
+
+**Unbounded, four instances have a batch big enough to show anything, and one shows a lot.**
+planted-10's single unbounded batch is 11.0–11.5 ms of target loop and parallelizes to **1.26–1.51
+ms at 32 workers — 7.3x to 8.8x**, bit-identical. katsura-7, cyclic-6 and planted-8 reach 1.2x to
+2.0x at eight workers, and nothing else moves at all.
+
+So the question §6.4 left open — whether an *unbounded* batch plus parallelism beats a *bounded*
+sequential one, which is a different trade from the one that chose the batch size — has a measured
+answer. It is no, and not by much, which is why it is worth stating as arithmetic rather than as a
+slogan. Substituting the fastest measured parallel reduction into the measured unbounded
+conversion, **a projection from two measured quantities and not a measured conversion** — the
+conversion cannot call the parallel path, which is the point of §6.8:
+
+| system | bounded 64, sequential | unbounded, sequential | unbounded, parallel (projected) | at | vs the default |
+|---|---:|---:|---:|---:|---:|
+| katsura-7 | 1.74 | 1.56 | **1.41** | 8 | **1.23x** |
+| cyclic-6 | 1.80 | 1.76 | 1.71 | 8 | 1.05x |
+| planted-8 | 1.87 | 2.28 | 2.02 | 8 | **0.92x** |
+| planted-10 | 22.63 | 32.05 | 22.69 | 32 | 1.00x |
+
+**It is not safe everywhere, which is the criterion §6.4 chose the batch size against.** The best
+case is 1.23x on katsura-7's conversion; planted-8 **regresses 8%**; planted-10 lands at parity,
+and lands there only by coincidence — the 9.4 ms the parallel reduction removes is, to the last
+tenth, the 9.4 ms that going unbounded cost it. Taking the reduction to *zero* would put
+planted-10 at 21.2 ms against a bounded sequential 20.4–22.6 ms across two passes — inside the
+spread, so there is no worker count at which this route wins on the sparse family and there is one
+at which it draws.
+
+Two further reasons the draw is not worth buying:
+
+* **23–28% parallel efficiency** at planted-10's peak, against the 92–95% to 32 cores that §6.4 of
+  the parallelism milestone records for the resultant route. The curve turns over — 128 workers is
+  slower than 16 on every row of the table.
+* **The best worker count is instance-dependent** — eight on katsura-7 and planted-8, thirty-two on
+  planted-10 — so a default would need a predictor of batch size *and* one of worker count, where
+  §6.5 has already deferred the first for want of a predictor of reduction depth.
+
+#### What landed, and what did not
+
+**Won't-do, on the same shape of measurement as #50, #51 and #52.** What landed is the measurement
+and the machinery that makes it repeatable:
+
+* the batch clock split into `closure_time` / `reduction_time` / `peak_reduction_time`, a strict
+  refinement of `border_symbolic` rather than a replacement, so every figure quoted against that
+  field still means what it said;
+* `buffer_cells_zeroed`, the carry's accounting in cells;
+* `BorderReduction::{Sequential, Grouped}` — the decomposition without the threads, default
+  `Sequential`, which is the half of parallelism that costs no public API;
+* `measure_border_reduction`, which runs it on threads and carries the `Send + Sync` bound alone,
+  so the refutation can be re-measured rather than re-argued.
+
+What did **not** land is `Send + Sync` on the conversion and solver entry points, and no default
+moved. The projection above is the condition to re-open on: a workload whose border batches are
+**milliseconds each at a batch size that is already the right one for it** — a staircase dense
+enough that `Unbounded` wins on its own merits, which katsura-7 nearly is and planted-8 is not. The
+entry point to re-measure from is `fglm_parallel -- sweep`, and the first thing to re-measure is
+the dispatch floor: 21 µs per worker is a thread spawn, and a persistent pool would move every
+figure in this section.
+
+**On the load these figures were taken under.** The two passes above were taken at `load=46.5` and
+`load=55.5` on a 128-core machine shared with other agents, which is not a condition under which
+this project publishes a scaling curve. They are published because they agree — the dispatch floor
+to within 2% at every worker count, katsura-7's per-batch loop to within 0.5%, planted-10's peak
+speedup to within 17% — and because the decision rests on the projection table rather than on the
+curve's precision: contention can only have *slowed* the parallel rows, so the refutation is in the
+direction the load would bias it toward and not against.
+
 ---
 
 ## 7. M18-3: adaptive operator storage
@@ -1561,7 +1773,10 @@ Three things are worth doing, in this order:
 3. **Reuse closures across batches.** katsura-7's remaining 52% is the batch closure, and a closure
    is currently discarded at the end of its batch. Border monomials are processed in descending
    order, so consecutive batches' closures overlap heavily; §6.4 measured what a *bigger* batch is
-   worth and never measured what a *shared* one would be.
+   worth and never measured what a *shared* one would be. §6.8 sharpened this one by splitting the
+   batch clock: of katsura-7's 46%, the closure is 23% and the target loop 24%, so this
+   recommendation and the parallelism §6.8 refuted were each aimed at about half of the stage — and
+   the closure half is the half that is still open.
 
 What is explicitly **not** recommended is a sparse-FGLM milestone. §8.5 is the no-go and the
 measurement behind it has not changed: the systems whose memory is the problem are exactly the
@@ -1603,6 +1818,8 @@ algebraic-hash systems that motivate this project are in shape position at all.
 - [x] Batch-size performance measured — §6.4, and it decides the recommended size.
 - [x] Appropriate fallback strategy retained — `BatchOverflow`, and neither option drops a
       target, §6.5.
+- [x] Per-batch reduction time recorded, and parallelism decided against it — **won't do** on the
+      measurement in §6.8, which also corrects the carry the issue named as the crux.
 
 ### M18-3 — operator storage
 
