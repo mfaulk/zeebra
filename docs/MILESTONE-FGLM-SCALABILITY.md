@@ -1154,6 +1154,18 @@ shape-position quotients ever appears. Measuring whether the algebraic-hash syst
 this project's architecture are in shape position is the thing to do **before** committing to such a
 milestone, not after.
 
+**This no-go is carried forward in `docs/research/wiedemann-krylov.md`** (issue #58), which is where
+to read it from rather than here: it keeps the three measurements above intact and records what has
+happened to them since. Two things a reader of this section needs and will not find in it. First,
+**§9.4 supersedes §3.4** — M18 made border reduction far faster without touching the lex walk, so
+the walk's share of a katsura conversion is ~31% and not the 2.6% §3.4 reports, and §3.4 must not be
+quoted as a current argument against a Krylov route. Second, M25's competitive baseline
+(`docs/research/competitive-baseline.md`, #263) measured Zeebra's conversion ~30x behind msolve's
+Wiedemann scalar sequence on Anemoi CICO — **a family this section did not measure**, and whose
+stage split is the opposite of katsura-7's — which reopened the FGLM half as staged work under #368,
+with #224 as the alternatives survey. The three measurements above are unrefuted and #368 does not
+refute them; they simply do not cover that family.
+
 ### 8.6 Follow-up (issue #56): the coordinate block is triangular too
 
 Filed and done after the milestone closed, by §8.1's argument applied to the other block. An

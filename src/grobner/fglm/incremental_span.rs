@@ -40,6 +40,12 @@
 //! these are `O(D)` — 0.1% of them at `D = 1,024` and 6% at `D = 16`. Nor do they raise the peak,
 //! since the per-call vectors they replace were live during every reduction anyway. See
 //! [`FglmMemory::dense_blocks_for`](super::FglmMemory::dense_blocks_for), which says so.
+//!
+//! # Replacing this with a Krylov sequence
+//! A scalar Krylov sequence plus Berlekamp–Massey would make the dependence test `O(D)` memory
+//! instead of `O(D^2)`, and it is what msolve does. It is **open, staged work** rather than a free
+//! win: the systems where this block dominates are mostly not in shape position, so the scalar
+//! route cannot convert them. Read `docs/research/wiedemann-krylov.md` §2 and issue #368 first.
 
 use crate::FiniteField;
 

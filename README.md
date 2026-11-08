@@ -1035,6 +1035,10 @@ output is verified before it is returned — every polynomial's class in `R/I` m
 with the leading monomials proves it is the reduced lex basis — so nothing probabilistic is
 exposed. It is public and tested but not a `FglmOptions` strategy; `docs/MILESTONE-FGLM-SCALABILITY.md`
 §8.5 is the **no-go** on a full sparse-FGLM milestone and the measurements behind it.
+[`docs/research/wiedemann-krylov.md`](docs/research/wiedemann-krylov.md) is the decision record for
+Wiedemann and Krylov methods in both places this crate eliminates — **won't-do** for F4's
+echelonization, and a deferral for order conversion that M25's competitive baseline has since
+reopened as staged work. Read it before proposing either.
 
 `fglm_storage` reports the operator representations three ways: bytes under each strategy, which are
 exact; operator *application*, on a unit input and a dense one, because the sparse path skips a zero
@@ -4838,6 +4842,13 @@ over `Sparse` on the elimination stage — and `Backend::Dense` is slower than `
 which is the honest answer to whether a dense representation pays on F4-shaped matrices. It is kept
 because it is the control the other two are compared against. See §7.4 of
 [`docs/MILESTONE-F4-OPTIMIZATION.md`](docs/MILESTONE-F4-OPTIMIZATION.md).
+
+Black-box linear algebra — Wiedemann, block Wiedemann, Krylov — is a **recorded won't-do for this
+stage**, and not on cost: the output of an F4 elimination *is* the transformed matrix and its rank
+defect, so there is no vector to solve for, and the operator is destroyed by the computation.
+[`docs/research/wiedemann-krylov.md`](docs/research/wiedemann-krylov.md) §1 has the argument, the
+arithmetic, and why `ReductionStrategy::Structured` is the structure such a method would have to
+throw away.
 
 The three criteria are Buchberger's first criterion (`product`, relatively prime leading
 monomials), Buchberger's chain criterion (`chain`, applied when a batch is selected), and

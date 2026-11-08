@@ -13,6 +13,11 @@
 //!
 //! `linalg` does not depend on `grobner`, and does not learn to. [`Backend`] is this module's own
 //! type; F4 holds one in its options.
+//!
+//! **Black-box methods — Wiedemann, block Wiedemann, Krylov — are a recorded won't-do here**, not a
+//! cost question: the output of this elimination *is* the transformed matrix and its rank defect,
+//! so there is no vector to solve for. `docs/research/wiedemann-krylov.md` §1 has the argument and
+//! the measurements; do not re-derive it.
 
 use crate::{
     linalg::{
