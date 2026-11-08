@@ -1,8 +1,11 @@
 //! Live agreement between Zeebra and the two M25 comparands it drives through adapters.
 //!
-//! Every test here is `#[ignore]`d. The reason is the same one `src/grobner/differential/mod.rs`
+//! Every test that *drives a tool* is `#[ignore]`d; the ones that only read the frozen corpus run
+//! everywhere. The reason for the first half is the same one `src/grobner/differential/mod.rs`
 //! gives for its live Singular sweep: **CI has no Julia and no Sagebrush driver, and a test that
-//! silently passed when the tool is absent would be worse than no test.** The offline half of each
+//! silently passed when the tool is absent would be worse than no test.** The reason for the second
+//! is #386: a corpus defect behind an `#[ignore]` is a defect CI cannot see, so an assertion that
+//! needs no tool does not belong behind one. The offline half of each
 //! adapter — capability bounds, script and input generation, marker parsing, the missing-binary
 //! path — is covered by ordinary unit tests in `src/grobner/external/{groebner_jl,sagebrush}.rs`
 //! and runs everywhere.
@@ -791,6 +794,59 @@ fn test_anemoi_is_representable_only_by_groebner_jl_so_its_timing_is_uncorrobora
         !entry.equivalence.is_corroborated(),
         "one engine in range is not a cross-library comparison, so the row stays uncorroborated"
     );
+}
+
+/// Both Anemoi rungs record `SoleComparand { tool: "Groebner.jl" }`, not `NoComparand`.
+///
+/// The distinction is the one the whole module turns on: `NoComparand` says *no engine can
+/// represent the field*, which is false here — Groebner.jl reaches `2^64 − 353`. So the row is
+/// publishable as a timing (`licenses_timing()`) and uncorroborated (`is_corroborated()` false),
+/// and a renderer must mark it on the second rather than suppress it on the first.
+///
+/// Unignored on purpose: it reads the frozen ladder and needs no external tool, so CI pins the
+/// variant and the recorded reason that
+/// [`test_anemoi_is_representable_only_by_groebner_jl_so_its_timing_is_uncorroborated`] can only
+/// check where Julia and the Sagebrush driver are provisioned. That is the coverage gap #386 named:
+/// the defect it was filed for was invisible to CI because every test in this file was `#[ignore]`d.
+#[test]
+fn test_the_anemoi_rungs_are_sole_comparand_not_no_comparand() {
+    let anemoi: Vec<_> = corpus::ladder()
+        .into_iter()
+        .filter(|e| e.family == "anemoi")
+        .collect();
+    assert_eq!(anemoi.len(), 2, "anemoi64-cico-n1-fcico and -n2-fcico");
+
+    for entry in anemoi {
+        match entry.equivalence {
+            corpus::Equivalence::SoleComparand { tool, reason } => {
+                assert_eq!(
+                    tool, "Groebner.jl",
+                    "{}: the one engine in range",
+                    entry.name
+                );
+                assert!(
+                    reason.contains("2^62") && reason.contains("2^31"),
+                    "{}: the reason must name both gates it clears, got {:?}",
+                    entry.name,
+                    reason
+                );
+            }
+            other => panic!(
+                "{}: Groebner.jl represents 2^64 - 353, so the rung is not no-comparand: {:?}",
+                entry.name, other
+            ),
+        }
+        assert!(
+            entry.equivalence.licenses_timing(),
+            "{}: one engine on one machine is still a valid ratio",
+            entry.name
+        );
+        assert!(
+            !entry.equivalence.is_corroborated(),
+            "{}: nothing corroborates Groebner.jl above 2^31",
+            entry.name
+        );
+    }
 }
 
 /// Neither comparand confuses `x1` with `x10`, which is the one error agreement cannot detect.
