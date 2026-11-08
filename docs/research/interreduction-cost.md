@@ -464,9 +464,11 @@ previous iteration had already formed.**
 This is not a candidate from #436's list and not one of #440's three stages. It needs no new data
 structure, no new boundary and no change of algorithm — only computing the shifted term in the
 outer loop, where `j` advances, instead of the inner one. The bound after the change is
-`tail_terms_merged + 2 · reduction_steps` = 19 364 937 products, a **46.2x** reduction, and
-`sparse_multivariate_polynomial_arithmetic::tests::test_the_merge_multiplies_each_tail_term_once`
-asserts that bound rather than trusting it.
+`tail_terms_merged + 2 · reduction_steps`, which on these counts is **≤ 19 364 937** products — at
+least **46.2x** fewer. The bound is **asserted**, by
+`sparse_multivariate_polynomial_arithmetic::tests::test_the_merge_multiplies_each_tail_term_once`,
+rather than trusted; the exact post-change count on this instance is derived from the bound and not
+separately measured.
 
 Whether removing 875.9 M monomial multiplies moves the wall clock is a separate question from
 whether the source performs them, because LLVM's partial-redundancy elimination could in principle
@@ -506,7 +508,8 @@ cost is theirs.
 the counter was lying.** Before the hoist, `merge_monomial_multiplies` reported 894 232 085
 multiplies that the machine was not performing — an instrument that would have funded a fix for a
 cost that does not exist, which is precisely the failure mode §3.0a's inference fell into. After it,
-the counter reports **19 364 937** and matches what the hardware does.
+the counter is bounded at **19 364 937** by a test, and reports something much closer to what the
+hardware does.
 
 ### 3d.3 What stage 3 is now competing against
 
