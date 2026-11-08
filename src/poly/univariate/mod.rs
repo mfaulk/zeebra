@@ -29,6 +29,17 @@ mod power_permutation;
 mod resultant;
 pub use resultant::{resultant, resultant_at_formal_degrees, resultant_from_coefficients};
 mod roots;
+mod subproduct_tree;
+pub use subproduct_tree::multipoint_evaluate;
+// Measurement and differential-testing hooks for `examples/subproduct_crossover.rs`, not API. Both
+// arms have to be separately reachable or the crossover cannot be swept and the differential test
+// could only ever check whichever arm the shipped constant selects.
+#[doc(hidden)]
+pub use lagrange_interpolation::interpolate_quadratic_unstable;
+#[doc(hidden)]
+pub use subproduct_tree::{
+    subproduct_evaluate_unstable, subproduct_interpolate_unstable, tree_crossover_unstable,
+};
 mod univariate_parser;
 
 use crate::FiniteField;

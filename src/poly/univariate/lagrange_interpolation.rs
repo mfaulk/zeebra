@@ -26,7 +26,8 @@ use crate::poly::univariate::Polynomial;
 
 /// Interpolate n points into a polynomial of degree n-1.
 ///
-/// `O(n^2)` field operations and `O(n)` memory.
+/// `O(n^2)` field operations and `O(n)` memory below the subproduct tree's measured crossover,
+/// `O(M(n) log n)` above it — see [`super::subproduct_tree`], which is #162 stage 2.
 ///
 /// # Arguments
 /// * `points` - Collection of (x,y) points.
@@ -34,6 +35,18 @@ use crate::poly::univariate::Polynomial;
 /// # Panics
 /// If `points` is empty, or if two points share an x coordinate.
 pub fn interpolate<F: FiniteField>(points: Vec<(F, F)>) -> UnivariatePolynomial<F> {
+    assert!(!points.is_empty());
+    if points.len() > super::subproduct_tree::tree_crossover::<F>() {
+        return super::subproduct_tree::interpolate(&points);
+    }
+    interpolate_quadratic(points)
+}
+
+/// The `O(n^2)` arm of [`interpolate`], reachable directly so the two can be differentially tested
+/// at sizes the shipped dispatch would not send here.
+pub(crate) fn interpolate_quadratic<F: FiniteField>(
+    points: Vec<(F, F)>,
+) -> UnivariatePolynomial<F> {
     assert!(!points.is_empty());
     assert_distinct_abscissae(&points);
     let n = points.len();
@@ -98,12 +111,20 @@ pub fn interpolate<F: FiniteField>(points: Vec<(F, F)>) -> UnivariatePolynomial<
     UnivariatePolynomial::new(&coefficients)
 }
 
+/// [`interpolate_quadratic`], reachable from an example binary so the crossover can be swept.
+#[doc(hidden)]
+pub fn interpolate_quadratic_unstable<F: FiniteField>(
+    points: Vec<(F, F)>,
+) -> UnivariatePolynomial<F> {
+    interpolate_quadratic(points)
+}
+
 /// Panic unless every x coordinate is distinct.
 ///
 /// Deliberate rather than incidental: the quadratic form above divides by the *product* of the
 /// differences, and a repeated abscissa makes that product zero, which `batch_invert` leaves as
 /// zero instead of panicking. Nothing downstream would notice.
-fn assert_distinct_abscissae<F: FiniteField>(points: &[(F, F)]) {
+pub(crate) fn assert_distinct_abscissae<F: FiniteField>(points: &[(F, F)]) {
     let mut seen: HashSet<F> = HashSet::with_capacity(points.len());
     for (x, _y) in points {
         assert!(
