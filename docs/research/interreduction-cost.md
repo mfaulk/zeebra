@@ -15,6 +15,11 @@ path these figures describe nor their comparability with §3a and §3b. **§3e w
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
 
+**[§3e](#3e-the-adjudication-436s-four-mechanisms-and-what-became-of-the-510x-ceiling) adjudicates
+#436's four candidate mechanisms against everything below and says what is left of the 5.10x
+ceiling.** Read it first if that is the question; it takes no new measurement and cites only what
+the rest of this note establishes.
+
 Pinned: Zeebra at the commit recorded beside each figure. Instance `mq-random-10` from the external
 corpus at `REFERENCE_CHARACTERISTIC = 2147483647` under grevlex, identity digest
 `72d0ad315fc25409…`, asserted by `examples/f4_profile.rs` against the one in the retained
@@ -985,6 +990,131 @@ the same direction, and now subject to #536's budget like everything else. Neith
 reason to doubt a 1.23x; both are reasons #575 takes the table rather than quoting these two rows as
 one.
 
+
+---
+
+## 3e. The adjudication: #436's four mechanisms, and what became of the 5.10x ceiling
+
+#436 asked for one thing — *profile within `normal_form` on `mq-random-10` at the recorded digest,
+divisor-search steps against arithmetic, and report which of three candidate mechanisms the cost is,
+before any implementation*. #440 added a fourth. This section settles each against what is now on
+record, because an adjudication kept only in an issue thread is not where the next reader of these
+measurements will look.
+
+**No new measurement is taken here.** Every figure below is already published in §3, §3a, §3b, §3c
+or §3d of this note, at the commits its own header declares; the arithmetic over them is labelled as
+arithmetic.
+
+### 3e.1 The four mechanisms
+
+| # | mechanism | verdict | what settles it |
+|---|---|---|---|
+| 1 | the divisor search inside `normal_form` | **refuted** | §3 — **37.5** divisor tests a term popped, **22 587 181** across all 247 elements |
+| 2 | repeated work across elements | **still unmeasured** | nothing. See §3e.2 |
+| 3 | the `O(n²)` loop shape itself | **confirmed as the count, refuted as the cost** | §3 — 534 135 reduction steps is real; §3.1 — the cost is per-step, not per-step-count |
+| 4 | the per-step full-dividend merge (#440) | **confirmed, and it is the cost** | §3 — 64.2x amplification, **1 174 314 651** terms rewritten; §3d — 76.1% of them in the compared span |
+
+**Candidate 1 is refuted by a counter at this site, not by analogy with the batch path.** #436 was
+explicit that `F4Statistics::divisor_queries` and `divisor_scan_steps_per_query` cover the *batch*
+path only and might not cover interreduction's `find_map`, and that whether the two behave alike was
+the open question. They do not share a counter and the question was answered directly:
+`NormalFormCounts::divisor_tests` increments **inside** the `find_map` in
+`SparseMultiPoly::normal_form_counting`
+(`src/poly/multivariate/sparse_multivariate_polynomial_arithmetic.rs`), which is the scan #436
+quoted, reached through `reduce_grobner_basis_counted` — so the 37.5 is interreduction's own search
+over its own 246 reducers. It is **higher** than the batch path's 16.6 steps a query and still
+nowhere near enough: 22.6 M `checked_div` calls cannot be a 35-second stage at any plausible cost
+per call, and they sit three orders of magnitude below the 1.17 G term rewrites beside them.
+`interreduction_stop_tests::test_the_interreduction_counters_are_internally_consistent` pins that
+the counter is populated from this loop.
+
+**Candidate 3 needs splitting, and both halves are now answered.** #436 posed it as "if the per-division
+cost is what dominates rather than the count, the fix is in `normal_form` and not in the loop". The
+count is 534 135 reduction steps over 247 elements; the cost is 2 199 terms rewritten per step. The
+per-step cost dominates, which is candidate 4 — so #436's own disjunction resolves against the loop
+shape. But the *fix* went the other way from what that implied: #471 removed the loop outright
+rather than making a step cheaper, and #477 removed most of the work before the stage ever sees it.
+
+**Candidate 4 is the cost, and §3d's region split says which part of it.** Copy-bound in volume,
+compare-bound in cost: 76.1% of the 1.17 G rewrites are inside the span the shifted tail straddles,
+where each term pays a `MonomialOrder::cmp`. The two cheap fixes aimed at it both measured inside
+the noise — stage 2's window ~7% (§3b), §3d.2's multiply hoist ~1.6% — and §3d.2 is the reason
+§3.0a's attribution is now half retracted: the multiply half of the per-term cost was not being
+performed at all. What is left in the span is the comparison and the copy, which is #562 (heap
+division) and #317 (a cheaper comparison), and neither is this issue's.
+
+### 3e.2 What candidate 2 still lacks, precisely
+
+Element `i` and element `i + 1` are reduced against almost the same divisor set and nothing is
+cached between them. **No counter in this note distinguishes work that is repeated across calls from
+work that is not.** `NormalFormCounts` is per-call and summed: `calls`, `reducers`,
+`dividend_terms`, `terms_popped`, `reduction_steps`, `tail_terms_merged` and the three region
+fields all accumulate, so the 247 calls are indistinguishable from 247 unrelated ones. Measuring it
+needs something the counters do not have — a repeat rate over `(quotient monomial, reducer)` pairs,
+or a hit rate against a cache that does not exist — and §3's figures cannot be reanalysed into it.
+
+So candidate 2 is **not** answered by elimination, and this note does not claim it is. What *can* be
+said is that its subject has shrunk: the loop it would cache across is 25 744 ms on the path that
+ships today and **1 415 ms** with `reduce_batch_rows` on, **2 400 ms** with `interreduce_by_matrix`
+on, and **16.4 ms** with both (§3c) — so the headroom any cache could recover is bounded by whatever
+#507 settles the default to be. It is filed separately rather than left inside a closed issue.
+
+### 3e.3 The 5.10x ceiling: spent in the lab, intact in the product
+
+#349 put final interreduction at **80.4%** of `mq-random-10`, an Amdahl ceiling of **5.10x** if the
+stage became free. Arithmetic over §3c's four arms, which are flags on one build and therefore
+directly comparable:
+
+| arm | total | the stage | stage share | ceiling left on this arm | realized vs. shipping |
+|---|---:|---:|---:|---:|---:|
+| `div` + echelon — **the default** | 31 713 ms | 25 744 ms | 81.2% | 5.31x | 1.00x |
+| `div` + reduced | 6 441 ms | 1 415 ms | 22.0% | 1.28x | 4.92x |
+| `mat` + echelon | 8 467 ms | 2 400 ms | 28.3% | 1.40x | 3.75x |
+| **`mat` + reduced** | **4 851 ms** | **16.4 ms** | **0.34%** | **1.003x** | **6.54x** |
+
+Three things follow, and the third is the one that matters.
+
+**The ceiling has been exceeded, not merely approached.** 6.54x against a ceiling of 5.31x computed
+on the same arm's own stage share. An Amdahl bound assumes everything outside the stage is fixed and
+#477 made it not fixed: the residue that is neither elimination nor interreduction falls from
+`31 713 − 4 483 − 25 744 = 1 486 ms` to `4 851 − 4 531 − 16.4 ≈ 304 ms` (arithmetic over §3c's rows).
+Candidates leaving each batch in normal form shrinks work the ceiling had treated as constant.
+
+**And nothing is left inside the stage to take.** At 16.4 ms — 9.4x Groebner.jl's 1.74 ms, inside the
+11.6x–97.1x per-operation constant `groebner-jl-gap.md` §0 measures for every other stage —
+interreduction stops being an outlier, and the remaining ceiling on it is 1.003x. There is no
+version of #436's loop worth optimizing in that arm.
+
+**None of it ships.** `F4Options::default()` is `recommended()`, and `src/grobner/f4/options.rs`
+sets `interreduce_by_matrix: false` and `reduce_batch_rows: false` — each documented "off by default
+until the A/B is on record", the discipline every strategy flag here follows. So the shipping path is
+the first row, the 5.10x ceiling is fully intact on it, and **the whole of the win is a default
+decision rather than an implementation one**. That decision is #507's, in a cohort rather than from a
+single-instance A/B, and #536 is the gate on half of it: the matrix route's working set is 13.1 GB on
+katsura-11 with every budget satisfied.
+
+### 3e.4 So #436's framing was right about the stage and wrong about the remedy
+
+"This loop, not the storage" was correct and is confirmed twice over — 99.94% in `92a262d`, 99.97%
+here (§3), against `minimize_grobner_basis`'s 10.71 ms, which is what retired #304 as a time
+argument. What it got wrong is the implied premise that a cost located *in* a loop is fixed *in*
+that loop. Every change that moved this stage came from outside it:
+
+- **#471** does not make the loop cheaper; it does not run the loop. **3.75x** in §3c's cross,
+  **4.18x** in §3a's own A/B, **3.63x** in #451's at `53fbf50`. The spread is the *division* side
+  moving, not the matrix side: #507 established that #478's division arm was 1.40x the board row and
+  its 86.27% stage share above the ~80% everything else agrees on, so the higher ratio comes from an
+  inflated numerator. The figure that composes with the board is the lowest of the three.
+- **#477** does not touch interreduction at all. It stops the **main loop** emitting candidates with
+  reducible tails, so the stage has almost nothing to do. 4.92x on the shipping route — larger than
+  #471's, from a change in a different stage.
+- Both changes **inside** `normal_form`, aimed at counted operations in the hot merge, measured
+  inside the noise: ~7% and ~1.6%.
+
+That is the transferable finding, and it is worth more than the verdicts in §3e.1: in this engine,
+two fixes aimed at the operation the counters said was hot each returned a ratio inside the noise,
+and both large wins came from not generating the operation. §3d.2's warning applies to #562 for
+exactly this reason.
 
 ---
 
