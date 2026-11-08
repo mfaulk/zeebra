@@ -632,6 +632,15 @@ conventions; the mathematical objective; any known witness; the independent veri
 expected quotient dimension where known, labelled **proved** or **observed**; a dataset checksum;
 and redistribution terms.
 
+> **Read as design intent, not as the field list (#73, 2026-11-08).** Three of the fields above are
+> not in the type: a repository **commit** (folded into `Provenance::version`, "whatever that source
+> versions by"), a **modulus or irreducible polynomial** (absent from both manifests, and a real
+> ambiguity over an extension field), and a **variable count** distinct from the names (derivable
+> from `variables.len()`). The implemented schema — two manifests, not one, plus the measurement
+> side and `cost_model::FigureBasis` — is written out field by field in
+> [`docs/research/benchmark-schema.md`](research/benchmark-schema.md), with what it deliberately
+> refuses and why.
+
 ### 7.2 Corpus
 
 | category | instances | purpose |

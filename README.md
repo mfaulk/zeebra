@@ -3671,6 +3671,16 @@ MDS matrix, and three of them are pinned in tests.
 `dispatch_cico` bridges the const generic — `CicoInstance::system::<N>()` needs `N` at compile time
 and the registry has fifteen distinct `N` — in the same shape as `MqVisitor` does for the MQ family.
 
+**There are two manifest schemas, not one, and that was the decision rather than the accident.**
+A `ChallengeManifest` says what a *problem* is; an `InstanceManifest` says what a *file* is, and a
+challenge need not be a file — the 2026 CICO targets are a sentence and five numbers whose round
+constants are derived rather than published. They share no field set and no conversion, and they do
+share a convention set: one `Claim` tag for proved-against-observed, one float-free JSON writer, one
+canonical-lines-then-SHA-256 idiom, and a `redistribution` field on each.
+[`docs/research/benchmark-schema.md`](docs/research/benchmark-schema.md) is the written schema — the
+three identity layers, #73's nine fields mapped onto the four types that carry them, and the eleven
+things the schema deliberately refuses with the reason for each.
+
 **A registered problem need not be one this crate can build.** The initiative ran two bounty
 programs with objectives at opposite ends of the state — the 2026 CICO program constrains the
 leading words, the 2025 program the trailing ones — and three 2025 tiers are still listed as
