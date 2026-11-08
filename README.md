@@ -935,7 +935,7 @@ size is a per-process reading: `--arm unbounded` lifts the live-entry allowance 
 runs to completion and reports its elimination's own high-water mark, `--arm default` is the shipped
 allowance where that pass refuses and falls back, and `--arm division` is the comparand the memory
 ratio is against. It is the instrument [#536](https://github.com/mfaulk/zeebra/issues/536) was
-settled with; `docs/research/f4-resource-scaling.md` §11 has the table it produced.
+settled with; `docs/research/f4-resource-scaling.md` §12 has the table it produced.
 
 `f4_degrees` is M22-0's baseline: one table per system giving, for each lcm degree, the pairs
 selected and discarded, the split of matrix rows into reducer scaffolding and pair halves, **the
@@ -4396,7 +4396,7 @@ high-water of **103 865 277**, 9.18x the construction and 5.19x the allowance th
 [#536](https://github.com/mfaulk/zeebra/issues/536) the matrix interreduction route checked only the
 construction, so it could take a 533.0 MB computation to **13 144.3 MB with every budget satisfied**;
 it now refuses and falls back, recording `MatrixRefusal::LiveEntries`. See
-[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §11 for the
+[`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §12 for the
 attribution and `cargo run --release --example interreduce_working_set` to reproduce it.
 
 **That agreement is also a trap, so set the two together.** The effective limit is the `min`, and at
@@ -4550,7 +4550,7 @@ suspect at `O(|G|²)` pairs, is **0.03%**. `F4Statistics` reports the counts:
 [`docs/research/f4-resource-scaling.md`](docs/research/f4-resource-scaling.md) §9 has the full table
 and the method; `cargo run --release --example f4_memory` reproduces it on any system.
 
-**And the same question for the final interreduction**, which no per-batch probe reaches. §11
+**And the same question for the final interreduction**, which no per-batch probe reaches. §12
 attributes the matrix route's `katsura-11` peak to the elimination's **row buffers**: the payload at
 the high-water is 1 584.9 MB of a 13 144.3 MB peak, and the capacity those buffers were *allocated*
 for is **18 126.4 MB** — more than the peak, because capacity is reserved and `VmHWM` counts touched

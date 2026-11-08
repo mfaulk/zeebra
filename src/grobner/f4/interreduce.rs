@@ -267,7 +267,7 @@ pub(crate) fn interreduce_by_matrix<const N: usize, F: FiniteField>(
     // #507 found every budget satisfied — and reduced at a high-water of 103 865 277 live entries,
     // **5.19x the allowance**, in a run peaking at 13 144.3 MB against the division route's
     // 533.0 MB.
-    // `docs/research/f4-resource-scaling.md` §11 has the attribution.
+    // `docs/research/f4-resource-scaling.md` §12 has the attribution.
     //
     // So the same allowance is applied here, which is what `F4Options::max_live_nonzeros` already
     // documents itself as doing ("in construction and in elimination") and what the batch loop does

@@ -95,7 +95,7 @@ impl<F: FiniteField> SparseRow<F> {
     /// resident memory: [`SparseRow::subtract_scaled`] reserves the merge's worst case and swaps
     /// the buffer in, so a row whose entries cancelled down to a handful keeps the capacity the
     /// merge might have needed, and nothing shrinks it. Measured at **7.77x** the payload across one
-    /// interreduction matrix on `katsura-10` and 11.44x on `katsura-11` — see `docs/research/f4-resource-scaling.md` §11.
+    /// interreduction matrix on `katsura-10` and 11.44x on `katsura-11` — see `docs/research/f4-resource-scaling.md` §12.
     pub fn capacity(&self) -> usize {
         self.entries.capacity()
     }

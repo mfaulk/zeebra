@@ -236,7 +236,7 @@ pub fn reduced_row_echelon_within<F: FiniteField>(
 /// The attribution entry point. #536 needed the figure because the payload the budget counts is a
 /// *twelfth* of what the machine pays on `katsura-11`'s interreduction matrix, and the difference
 /// is one nameable allocation rather than allocator slack; see
-/// `docs/research/f4-resource-scaling.md` §11.
+/// `docs/research/f4-resource-scaling.md` §12.
 pub fn reduced_row_echelon_tracked<F: FiniteField>(
     matrix: &mut SparseMatrix<F>,
     max_nonzeros: usize,
