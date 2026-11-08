@@ -817,7 +817,7 @@ a bandwidth limit would not do. But the size of it disagrees with what is on rec
 milestone did not resolve why. Treated as a finding, not repaired — #319.
 
 > **Resolved in §6.13, against this reading.** The 31–44% is **ambient load**: §6.6's own
-> configuration, re-run on both §6.6's binary and `main` with the box otherwise idle, gives
+> configuration, re-run on both §6.6's binary (`93bb1c2`) and `1985504` with the box idle, gives
 > 1.058x–1.072x — §6.6's figure — and reproduces 1.343x/1.478x hours later with three other agents'
 > `cargo test --release` runs resident. `tools/benchlock.sh` serializes benchmarks and not builds,
 > so that load went straight through the lock and nothing in the log recorded it. The width penalty
@@ -1294,7 +1294,9 @@ figure which no longer reproduces indicts some commit in between. That inverts t
 asking *which commit* slowed it down, ask whether the **original commit itself** still delivers its
 own figure. So `93bb1c2` — the commit §6.5's table was taken at — was checked out into its own
 worktree, built, and re-run on one pinned core under `tools/benchlock.sh`, bare, which is the
-invocation that produced §6.5. Beside it, `origin/main` on the same core in the same session. The
+invocation that produced §6.5. Beside it, `1985504` — `main` as it stood that evening, 435 commits
+later — on the same core in the same session. Both ends are named by commit rather than by branch,
+because the point of the exercise is that a figure without its commit cannot be re-tested. The
 whole programme was then run twice, hours apart, which is how the second finding came out: the two
 runs disagree with each other, and what differed was what else was on the box.
 
@@ -1366,7 +1368,7 @@ are excluded outright: transparent hugepages are `madvise`-only on this host wit
 changed between the sessions; and the kernel source is byte-identical, so it is not the code.
 
 **The reproducibility bound, which is the usable output.** Even inside the current era the figure
-moves: `origin/main` on the same row, route, core and lock measures 3.758 ms and 3.840 ms a
+moves: `1985504` on the same row, route, core and lock measures 3.758 ms and 3.840 ms a
 determinant in two sessions hours apart, against the **3.439 ms** M25 recorded for exactly that
 measurement one day earlier. So the honest statement is not a correction factor but a bound:
 
@@ -1386,14 +1388,14 @@ That is what M27 needs and it is enough to make its own figures clean: every rat
 **twice in the same day, on the same two binaries, under the same lock**, and it gave two different
 answers:
 
-| workers | §6.6 on record | re-run, `load≈14` | re-run, box quiet | `main`, box quiet |
+| workers | §6.6 on record | `93bb1c2`, `load≈14` | `93bb1c2`, box quiet | `1985504`, box quiet |
 |---:|---:|---:|---:|---:|
 | 1 | 3.007 ms | 3.666 ms | 3.446 ms | 4.052 ms |
 | 8 | 3.139 ms (1.044x) | 4.925 ms (**1.343x**) | 3.646 ms (**1.058x**) | 4.176 ms (1.031x) |
 | 32 | 3.270 ms (1.087x) | 5.420 ms (**1.478x**) | 3.662 ms (**1.063x**) | 4.342 ms (1.072x) |
 
 **§6.6's 4–9% reproduces.** 1.058x and 1.063x against its 1.044x and 1.087x, on its own binary, and
-1.031x / 1.072x on `main`. The 31–44% reproduces too — on the same binaries, in the same
+1.031x / 1.072x on `1985504`. The 31–44% reproduces too — on the same binaries, in the same
 configuration, hours earlier, with three other agents' `cargo test --release` runs resident.
 
 **`tools/benchlock.sh` serializes benchmarks and it does not serialize builds.** That was always

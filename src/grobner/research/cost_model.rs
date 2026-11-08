@@ -3038,7 +3038,7 @@ pub fn transcribed_rows() -> Vec<CostRow> {
             "per 10 000",
             10_630,
             "3.662 ms against 3.446 ms at one worker, at commit 93bb1c2 on a 32-core pinned set \
-             with the box otherwise idle. 1.072x on main in the same session; 1.343x at 8 workers \
+             with the box otherwise idle. 1.072x at 1985504 in the same session; 1.343x at 8 workers \
              and 1.478x at 32 for the same configuration on the same binaries hours earlier, with \
              three other agents' cargo test --release runs resident",
             resolved,
@@ -3048,7 +3048,7 @@ pub fn transcribed_rows() -> Vec<CostRow> {
                      MEASUREMENTS #319 was opened about, not between this row's own columns. \
                      6.9's 31-44% was ambient load, which resolves #319 against 6.9's own reading \
                      that it was #318 seen through the worker count. 6.6's 4-9% REPRODUCES on an \
-                     idle box, on 6.6's own binary and on main alike, so the 31-44% is not a \
+                     idle box, on 6.6's own binary (93bb1c2) and on 1985504 alike, so the 31-44% is not a \
                      property of M25's harness, of its synthetic pair or of the batch length: it \
                      is what the same measurement gives while other agents are building. \
                      benchlock.sh serializes benchmarks and not builds, so that load runs straight \

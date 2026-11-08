@@ -153,7 +153,7 @@ const DEFAULT_WALL_BUDGET_SECONDS: usize = 1_800;
 /// **Left at 3.624 by §6.13, which resolved that gap and could have re-anchored this.** The gap is
 /// a measurement session and not an implementation — §6.5's own binary re-run at its own commit
 /// gives 45 159.4–47 944.4 ms against the 37 634.3 ms on record — and the registered row measures
-/// 3.758–3.840 ms at one worker on `main`, so this anchor is mildly optimistic. It is not raised,
+/// 3.758–3.840 ms at one worker at `1985504`, so this anchor is mildly optimistic. It is not raised,
 /// because the `max` above pairs it with an exponent fitted over five orders in *one* session:
 /// re-anchoring at 162 alone would leave the prefactor and the exponent belonging to different
 /// sessions, which is the error §6.13 exists to stop. Re-anchoring honestly means re-running
