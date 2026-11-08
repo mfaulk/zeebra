@@ -130,8 +130,10 @@ be spent on a **non-generic slice chosen to lower the degree** rather than a gen
 precisely the shape of FreeLunch's Appendix B bypass for Griffin (choose the affine input so the
 degree growth is suppressed for three rounds — see `docs/research/griffin-freelunch.md` §1.2, where
 the line is recovered from published witnesses) and of 2026/1254 §2.2's `(1,[1])` round-skipping
-parametrisation, which `docs/research/elimination-beyond-grobner.md` §5 item 3 already lists as "new
-mathematics for the crate".
+parametrisation, which `docs/research/elimination-beyond-grobner.md` §5 item 3 listed as "new
+mathematics for the crate" and whose §5.1 now scores as landed — `parametrize` in
+`src/grobner/research/univariate_cico.rs` (#209). So the mechanism exists; what does not is a
+*degree-lowering* choice of family, which is the point of this section.
 
 **That is a different research direction with a different cost model, and it is where the useful part
 of #287 should be redirected.** It is not "a `k = 3` family"; it is "a degree-lowering choice of
@@ -267,7 +269,8 @@ Not as scope creep — as the redirect #287's closure leaves owing.
 1. **The degree-lowering parametrisation (§3.3) is the live question, and it is not this one.** The
    extra freedom in a family is worth something only if spent on lowering the elimination degree,
    not on adding solutions. 2026/1254 §2.2's `(1,[1])` round skip and Griffin's Appendix B bypass are
-   two instances of it; `elimination-beyond-grobner.md` §5 item 3 already has the first on the books.
+   two instances of it; the first is not merely on the books but implemented — `parametrize` (#209),
+   scored in `elimination-beyond-grobner.md` §5.1 — so pricing it needs no new construction.
    Worth filing as its own issue: *"Degree-lowering CICO parametrisations: price the `(1,[1])` round
    skip against the measured resultant degree `d^{2R_F+R_P}`"*.
 2. **The resultant route's per-sample determinant is the axis with an exponent in it.** Since `k = 2`
