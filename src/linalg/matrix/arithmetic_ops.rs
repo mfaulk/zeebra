@@ -69,6 +69,16 @@ impl<T: Ring> Mul for &Matrix<T> {
         // right operand is past L3. Eight elements is also exactly one 64-byte cache line at 8
         // bytes apiece, which is the obvious reading of why the wider tiles fall off, and not one
         // these measurements establish.
+        //
+        // **The `i` dimension is exhausted at 2**, and that is measured rather than assumed (#517).
+        // Hand-written 4x8 and 4x4 — four named row slices in this same style, with the two passes
+        // below kept as the row remainder — lose: 4x8 by 0.977-1.012x in cache and **0.497x on the
+        // 128 MiB arm**, where 32 accumulators against 16 registers spill and the halved
+        // right-operand traffic does not pay for it; 4x4 by 0.969-1.015x, parity at best. Do not
+        // read a figure taken from an array-indexed template (`acc[r][t]`) as a figure about a tile
+        // shape — the same 2x8 shape spelled that way measures ~20% slower than this one, which is
+        // why these rows are named and why #517 had to measure the 4-row shapes a second time.
+        // `docs/research/matmul-register-tiling.md` has every shape in one table.
         const JT: usize = 8;
         let mut i = 0;
         while i + 2 <= m {
