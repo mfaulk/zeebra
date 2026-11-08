@@ -358,7 +358,7 @@ cargo test --lib -- --exact grobner::research::mq::tests::test_the_binary_and_ex
 cargo test --lib -- --exact grobner::differential::tests::test_every_committed_fixture_agrees
 ```
 
-`boolean_readiness` reports **10 passed, 0 ignored**: the two that named #377 —
+`boolean_readiness` reports **11 passed, 0 ignored**: the two that named #377 —
 `the_enumeration_oracle_should_cover_gf256` and `a_system_over_gf256_should_parse_from_text` — are
 un-ignored and green (§13). The live Singular sweep of §7 needs a local install and is `--ignored`:
 
@@ -499,3 +499,110 @@ fail `test_the_fixtures_cover_every_field_and_variable_count` by design. Extensi
 characteristic (`Gf13Pow4`) are not covered either; `CaseField` has no variant for them, because
 Singular's `minpoly` syntax would need the coefficient translation generalized past GF(2) and no
 open issue wants it. Both are noted on the issues that would use them rather than left implicit.
+
+## 15. #218 closed: question 3 measured, question 7 recorded, and the backends reached
+
+§9 left this issue open "on this question alone". This section closes it, and corrects two things
+the earlier passes claimed.
+
+### 15.1 Question 7: no NTT over `GF(2^m)`, and none is wanted
+
+**Recorded as a won't-do, which is all #218 asked for.** The multiplicative group of `GF(2^m)` has
+order `2^m - 1`, which is odd, so it contains no element of order `2^k` for any `k >= 1` and there
+is no two-adic root of unity to build a radix-2 transform on. `src/fields/two_adic.rs` says the same
+thing from the other side: `GF(2)`'s two-adicity is zero.
+
+That is not a gap to fill. Nothing in the crate needs one: the Boolean path is F4 and FGLM over
+`Monomial<N>`, and the univariate transforms that would want an NTT — `src/fft/`, Bluestein, the
+Graeffe root-finding of #161 — are reached only over prime fields with the required two-adicity.
+A characteristic-two instance that wanted fast univariate multiplication would use carry-less
+multiplication, which **already exists** and which M19-B measured at 105x on the operation. So the
+honest record is: the obstacle is real, the capability is not needed, and the alternative is
+already shipped. **Do not build it**, and revisit only if something asks.
+
+### 15.2 Question 3: the per-nonzero cost, measured
+
+`examples/boolean_density.rs` is the instrument. It eliminates the **same structural system at two
+field widths** — random quadratics in `n` variables with `x_i^2 - x_i` adjoined, one equation per
+variable, seed 218 — over `Zp2` and over `Zp2147483647`, and times all three backends over every
+matrix.
+
+Two notes on the design, both of which are corrections to what an earlier draft of this harness
+asserted:
+
+- `benchmark_systems::planted` is **not** the workload. It is structured, and at `n = 12` it builds
+  a widest matrix of 54 x 36 with every elimination under 0.01 ms — real figures about nothing.
+  #218's own reproducible experiment specifies *random* quadratics, and the construction used here
+  is the one `field_equations`' dimension test uses.
+- `with_field_equations` is **not** used for the wide-field side. `x_i^q - x_i` at
+  `q = 2147483647` is a degree-2^31 generator, and F4 refuses it at 200 000 matrix rows — which is
+  what the first run of this harness did. The adjoined generators are degree two at both widths,
+  and over `GF(2)` they *are* the field equations, which
+  `boolean_restriction_is_the_gf2_field_equation` asserts against the shipped
+  [`field_equations`](../../src/grobner/field_equations.rs) rather than arguing from `q = 2`.
+
+§9's layout facts are confirmed and unchanged: `size_of::<(usize, Zp2)>()` is **16**, the same as
+over a 32-bit prime and over `GF(2^8)`, so one bit of information occupies 16 bytes — a factor of
+**128**. The index is what pins it: a `usize` column number is 8 bytes before any coefficient is
+stored.
+
+**And the measurement adds a finding §9 did not anticipate.** The two widths do not build the same
+matrices, though the structural system and its monomial support are identical:
+
+| n | field | widest | entries | peak live | row ops | live entry bytes |
+| ---: | --- | --- | ---: | ---: | ---: | ---: |
+| 6 | `Zp2` | 251 x 184 | 5 628 | 2 193 | 5 940 | 35 088 |
+| 6 | `Zp2147483647` | 256 x 190 | 8 325 | 4 299 | 12 282 | 68 784 |
+| 8 | `Zp2` | 1296 x 833 | 51 214 | 44 949 | 104 759 | 719 184 |
+| 8 | `Zp2147483647` | 1292 x 829 | 91 084 | 108 712 | 222 280 | 1 739 392 |
+| 10 | `Zp2` | 4209 x 2363 | 347 397 | 469 286 | 1 150 140 | 7 508 576 |
+| 10 | `Zp2147483647` | 4252 x 2405 | 678 266 | 1 107 279 | 2 272 797 | 17 716 464 |
+
+**Over `GF(2)` the same system needs about half the entries and about half the row operations** —
+1.95x fewer entries and 1.98x fewer row operations at `n = 10`, and 2.36x less peak live memory.
+Coefficients are 0 or 1 and `a + a = 0`, so additions cancel mod 2 far more often and rows go to
+zero that would not over a large prime.
+
+**Every figure in that table is a count rather than a timing**, so it is exact and reproduces
+bit-for-bit on any machine under any load. That is deliberate: this workstation runs several agents
+and the benchmark lock was held throughout, so a wall-clock column would have been a figure about
+the queue. The harness does report per-backend milliseconds and nanoseconds per row operation —
+the normalization that separates "fewer operations" from "cheaper operations" — and those belong in
+a run taken under `tools/benchlock.sh` on a quiet box. What they will show is already known
+independently and is not a characteristic-two effect: `Zp2` is a four-byte cell and
+`Zp2147483647` an eight-byte one, which is the comparison
+`MILESTONE-SIMD-PARALLELISM.md` §8.4 measured at 2.80x on the dense backend.
+
+So the conclusion for a representation decision is sharper than §9's, and in the opposite direction
+from the intuition the 16-byte figure invites. **`GF(2)` is already cheaper in memory than the wide
+field, and not for the reason the question asked about**: the entry is exactly the same size, there
+are simply fewer of them. The 128x gap between a bit and its 16 bytes is real and is entirely a
+representation cost — which is what makes it #272's to collect, and why no arithmetic or field
+change narrows it.
+
+`n = 12` is compiled and reachable as an argument but is not measured: random quadratic Boolean F4
+does not finish there inside ten minutes where `n = 10` takes seconds.
+
+### 15.3 The characteristic-two gap §3 implied was closed, and was not
+
+§3 wrote that "F4, FGLM, `solve_one` **and the echelon backends**" had never run in characteristic
+two, and implied all four were then closed. Three were. The fourth was not: `src/linalg/` contained
+no `Zp2`, `Gf256` or `BinaryFieldElement` at all, so of the three backends only
+[`Backend::Adaptive`] had ever run at this characteristic — and only indirectly, because that is
+what `F4Options::default()` selects. `Sparse` and `Dense` had never been run over an
+even-characteristic field by anything.
+
+Closed now, and **in the tests rather than in the example**, because an example is not run by CI:
+`test_every_backend_agrees_on_every_shape_and_field` and
+`test_every_backend_honours_the_split_contract` in `src/linalg/echelon.rs` now check `Zp2` and
+`Gf256` alongside the five odd fields they already covered. Both shapes of even characteristic are
+there because they are different code — `Zp2` keeps the wide-remainder path, since `2^32` is not
+invertible modulo an even number, while `Gf256` is carry-less multiplication with a Barrett
+reduction.
+
+Worth checking rather than assuming, for a reason specific to the characteristic: every nonzero
+coefficient over `GF(2)` is one, so normalization never divides and `pivot_inversions` stays zero
+throughout; and the frequent cancellation §15.2 measures is exactly the path on which the three
+backends maintain their nonzero counters by separate code. The example still runs all three and
+asserts the same agreement, which is how the measurement knows its own timings are of the same
+computation.

@@ -814,6 +814,8 @@ cargo run --release --example f4_selection         # reducer selection and the r
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
 cargo run --release --example accumulator_span -- list
+cargo run --release --example boolean_density      # what a GF(2) entry costs, at two field widths
+cargo run --release --example boolean_density -- 6 8
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -993,6 +995,20 @@ than a timing, so it reproduces exactly and needs no exclusive lock — and it i
 every matrix it also runs the real backend, split form included, and asserts its replay applied the
 same pivots, by `row_operations` and `pivot_inversions`. The answer, measured, is **no** — see
 [`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md) §10.
+
+`boolean_density` answers what a `GF(2)` coefficient costs to store, which is #218's last open
+question. A sparse entry is `(usize, F)` and the index's alignment pads it to **16 bytes at any
+field width**, so over `GF(2)` it is 16 bytes carrying one bit — a factor of 128, and a
+representation cost rather than an arithmetic one. The harness eliminates the *same* structural
+system at two field widths — random quadratics with `x_i^2 - x_i` adjoined, which over `GF(2)` are
+the field equations and are asserted to be — and reports entries, peak live entries, row operations
+and per-backend times for each. The counts are exact and reproduce bit-for-bit; the measured
+surprise is that `GF(2)` needs about **half** the entries and half the row operations of the wide
+field on the same system, because `a + a = 0` makes cancellation far more frequent. So `GF(2)` is
+already cheaper in memory — by entry count, not entry size. It also runs all three elimination
+backends over characteristic-two matrices and asserts they agree, which
+[`docs/research/boolean-solving.md`](docs/research/boolean-solving.md) §15 explains had never been
+checked.
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,

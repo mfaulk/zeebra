@@ -214,9 +214,15 @@ is three of them.
 | bitwise loop + long division | 212.70 |
 | `PCLMULQDQ` + Barrett | 2.02 |
 
-**105x.** Not a criterion benchmark: `fields::binary_field` is a private module with no `pub use`,
-so no bench target can reach the type. The figure is from a standalone program replicating both
+**105x.** Not a criterion benchmark: at the time, `fields::binary_field` was a private module with
+no `pub use`, so no bench target could reach the type. The figure is from a standalone program
+replicating both
 implementations, which also cross-checks them on 1024 pairs.
+
+> **The reason given above expired, 2026-11-08 (#218).** `src/fields/mod.rs` has exported
+> `BinaryFieldElement` since `8757b4a` (2026-11-05), so privacy is no longer what keeps this off
+> the bench harness — `benches/` simply has no characteristic-two target yet. The 105x stands; only
+> its stated obstacle was stale. §5.2's identical claim is corrected the same way.
 
 `pclmulqdq` is probed at run time, not assumed. It is **not** implied by the `x86-64-v3` floor —
 it arrived with the AES-NI generation and belongs to none of the microarchitecture levels.
@@ -236,7 +242,9 @@ the largest declared being P = 251 at N = 4.
 The per-multiplication heap allocation is gone — `[u128; 2N-1]` needs const-expression arithmetic
 but two `[u128; N]` arrays do not.
 
-Also not benchmarked, for the same reason as §5.1: `fields::extension_field` is private.
+Also not benchmarked, for the same reason as §5.1 — and with the same correction: at the time
+`fields::extension_field` was private, and it has been exported since `8757b4a`. What is missing is
+a characteristic-two bench target, not an export (#218).
 
 ### 5.3 The SIMD question answered in the negative (#49)
 
