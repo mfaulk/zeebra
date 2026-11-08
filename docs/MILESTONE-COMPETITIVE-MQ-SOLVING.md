@@ -827,7 +827,9 @@ wrong object. §3 carries each with its figure.
 **The gate, and it may legitimately return "none".** It does not invent its own metric: **#77 owns
 the comparison methodology** for epic #66 — time and peak bytes to a *verified solution*, so an F4
 baseline must include FGLM and `solve_one`, with per-algorithm secondary metrics marked
-non-comparable. The gate consumes that and adds only the choosing.
+non-comparable. The gate consumes that and adds only the choosing. That methodology is now
+> written out in [`docs/research/mq-comparison-methodology.md`](research/mq-comparison-methodology.md)
+> (#77), including the baseline column it validates itself against.
 
 1. Name one benchmark instance and its **measured** bottleneck — from M27-0 or M27-B step 1, not
    from a literature claim.
