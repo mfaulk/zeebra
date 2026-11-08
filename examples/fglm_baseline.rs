@@ -20,6 +20,7 @@
 //! cargo run --release --example fglm_baseline
 //! cargo run --release --example fglm_baseline -- cyclic-6         # one system
 //! cargo run --release --example fglm_baseline -- all              # every system, hard ones too
+//! cargo run --release --example fglm_baseline -- katsura-10        # an upper rung, by name
 //! ```
 //!
 //! Rows print as they are measured and each names its system, so the hard instances can be run
@@ -276,6 +277,27 @@ const SYSTEMS: &[(&str, bool)] = &[
     ("planted-8", true),
 ];
 
+/// #424's upper rungs, **excluded from a bare run** and reached by name or by `all`.
+///
+/// Not in [`SYSTEMS`] because a bare `fglm_baseline` should stay a few minutes: `katsura-11`'s
+/// grevlex basis alone is about 280 s, and its lex F4 burns a budget before refusing. Classical
+/// Buchberger is `OutOfReach` on every one — it already does not finish `katsura-6` under lex in
+/// 900 s and these are strictly larger.
+///
+/// `cyclic-9` and `cyclic-10` are the **measured ceiling**: F4's grevlex basis crosses the
+/// live-entry budget, which is a reproducible bound rather than a clock. They are listed so that
+/// the refusal is a row rather than an omission — see `corpus`'s module header.
+const UPPER_RUNGS: &[(&str, bool)] = &[
+    ("katsura-8", false),
+    ("katsura-9", false),
+    ("katsura-10", false),
+    ("katsura-11", false),
+    ("cyclic-7", false),
+    ("cyclic-8", false),
+    ("cyclic-9", false),
+    ("cyclic-10", false),
+];
+
 /// Why an instance's classical run is not attempted.
 const OUT_OF_REACH: &str =
     "classical Buchberger does not finish it in 900 s at ALL criteria (M16 §8.3)";
@@ -304,7 +326,15 @@ fn main() {
     let point6 = planted_point::<6>(3);
     let point8 = planted_point::<8>(3);
 
-    for (name, attempt) in SYSTEMS {
+    for (name, attempt) in SYSTEMS.iter().chain(UPPER_RUNGS) {
+        // An upper rung needs its name, or `all`: a bare run must not become a
+        // twenty-minute one by growth of the ladder.
+        if UPPER_RUNGS.iter().any(|(upper, _)| upper == name)
+            && !force_all
+            && !args.iter().any(|a| a == name)
+        {
+            continue;
+        }
         if !wanted(name) {
             continue;
         }
@@ -314,11 +344,19 @@ fn main() {
             "cyclic-4" => measure(name, &cyclic::<4, F>(), rounds, classical),
             "cyclic-5" => measure(name, &cyclic::<5, F>(), rounds, classical),
             "cyclic-6" => measure(name, &cyclic::<6, F>(), rounds, classical),
+            "cyclic-7" => measure(name, &cyclic::<7, F>(), rounds, classical),
+            "cyclic-8" => measure(name, &cyclic::<8, F>(), rounds, classical),
+            "cyclic-9" => measure(name, &cyclic::<9, F>(), rounds, classical),
+            "cyclic-10" => measure(name, &cyclic::<10, F>(), rounds, classical),
             "katsura-3" => measure(name, &katsura::<3, F>(), rounds, classical),
             "katsura-4" => measure(name, &katsura::<4, F>(), rounds, classical),
             "katsura-5" => measure(name, &katsura::<5, F>(), rounds, classical),
             "katsura-6" => measure(name, &katsura::<6, F>(), rounds, classical),
             "katsura-7" => measure(name, &katsura::<7, F>(), rounds, classical),
+            "katsura-8" => measure(name, &katsura::<8, F>(), rounds, classical),
+            "katsura-9" => measure(name, &katsura::<9, F>(), rounds, classical),
+            "katsura-10" => measure(name, &katsura::<10, F>(), rounds, classical),
+            "katsura-11" => measure(name, &katsura::<11, F>(), rounds, classical),
             "planted-4" => measure(name, &planted::<4, F>(&point4), rounds, classical),
             "planted-6" => measure(name, &planted::<6, F>(&point6), rounds, classical),
             "planted-8" => measure(name, &planted::<8, F>(&point8), rounds, classical),

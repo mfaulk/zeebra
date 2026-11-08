@@ -153,7 +153,7 @@ impl ZeebraSolver {
 /// its own families use.
 fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
     match characteristic {
-        // Katsura 4–7, Cyclic 4–6, random and planted MQ at 6, 10, 14.
+        // Katsura 4–11, Cyclic 4–10, random and planted MQ at 6, 10, 14.
         //
         // The same list at every prime the corpus generates these families over
         // (`corpus::GENERATED_CHARACTERISTICS`). None of them is optional for the **eliminant**,
@@ -161,11 +161,17 @@ fn compiled_dimensions(characteristic: u64) -> &'static [usize] {
         // is `1515531529`, so a Zeebra-against-msolve eliminant comparison exists only below it.
         // Compiling the reference prime alone left the one task with two external engines still
         // unable to produce a Zeebra operand — the #465 defect from the other direction.
-        REFERENCE_CHARACTERISTIC | ALTERNATE_CHARACTERISTIC => &[4, 5, 6, 7, 10, 14],
+        //
+        // Widths 8–11 are #424's upper rungs, and they are the expensive half of this list: each
+        // (field, width) pair monomorphizes F4 *and* FGLM, so every width added here is another
+        // copy of both at every prime. They are here rather than omitted because a board row
+        // saying `Unsupported::Representation` on a rung the corpus publishes would report an
+        // adapter gap as a Zeebra limit, which is the one confusion this file exists to prevent.
+        REFERENCE_CHARACTERISTIC | ALTERNATE_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10, 11, 14],
         // The same rungs at the corpus's small-prime identity. Over `Zp32003`, a 32-bit
         // Montgomery field — so a small-prime row measures the narrow arithmetic regime rather
         // than the 64-bit path at a small modulus.
-        SMALL_PRIME_CHARACTERISTIC => &[4, 5, 6, 7, 10, 14],
+        SMALL_PRIME_CHARACTERISTIC => &[4, 5, 6, 7, 8, 9, 10, 11, 14],
         // The three planted Poseidon rows.
         KOALABEAR_PRIME => &[5, 7, 9],
         // Anemoi FCICO at N = 1 and 2.
@@ -521,7 +527,10 @@ impl ZeebraSolver {
                 5,
                 6,
                 7,
+                8,
+                9,
                 10,
+                11,
                 14
             ),
             ALTERNATE_CHARACTERISTIC => dispatch!(
@@ -534,7 +543,10 @@ impl ZeebraSolver {
                 5,
                 6,
                 7,
+                8,
+                9,
                 10,
+                11,
                 14
             ),
             REFERENCE_CHARACTERISTIC => dispatch!(
@@ -547,7 +559,10 @@ impl ZeebraSolver {
                 5,
                 6,
                 7,
+                8,
+                9,
                 10,
+                11,
                 14
             ),
             KOALABEAR_PRIME => dispatch!(
@@ -1132,7 +1147,13 @@ mod tests {
     #[test]
     fn test_an_uncompiled_dimension_names_itself_an_adapter_limit() {
         let mut wide = instance("katsura-4", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
-        wide.variables = (1..=9).map(|i| format!("x{}", i)).collect();
+        // The narrowest width this adapter does **not** compile, found rather than written: the
+        // compiled set grows with the ladder, and a literal here went stale the moment #424 added
+        // the widths 8 to 11.
+        let uncompiled = (1..)
+            .find(|width| !compiled_dimensions(REFERENCE_CHARACTERISTIC).contains(width))
+            .expect("some width is uncompiled");
+        wide.variables = (1..=uncompiled).map(|i| format!("x{}", i)).collect();
 
         match ZeebraSolver::new().supports(&wide, Task::ReducedGrobnerBasis) {
             Support::No(Unsupported::Representation { detail }) => {
@@ -1148,12 +1169,33 @@ mod tests {
     }
 
     /// Every corpus field compiles the dimensions its own families need, and no others.
+    ///
+    /// Derived from the ladder rather than written out, so a rung added at a new width fails here
+    /// until the adapter compiles it — which is the coupling the hard-coded list used to hide. The
+    /// registry fields are excluded because their widths follow from a round count rather than from
+    /// a rung name.
     #[test]
     fn test_each_field_compiles_the_dimensions_its_families_need() {
-        assert_eq!(
-            compiled_dimensions(REFERENCE_CHARACTERISTIC),
-            &[4, 5, 6, 7, 10, 14]
-        );
+        use std::collections::BTreeSet;
+        // Derived from the ladder rather than written out, so a rung added at a new width fails
+        // here until the adapter compiles it — which is the coupling a hard-coded list hid.
+        for characteristic in [REFERENCE_CHARACTERISTIC, SMALL_PRIME_CHARACTERISTIC] {
+            let needed: BTreeSet<usize> = crate::grobner::external::corpus::ladder()
+                .into_iter()
+                .filter_map(|entry| instance(entry.name, characteristic, GREVLEX))
+                .filter(|built| built.field.characteristic == characteristic)
+                .map(|built| built.variable_count())
+                .collect();
+            let compiled: BTreeSet<usize> = compiled_dimensions(characteristic)
+                .iter()
+                .copied()
+                .collect();
+            assert_eq!(
+                compiled, needed,
+                "GF({}) compiles {:?} where the ladder needs {:?}",
+                characteristic, compiled, needed
+            );
+        }
         // The alternate prime carries the same families, and is the only field at which an
         // eliminant comparison against msolve exists at all (#465).
         assert_eq!(

@@ -63,6 +63,12 @@ As the saying goes, you can either make software so simple that it obviously has
       resolved against msolve's own distributed input files — now at **two** reference
       characteristics, `2^31 − 1` and `GF(32003)`, each rung frozen at each, because a rung at
       another prime is another ideal and not the same one under a parameter
+- [x] The ladder to `katsura-11` and `cyclic-10`, with the quotient dimension **asserted** per rung
+      against the published record rather than merely reported: `2^(N−1)` exact at eight consecutive
+      Katsura rungs, 70/156/**924** for Cyclic against Björck–Fröberg and Backelin–Fröberg, and the
+      cyclic dimension class from Backelin's squarefree criterion — and a **measured ceiling** at
+      `cyclic-9`, set by the F4 basis crossing its live-entry budget, which is a bound that crosses
+      at the same counter on any machine rather than a wall clock
 - [x] Symbolic preprocessing's monomial queue deduplicated on push rather than on pop:
       `fukuoka-mq-III-n20-seed0`'s peak RSS 9.1x lower and its runtime 10% shorter, with the
       symbolic closure checked unchanged batch by batch rather than inferred from the basis
@@ -375,10 +381,12 @@ ZEEBRA_REQUIRE_MSOLVE=1 cargo nextest run --profile ci --lib -E 'test(/^grobner:
 ```
 
 `ZEEBRA_REQUIRE_MSOLVE=1` turns an absent msolve from a silent early return into a failure, so the
-command either exercises the comparand or says it could not. It is 241 tests in 1.6s once built —
-a debug build is enough, because every msolve comparison runs on a corpus rung small enough to be
-instant — so this is cheap to run before merging anything that changes the corpus, the challenge
-registry, or either engine's side of the comparison. The test that #339 is named for lives here:
+command either exercises the comparand or says it could not. It is 246 tests in 30s once built —
+a debug build is enough, because every msolve comparison runs on a corpus rung at or below seven
+variables, which `DEFAULT_ORACLE_WIDTH_CEILING` is what bounds; `cyclic-7`, added in #424, is almost
+all of those thirty seconds and the rungs above it print `NO ORACLE` rather than being run. So this
+is still cheap to run before merging anything that changes the corpus, the challenge registry, or
+either engine's side of the comparison. The test that #339 is named for lives here:
 `grobner::external::msolve::tests`, driven from `corpus::ladder()`.
 
 ### Build configuration
@@ -2928,7 +2936,7 @@ five weeks old, every engine crate is `0.1.0`, its `f4.rs` carries six tests, an
 oracle run in its own repository exercises the elimination. It also agrees with Zeebra **term for
 term, every coefficient included** on every Katsura and Cyclic rung of the shared corpus, plus the
 reference smoke system, a 62-bit prime and a fourteen-variable system — ten instances — and across
-the full eighteen-rung ladder it has **disagreed with nothing**. Both halves belong in any table that
+the full ladder — eighteen rungs then, twenty-six since #424 — it has **disagreed with nothing**. Both halves belong in any table that
 quotes it: report its rows with the pinned SHA, and do not make it the denominator of a headline
 speedup. The verdict is `docs/research/sagebrush-implementation.md` §6.3.
 

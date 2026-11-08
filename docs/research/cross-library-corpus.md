@@ -327,8 +327,8 @@ asserts both for every rung.
 
 | Family | Rungs | Evidence | Timing publishable? |
 |---|---|---|---|
-| Katsura | `katsura-4,5,6,7` | msolve 0.11.0 `input_files/kat6-31.ms`, generator for generator | **yes** |
-| Cyclic (affine) | `cyclic-4,5,6` | msolve 0.11.0 `input_files/cyclic5-16.ms`, generator for generator | **yes** |
+| Katsura | `katsura-4 … 11` | msolve 0.11.0 `input_files/kat6-31.ms`, generator for generator | **yes** |
+| Cyclic (affine) | `cyclic-4 … 10` | msolve 0.11.0 `input_files/cyclic5-16.ms`, generator for generator | **yes** |
 | Random MQ | `mq-random-6,10,14` | live Singular invariants; seeded, reproducible from the name | **yes** |
 | Planted MQ | `mq-planted-6,10,14` | the planted point satisfies the **rendered text** | **yes** |
 | Poseidon | `poseidon-t2-rf2-rp0/rp2-planted`, `poseidon-t2-rf4-rp0-planted` | planted target, from the cryptanalysis registry | **yes** |
@@ -336,6 +336,15 @@ asserts both for every rung.
 | Zero-dimensional FGLM workloads | Katsura, Cyclic, both MQ families | as above | **yes**, as `lex-basis-by-conversion` |
 | Fukuoka MQ Type III | — | **excluded by licence**, not by effort — see below | n/a |
 | Characteristic two | — | **blocked on a convention** — see §6 | no |
+
+The upper rungs' evidence needs a word, because msolve ships `kat6-31.ms` and `cyclic5-16.ms` only
+and there is no distributed file at eight variables or above. The `ComparandFile` evidence is
+nonetheless the right record and not a stretch: it is evidence about the **construction**, which
+every rung of a family shares (§5's opening), and the construction is one const-generic function
+pinned against msolve's own bytes at `N = 6` and `N = 5`. What the upper rungs add on top is the
+**invariant** check of §9 — `D = 2^(N−1)` exact at eight consecutive Katsura rungs, `924` at
+`cyclic-7` against Backelin–Fröberg, and the dimension class at `cyclic-8` and `cyclic-9` against
+Backelin's theorem. That is a second, independent anchor, and it is the one the upper rungs rest on.
 
 **Six families**, which is the milestone's minimum, and
 `test_the_corpus_covers_six_families_each_with_recorded_evidence` asserts both the count and that
@@ -397,11 +406,12 @@ a conversion row by four engines to zero.
 
 Two notes a reader needs before using the eliminant row. msolve's eliminant bound is `1515531529`,
 below a tenth of its basis bound, which is what makes `32003` and `2^31 − 1` land in different cells.
-And **Zeebra's own adapter refuses `UnivariateEliminant`**, so that column has no in-crate operand at
-any field: the gain there is corroboration of an invariant between two external engines, not a
-Zeebra ranking. The refusal's stated reason — "no comparand offers the task at all" — is false, and
-#465 is the fix; the eliminant is the only task the board defines with two external engines and no
-in-crate answer.
+And Zeebra's own adapter **used to refuse** `UnivariateEliminant`, on the stated ground that "no
+comparand offers the task at all" — which was false, since msolve and Singular both do. #465 fixed
+it: the eliminant is now served as a projection of an already-computed lex basis, adding no algorithm
+and no strategy choice. So the two-way cell above is now a cell a Zeebra row can be ranked in, where
+when this section was first written it could only corroborate an invariant between two external
+engines.
 
 The ceilings, each from the engine's own gate:
 
@@ -470,6 +480,15 @@ whose every row is one difficulty says less than its row count suggests:
 intermediate rung, and that the ladder as a whole carries a challenging one — without which nothing
 exercises `StoppedByLimit`, the outcome the protocol spends the most care on.
 
+**#424 made `Challenging` mean something again, and reclassified `katsura-7` on the way.** The label
+is defined as "expected to exhaust at least one engine's limits", and `katsura-7` exhausts none: all
+five engines complete it, msolve and Sagebrush at their process floors. It was the top rung when it
+was labelled, which is how the label came to mean "the largest one here" instead. It is now
+`Intermediate`, and `Challenging` is `katsura-10`, `katsura-11`, `cyclic-8`, `cyclic-9` and
+`cyclic-10` — the four that need minutes or refuse, plus the positive-dimensional one. Nothing about
+any rung's *identity* changed: the `rung` field is a judgement about the ladder's shape and is not
+part of the digest, so no frozen value moved.
+
 ---
 
 ## 8. The manifest
@@ -482,20 +501,36 @@ rung whose field varies appears twice and a registry rung once (§4b):
 # name family rung equivalence dimension variables characteristic digest
 anemoi64-cico-n1-fcico anemoi easy sole-comparand zero-dimensional 2 18446744073709551263 c053c6ff0186e3b4…
 anemoi64-cico-n2-fcico anemoi intermediate sole-comparand zero-dimensional 4 18446744073709551263 e3a6312e85c486b0…
+cyclic-10 cyclic challenging comparand-file zero-dimensional 10 2147483647 df450bfc1886aa26…
+cyclic-10 cyclic challenging comparand-file zero-dimensional 10 32003 538964ac3a891da6…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 2147483647 e1d8d59448b3d648…
 cyclic-4 cyclic easy comparand-file positive-dimensional 4 32003 e5a49df27c74d4d7…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 2147483647 3274d14b224664ae…
 cyclic-5 cyclic easy comparand-file zero-dimensional 5 32003 e80b7d8a6432b7d3…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 2147483647 ed89afe173d16024…
 cyclic-6 cyclic intermediate comparand-file zero-dimensional 6 32003 bf3bb57af08fcc94…
+cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 2147483647 30ce3b4f54c7b30e…
+cyclic-7 cyclic intermediate comparand-file zero-dimensional 7 32003 18746449c45766c3…
+cyclic-8 cyclic challenging comparand-file positive-dimensional 8 2147483647 a5eda0f9e2642ffe…
+cyclic-8 cyclic challenging comparand-file positive-dimensional 8 32003 e2f6be738bd1f215…
+cyclic-9 cyclic challenging comparand-file positive-dimensional 9 2147483647 ff4c2030a8f74d29…
+cyclic-9 cyclic challenging comparand-file positive-dimensional 9 32003 ccffb9b3e5ca7b82…
+katsura-10 katsura challenging comparand-file zero-dimensional 10 2147483647 67d6a96fadd21cc7…
+katsura-10 katsura challenging comparand-file zero-dimensional 10 32003 c55e1bb74cf3e35c…
+katsura-11 katsura challenging comparand-file zero-dimensional 11 2147483647 03bf44d5d614a21c…
+katsura-11 katsura challenging comparand-file zero-dimensional 11 32003 c6802b0391f8394f…
 katsura-4 katsura easy comparand-file zero-dimensional 4 2147483647 825a3aa54e152da5…
 katsura-4 katsura easy comparand-file zero-dimensional 4 32003 c5fb073f5c9aceaa…
 katsura-5 katsura easy comparand-file zero-dimensional 5 2147483647 6f305e37b2cc4ade…
 katsura-5 katsura easy comparand-file zero-dimensional 5 32003 8be0a39d2d8c64ff…
 katsura-6 katsura intermediate comparand-file zero-dimensional 6 2147483647 aa992992dfe29a23…
 katsura-6 katsura intermediate comparand-file zero-dimensional 6 32003 a7bd9edf654af9e9…
-katsura-7 katsura challenging comparand-file zero-dimensional 7 2147483647 545cef6185ed10e4…
-katsura-7 katsura challenging comparand-file zero-dimensional 7 32003 c56bf75048b0fbae…
+katsura-7 katsura intermediate comparand-file zero-dimensional 7 2147483647 545cef6185ed10e4…
+katsura-7 katsura intermediate comparand-file zero-dimensional 7 32003 c56bf75048b0fbae…
+katsura-8 katsura intermediate comparand-file zero-dimensional 8 2147483647 b389774a0934503b…
+katsura-8 katsura intermediate comparand-file zero-dimensional 8 32003 94d8b158719bdb10…
+katsura-9 katsura intermediate comparand-file zero-dimensional 9 2147483647 9373c952e86d4a72…
+katsura-9 katsura intermediate comparand-file zero-dimensional 9 32003 4010a392ecf953ea…
 mq-planted-10 mq-planted intermediate known-solution zero-dimensional 10 2147483647 0eef4b55bce6fdc6…
 mq-planted-10 mq-planted intermediate known-solution zero-dimensional 10 32003 74fc86970c3e5658…
 mq-planted-14 mq-planted challenging known-solution zero-dimensional 14 2147483647 063f5b1ddbab6ef1…
@@ -513,9 +548,8 @@ poseidon-t2-rf2-rp2-planted poseidon intermediate known-solution zero-dimensiona
 poseidon-t2-rf4-rp0-planted poseidon challenging known-solution zero-dimensional 9 2130706433 95cec79371a8751a…
 ```
 
-**Eighteen rungs across six families, thirty-one identities.** Thirteen rungs carry two
-(the two published characteristics) and five carry one (the registry rows, whose field is their
-own). `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
+**Twenty-six rungs across six families, forty-seven identities.** Twenty-one rungs carry two (the
+two published characteristics) and five carry one (the registry rows, whose field is their own). `test_the_manifest_lists_every_rung_with_its_digest` checks the row count against
 `digests.len()` summed over the ladder, so the manifest and the frozen table cannot disagree about
 how many problems the corpus holds, and asserts every digest in it is distinct. Digests are
 abbreviated above; the manifest carries all 64 hex digits.
@@ -534,7 +568,84 @@ touching the constant, not after.
 
 ---
 
-## 9. Adding a family
+## 9. The invariants, and where the ceiling is
+
+`classical-benchmarks.md` §6's one concrete follow-up was "add a regression test asserting them",
+and §9 recorded that it had not been done: "nothing asserts it. A generator that drifted — an
+off-by-one in the cyclic window, a sign in Katsura — would change `D` and currently nothing would
+notice." `CorpusEntry::quotient_dimension` is that assertion, and `dim_F(R/I)` is the cheapest
+external-correctness check the crate has: machine-independent, library-independent and
+clock-independent, which is why it is a stronger anchor than any timing.
+
+| family | `D` | source | asserted by |
+|---|---|---|---|
+| Katsura `N = 4 … 11` | `2^(N−1)` = 8 … 1024 | **measured** exact at eight consecutive rungs; no primary source for the closed form was located (§3.2, §9 of `classical-benchmarks.md`) | `test_katsuras_quotient_dimension_is_two_to_the_n_minus_one` |
+| Cyclic `n = 5, 6` | 70, 156 | Björck–Fröberg | `test_the_cyclic_quotient_dimensions_are_the_published_counts` |
+| Cyclic `n = 7` | **924** | Backelin–Fröberg, proved exactly | same |
+| Cyclic `n = 10` | **34940** | Steel's page, verbatim: "the quotient … has dimension 34940 as a vector space" | same |
+| Cyclic `n = 4, 8, 9` | absent | **Backelin's theorem**: `d² \| n` for `d ≥ 2` gives infinitely many cyclic `n`-roots | `test_a_cyclic_rung_is_zero_dimensional_exactly_where_n_is_squarefree` |
+| Planted MQ | `2^N` | by construction, two roots per coordinate pair | `test_planted_mqs_quotient_dimension_is_two_to_the_n` |
+| Random MQ, Poseidon, Anemoi | 57, 354; 9, 81, 81; 5, 25 | the board, all five engines agreeing | the frozen record |
+
+`None` means **absent, not zero**. A positive-dimensional ideal has no finite quotient, and
+`Invariants::agree` compares only fields both sides carry — so an engine reporting no dimension and
+an engine reporting none agree without either claiming anything.
+
+**Backelin's theorem is the cyclic family's dimension class, as arithmetic.** It is what makes
+`cyclic-4`, `cyclic-8` and `cyclic-9` positive-dimensional *for a published reason* rather than as
+three local observations, and it is checkable **without computing a basis** — which matters, because
+`cyclic-9` is precisely the rung Zeebra cannot reach.
+
+Two sides are checked, deliberately. The tests above compare the record against the **literature**;
+`test_every_cheap_rungs_recorded_quotient_dimension_is_computed` and its `#[ignore]`d companion
+`test_the_upper_rungs_quotient_dimensions_are_computed` compare it against the **code**, by parsing
+each rung's own rendered text, computing a grevlex basis and enumerating standard monomials. A
+transcription error in the table therefore cannot hide behind a formula written from the same table.
+All eight upper rungs verify in 334 s under `--release`.
+
+### Where the ceiling is, and which stage sets it
+
+Measured at the reference prime under grevlex at `F4Options::default()`. The answer is **not** where
+the family index is largest:
+
+| rung | basis | `D` | conversion |
+|---|---:|---:|---:|
+| `katsura-8` | 0.22 s | 128 | 13 ms |
+| `katsura-9` | 2.1 s | 256 | 84 ms |
+| `katsura-10` | 21.8 s | 512 | 0.62 s |
+| `katsura-11` | 277 s | 1024 | 5.2 s |
+| `cyclic-7` | 1.4 s | 924 | 0.16 s |
+| `cyclic-8` | 21.3 s | — (positive-dimensional) | n/a |
+| `cyclic-9` | **refuses after 10.6 s** | — | — |
+| `cyclic-10` | **refuses after 24.3 s** | — | — |
+
+**The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, crossing the live-entry
+budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura ladder is
+reachable to `katsura-11` — four rungs above the old ceiling, at roughly 10x per rung — so the
+expectation in #424 that "this issue may well resolve as the ceiling is here" was right about the
+*shape* and wrong about the *place*: Katsura did not run out, Cyclic did.
+
+That the refusal is a **resource** stop and not a wall-clock one is the point rather than a detail.
+An entry count crosses at the same counter on any machine, so the ceiling can be written down; a
+time stop would make it a fact about how busy the box was. `F4Options`' own `StopKind` draws exactly
+that distinction, and `test_the_ceiling_is_cyclic_9_and_the_basis_stage_sets_it` asserts the kind and
+not only the fact. It also asserts that `katsura-11` still completes — so a regression that moved the
+ceiling down is a failure, and one that moved it *up* is a failure too, with a message saying the
+result needs writing up rather than the assertion relaxing.
+
+The timings in the table are from the development workstation with other agents at work on it.
+**They bound reachability and nothing else**: no cross-engine ratio is taken from them, and
+`classical-benchmarks.md` §4's prohibition on comparing against Steel's 2004 figures stands
+untouched — Steel's page is used here for the instance list and the checkable invariants only.
+
+A refusal is a **result**, which is why `cyclic-9` and `cyclic-10` are on the ladder rather than left
+off. `cyclic-10`'s `D = 34940` is the published value the rung exists to one day be checked against,
+and both rungs' dimension class comes from Backelin rather than from a computation — the record says
+so in each entry.
+
+---
+
+## 10. Adding a family
 
 1. Generate it from an existing `benchmark_systems` or `research` generator — never a second
    definition, which would drift. `corpus::text_instance` renders through
