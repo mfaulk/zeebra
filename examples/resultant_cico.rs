@@ -25,6 +25,16 @@
 //! wholesale. `--build-only` times `cico_bivariate` alone and stops, which is the one bounded
 //! measurement a row past the budget still supports.
 //!
+//! `--wall-budget` is against the **whole row** and not against one stage of it, which is #410:
+//! until then it costed the Sylvester determinants alone, and after #350 and #351 those are 15% of
+//! a `rf4-rp2` row and 0.5% of an `rf6-rp0` one. `grobner::research::row_cost` is the model;
+//! [`print_cost`] prints every term with its basis, so a budget line cannot read as covering a row
+//! it covers a fraction of. Root finding is a **band** — the gcd route pessimistic, deflation
+//! optimistic, because the cost is set by the eliminant's base-field root count and that is a
+//! property of the problem — and the refusal is on the pessimistic edge. A row with a term nobody
+//! has measured at its size is refused as *unbounded* rather than admitted on the terms that are
+//! modelled.
+//!
 //! # Concurrency
 //!
 //! `--concurrency` takes a comma-separated list and **defaults to `1`**, so the figures recorded
@@ -87,8 +97,9 @@ use zeebra::{
         bivariate_resultant_ntt_with, bivariate_resultant_predicted,
         bivariate_resultant_reference_with, challenge, cico_bivariate, predicted_resultant_degree,
         registry, sylvester_determinant_at, ChallengeManifest, CicoInstance, DegreeSource,
-        DeterminantKernel, Environment, Json, ResultantOptions, ResultantRoute, ResultantStages,
-        RunOutcome, RunRecord, Scoreboard, Specialization, Stage, StageCost, KOALABEAR_PRIME,
+        DeterminantKernel, Environment, Json, ResultantOptions, ResultantRoute, ResultantRowCost,
+        ResultantStages, RowVerdict, RunOutcome, RunRecord, Scoreboard, Specialization, Stage,
+        StageCost, KOALABEAR_PRIME,
     },
     roots,
     util::peak_resident_bytes,
@@ -137,157 +148,12 @@ fn evaluate_symbolically(instance: &CicoInstance<K>, fixed: &[K]) -> Bivariate {
 /// refuses them: those samples are order-1 458 determinants.
 const DEFAULT_MAX_SAMPLES: usize = 16_384;
 
-/// Predicted determinant wall clock a row may take before it is costed and skipped, in seconds.
+/// Predicted **whole-row** wall clock a row may take before it is costed and skipped, in seconds.
+///
+/// Left at 1 800 s by #410, which widened what the number covers rather than what it is. The
+/// four-round rows the figure was chosen around cost 0.0 s, 3.2 s and 28.6 s as whole rows at the
+/// pessimistic edge, so none of them moves across it.
 const DEFAULT_WALL_BUDGET_SECONDS: usize = 1_800;
-
-/// One order-162 Sylvester determinant at **one** worker, measured.
-///
-/// `examples/determinant_sweep`, five orders, three draws each, under `tools/benchlock.sh` —
-/// `docs/research/resultant-elimination.md` §6.9. It replaces the 2.868 ms §6.5 derived from
-/// 37 634.3 ms over 13 123 samples, because **that figure no longer reproduces on this machine**:
-/// the same 13 123-determinant reference route measured 45 131.0 ms (3.439 ms each) in M25, and the
-/// synthetic sweep 3.624 ms. A cost model whose job is to refuse runs must not be anchored to the
-/// fastest figure ever recorded, so the anchor is the larger, current one and §6.9 records the
-/// unexplained 1.2x gap as a finding.
-///
-/// **Left at 3.624 by §6.13, which resolved that gap and could have re-anchored this.** The gap is
-/// a measurement session and not an implementation — §6.5's own binary re-run at its own commit
-/// gives 45 159.4–47 944.4 ms against the 37 634.3 ms on record — and the registered row measures
-/// 3.758–3.840 ms at one worker at `1985504`, so this anchor is mildly optimistic. It is not raised,
-/// because the `max` above pairs it with an exponent fitted over five orders in *one* session:
-/// re-anchoring at 162 alone would leave the prefactor and the exponent belonging to different
-/// sessions, which is the error §6.13 exists to stop. Re-anchoring honestly means re-running
-/// §6.9's five-order sweep in one session on a quiet box, which is a measurement rather than an
-/// edit.
-const DETERMINANT_MS_AT_162: f64 = 3.624;
-
-/// The matrix order that cost was measured at.
-const MEASURED_ORDER: f64 = 162.0;
-
-/// The exponent measured above the L2 footprint: `core(order) ∝ order^2.9953`, ±0.0285.
-///
-/// §6.9's sweep, fitted over orders 486, 1 458 and 4 374 — every order whose matrix exceeds this
-/// machine's 512 kB L2 — with a worst residual of 3.7%. The kernel is **cubic** up there to within
-/// the measurement, and the 3.116 exponent #289 was opened with is not reproduced: it came from
-/// dividing a 32-worker core-time at order 1 458 by a single-worker one at order 162, and the
-/// width is what the excess was.
-///
-/// Below L2 the sweep measures 2.79 — fixed per-determinant overhead that the small orders cannot
-/// amortize — and that is *sub*-cubic, so a model using it would predict less work than cubic.
-/// [`determinant_core_ms`] therefore takes the larger of the two laws rather than this one.
-const ABOVE_L2_EXPONENT: f64 = 2.9953;
-
-/// How much core-time one determinant gains per doubling of the worker count, measured.
-///
-/// Core-time per determinant — wall clock times workers — is not flat in the worker count on this
-/// box. A budget guard that costed a 32-worker run at the single-worker figure would under-predict
-/// it by 30%, and a guard that under-predicts refuses nothing.
-///
-/// **6.5% a doubling, and §6.13 confirmed it rather than raising it.** The figure came from §6.9's
-/// 2.404 s / 2.821 s / 3.148 s at order 1 458 on 1 / 8 / 32 workers. §6.6 had measured 4–9% out to
-/// 32 workers, §6.9 re-measured 31–44%, and #319 was that disagreement; §6.13 re-ran §6.6's exact
-/// configuration on §6.6's own binary and got **1.058x at 8 workers and 1.063x at 32** — §6.6's
-/// figure, reproduced. The 31–44% came back the same day on the same binaries **when other agents'
-/// `cargo test --release` runs were resident**: 1.343x and 1.478x. `tools/benchlock.sh` serializes
-/// benchmarks and not builds, so that load runs straight through the lock.
-///
-/// **So the width penalty is 6.5% a doubling and ambient contention is a separate factor of up to
-/// 1.4x on top of it.** This constant deliberately models the first and not the second. Folding
-/// contention in would make the law predict a number no quiet machine produces, and mixing a
-/// kernel property with a machine state is the error §6.13 exists to stop — the 3.116 "super-cubic"
-/// exponent of #289 was exactly that mistake. The consequence for an operator is a real one and
-/// belongs with the operator: **a 32-worker row on a loaded box costs up to 1.4x what this predicts,
-/// so run it under the lock with the box otherwise quiet, and check `load=` in the benchlock log
-/// afterwards.**
-///
-/// The mechanism is **not** the all-core clock, which §6.13 excludes: stages of one process on one
-/// core move by 1.00x, 1.04–1.06x and 1.20x according to working-set size, and no clock can do that.
-const CORE_TIME_PER_DOUBLING: f64 = 0.065;
-
-/// Euclidean core-time per determinant at [`EUCLID_MEASURED_ORDER`], milliseconds, **measured**.
-const EUCLID_MS_AT_1458: f64 = 1.109;
-
-/// The order the Euclidean anchor was measured at — the order every six-round row uses.
-const EUCLID_MEASURED_ORDER: f64 = 1458.0;
-
-/// The Euclidean kernel's fitted exponent above the L2 footprint, **fitted** over three orders.
-const EUCLID_EXPONENT: f64 = 1.8452;
-
-/// Core-time of one Sylvester determinant at `matrix_order` on `workers` workers, in milliseconds.
-///
-/// The **larger** of the measured above-L2 law and the cubic, both anchored at order 162, times the
-/// measured width penalty. Taking the larger is deliberate and is the whole point of the
-/// calibration: the fitted exponent 2.9953 is *below* 3, so using the fit alone would predict less
-/// work than the cubic this guard has always used, and a cost model that under-predicts is a budget
-/// that authorizes a run nobody costed. If a future sweep measures an exponent above 3, this picks
-/// it up with no further change.
-///
-/// Measured at orders 18 to 4 374 and at 1, 8 and 32 workers. Above 4 374 — which is every row past
-/// seven rounds — it is an **extrapolation**, and every caller labels it as one.
-fn determinant_core_ms(matrix_order: usize, workers: usize) -> f64 {
-    let ratio = matrix_order as f64 / MEASURED_ORDER;
-    let cubic = DETERMINANT_MS_AT_162 * ratio.powi(3);
-    let fitted = DETERMINANT_MS_AT_162 * ratio.powf(ABOVE_L2_EXPONENT);
-    cubic.max(fitted) * width_penalty(workers)
-}
-
-/// Core-time per determinant for the **Euclidean** kernel, in milliseconds.
-///
-/// Anchored at the measurement that landed with #350: **1.109 ms at order 1 458**, one pinned core,
-/// on the lock, the Euclidean kernel and its dense comparand taken in the same binary minutes
-/// apart. The exponent is the **1.8452** fitted above the L2 footprint over orders 162/486/1 458,
-/// against the dense kernel's 2.94 — the two differ by about one power of the order, which is the
-/// whole point of axis 4 and the reason the gap widens with the row.
-///
-/// The width penalty is this kernel's **own, measured**, and it is worse than the dense one —
-/// which falsifies the hypothesis this function was first written under.
-///
-/// #350 predicted axis 4 would *recover* #319's width penalty, on the reasoning that the working
-/// set falls from a 17 MB matrix to two ~6 kB coefficient vectors. The authorized `rf4-rp2` row
-/// measured the opposite: **3.21x at 32 workers**, against the dense law's 1.32x. 59 050
-/// determinants took 6.574 s of wall on 32 workers, so 210.4 s of core time, so **3.563 ms** a
-/// determinant against the **1.109 ms** measured on one core.
-///
-/// The first version of this function used `width_penalty` — the dense curve — and called that
-/// conservative. It was optimistic, and under-predicted the row's determinant stage by **2.43x**.
-/// The mechanism is **unmeasured**; the plausible candidate is allocator contention, since
-/// `remainder` allocates a fresh vector per step and there are as many steps as the degree, so 32
-/// threads each allocate thousands of times per determinant where the dense kernel allocates a
-/// handful of large matrices. That is a hypothesis and #412 is the measurement.
-fn euclidean_core_ms(matrix_order: usize, workers: usize) -> f64 {
-    let ratio = matrix_order as f64 / EUCLID_MEASURED_ORDER;
-    EUCLID_MS_AT_1458 * ratio.powf(EUCLID_EXPONENT) * euclidean_width_penalty(workers)
-}
-
-/// The Euclidean kernel's measured core-time penalty for running at `workers` workers.
-///
-/// Anchored on the two points there are: **1.0x at one worker** and **3.21x at 32**, interpolated
-/// linearly in `log2(workers)` as [`width_penalty`] does for the dense kernel, and extrapolated at
-/// the same slope beyond 32 rather than held flat — nothing wider has been measured and flattening
-/// it would make the guard optimistic exactly where it has no evidence, which is the mistake this
-/// function already made once.
-fn euclidean_width_penalty(workers: usize) -> f64 {
-    const PER_DOUBLING: f64 = (3.21 - 1.0) / 5.0;
-    1.0 + PER_DOUBLING * (workers.max(1) as f64).log2()
-}
-
-/// Core-time per determinant for `kernel`.
-fn kernel_core_ms(kernel: DeterminantKernel, matrix_order: usize, workers: usize) -> f64 {
-    match kernel {
-        DeterminantKernel::Dense => determinant_core_ms(matrix_order, workers),
-        DeterminantKernel::Euclidean => euclidean_core_ms(matrix_order, workers),
-    }
-}
-
-/// The measured core-time penalty for running at `workers` workers, as a factor.
-///
-/// Linear in `log2(workers)` through the widths measured, and extrapolated at the same slope beyond
-/// 32 rather than held flat: nothing wider has been measured, and flattening it would make the
-/// guard optimistic exactly where it has no evidence. See [`CORE_TIME_PER_DOUBLING`] for why the
-/// slope is the uncontended 6.5% and what an operator owes on top of it on a busy box.
-fn width_penalty(workers: usize) -> f64 {
-    1.0 + CORE_TIME_PER_DOUBLING * (workers.max(1) as f64).log2()
-}
 
 /// The determinant kernel named by `--kernel <dense|euclidean>`, defaulting to dense.
 ///
@@ -376,61 +242,59 @@ fn human_seconds(seconds: f64) -> String {
     }
 }
 
-/// What one registered row is predicted to cost, before anything is attempted.
+/// The row's predicted cost, term by term, with each term's basis named.
 ///
-/// The sample counts are exact — they come from the row's own `alpha`, `R_F` and `R_P` — and the
-/// times are extrapolations from one measured determinant at order 162.
-struct RowCost {
-    /// `R_F + R_P`.
-    rounds: usize,
-    /// The S-box exponent.
-    alpha: u32,
-    /// Full rounds.
-    r_f: usize,
-    /// Partial rounds.
-    r_p: usize,
-    /// `alpha^(2 R_F + R_P)`, the experimental degree.
-    predicted_degree: usize,
-    /// Samples the prediction needs.
-    samples: usize,
-    /// Samples the proven `2d²` bound needs.
-    proven_samples: usize,
-    /// Order of the Sylvester matrix, `2 · 3^rounds`.
-    matrix_order: usize,
-    /// Predicted determinant wall clock for `samples`, over the given worker count.
-    predicted_seconds: f64,
-    /// The same for `proven_samples`.
-    proven_seconds: f64,
-}
-
-impl RowCost {
-    /// Cost `manifest` at `workers` determinant workers.
-    fn of(manifest: &ChallengeManifest, workers: usize, kernel: DeterminantKernel) -> Self {
-        let parameters = manifest.poseidon_parameters().expect("a CICO row");
-        let rounds = parameters.rounds();
-        let degree = 3usize.pow(rounds as u32);
-        let predicted_degree =
-            predicted_resultant_degree(parameters.alpha, parameters.r_f, parameters.r_p)
-                .expect("the predicted degree fits a usize");
-        let matrix_order = 2 * degree;
-        // Core-time per determinant, divided by the workers that share it. `determinant_core_ms`
-        // carries both the cost law and the measured penalty for running wide.
-        let each = kernel_core_ms(kernel, matrix_order, workers) / 1e3 / workers.max(1) as f64;
-        let samples = predicted_degree + 1;
-        let proven_samples = 2 * degree * degree + 1;
-        Self {
-            rounds,
-            alpha: parameters.alpha,
-            r_f: parameters.r_f,
-            r_p: parameters.r_p,
-            predicted_degree,
-            samples,
-            proven_samples,
-            matrix_order,
-            predicted_seconds: samples as f64 * each,
-            proven_seconds: proven_samples as f64 * each,
-        }
+/// The basis column is the point. Before #410 this printed one number — the determinant term — with
+/// no indication that it was 15% of a six-round row, so a budget line covering a sixth of a row read
+/// exactly like one covering the row. A reader cannot check a total they cannot decompose, and an
+/// operator cannot weigh a margin whose terms they cannot see.
+fn print_cost(cost: &ResultantRowCost, workers: usize) {
+    println!(
+        "- predicted **row** wall clock on {} worker{}, {} kernel — **{} to {}**, the band being \
+         the root finder:",
+        workers,
+        plural(workers),
+        cost.kernel,
+        human_seconds(cost.optimistic_seconds()),
+        human_seconds(cost.pessimistic_seconds())
+    );
+    println!("\n| term | predicted | basis | anchor |\n|---|---:|---|---|");
+    for term in cost.terms() {
+        let predicted = if term.basis.is_modelled() {
+            human_seconds(term.seconds)
+        } else {
+            "—".to_string()
+        };
+        println!(
+            "| {} | {} | {} | {} |",
+            term.stage,
+            predicted,
+            term.basis.label(),
+            term.anchor
+        );
     }
+    let optimistic = cost.root_finding_optimistic;
+    println!(
+        "| {} | {} | {} | {} |",
+        optimistic.stage,
+        human_seconds(optimistic.seconds),
+        optimistic.basis.label(),
+        optimistic.anchor
+    );
+    println!(
+        "\n  The determinants alone are **{:.1}%** of the pessimistic row, which is the whole of \
+         what this guard costed before #410.",
+        100.0 * cost.determinant_share()
+    );
+    let unmodelled = cost.unmodelled();
+    if !unmodelled.is_empty() {
+        println!(
+            "  **{} is not modelled at this size**, so the total above is a lower bound and the \
+             row is refused rather than admitted on it.",
+            unmodelled.join(", ")
+        );
+    }
+    println!();
 }
 
 /// `cico_bivariate` alone on one row, which is the whole of `--build-only`.
@@ -507,8 +371,12 @@ fn main() {
     );
 
     println!(
-        "Budget: at most {} samples a row, and {:.0} s of predicted determinant wall clock at the \
-         largest concurrency given. A row over either is **costed and skipped**, not attempted.\n",
+        "Budget: at most {} samples a row, and {:.0} s of predicted **whole-row** wall clock at the \
+         largest concurrency given — symbolic build, determinants, interpolation, off-domain \
+         validation and root finding, each labelled with its basis. Root finding is a band (gcd \
+         route pessimistic, deflation optimistic) and the refusal is on the pessimistic edge. A row \
+         over either budget is **costed and skipped**, not attempted; so is a row with a term \
+         nobody has measured at its size, because an unmodelled term is not a zero term.\n",
         max_samples, wall_budget
     );
 
@@ -532,7 +400,8 @@ fn main() {
         let manifest = challenge(id).expect("registered");
         let workers = concurrencies.iter().copied().max().unwrap_or(1);
         let kernel = kernel_flag();
-        let cost = RowCost::of(&manifest, workers, kernel);
+        let parameters = manifest.poseidon_parameters().expect("a CICO row");
+        let cost = ResultantRowCost::of(&parameters, kernel, workers);
         println!("## {} — {} rounds\n", manifest.id, cost.rounds);
         println!(
             "- predicted degree `{}^(2·{} + {})` = {}, so {} samples of an order-{} determinant; \
@@ -545,39 +414,11 @@ fn main() {
             cost.matrix_order,
             cost.proven_samples
         );
-        // The anchors named here are the ones the prediction was computed from. Before the
-        // kernel became selectable this message hardcoded the dense pair, which meant a run under
-        // `--kernel euclidean` reported a Euclidean number attributed to a dense law — a figure
-        // that cannot be checked against anything, which is worse than no figure.
-        let (anchor_ms, anchor_order, exponent) = match kernel {
-            DeterminantKernel::Dense => (DETERMINANT_MS_AT_162, MEASURED_ORDER, ABOVE_L2_EXPONENT),
-            DeterminantKernel::Euclidean => {
-                (EUCLID_MS_AT_1458, EUCLID_MEASURED_ORDER, EUCLID_EXPONENT)
-            }
-        };
-        println!(
-            "- predicted determinant wall clock **{}** on {} worker{}, {} kernel, from {:.3} ms \
-             per determinant measured at order {:.0} and one worker, scaled by the fitted \
-             `order^{:.4}` law and a {:.2}x penalty for running at this width — **{}** at order {}",
-            human_seconds(cost.predicted_seconds),
-            workers,
-            plural(workers),
-            kernel,
-            anchor_ms,
-            anchor_order,
-            exponent,
-            width_penalty(workers),
-            if cost.matrix_order <= 4_374 {
-                "measured"
-            } else {
-                "an extrapolation"
-            },
-            cost.matrix_order
-        );
+        print_cost(&cost, workers);
 
-        // Before the budget, because the budget is on the determinants and this runs none of
-        // them. The build is the stage whose cost law is least checked: at six rounds the outputs
-        // have ~266 000 terms where every row measured so far had ~3 400.
+        // Before the budget, because the budget covers stages this runs none of. The build is the
+        // stage whose cost law is least checked: at six rounds the outputs have ~266 000 terms
+        // where every row measured so far had ~3 400.
         if build_only {
             let built = build_alone(&manifest, 1);
             println!(
@@ -595,29 +436,47 @@ fn main() {
             }
             continue;
         }
-        if cost.samples > max_samples || cost.predicted_seconds > wall_budget {
+        let refusal = if cost.samples > max_samples {
+            Some(format!(
+                "the sample count exceeds the budget ({} against {})",
+                cost.samples, max_samples
+            ))
+        } else {
+            match cost.verdict(wall_budget) {
+                RowVerdict::Admit => None,
+                RowVerdict::OverBudget {
+                    pessimistic_seconds,
+                } => Some(format!(
+                    "the pessimistic row total exceeds the budget ({} against {})",
+                    human_seconds(pessimistic_seconds),
+                    human_seconds(wall_budget)
+                )),
+                RowVerdict::Unbounded { stages } => Some(format!(
+                    "the row cannot be bounded: nothing has measured {} at this size, and an \
+                     unmodelled term is not a zero term",
+                    stages.join(", ")
+                )),
+            }
+        };
+        if let Some(why) = refusal {
             println!(
-                "- **not attempted**: {} the budget. Raise it deliberately — `--row {} \
-                 --max-samples {} --wall-budget {:.0}` — or leave the row as a prediction\n",
-                if cost.samples > max_samples {
-                    "the sample count exceeds"
-                } else {
-                    "the predicted wall clock exceeds"
-                },
+                "- **not attempted**: {}. Raise it deliberately — `--row {} --max-samples {} \
+                 --wall-budget {:.0}` — or leave the row as a prediction\n",
+                why,
                 id,
                 cost.samples,
-                cost.predicted_seconds.ceil()
+                cost.pessimistic_seconds().ceil()
             );
             continue;
         }
-        if cost.proven_seconds > wall_budget {
+        if cost.proven_determinant_seconds > wall_budget {
             println!(
-                "- the proven `2d²` fallback is **unaffordable** here: {} samples is {}. If the \
-                 off-domain check refuses the prediction on this row, the result is *prediction \
-                 falsified, generic bound unaffordable* — a counterexample to the published \
-                 formula, and a better outcome than the witness",
+                "- the proven `2d²` fallback is **unaffordable** here: {} samples is {} of \
+                 determinants alone. If the off-domain check refuses the prediction on this row, \
+                 the result is *prediction falsified, generic bound unaffordable* — a \
+                 counterexample to the published formula, and a better outcome than the witness",
                 cost.proven_samples,
-                human_seconds(cost.proven_seconds)
+                human_seconds(cost.proven_determinant_seconds)
             );
         }
         for record in row(&manifest, 1, &concurrencies) {
