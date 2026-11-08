@@ -3,7 +3,7 @@
 **Measured at:** publication bound `aef9ab81`…`bcd2ec21` for §2 through §9 — the commits that
 published those figures, recovered from git rather than recorded at the time
 ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
-**§6.8 is measured at `a8f1cf63`** and its figures are not comparable with the rest of this
+**§6.8 is measured at `5a42f246`** and its figures are not comparable with the rest of this
 document: the conversion totals there are 20% to 45% below §9's on the same systems, because M19
 and #159 landed in between.
 
@@ -879,19 +879,20 @@ has no thread pool:
 
 | workers | dispatch/ms | per worker/µs |
 |---:|---:|---:|
-| 1 | 0.0000 | 0.02 |
-| 2 | 0.0595 | 29.76 |
-| 4 | 0.1022 | 25.56 |
-| 8 | 0.1867 | 23.34 |
-| 16 | 0.3579 | 22.37 |
-| 32 | 0.6760 | 21.13 |
-| 64 | 1.3307 | 20.79 |
-| 128 | 2.6614 | 20.79 |
+| 1 | 0.0000 | 0.03 |
+| 2 | 0.0599 | 29.93 |
+| 4 | 0.0994 | 24.86 |
+| 8 | 0.1852 | 23.15 |
+| 16 | 0.3470 | 21.69 |
+| 32 | 0.6759 | 21.12 |
+| 64 | 1.3232 | 20.67 |
+| 128 | 2.6407 | 20.63 |
 
 **About 21 µs per worker, and linear in the worker count**, because each dispatch spawns and joins
-OS threads rather than waking a pool. This is the figure §6.3 of the parallelism milestone estimated
-at 0.52 ms for rayon; measured here for the construction actually available, two workers cost 59 µs
-and 32 cost 677 µs. Every row of the per-batch table above is at or below the two-worker row.
+OS threads rather than waking a pool. This is the quantity §6.3 of the parallelism milestone
+estimated at 0.52 ms for rayon; measured here for the construction actually available, two workers
+cost 60 µs and 32 cost 676 µs. **Every row of the per-batch table above is at or below the
+two-worker row**, which is the refutation in one sentence — the arithmetic below only confirms it.
 
 #### The obstacle the issue named is not the obstacle
 
@@ -907,7 +908,8 @@ halves, and `test_a_split_costs_one_full_width_of_zeroing_per_group` pins the ar
 model built from the targets' leading columns rather than from the implementation.
 
 The second is that it does not matter. `BorderReduction::Grouped` runs the split decomposition
-*sequentially*, so the only difference between its rows is the carry:
+*sequentially*, so the only difference between its rows is the carry. Unbounded batches, pinned to
+one core, `cargo run --release --example fglm_parallel -- carry`:
 
 | system | cells, 1 group | x at 8 groups | x at 32 | x at 128 | `x` on the clock |
 |---|---:|---:|---:|---:|---:|
@@ -920,12 +922,13 @@ The second is that it does not matter. `BorderReduction::Grouped` runs the split
 | planted-8 | 731,917 | 1.005 | 1.024 | 1.098 | 0.88–0.96 |
 | planted-10 | 17,088,915 | 1.001 | 1.005 | 1.021 | 0.89–1.08 |
 
-**The carry costs 1.00x to 1.02x of the cells on the systems whose batches are large enough to
-parallelize at all**, and is not measurable in time — every `x time` cell is inside the ±2% to ±10%
-this harness repeats to, several of them below 1.00. It reaches 1.37x on katsura-5, where one width
-is 419 cells against a whole-border total of 1,677 and the absolute figure is 12 µs. The carry is a
-saving that scales with the *ratio* of the batch to the closure width, and the batches where
-parallelism could pay are exactly the ones where that ratio makes it negligible.
+**The carry costs 1.00x to 1.02x of the cells on the two systems whose batches are large enough to
+parallelize at all**, and is not measurable in time at all: every `x` on the clock lands between
+0.80 and 1.20, scattered on both sides of 1.00, which is noise and not a trend. The cell ratio
+reaches 1.57x only on katsura-5 at 128 groups, where the whole border's one-group total is 1,677
+cells and the loop it belongs to is 12 µs. That is the shape of the thing: the carry's saving scales
+with the *ratio* of the batch to the closure width, and the batches where parallelism could pay are
+exactly the ones where that ratio makes it negligible.
 
 So the obstacle is the dispatch, which the issue did not name, and not the carry, which it did.
 
@@ -942,34 +945,33 @@ batch sizes and six systems.
 
 | system | size | 1 worker | fastest | at | speedup | efficiency | 128 workers |
 |---|---|---:|---:|---:|---:|---:|---:|
-| katsura-5 | 64 | 0.012 / 0.013 | 0.012 / 0.013 | 1 / 1 | 1.21x / 1.10x | 121% / 110% | 1.00 / 0.98 |
-| katsura-5 | unbounded | 0.012 / 0.012 | 0.012 / 0.012 | 1 / 1 | 1.41x / 1.06x | 141% / 106% | 0.99 / 1.00 |
-| katsura-6 | 64 | 0.062 / 0.060 | 0.062 / 0.060 | 1 / 1 | 1.03x / 1.05x | 103% / 105% | 2.24 / 2.49 |
-| katsura-6 | unbounded | 0.062 / 0.062 | 0.062 / 0.062 | 1 / 1 | 1.04x / 1.02x | 104% / 102% | 2.22 / 2.28 |
-| katsura-7 | 64 | 0.423 / 0.410 | 0.423 / 0.410 | 1 / 1 | 0.99x / 1.00x | 99% / 100% | 5.21 / 5.18 |
-| katsura-7 | unbounded | 0.466 / 0.412 | 0.265 / 0.273 | 8 / 8 | 1.77x / 1.54x | 22% / 19% | 2.50 / 2.52 |
-| cyclic-5 | 64 | 0.047 / 0.048 | 0.047 / 0.048 | 1 / 1 | 1.06x / 1.06x | 106% / 106% | 3.58 / 3.61 |
-| cyclic-5 | unbounded | 0.055 / 0.057 | 0.055 / 0.057 | 1 / 1 | 1.03x / 1.00x | 103% / 100% | 1.79 / 1.98 |
-| cyclic-6 | 64 | 0.251 / 0.253 | 0.251 / 0.253 | 1 / 1 | 1.01x / 1.01x | 101% / 101% | 8.66 / 8.74 |
-| cyclic-6 | unbounded | 0.303 / 0.303 | 0.269 / 0.259 | 8 / 8 | 1.12x / 1.18x | 14% / 15% | 2.09 / 2.33 |
-| planted-6 | 64 | 0.024 / 0.024 | 0.024 / 0.024 | 1 / 1 | 1.04x / 1.03x | 104% / 103% | 4.37 / 4.43 |
-| planted-6 | unbounded | 0.034 / 0.034 | 0.034 / 0.034 | 1 / 1 | 1.09x / 1.09x | 108% / 109% | 2.18 / 2.28 |
-| planted-8 | 64 | 0.130 / 0.131 | 0.130 / 0.131 | 1 / 1 | 1.01x / 1.02x | 101% / 102% | 22.84 / 24.17 |
-| planted-8 | unbounded | 0.527 / 0.525 | 0.264 / 0.260 | 8 / 8 | 2.03x / 2.04x | 25% / 26% | 2.92 / 2.90 |
-| planted-10 | 64 | 0.697 / 0.677 | 0.697 / 0.677 | 1 / 1 | 0.99x / 1.02x | 99% / 102% | 117.68 / 118.72 |
-| planted-10 | unbounded | 11.470 / 11.028 | 1.262 / 1.512 | 32 / 32 | 8.84x / 7.29x | 28% / 23% | 3.25 / 3.16 |
+| katsura-5 | 64 | 0.012 | 0.012 | 1 | 1.24x | 124% | 1.041 |
+| katsura-5 | unbounded | 0.012 | 0.012 | 1 | 1.11x | 111% | 1.005 |
+| katsura-6 | 64 | 0.061 | 0.061 | 1 | 1.02x | 102% | 2.308 |
+| katsura-6 | unbounded | 0.062 | 0.062 | 1 | 1.04x | 104% | 2.266 |
+| katsura-7 | 64 | 0.426 | 0.426 | 1 | 1.00x | 100% | 5.122 |
+| katsura-7 | unbounded | 0.430 | 0.253 | 8 | 1.72x | 22% | 2.573 |
+| cyclic-5 | 64 | 0.048 | 0.048 | 1 | 1.05x | 105% | 3.735 |
+| cyclic-5 | unbounded | 0.055 | 0.055 | 1 | 1.07x | 107% | 1.816 |
+| cyclic-6 | 64 | 0.251 | 0.251 | 1 | 1.01x | 101% | 8.800 |
+| cyclic-6 | unbounded | 0.302 | 0.257 | 4 | 1.18x | 30% | 2.217 |
+| planted-6 | 64 | 0.025 | 0.025 | 1 | 1.03x | 103% | 4.328 |
+| planted-6 | unbounded | 0.034 | 0.034 | 1 | 1.07x | 107% | 2.199 |
+| planted-8 | 64 | 0.129 | 0.129 | 1 | 1.02x | 102% | 23.933 |
+| planted-8 | unbounded | 0.533 | 0.279 | 8 | 2.03x | 25% | 2.970 |
+| planted-10 | 64 | 0.682 | 0.682 | 1 | 1.00x | 100% | 116.518 |
+| planted-10 | unbounded | 11.225 | 1.484 | 32 | 7.73x | 24% | 3.061 |
 
 **At the batch size the default uses, one worker is the fastest row on every system in the corpus.**
-The best any multi-worker row reaches is 0.59x — katsura-7 at four workers — and 128 workers is
-0.01x to 0.19x, because the dispatch is per batch and the batches are microseconds. planted-10 at
-64 is the arithmetic in the open: 0.68 ms of target loop over 80 batches, against 80 dispatches of
-59 µs each at two workers, which is 4.8 ms of spawning for 0.68 ms of work and the 0.10x the table
-reports.
+The best any multi-worker row reaches is 0.68x — katsura-7 at two workers — and the worst is 0.01x,
+because the dispatch is per batch and the batches are microseconds. planted-10 at 64 is the
+arithmetic in the open: 0.68 ms of target loop over 80 batches, against 80 dispatches of 60 µs each
+at two workers, which is 4.8 ms of spawning for 0.68 ms of work.
 
 **Unbounded, four instances have a batch big enough to show anything, and one shows a lot.**
-planted-10's single unbounded batch is 11.0–11.5 ms of target loop and parallelizes to **1.26–1.51
-ms at 32 workers — 7.3x to 8.8x**, bit-identical. katsura-7, cyclic-6 and planted-8 reach 1.2x to
-2.0x at eight workers, and nothing else moves at all.
+planted-10's single unbounded batch is 11.2 ms of target loop and parallelizes to **1.48 ms at 32
+workers — 7.73x**, bit-identical. katsura-7 and planted-8 reach 1.72x and 2.03x at eight workers,
+cyclic-6 1.18x at four, and nothing else moves at all.
 
 So the question §6.4 left open — whether an *unbounded* batch plus parallelism beats a *bounded*
 sequential one, which is a different trade from the one that chose the batch size — has a measured
@@ -980,27 +982,28 @@ conversion cannot call the parallel path, which is the point of §6.8:
 
 | system | bounded 64, sequential | unbounded, sequential | unbounded, parallel (projected) | at | vs the default |
 |---|---:|---:|---:|---:|---:|
-| katsura-7 | 1.74 | 1.56 | **1.41** | 8 | **1.23x** |
-| cyclic-6 | 1.80 | 1.76 | 1.71 | 8 | 1.05x |
-| planted-8 | 1.87 | 2.28 | 2.02 | 8 | **0.92x** |
-| planted-10 | 22.63 | 32.05 | 22.69 | 32 | 1.00x |
+| katsura-7 | 1.74 | 1.56 | **1.39** | 8 | **1.25x** |
+| cyclic-6 | 1.80 | 1.76 | 1.71 | 4 | 1.05x |
+| planted-8 | 1.87 | 2.28 | 2.04 | 8 | **0.92x** |
+| planted-10 | 22.63 | 32.05 | 22.66 | 32 | 1.00x |
 
 **It is not safe everywhere, which is the criterion §6.4 chose the batch size against.** The best
-case is 1.23x on katsura-7's conversion; planted-8 **regresses 8%**; planted-10 lands at parity,
-and lands there only by coincidence — the 9.4 ms the parallel reduction removes is, to the last
-tenth, the 9.4 ms that going unbounded cost it. Taking the reduction to *zero* would put
-planted-10 at 21.2 ms against a bounded sequential 20.4–22.6 ms across two passes — inside the
-spread, so there is no worker count at which this route wins on the sparse family and there is one
-at which it draws.
+case is 1.25x on katsura-7's conversion; planted-8 **regresses 8%**; planted-10 lands at parity,
+and lands there only by coincidence — the 9.7 ms the parallel reduction removes is almost exactly
+the 9.4 ms that going unbounded cost it. Taking the reduction to *zero* would put planted-10 at
+21.2 ms against a bounded sequential 20.4–22.6 ms across the passes — inside the spread, so there
+is no worker count at which this route wins on the sparse family and there is one at which it
+draws.
 
 Two further reasons the draw is not worth buying:
 
-* **23–28% parallel efficiency** at planted-10's peak, against the 92–95% to 32 cores that §6.4 of
-  the parallelism milestone records for the resultant route. The curve turns over — 128 workers is
+* **24% parallel efficiency** at planted-10's peak, against the 92–95% to 32 cores that §6.4 of the
+  parallelism milestone records for the resultant route. The curve turns over — 128 workers is
   slower than 16 on every row of the table.
-* **The best worker count is instance-dependent** — eight on katsura-7 and planted-8, thirty-two on
-  planted-10 — so a default would need a predictor of batch size *and* one of worker count, where
-  §6.5 has already deferred the first for want of a predictor of reduction depth.
+* **The best worker count is instance-dependent** — eight on katsura-7 and planted-8, four on
+  cyclic-6, thirty-two on planted-10 — so a default would need a predictor of batch size *and* one
+  of worker count, where §6.5 has already deferred the first for want of a predictor of reduction
+  depth.
 
 #### What landed, and what did not
 
@@ -1024,13 +1027,18 @@ entry point to re-measure from is `fglm_parallel -- sweep`, and the first thing 
 the dispatch floor: 21 µs per worker is a thread spawn, and a persistent pool would move every
 figure in this section.
 
-**On the load these figures were taken under.** The two passes above were taken at `load=46.5` and
-`load=55.5` on a 128-core machine shared with other agents, which is not a condition under which
-this project publishes a scaling curve. They are published because they agree — the dispatch floor
-to within 2% at every worker count, katsura-7's per-batch loop to within 0.5%, planted-10's peak
-speedup to within 17% — and because the decision rests on the projection table rather than on the
-curve's precision: contention can only have *slowed* the parallel rows, so the refutation is in the
-direction the load would bias it toward and not against.
+**On the load these figures were taken under.** The floor and the sweep are from a pass taken at
+`load=5.6` on this 128-core box, the lock held while the script waited for the machine to go quiet —
+`tools/benchlock.sh` serializes benchmarks and not builds, so holding the lock is not by itself a
+quiet machine, and a scaling curve is exactly the figure ambient load corrupts. The single-threaded
+tables are pinned to one core from a pass at `load=55.5`, where pinning makes the load immaterial
+and two passes agreed to within 0.5% on katsura-7's per-batch loop.
+
+Two earlier full passes at `load=46.5` and `load=55.5` are not published and are worth recording as
+a negative control: **they changed nothing.** The dispatch floor agrees to within 3% at every worker
+count, one worker was the fastest row at a batch of 64 on every system in all three, and
+planted-10's peak speedup was 8.84x, 7.29x and 7.73x — a 17% spread around a figure that would have
+to improve by 9 ms to change the projection table's verdict.
 
 ---
 

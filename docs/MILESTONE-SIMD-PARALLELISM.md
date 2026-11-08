@@ -386,11 +386,11 @@ the pivots being fixed before any target is touched, which is precisely what §6
 the block update. The granularity rule held anyway. The target loop's largest single batch is
 **210 µs on katsura-7 and 8 to 69 µs on every other system in the corpus** at the recommended batch
 size of 64, against a measured **21 µs per worker** for `std::thread::scope` on this machine — so
-one worker is the fastest row everywhere, the best multi-worker figure is 0.59x, and 128 workers is
-0.01x to 0.19x, the dispatch being paid once per batch. One *unbounded* batch on planted-10 is
-large enough to reach **7.3x to 8.8x at 32 workers** at 23–28% efficiency; substituted back into the
-conversion that contains it, that route is 1.23x on katsura-7, parity on planted-10 and **0.92x on
-planted-8** — not safe everywhere, which is the criterion the batch size itself was chosen against.
+one worker is the fastest row everywhere and the best multi-worker figure is 0.68x, the dispatch
+being paid once per batch. One *unbounded* batch on planted-10 is large enough to reach **7.73x at
+32 workers** at 24% efficiency; substituted back into the conversion that contains it, that route is
+1.25x on katsura-7, parity on planted-10 and **0.92x on planted-8** — not safe everywhere, which is
+the criterion the batch size itself was chosen against.
 §6.8 of [`MILESTONE-FGLM-SCALABILITY.md`](MILESTONE-FGLM-SCALABILITY.md) has the four tables, the
 projection, and the `dirty_from` accounting — including that the carry #167 named as the crux costs
 1.00x to 1.02x of the cells on the batches large enough to matter, and the dispatch it did not name
