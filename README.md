@@ -3038,6 +3038,17 @@ which needs no patched build. It is a measurement instrument on no build path, a
 randomized linear algebra (4.89x, declined by policy), interreduction done by division rather than
 by one Macaulay matrix (5.03x), and a per-operation representation constant (14.0x).
 
+[`docs/research/m27-baseline.md`](docs/research/m27-baseline.md) is the frozen baseline these
+ratios are quoted against: which cohort each engine's rows belong to, the cryptanalysis frontier by
+class, the `poseidon31-cico-t16-rf4-rp2` row resolved across its three cost tables, and the rule for
+when a ratio carries the #318/#319 systematic. **Cite it rather than re-deriving a baseline.** Three
+things it establishes that are easy to get wrong: a ratio formed *within* one cohort carries no
+systematic while one spanning a pre-M25 record carries +26%/−8%; `mq-random-10`'s interreduction
+share is unchanged at ~80% after #437 and is **still ~80% on the default path**, because
+`interreduce_by_matrix` is off in `F4Options::recommended()`; and the interreduction A/B measures
+**3.63x** end to end on a box whose division side matches the board row, against the 4.18x measured
+on one 1.40x slower than it.
+
 ### Solving zero-dimensional systems
 
 `grobner::solve_one` finds one solution and stops; `grobner::solve_zero_dimensional` finds every
