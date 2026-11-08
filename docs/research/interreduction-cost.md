@@ -232,6 +232,81 @@ end, for six sevenths of the run.
 
 ---
 
+## 3a. #471: the matrix route, measured
+
+Three reps, **interleaved in one process on one build**, so no cross-build or cross-session
+difference is in the ratio. The example asserts the two routes' bases **equal** on every run; a
+difference would have panicked rather than printed.
+
+| rep | route | total/ms | interreduction/ms | stage share | basis |
+|---|---|---:|---:|---:|---:|
+| 1 | division | 40 843.17 | 35 149.00 | 86.06% | 247 |
+| 1 | **matrix** | **9 517.01** | **4 004.10** | 42.07% | 247 |
+| 2 | division | 40 808.56 | 35 247.40 | 86.37% | 247 |
+| 2 | **matrix** | **9 753.13** | **4 185.36** | 42.91% | 247 |
+| 3 | division | 40 485.68 | 34 971.39 | 86.38% | 247 |
+| 3 | **matrix** | **9 801.60** | **4 093.93** | 41.77% | 247 |
+
+| | median | per-rep |
+|---|---:|---|
+| **end to end** | **4.18x** | 4.29x, 4.18x, 4.13x |
+| the stage itself | **8.59x** | 8.78x, 8.42x, 8.54x |
+
+Run-to-run spread is 1.009x on the division side and 1.030x on the matrix side, so a 4.18x median
+is not a noise artefact — it is two orders of magnitude outside the spread.
+
+The matrix is **identical on all three reps** — 7 642 x 7 996, 893 531 nonzeros — which is what a
+deterministic construction should be and is a check on the instrument as much as on the change.
+
+### 3a.1 The estimate was wrong by 24x, and the reason is the better finding
+
+`groebner-jl-gap.md` §4 estimated the matrix pass at **~170 ms**, by scaling Groebner.jl's 1.74 ms
+by Zeebra's own 97.1x per-operation constant. The measured pass is **4 094 ms**, twenty-four times
+that — and the error is not in the constant. It is in the **shape**:
+
+| | Groebner.jl | Zeebra | ratio |
+|---|---:|---:|---:|
+| rows | 250 | **7 642** | 30.6x |
+| columns | 604 | **7 996** | 13.2x |
+| cells | 151 000 | **61 105 432** | **405x** |
+
+The estimate assumed the two engines would build the *same matrix* and differ only in cost per
+entry. They do not. **Zeebra's autoreduce matrix has 405x the cells**, and 405x / 24x says Zeebra's
+per-cell cost is actually *better* than the scaling assumed — the pass is slow because the matrix is
+enormous, not because the kernel is.
+
+And the row counts say why. 250 rows for 247 elements means Groebner.jl's closure added about
+**three** reducer multiples; Zeebra's added **7 395**. Groebner.jl's 604 columns is almost exactly
+`247 leading monomials + 354 standard monomials = 601`, i.e. **the only monomials in its basis
+entering autoreduce are the leading monomials and the standard monomials** — nothing in its tails is
+reducible at all, so there is nothing for a closure to find. Zeebra's basis carries ~7 395 further
+reducible monomials in its tails.
+
+That is a property of the *main loop*, not of interreduction. Groebner.jl's `linalg_main!` reduces
+rows fully against the pivots in every batch, so a candidate leaves a batch already in normal form
+with respect to everything above it. Zeebra's candidate extraction takes rows from an echelon form
+that has not been back-substituted, so candidates carry reducible tails and the debt accumulates to
+the end of the computation — where this stage pays it.
+
+**So the remaining 4 094 ms is a measured, attributable, and separately addressable cost**, and the
+ceiling on it is Groebner.jl's own 1.74 ms for the same stage. Filed separately; it is not this
+change's to fix, and this change does not need it to be worth 4.18x.
+
+### 3a.2 What the matrix route does not change
+
+* **The answer.** Asserted equal on every rep here, and asserted equal against the division route
+  over katsura-4, katsura-5, cyclic-4, cyclic-5 and katsura-4 over GF(13), under all three orders,
+  by `interreduce::tests::test_the_matrix_route_reproduces_the_division_route`.
+* **Any other instance's cost.** Every figure above is `mq-random-10` grevlex at one digest. The
+  stage's shape on katsura under lex is completely different — `buchberger.rs:294-314` records the
+  ascending sort alone taking it from 2.5 s to a millisecond — and nothing here transfers.
+* **The division route's existence.** It remains the default in this change, remains the fallback
+  when a budget refuses the matrix, and remains the oracle the matrix route is tested against. It is
+  also still on the critical path of FGLM border reduction, the differential oracles and
+  `multi_div_rem`, so #440 stage 2's windowed merge remains worth taking for those callers.
+
+---
+
 ## 4. Reproducing
 
 ```sh
@@ -253,6 +328,11 @@ ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
   tools/benchlock.sh <tag> taskset -c 0-7 \
   cargo run --release --example f4_profile -- mq-counts
 
-# The stage in isolation, over a basis from a real trace.
-cargo bench --bench f4_stages -- interreduction
+# #471's A/B: both interreduction routes, interleaved in one process on one build.
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example f4_profile -- mq-matrix
+
+# The stage in isolation, over a basis from a real trace. Both routes, same input.
+tools/benchlock.sh <tag> taskset -c 0-7 cargo bench --bench f4_stages -- interreduction
 ```
