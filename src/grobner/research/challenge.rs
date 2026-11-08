@@ -317,7 +317,8 @@ pub enum ChallengeParameters {
         /// SHA-256 of the instance file, lowercase hex.
         ///
         /// The identity, for a family whose problem *is* a file. Empty for a size this registry
-        /// names but does not have the bytes of — the `n = 55` entry exists to show the gap.
+        /// names but does not have the bytes of — the type III `n = 34` entry exists to show the
+        /// gap.
         sha256: &'static str,
     },
 }
@@ -1347,6 +1348,23 @@ const HUANG_2015_VI_N15: &[ReferencePoint] = &[ReferencePoint {
     software: "Magma V2.19-9, F4",
 }];
 
+/// The recorded solve of the smallest *type III* challenge, which is not a size this crate reaches.
+///
+/// `wall-total` in the fixture, and the detail page's own "32 days 18 hours 26 minutes" agrees with
+/// the seconds to the minute. It is here so the row that exists to show the gap also says what
+/// crossing it has cost somebody: 33 days of four Opterons, by XL with block Wiedemann rather than
+/// by F4.
+const CHOU_2015_III_N34: &[ReferencePoint] = &[ReferencePoint {
+    source: "Fukuoka MQ Challenge submission details, details/details_III_20150804.html, accessed \
+             2026-11-07",
+    parameters: "type III, n = 34, m = 68, seed 0",
+    step: "whole solve, wall-clock total",
+    reported_time: "2831160 seconds (32 days 18 hours 26 minutes)",
+    reported_memory: None,
+    hardware: "4 x AMD Opteron 6282 SE",
+    software: "XL with block Wiedemann",
+}];
+
 const FAUGERE_2015_VI_N24: &[ReferencePoint] = &[ReferencePoint {
     source: "Fukuoka MQ Challenge submission details, details/details_VI_20150401.html, accessed \
              2026-11-07",
@@ -2000,19 +2018,28 @@ pub fn registry() -> Vec<ChallengeManifest> {
              slice space.",
         ),
         (
-            "fukuoka-mq-III-n55-seed0",
+            // The smallest *type III* challenge: the download index lists challenge-3-34-0
+            // through challenge-3-53-0, so the range is n = 34..=53. The row was at n = 55 until
+            // #501, which is type I's lower bound and an instance type III does not publish.
+            "fukuoka-mq-III-n34-seed0",
             "III",
-            55,
-            110,
+            34,
+            68,
             "",
-            ExternalStatus::NoneRecorded {
-                as_of: "2026-11-05",
+            // Solved externally, not open: the fixture records type III n = 34 seeds 0 and 1, so
+            // the row the n = 55 one claimed to be — "the smallest real size, with no public
+            // solution" — does not exist. The smallest type III size with no recorded solve is
+            // n = 39 (docs/research/fukuoka-mq.md §8.1), and §8.3 is why that is not a claim about
+            // hardness.
+            ExternalStatus::SolvedExternally {
+                verified: "2015-08-04",
             },
-            NO_REFERENCE_POINTS,
-            "Registered to show the gap and deliberately not implemented; its file checksum is \
-             empty because this registry does not hold those bytes. Note that n = 55 is type I's \
-             range: type III publishes n = 34..=53, so this row is the smallest size in *a* real \
-             challenge and not in type III's — #501.",
+            CHOU_2015_III_N34,
+            "Registered to show the gap in the family this crate has actually measured, and \
+             deliberately not implemented: 14 variables past the largest toy example, with no \
+             dispatch arm and no bytes held here, so its file checksum is empty. The smallest \
+             real instance this crate can import is fukuoka-mq-VI-n24-seed0, in a different \
+             type.",
         ),
         (
             // The first row in this family that is challenge data rather than a toy example.
@@ -2420,7 +2447,11 @@ mod tests {
             ("fukuoka-mq-III-n20-seed0", "434135c809f6"),
             ("fukuoka-mq-VI-n10-seed0", "2558f4bccd7d"),
             ("fukuoka-mq-VI-n15-seed0", "0345980a26d8"),
-            ("fukuoka-mq-III-n55-seed0", "f3ac89821637"),
+            // #501 redefined this row: it was ("fukuoka-mq-III-n55-seed0", "f3ac89821637") at a
+            // size type III does not publish. Corrected in place rather than appended, because
+            // nothing was ever measured against the old id — its checksum was empty and
+            // `dispatch` had no arm at 55 — so there is no history keyed on the old digest.
+            ("fukuoka-mq-III-n34-seed0", "9c2033d49ecb"),
             // #454. Appended, so the six frozen digests above keep both their order and their
             // values — and they did: notes and reference points are paperwork, not identity.
             ("fukuoka-mq-VI-n24-seed0", "e97e852ee8f0"),
@@ -2522,8 +2553,10 @@ mod tests {
         ));
 
         // An official problem with nothing recorded against it is the only case that can say "no
-        // public solution was recorded", and it still says it is not a priority claim.
-        let open = challenge("fukuoka-mq-III-n55-seed0").expect("registered");
+        // public solution was recorded", and it still says it is not a priority claim. This was
+        // the MQ gap row until #501 found that the size it named does not exist and the size it
+        // meant is solved; an unsolved tier of the 2025 Poseidon program is the honest stand-in.
+        let open = challenge("poseidon256-cico-2025-rf6-rp11").expect("registered");
         assert_eq!(
             open.significance(true),
             Significance::NoPublicSolutionRecorded {
@@ -2820,7 +2853,7 @@ mod tests {
             let ChallengeParameters::MqSystem { n, m, sha256, .. } = manifest.parameters else {
                 continue;
             };
-            if manifest.id == "fukuoka-mq-III-n55-seed0" {
+            if manifest.id == "fukuoka-mq-III-n34-seed0" {
                 assert!(sha256.is_empty(), "the gap row holds no bytes");
                 assert!(manifest.notes.contains("not implemented"));
                 continue;
@@ -2853,6 +2886,29 @@ mod tests {
                 continue;
             }
             assert_eq!(n, 3 * m / 2, "{} is not floor(3m/2)", manifest.id);
+        }
+    }
+
+    /// Every type III row names a size the challenge actually publishes for type III.
+    ///
+    /// Type III publishes the toy examples `n = 10, 15, 20` and the real range `n = 34..=53`;
+    /// `n = 55` is type I's lower bound, and a row there names an instance that does not exist
+    /// (#501). The shape checks above cannot catch it: `m = 2n` holds at any `n`.
+    #[test]
+    fn test_the_type_iii_rows_name_published_sizes() {
+        for manifest in registry() {
+            let ChallengeParameters::MqSystem { kind, n, .. } = manifest.parameters else {
+                continue;
+            };
+            if kind != "III" {
+                continue;
+            }
+            assert!(
+                matches!(n, 10 | 15 | 20 | 34..=53),
+                "{} is at n = {}, which type III does not publish",
+                manifest.id,
+                n
+            );
         }
     }
 

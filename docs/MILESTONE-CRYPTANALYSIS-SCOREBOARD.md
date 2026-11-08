@@ -142,7 +142,7 @@ every id and digest, so redefining a row fails a test; adding one is a deliberat
 | `fukuoka-mq-III-n20-seed0` | official | 20 | 40 | published with answer |
 | `fukuoka-mq-VI-n10-seed0` | official | 10 | 7 | published with answer |
 | `fukuoka-mq-VI-n15-seed0` | official | 15 | 10 | published with answer |
-| `fukuoka-mq-III-n55-seed0` | official | 55 | 110 | none recorded, 2026-11-05 |
+| `fukuoka-mq-III-n34-seed0` | official | 34 | 68 | solved externally, 2015-08-04 |
 | `fukuoka-mq-VI-n24-seed0` | official | 24 | 16 | solved externally, 2015-04-01 |
 
 `N − E = t − 2k = 12` on every Poseidon row with `k = 2`, whatever the rounds — the underdetermined
@@ -157,11 +157,13 @@ lists as unsolved. Their objective constrains the *trailing* words rather than t
 registry with no public solution recorded, and both `cico_instance` and `dispatch_cico` refuse them
 by name. See `docs/research/poseidon.md` §5a.
 
-`fukuoka-mq-III-n55-seed0` is registered and deliberately not implemented: its file checksum is
+`fukuoka-mq-III-n34-seed0` is registered and deliberately not implemented: its file checksum is
 empty because this repository does not hold those bytes, and its purpose is to keep the distance
-between a toy example and the real challenge visible in the same table. Note that `n = 55` is type
-I's range and not type III's, which publishes `n = 34..=53`, so the row names a size the challenge
-does not offer — #501.
+between a toy example and the real challenge visible in the same table. It read `n = 55` until
+#501, which is type I's lower bound and not a size type III offers at all — type III publishes
+`n = 34..=53`. Correcting it also corrected its status: the hall of fame records `n = 34` seeds 0
+and 1, so the row is `solved externally` (32 days 18 h of four Opterons, by XL with block
+Wiedemann) rather than open, and the smallest type III size with *no* recorded solve is `n = 39`.
 
 M27-B (#454) added `fukuoka-mq-VI-n24-seed0`, and it is the **first row in this family that is not a
 toy example**. Type VI publishes `m = 16..=35` and the generator truncates `n = m * 1.5`, so `m = 16`
