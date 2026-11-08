@@ -681,7 +681,41 @@ fn subtract_shifted<const N: usize, F: FiniteField>(
     scratch.clear();
     scratch.reserve(working.len() + tail.len());
 
-    let mut i = 0;
+    // The window: everything below the smallest shifted tail term is copied wholesale instead of
+    // being compared against it.
+    //
+    // # Why this is safe, and total rather than probabilistic
+    //
+    // Monomial orders are multiplicative, so `q * tail[0]` is the smallest term the shifted tail
+    // has — `tail` is sorted ascending and multiplying by `q` preserves that. No tail term can
+    // therefore land at or below any `working` term strictly below it, so no term in the prefix can
+    // merge or cancel against the tail. The merge loop would have pushed each of them unchanged;
+    // copying them is what it would have done, term for term. The cancellation branch only fires on
+    // `Ordering::Equal`, which cannot occur in the prefix.
+    //
+    // # Why it is worth doing, measured rather than assumed
+    //
+    // `docs/research/interreduction-cost.md` §3 measured this merge rewriting **1 174 314 651**
+    // terms over 534 135 reduction steps on `mq-random-10` — a mean working polynomial of 2 199
+    // terms against a mean divisor tail of 34.3, an amplification of **64.2x**. §3.0a then measured
+    // the per-term cost at **30.2 ns**, which at 48 bytes a term is 1.59 GB/s and so an order of
+    // magnitude under this machine's streaming bandwidth: the cost is not the copying, it is the
+    // monomial multiply and `MonomialOrder::cmp` this prefix pays per element. Those are exactly
+    // what the window removes.
+    //
+    // The downside is bounded at one `partition_point` — `O(log W)` — per step, in the case where
+    // the tail straddles all of `working` and the prefix is empty.
+    let start = if tail.is_empty() {
+        0
+    } else {
+        let shifted_min = &tail[0].0 * monomial;
+        let start =
+            working.partition_point(|term| order.cmp(&term.0, &shifted_min) == Ordering::Less);
+        scratch.extend_from_slice(&working[..start]);
+        start
+    };
+
+    let mut i = start;
     let mut j = 0;
     while i < working.len() && j < tail.len() {
         let shifted = &tail[j].0 * monomial;
@@ -1138,6 +1172,90 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// `normal_form` agrees with `multi_div_rem` on **random** inputs, over several fields,
+    /// arities and all three orders.
+    ///
+    /// The hand-written cases below cover the shapes someone thought of. This covers the one
+    /// nobody can enumerate: where the shifted divisor tail lands *inside* the working polynomial,
+    /// which is the boundary the windowed merge in `subtract_shifted` computes with
+    /// `partition_point`. An off-by-one there would drop or duplicate exactly one term, and
+    /// `multi_div_rem` — which reduces by rebuilding polynomials and never calls
+    /// `subtract_shifted` — is the independent oracle that would catch it.
+    #[test]
+    fn test_normal_form_agrees_with_multi_div_rem_on_random_input() {
+        fn case<const N: usize, F: FiniteField>() {
+            let mut runner = TestRunner::default();
+            runner
+                .run(
+                    &(
+                        poly_strategy::<N, F>(12),
+                        vec(poly_strategy::<N, F>(5), 1..5),
+                    ),
+                    |(dividend, divisors)| {
+                        let divisors: Vec<_> =
+                            divisors.into_iter().filter(|d| !d.is_zero()).collect();
+                        if divisors.is_empty() {
+                            return Ok(());
+                        }
+                        for order in [
+                            MonomialOrder::Lexicographic,
+                            MonomialOrder::GradedLexicographic,
+                            MonomialOrder::GradedReverseLexicographic,
+                        ] {
+                            prop_assert_eq!(
+                                dividend.normal_form(&divisors, order),
+                                dividend.multi_div_rem(&divisors, order).1
+                            );
+                        }
+                        Ok(())
+                    },
+                )
+                .expect("normal_form agrees with its oracle on random input");
+        }
+        case::<1, PrimeFieldElement64<13>>();
+        case::<2, PrimeFieldElement64<13>>();
+        case::<3, PrimeFieldElement64<7>>();
+        case::<4, PrimeFieldElement64<2147483647>>();
+        case::<6, PrimeFieldElement64<13>>();
+    }
+
+    /// The windowed merge's prefix boundary, exercised directly rather than through a reduction.
+    ///
+    /// `subtract_shifted` binary-searches for the smallest shifted tail term and copies everything
+    /// below it. These cases put the boundary at each of the three places it can be: below every
+    /// working term, above every working term, and strictly inside.
+    #[test]
+    fn test_the_merge_window_is_correct_at_each_boundary() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::Lexicographic;
+        let vars = ["x"];
+        let parse = |s: &str| MultivariatePolynomial::<1, F>::parse(s, vars).unwrap();
+
+        // Reducing by `x^k - 1` shifts a tail of `{1}` to `{x^{d-k}}`, so the boundary's position
+        // inside the working polynomial is controlled by `k` against the dividend's spread.
+        let cases: [(&str, &str); 5] = [
+            // The tail lands below every surviving term.
+            ("x^9 + x^8 + x^7", "x^9 - 1"),
+            // The tail lands above every surviving term.
+            ("x^9 + x + 1", "x^9 - x^8"),
+            // Strictly inside.
+            ("x^9 + x^6 + x^3 + 1", "x^9 - x^5"),
+            ("x^12 + x^7 + x^2", "x^12 - x^4"),
+            // And a case where the merge cancels, which only fires on `Ordering::Equal`.
+            ("x^9 + x^4", "x^9 + x^4"),
+        ];
+
+        for (dividend, divisor) in cases {
+            let f = parse(dividend);
+            let d = parse(divisor);
+            assert_eq!(
+                f.normal_form(std::slice::from_ref(&d), order),
+                f.multi_div_rem(std::slice::from_ref(&d), order).1,
+                "{dividend} modulo {divisor}"
+            );
         }
     }
 
