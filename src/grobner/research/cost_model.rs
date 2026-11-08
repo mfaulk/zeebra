@@ -36,6 +36,17 @@
 //!   resident peak is why reading "peak memory" carefully does not distinguish the two — only
 //!   recording which one it is does.
 //!
+//! # Curated, not a second copy of the scoreboard
+//!
+//! Every row is here because somebody made a claim about what a stage would cost. A row may be
+//! *emitted* from a retained run by [`CostRow::from_run`], filling only the measured half, but
+//! [`select_runs_by_stem`] takes the runs **by name** and there is no way to ask for all of them
+//! (#532). Two reasons, and the second is the harder one: an emitted row carries no prediction, so
+//! [`CostModelBoard::open_predictions`] ignores it while [`CostModelBoard::to_markdown`] still
+//! renders it; and a run that shares a `run_file_stem` with another has no record file that holds
+//! its figures, so a row emitted for it would cite a source that does not contain it. Sixteen
+//! retained runs are in that position. #540 is that identity problem.
+//!
 //! Prediction error is **derived** by [`CostRow::prediction_errors`] and never authored. The stored
 //! form carries it for a machine consumer's convenience and [`CostRow::from_json`] ignores what is
 //! there, so a typo in the file cannot become a published finding.
@@ -1995,6 +2006,13 @@ impl CostModelBoard {
              is never authored. The history is **append-only**: a re-measurement is a new row with \
              a new commit, never an edit.\n\n",
         );
+        out.push_str(
+            "The register is **curated**, not a second copy of the scoreboard (#532). Every row \
+             is here because somebody made a claim about what a stage would cost; \
+             `research/scoreboard/` is the complete measured record. A row may be *emitted* from a \
+             retained run — `--from-runs <run-file-stem>`, one named run at a time, which fills \
+             only the measured half — and there is deliberately no way to ask for all of them.\n\n",
+        );
 
         if self.rows.is_empty() {
             out.push_str("_No rows yet._\n");
@@ -2254,6 +2272,122 @@ fn duration_text(elapsed: Duration) -> String {
         // would print a ratio the numbers in the cells cannot produce.
         format!("{:.3} ms", seconds * 1e3)
     }
+}
+
+/// The retained runs a cost-model emission names, and the repeats it could not address.
+///
+/// Returned by [`select_runs_by_stem`].
+#[derive(Debug)]
+pub struct SelectedRuns<'a> {
+    /// One run per named stem: the one `research/scoreboard/runs/<stem>.json` holds.
+    pub runs: Vec<&'a RunRecord>,
+    /// Named stems that cover more than one retained run, with how many: `(stem, count)`.
+    ///
+    /// Surfaced rather than swallowed. Only the last run written under a stem is in the record
+    /// tree, so the earlier ones have no file to cite and no row is emitted for them.
+    pub shadowed: Vec<(String, usize)>,
+}
+
+/// Why a run selection was refused.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RunSelectionError {
+    /// No run was named, and there is no sweep to fall back on.
+    NoSelector,
+    /// A named stem matches no retained run.
+    UnknownRun {
+        /// The stem as given.
+        stem: String,
+    },
+}
+
+impl std::fmt::Display for RunSelectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoSelector => f.write_str(
+                "no run named. The register is curated: it holds claims about what a stage was \
+                 predicted to cost, so a row is emitted for a run whose prediction wants its \
+                 measurement, one run at a time",
+            ),
+            Self::UnknownRun { stem } => {
+                write!(f, "no retained run is written under the stem {:?}", stem)
+            }
+        }
+    }
+}
+
+/// The retained runs named by their record-file stems, one row's worth each.
+///
+/// **There is deliberately no way to ask for all of them.** #532 settled what this register is:
+/// the module doc's "what a stage was predicted to cost, what it cost, and why those differ", a
+/// board about prediction accuracy rather than a second copy of the scoreboard. A row emitted from
+/// a run carries no prediction, so [`CostModelBoard::open_predictions`] — the register's most
+/// useful view — ignores it, while [`CostModelBoard::to_markdown`] still renders it in the
+/// per-algorithm table. Sweeping the retained history would therefore add nothing to the view the
+/// register exists for and dilute its table four to one.
+///
+/// The second reason is that a row per run is **not expressible** in the record tree. Identity
+/// comes from [`RunRecord::run_file_stem`], which is `challenge--formulation--commit` and carries
+/// no timestamp; `colliding_run_file` documents that a re-run of one problem at one commit
+/// legitimately *replaces* its predecessor's record file. Sixteen committed runs share a stem with
+/// another, and the three `poseidon-t2-rf4-rp0-planted` runs at `86aaa53` measured 369.4 ms,
+/// 360.9 ms and 369.3 ms in Gröbner — only the last of which is in the file all three would have
+/// to cite. A `measured_` figure whose source does not hold it is the defect the basis vocabulary
+/// exists to refuse, so the earlier runs are reported through [`SelectedRuns::shadowed`] and not
+/// emitted.
+///
+/// # Errors
+/// [`RunSelectionError::NoSelector`] if `stems` is empty, [`RunSelectionError::UnknownRun`] if a
+/// stem matches no retained run — a mistyped selector that emitted nothing would read as
+/// "already up to date".
+pub fn select_runs_by_stem<'a>(
+    runs: &'a [RunRecord],
+    stems: &[String],
+) -> Result<SelectedRuns<'a>, RunSelectionError> {
+    if stems.is_empty() {
+        return Err(RunSelectionError::NoSelector);
+    }
+    let mut selection = SelectedRuns {
+        runs: Vec::new(),
+        shadowed: Vec::new(),
+    };
+    let mut named: Vec<&str> = Vec::new();
+    for stem in stems {
+        // A stem named twice is selected once, so a repeated selector cannot double-append.
+        if named.contains(&stem.as_str()) {
+            continue;
+        }
+        named.push(stem.as_str());
+        let matching: Vec<&RunRecord> = runs
+            .iter()
+            .filter(|run| &run.run_file_stem() == stem)
+            .collect();
+        let Some(addressable) = matching.last().copied() else {
+            return Err(RunSelectionError::UnknownRun { stem: stem.clone() });
+        };
+        if matching.len() > 1 {
+            selection.shadowed.push((stem.clone(), matching.len()));
+        }
+        selection.runs.push(addressable);
+    }
+    Ok(selection)
+}
+
+/// Every distinct record-file stem in a retained run set, in first-appearance order, with how many
+/// runs share it.
+///
+/// A count above one is a run the record tree cannot cite, which is what makes the stem set the
+/// honest measure of how much of the history is addressable. Linear scan rather than a map because
+/// first-appearance order is the history's order and the set is a few dozen entries.
+pub fn retained_run_stems(runs: &[RunRecord]) -> Vec<(String, usize)> {
+    let mut stems: Vec<(String, usize)> = Vec::new();
+    for run in runs {
+        let stem = run.run_file_stem();
+        match stems.iter_mut().find(|(known, _)| *known == stem) {
+            Some((_, count)) => *count += 1,
+            None => stems.push((stem, 1)),
+        }
+    }
+    stems
 }
 
 /// The rows transcribed from the documents that published them, in the order their claims were
@@ -4053,5 +4187,114 @@ mod tests {
         let text = row.to_json().to_json();
         let back = CostRow::from_json(&Json::parse(&text).expect("valid")).expect("round trips");
         assert_eq!(back, row);
+    }
+
+    /// Naming no run refuses the selection rather than returning every retained run.
+    ///
+    /// #532's decision made mechanical: the register is curated, so there is no sweep to reach by
+    /// accident. The refusal lives in the library rather than in the example's argument parsing,
+    /// because a parser that collected no stems must not be the thing standing between an
+    /// operator and 80 appended rows.
+    #[test]
+    fn test_naming_no_run_is_refused_rather_than_selecting_every_run() {
+        let runs = vec![measured_run()];
+        assert_eq!(
+            select_runs_by_stem(&runs, &[]).unwrap_err(),
+            RunSelectionError::NoSelector
+        );
+    }
+
+    /// A named stem selects exactly that run, and a stem that matches nothing is an error.
+    ///
+    /// A mistyped selector that silently emitted nothing is the other half of the hazard: the
+    /// operator would read "emitted 0 rows" as "already up to date".
+    #[test]
+    fn test_a_named_stem_selects_its_run_and_an_unmatched_stem_is_refused() {
+        let runs = vec![measured_run()];
+        let stem = runs[0].run_file_stem();
+
+        let selection =
+            select_runs_by_stem(&runs, std::slice::from_ref(&stem)).expect("the stem matches");
+        assert_eq!(selection.runs.len(), 1);
+        assert_eq!(selection.runs[0].run_file_stem(), stem);
+        assert!(selection.shadowed.is_empty());
+
+        assert_eq!(
+            select_runs_by_stem(&runs, &["no-such-run".to_string()]).unwrap_err(),
+            RunSelectionError::UnknownRun {
+                stem: "no-such-run".to_string()
+            }
+        );
+    }
+
+    /// Where several retained runs share a stem, the selection takes the one the record file holds
+    /// and reports the repeats it cannot address.
+    ///
+    /// The register's `source` is its only link back to evidence, and the run-file scheme lets a
+    /// re-run of one problem at one commit replace its predecessor's file (see
+    /// [`colliding_run_file`](crate::grobner::research::colliding_run_file)). So the earlier run's
+    /// figures have no addressable source, and a row emitted for them would cite a file that does
+    /// not contain them. Reported rather than dropped silently.
+    #[test]
+    fn test_a_repeated_stem_selects_the_run_its_record_file_holds_and_reports_the_rest() {
+        let mut first = measured_run();
+        first.stages[1] = crate::grobner::research::StageCost::new(
+            crate::grobner::research::Stage::Grobner,
+            Duration::from_millis(360),
+        );
+        let second = measured_run();
+        let stem = second.run_file_stem();
+        assert_eq!(first.run_file_stem(), stem, "same problem, same commit");
+
+        let runs = vec![first, second];
+        let selection =
+            select_runs_by_stem(&runs, std::slice::from_ref(&stem)).expect("the stem matches");
+        assert_eq!(selection.runs.len(), 1, "one row per addressable record");
+        assert_eq!(
+            selection.runs[0].stages[1].elapsed,
+            Duration::from_millis(331),
+            "the record file holds the last run written under the stem"
+        );
+        assert_eq!(selection.shadowed, vec![(stem, 2)]);
+    }
+
+    /// Naming one stem twice selects it once, so a repeated selector cannot double-append.
+    #[test]
+    fn test_a_stem_named_twice_is_selected_once() {
+        let runs = vec![measured_run()];
+        let stem = runs[0].run_file_stem();
+        let selection =
+            select_runs_by_stem(&runs, &[stem.clone(), stem]).expect("the stem matches");
+        assert_eq!(selection.runs.len(), 1);
+    }
+
+    /// Sixteen retained runs share a record-file stem with another, so they are not addressable.
+    ///
+    /// The blocker behind #532's decision, pinned to the committed data rather than left in prose:
+    /// a register holding a row per run would need one per run and the record tree can name one
+    /// per stem. If a
+    /// run identity lands (#540) these numbers change and this test is where that shows up.
+    #[test]
+    fn test_sixteen_retained_runs_share_a_stem_with_another() {
+        use crate::grobner::research::{registry, Scoreboard};
+
+        let history = Json::parse(include_str!(
+            "../../../research/scoreboard/results/history.json"
+        ))
+        .expect("parses");
+        let scoreboard = Scoreboard::load(&history, &registry()).expect("every retained run");
+        let stems = retained_run_stems(scoreboard.runs());
+
+        let addressable = stems.len();
+        let repeats: usize = stems.iter().map(|(_, count)| count - 1).sum();
+        assert_eq!(
+            addressable + repeats,
+            scoreboard.runs().len(),
+            "every retained run is either a stem or a repeat of one"
+        );
+        assert_eq!(
+            repeats, 16,
+            "the runs no record file can be cited for; see #540"
+        );
     }
 }

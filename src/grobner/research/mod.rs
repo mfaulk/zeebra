@@ -33,8 +33,9 @@ pub use challenge::{
     CicoVisitor, DisclosedMethod, ExternalStatus, Objective, ReferencePoint, Significance,
 };
 pub use cost_model::{
-    Attribution, CostModelBoard, CostRow, Figure, FigureBasis, Intermediate, LimitingStage,
-    NextSizeProjection, PredictionError, Quantity, SchemaError, COST_MODEL_HISTORY_CONTRACT,
+    retained_run_stems, select_runs_by_stem, Attribution, CostModelBoard, CostRow, Figure,
+    FigureBasis, Intermediate, LimitingStage, NextSizeProjection, PredictionError, Quantity,
+    RunSelectionError, SchemaError, SelectedRuns, COST_MODEL_HISTORY_CONTRACT,
 };
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};

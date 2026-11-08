@@ -21,6 +21,12 @@
 #
 # ZEEBRA_CORES pins the run (default 0-7). ZEEBRA_MACHINE labels it; without one the hostname is
 # used, which is what a cross-machine comparison keys on.
+#
+# This script does NOT feed the cost-model register. #532 settled that the register is curated — a
+# board about whether predictions held, not a second copy of these records — so a row is emitted
+# from a run by naming it: `cargo run --release --example cost_model -- --write --from-runs <stem>`,
+# when a prediction wants its measurement. Whether a new figure is checking a prediction is a
+# judgement this runner cannot make.
 set -euo pipefail
 
 TIER="${1:-smoke}"
