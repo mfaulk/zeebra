@@ -425,10 +425,11 @@ The job was verified non-vacuous by reinstating that exact defect: `cargo build 
 exits **0** with it present and `cargo bench --profile ci-release -- --test` exits **101**, naming
 the assert. So the compile coverage alone would not have caught it.
 
-It costs job-minutes and **no wall clock**: ~8.4 minutes against `Tests (release)`'s 25–27 on the
-same run, so it finishes well inside the critical path. A pull request's job set is now the push
-set apart from one step (`Gröbner engines agree on the slow systems`, still `push`-only), which is
-what makes the 20.7–25.9 figure above the right baseline for a PR run too.
+It costs job-minutes and **no wall clock**: measured at **4m17s** on the run that enabled it,
+against `Tests (release)`'s 25–27 minutes on the same run, so it finishes well inside the critical
+path. A pull request's job set is now the push set apart from one step (`Gröbner engines agree on
+the slow systems`, still `push`-only), which is what makes the 20.7–25.9 figure above the right
+baseline for a PR run too — this job is already inside it.
 
 ### Build configuration
 
