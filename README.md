@@ -2786,13 +2786,37 @@ multiplies once per division *step*, and a step that skips a degree leaves the p
 `x^6 + 1` against `x^2 + 1` takes three steps where `delta + 1` is five — so the two
 pseudo-remainders are not interchangeable and the subresultant route has its own.
 
-**The subresultant route is the default on correctness evidence, not on a measurement.** The two
-are asserted to return the same value by the exhaustive brute force, by `for_each_field!` at two
-arities, and case by case including the degree-gap cases. What is also asserted is the *operation
-count*: on a degree-five-against-degree-two pair the primitive route takes 18 recursive content
-GCDs and the subresultant route 6. That is a count and not a duration. **No timing is published
-for either route**, and whether the wall clock follows the operation count on any particular
-machine is exactly what has not been measured.
+**The subresultant route is the default on a measured tail, not on a measured median — and not on
+the operation count.** #407 took the first timings for either route, and they do not follow the
+count. On twenty shapes per field crossing arity, factor size and exponent, the **primitive** route
+wins 14–16 of them and the subresultant route 2–3; the subresultant route's typical loss is 10% to
+50%.
+
+What decides the default is the other end of the distribution:
+
+| | shape | primitive | subresultant | |
+|---|---|---:|---:|---|
+| the primitive route's worst | KoalaBear, 4 vars, 10 terms | **1.2561 s** | 0.0020 s | **628x** |
+| the subresultant route's worst | KoalaBear, 4 vars, 16 terms | 0.0011 s | **0.0262 s** | 24x |
+
+And on one four-variable shape the primitive route did not finish a single pass in the ~40 minutes
+remaining of a 2 400 s run, which is how the first attempt at this sweep was killed mid-table. The
+theory says why: a content is itself a recursive GCD, so the primitive route is a recursion over
+recursions with nothing bounding a step's cost in terms of the inputs, while the subresultant
+route's entries *are* subresultants and Hadamard bounds them in advance. The routes are not
+slower-and-faster but different-tailed, and a library default should be the one that cannot fall off
+a cliff on an input the caller did not know was special.
+
+**So `PrimitivePrs` is not merely the reference implementation.** It is 10–50% faster on most
+shapes, and `gcd_by(&other, GcdRoute::PrimitivePrs)` is a reasonable choice for a caller who knows
+its inputs are ordinary. [`docs/research/multivariate-gcd.md`](docs/research/multivariate-gcd.md)
+has the full tables, the single-repetition caveat on the 628x figure, and what the measurement does
+not establish — including that the input distribution F4 and FGLM actually hand `gcd` is still
+unmeasured.
+
+```text
+cargo run --release --example gcd_routes
+```
 
 Brown's modular algorithm — evaluate all but one variable at points over a prime field, take
 univariate GCDs, interpolate back, with degree bounds and a check against bad evaluation points —
