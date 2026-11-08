@@ -78,7 +78,10 @@ pub fn try_interpolate<F: FiniteField>(
     let w_inv = w.inverse();
 
     let mut coefficients = x.to_vec();
-    transform_any(&mut coefficients, w_inv.powers());
+    // `w.bluestein_domain()`, not `w_inv`'s: `inverse()` does not carry the prepared capability
+    // forward, and it does not need to. The convolution domain depends only on the *size*, which
+    // inversion preserves, so the one `w` holds is exactly the one the inverse transform wants.
+    transform_any(&mut coefficients, w_inv.powers(), w.bluestein_domain());
     for c in coefficients.iter_mut() {
         *c *= size_inverse;
     }

@@ -1926,8 +1926,9 @@ dispatched the same way, recursively, and what it costs depends on the factor:
 So `2520 = 2^3 * 3^2 * 5 * 7` costs `n log 8` plus `n * (9 + 5 + 7)`, which is why a size whose
 odd factors are small is cheap and **a large prime size is quadratic through this route**.
 [Bluestein](#bluestein-a-large-prime-size-without-the-quadratic-cost) is what removes that case,
-and it is a separate entry point rather than a decomposition the dispatcher reaches on its own —
-see below for why.
+and since #375 the dispatcher **does** reach it on its own — above a measured size, and for a
+domain that was prepared to. See below for what preparing means and why it is a property of the
+domain rather than a bound on the transform.
 
 Two consequences of allowing any size, both visible in the API:
 
@@ -2025,17 +2026,62 @@ assert_eq!(
 );
 ```
 
-**It is not yet dispatched to automatically.** `evaluate` and `interpolate` at a prime size still
-take the quadratic route, and reaching Bluestein means calling it. Two reasons, both of which want
-their own change:
+**It is dispatched to automatically, for a domain that carries a convolution domain.** #375 closed
+the two reasons it was not.
 
-- The crossover against the quadratic definition is **unmeasured**. `dft` is quadratic but
-  allocation-free and branch-free, while Bluestein pays three `n`-length chirp passes plus a padded
-  convolution of length up to `4n`, so below some size the quadratic route wins. No figure is
-  quoted here because none has been measured.
-- `prime_factor::transform_any` is generic over `FiniteField`, and constructing a primitive `L`-th
-  root needs `KnownOrder` and an rng. Tightening that bound would propagate through `evaluate` and
-  `interpolate` into the polynomial API — a breaking change that is a decision, not a side effect.
+```rust
+use rand::{prelude::StdRng, SeedableRng};
+use zeebra::fields::PrimeFieldElement64;
+use zeebra::{
+    evaluate, with_bluestein, FFTDomain, FiniteField, KnownOrder, Polynomial, UnivariatePolynomial,
+};
+
+// Goldilocks, whose q - 1 = 2^32 * 3 * 5 * 17 * 257 * 65537 hosts a 257-point domain.
+type F = PrimeFieldElement64<18_446_744_069_414_584_321>;
+let mut rng = StdRng::seed_from_u64(375);
+
+let root = F::try_root_of_unity(257, &mut rng).unwrap();
+let plain = FFTDomain::from_generator(root, 257);
+let prepared = with_bluestein(plain.clone(), &mut rng).unwrap();
+
+// The same transform either way; `prepared` takes Bluestein and `plain` takes the definition.
+let p = UnivariatePolynomial::<F>::rand(200, &mut rng);
+assert_eq!(evaluate(&p, &prepared), evaluate(&p, &plain));
+```
+
+**The bound problem is solved by moving the capability, not by widening a signature.** Building a
+convolution domain needs a primitive power-of-two root, hence `KnownOrder` and an rng; the
+*transform* needs neither. Tightening `transform_any` would have propagated through `evaluate` and
+`interpolate` into the polynomial API and ruled the FFT out over every field that is not
+`KnownOrder`. Instead the convolution domain is attached to the **domain**, where the size already
+lives, by `with_bluestein` — which carries the bound alone — and threaded down the decomposition as
+an `Option`. `evaluate` and `interpolate` keep their `FiniteField` bounds, nothing is breaking, and
+an unprepared domain behaves exactly as it did before.
+
+Threading rather than reading it off a domain per node is forced by the recursion: `good_thomas`
+builds its sub-domains as strided `Vec<F>` copies, so there is no domain object at a recursive site
+— and a *nested* odd prime power is reached only through that path. One prepared domain serves
+every factor, because the convolution length's contract admits a larger `L` than a given factor
+needs.
+
+**The crossover is 64, and it is one constant rather than a tier per element width.** That is a
+property of the fields: a size `m` needs `m | q - 1`, the dispatch is reached only at an odd prime
+power, and Bluestein needs the two-adicity to cover `log2 L`. What survives all three is
+`3, 5, 17, 257` over Goldilocks, `127` over KoalaBear, `3, 5` over BabyBear and **nothing at all**
+over BN254 `Fr` — one field per width, none at the widest. Measured, `dft` wins at `m = 17` (0.25x)
+and loses at `m = 257` (3.06x), so Goldilocks brackets the crossover to `[17, 257)`; KoalaBear's
+only size, 127, favours Bluestein by **3.55x**, capping the constant below 127; BabyBear's 3 and 5
+both favour `dft`, flooring it at 5. Any constant in **`[17, 127)`** therefore dispatches
+identically on every field that can exercise it, and 64 is the middle of that range.
+
+```text
+cargo run --release --example bluestein_crossover
+```
+
+reproduces that, and reports which sizes each field could host so the bracket is visible rather
+than implied. A field that cannot host a convolution domain at all — Mersenne-31, whose two-adicity
+is 1 — keeps the quadratic route at every size, which is why `with_bluestein` returns a `Result`
+and an absent convolution domain is an ordinary state rather than an error.
 
 ### What the univariate stages cost
 

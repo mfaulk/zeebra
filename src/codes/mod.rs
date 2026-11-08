@@ -19,8 +19,10 @@
 //! [`crate::evaluate`] costs at the chosen block length: `O(n log n)` for a power of two or a
 //! product of small coprime factors, but `O(n^2)` for a block length with a large prime factor,
 //! which `fft::prime_factor` handles by the definition. [`crate::bluestein_transform`] removes
-//! that case and is not dispatched to automatically (#375), so a prime block length is a choice to
-//! make deliberately rather than one to stumble into.
+//! that case, and since #375 it **is** dispatched to automatically above a measured size — but
+//! only for a domain prepared by [`crate::with_bluestein`], which needs
+//! [`crate::KnownOrder`] and an rng. So a prime block length over an unprepared domain is still
+//! quadratic, and preparing one is the deliberate choice rather than the prime length itself.
 
 mod reed_solomon;
 

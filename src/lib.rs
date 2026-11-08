@@ -37,8 +37,11 @@ pub(crate) mod test_support;
 pub use fft::{
     bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform, evaluate,
     fft_multiplication_crossover, interpolate, multiply, multiply_above, multiply_over_domain,
-    powers_of, try_interpolate, try_multiply_via_fft, DomainError, FFTDomain, InterpolateError,
+    powers_of, try_interpolate, try_multiply_via_fft, with_bluestein, DomainError, FFTDomain,
+    InterpolateError,
 };
+#[doc(hidden)]
+pub use fft::{bluestein_crossover_unstable, dft_unstable};
 pub use fields::{FiniteField, KnownOrder, ParseFieldElementError};
 pub use identities::{One, Zero};
 #[doc(hidden)]
