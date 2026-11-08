@@ -493,7 +493,7 @@ fn interreduction<const N: usize>(
 /// Echelon against reduced batch rows, over both interreduction routes, on one build.
 ///
 /// #477's question, as four arms rather than two. The payoff it claims is a smaller final
-/// autoreduce matrix, and that matrix only exists when `interreduce_by_matrix` is on — but that
+/// autoreduce matrix, and that matrix only exists when the matrix route is selected — but that
 /// flag is **off by default** (#507 is the issue that decides it), so measuring only the matrix
 /// route would answer a question about a path no board row describes. The division arms are what
 /// say whether this flag pays on the path that ships today.

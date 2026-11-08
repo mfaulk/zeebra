@@ -74,15 +74,20 @@ pub enum ReductionStrategy {
 /// Groebner.jl's `f4_autoreduce!` performs — and #507 measured it across the whole corpus ladder,
 /// where it splits cleanly on the order (`docs/research/interreduction-cost.md` §3c):
 ///
-/// | order | every rung measured | worst rung |
+/// | order | over the rungs above the noise floor | worst rung |
 /// |---|---|---|
-/// | grevlex | **0.99x–3.78x faster** | katsura-6, a wash at 0.99x |
-/// | grlex | **1.07x–1.71x faster** | mq-planted-6 at 1.07x |
-/// | lex | **1.49x–6.20x slower** | katsura-6 at 6.20x |
+/// | grevlex | **1.01x–3.78x faster** | katsura-6, a wash at 1.01x |
+/// | grlex | **1.15x–1.71x faster** | katsura-5 at 1.15x |
+/// | lex | **1.59x–6.25x slower** | katsura-6 at 6.25x |
+///
+/// "Above the noise floor" is the thirteen rungs taking 0.5 ms or more. The four that run in
+/// 25–170 µs are excluded because their ratios cross 1.00x between runs of identical work — see
+/// §3d.2, which quotes the case.
 ///
 /// The mechanism is shape position, and the matrix shape shows it: katsura-6 under lex builds a
 /// **7 983 × 8 015** matrix for a **six-element** basis, where grevlex builds 217 × 249 for
-/// twenty-two. A lex basis in shape position — linear elements over one univariate of high degree
+/// twenty-two, and that shape is exact and reproduces to the digit across trees. A lex basis in
+/// shape position — linear elements over one univariate of high degree
 /// — is the **best** case for iterated division, because the ascending-order sort leaves every
 /// substituted tail already in normal form, and the **worst** case for a matrix, which must carry
 /// columns spanning the univariate's whole degree range.

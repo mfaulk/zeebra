@@ -3274,8 +3274,9 @@ measured on one 1.40x slower than it.
 **8 333.1 ms** measured against 7 999 ms projected, **1.07x behind Singular** on
 `reduced-grobner-basis` and **parity on `lex-basis-by-conversion`** (1.09x ahead, inside the box's
 spread), with the matrix route ahead on
-every graded rung of the ladder (0.99x–3.78x) and behind on every lex one (up to 6.20x, because a
-shape-position lex basis makes katsura-6 build 7 983 × 8 015 for a six-element basis). The default
+every graded rung of the ladder above the timer's noise floor (1.01x–3.78x) and behind on every lex
+one (up to 6.25x, because a shape-position lex basis makes katsura-6 build 7 983 × 8 015 for a
+six-element basis). The default
 nevertheless stays on the division route, and the reason is **memory that no budget sees**:
 `katsura-11` goes 534.6 MB → 13 148.3 MB with every limit satisfied, because the refusal counts
 matrix entries and the entries are not where the memory goes. That gate is **#536**.

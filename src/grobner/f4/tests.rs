@@ -3872,7 +3872,7 @@ fn test_by_order_builds_a_matrix_under_the_graded_orders_only() {
     let (_, statistics) = f4_reported(&katsura::<4, G>(), MonomialOrder::Lexicographic, &options);
     assert!(
         statistics.interreduction_matrix.is_none(),
-        "ByOrder built a matrix under lex, which #507 measured as a regression of up to 6.20x"
+        "ByOrder built a matrix under lex, which #507 measured as a regression of up to 6.25x"
     );
 }
 

@@ -713,8 +713,25 @@ and a patch id hashes the diff rather than the history.
 
 Every figure under `tools/benchlock.sh`, `taskset -c 0-7`, `ZEEBRA_MACHINE=workstation`,
 `ZEEBRA_AFFINITY=0-7`, `RUSTC_WRAPPER=""`, a private `CARGO_TARGET_DIR`, one worker, `--wall 60`
-except `katsura-11` at 600. Board rows
-`--measure --write`, one row per process, so their peak-RSS figures are attributable.
+except `katsura-11` at 600. Board rows `--measure --write`, one row per process, so their peak-RSS
+figures are attributable.
+
+**This section describes the default path, and §3c's change does not alter it.** `#555` landed
+`F4Options::reduce_batch_rows` while this work was in flight, and it is what §3c measures — so the
+two sections are about different configurations of the same stage and their figures are not
+alternatives to each other. `reduce_batch_rows` is `false` in `F4Options::baseline()` and
+`recommended()` inherits it, so every figure here has it off; `reduction.rs:164` is the whole of its
+effect, selecting `RowForm::Reduced` over the pre-existing `RowForm::Echelon`. Read §3c for what the
+stage costs once the debt is not accrued, and this section for what the route choice is worth on the
+path the board rows and `F4Options::default()` actually take.
+
+The ladder figures in §3d.2 come from `examples/interreduction_routes.rs` rather than from the
+board, and were taken at `b89d68b7`, before this branch was rebased twice. They are not re-taken,
+and the reason is checkable rather than asserted: of everything merged in between, `#541` made **no
+`src/` change** at all (its result is negative), and `#555`'s is behind the flag above. The work
+counts and matrix shapes are the check that matters, because they are exact and machine-independent
+rather than timings — `mq-random-10` reproduces 7 642 × 7 996 with 893 531 nonzeros, and katsura-6
+under lex 7 983 × 8 015 with 314 500, on both trees.
 
 ### 3e.0 What #451 projected, and what the board actually says
 
@@ -802,11 +819,29 @@ told apart from one where the matrix was never built.
 | mq-planted-10 | 1.22x | 1.07x | 1.10x |
 | mq-planted-14 | 1.55x | 1.24x | 1.12x |
 
-Above 1.00x the matrix route is faster. **Every graded entry is at or above 1.00x** — grevlex
-0.99x–3.78x across two runs of katsura-6, grlex 1.07x–1.71x — and **every lex regression is on a
-rung whose basis is in shape position**: katsura and cyclic-5. The lex rungs that are *not*
-(`mq-planted`, whose lex basis is the planted point's linear forms, and cyclic-4) are unaffected at
-1.07x–1.12x.
+Above 1.00x the matrix route is faster.
+
+**Four rungs here are below the instrument's noise floor and their ratios are not evidence.**
+`katsura-4`, `cyclic-4`, `mq-planted-6` and `mq-planted-10` run in **25–170 µs**, where a stage
+clock read four times a batch and a shared-L3 box dominate the difference. A third run of the table
+put `mq-planted-6` grlex at **0.88x** where the one above has 1.08x — the same work, the same
+matrix (9 × 19, 24 nonzeros, identical to the digit), and a ratio that crossed 1.00x. Quoting those
+rungs either way would be quoting noise, so the ranges below exclude them.
+
+Over the **thirteen rungs that take 0.5 ms or more**:
+
+| order | range | rungs |
+|---|---|---|
+| grevlex | **1.01x–3.78x faster** | katsura-5…10, cyclic-5…8, mq-random-6, mq-random-10 |
+| grlex | **1.15x–1.71x faster** | katsura-5, katsura-6, katsura-7, cyclic-5, mq-random-6 |
+| lex | **1.59x–6.25x slower** (0.63x–0.16x) | katsura-5, katsura-6, cyclic-5 |
+
+Not one graded rung above the noise floor favours the division route, and not one lex rung favours
+the matrix route. And **every lex regression is on a rung whose basis is in shape position** —
+katsura and cyclic-5. The lex rungs that are *not* in shape position are the `mq-planted` family,
+whose lex basis is the planted point's linear forms, and `cyclic-4`; all of them sit at the noise
+floor, so the shape-position reading is **consistent with** this table rather than separately
+confirmed by it.
 
 `cyclic-9`, `cyclic-10` and `mq-random-14` stopped under both routes at 60 s, which is a fact about
 the rungs. The three Poseidon and two Anemoi rungs pin their own characteristic and this example
@@ -826,8 +861,8 @@ case for iterated division, because the ascending-order sort leaves every substi
 in normal form, and the **worst** case for a matrix, which must carry columns spanning the
 univariate's whole degree range. This is what `buchberger.rs:294-314` already documented and what
 §3a.1b measured at the stage level as a 25x regression on katsura-5 lex; the end-to-end figure for
-that rung is 0.37x, and the regression **grows with the rung** — 1.49x, 2.73x, 6.20x slower for
-katsura-4, 5 and 6.
+that rung is 0.39x, and the regression **grows with the rung** — 2.56x and 6.25x slower for
+katsura-5 and katsura-6, the two above the noise floor.
 
 **No rung fell back.** `fell_back` was false and `refused_by` `None` on every rung under every
 order, including the 7 983 × 8 015 lex matrix. That is not reassurance; §3e.3 is why.
