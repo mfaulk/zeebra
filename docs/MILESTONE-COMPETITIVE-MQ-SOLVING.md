@@ -23,6 +23,7 @@ because the arithmetic now says the comparand was the wrong one.
 | date | change |
 |---|---|
 | 2026-11-07 | Written at `d9121c0` from M26's landed work, #447's cross-engine screen, and `f4-resource-scaling.md` §10.4. M26's §13 report does not exist yet; §0 records what that costs this plan. |
+| 2026-11-07 | **#452 and #471 implemented** (PRs #476, #478). #452's counters settle #440's four-way verdict as **copy-bound** — 1.17 billion terms rewritten at 64.2x amplification, where swell is only 8.8x and 22.6 M divisor tests cannot be 35 s — and correct §4's inference, which had read Groebner.jl's 604 as a term count when it is a column count. #471 then measured **4.18x end to end** with bases asserted equal, clearing §10's Strong criterion. Two findings M27-0 must carry: the §3 baseline does not reproduce (four stages within 4.4%, interreduction 54% higher, so the share is 86.7% and the ceiling 7.52x), and the §4 cost estimate was 24x out because Zeebra's autoreduce matrix has **405x** the cells Groebner.jl's does — now #477. |
 | 2026-11-07 | **#447 answered** (`a1867a7`, `docs/research/groebner-jl-gap.md`) **and M27-A's shape changed with it.** The counts agree — both engines reach 10 batches, 11 matrices, 247 basis elements and quotient dimension 354 — so gate 0's "Zeebra does asymptotically more work" branch is **dead**, and the 344x decomposes into **4.89x** randomized linear algebra (declined by policy), **5.03x** interreduction done as 247 divisions where Groebner.jl uses one Macaulay matrix, and **14.0x** a per-operation constant uniform to 11.6x-25.5x across every other stage. Final interreduction is **13 871x** behind; the next worst stage is 97.1x. So M27-A's first item is no longer a faster `normal_form` but **matrix-based interreduction** (§5.2a), and the JIT caveat is settled at ~2%. |
 | 2026-11-07 | **#435 merged during planning** (`25e10fe`), so §1.1's figures were re-read from `main`'s five-library board at cohort `7adb29e` rather than from #447's issue body. Three consequences: Singular's wall on that cohort is 7 001.1 ms, not the 7 291 ms M25 recorded, which moves the Singular-parity requirement from 14.5x to **17.7x** on interreduction; Sagebrush's ratio is marked **non-authoritative by the board** and is demoted to context; and the board stores `process-wall 7.35 s` beside Groebner.jl's `solve 83.4 ms`, an 88x gap against which Zeebra is **3.95x faster** — which sharpens #447's first question rather than softening it. Also records #448's resolution (`a062b59`), which explains the board-membership discrepancy the first draft hedged against. |
 
@@ -559,12 +560,38 @@ at the end, for four fifths of the run.
 Gröbner basis is determined by its leading monomials, so the route to it cannot change the answer.
 That makes the acceptance criterion exact equality rather than a tolerance.
 
-**The ceiling, and the one honest caveat.** 5.03x is a ceiling on *interreduction*, and a matrix pass
-is not free. Groebner.jl's 1.74 ms is an engine 11.6x–97x faster per operation, so Zeebra should
-expect to pay of order **170 ms** and keep about **5.0x of the 5.18x available** — 29 913 ms to
-roughly **5 946 ms**, which is **ahead of Singular's 7 001 ms on this row.** This is the first
-stage-level estimate in this repository where the comparand's own cost for the same stage is known
-rather than a share divided into one. It remains an estimate.
+### 5.2a.1 **Delivered**, and the estimate was wrong in an instructive direction
+
+**#471 landed and measured 4.18x end to end** (PR #478, `docs/research/interreduction-cost.md` §3a):
+three reps interleaved in one process on one build, on the lock, with both routes' bases asserted
+**equal** on every run.
+
+| | division | matrix | ratio |
+|---|---:|---:|---:|
+| total (median of 3) | 40 809 ms | **9 753 ms** | **4.18x** |
+| the stage | 35 247 ms | **4 094 ms** | **8.59x** |
+| stage share | 86.4% | 42.1% | — |
+
+Run-to-run spread is 1.009x and 1.030x, so the result is two orders of magnitude outside the noise.
+**This clears §10's Strong criterion of 2x end-to-end with a bit-identical basis.**
+
+**The estimate above said ~170 ms for the matrix pass. It measured 4 094 ms — 24x out.** The error is
+not in the per-operation constant; it is in the *shape*. Groebner.jl's autoreduce matrix is
+250 x 604; Zeebra's is **7 642 x 7 996**, which is **405x the cells**. 405x cells against 24x time
+means Zeebra's per-cell cost is *better* than the scaling assumed — the pass is slow because the
+matrix is enormous.
+
+And 250 rows for 247 elements says Groebner.jl's closure added about **three** reducer multiples
+against Zeebra's **7 395**, with its 604 columns being almost exactly `247 leading + 354 standard
+= 601` — so **nothing in its tails is reducible at all**. That is a property of the main loop:
+Groebner.jl reduces rows fully against pivots in every batch, Zeebra extracts candidates from an
+echelon form that was never back-substituted, so each batch leaves reducible tails and the debt
+accrues to the end. **#477** owns not accruing it, with Groebner.jl's 1.74 ms as its ceiling.
+
+**The lesson for the rest of M27**, and it is §9's rule arriving from a new direction: a
+stage-level estimate built from a comparand's cost is only as good as the assumption that both
+engines build the *same object*. They did not. The ceiling was right; the cost model under it was
+not.
 
 **The division route is retained, not replaced.** `normal_form` is on the critical path of FGLM
 border reduction, the differential oracles and `multi_div_rem`; and its divisor-selection order is
@@ -860,7 +887,7 @@ So the order is now:
 
 | rank | item | ceiling | status |
 |---|---|---:|---|
-| 1 | **matrix-based final interreduction** (#471, §5.2a, factor B) | **5.03x** | unconditional. The comparand's own cost for the same stage is known |
+| 1 | **matrix-based final interreduction** (#471, §5.2a, factor B) | **5.03x** | **done — 4.18x end to end, PR #478.** It also exposed #477, which owns the stage's remaining 42% |
 | 2 | **the monomial representation** at two words (#317, factor C) | *not a stage; the screen cannot bound it* | gated on #317's own `MonomialOrder::cmp` microbenchmark **before** touching the type, because `Monomial` is serialized and a new field is a format change. The `HashMap<Monomial<N>, F>` term store belongs in the same screen, and nothing has measured the two apart |
 | 3 | #440's window-the-merge, #436's candidates 1–3, #331 | bounded by what remains of the division route after item 1 | these now serve FGLM border reduction, the differential oracles and `multi_div_rem` rather than F4's hot stage. Still worth taking, no longer the headline |
 | — | #268 §6.1-style interning, divmask, delayed reduction | **1.014x–1.16x** on the losing column | won't-do, now on measured evidence rather than inference |
