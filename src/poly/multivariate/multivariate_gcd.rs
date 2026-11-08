@@ -21,10 +21,13 @@
 //! since the sequence's entries are subresultants and so determinants of submatrices of the
 //! inputs' Sylvester matrix.
 //!
-//! The subresultant route is the default, on correctness evidence — the two are asserted to return
-//! the same value exhaustively and over every field — and **not on a measurement**. The operation
-//! count is asserted (`test_the_subresultant_route_takes_fewer_content_gcds`); the wall clock is
-//! not, and #407 is where that belongs.
+//! The subresultant route is the default, and #407 measured why. Not for the reason the asserted
+//! operation count suggests: on twenty shapes per field the **primitive** route is faster on 14–16
+//! of them, by 10% to 50%. What decides it is the tail. The primitive route's content GCD is itself
+//! a recursion, so nothing bounds a step's cost in terms of the inputs, and it was measured at
+//! **628x** the subresultant route on one four-variable shape and did not finish a single pass on
+//! another. The subresultant route's entries are subresultants, which Hadamard bounds in advance,
+//! and its own worst measured case is 24x. See `docs/research/multivariate-gcd.md`.
 //!
 //! Brown's modular algorithm, which evaluates the problem down to univariate GCDs over a prime
 //! field and lifts, is the route that changes the asymptotics and is not here.
@@ -47,8 +50,10 @@ pub enum GcdRoute {
     /// #128's route. Nothing can grow, because a content is divided out at every step — so the
     /// coefficient bound is by construction. A content is itself a recursive GCD in a smaller
     /// ring, so this pays one such GCD per Euclidean step, which is the cost
-    /// [`Self::SubresultantPrs`] removes. Kept as the reference the other is differentially tested
-    /// against.
+    /// [`Self::SubresultantPrs`] removes. It is the reference the other is differentially tested
+    /// against — and also, per #407, the **faster** route on most shapes, by 10% to 50%, so a
+    /// caller who knows its inputs are ordinary can reasonably ask for it. What it cannot offer is
+    /// a bounded worst case; see [`Self::SubresultantPrs`].
     PrimitivePrs,
 
     /// Divide every pseudo-remainder by `g * h^delta`, carrying `g` and `h` across steps.
@@ -59,10 +64,12 @@ pub enum GcdRoute {
     /// subresultants, determinants of submatrices of the inputs' Sylvester matrix, so Hadamard's
     /// inequality bounds them in terms of the inputs alone.
     ///
-    /// **Default on correctness evidence, not on a measurement.** The two routes are asserted to
-    /// return the same value by the exhaustive brute force, by `for_each_field!` at two arities,
-    /// and case by case; whether it is faster in wall clock on any particular machine is
-    /// unmeasured, and #407 is where that measurement belongs.
+    /// **Default on a measured tail rather than a measured median.** #407 found this route 10% to
+    /// 50% *slower* than [`Self::PrimitivePrs`] on most shapes, and kept it the default anyway
+    /// because the primitive route's tail is unbounded — 628x on one measured four-variable shape,
+    /// and non-terminating within 40 minutes on another — while this route's worst measured case is
+    /// 24x. A default should be the route that cannot fall off a cliff on an input the caller did
+    /// not know was special. `docs/research/multivariate-gcd.md` has the tables.
     #[default]
     SubresultantPrs,
 }
