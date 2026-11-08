@@ -3151,6 +3151,74 @@ rational param(cpu)             0.75 sec
         }
     }
 
+    /// msolve and Zeebra return the **same eliminant** on katsura-5, polynomial not text.
+    ///
+    /// The corroboration gain #465 unlocked. Until Zeebra served the task, the eliminant was the
+    /// only one the board defines with two external engines and no in-crate operand — the
+    /// invariant could not be checked against Zeebra at all. Both renderers were already made to
+    /// agree (`render_eliminant` matches Zeebra's printer), but a text comparison would pass on a
+    /// coincidence of formatting and fail on a harmless one, so this parses both sides back into
+    /// polynomials over the same field and compares those.
+    ///
+    /// `P30`, not the corpus reference prime: `P31` is above `MAX_CHARACTERISTIC_ELIMINANT`, so
+    /// msolve is `Unsupported` there by design.
+    #[test]
+    fn test_a_real_msolve_and_zeebra_return_the_same_eliminant() {
+        use crate::fields::PrimeFieldElement64;
+        use crate::grobner::external::zeebra::ZeebraSolver;
+        use crate::MultivariatePolynomial;
+
+        let Some(binary) = installed_binary() else {
+            return;
+        };
+        let katsura_5 = corpus_instance("katsura-5", P30);
+        let limits = Limits::wall(Duration::from_secs(60));
+
+        let mut msolve = MsolveSolver::new(
+            &binary,
+            std::env::temp_dir().join(format!("zeebra-msolve-live-agree-{}", std::process::id())),
+        );
+        let theirs = match msolve
+            .run(&katsura_5, Task::UnivariateEliminant, &limits)
+            .status
+        {
+            RunStatus::Complete(answer) => answer,
+            other => panic!("msolve's eliminant did not complete: {:?}", other),
+        };
+
+        let mut zeebra = ZeebraSolver::new();
+        let ours = match zeebra
+            .run(&katsura_5, Task::UnivariateEliminant, &limits)
+            .status
+        {
+            RunStatus::Complete(answer) => answer,
+            other => panic!("zeebra's eliminant did not complete: {:?}", other),
+        };
+
+        // The invariant first, which is what a board row compares.
+        assert_eq!(ours.invariants.eliminant_degree, Some(16));
+        assert_eq!(
+            ours.invariants.eliminant_degree,
+            theirs.invariants.eliminant_degree
+        );
+
+        // Then the polynomial. Parsed rather than string-compared: equality has to be on the
+        // object, since both sides are rendered by printers that could agree or differ for
+        // reasons that have nothing to do with the mathematics.
+        type F = PrimeFieldElement64<P30>;
+        let names: Vec<&str> = katsura_5.variables.iter().map(String::as_str).collect();
+        let mut compiled = [""; 5];
+        compiled.copy_from_slice(&names[..5]);
+        let parse = |text: &str, who: &str| {
+            MultivariatePolynomial::<5, F>::parse(text, compiled)
+                .unwrap_or_else(|e| panic!("{}'s eliminant does not parse: {} ({})", who, text, e))
+        };
+        assert_eq!(
+            parse(ours.eliminant.as_deref().expect("ours"), "zeebra"),
+            parse(theirs.eliminant.as_deref().expect("theirs"), "msolve"),
+        );
+    }
+
     /// Against a real msolve, the smoke system's eliminant request hits the silent failure and is
     /// reported rather than completed.
     ///
