@@ -1,7 +1,9 @@
 # Fast univariate algorithms: the wide-field root of unity, and what each stage costs
 
-**Measured at:** publication bound `29ce42b4`…`b9c104be` — the commits that published these figures,
-recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Measured at:** publication bound `29ce42b4`…`b9c104be` for everything but §4.3.3 — the commits
+that published those figures, recovered from git rather than recorded at the time
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
+was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -133,7 +135,7 @@ source.
 | div | 1.63 – 2.12 → **2** | in-place long division, after §2 — **superseded, see §4.5** |
 | ntt | 0.97 – 1.18 → **1** (n log n) | `fft::evaluate`, recursive — **superseded, see §3.3** |
 | intt | 0.92 – 1.18 → **1** | `fft::interpolate`; §3 on what #118 then removed — **superseded, see §3.3** |
-| lagrange | 2.68 – 2.98 → **3** | arbitrary abscissae — **superseded, see §4.3** |
+| lagrange | 2.68 – 2.98 → **3** | arbitrary abscissae — **superseded twice, see §4.3.1 then §4.3.3** |
 | roots | 1.64 – 2.01 → **2** | `roots`, dominated by `x^q mod f` — **superseded, see §4.5** |
 
 **The `div` and `roots` rows are superseded by #193.** Division now dispatches to Newton inversion
@@ -219,8 +221,20 @@ the rest of the table was taken in the same run:
 | stage | Mersenne-31 | KoalaBear | Goldilocks | BN254 `Fr` |
 |---|---|---|---|---|
 | lagrange, before #162 | 1 024 | 1 024 | 1 024 | 512 |
-| lagrange, after #162 | **16 384** | **16 384** | **16 384** | **4 096** |
+| lagrange, after #162 stage 1 | **16 384** | **16 384** | **16 384** | **4 096** |
 | factor | 16x | 16x | 16x | 8x |
+
+**And again after #162 stage 2**, the subproduct tree. Only the two fields the absolute-cost table
+below reports were re-taken:
+
+| stage | KoalaBear | BN254 `Fr` |
+|---|---|---|
+| lagrange, after stage 1 | 16 384 | 4 096 |
+| lagrange, after stage 2 | **65 536** | **16 384** |
+| factor against stage 1 | 4x | 4x |
+| factor against the cubic form | **64x** | **32x** |
+
+`roots` is unchanged at 8 192 and 512 by stage 2, because interpolation is not in it — see §4.3.3.
 
 **The `div` and `roots` rows are superseded by #193**, likewise re-measured on the same workstation
 under the same protocol. Only the two fields the absolute-cost table below reports were re-taken:
@@ -250,6 +264,7 @@ Absolute cost at the largest size reached, and the peak bytes there:
 | KoalaBear | intt | 2^22 | 2.03 | 485 | 301 989 856 |
 | KoalaBear | lagrange | 2^10 | 2.74 | 2 677 318 | 65 544 |
 | KoalaBear | lagrange, after #162 | 2^14 | 2.39 | 146 044 | 655 368 |
+| KoalaBear | lagrange, after stage 2 | 2^16 | 2.80 | 42 688 | 19 661 568 |
 | KoalaBear | roots | 2^12 | 1.72 | 418 695 | 393 176 |
 | KoalaBear | roots, after #193 | 2^13 | 1.25 | 152 537 | 1 048 512 |
 | BN254 `Fr` | mul | 2^13 | 1.59 | 193 550 | 1 048 512 |
@@ -259,6 +274,7 @@ Absolute cost at the largest size reached, and the peak bytes there:
 | BN254 `Fr` | intt | 2^18 | 1.89 | 7 209 | 75 497 344 |
 | BN254 `Fr` | lagrange | 2^9 | 3.16 | 6 167 733 | 131 104 |
 | BN254 `Fr` | lagrange, after #162 | 2^12 | 1.34 | 327 072 | 655 392 |
+| BN254 `Fr` | lagrange, after stage 2 | 2^14 | 2.87 | 175 084 | 15 467 760 |
 | BN254 `Fr` | roots | 2^8 | 1.04 | 4 074 934 | 98 144 |
 | BN254 `Fr` | roots, after #193 | 2^9 | 1.87 | 3 650 070 | 262 464 |
 
@@ -1025,12 +1041,18 @@ Two things exist and neither is quasi-linear:
   across the four fields. It was cubic at 2.97 when this section was first written; #162 stage 1
   changed that and §4.3.1 is the measurement.
 
-There is still **no subproduct tree**: no routine builds `prod (x - x_i)` as a balanced binary
-tree, no simultaneous remaindering down such a tree, and no fast transposed form for interpolation.
-That machinery — a subproduct tree plus fast division by Newton iteration — is what would make this
-`O(n log^2 n)`, it is what D1's evaluation–interpolation route wants for the degrees §5 is about,
-and it does not exist in any partial form. #162 remains open for it. Nor is there multipoint
-*evaluation* at arbitrary points in any form better than `n` separate Horner passes.
+**All three now exist — #162 stage 2, and §4.3.3 is the measurement.**
+`src/poly/univariate/subproduct_tree.rs` builds `prod (x - x_i)` as a balanced binary tree, pushes
+remainders down it for multipoint evaluation at an arbitrary point set, and accumulates the
+transposed form upward for interpolation. `lagrange_interpolate` dispatches to it above a measured
+crossover and `multipoint_evaluate` is the public entry point for the evaluation half.
+
+The paragraph this replaces named "a subproduct tree plus fast division by Newton iteration" as the
+pair, and the pairing was the load-bearing part: with long division the tree does not move the
+exponent **at all**, because the levels sum to `n^2 * sum_k 2^-k`. #193 supplied the division and
+§4.3.3 has the arithmetic. What it reaches is `O(M(n) log n)` with a Karatsuba `M`, measured at
+**1.46 – 1.62**, rather than the `O(n log^2 n)` this paragraph predicted — see §4.3.3's last
+section on why "near 1" is unreachable under this issue's own `FiniteField` bound (#559).
 
 #### 4.3.1 What #162 stage 1 changed, measured
 
@@ -1102,6 +1124,139 @@ the cubic form.
 
 So the hour §4.1 attributes to the interpolation in the four-round row is now **1.4 seconds**, and
 its ranked fix-list reorders: the interpolation is no longer first.
+
+#### 4.3.3 Stage 2: the subproduct tree, and the exponent it actually reaches
+
+**Measured at `1154bf5b` plus the change itself.** Both arms of every table below are entry points
+in one binary, so there is no before-side tree to name and nothing merged after `1154bf5b` can have
+moved one arm relative to the other; `1154bf5b` is a merge commit on `main` and so stays resolvable
+(#505). ISA floor `x86-64-v3 or better (AVX2)`, printed in the run's own header by
+`examples/subproduct_crossover.rs`.
+
+`src/poly/univariate/subproduct_tree.rs` builds `prod (x - x_i)` as a balanced binary tree and runs
+two algorithms on it: multipoint evaluation by simultaneous remaindering down the tree, and
+interpolation as the transposed form accumulated upward,
+`T_parent = T_left * M_right + T_right * M_left`, with every denominator `M'(x_i)` coming from one
+evaluation of the derivative.
+
+##### Why this could not be written before #193
+
+§4.3 said this machinery "is what would make this `O(n log^2 n)`" and named "a subproduct tree plus
+fast division by Newton iteration" as the pair. The pairing was the load-bearing part, and the
+reason is worth stating because the tree on its own is **worthless**:
+
+```text
+  evaluation cost  =  sum_k 2^k * D(n / 2^k)
+```
+
+With `D(d) = d^2` — long division, which is what §4.5 was until #193 — that sum is
+`n^2 * sum_k 2^-k = O(n^2)`, and the top level alone is `(n/2)^2` twice. The tree bought a constant
+factor of about two over `n` Horner passes and **did not move the exponent at all**. #193 made
+`D(d) = O(M(d))`, so the sum telescopes to `O(M(n))`; each node's division is exactly the balanced
+shape #193's crossover is read off, so the upper levels take the Newton route and the nodes near
+the leaves fall back to long division without being told to.
+
+##### The two arms, measured against each other
+
+`examples/subproduct_crossover.rs`, fastest of up to 7 interleaved repetitions, arms checked equal
+before the clock starts:
+
+| field | quadratic at n = 8192 | tree at n = 8192 | | quadratic exp. | tree exp. |
+|---|---:|---:|---:|---:|---:|
+| Mersenne-31, `u32` | 0.5453 s | **0.0293 s** | **18.6x** | 1.989 | **1.460** |
+| Mersenne-31, `u64` | 0.6378 s | **0.1192 s** | 5.35x | 1.989 | 1.596 |
+| Goldilocks | 0.7732 s | **0.1092 s** | 7.08x | 2.043 | 1.612 |
+| BN254 `Fr` | 5.2884 s | **0.9839 s** | 5.37x | 2.001 | 1.620 |
+
+The exponents are least-squares fits over the top half of the sweep. **The tree's is the
+multiplication exponent**, 1.46–1.62 against `log2(3) = 1.585`, which is what a `FiniteField` bound
+can reach and is discussed below.
+
+And multipoint evaluation, against the `n`-Horner loop it replaces — there is no second algorithm to
+compare against, since `fft::evaluate`'s domain must be geometric, which is the whole gap this
+stage fills:
+
+| field | Horner exp. | tree exp. | tree first faster by >10% |
+|---|---:|---:|---:|
+| Mersenne-31, `u32` | 2.026 | 1.515 | n = 256 |
+| Mersenne-31, `u64` | 2.012 | 1.626 | n = 1 024 |
+| Goldilocks | 2.052 | 1.629 | n = 512 |
+| BN254 `Fr` | 2.001 | 1.607 | n = 2 048 |
+
+##### The crossover is nearly flat across widths, unlike every other one here
+
+| element | field | `t` | first clear win | the shipped rule takes the tree from |
+|---|---|---:|---:|---:|
+| 4 bytes | Mersenne-31 in a `u32` | **64** | n = 128 | n = 128 |
+| 8 bytes | Mersenne-31 in a `u64` | **128** | n = 256 | n = 256 |
+| 8 bytes | Goldilocks | **128** | n = 256 | n = 256 |
+| 32 bytes | BN254 `Fr` | **128** | n = 256 | n = 256 |
+
+Each `t` is the largest swept `n` at which the tree does **not** win by more than 10%; inside 10%
+the two cost the same to within this box's spread and the tiebreak is memory, where the quadratic
+form's two flat arrays win decisively. The shipped rule lands on the first clear win on all four
+fields, which is the check that the constant is the measurement rather than near it.
+
+§4.1.1's base case falls **12x** across these widths and §4.5's Newton crossover falls **8x**. This
+one barely moves: 64 at four bytes and 128 everywhere above. Both arms' cost is field
+multiplications in roughly the same proportion, so widening the element scales the two sides
+together. The 4-byte tier is kept because it genuinely differs, not for symmetry.
+
+##### The `lagrange` row, re-measured
+
+Same command as §4.3.1, `budget=1.0`, so these compose with that table:
+
+| field | before #162 | after stage 1 | after stage 2 | exp. stage 1 | exp. stage 2 |
+|---|---:|---:|---:|---:|---:|
+| KoalaBear | 1 024 | 16 384 | **65 536** | 1.86 – 2.12 → 2 | **1.49 – 1.72 → 1.6** |
+| BN254 `Fr` | 512 | 4 096 | **16 384** | 2.00 | **1.51 – 1.67 → 1.6** |
+
+A further **4x** in reachable point count on both fields, and **64x / 32x** against the cubic form
+this issue started from. Absolute cost at the largest size reached: KoalaBear 65 536 points in
+2.80 s at 19 661 568 peak bytes; BN254 16 384 in 2.87 s at 15 467 760.
+
+**`roots` did not move, and should not have.** It is still 8 192 on KoalaBear and 512 on BN254 —
+the figures #193 left — because interpolation is not in it. §5's binding stage is unchanged by this
+change, which is worth saying because the previous two stages both moved it.
+
+**The crossover is visible in the memory column**, which is the cheapest confirmation that the
+dispatch fires where it claims. The `lagrange` row's bytes-per-element over KoalaBear is 40.1 at
+n = 128 and 237.5 at n = 256 — `5 n B` below the 8-byte tier's constant and `~30 n B` above it,
+with the step exactly at the constant; over BN254 it is 160.2 then 722.8 at the same boundary.
+Nothing in this change writes that column.
+
+##### The exponent criterion, which is not met and cannot be
+
+#162's acceptance asks for a `lagrange` exponent "near 1", and says an exponent that does not move
+"is the signal that the implementation is not what it claims to be". The exponent moved, from 2 to
+1.6. It is not near 1, and **it cannot be under this issue's own Scope**, which says:
+
+> `KnownOrder` is not required: nothing here needs the field's order, so the bound should stay
+> `FiniteField` as it is today.
+
+Near 1 needs the transform; the transform needs a primitive `2^k`-th root of unity, hence
+`KnownOrder` and an RNG, which is precisely why `fft::multiply` carries that bound and `Mul` does
+not (§4.1). Under `FiniteField` the fastest product is Karatsuba and the best a tree can reach is
+`O(M(n) log n)` with `M(d) = d^1.585`. The two requirements are in tension; this stage resolved it
+the way the bound demands and **#559** is the issue to decide between relaxing the criterion,
+adding a `KnownOrder` specialization beside the `FiniteField` path, or recording near-1 as out of
+reach. Mersenne-31's two-adicity of 1 means the `FiniteField` path has to exist on that field
+whatever is decided.
+
+##### What this does not establish
+
+* **The answer.** The tree agrees with the quadratic form exhaustively over GF(7) for every
+  abscissa subset of size at most three, at every n to 64 over Mersenne-31 and to 40 over BN254,
+  and the dispatcher agrees with both either side of its crossover at degrees derived from the
+  constant.
+* **That `from_zeros` got faster.** It did not: it is still the quadratic fold, left that way
+  deliberately so it stays an independent oracle for the tree's own root. **#560** is the issue to
+  change it.
+* **Anything about #82.** The degrees D1's evaluation–interpolation resultant wants are §5's
+  subject and this measures the stage, not the route.
+* **`O(n log^2 n)`.** §4.3 predicted that figure for this machinery. What it reaches is
+  `O(M(n) log n)` with a Karatsuba `M`, which is not the same thing, and the measured 1.6 is the
+  honest version of that prediction.
 
 ### 4.4 Root finding: quadratic, and it is the binding stage
 
@@ -1289,7 +1444,10 @@ pre-#162 conclusion is kept here as the record of what the sweep said then:
 > **root finding** (d = 256) on BN254, at one second per measurement.
 
 Both the old and the new binding stage are quasi-linear in the literature and
-quadratic-or-worse here, so what changed is which one binds, not the character of the finding. The
+quadratic-or-worse here, so what changed is which one binds, not the character of the finding.
+**#162 stage 2 has since taken arbitrary-point interpolation to 65 536 and 16 384** at a measured
+exponent of 1.6 (§4.3.3), so it is now two doublings further from binding than `div` is and three
+further than `roots`; `roots` itself is untouched by that change, since interpolation is not in it. The
 NTT, the one stage with a quasi-linear implementation, reaches `2^23` in the same second —
 **`2^24` after #161, which is KoalaBear's two-adic ceiling; see §3.3.**
 

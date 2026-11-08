@@ -854,6 +854,8 @@ cargo run --release --example karatsuba_crossover -- bn254
 cargo run --release --example division_crossover   # Newton inversion against long division, per field width
 cargo run --release --example division_crossover -- bn254
 cargo run --release --example division_crossover -- all max_log=13
+cargo run --release --example subproduct_crossover  # the subproduct tree against the quadratic forms
+cargo run --release --example subproduct_crossover -- bn254
 cargo run --release --example multiplication_dispatch  # schoolbook vs Karatsuba vs transform, and the crossings
 cargo run --release --example multiplication_dispatch -- koalabear max_log=17
 cargo run --release --example multivariate_mul     # multivariate multiply: time and live heap per route
@@ -2038,8 +2040,23 @@ and so is in the crossover section below:
 | `div`, dispatched (#193) | **1.6** | **2^16** | **2^14** | `6 n B` / `10 n B` |
 | `evaluate` (NTT) | 1 | **2^24** | **2^22** | `1 n B` |
 | `interpolate` (iNTT) | 1 | **2^24** | **2^22** | `2 n B` |
-| `lagrange_interpolate` | 2 | 2^14 | 2^12 | `5 n B` |
+| `lagrange_interpolate`, dispatched (#162) | **1.6** | **2^16** | **2^14** | `5 n B` / `~30 n B` |
 | `roots` | **1.5–1.9** | **2^13** | **2^9** | `12 n B` / `16 n B` |
+
+The `lagrange_interpolate` row moved in #162 stage 2, which builds `prod (x - x_i)` as a balanced
+binary tree and runs multipoint evaluation down it and the transposed interpolation up it. That took
+the exponent from 2 to **1.6** and the reachable point count up a further 4x on both fields — 64x
+against the cubic form the issue started from. It could not have been written before #193: with
+long division the tree's levels sum to `n^2 * sum_k 2^-k`, so it would not have moved the exponent
+at all. The two peak figures are the two arms, and the step between them is visible in the sweep's
+own bytes-per-element column exactly at the crossover. `multipoint_evaluate` is the public entry
+point for the evaluation half, which is the thing `fft::evaluate` cannot do: its domain has to be
+geometric, and an evaluation–interpolation resultant needs an arbitrary point set.
+
+The exponent is **1.6 and not 1**, and that is a bound rather than a shortfall: near 1 needs the
+transform, the transform needs `KnownOrder` and an RNG, and #162's own scope requires the
+`FiniteField` bound this is written against. #559 is the issue to decide between relaxing the
+criterion and adding a `KnownOrder` specialization.
 
 The `div` and `roots` rows moved in #193, which put Newton inversion of the reversed divisor behind
 a measured crossover: `div`'s exponent fell from 2 to 1.6, its reach doubled over KoalaBear and
