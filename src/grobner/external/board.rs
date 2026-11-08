@@ -1023,6 +1023,85 @@ impl CompetitiveBoard {
         found
     }
 
+    /// Every **engine-internal** ratio against `baseline`, on equivalent tasks (#428).
+    ///
+    /// The same pairing rule as [`Self::speedups`] — same problem digest, task, limits, machine and
+    /// build, both rows answered — over each row's own self-reported stage times rather than its
+    /// wall. A pair contributes nothing when either side reports no stage this statistic can use,
+    /// which is a library-level fact and visible in the measurement table's `stages` column.
+    ///
+    /// Not a replacement for [`Self::speedups`] and not a correction to it. The wall-clock ratio is
+    /// the cost of asking, which is what a user pays; this is the engines compared with process
+    /// setup, parsing and output excluded from both, which is what an implementation study needs.
+    /// The board prints them in separate sections for that reason.
+    pub fn engine_ratios(&self, baseline: &str) -> Vec<EngineRatio> {
+        let mut found = Vec::new();
+        let provenance: BTreeMap<&'static str, Equivalence> = ladder()
+            .iter()
+            .map(|entry| (entry.name, entry.equivalence))
+            .collect();
+        for reference in self.rows.iter().filter(|row| row.library == baseline) {
+            if !reference.is_timing_evidence() {
+                continue;
+            }
+            let Some(theirs) =
+                engine_internal_time(&reference.library, reference.task, &reference.stages)
+            else {
+                continue;
+            };
+            for subject in self.rows.iter() {
+                if subject.library == baseline || !subject.is_timing_evidence() {
+                    continue;
+                }
+                if !subject.comparable_with(reference) {
+                    continue;
+                }
+                let Some(ours) =
+                    engine_internal_time(&subject.library, subject.task, &subject.stages)
+                else {
+                    continue;
+                };
+                if ours.is_zero() {
+                    // A zero-length engine time is the resolution speaking, not a measurement, and
+                    // it has no reciprocal. Refused here rather than carried as an infinity: the
+                    // refusal is already visible as the library's own `0.0 ms` stage in the
+                    // measurement table.
+                    continue;
+                }
+                found.push(EngineRatio {
+                    problem: subject.problem.clone(),
+                    task: subject.task,
+                    baseline: baseline.to_string(),
+                    subject: subject.library.clone(),
+                    ratio: theirs.as_secs_f64() / ours.as_secs_f64(),
+                    baseline_internal: theirs,
+                    subject_internal: ours,
+                    // The minimum over both operands, as with the startup floor: a ratio is
+                    // resolution-dominated if *either* side is near its own granularity.
+                    resolution_multiple: [
+                        (theirs, stage_resolution(&reference.library)),
+                        (ours, stage_resolution(&subject.library)),
+                    ]
+                    .into_iter()
+                    .map(|(elapsed, resolution)| {
+                        resolution
+                            .filter(|resolution| !resolution.is_zero())
+                            .map(|resolution| elapsed.as_secs_f64() / resolution.as_secs_f64())
+                    })
+                    .min_by(|a, b| match (a, b) {
+                        // An undeclared resolution is the worst case, not a missing one.
+                        (None, _) | (_, None) => std::cmp::Ordering::Less,
+                        (Some(a), Some(b)) => a.total_cmp(b),
+                    })
+                    .flatten(),
+                    shared_invariants: reference.invariants.overlap(&subject.invariants),
+                    equivalence: provenance.get(subject.problem.as_str()).copied(),
+                });
+            }
+        }
+        found
+    }
+
     /// The shortest wall time `library` recorded, which is its **process-startup floor**.
     ///
     /// Derived from the board rather than configured, which is the point: the floor is a property
@@ -1231,6 +1310,87 @@ impl CompetitiveBoard {
             out.push('\n');
         }
 
+        let engine_ratios = self.engine_ratios("zeebra");
+        if !engine_ratios.is_empty() {
+            out.push_str("## Engine-internal speedups over Zeebra\n\n");
+            out.push_str(
+                "**A different statistic from the table above, and not a correction to it.** Each \
+                 operand here is the library's **own reported stage time** for the task, so \
+                 process startup, parsing and output are excluded from both sides. It is therefore \
+                 **not an end-to-end cost** and may not be quoted as one: what a caller pays is \
+                 the wall-clock table.\n\n",
+            );
+            out.push_str(
+                "It exists because the startup-floor guard above correctly disqualifies every \
+                 classical row this board holds — Singular's wall on everything up to `katsura-6` \
+                 is its own `exec` — while the data for an engine comparison is already recorded. \
+                 The floor guard is **not** relaxed; there is no startup in either operand of this \
+                 ratio, so the condition that replaces it is one of **resolution**: a stage \
+                 printed in whole milliseconds says nothing about a figure of one or two, and a \
+                 reported figure must be at least 5x its own library's granularity. Each \
+                 published figure carries the quantization uncertainty the coarser operand puts on \
+                 it.\n\n",
+            );
+            out.push_str(
+                "Stage selection per library, and what is excluded from each, is \
+                 `engine_internal_time`; the granularities are `stage_resolution`. A library that \
+                 reports no usable stage contributes no row, which is visible as an em dash in the \
+                 measurement table's `stages` column.\n\n",
+            );
+
+            let unlicensed = engine_ratios
+                .iter()
+                .filter(|ratio| !ratio.licenses_timing())
+                .count();
+            let unresolved = engine_ratios
+                .iter()
+                .filter(|ratio| ratio.licenses_timing() && !ratio.is_resolved())
+                .count();
+            let unchecked = engine_ratios
+                .iter()
+                .filter(|ratio| {
+                    ratio.licenses_timing() && ratio.is_resolved() && ratio.shared_invariants == 0
+                })
+                .count();
+            let publishable: Vec<&EngineRatio> = engine_ratios
+                .iter()
+                .filter(|ratio| ratio.is_publishable())
+                .collect();
+            let _ = writeln!(
+                out,
+                "**{} pairs**: {} refused for want of a recorded ideal equivalence, {} refused on \
+                 stage resolution, {} with no checked invariant, {} publishable as an \
+                 engine-internal comparison.\n",
+                engine_ratios.len(),
+                unlicensed,
+                unresolved,
+                unchecked,
+                publishable.len(),
+            );
+
+            let _ = writeln!(
+                out,
+                "| problem | task | library | zeebra engine | their engine | ratio | provenance | \
+                 checked |"
+            );
+            let _ = writeln!(out, "|---|---|---|---:|---:|---:|---|---|");
+            for ratio in &engine_ratios {
+                let _ = writeln!(
+                    out,
+                    "| `{}` | {} | {} | {} | {} | {} | {} | {} |",
+                    ratio.problem,
+                    ratio.task,
+                    ratio.subject,
+                    duration_cell(Some(ratio.baseline_internal)),
+                    duration_cell(Some(ratio.subject_internal)),
+                    engine_ratio_cell(ratio),
+                    engine_provenance_cell(ratio),
+                    engine_verdict_cell(ratio),
+                );
+            }
+            out.push('\n');
+        }
+
         out
     }
 }
@@ -1357,6 +1517,268 @@ fn verification_cell(row: &CompetitiveRecord) -> String {
     }
 }
 
+/// The ratio with the uncertainty the coarser stage resolution puts on it.
+///
+/// Printed for every row, refused or not: a reader comparing two engines has to see whether the
+/// figure is `2.58x ±5%` or `2.6x ±50%`, and the second is why the resolution gate exists.
+fn engine_ratio_cell(ratio: &EngineRatio) -> String {
+    match ratio.relative_uncertainty() {
+        // `±0%` would be a claim of exactness that quantization never supports. Below half a
+        // percent the honest rendering is a bound, and it is the common case: every library but
+        // Singular and msolve reports microseconds.
+        Some(uncertainty) if uncertainty < 0.005 => format!("{:.2}x ±<1%", ratio.ratio),
+        Some(uncertainty) => format!("{:.2}x ±{:.0}%", ratio.ratio, uncertainty * 100.0),
+        None => format!("{:.2}x (resolution unknown)", ratio.ratio),
+    }
+}
+
+/// The corpus's equivalence tag for an engine-internal row.
+fn engine_provenance_cell(ratio: &EngineRatio) -> String {
+    match ratio.equivalence {
+        None => "**none recorded**".to_string(),
+        Some(Equivalence::SoleComparand { tool, .. }) => format!("sole-comparand ({})", tool),
+        Some(equivalence) => equivalence.tag().to_string(),
+    }
+}
+
+/// What an engine-internal row may claim, in the order the gates apply.
+///
+/// Provenance, then resolution, then the invariant — the same order as the wall-clock verdict, with
+/// the startup floor replaced by resolution. Every refusal is printed in the cell rather than
+/// dropping the row.
+fn engine_verdict_cell(ratio: &EngineRatio) -> String {
+    match ratio.equivalence {
+        None => {
+            return format!(
+                "**NOT PUBLISHABLE: `{}` is not a corpus rung, so no ideal equivalence is \
+                 recorded for it**",
+                ratio.problem
+            )
+        }
+        Some(Equivalence::NoComparand { reason }) => {
+            return format!(
+                "**NOT PUBLISHABLE: no cross-library check is possible — {}**",
+                reason
+            )
+        }
+        Some(_) => {}
+    }
+    if !ratio.is_resolved() {
+        return match ratio.resolution_multiple {
+            Some(multiple) => format!(
+                "**NOT A RESOLVED COMPARISON: an operand is {:.1}x its own stage resolution, so \
+                 the figure carries ±{:.0}%**",
+                multiple,
+                50.0 / multiple.max(f64::MIN_POSITIVE)
+            ),
+            None => "**NOT A RESOLVED COMPARISON: a library's stage resolution is not declared**"
+                .to_string(),
+        };
+    }
+    if ratio.shared_invariants == 0 {
+        return "**NOT PUBLISHABLE: no invariant was checked**".to_string();
+    }
+    let mut cell = if ratio.has_authoritative_comparand() {
+        format!("{} invariants agreed", ratio.shared_invariants)
+    } else {
+        format!(
+            "{} invariants agreed, but **NOT AUTHORITATIVE: {} may not be a speedup denominator**",
+            ratio.shared_invariants, ratio.subject
+        )
+    };
+    if let Some(Equivalence::SoleComparand { tool, reason }) = ratio.equivalence {
+        let _ = write!(
+            cell,
+            "; **NOT CORROBORATED: {} is the only external engine here — {}**",
+            tool, reason
+        );
+    }
+    cell
+}
+
+// --- The engine-internal statistic (#428) ----------------------------------------------------
+//
+// A second, separately named ratio. The wall-clock one above is the cost of *asking*, which is the
+// honest end-to-end figure and is also why the startup-floor guard disqualifies every Katsura and
+// Cyclic row the board holds: Singular's wall is its own `exec` up to `katsura-6`. The data for an
+// engine comparison is nonetheless already here, because the adapters record each tool's
+// self-reported stage times, and those are inside the process.
+//
+// It is **not** a relaxation of the floor guard and is never substituted into the wall-clock
+// column. It compares like with like — engine-internal against engine-internal — and it has its own
+// refusal conditions, because a tool-reported stage is only as good as the resolution it was
+// printed at.
+
+/// Which of a library's stages are its own engine time for `task`, summed.
+///
+/// `None` when the library reports nothing usable, which is a refusal and not a zero.
+///
+/// | library | reduced basis | lex basis by conversion | excluded, and why |
+/// |---|---|---|---|
+/// | `zeebra` | `basis` | `basis` + `conversion` | `conversion:` sub-stages, which are inside `conversion`; `quotient-dimension (for the invariant)`, which is work done to *report* an invariant and is already outside the published figure |
+/// | `singular` | `solve` | `source-basis` + `solve` | — |
+/// | `groebner.jl` | `solve` | n/a (no FGLM) | `process-wall` and `process-cpu`, which are the quantity this statistic exists to exclude — Julia's compiler |
+/// | `sagebrush` | `solve` | `solve` | — |
+/// | `msolve` | `f4: overall(elapsed)` | `f4:` + `sparse-fglm: overall(elapsed)` | every named sub-stage, which would double-count its own total |
+///
+/// msolve is the one library whose labels are its **own** rather than translated — deliberately,
+/// because the correspondence with Zeebra's stage names is a finding that belongs in
+/// `docs/research/msolve-implementation.md` and renaming here would hide it. So the selector names
+/// msolve's totals rather than mapping them, and at the sizes this board reaches msolve's **10 ms**
+/// stage resolution refuses the ratio anyway (see [`stage_resolution`]).
+fn engine_internal_time(
+    library: &str,
+    task: super::Task,
+    stages: &[(String, Duration)],
+) -> Option<Duration> {
+    let wanted: &[&str] = match (library, task) {
+        ("zeebra", super::Task::LexBasisByConversion) => &["basis", "conversion"],
+        ("zeebra", _) => &["basis"],
+        ("singular", super::Task::LexBasisByConversion) => &["source-basis", "solve"],
+        ("singular", _) => &["solve"],
+        ("groebner.jl" | "sagebrush", _) => &["solve"],
+        ("msolve", super::Task::LexBasisByConversion) => {
+            &["f4: overall(elapsed)", "sparse-fglm: overall(elapsed)"]
+        }
+        ("msolve", _) => &["f4: overall(elapsed)"],
+        _ => return None,
+    };
+    let mut total = Duration::ZERO;
+    let mut found = false;
+    for name in wanted {
+        // Exact match on the whole label: `conversion` must not pick up `conversion: border`, and
+        // a prefix match would silently double-count.
+        for (_, elapsed) in stages.iter().filter(|(label, _)| label == name) {
+            total += *elapsed;
+            found = true;
+        }
+    }
+    found.then_some(total)
+}
+
+/// The granularity a library prints a stage figure at, taken from the adapter that parses it.
+///
+/// Declared rather than inferred, and the figures are the parsers':
+///
+/// | library | printed as | resolution | where |
+/// |---|---|---|---|
+/// | `singular` | whole milliseconds | 1 ms | `singular.rs`, `@solve_ms` through `Duration::from_millis` |
+/// | `msolve` | `%.2f sec` | 10 ms | `msolve.rs`, `timing_line` |
+/// | `sagebrush` | `%.6f` seconds | 1 µs | `sagebrush.rs`, `#seconds:` |
+/// | `groebner.jl` | Julia's own `@elapsed` | 1 µs | `groebner_jl.rs` |
+/// | `zeebra` | an `Instant` difference | 1 µs | `zeebra.rs` |
+///
+/// 1 µs is a floor on the claim rather than a measured jitter: every one of those three reports
+/// more digits than that, and no ratio on this board is within three orders of magnitude of it, so
+/// a finer figure would be precision nobody can use.
+fn stage_resolution(library: &str) -> Option<Duration> {
+    Some(match library {
+        "singular" => Duration::from_millis(1),
+        "msolve" => Duration::from_millis(10),
+        "sagebrush" | "groebner.jl" | "zeebra" => Duration::from_micros(1),
+        _ => return None,
+    })
+}
+
+/// A ratio of **engine-internal** times: the same task, with process setup excluded from both.
+///
+/// Deliberately a different type from [`Speedup`] rather than a field on it. The two answer
+/// different questions — "what does it cost to ask" against "how fast is the engine" — and a
+/// renderer that could reach for either through one type is a renderer that will eventually print
+/// one under the other's heading.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EngineRatio {
+    /// The problem both rows solved.
+    pub problem: String,
+
+    /// The task both rows performed.
+    pub task: super::Task,
+
+    /// The library being compared against.
+    pub baseline: String,
+
+    /// The other library.
+    pub subject: String,
+
+    /// `baseline internal / subject internal`. Above one means the subject's engine is faster.
+    pub ratio: f64,
+
+    /// The baseline's own engine time, as it reported it.
+    pub baseline_internal: Duration,
+
+    /// The subject's own engine time, as it reported it.
+    pub subject_internal: Duration,
+
+    /// The smaller of the two operands measured in units of its own library's stage resolution.
+    ///
+    /// The refusal condition this statistic needs and the wall-clock one does not. Singular prints
+    /// whole milliseconds, so a `0.0 ms` stage is not a fast engine and a `1 ms` stage carries
+    /// ±50%. `None` when a library's resolution is not declared, which cannot happen for a row this
+    /// type was built from — [`engine_internal_time`] and [`stage_resolution`] cover the same five
+    /// libraries — and is read as a refusal if it ever does.
+    pub resolution_multiple: Option<f64>,
+
+    /// How many invariants the two answers were checked to agree on, as in [`Speedup`].
+    pub shared_invariants: usize,
+
+    /// The corpus's record of how this problem's ideal equivalence was established.
+    pub equivalence: Option<Equivalence>,
+}
+
+impl EngineRatio {
+    /// How many times its own resolution a reported stage must be before a ratio uses it.
+    ///
+    /// Five, which bounds the quantization error on each operand at ±10% and on the ratio at
+    /// roughly ±20% in the worst case. Chosen rather than inherited: it admits the two rows this
+    /// statistic was asked for — `katsura-7`'s Singular `solve` at 10 ms and `cyclic-6`'s at 7 ms —
+    /// and refuses `katsura-4`'s at 0 ms, which is the case that makes a ratio meaningless. The
+    /// uncertainty is not swept under it either: [`Self::relative_uncertainty`] is printed beside
+    /// every figure.
+    pub const RESOLUTION_MULTIPLE_REQUIRED: f64 = 5.0;
+
+    /// Whether both operands are coarse-resolution-safe.
+    pub fn is_resolved(&self) -> bool {
+        self.resolution_multiple
+            .is_some_and(|multiple| multiple >= Self::RESOLUTION_MULTIPLE_REQUIRED)
+    }
+
+    /// The quantization uncertainty the coarser operand puts on this ratio, as a fraction.
+    ///
+    /// A figure printed at resolution `r` is `x ± r/2`, so a figure of `k` resolution units carries
+    /// `0.5 / k`. Reported for the coarser side only: the finer one is three orders of magnitude
+    /// below it on every row this board holds.
+    pub fn relative_uncertainty(&self) -> Option<f64> {
+        self.resolution_multiple.map(|multiple| 0.5 / multiple)
+    }
+
+    /// Whether the corpus's evidence permits a cross-library figure for this problem at all.
+    pub fn licenses_timing(&self) -> bool {
+        self.equivalence
+            .is_some_and(|equivalence| equivalence.licenses_timing())
+    }
+
+    /// Whether a third opinion exists, so a disagreement could name the odd one out.
+    pub fn is_corroborated(&self) -> bool {
+        self.equivalence
+            .is_some_and(|equivalence| equivalence.is_corroborated())
+    }
+
+    /// Whether a conclusion may rest on this ratio's comparand.
+    pub fn has_authoritative_comparand(&self) -> bool {
+        !Speedup::NOT_AUTHORITATIVE.contains(&self.subject.as_str())
+    }
+
+    /// Whether this ratio may be published **as an engine comparison**.
+    ///
+    /// The same provenance and invariant gates as [`Speedup::is_publishable`], with the startup
+    /// floor replaced by the resolution condition — because that is exactly the substitution this
+    /// statistic is: the floor guard exists to stop a wall-clock ratio against a startup-dominated
+    /// operand, and there is no startup in either operand here.
+    pub fn is_publishable(&self) -> bool {
+        self.licenses_timing() && self.is_resolved() && self.shared_invariants > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1446,6 +1868,217 @@ mod tests {
         )
         .with_version(ToolVersion::new(library, "1.0"));
         CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    /// A row with stage timings, for the engine-internal statistic.
+    fn staged_row(library: &str, wall_ms: u64, stages: &[(&str, Duration)]) -> CompetitiveRecord {
+        let instance = instance();
+        let mut measurement = Measurement::wall(Duration::from_millis(wall_ms));
+        for (name, elapsed) in stages {
+            measurement = measurement.with_stage(*name, *elapsed);
+        }
+        let report = RunReport::new(
+            library,
+            &instance,
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(600)),
+            answered(4),
+            measurement,
+        )
+        .with_version(ToolVersion::new(library, "1.0"));
+        CompetitiveRecord::of(&report, &instance, &environment())
+    }
+
+    /// The engine-internal ratio uses each library's own stage, not the wall.
+    ///
+    /// The statistic's reason for existing: on this row the wall-clock ratio is startup-dominated
+    /// and disqualified, while the engines are 2.58x apart.
+    #[test]
+    fn test_the_engine_ratio_is_taken_over_stages_and_not_walls() {
+        let mut board = CompetitiveBoard::new();
+        board.add(staged_row(
+            "zeebra",
+            26,
+            &[("basis", Duration::from_micros(25_800))],
+        ));
+        board.add(staged_row(
+            "singular",
+            36,
+            &[("solve", Duration::from_millis(10))],
+        ));
+        let ratios = board.engine_ratios("zeebra");
+        assert_eq!(ratios.len(), 1);
+        let ratio = &ratios[0];
+        assert_eq!(ratio.subject, "singular");
+        assert_eq!(ratio.baseline_internal, Duration::from_micros(25_800));
+        assert_eq!(ratio.subject_internal, Duration::from_millis(10));
+        assert!(
+            (ratio.ratio - 2.58).abs() < 0.01,
+            "25.8 ms of engine against 10 ms, not 26 ms of wall against 36: {}",
+            ratio.ratio
+        );
+        // 10 ms at Singular's 1 ms granularity, which clears the gate at exactly 10x.
+        assert_eq!(ratio.resolution_multiple, Some(10.0));
+        assert!(ratio.is_resolved());
+        assert_eq!(ratio.relative_uncertainty(), Some(0.05));
+    }
+
+    /// A stage at its library's own granularity is refused, which is `katsura-4` against Singular.
+    ///
+    /// The condition that replaces the startup floor. A `0.0 ms` or `1 ms` Singular stage is the
+    /// printf speaking, and a ratio against it is as meaningless as a wall-clock ratio against
+    /// `exec`.
+    #[test]
+    fn test_a_stage_near_its_resolution_is_refused() {
+        let mut board = CompetitiveBoard::new();
+        board.add(staged_row(
+            "zeebra",
+            1,
+            &[("basis", Duration::from_micros(300))],
+        ));
+        board.add(staged_row(
+            "singular",
+            36,
+            &[("solve", Duration::from_millis(2))],
+        ));
+        let ratios = board.engine_ratios("zeebra");
+        assert_eq!(ratios.len(), 1);
+        assert_eq!(ratios[0].resolution_multiple, Some(2.0));
+        assert!(!ratios[0].is_resolved(), "2 ms at 1 ms granularity is ±25%");
+        assert!(!ratios[0].is_publishable());
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("NOT A RESOLVED COMPARISON"),
+            "the refusal is printed in the cell rather than dropping the row"
+        );
+        assert!(
+            markdown.contains("1 refused on stage resolution"),
+            "and counted before the table"
+        );
+    }
+
+    /// A zero-length engine time yields no row at all, because it has no reciprocal.
+    #[test]
+    fn test_a_zero_engine_time_contributes_no_ratio() {
+        let mut board = CompetitiveBoard::new();
+        board.add(staged_row(
+            "zeebra",
+            1,
+            &[("basis", Duration::from_micros(400))],
+        ));
+        board.add(staged_row("singular", 36, &[("solve", Duration::ZERO)]));
+        assert!(board.engine_ratios("zeebra").is_empty());
+    }
+
+    /// A library reporting no usable stage contributes no row rather than a zero.
+    #[test]
+    fn test_a_library_with_no_usable_stage_contributes_no_ratio() {
+        let mut board = CompetitiveBoard::new();
+        board.add(staged_row(
+            "zeebra",
+            26,
+            &[("basis", Duration::from_millis(26))],
+        ));
+        // Groebner.jl's process figures are precisely what this statistic excludes, so a row with
+        // only those is a row with no engine time.
+        board.add(staged_row(
+            "groebner.jl",
+            7_400,
+            &[
+                ("process-wall", Duration::from_millis(7_400)),
+                ("process-cpu", Duration::from_millis(8_230)),
+            ],
+        ));
+        assert!(board.engine_ratios("zeebra").is_empty());
+    }
+
+    /// Zeebra's conversion sub-stages are inside `conversion` and must not be counted twice.
+    #[test]
+    fn test_the_conversion_substages_are_not_double_counted() {
+        let stages = vec![
+            ("basis".to_string(), Duration::from_millis(10)),
+            ("conversion".to_string(), Duration::from_millis(4)),
+            (
+                "conversion: dependence".to_string(),
+                Duration::from_millis(3),
+            ),
+            ("conversion: border".to_string(), Duration::from_millis(1)),
+            (
+                "quotient-dimension (for the invariant)".to_string(),
+                Duration::from_millis(5),
+            ),
+        ];
+        assert_eq!(
+            super::engine_internal_time("zeebra", Task::LexBasisByConversion, &stages),
+            Some(Duration::from_millis(14)),
+            "basis + conversion, with the sub-stages and the invariant's cost excluded"
+        );
+        assert_eq!(
+            super::engine_internal_time("zeebra", Task::ReducedGrobnerBasis, &stages),
+            Some(Duration::from_millis(10)),
+            "the basis task does not pay for a conversion it did not do"
+        );
+    }
+
+    /// Singular's conversion task is both of its stages; an unknown library has no selector.
+    #[test]
+    fn test_each_librarys_engine_stages_are_the_ones_it_reports() {
+        let singular = vec![
+            ("source-basis".to_string(), Duration::from_millis(10)),
+            ("solve".to_string(), Duration::from_millis(8)),
+        ];
+        assert_eq!(
+            super::engine_internal_time("singular", Task::LexBasisByConversion, &singular),
+            Some(Duration::from_millis(18))
+        );
+        assert_eq!(
+            super::engine_internal_time("singular", Task::ReducedGrobnerBasis, &singular),
+            Some(Duration::from_millis(8)),
+            "a direct basis is the solve stage alone"
+        );
+        assert_eq!(
+            super::engine_internal_time("nobody", Task::ReducedGrobnerBasis, &singular),
+            None,
+            "an unrecognized library has no declared stage vocabulary"
+        );
+        assert_eq!(super::stage_resolution("nobody"), None);
+    }
+
+    /// The engine-internal section is separate from the wall-clock one and says it is not end to end.
+    ///
+    /// The whole point of a second statistic: a reader must not be able to mistake it for the cost
+    /// of asking, and the floor guard above must still be visible on the same board.
+    #[test]
+    fn test_the_two_statistics_are_rendered_apart_and_labelled() {
+        let mut board = CompetitiveBoard::new();
+        board.add(staged_row(
+            "zeebra",
+            26,
+            &[("basis", Duration::from_micros(25_800))],
+        ));
+        board.add(staged_row(
+            "singular",
+            36,
+            &[("solve", Duration::from_millis(10))],
+        ));
+        let markdown = board.to_markdown();
+        assert!(markdown.contains("## Speedups over Zeebra"));
+        assert!(markdown.contains("## Engine-internal speedups over Zeebra"));
+        assert!(
+            markdown.contains("not an end-to-end cost"),
+            "the exclusion has to be stated where the figure is"
+        );
+        assert!(
+            markdown.contains("2.58x ±5%"),
+            "the figure carries the coarser operand's quantization uncertainty"
+        );
+        // The same pair, two statistics, opposite readings: 26 ms of wall against 36 ms is 0.72x
+        // and looks like a loss, while 25.8 ms of engine against 10 ms is 2.58x the other way.
+        // Both are on the board, neither is substituted for the other, and that is #428's point.
+        assert!(
+            markdown.contains("0.72x"),
+            "the wall-clock ratio is unchanged by the new statistic"
+        );
     }
 
     /// An answered row carries a wall time; a row with no answer carries none.

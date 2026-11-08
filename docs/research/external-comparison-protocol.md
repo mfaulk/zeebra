@@ -491,6 +491,72 @@ and, not expressible in the type and therefore required of the operator:
 For every other pair the cell records **the resource limit or the missing capability instead of a
 ratio**. There is no "approximately" in this section.
 
+### 7.1 The wall-clock ratio, and the floor that disqualifies most of them
+
+The ratio above is over **wall time**, which is the cost of *asking* and is the figure a caller
+pays. It carries one further condition, enforced by `Speedup::is_engine_comparison`: neither
+operand may be within 2x of its own library's observed startup floor. Singular's wall is ~36 ms on
+everything up to `katsura-6` — its `exec` — so a `0.01x` there measures process creation and
+nothing else, and four apparent Zeebra wins of 2.2x, 3.4x, 8.4x and **450x** were entirely that
+floor.
+
+The consequence is that the board publishes **no wall-clock engine comparison on either classical
+family**, which is correct and is also a gap: the data for one is already recorded.
+
+### 7.2 The engine-internal ratio: a second statistic, never a substitute
+
+Every adapter records its tool's **self-reported stage times**, and those are inside the process.
+The engine-internal ratio is taken over them, and it is a **separately named statistic with its own
+column and its own refusals** (`EngineRatio`, #428). The floor guard is not relaxed, reinterpreted
+or bypassed; this figure simply has no process startup in either operand, so that guard has nothing
+to do.
+
+**What it is.** The same pairing conditions 1–7 above, with each operand replaced by the sum of the
+stages that constitute that library's own engine time for the task:
+
+| library | reduced basis | lex basis by conversion | excluded, and why |
+|---|---|---|---|
+| `zeebra` | `basis` | `basis` + `conversion` | the `conversion:` sub-stages, which are inside `conversion`; and `quotient-dimension (for the invariant)`, which is work done to *report* an invariant |
+| `singular` | `solve` | `source-basis` + `solve` | — |
+| `groebner.jl` | `solve` | n/a — no FGLM | `process-wall` and `process-cpu`: Julia's compiler is exactly what this statistic excludes |
+| `sagebrush` | `solve` | `solve` | — |
+| `msolve` | `f4: overall(elapsed)` | `f4:` + `sparse-fglm: overall(elapsed)` | its named sub-stages, which would double-count its own total |
+
+msolve's labels are its **own**, not translated: the correspondence with Zeebra's stage names is a
+finding that belongs in its implementation study, and renaming it here would hide it.
+
+**What it must say about itself.** It is **not an end-to-end cost** and may not be quoted as one.
+The board prints that sentence above the table, in the same section as the figures, because a
+reader who meets a `2.58x` without it will compare it against a wall-clock number somewhere else.
+
+**When it refuses.** Three conditions, all of them visible in the cell rather than dropping the row:
+
+1. **No usable stage.** A library that reports no stage this statistic can use contributes no row.
+   Absent evidence is a refusal here, unlike the startup floor, where an unobservable floor is
+   treated as acceptable — the asymmetry is deliberate: an unknown floor would silently drop rows,
+   and a missing stage is visible as an em dash in the measurement table.
+2. **A figure at its own granularity.** A tool-reported stage is only as good as the resolution it
+   was printed at. Singular prints **whole milliseconds** and msolve `%.2f` seconds, so a `0.0 ms`
+   stage is a printf and not a measurement. A figure must be at least **5x** its library's
+   granularity, which bounds each operand's quantization error at ±10%; `katsura-4`'s `0.0 ms` is
+   refused, `cyclic-6`'s 7 ms passes at ±7%. A zero-length engine time contributes no row at all,
+   having no reciprocal.
+3. **The provenance and invariant gates of §5 and §8**, unchanged: a problem with no recorded ideal
+   equivalence, or a ratio between two unchecked answers, is refused exactly as in the wall-clock
+   table.
+
+**Every published figure carries its uncertainty.** The coarser operand's quantization is printed
+beside the ratio — `2.58x ±5%` — because the gate admits figures at five granularity units and the
+reader has to see which end of that they are looking at. Below half a percent it prints `±<1%`
+rather than `±0%`, which quantization never supports.
+
+**What it exposed.** On the two hardest classical rungs the board reaches, Zeebra's engine is
+**2.58x ±5%** slower than Singular's on `katsura-7` and **1.88x ±7%** on `cyclic-6` — a gap the
+board previously held and refused to report, because the wall-clock ratio on those rows is
+`exec`. Against Groebner.jl's engine the same rung is **15.89x**, and against Sagebrush's
+**8.67x**. The end-to-end column remains uncomparable at these sizes, and the fix for *that* is
+bigger rungs rather than a different statistic.
+
 ---
 
 ## 8. Licensing
