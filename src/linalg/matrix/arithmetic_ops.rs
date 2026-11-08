@@ -140,7 +140,7 @@ impl_mul_variants!([T: Ring], Matrix<T>);
 #[cfg(test)]
 mod tests {
     use super::Matrix;
-    use crate::fields::{Zp541, Zp65537};
+    use crate::fields::{Mersenne31, Zp18446744073709551557, Zp2147483647, Zp541, Zp65537};
     use crate::identities::Zero;
     use crate::linalg::MatrixParams;
     use crate::FiniteField;
@@ -283,6 +283,62 @@ mod tests {
             for i in 0..m {
                 for j in 0..n {
                     let mut sum = Zp65537::ZERO;
+                    for k in 0..depth {
+                        sum += a[[i, k]] * b[[k, j]];
+                    }
+                    expected[[i, j]] = sum;
+                }
+            }
+
+            assert_eq!(&a * &b, expected, "{m}x{depth} times {depth}x{n}");
+        }
+    }
+
+    #[test]
+    // The product agrees with the textbook sum over every residue of the row count against the
+    // tile heights the kernel has been swept at (2 and 4), of the depth and the width against the
+    // tile widths (4 and 8), and over the degenerate shapes — in all three field representations
+    // `benches/linear_algebra.rs` measures. Field arithmetic is exact, so a correct kernel is
+    // bit-identical to the reference whatever order it accumulates in, and this is what a
+    // candidate tile shape has to pass before it is allowed to be fast.
+    fn test_product_matches_reference_across_tile_remainders() {
+        // `p31`, `p31_u32` and `p64` of the benchmark: the same modulus at two storage widths,
+        // plus a 64-bit prime, so a kernel that mishandles a cell size is caught.
+        check_against_reference::<Zp2147483647>();
+        check_against_reference::<Mersenne31>();
+        check_against_reference::<Zp18446744073709551557>();
+    }
+
+    fn check_against_reference<F: FiniteField>() {
+        // Row counts 1..=9 cover every residue mod 2 and mod 4, including the 3 that a 4-row tile
+        // must finish with a 2-row pass and then a 1-row pass. Depths and widths mix multiples of
+        // 8 with 5, 7, 11, 13, 17 and 23, none of which is a multiple of 4 or 8.
+        let mut shapes: Vec<(usize, usize, usize)> = Vec::new();
+        for m in 1..=9 {
+            for &(depth, n) in &[(1, 1), (5, 7), (8, 8), (11, 13), (17, 23), (16, 8), (7, 32)] {
+                shapes.push((m, depth, n));
+            }
+        }
+        // 1xN and Nx1 at a width and a depth past one tile, and the three empty shapes: a kernel
+        // whose loop bound is written as a subtraction underflows on these.
+        shapes.extend_from_slice(&[
+            (1, 23, 23),
+            (23, 23, 1),
+            (1, 1, 23),
+            (23, 1, 1),
+            (0, 5, 7),
+            (5, 0, 7),
+            (5, 7, 0),
+        ]);
+
+        for (m, depth, n) in shapes {
+            let a = random_rect::<F>(m, depth, 101);
+            let b = random_rect::<F>(depth, n, 103);
+
+            let mut expected = Matrix::<F>::zero(m, n);
+            for i in 0..m {
+                for j in 0..n {
+                    let mut sum = F::ZERO;
                     for k in 0..depth {
                         sum += a[[i, k]] * b[[k, j]];
                     }
