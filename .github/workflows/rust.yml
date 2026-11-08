@@ -142,13 +142,34 @@ jobs:
 
   bench-smoke:
     name: Benchmarks run
-    # Pushes to main and manual runs only. Criterion's `--test` mode executes all 493 benchmark
-    # cases once each, which is ~40s warm on a fast machine and several minutes on a shared
-    # runner. That is worth paying after a merge, where latency does not block anything, and not
-    # on every pull request. A benchmark that stops *compiling* still breaks the `--all-targets`
-    # build in the jobs above, on every pull request; this job is what catches one that compiles
-    # and then panics.
-    if: github.event_name != 'pull_request'
+    # Runs on pull requests too, since #586. It used to be `push` and `workflow_dispatch` only, on
+    # the grounds that Criterion's `--test` mode over all 493 cases is several minutes on a shared
+    # runner and latency after a merge blocks nothing. That reasoning weighed the wrong cost.
+    #
+    # What a pull request did and did not cover:
+    #
+    #   * **Compilation** was covered, and still is — `cargo build --all-targets` and
+    #     `cargo clippy --all-targets` both build `benches/`, which `test = false` keeps out of the
+    #     test run but not out of the build.
+    #   * **A benchmark that compiles and then panics** was not. `14f69182` is the case: a
+    #     `random_poly::<N>(48, 4, …)` asked for 48 distinct monomials where 25 exist at N = 2, its
+    #     own assert fired, and the branch was **green through review and merge** with `main` going
+    #     red on the push run afterwards.
+    #
+    # The second cost is the one that mattered: every commit in such a window is **unmeasurable**
+    # without cherry-picking the fix onto it, which is how #363's A/B could not be taken against
+    # the tree it was meant to measure. A red job after a merge is an inconvenience; a historical
+    # commit whose own benchmarks cannot run is a hole in the record.
+    #
+    # And on a pull request this job costs **no wall clock**, only job-minutes: **4m17s and
+    # 5m14s** on the two runs that enabled it, against `Tests (release)`'s 25–27 minutes on the
+    # same run, so it finishes well inside the critical path. (The ~8.4 minutes this comment used
+    # to cite is a cold-cache push run; a PR run hits `Swatinem/rust-cache`.) See README's
+    # "Testing the merged result" for the job-minute accounting.
+    #
+    # It still takes **no measurements** — `--test` runs each case once and samples nothing — so
+    # nothing here produces a figure, which a shared runner could not produce comparably anyway.
+    # That line is the reason this is a smoke job and not a benchmark run, and it does not move.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -157,9 +178,18 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # `cargo bench -- --test`, not `cargo test --benches`: with `test = false` on the benchmark
-      # targets the latter now selects nothing and would pass vacuously. This runs each case once
-      # and takes no measurements.
+      # `cargo bench -- --test`, not `cargo test --benches`. The reason recorded here used to be
+      # that `test = false` made the latter "select nothing and pass vacuously"; that is **wrong**,
+      # and #586 measured it. `test = false` governs what a bare `cargo test` picks up, not what an
+      # explicit `--benches` selects, so `cargo test --benches` does build and run all 493 cases.
+      #
+      # The real reason is the profile. `cargo test --benches` resolves the **dev** profile, so the
+      # smoke run is unoptimized. Warm, on the same tree and machine:
+      #
+      #   cargo bench --profile ci-release -- --test     26.3 s
+      #   cargo test --benches                          382.0 s     14.5x
+      #
+      # This runs each case once and takes no measurements.
       #
       # It selects exactly the eight criterion targets. It used to select ten: `bench` defaults to
       # true, so the lib and the one `src/bin` were built as bench targets too and `--test` ran
