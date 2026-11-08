@@ -4,7 +4,11 @@
 those figures, recovered from git rather than recorded at the time
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§3c was
 taken at `489ccbd6` plus the change it measures**, recorded at the time rather than recovered,
-which is what #335 asked for.
+which is what #335 asked for. **§3d was taken on this branch's two commits before they were rebased
+onto `1154bf5b`** — the region-split counters (`c1e1b1d4` post-rebase) for the counts, and those
+against the hoist (`717e63aa`) for the A/B, two builds from one tree. The rebase brings in
+`922deeb6`, which adds `F4Options::reduce_batch_rows` **off by default**, so it changes neither the
+path these figures describe nor their comparability with §3a and §3b.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -409,11 +413,11 @@ the prefix's size from an end-to-end ratio, which is a weaker instrument than co
 `terms_below_window` counter beside the existing ones would turn the inference into a measurement,
 and is the honest remaining item on #440.
 
-**Taken in §3c.**
+**Taken in §3d.**
 
 ---
 
-## 3c. #440 stage 1, finished: the per-step region split, counted rather than inferred
+## 3d. #440 stage 1, finished: the per-step region split, counted rather than inferred
 
 One `mq-counts` run at the recorded digest `72d0ad315fc25409…`, build flags verified in the
 artifact. Every count in §3 reproduces to the digit — 602 377 popped, 68 242 in the answer,
@@ -443,7 +447,7 @@ span of 893 610 377, so everything that is not a span element — the binary sea
 loop-exit comparisons — is **6 558 786**, i.e. **12.3 a step** against a mean working polynomial of
 2 199 whose `log2` is 11.1. The `partition_point` costs what it claims and nothing more.
 
-### 3c.1 And it exposes a redundancy that is neither of #440's three stages
+### 3d.1 And it exposes a redundancy that is neither of #440's three stages
 
 | | count |
 |---|---:|
@@ -466,10 +470,10 @@ asserts that bound rather than trusting it.
 
 Whether removing 875.9 M monomial multiplies moves the wall clock is a separate question from
 whether the source performs them, because LLVM's partial-redundancy elimination could in principle
-have hoisted the product across the back edge already. §3c.2 measures it, and the answer is the
+have hoisted the product across the back edge already. §3d.2 measures it, and the answer is the
 useful part of this section.
 
-### 3c.2 The hoist, measured: ~1.6% on the stage, and that is the finding
+### 3d.2 The hoist, measured: ~1.6% on the stage, and that is the finding
 
 Three reps, **interleaved** between the hoist and its parent, one session, on the lock, pinned to
 cores 0-7, two builds from one tree into separate binaries with each artifact's AVX2 floor verified
@@ -504,15 +508,15 @@ multiplies that the machine was not performing — an instrument that would have
 cost that does not exist, which is precisely the failure mode §3.0a's inference fell into. After it,
 the counter reports **19 364 937** and matches what the hardware does.
 
-### 3c.3 What stage 3 is now competing against
+### 3d.3 What stage 3 is now competing against
 
 Stage 1 is finished and its verdict is sharper than the four #440 asked for. The stage is
 **copy-bound in volume and compare-bound in cost**: 76.1% of the rewritten terms sit in the region
 that pays per element, and the window cannot reach them because the shifted tail genuinely
 straddles the working polynomial (§3b.1, now counted). Both cheap routes are now spent and **both
-measured inside the noise** — stage 2's window took the 14.2% prefix for ~7%, §3c.2's hoist took the
+measured inside the noise** — stage 2's window took the 14.2% prefix for ~7%, §3d.2's hoist took the
 48.9x multiply redundancy for ~1.6% — and what remains in the span is **893 610 377
-`MonomialOrder::cmp` calls and 1 174 314 651 term copies**, which §3c.2 narrows the per-term cost
+`MonomialOrder::cmp` calls and 1 174 314 651 term copies**, which §3d.2 narrows the per-term cost
 down to. Only two things touch those: a cheaper comparison (#317), or a structure that never
 materializes the working polynomial.
 
@@ -532,7 +536,7 @@ comparisons. At a sift cost of 1–2 comparisons a level that is **2.0e8–4.1e8
 Against that: the comparisons become random access into a `k`-entry heap where today they are a
 sequential walk, which is the risk #440 named and which no count can settle.
 
-**And §3c.2 is a warning about that extrapolation, not a reason to trust it.** Two changes aimed at
+**And §3d.2 is a warning about that extrapolation, not a reason to trust it.** Two changes aimed at
 counted operations in this merge have now each predicted a large reduction in a count and delivered
 a ratio inside the noise. A third prediction from the same counters — however arithmetically sound —
 has to carry that record with it. The heap is worth building only with an A/B budgeted up front and
@@ -711,6 +715,6 @@ tools/benchlock.sh <tag> taskset -c 0-7 cargo bench --bench f4_stages -- interre
 
 # #440 stage 2's A/B is between two commits rather than two flags, so it needs two builds
 # from one tree into separate target directories, interleaved. See §3b. The same applies to
-# §3c.2's hoist; §3c's region split is counts and comes out of the `mq-counts` run above,
+# §3d.2's hoist; §3d's region split is counts and comes out of the `mq-counts` run above,
 # on the `regions:` and `merge ops:` lines.
 ```
