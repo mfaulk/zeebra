@@ -123,18 +123,20 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     })?;
     stages.symbolic = clock.lap();
 
-    let mut matrix = MacaulayMatrix::build_within(
+    let (mut matrix, construction_split) = MacaulayMatrix::build_measured(
         basis,
         &preprocessed,
         order,
         options.max_matrix_columns,
         allowance,
+        options.measure_stages,
     )
     .map_err(|exceeded| match exceeded {
         BuildBudgetExceeded::Columns { limit } => F4Error::TooManyColumns { limit },
         BuildBudgetExceeded::Nonzeros { nonzeros, .. } => options.entry_budget_error::<F>(nonzeros),
     })?;
     stages.construction = clock.lap();
+    stages.construction_split = construction_split;
 
     let reducer_rows = preprocessed
         .rows

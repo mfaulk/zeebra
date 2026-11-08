@@ -119,6 +119,86 @@ pub struct StageTimings {
     /// carries is why: 24 136 ms over 247 elements against a comparand's 1.74 ms for the same
     /// stage.
     pub interreduction_reduce: Duration,
+
+    /// How `construction` divided between column collection, the map, and the scatter.
+    ///
+    /// Refines `construction` rather than extending it, like the interreduction split above, so it
+    /// is folded by [`StageTimings::add`] and excluded from [`StageTimings::sum`].
+    pub construction_split: ConstructionTimings,
+}
+
+/// Where [`MacaulayMatrix::build_measured`](super::macaulay::MacaulayMatrix::build_measured)
+/// spent its time, as a partition of the whole call.
+///
+/// The three phases exist as separate counters because #330 stated its refutation condition on
+/// their ratio before anything was implemented: handing out column indices during interning can
+/// only remove `columns` and `map`, so if those two are a small share of the total then the cost
+/// is in `scatter`, which that restructuring does not touch.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ConstructionTimings {
+    /// Inserting every row monomial into the distinct-monomial set.
+    ///
+    /// Split from `sort` because the two have different fates under a column-index handout: this
+    /// phase repeats hashing that symbolic preprocessing already did in its own `examined` set and
+    /// is therefore removable, while the sort is not — msolve orders its columns too.
+    pub collect: Duration,
+
+    /// Sorting the distinct monomials into descending column order.
+    pub sort: Duration,
+
+    /// Building the monomial-to-column map over the sorted columns.
+    pub map: Duration,
+
+    /// Writing every row's entries through the map, and assembling the matrix.
+    pub scatter: Duration,
+}
+
+impl ConstructionTimings {
+    /// Every phase added together, which is the whole of the measured call.
+    pub fn total(&self) -> Duration {
+        self.collect + self.sort + self.map + self.scatter
+    }
+
+    /// The set and the sort together: #330's phase (1), before it was split further.
+    pub fn columns(&self) -> Duration {
+        self.collect + self.sort
+    }
+
+    /// The share of the total spent on the phases #330's kill criterion is stated on.
+    ///
+    /// That is `columns() + map`, phases (1)+(2) of the issue, over the whole. Under one third,
+    /// #330 said to close. Zero when nothing was measured, so a caller does not have to guard
+    /// against a zero total.
+    pub fn handout_share(&self) -> f64 {
+        self.share(self.columns() + self.map)
+    }
+
+    /// The share a column-index handout could actually remove: the set and the map, not the sort.
+    ///
+    /// This is the narrower and more honest figure. `handout_share` charges the sort to the
+    /// hypothesis, but interning with an index does not remove a sort from anybody — msolve sorts
+    /// its columns as well, and that sort is where its A|B split comes from. So this is the number
+    /// an implementation decision should rest on, and it can be far below `handout_share`.
+    pub fn removable_share(&self) -> f64 {
+        self.share(self.collect + self.map)
+    }
+
+    /// `part` over the total, or zero when nothing was measured.
+    fn share(&self, part: Duration) -> f64 {
+        let total = self.total().as_secs_f64();
+        if total == 0.0 {
+            return 0.0;
+        }
+        part.as_secs_f64() / total
+    }
+
+    /// Fold another matrix's phases into these.
+    pub fn add(&mut self, other: &Self) {
+        self.collect += other.collect;
+        self.sort += other.sort;
+        self.map += other.map;
+        self.scatter += other.scatter;
+    }
 }
 
 impl StageTimings {
@@ -128,9 +208,9 @@ impl StageTimings {
     /// outside every stage. The difference is left visible rather than folded into one of them,
     /// which is what [`F4Statistics::stage_coverage`] reports.
     pub fn sum(&self) -> Duration {
-        // `interreduction_minimize` and `interreduction_reduce` are deliberately **not** added:
-        // they refine `interreduction` rather than extending it, and adding them would double
-        // every interreduction millisecond in the coverage figure.
+        // The interreduction and construction splits are deliberately **not** added: they refine
+        // a stage rather than extending it, and adding them would double every millisecond they
+        // describe in the coverage figure.
         self.symbolic + self.construction + self.elimination + self.extraction + self.interreduction
     }
 
@@ -143,6 +223,7 @@ impl StageTimings {
         self.interreduction += other.interreduction;
         self.interreduction_minimize += other.interreduction_minimize;
         self.interreduction_reduce += other.interreduction_reduce;
+        self.construction_split.add(&other.construction_split);
     }
 }
 
@@ -992,7 +1073,7 @@ impl F4Statistics {
 
 #[cfg(test)]
 mod tests {
-    use super::{BatchStatistics, F4Statistics, StageClock, StageTimings};
+    use super::{BatchStatistics, ConstructionTimings, F4Statistics, StageClock, StageTimings};
     use crate::linalg::sparse::EliminationStatistics;
     use std::time::Duration;
 
@@ -1210,14 +1291,22 @@ mod tests {
             interreduction: Duration::from_micros(50),
             interreduction_minimize: Duration::from_micros(2),
             interreduction_reduce: Duration::from_micros(48),
+            construction_split: ConstructionTimings {
+                collect: Duration::from_micros(3),
+                sort: Duration::from_micros(1),
+                map: Duration::from_micros(2),
+                scatter: Duration::from_micros(14),
+            },
         };
-        // The two halves refine `interreduction` rather than extending it, so the sum is still
-        // 150 and not 200. A coverage figure that double-counted the stage would exceed 1.0.
+        // Both refinements — the interreduction halves and the construction phases — refine a
+        // stage rather than extending it, so the sum is still 150 and not 220. A coverage figure
+        // that double-counted a stage would exceed 1.0.
         assert_eq!(one.sum(), Duration::from_micros(150));
         assert_eq!(
             one.interreduction_minimize + one.interreduction_reduce,
             one.interreduction
         );
+        assert_eq!(one.construction_split.total(), one.construction);
 
         let mut total = StageTimings::default();
         total.add(&one);
@@ -1225,6 +1314,28 @@ mod tests {
         assert_eq!(total.symbolic, Duration::from_micros(20));
         assert_eq!(total.interreduction, Duration::from_micros(100));
         assert_eq!(total.sum(), Duration::from_micros(300));
+        assert_eq!(total.construction_split.scatter, Duration::from_micros(28));
+        assert_eq!(total.construction_split.total(), total.construction);
+    }
+
+    /// The construction split's two shares price different things: the criterion charges the sort
+    /// to the hypothesis and the removable share does not.
+    #[test]
+    fn test_the_construction_shares_price_the_criterion_and_the_sort_separately() {
+        let split = ConstructionTimings {
+            collect: Duration::from_micros(20),
+            sort: Duration::from_micros(10),
+            map: Duration::from_micros(10),
+            scatter: Duration::from_micros(60),
+        };
+        assert_eq!(split.total(), Duration::from_micros(100));
+        assert_eq!(split.columns(), Duration::from_micros(30));
+        // (collect + sort + map) / total, which is what #330's criterion is stated on.
+        assert_eq!(split.handout_share(), 0.4);
+        // (collect + map) / total: the sort survives the restructuring, so it is not counted.
+        assert_eq!(split.removable_share(), 0.3);
+        assert_eq!(ConstructionTimings::default().handout_share(), 0.0);
+        assert_eq!(ConstructionTimings::default().removable_share(), 0.0);
     }
 
     /// Recording a batch accumulates the new per-stage and per-strategy counters too.

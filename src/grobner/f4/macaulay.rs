@@ -7,6 +7,7 @@
 //! with the monomial order. Nothing downstream has to translate between the two.
 
 use crate::{
+    grobner::f4::statistics::{ConstructionTimings, StageClock},
     grobner::f4::symbolic::{MonicBasis, Preprocessed, PreprocessedRow, RowKind},
     linalg::sparse::{SparseMatrix, SparseRow},
     poly::{MonomialMap, MonomialOrder, MonomialSet},
@@ -38,6 +39,70 @@ pub struct MacaulayMatrix<const N: usize, F: FiniteField> {
 }
 
 impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
+    /// #330's pre-handout route: hash every row monomial again here instead of reading the set
+    /// symbolic preprocessing interned.
+    ///
+    /// A reimplementation kept only so the two routes can be measured against each other in **one
+    /// process on one build**, which is the only way to keep a compiler difference out of the
+    /// ratio for a change that is structural rather than option-gated. Nothing in the shipping
+    /// path calls it, and `test_the_two_construction_routes_agree` asserts it returns the same
+    /// matrix as [`MacaulayMatrix::build`].
+    pub fn build_rehashing_for_benchmark(
+        basis: &MonicBasis<N, F>,
+        preprocessed: &Preprocessed<N>,
+        order: MonomialOrder,
+        measure: bool,
+    ) -> (Self, ConstructionTimings) {
+        let mut clock = StageClock::new(measure);
+        let mut timings = ConstructionTimings::default();
+
+        let mut columns: Vec<Monomial<N>> = {
+            let mut distinct: MonomialSet<N> = MonomialSet::default();
+            let mut seen: Vec<Monomial<N>> = Vec::new();
+            for row in &preprocessed.rows {
+                for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
+                    if distinct.insert(monomial) {
+                        seen.push(monomial);
+                    }
+                }
+            }
+            seen
+        };
+        timings.collect = clock.lap();
+
+        columns.sort_by(|a, b| order.cmp(b, a));
+        timings.sort = clock.lap();
+
+        let column_of: MonomialMap<N, usize> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, monomial)| (*monomial, index))
+            .collect();
+        timings.map = clock.lap();
+
+        let mut sparse_rows: Vec<SparseRow<F>> = Vec::with_capacity(preprocessed.rows.len());
+        for row in &preprocessed.rows {
+            let entries: Vec<(usize, F)> = basis
+                .shifted_terms(row.basis_index, &row.multiplier)
+                .map(|(monomial, coefficient)| {
+                    let column = *column_of
+                        .get(&monomial)
+                        .expect("every row monomial is a column");
+                    (column, coefficient)
+                })
+                .collect();
+            sparse_rows.push(SparseRow::from_sorted_unchecked(entries));
+        }
+        let built = Self {
+            matrix: SparseMatrix::new(columns.len(), sparse_rows),
+            columns,
+            rows: preprocessed.rows.clone(),
+        };
+        timings.scatter = clock.lap();
+
+        (built, timings)
+    }
+
     /// Build the matrix of a preprocessed batch.
     pub fn build(
         basis: &MonicBasis<N, F>,
@@ -50,11 +115,17 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
 
     /// As [`MacaulayMatrix::build`], abandoned if the matrix would exceed either budget.
     ///
-    /// Both budgets are checked *while* the matrix is assembled, not after. Column collection
-    /// stops as soon as too many distinct monomials have been seen, and entry counting stops as
-    /// soon as too many entries have been written, so neither the monomial set nor the rows are
-    /// fully materialized before the limit is noticed. The point of a budget is to refuse the
-    /// allocation, which a check afterwards cannot do.
+    /// The entry budget is checked *while* the rows are written, not after: counting stops as soon
+    /// as too many entries have been written, so the rows are never fully materialized before the
+    /// limit is noticed. The point of a budget is to refuse the allocation, which a check
+    /// afterwards cannot do.
+    ///
+    /// The column budget is a length check rather than an incremental one, and still refuses
+    /// before this function allocates anything: the monomial set it reads was interned by symbolic
+    /// preprocessing under [`RowBudgetExceeded`](super::symbolic::RowBudgetExceeded)'s own bound,
+    /// so there is nothing left here for an incremental check to refuse. Which count crosses the
+    /// line is unchanged — the old loop errored exactly when the distinct monomials exceeded
+    /// `max_columns`, and so does this.
     ///
     /// Neither error says how large the matrix would have been: establishing that is the work
     /// being refused.
@@ -65,29 +136,48 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         max_columns: usize,
         max_nonzeros: usize,
     ) -> Result<Self, BuildBudgetExceeded> {
-        // The distinct monomials of every row, descending.
-        let mut columns: Vec<Monomial<N>> = {
-            let mut distinct: MonomialSet<N> = MonomialSet::default();
-            let mut seen: Vec<Monomial<N>> = Vec::new();
-            for row in &preprocessed.rows {
-                for (monomial, _) in basis.shifted_terms(row.basis_index, &row.multiplier) {
-                    if distinct.insert(monomial) {
-                        if seen.len() == max_columns {
-                            return Err(BuildBudgetExceeded::Columns { limit: max_columns });
-                        }
-                        seen.push(monomial);
-                    }
-                }
-            }
-            seen
-        };
+        Self::build_measured(basis, preprocessed, order, max_columns, max_nonzeros, false)
+            .map(|(matrix, _)| matrix)
+    }
+
+    /// As [`MacaulayMatrix::build_within`], reporting where the time went when `measure` is set.
+    ///
+    /// The three reported phases partition the call, so their sum is the whole of it. They exist
+    /// because #330 asked whether the monomial-to-column map is worth removing, and the only way
+    /// to answer that before writing the replacement is to price the map against the scatter it
+    /// feeds. `measure` is threaded rather than always on so that the clock reads do not appear in
+    /// the instruction stream of the default path at all — see [`StageClock`].
+    pub fn build_measured(
+        basis: &MonicBasis<N, F>,
+        preprocessed: &Preprocessed<N>,
+        order: MonomialOrder,
+        max_columns: usize,
+        max_nonzeros: usize,
+        measure: bool,
+    ) -> Result<(Self, ConstructionTimings), BuildBudgetExceeded> {
+        let mut clock = StageClock::new(measure);
+        let mut timings = ConstructionTimings::default();
+
+        // The distinct monomials of every row, taken from the set symbolic preprocessing already
+        // interned rather than hashed a second time here (#330). The two sets are equal by
+        // construction — see `Preprocessed::monomials` — so this is a copy of `num_columns`
+        // monomials in place of one hash insert per row monomial, and row monomials outnumber
+        // columns by whatever the matrix's average column density is.
+        if preprocessed.monomials.len() > max_columns {
+            return Err(BuildBudgetExceeded::Columns { limit: max_columns });
+        }
+        let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
+        timings.collect = clock.lap();
+
         columns.sort_by(|a, b| order.cmp(b, a));
+        timings.sort = clock.lap();
 
         let column_of: MonomialMap<N, usize> = columns
             .iter()
             .enumerate()
             .map(|(index, monomial)| (*monomial, index))
             .collect();
+        timings.map = clock.lap();
 
         // Entries written so far, so a matrix that is small in each dimension but dense cannot
         // slip past the row and column budgets.
@@ -122,11 +212,14 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
             });
         }
 
-        Ok(Self {
+        let built = Self {
             matrix: SparseMatrix::new(columns.len(), sparse_rows),
             columns,
             rows: preprocessed.rows.clone(),
-        })
+        };
+        timings.scatter = clock.lap();
+
+        Ok((built, timings))
     }
 
     /// Move the reducer multiples ahead of the pair rows, ascending by leading column, and report
@@ -219,14 +312,16 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BuildBudgetExceeded, MacaulayMatrix};
+    use std::time::Duration;
+
+    use super::{BuildBudgetExceeded, ConstructionTimings, MacaulayMatrix};
     use crate::{
         fields::Zp13,
         grobner::{
             f4::symbolic::{symbolic_preprocessing, MonicBasis},
             pairs::CriticalPair,
         },
-        poly::MonomialOrder,
+        poly::{MonomialOrder, MonomialSet},
         Monomial, MultivariatePolynomial, One,
     };
 
@@ -472,6 +567,137 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Symbolic preprocessing's monomial set is exactly the matrix's column set.
+    ///
+    /// This is the invariant #330's column handout rests on: if it holds, construction can take
+    /// the set preprocessing already interned instead of hashing every row monomial a second time.
+    /// Asserted over every order and over a batch with reducer rows, because the set is grown in
+    /// two places — the seed rows' terms and each reducer row's terms as it is admitted — and a
+    /// batch with no reducers would exercise only the first.
+    #[test]
+    fn test_preprocessing_interns_exactly_the_column_set() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let mut pairs = Vec::new();
+            for left in 0..polynomials.len() {
+                for right in (left + 1)..polynomials.len() {
+                    pairs.push(CriticalPair::new(&polynomials, left, right, order));
+                }
+            }
+            let preprocessed = symbolic_preprocessing(&basis, &pairs);
+            assert!(
+                preprocessed
+                    .rows
+                    .iter()
+                    .any(|row| row.kind == crate::grobner::f4::RowKind::Reducer),
+                "the batch must have reducer rows for this to mean anything"
+            );
+
+            let matrix = MacaulayMatrix::<3, F>::build(&basis, &preprocessed, order);
+            let built: MonomialSet<3> = matrix.columns().iter().copied().collect();
+            assert_eq!(preprocessed.monomials, built, "{}", order.name());
+        }
+    }
+
+    /// The handout route and the rehashing route return the identical matrix, columns and all.
+    ///
+    /// This is what makes the A/B in `examples/f4_profile construction` a measurement of cost
+    /// rather than of two different matrices. Equality of the whole `MacaulayMatrix` covers the
+    /// column order too, which matters because the handout route sorts a vector drained from a
+    /// hash set and the old one sorted a vector in first-appearance order — the monomial order is
+    /// total on distinct monomials, so both sorts land in the same place, and this says so.
+    #[test]
+    fn test_the_two_construction_routes_agree() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let mut pairs = Vec::new();
+            for left in 0..polynomials.len() {
+                for right in (left + 1)..polynomials.len() {
+                    pairs.push(CriticalPair::new(&polynomials, left, right, order));
+                }
+            }
+            let preprocessed = symbolic_preprocessing(&basis, &pairs);
+
+            let handout = MacaulayMatrix::<3, F>::build(&basis, &preprocessed, order);
+            let (rehashing, _) = MacaulayMatrix::<3, F>::build_rehashing_for_benchmark(
+                &basis,
+                &preprocessed,
+                order,
+                false,
+            );
+            assert_eq!(handout, rehashing, "{}", order.name());
+        }
+    }
+
+    /// Measuring construction does not change the matrix, and the measured phases are all nonzero.
+    #[test]
+    fn test_the_construction_phases_partition_a_measured_build() {
+        for order in ALL_ORDERS {
+            let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+            let basis = MonicBasis::new(&polynomials, order);
+            let mut pairs = Vec::new();
+            for left in 0..polynomials.len() {
+                for right in (left + 1)..polynomials.len() {
+                    pairs.push(CriticalPair::new(&polynomials, left, right, order));
+                }
+            }
+            let preprocessed = symbolic_preprocessing(&basis, &pairs);
+            let unmeasured = MacaulayMatrix::build(&basis, &preprocessed, order);
+
+            let (measured, split) = MacaulayMatrix::build_measured(
+                &basis,
+                &preprocessed,
+                order,
+                usize::MAX,
+                usize::MAX,
+                true,
+            )
+            .expect("an unbounded construction cannot exceed its budget");
+            assert_eq!(measured, unmeasured, "{}", order.name());
+            assert_eq!(
+                split.total(),
+                split.collect + split.sort + split.map + split.scatter,
+                "{}",
+                order.name()
+            );
+            assert_eq!(split.columns(), split.collect + split.sort);
+            assert!(split.total() > Duration::ZERO, "{}", order.name());
+            assert!(
+                (0.0..=1.0).contains(&split.handout_share()),
+                "{}",
+                order.name()
+            );
+            assert!(
+                split.removable_share() <= split.handout_share(),
+                "{}",
+                order.name()
+            );
+        }
+    }
+
+    /// A build with measurement off reads no clock, so every phase is zero.
+    #[test]
+    fn test_an_unmeasured_build_records_no_phase_times() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let polynomials = system(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"]);
+        let basis = MonicBasis::new(&polynomials, order);
+        let pairs = vec![CriticalPair::new(&polynomials, 0, 1, order)];
+        let preprocessed = symbolic_preprocessing(&basis, &pairs);
+
+        let (_, split) = MacaulayMatrix::build_measured(
+            &basis,
+            &preprocessed,
+            order,
+            usize::MAX,
+            usize::MAX,
+            false,
+        )
+        .expect("an unbounded construction cannot exceed its budget");
+        assert_eq!(split, ConstructionTimings::default());
     }
 
     /// The column and entry budgets are exact at their boundaries, and stop mid-construction.
