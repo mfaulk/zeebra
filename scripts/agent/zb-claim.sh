@@ -112,6 +112,56 @@ zb_parse_claims() {
   printf '%s\n' "$out"
 }
 
+# Withdrawal markers in a JSON array of comment bodies, as "<agent>\t<at>\t<token>".
+#
+# A withdrawal is how the loser of a race retracts its own claim without touching
+# the label, the assignee or the board row — all of which are shared, and none of
+# which belong to it (#544). A comment cannot be unsaid, so the retraction has to
+# be a marker the resolver reads rather than a deletion.
+#   0 — rows printed   1 — none   2 — UNREADABLE
+zb_parse_withdrawals() {
+  local raw out
+  raw="$(cat)"
+  [ -n "$raw" ] || return 2
+  out="$(printf '%s' "$raw" | jq -r '
+      if type == "array" then .[] else error("not a JSON array") end
+      | tostring
+      | scan("<!-- zb-withdraw agent=\"([^\"]*)\" token=\"([^\"]*)\" at=\"([^\"]*)\" -->")
+      | [.[0], .[2], .[1]]
+      | @tsv' 2>/dev/null)" || return 2
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
+}
+
+# Whether a claim marker has been retracted by a later withdrawal.
+#
+# A withdrawal retracts a claim when it is **strictly later** and provably from the
+# same checkout: same token, or — for a marker written before tokens existed — the
+# same id with no token on either side to contradict it. Only the owner of a token
+# can write that token, so this cannot retract another agent's claim; and the
+# strictly-later test means a withdrawal cannot pre-emptively cancel a claim made
+# after it, which is what keeps a reclaim honest.
+#   0 — withdrawn   1 — still standing
+zb_claim_is_withdrawn() { # <marker-agent> <marker-token> <marker-at> <withdrawals-tsv>
+  local marker_agent="$1" marker_token="$2" marker_at="$3" withdrawals="$4"
+  local w_agent w_at w_token
+  [ -n "$withdrawals" ] || return 1
+  while IFS="$(printf '\t')" read -r w_agent w_at w_token; do
+    [ -n "$w_at" ] || continue
+    # Not strictly later, so it says nothing about this claim.
+    [ "$w_at" \> "$marker_at" ] || continue
+    if [ -n "$w_token" ] && [ "$w_token" != "-" ] && [ "$w_token" = "$marker_token" ]; then
+      return 0
+    fi
+    if { [ -z "$marker_token" ] || [ "$marker_token" = "-" ]; } && [ "$w_agent" = "$marker_agent" ]; then
+      return 0
+    fi
+  done <<EOF
+$withdrawals
+EOF
+  return 1
+}
+
 # Whether one marker belongs to this agent.
 #
 # Three ways, in order of strength:
@@ -144,11 +194,28 @@ zb_claim_is_ours() { # <marker-agent> <marker-token> <our-id> <our-token> [alias
 # The resolution rule is untouched: among claims inside the current lease window
 # the earliest `at=` wins. The token only answers the separate question of
 # whether that winner is us.
+#
+# Retracted claims are dropped before the rule is applied, so a withdrawn claim
+# cannot win the race it had already conceded. Dropping them first rather than
+# excusing them afterwards is what makes the rule's one sentence stay true.
 #   prints "<held|lost|none>\t<winner-id>\t<id|token|->"
 #   0 — held by us   1 — lost, or no claim inside the window
-zb_resolve_claim() { # <our-id> <our-token> <cutoff-iso>
-  local live winner winner_id winner_token how aliases
+zb_resolve_claim() { # <our-id> <our-token> <cutoff-iso> [withdrawals-tsv]
+  local live standing winner winner_id winner_token how aliases
+  local agent at until token
   live="$(awk -F'\t' -v c="$3" '$2 >= c')"
+  if [ -n "${4:-}" ] && [ -n "$live" ]; then
+    standing=""
+    while IFS="$(printf '\t')" read -r agent at until token; do
+      [ -n "$at" ] || continue
+      zb_claim_is_withdrawn "$agent" "$token" "$at" "$4" && continue
+      standing="$standing$agent	$at	$until	$token
+"
+    done <<EOF
+$live
+EOF
+    live="$(printf '%s' "$standing")"
+  fi
   if [ -z "$live" ]; then
     printf 'none\t-\t-\n'
     return 1
@@ -240,6 +307,11 @@ zb_merge_issue_pages() {
           | . as $i
           | ($i.labels.nodes | map(.name)) as $L
           | select(($L | index($cl)) == null and ($L | index("blocked")) == null)
+          # An open linked PR is a LIVE claim by §4 whether or not the label is
+          # still on. §6 tells the finishing agent to drop the label and leave the
+          # issue for the PR to close, so keying on the label alone put finished
+          # work back in the queue (#544).
+          | select([$i.closedByPullRequestsReferences.nodes[] | select(.state == "OPEN")] | length == 0)
           | ($i.projectItems.nodes[] | select(.project.number == $pn)) as $it
           | select(($it.s.name // "") != "Done")
           | {n: $i.number, t: $i.title, p: ($it.fieldValueByName.name // "—")} ]
@@ -286,6 +358,7 @@ zb_orient() {
             nodes {
               number title
               labels(first: 20) { nodes { name } }
+              closedByPullRequestsReferences(first: 10) { nodes { state } }
               projectItems(first: 5) { nodes {
                 project { number }
                 fieldValueByName(name: \"Priority\") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
@@ -313,6 +386,35 @@ zb_issue_claims() { # <issue-number>
   local bodies
   bodies="$(gh issue view "$1" --repo "$ZB_REPO" --json comments --jq '[.comments[].body]' 2>/dev/null)" || return 2
   printf '%s' "$bodies" | zb_parse_claims
+}
+
+# Withdrawal markers on one issue, as TSV. Statuses are zb_parse_withdrawals's.
+zb_issue_withdrawals() { # <issue-number>
+  local bodies
+  bodies="$(gh issue view "$1" --repo "$ZB_REPO" --json comments --jq '[.comments[].body]' 2>/dev/null)" || return 2
+  printf '%s' "$bodies" | zb_parse_withdrawals
+}
+
+# The issue's claim resolution for this checkout, withdrawals accounted for.
+#   prints zb_resolve_claim's row
+#   0 — held by us   1 — lost or unclaimed   2 — UNREADABLE
+zb_issue_resolution() { # <issue-number>
+  local claims withdrawals id token cutoff rc=0
+  id="$(zb_agent_id)"
+  token="$(zb_agent_token)" || token="-"
+  claims="$(zb_issue_claims "$1")" || {
+    rc=$?
+    [ "$rc" -eq 2 ] && return 2
+    printf 'none\t-\t-\n'
+    return 1
+  }
+  withdrawals="$(zb_issue_withdrawals "$1")" || {
+    rc=$?
+    [ "$rc" -eq 2 ] && return 2
+    withdrawals=""
+  }
+  cutoff="$(date -u -d "-${ZB_LEASE_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ)"
+  printf '%s\n' "$claims" | zb_resolve_claim "$id" "$token" "$cutoff" "$withdrawals"
 }
 
 # 1 if the issue has an open linked PR, else 0. Prints nothing on failure (rc 2).
@@ -375,15 +477,11 @@ zb_claim() { # <issue-number> <intent>
 # previous, already-released rounds and must not win forever.
 #   0 — we hold it   1 — another agent won; back off   2 — UNREADABLE
 zb_verify() { # <issue-number>
-  local claims id token cutoff resolution verdict winner how
+  local id resolution verdict winner how
   id="$(zb_agent_id)"
-  token="$(zb_agent_token)" || token="-"
-  claims="$(zb_issue_claims "$1")" || {
-    [ $? -eq 1 ] && { echo "zb-claim: no claim markers on #$1" >&2; return 1; }
-    return 2
+  resolution="$(zb_issue_resolution "$1")" || {
+    [ $? -eq 2 ] && return 2
   }
-  cutoff="$(date -u -d "-${ZB_LEASE_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ)"
-  resolution="$(printf '%s\n' "$claims" | zb_resolve_claim "$id" "$token" "$cutoff")"
   verdict="$(printf '%s' "$resolution" | cut -f1)"
   winner="$(printf '%s' "$resolution" | cut -f2)"
   how="$(printf '%s' "$resolution" | cut -f3)"
@@ -400,7 +498,7 @@ zb_verify() { # <issue-number>
         echo "verified: #$1 is held by $id"
       fi ;;
     *)
-      echo "LOST RACE on #$1 — $winner claimed first. Release and pick other work." >&2
+      echo "LOST RACE on #$1 — $winner claimed first. Run 'withdraw $1' and pick other work; do NOT release, which would strip their label." >&2
       return 1 ;;
   esac
 }
@@ -432,14 +530,59 @@ zb_reclaim() { # <issue-number> <intent>
   zb_claim "$1" "${2:-taking over an expired lease}"
 }
 
-zb_release() { # <issue-number> [--abandon]
-  if [ "${2:-}" = "--abandon" ]; then
-    gh issue edit "$1" --repo "$ZB_REPO" --remove-label "$ZB_CLAIM_LABEL" --remove-assignee "@me" >/dev/null || return 2
-    zb_set_status "$1" "$ZB_STATUS_TODO" || return 2
-    echo "abandoned #$1 — label and assignee removed, board back to Todo"
+# Retract this checkout's own claim, touching nothing that is shared.
+#
+# What the loser of a race is for. The label, the assignee and the board row are
+# one each and belong to whoever won; `release` used to remove them anyway, so the
+# loser following CLAUDE.md §3 broke the winner's claim (#544). This writes a
+# marker the resolver reads and changes nothing else.
+zb_withdraw() { # <issue-number>
+  local id token now
+  id="$(zb_agent_id)"; now="$(zb_now)"
+  token="$(zb_agent_token)" || { echo "zb-claim: could not read this checkout's claim token" >&2; return 2; }
+  gh issue comment "$1" --repo "$ZB_REPO" --body \
+"🚫 \`$id\` withdraws its claim on this issue. No label, assignee or board state was changed.
+<!-- zb-withdraw agent=\"$id\" token=\"$token\" at=\"$now\" -->" >/dev/null || return 2
+  echo "withdrew this checkout's claim on #$1 (shared state untouched)"
+}
+
+# Drop the working label, and optionally the assignee and the board row.
+#
+# Refuses when another agent demonstrably holds the claim, because all three of
+# those are shared state and there is one of each. `--force` is the override the
+# refusal names; `reclaim` already refuses a live lease and this is the mutation
+# that used to trust its caller instead (#544).
+zb_release() { # <issue-number> [--abandon] [--force]
+  local issue="$1" abandon=0 force=0 arg resolution verdict winner
+  shift
+  for arg in "$@"; do
+    case "$arg" in
+      --abandon) abandon=1 ;;
+      --force)   force=1 ;;
+      *) echo "zb-claim: unknown release option $arg" >&2; return 2 ;;
+    esac
+  done
+
+  if [ "$force" -eq 0 ]; then
+    resolution="$(zb_issue_resolution "$issue")" || {
+      [ $? -eq 2 ] && return 2
+    }
+    verdict="$(printf '%s' "$resolution" | cut -f1)"
+    winner="$(printf '%s' "$resolution" | cut -f2)"
+    if [ "$verdict" = lost ]; then
+      echo "zb-claim: #$issue is held by $winner, not by this checkout — refusing to remove a label, assignee or board row that is not yours." >&2
+      echo "zb-claim: to retract your own losing claim, use 'withdraw $issue'. To override anyway, pass --force." >&2
+      return 1
+    fi
+  fi
+
+  if [ "$abandon" -eq 1 ]; then
+    gh issue edit "$issue" --repo "$ZB_REPO" --remove-label "$ZB_CLAIM_LABEL" --remove-assignee "@me" >/dev/null || return 2
+    zb_set_status "$issue" "$ZB_STATUS_TODO" || return 2
+    echo "abandoned #$issue — label and assignee removed, board back to Todo"
   else
-    gh issue edit "$1" --repo "$ZB_REPO" --remove-label "$ZB_CLAIM_LABEL" >/dev/null || return 2
-    echo "released the working label on #$1 (the open PR keeps it In Progress)"
+    gh issue edit "$issue" --repo "$ZB_REPO" --remove-label "$ZB_CLAIM_LABEL" >/dev/null || return 2
+    echo "released the working label on #$issue (the open PR keeps it In Progress)"
   fi
 }
 
@@ -472,6 +615,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     heartbeat) zb_heartbeat "$@" ;;
     reclaim)   zb_reclaim "$@" ;;
     release)   zb_release "$@" ;;
+    withdraw)  zb_withdraw "$@" ;;
     state)     zb_issue_lease_state "$@" ;;
     reap)      zb_reap; rc=$?; [ $rc -eq 1 ] && echo "no stale claims"; [ $rc -eq 2 ] && { echo "REAP READ FAILED" >&2; exit 2; }; exit 0 ;;
     id)        zb_agent_id ;;
@@ -488,6 +632,8 @@ zb-claim.sh — issue claiming for parallel agents
   reclaim <N> "<intent>"     take over #N, only if its lease is stale
   release <N>                drop the label (finished; PR keeps it In Progress)
   release <N> --abandon      drop label + assignee and return the board to Todo
+  release <N> --force        release even when another agent holds the claim
+  withdraw <N>               retract your own claim, touching no shared state
   reap                       every claimed issue whose lease has expired
   id                         this agent's id (worktree@branch)
   token                      this checkout's claim token, minted on first use

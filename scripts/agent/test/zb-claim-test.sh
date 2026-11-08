@@ -321,10 +321,16 @@ issue_node() { # <number> <title> <priority|-> <status|-> [label...]
     --argjson pn "$ZB_PROJECT_NUMBER" --args '
     { number: $n, title: $t,
       labels: {nodes: ($ARGS.positional | map({name: .}))},
+      closedByPullRequestsReferences: {nodes: []},
       projectItems: {nodes: [
         { project: {number: $pn},
           fieldValueByName: (if $p == "-" then null else {name: $p} end),
           s: (if $s == "-" then null else {name: $s} end) }]} }' "$@"
+}
+
+# The same node with a linked pull request in the given state.
+with_linked_pr() { # <node-json> <OPEN|MERGED|CLOSED>
+  printf '%s' "$1" | jq -c --arg s "$2" '.closedByPullRequestsReferences.nodes = [{state: $s}]'
 }
 
 # One page of the paginated read: a compact JSON array of nodes on one line.
@@ -381,6 +387,143 @@ check_rc "merge: a non-array page is 2, not a short list" 2 $?
 printf '%s\nnot json\n' "$p1" | zb_merge_issue_pages >/dev/null 2>&1
 check_rc "merge: non-JSON on any page is 2" 2 $?
 
+
+# --- orient: an open linked PR is a live claim ------------------------------
+
+# §4 makes an open linked PR live unconditionally, and §6 tells the finishing
+# agent to drop the label and leave the issue for the PR to close. Keying the
+# queue on the label alone therefore re-offered finished work (#544).
+check "merge: an issue with an open linked PR is not offered" "" \
+  "$(printf '%s\n' "$(page_of "$(with_linked_pr "$(issue_node 149 'has an open PR' High Todo)" OPEN)")" \
+     | zb_merge_issue_pages)"
+printf '%s\n' "$(page_of "$(with_linked_pr "$(issue_node 149 'has an open PR' High Todo)" OPEN)")" \
+  | zb_merge_issue_pages >/dev/null 2>&1
+check_rc "merge: a queue emptied by an open PR is 1, not 2" 1 $?
+
+# A merged or closed PR says nothing about liveness — the issue is either closed
+# already or the attempt was abandoned, and in the latter case it must come back.
+check "merge: a MERGED linked PR does not hide the issue" \
+  "$(printf 'High\t#149\tabandoned attempt')" \
+  "$(printf '%s\n' "$(page_of "$(with_linked_pr "$(issue_node 149 'abandoned attempt' High Todo)" MERGED)")" \
+     | zb_merge_issue_pages)"
+check "merge: a CLOSED linked PR does not hide the issue" \
+  "$(printf 'High\t#149\tabandoned attempt')" \
+  "$(printf '%s\n' "$(page_of "$(with_linked_pr "$(issue_node 149 'abandoned attempt' High Todo)" CLOSED)")" \
+     | zb_merge_issue_pages)"
+
+# One issue's open PR must not suppress its neighbours.
+check "merge: only the PR-covered issue is withheld" \
+  "$(printf 'High\t#447\tstill available')" \
+  "$(printf '%s\n' "$(page_of \
+        "$(with_linked_pr "$(issue_node 149 'has an open PR' High Todo)" OPEN)" \
+        "$(issue_node 447 'still available' High Todo)")" \
+     | zb_merge_issue_pages)"
+
+# --- zb_parse_withdrawals --------------------------------------------------
+
+withdrawal() { # <agent> <token> <at>
+  printf '<!-- zb-withdraw agent="%s" token="%s" at="%s" -->' "$1" "$2" "$3"
+}
+
+# A withdrawal marker yields one agent/at/token row, token last as the resolver
+# reads it.
+one_w=$(jq -n --arg b "🚫 withdrawn. $(withdrawal zb-a@feat/x tok-1 2026-01-01T03:00:00Z)" '[$b]' \
+  | zb_parse_withdrawals)
+check "withdraw-parse: single marker" \
+  "$(printf 'zb-a@feat/x\t2026-01-01T03:00:00Z\ttok-1')" "$one_w"
+
+# Claim markers are not withdrawals, and vice versa: the two parsers must not
+# read each other's markers, or a claim would retract itself.
+jq -n --arg b "🔒 $(marker_tok zb-a@feat/x tok-1 2026-01-01T00:00:00Z 2026-01-01T04:00:00Z)" '[$b]' \
+  | zb_parse_withdrawals >/dev/null 2>&1
+check_rc "withdraw-parse: a claim marker is not a withdrawal" 1 $?
+jq -n --arg b "🚫 $(withdrawal zb-a@feat/x tok-1 2026-01-01T03:00:00Z)" '[$b]' \
+  | zb_parse_claims >/dev/null 2>&1
+check_rc "withdraw-parse: a withdrawal marker is not a claim" 1 $?
+
+# An unreadable body is status 2, never an empty withdrawal set — the same
+# three-outcome rule the rest of the script keeps.
+printf 'not json' | zb_parse_withdrawals >/dev/null 2>&1
+check_rc "withdraw-parse: non-JSON input is 2, not 1" 2 $?
+
+# --- zb_claim_is_withdrawn -------------------------------------------------
+
+W_LATER="$(printf 'zb-a@feat/x\t2026-01-01T03:00:00Z\ttok-1\n')"
+
+# A later withdrawal carrying the claim's token retracts it.
+zb_claim_is_withdrawn zb-a@feat/x tok-1 2026-01-01T01:00:00Z "$W_LATER"
+check_rc "withdrawn: a later withdrawal with our token retracts the claim" 0 $?
+
+# An earlier withdrawal cannot retract a claim made after it, or a stale
+# withdrawal would cancel every future claim from the same checkout.
+zb_claim_is_withdrawn zb-a@feat/x tok-1 2026-01-01T05:00:00Z "$W_LATER"
+check_rc "withdrawn: a withdrawal earlier than the claim retracts nothing" 1 $?
+
+# A withdrawal at exactly the claim's instant is not strictly later.
+zb_claim_is_withdrawn zb-a@feat/x tok-1 2026-01-01T03:00:00Z "$W_LATER"
+check_rc "withdrawn: an equal timestamp is not strictly later" 1 $?
+
+# Another agent's withdrawal cannot retract our claim. This is the property that
+# keeps withdrawal from becoming a second way to break someone else's claim.
+zb_claim_is_withdrawn zb-b@feat/y tok-2 2026-01-01T01:00:00Z "$W_LATER"
+check_rc "withdrawn: a different token does not retract another agent's claim" 1 $?
+
+# A tokenless claim is retracted by its own id, which is all a pre-token marker
+# can be matched on — the same concession zb_claim_is_ours makes.
+zb_claim_is_withdrawn zb-a@feat/x - 2026-01-01T01:00:00Z "$W_LATER"
+check_rc "withdrawn: a tokenless claim is retracted by its own id" 0 $?
+
+# But a tokenless claim under a different id is untouched.
+zb_claim_is_withdrawn zb-b@feat/y - 2026-01-01T01:00:00Z "$W_LATER"
+check_rc "withdrawn: a tokenless claim under another id is not retracted" 1 $?
+
+# No withdrawals at all retracts nothing, and does not error.
+zb_claim_is_withdrawn zb-a@feat/x tok-1 2026-01-01T01:00:00Z ""
+check_rc "withdrawn: an empty withdrawal set retracts nothing" 1 $?
+
+# --- zb_resolve_claim with withdrawals -------------------------------------
+
+# The case the whole change exists for: we lost the race, withdrew, and the
+# winner's claim is still theirs. Our withdrawal must not promote us.
+lost_then_withdrawn="$(printf 'zb-b@feat/b\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-2\nzb-a@feat/a\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\ttok-1\n')"
+check "resolve: our own withdrawal does not take the winner's claim" \
+  "$(printf 'lost\tzb-b@feat/b\t-')" \
+  "$(printf '%s' "$lost_then_withdrawn" \
+     | zb_resolve_claim zb-a@feat/a tok-1 "$CUTOFF" "$(printf 'zb-a@feat/a\t2026-01-01T03:00:00Z\ttok-1\n')")"
+
+# And from the winner's side, the loser's withdrawal leaves the winner holding
+# it — the acceptance criterion of #544, asserted rather than argued.
+check "resolve: the loser's withdrawal leaves the winner holding the claim" \
+  "$(printf 'held\tzb-b@feat/b\ttoken')" \
+  "$(printf '%s' "$lost_then_withdrawn" \
+     | zb_resolve_claim zb-b@feat/b tok-2 "$CUTOFF" "$(printf 'zb-a@feat/a\t2026-01-01T03:00:00Z\ttok-1\n')")"
+
+# A withdrawn earlier claim stops winning the tiebreak, so the next-earliest
+# standing claim takes it. This is what makes withdrawal mean something.
+check "resolve: withdrawing the earliest claim hands the race to the next" \
+  "$(printf 'held\tzb-a@feat/a\ttoken')" \
+  "$(printf 'zb-b@feat/b\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-2\nzb-a@feat/a\t2026-01-01T02:00:00Z\t2026-01-01T06:00:00Z\ttok-1\n' \
+     | zb_resolve_claim zb-a@feat/a tok-1 "$CUTOFF" "$(printf 'zb-b@feat/b\t2026-01-01T03:00:00Z\ttok-2\n')")"
+
+# Every standing claim withdrawn is the same as no claim: the issue is free.
+check "resolve: withdrawing the only claim leaves the issue unclaimed" \
+  "$(printf 'none\t-\t-')" \
+  "$(printf 'zb-a@feat/a\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-1\n' \
+     | zb_resolve_claim zb-a@feat/a tok-1 "$CUTOFF" "$(printf 'zb-a@feat/a\t2026-01-01T03:00:00Z\ttok-1\n')")"
+
+# Omitting the withdrawal argument entirely is the pre-#544 behaviour, so every
+# caller that does not read withdrawals is unaffected.
+check "resolve: no withdrawal argument resolves exactly as before" \
+  "$(printf 'held\tzb-a@feat/old\ttoken')" \
+  "$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\ttok-1\n' \
+     | zb_resolve_claim zb-a@feat/new tok-1 "$CUTOFF")"
+
+# A withdrawal by a later heartbeat's id, proved ours by the token, retracts the
+# earlier tokenless claim it belongs to — the §3 alias case, withdrawn.
+check "resolve: a withdrawal retracts the pre-token claim of the same id" \
+  "$(printf 'none\t-\t-')" \
+  "$(printf 'zb-a@feat/old\t2026-01-01T01:00:00Z\t2026-01-01T05:00:00Z\t-\n' \
+     | zb_resolve_claim zb-a@feat/old tok-1 "$CUTOFF" "$(printf 'zb-a@feat/old\t2026-01-01T03:00:00Z\ttok-1\n')")"
 # ---------------------------------------------------------------------------
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
