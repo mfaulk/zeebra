@@ -624,9 +624,14 @@ supplied locally and extracted with `pdftotext`.
 | **2025/950** Zhao–Ding, *Breaking Poseidon Challenges with Graeffe Transforms…* | read | the FFT 4/3-power memory-access lower bound; its CICO-1 scope and its remark on >1 zero, now superseded by §4 |
 | **2026/150** Bak–Bariant–Jazeron et al., *Ethereum Poseidon bounties* | read | the 2025 round's resultant attacks and the streaming-memory argument |
 | Jazeron, *Solving CICO-2 bounty instances of Poseidon*, 15 Mar 2025 | read — fetched directly | the 2025 round's instance table and results |
-| [BSGL20] Thm 10 and [BBB+25] on `D_I` | **not read** — only as 2026/150 and 2026/1905 cite them, and they cite *different* results with *different* strengths | §1.1, which records the discrepancy rather than resolving it |
-| `PoseidonCicoTwo` implementation | **not inspected** — existence and contents per 2026/1905 and the user's check | §2.2, §6.3 |
+| [BSGL20] Thm 10 and [BBB+25] on `D_I` | **read**, 2026-11-06 — this row previously said "not read", which §1.1 has contradicted since `8b343139` | §1.1, which resolves the discrepancy as a citation error rather than recording it |
+| `PoseidonCicoTwo` implementation | **not inspected**, and no longer load-bearing — existence and contents per 2026/1905 and the user's check | §2.2, §6.3 |
 
-The two items not read are the results bounding `D_I` and the public implementation. Both are
-load-bearing — `D_I` for every cost figure here, the implementation for §6.3's recommendation — and
-should be read before anything stronger than §1.1's upper-bound reading is claimed.
+**One item remains unread, and it stopped mattering.** `PoseidonCicoTwo` was load-bearing only for
+§6.3's recommendation to benchmark it rather than build a resultant, and §0.1 records that
+recommendation as **reversed**: M24 built the resultant and measured it against Zeebra's own F4, so
+D4 was settled without the external instrument. Reading it would now be a cross-check on a
+comparison that already exists, not a prerequisite for one.
+
+The `D_I` results, which were the genuinely load-bearing unread item — every cost figure here depends
+on `D_I` — were read on 2026-11-06 and §1.1 is the resolution.
