@@ -30,7 +30,10 @@ use std::{
 };
 
 use crate::{
-    grobner::{f4::options::ReducerSelection, pairs::CriticalPair},
+    grobner::{
+        f4::{divmask::DivmaskCalibration, options::ReducerSelection},
+        pairs::CriticalPair,
+    },
     poly::MonomialOrder,
     FiniteField, Monomial, MultivariatePolynomial,
 };
@@ -73,6 +76,30 @@ pub struct SymbolicCounts {
     /// forced. Sampled after each iteration's run of pushes, which is where the queue can only
     /// have grown, so this is the exact maximum rather than an approximation to it.
     pub max_pending_monomials: usize,
+
+    /// Divisibility tests the divmask probe replayed. Zero unless the probe is on.
+    ///
+    /// Must equal [`Self::divisor_scan_steps`] whenever the probe is on, because the replay walks
+    /// the basis exactly as the selection policy does — including stopping at the first hit under
+    /// [`ReducerSelection::FirstApplicable`]. That equality is the probe's own correctness check
+    /// (`test_the_probe_replays_exactly_the_scan_the_policy_performed`): a replay over a different
+    /// set of tests would answer a different question from the one #331 asks.
+    pub divmask_tests: usize,
+
+    /// Of [`Self::divmask_tests`], the tests that answered **not divisible**.
+    ///
+    /// The population a mask can help with. A mask can never shortcut a positive answer — see
+    /// [`DivmaskCalibration::rejects`] — so this is the denominator for the probe's hit rate, and
+    /// `divmask_tests - divmask_negative` is work no mask could have saved.
+    pub divmask_negative: usize,
+
+    /// Of [`Self::divmask_negative`], the tests a 32-bit calibrated mask would have decided.
+    ///
+    /// The number #331 is for: the fraction of the exponent comparisons that one AND and one
+    /// branch would have replaced. Compare against [`Self::divmask_tests`] rather than against
+    /// [`Self::divmask_negative`] when asking what a mask saves overall, because the positives are
+    /// in the denominator of the stage's cost whether a mask exists or not.
+    pub divmask_decided: usize,
 }
 
 impl SymbolicCounts {
@@ -86,6 +113,9 @@ impl SymbolicCounts {
         self.reducer_rows_reused += other.reducer_rows_reused;
         self.monomials_enqueued += other.monomials_enqueued;
         self.max_pending_monomials = self.max_pending_monomials.max(other.max_pending_monomials);
+        self.divmask_tests += other.divmask_tests;
+        self.divmask_negative += other.divmask_negative;
+        self.divmask_decided += other.divmask_decided;
     }
 }
 
@@ -247,6 +277,29 @@ pub struct MonicBasis<const N: usize, F: FiniteField> {
     /// Kept because reducer selection compares them: "the largest leading monomial that divides"
     /// is not a question about exponent vectors alone.
     order: MonomialOrder,
+
+    /// The divmask probe, when one was installed. `None` on every shipping path.
+    ///
+    /// `MonicBasis::new` cannot build it: the calibration is a function of the *input system*, and
+    /// a basis under construction is not that — calibrating off the growing basis would move the
+    /// thresholds mid-run and make the counters incomparable between batches. So it is installed
+    /// by the caller that read the system; see [`MonicBasis::probe_divmask_from`].
+    divmask: Option<DivmaskProbe<N>>,
+}
+
+/// A calibration and the mask of each basis element's leading monomial.
+///
+/// The masks are cached because the scan asks about the same leading monomials once per monomial
+/// tested, which is the asymmetry the technique rests on: msolve keeps them in `bs->lm` for
+/// exactly this reason (`symbol.c:514`). Recomputing one per test would still give the right
+/// counters and would measure a straw man.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct DivmaskProbe<const N: usize> {
+    calibration: DivmaskCalibration<N>,
+
+    /// `leads[i]` is the mask of element `i`'s leading monomial, maintained by every path that
+    /// appends to `elements`.
+    leads: Vec<u32>,
 }
 
 impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
@@ -292,7 +345,11 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
             })
             .collect();
 
-        Self { elements, order }
+        Self {
+            elements,
+            order,
+            divmask: None,
+        }
     }
 
     /// The order the basis was prepared under.
@@ -418,6 +475,83 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         );
         let appended = Self::new(std::slice::from_ref(polynomial), order);
         self.elements.extend(appended.elements);
+        self.refresh_divmask_leads();
+    }
+
+    /// Install the divmask probe, calibrated from the monomials of `system`.
+    ///
+    /// Measurement only: nothing the solver returns changes, because
+    /// [`MonicBasis::find_divisor_with`] consults the probe *after* answering and only to count
+    /// (#331). Calibrated from the system as read, which is msolve's point of calibration
+    /// (`engine.c:93`) and the only one at which the thresholds are a property of the input rather
+    /// than of how far the run has got.
+    pub fn probe_divmask_from<'a>(
+        &mut self,
+        system: impl IntoIterator<Item = &'a MultivariatePolynomial<N, F>>,
+    ) where
+        F: 'a,
+    {
+        let mut monomials: Vec<Monomial<N>> = Vec::new();
+        for polynomial in system {
+            monomials.extend(polynomial.terms().keys().copied());
+        }
+        self.divmask = Some(DivmaskProbe {
+            calibration: DivmaskCalibration::calibrate(monomials.iter()),
+            leads: Vec::new(),
+        });
+        self.refresh_divmask_leads();
+    }
+
+    /// Whether a divmask probe is installed and its calibration can decide anything.
+    pub fn divmask_is_informative(&self) -> bool {
+        self.divmask
+            .as_ref()
+            .is_some_and(|probe| probe.calibration.is_informative())
+    }
+
+    /// Bring the cached lead masks up to the element count. A no-op with no probe.
+    fn refresh_divmask_leads(&mut self) {
+        let Some(probe) = self.divmask.as_mut() else {
+            return;
+        };
+        for element in &self.elements[probe.leads.len()..] {
+            probe
+                .leads
+                .push(probe.calibration.mask(&element.leading_monomial));
+        }
+    }
+
+    /// Replay the scan the policy just performed, counting what a mask would have decided.
+    ///
+    /// Walks the basis the way the policy does — stopping at the first divisor under
+    /// [`ReducerSelection::FirstApplicable`], scanning the whole basis otherwise — so
+    /// [`SymbolicCounts::divmask_tests`] is the same population as
+    /// [`SymbolicCounts::divisor_scan_steps`]. A separate walk rather than a hook inside the four
+    /// scan functions: the probe must not be able to change which divisor is selected, and code
+    /// that cannot reach the return value cannot.
+    fn replay_divmask(
+        &self,
+        monomial: &Monomial<N>,
+        selection: ReducerSelection,
+        counts: &mut SymbolicCounts,
+    ) {
+        let Some(probe) = self.divmask.as_ref() else {
+            return;
+        };
+        let dividend = probe.calibration.mask(monomial);
+        for (index, element) in self.elements.iter().enumerate() {
+            counts.divmask_tests += 1;
+            if monomial.checked_div(&element.leading_monomial).is_some() {
+                if selection == ReducerSelection::FirstApplicable {
+                    return;
+                }
+                continue;
+            }
+            counts.divmask_negative += 1;
+            if probe.calibration.rejects(probe.leads[index], dividend) {
+                counts.divmask_decided += 1;
+            }
+        }
     }
 
     /// The leading monomial of each element, in index order.
@@ -535,6 +669,7 @@ impl<const N: usize, F: FiniteField> MonicBasis<N, F> {
         counts: &mut SymbolicCounts,
     ) -> Option<(usize, Monomial<N>)> {
         counts.divisor_queries += 1;
+        self.replay_divmask(monomial, selection, counts);
         match selection {
             ReducerSelection::FirstApplicable => {
                 for (index, element) in self.elements.iter().enumerate() {
@@ -1116,6 +1251,111 @@ mod tests {
 
     fn system(strings: &[&str]) -> Vec<MultivariatePolynomial<3, F>> {
         strings.iter().map(|s| parse(s)).collect()
+    }
+
+    /// The probe's replay covers exactly the tests the selection policy performed, under each
+    /// policy, so its three counters describe the shipping scan and not a second one.
+    #[test]
+    fn test_the_probe_replays_exactly_the_scan_the_policy_performed() {
+        let generators = system(&["x^2 + y", "x*y + z", "y^3 + x", "z^2 + x*y + 1"]);
+        for order in ALL_ORDERS {
+            for selection in [
+                ReducerSelection::FirstApplicable,
+                ReducerSelection::LargestLeadingMonomial,
+                ReducerSelection::FewestTerms,
+                ReducerSelection::MostTerms,
+            ] {
+                let mut basis = MonicBasis::new(&generators, order);
+                basis.probe_divmask_from(generators.iter());
+                assert!(basis.divmask_is_informative());
+
+                let mut counts = SymbolicCounts::default();
+                for a in 0..4u32 {
+                    for b in 0..4u32 {
+                        for c in 0..4u32 {
+                            basis.find_divisor_with(
+                                &Monomial::<3>::new(&[a, b, c]),
+                                selection,
+                                &mut counts,
+                            );
+                        }
+                    }
+                }
+                assert_eq!(
+                    counts.divmask_tests,
+                    counts.divisor_scan_steps,
+                    "{} under {:?}: the replay walked a different set of tests",
+                    order.name(),
+                    selection
+                );
+                assert!(counts.divmask_negative <= counts.divmask_tests);
+                assert!(counts.divmask_decided <= counts.divmask_negative);
+                assert!(
+                    counts.divmask_decided > 0,
+                    "{} under {:?}: the probe decided nothing, so the fixture measures nothing",
+                    order.name(),
+                    selection
+                );
+            }
+        }
+    }
+
+    /// With the probe on, the divisor selected is the same one, element for element.
+    ///
+    /// The property that makes this measurement-only: a probe that could change which divisor is
+    /// returned would change the multiplier, the row, and the matrix — so the counters would be
+    /// about a computation nothing else performs.
+    #[test]
+    fn test_the_probe_does_not_change_the_divisor_selected() {
+        let generators = system(&["x^2 + y", "x*y + z", "y^3 + x", "z^2 + x*y + 1"]);
+        for order in ALL_ORDERS {
+            for selection in [
+                ReducerSelection::FirstApplicable,
+                ReducerSelection::LargestLeadingMonomial,
+                ReducerSelection::FewestTerms,
+                ReducerSelection::MostTerms,
+            ] {
+                let plain = MonicBasis::new(&generators, order);
+                let mut probed = MonicBasis::new(&generators, order);
+                probed.probe_divmask_from(generators.iter());
+                for a in 0..5u32 {
+                    for b in 0..5u32 {
+                        for c in 0..5u32 {
+                            let monomial = Monomial::<3>::new(&[a, b, c]);
+                            let mut here = SymbolicCounts::default();
+                            let mut there = SymbolicCounts::default();
+                            assert_eq!(
+                                plain.find_divisor_with(&monomial, selection, &mut here),
+                                probed.find_divisor_with(&monomial, selection, &mut there),
+                                "{} under {:?}: the probe changed the divisor for {monomial}",
+                                order.name(),
+                                selection
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// An element appended after the probe was installed gets a mask, rather than panicking or
+    /// being read against a stale one.
+    #[test]
+    fn test_the_probe_covers_elements_appended_after_it_was_installed() {
+        let generators = system(&["x^2 + y", "x*y + z"]);
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let mut basis = MonicBasis::new(&generators, order);
+        basis.probe_divmask_from(generators.iter());
+        basis.push(&parse("y^4 + z"), order);
+
+        let mut counts = SymbolicCounts::default();
+        basis.find_divisor_with(
+            &Monomial::<3>::new(&[1, 1, 1]),
+            ReducerSelection::MostTerms,
+            &mut counts,
+        );
+        assert_eq!(counts.divmask_tests, basis.len());
+        assert_eq!(counts.divisor_scan_steps, basis.len());
     }
 
     /// Preparing a basis makes every element monic without changing the polynomial up to a unit.

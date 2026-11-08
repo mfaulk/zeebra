@@ -23,6 +23,7 @@
 pub mod budget;
 pub mod certify;
 pub mod degrees;
+pub mod divmask;
 pub mod hilbert_driven;
 pub(crate) mod interreduce;
 pub mod macaulay;
@@ -39,6 +40,7 @@ mod tests;
 pub use budget::{Allowance, BudgetApproach, BudgetLine, BudgetReport};
 pub use certify::{certify_f4_output, certify_submitted_basis, CertificationReport, Provenance};
 pub use degrees::{DegreeProfile, DegreeStatistics};
+pub use divmask::{DivmaskCalibration, DIVMASK_BITS};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
@@ -251,6 +253,11 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
     check_basis_size(basis.len(), options)?;
 
     let mut monic = MonicBasis::new(&basis, order);
+    if options.measure_divmask {
+        // Calibrated from the system as read, not from the basis as it grows: thresholds that move
+        // mid-run would make one batch's counters incomparable with the next's (#331).
+        monic.probe_divmask_from(basis.iter());
+    }
 
     // The leading monomials, maintained alongside the basis. Pair handling needs them and nothing
     // else, and taking them from a polynomial is a scan of its whole term map — which the pair

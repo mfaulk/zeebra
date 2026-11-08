@@ -16,6 +16,7 @@
 //! cargo run --release --example f4_profile -- list         # the configurations available
 //! cargo run --release --example f4_profile -- mq           # #349: the competitive MQ split
 //! cargo run --release --example f4_profile -- mq-counts    # that stage's operation counts
+//! cargo run --release --example f4_profile -- divmask     # #331: the divisor-mask counters
 //! cargo run --release --example f4_profile -- mq-matrix    # #471: the two interreduction routes
 //! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
 //! ```
@@ -892,6 +893,126 @@ fn competitive_mq(options: &F4Options) {
     }
 }
 
+/// #331: what a 32-bit calibrated divisor mask would have decided in symbolic preprocessing.
+///
+/// Counters only, which is what the issue asks for: `F4Options::measure_divmask` replays each
+/// divisibility test against the mask *after* the real answer is known, so nothing a mask could get
+/// wrong can reach the basis. The run is therefore slower than a shipping one and its durations are
+/// not quotable — the three columns are exact and machine-independent, which is the whole reason to
+/// settle this before writing a kernel.
+///
+/// The two instances are the ones #331 names, because the decision is per instance and not global:
+/// `MILESTONE-F4-OPTIMIZATION.md` §8.5 puts `symbolic` at **23% of katsura-6 lex** and **5% of
+/// katsura-7 grlex**, so the same mask hit rate is worth four times as much on the first.
+fn divmask_counters() {
+    println!();
+    println!("## #331: the divisor mask, counted rather than used");
+    println!();
+    println!("ISA: {}", zeebra::util::isa_floor());
+    println!("mask width: {} bits", zeebra::grobner::DIVMASK_BITS);
+    println!();
+    println!("`tests` is divisibility tests symbolic preprocessing performed — the same");
+    println!("population as `scan` under the shipping scan, asserted equal by");
+    println!("`test_the_probe_replays_exactly_the_scan_the_policy_performed`. `neg` answered");
+    println!("not-divisible, which is all a mask can ever shortcut. `decided` is the subset a");
+    println!("32-bit mask with input-calibrated thresholds settles without an exponent compare.");
+    println!("`of neg` and `of tests` are that subset over each denominator; the second is the");
+    println!("one that bounds what a kernel could save, because a positive answer stays in the");
+    println!("stage's cost whatever the representation.");
+    println!();
+    println!("`tests/q` is tests per divisor lookup, which is what the dividend's own mask");
+    println!("amortizes over: the lead masks are cached on the basis the way msolve caches");
+    println!("`bs->lm`, so the only mask a query has to build is the one it asks about. That is");
+    println!("the figure that decides whether `Monomial<N>` has to carry a mask field at all.");
+    println!();
+    println!("`maxexp` is the largest exponent in the input, which is what the thresholds are");
+    println!("calibrated from. Each variable gets `32/vars` bits, and an input whose exponent");
+    println!("range is at or below that count calibrates to unit steps — exactly the thresholds");
+    println!("a fixed scheme would pick. Where that holds the calibration earns nothing, and");
+    println!("msolve's reason for having one is inputs with ranges wide enough to need it.");
+    println!();
+    println!(
+        "{:<12} {:<8} {:>5} {:>7} {:>7} {:>12} {:>12} {:>12} {:>8} {:>9} {:>8}",
+        "system",
+        "order",
+        "vars",
+        "bits/v",
+        "maxexp",
+        "tests",
+        "neg",
+        "decided",
+        "of neg",
+        "of tests",
+        "tests/q"
+    );
+
+    macro_rules! go {
+        ($n:literal, $label:expr, $system:expr, $order:expr, $order_name:expr) => {{
+            let system: Vec<MultivariatePolynomial<$n, F>> = $system;
+            let options = F4Options {
+                measure_divmask: true,
+                ..F4Options::default()
+            };
+            let maximum_exponent = system
+                .iter()
+                .flat_map(|polynomial| polynomial.terms().keys())
+                .flat_map(|monomial| monomial.exponents().iter().copied())
+                .max()
+                .unwrap_or(0);
+            let (_, statistics) = f4_with_options(&system, $order, &options)
+                .expect("the instance finishes under the default budget");
+            let negative = statistics.divmask_negative.max(1) as f64;
+            println!(
+                "{:<12} {:<8} {:>5} {:>7} {:>7} {:>12} {:>12} {:>12} {:>7.1}% {:>8.1}% {:>8.1}",
+                $label,
+                $order_name,
+                $n,
+                zeebra::grobner::DIVMASK_BITS / $n,
+                maximum_exponent,
+                statistics.divmask_tests,
+                statistics.divmask_negative,
+                statistics.divmask_decided,
+                100.0 * statistics.divmask_decided as f64 / negative,
+                100.0 * statistics.divmask_decided_share(),
+                statistics.divisor_scan_steps_per_query()
+            );
+        }};
+    }
+
+    go!(
+        6,
+        "katsura-6",
+        katsura::<6, F>(),
+        MonomialOrder::Lexicographic,
+        "lex"
+    );
+    go!(
+        7,
+        "katsura-7",
+        katsura::<7, F>(),
+        MonomialOrder::GradedLexicographic,
+        "grlex"
+    );
+    // Two controls. katsura-6 grlex is the same ideal under the order where `symbolic` is small,
+    // which separates "the mask works here" from "this order asks a lot of divisibility
+    // questions"; cyclic-5 is a different family, so a hit rate that is a property of katsura
+    // rather than of the technique shows up as a disagreement.
+    go!(
+        6,
+        "katsura-6",
+        katsura::<6, F>(),
+        MonomialOrder::GradedLexicographic,
+        "grlex"
+    );
+    go!(
+        5,
+        "cyclic-5",
+        cyclic::<5, F>(),
+        MonomialOrder::GradedReverseLexicographic,
+        "grevlex"
+    );
+}
+
 fn main() {
     let argument = std::env::args().nth(1).unwrap_or_else(|| "baseline".into());
 
@@ -903,7 +1024,7 @@ fn main() {
     if argument == "list" {
         println!("configurations: {}", CONFIGURATIONS.join(", "));
         println!(
-            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation\n             counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's\n             batch row form A/B), mq-instance (its canonical text)"
+            "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation\n             counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's\n             batch row form A/B), mq-instance (its canonical text), divmask\n             (#331's divisor-mask counters)"
         );
         return;
     }
@@ -962,6 +1083,11 @@ fn main() {
         println!("rung the matrix interreduction route regresses 25x on.");
         println!();
         compare_batch_row_forms_on_the_rungs();
+        return;
+    }
+
+    if argument == "divmask" {
+        divmask_counters();
         return;
     }
 
