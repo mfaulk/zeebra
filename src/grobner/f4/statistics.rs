@@ -317,6 +317,14 @@ pub struct BatchStatistics {
     /// happens, so this is comparable between the two.
     pub free_pivots: usize,
 
+    /// Rows the back-substitution pass examined, or `None` when
+    /// [`super::F4Options::reduce_batch_rows`] was off.
+    ///
+    /// `Some(0)` and `None` are different findings: the first says the batch's echelon form was
+    /// already reduced and so carried no debt forward, the second says nobody looked. #477 exists
+    /// because the debt is real on `mq-random-10`, and this is where a batch reports its share.
+    pub back_substituted_rows: Option<usize>,
+
     /// Distinct leading monomials among the input rows.
     ///
     /// `reducer_rows` of them come from the reducer block, whose leading monomials are distinct by
@@ -613,6 +621,13 @@ pub struct F4Statistics {
     /// Summed over every batch: pivots established without a row operation.
     pub free_pivots: usize,
 
+    /// Summed over every batch: rows the back-substitution pass examined, or `None` when
+    /// [`super::F4Options::reduce_batch_rows`] was off for every batch.
+    ///
+    /// The price side of #477's trade, in the unit the price is paid in. The payoff side is
+    /// [`Self::interreduction_matrix`]'s shape, which is why the two are reported together.
+    pub back_substituted_rows: Option<usize>,
+
     /// Summed over every batch: rank the pair rows added on top of the reducer block.
     ///
     /// The useful-work figure. See [`super::degrees`] for why this and not the zero-row count.
@@ -763,6 +778,9 @@ impl F4Statistics {
         self.monomials_enqueued += batch.monomials_enqueued;
         self.max_pending_monomials = self.max_pending_monomials.max(batch.max_pending_monomials);
         self.free_pivots += batch.free_pivots;
+        if let Some(rows) = batch.back_substituted_rows {
+            *self.back_substituted_rows.get_or_insert(0) += rows;
+        }
         self.candidate_rank_contribution += batch.candidate_rank_contribution();
         self.dependent_candidate_rows += batch.dependent_candidate_rows();
         self.mutant_elements += batch.candidates_below_batch_degree;

@@ -374,6 +374,37 @@ pub struct F4Options {
     /// [`super::F4Statistics::interreduction_matrix`] rather than being silent.
     pub interreduce_by_matrix: bool,
 
+    /// Leave each batch's rows in **reduced** row echelon form rather than merely echelon.
+    ///
+    /// Off by default until the A/B is on record, which is the discipline every other strategy
+    /// flag in this struct follows.
+    ///
+    /// # What it changes, and what it cannot change
+    ///
+    /// Candidates are extracted from the rows whose leading column is new. Echelon is enough for
+    /// that selection — back-substitution never changes a row's *leading* column — so this flag
+    /// **cannot** change which rows become candidates, and
+    /// `reduction::tests::test_the_row_form_does_not_change_candidate_selection` asserts that
+    /// rather than arguing it. What it changes is each candidate's **tail**: an echelon row still
+    /// carries entries in other pivots' columns, i.e. monomials that other basis elements lead
+    /// with, so every batch emits candidates that are not in normal form and the debt is paid once
+    /// at the end by final interreduction. #477 measured that final matrix at 405x the cells
+    /// Groebner.jl's carries, and attributed it here.
+    ///
+    /// It cannot change the answer either, for the same reason
+    /// [`Self::interreduce_by_matrix`] cannot: a reduced Gröbner basis is determined by its
+    /// leading monomials.
+    ///
+    /// # What it costs
+    ///
+    /// A second sweep over every batch matrix, where the flag above pays one over a single much
+    /// smaller matrix at the end. Back-substitution is quadratic in the rows whatever the sparsity
+    /// (#168), the batch stage is already 13.90% of `mq-random-10`, and
+    /// [`super::BlockPlan::InterreducedBlock`] was measured and **rejected** for filling in the
+    /// reducer block — which is the same fill-in paid before the elimination instead of after it.
+    /// So the prior is unfavourable and the measurement is the point.
+    pub reduce_batch_rows: bool,
+
     /// Break the work down by the degree it was done at, into
     /// [`super::F4Statistics::degrees`].
     ///
@@ -412,6 +443,7 @@ impl F4Options {
             measure_stages: false,
             count_interreduction: false,
             interreduce_by_matrix: false,
+            reduce_batch_rows: false,
             profile_degrees: false,
         }
     }

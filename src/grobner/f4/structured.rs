@@ -32,7 +32,7 @@ use crate::{
     grobner::f4::{macaulay::MacaulayMatrix, symbolic::RowKind},
     linalg::{
         echelon::{reduce_rows_against_pivots_with, row_echelon_with, Backend},
-        sparse::{EliminationStatistics, SparseMatrix},
+        sparse::{back_substitute_pivots_within, EliminationStatistics, SparseMatrix},
     },
     FiniteField,
 };
@@ -80,6 +80,38 @@ pub struct BlockOutcome {
 
     /// Pivots established without a single row operation: the reducer block.
     pub free_pivots: usize,
+
+    /// Rows the back-substitution pass examined, or `None` when it did not run.
+    ///
+    /// Distinguishes "the pass was off" from "the pass ran and found nothing to do", which are the
+    /// two readings of a zero and mean opposite things about whether #477's debt exists.
+    pub back_substituted_rows: Option<usize>,
+}
+
+/// Whether a batch elimination leaves its rows merely echelon, or reduced.
+///
+/// The lever #477 is about. Echelon is enough to *extract* candidates — a row's leading column is
+/// the same either way, so the selection cannot change — but it leaves every candidate carrying
+/// entries in other pivots' columns, i.e. reducible monomials in its tail. That debt accumulates
+/// over every batch and is paid once at the end, by final interreduction, as a matrix two orders
+/// of magnitude larger in cells than the comparand's.
+///
+/// Reducing here is not free, and the arithmetic does not say which way it goes: the batch matrices
+/// are much larger than the one final interreduction builds, back-substitution is quadratic in the
+/// rows whatever the sparsity (#168), and [`BlockPlan::InterreducedBlock`] was already measured and
+/// rejected for filling in the reducer block — which is the same fill-in, paid before the
+/// elimination instead of after it.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RowForm {
+    /// Leave the rows in echelon form. The shipped behaviour.
+    #[default]
+    Echelon,
+
+    /// Clear every pivot column from every other row after the plan's elimination.
+    ///
+    /// Applies to whichever [`BlockPlan`] ran, including the ones that take the reducer block as
+    /// given: the pass is a second sweep over the result, not a different elimination.
+    Reduced,
 }
 
 /// Why a reducer block was not the triangular prefix block elimination relies on.
@@ -167,11 +199,53 @@ pub fn eliminate<const N: usize, F: FiniteField>(
     matrix: &mut MacaulayMatrix<N, F>,
     max_nonzeros: usize,
 ) -> Result<BlockOutcome, usize> {
+    eliminate_to(plan, RowForm::Echelon, backend, matrix, max_nonzeros)
+}
+
+/// [`eliminate`], with the row form the result is left in chosen by the caller.
+///
+/// # Panics
+/// As [`eliminate`].
+///
+/// # Errors
+/// The live entry count that crossed `max_nonzeros`, from either pass.
+pub fn eliminate_to<const N: usize, F: FiniteField>(
+    plan: BlockPlan,
+    form: RowForm,
+    backend: Backend,
+    matrix: &mut MacaulayMatrix<N, F>,
+    max_nonzeros: usize,
+) -> Result<BlockOutcome, usize> {
+    let mut outcome = eliminate_in_echelon(plan, backend, matrix, max_nonzeros)?;
+    if form == RowForm::Reduced {
+        // The second pass is sparse whatever the backend chose for the first. The dense and
+        // accumulated kernels exist for the pivot-discovery sweep over a batch matrix; this pass
+        // visits only the rows that hold a pivot column, which is the shape the sparse one is
+        // already output-sensitive in, and duplicating it per backend would be three copies of a
+        // pass whose cost this issue exists to find out.
+        let rows = back_substitute_pivots_within(
+            matrix.matrix_mut(),
+            max_nonzeros,
+            &mut outcome.statistics,
+        )?;
+        outcome.back_substituted_rows = Some(rows);
+    }
+    Ok(outcome)
+}
+
+/// The plan's own elimination, leaving the rows in echelon form.
+fn eliminate_in_echelon<const N: usize, F: FiniteField>(
+    plan: BlockPlan,
+    backend: Backend,
+    matrix: &mut MacaulayMatrix<N, F>,
+    max_nonzeros: usize,
+) -> Result<BlockOutcome, usize> {
     if plan == BlockPlan::Baseline {
         let statistics = row_echelon_with(backend, matrix.matrix_mut(), max_nonzeros)?;
         return Ok(BlockOutcome {
             statistics,
             free_pivots: 0,
+            back_substituted_rows: None,
         });
     }
 
@@ -191,6 +265,7 @@ pub fn eliminate<const N: usize, F: FiniteField>(
         BlockPlan::ReducersFirstEchelon => Ok(BlockOutcome {
             statistics: row_echelon_with(backend, matrix.matrix_mut(), max_nonzeros)?,
             free_pivots: 0,
+            back_substituted_rows: None,
         }),
 
         BlockPlan::ReducersFirstBlock => Ok(BlockOutcome {
@@ -201,6 +276,7 @@ pub fn eliminate<const N: usize, F: FiniteField>(
                 max_nonzeros,
             )?,
             free_pivots: split,
+            back_substituted_rows: None,
         }),
 
         BlockPlan::InterreducedBlock => {
@@ -223,6 +299,7 @@ pub fn eliminate<const N: usize, F: FiniteField>(
             Ok(BlockOutcome {
                 statistics,
                 free_pivots: split,
+                back_substituted_rows: None,
             })
         }
     }
