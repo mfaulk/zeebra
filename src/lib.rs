@@ -41,6 +41,13 @@ pub use fft::{
 };
 pub use fields::{FiniteField, KnownOrder, ParseFieldElementError};
 pub use identities::{One, Zero};
+#[doc(hidden)]
+pub use poly::{
+    div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
+    karatsuba_base_case_unstable, karatsuba_unstable, multiply_multivariate_unstable,
+    multivariate_multiply_route_unstable, newton_crossover_unstable, newton_is_cheaper_at_unstable,
+    MultiplyRoute,
+};
 pub use poly::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
@@ -49,11 +56,6 @@ pub use poly::{
     BuildMonomialHasher, GcdRoute, GraeffeError, GraeffeStats, Monomial, MonomialHasher,
     MonomialMap, MonomialOrder, MonomialSet, MultivariatePolynomial, Polynomial, PolynomialParams,
     PowerPermutation, SquarefreeError, SubgroupRoute, UnivariatePolynomial,
-};
-#[doc(hidden)]
-pub use poly::{
-    karatsuba_base_case_unstable, karatsuba_unstable, multiply_multivariate_unstable,
-    multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use rings::Ring;
 

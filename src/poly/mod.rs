@@ -12,6 +12,12 @@ pub use multivariate::{
     MonomialSet, MultivariatePolynomial, NormalFormCounts, SquarefreeError,
 };
 pub(crate) use univariate::multiply_dense;
+#[doc(hidden)]
+pub use univariate::{
+    div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
+    karatsuba_base_case_unstable, karatsuba_unstable, newton_crossover_unstable,
+    newton_is_cheaper_at_unstable,
+};
 pub use univariate::{
     factorize, gcd, graeffe_2, graeffe_2_over_domain, graeffe_all_roots, graeffe_l, graeffe_root,
     graeffe_root_with_stats, inverse_exponent, is_irreducible, is_permutation_exponent,
@@ -20,8 +26,6 @@ pub use univariate::{
     GraeffeError, GraeffeStats, Polynomial, PolynomialParams, PowerPermutation, SubgroupRoute,
     UnivariatePolynomial,
 };
-#[doc(hidden)]
-pub use univariate::{karatsuba_base_case_unstable, karatsuba_unstable};
 
 #[cfg(test)]
 pub(crate) use univariate::trace_to_gf2;
