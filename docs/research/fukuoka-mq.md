@@ -270,26 +270,47 @@ with its own worked pair: `de` is `1101 1110` = `x^7+x^6+x^4+x^3+x^2+x`, and `8d
 base 16 and the resulting integer as a coefficient bit pattern, lowest degree first. That is
 exactly what the inherent `BinaryFieldElement::new` takes.
 
-**Three concrete things this costs the importer today**, all of them #197's and none of them fixed
-here:
+**Three concrete things this cost the importer**, all of them #197's and **all three now fixed**:
 
-1. `MqField::parse` matches only `"GF(2)"`, `"GF(256)"` and `"GF(2^8)"`, so a genuine type II or
-   type V file fails at the header with `MqError::BadHeader`. No real GF(2^8) instance can be
-   parsed at all. Filed as #414.
-2. That header rejection is **load-bearing for correctness, not tidiness**. Coefficients are parsed
-   with `token.parse::<u64>()`, i.e. decimal, and the range check is `value > 256`. So a hex byte
-   whose digits happen to all be decimal — `08`, `13`, `99` — would parse as a *different* element
-   and pass the range check silently. Making `MqField::parse` accept the real header without also
-   switching to base 16 would turn a loud failure into a wrong system. Filed as #414.
+1. `MqField::parse` matched only `"GF(2)"`, `"GF(256)"` and `"GF(2^8)"`, so a genuine type II or
+   type V file failed at the header with `MqError::BadHeader`. No real GF(2^8) instance could be
+   parsed at all. Filed as #414 and **fixed**: `MqField::parse_header` reads the quotient-ring
+   spelling and returns the stated modulus alongside the field, which `MqInstance::modulus`
+   records.
+2. That header rejection was **load-bearing for correctness, not tidiness**. Coefficients were
+   parsed with `token.parse::<u64>()`, i.e. decimal, and the range check was `value > 256`. So a hex
+   byte whose digits happen to all be decimal — `08`, `13`, `99` — would have parsed as a
+   *different* element and passed the range check silently. Accepting the real header without also
+   switching to base 16 would have turned a loud failure into a wrong system, so #414 did both at
+   once: `MqField::radix` is 16 for GF(2^8) on coefficient rows and answer vectors alike, and
+   `MqField::max_coefficient` is `0xff` there rather than the order.
 3. `MqInstance::parse_answer` split on `!c.is_ascii_digit()`, so the published GF(2^8) answer
    `[a3, 67, 64, 5c, ab, 81, 4f, e6, f5, b8]` yielded nine values rather than ten, each of them
    wrong, with no error. Filed as #415 and **fixed**: the parser is a method on the instance, takes
-   its base from `MqField::answer_radix`, and returns `Result` — so a coordinate count that is not
-   the instance's `n` is `MqError::WrongAnswerCount` and an unreadable or out-of-range token is
+   its base from `MqField::radix`, and returns `Result` — so a coordinate count that is not the
+   instance's `n` is `MqError::WrongAnswerCount` and an unreadable or out-of-range token is
    `MqError::BadAnswerValue`, instead of either being dropped.
 
 Since `from_str` for `BinaryFieldElement` reads a **decimal** integer as a bit pattern (#377), it is
-not the route for these tokens either: the importer needs its own base-16 decode.
+not the route for these tokens: the importer has its own base-16 decode.
+
+**And the coefficient route is not `FiniteField::new` either.** For `BinaryFieldElement` the trait
+`new` is the prime-subfield embedding — `Gf256Mq::new(0xa7)` is `1` — so building a GF(2^8) system
+through it would collapse every byte to a bit and produce a system of the right shape whose every
+coefficient is wrong. `MqInstance::system` goes through `KnownOrder::element_at`, which for a binary
+field is the bit pattern `util.m` writes; the prime types stay on `new`, because the published
+GF(31) files carry the literal token `31` and it is congruent to zero. Pinned by
+`test_gf256_coefficients_do_not_go_through_the_prime_subfield_embedding`.
+
+### The modulus is verified against the coefficient type, not assumed
+
+Because the header *states* the irreducible polynomial, `MqInstance::check_coefficient_field` can
+check it rather than trust a convention. It derives the coefficient type's own modulus from
+arithmetic — in a binary field `element_at(2)` is `x`, so `x^8` is the modulus with its leading term
+dropped, which is the defining relation of the quotient ring and the only thing separating two
+irreducible polynomials of the same degree — and refuses a mismatch as `MqError::WrongModulus`. So
+`Gf256` (AES, `0x11B`) is refused for a challenge file and `Gf256Mq` (`0x11D`) is accepted, and
+neither order comparison nor type signature could have told them apart.
 
 ---
 
@@ -752,7 +773,8 @@ Three things make it worth stating precisely rather than assuming.
    evaluation.
 
 Answer-file syntax is `[v1, v2, …]`, decimal for GF(2) and GF(31) and two-digit hex for GF(2^8).
-The hex case is not handled — §2.5 item 3, #415.
+Both bases are handled — §2.5 item 3, #415 — and the same `MqField::radix` decides the base of a
+coefficient row, which is #414.
 
 ---
 
@@ -781,9 +803,11 @@ Collected so they are not buried.
    by hand, and `util.m` is the challenge's own reader. The empirical finding was right; the claim
    that it had to be empirical was not. (§2, §2.1)
 2. **The GF(2^8) header is `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1`.** Not `GF(2^8)`, not `GF(256)`.
-   `MqField::parse` matches neither of the real spellings, so no genuine type II or type V file
-   parses. The header carries the modulus, which means it can be *verified* rather than assumed.
-   (§2.5, #414)
+   `MqField::parse` matched neither of the real spellings, so no genuine type II or type V file
+   parsed. The header carries the modulus, which means it can be *verified* rather than assumed —
+   and since #414 it is: `MqInstance::check_coefficient_field` derives the coefficient type's own
+   modulus and refuses a mismatch, so `Gf256` is refused for a challenge file where `Gf256Mq` is
+   accepted. (§2.5, #414)
 3. **"The binary and extension field modules are not publicly exported" was stale in two places,
    and the real blocker was different.** Both modules have been public since `8757b4a`; the thing
    that actually prevented a GF(2^8) parse was `todo!()` in `FiniteField::new`/`from_str`, closed
