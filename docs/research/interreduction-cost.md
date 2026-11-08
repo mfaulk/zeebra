@@ -409,6 +409,143 @@ the prefix's size from an end-to-end ratio, which is a weaker instrument than co
 `terms_below_window` counter beside the existing ones would turn the inference into a measurement,
 and is the honest remaining item on #440.
 
+**Taken in §3c.**
+
+---
+
+## 3c. #440 stage 1, finished: the per-step region split, counted rather than inferred
+
+One `mq-counts` run at the recorded digest `72d0ad315fc25409…`, build flags verified in the
+artifact. Every count in §3 reproduces to the digit — 602 377 popped, 68 242 in the answer,
+18 296 667 tail terms merged, 1 174 314 651 rewritten over 534 135 steps, 64.2x — so this is the
+same computation §3 described, with three more counters on it.
+
+| region of the per-step rewrite | what it costs an element | terms | share | mean a step |
+|---|---|---:|---:|---:|
+| below the window, `[0, pos(q·tail_min))` | `extend_from_slice` | 166 320 801 | **14.2%** | 311.4 |
+| **the span, `[pos(q·tail_min), pos(q·tail_max)]`** | **a monomial multiply and an `order.cmp`** | **893 610 377** | **76.1%** | **1 673.0** |
+| above the window | `extend_from_slice` | 114 383 473 | 9.7% | 214.2 |
+| total rewritten | | 1 174 314 651 | | 2 198.5 |
+
+**§3.0a's inference was right, and this is the measurement it asked for.** Three quarters of the
+rewrite is in the region that pays a monomial multiply and a `MonomialOrder::cmp` per element; the
+quarter that is `memcpy` is split 14.2% below the window and 9.7% above it. So the 30.2 ns a term
+in §3.0a is not a bandwidth figure averaged over a memcpy — it is the per-element cost of the
+comparison region, diluted by a quarter of cheap copying.
+
+**It also explains stage 2's ~7% exactly, in the direction §3b.1 guessed.** The window removes the
+comparison work over the prefix, and the prefix is **14.2%** of the rewrite. A change that removes
+14.2% of the dominant cost in a stage that is ~86% of the run predicts roughly 10% end to end, and
+§3b measured 3.4%–9.3%. The prefix is small, as §3b.1 inferred from the ratio; it is now counted.
+
+**The window's downside is bounded, and now quantified.** Comparisons total 900 169 163 against a
+span of 893 610 377, so everything that is not a span element — the binary search plus the two
+loop-exit comparisons — is **6 558 786**, i.e. **12.3 a step** against a mean working polynomial of
+2 199 whose `log2` is 11.1. The `partition_point` costs what it claims and nothing more.
+
+### 3c.1 And it exposes a redundancy that is neither of #440's three stages
+
+| | count |
+|---|---:|
+| divisor-tail terms merged | 18 296 667 |
+| **`Monomial` products computed in the merge** | **894 232 085** |
+| products per tail term merged | **48.9x** |
+
+`subtract_shifted`'s merge loop computed `&tail[j].0 * monomial` **once per iteration**, and
+`Ordering::Less` — the branch taken for every working term stepped over, which is 1 673 of them a
+step against a 34.3-term tail — leaves `j` alone. So the same ten-`u32` product was recomputed
+across the whole span: **875 935 418 of the 894 232 085 products were recomputations of a value the
+previous iteration had already formed.**
+
+This is not a candidate from #436's list and not one of #440's three stages. It needs no new data
+structure, no new boundary and no change of algorithm — only computing the shifted term in the
+outer loop, where `j` advances, instead of the inner one. The bound after the change is
+`tail_terms_merged + 2 · reduction_steps` = 19 364 937 products, a **46.2x** reduction, and
+`sparse_multivariate_polynomial_arithmetic::tests::test_the_merge_multiplies_each_tail_term_once`
+asserts that bound rather than trusting it.
+
+Whether removing 875.9 M monomial multiplies moves the wall clock is a separate question from
+whether the source performs them, because LLVM's partial-redundancy elimination could in principle
+have hoisted the product across the back edge already. §3c.2 measures it, and the answer is the
+useful part of this section.
+
+### 3c.2 The hoist, measured: ~1.6% on the stage, and that is the finding
+
+Three reps, **interleaved** between the hoist and its parent, one session, on the lock, pinned to
+cores 0-7, two builds from one tree into separate binaries with each artifact's AVX2 floor verified
+by `tools/vec_census.sh` — the same protocol as §3b, for the same reason.
+
+| rep | base total | hoist total | ratio | base stage | hoist stage | ratio |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 28 514.09 | 28 409.27 | 1.0037x | 22 760.56 | 22 530.91 | 1.0102x |
+| 2 | 28 900.52 | 28 550.93 | 1.0122x | 22 988.56 | 22 598.37 | 1.0173x |
+| 3 | 28 539.24 | 28 321.35 | 1.0077x | 22 815.06 | 22 459.63 | 1.0158x |
+
+**Median 1.0077x end to end and 1.0158x on the stage, against a base-side spread of 1.0136x and
+1.0100x.** Sign consistent 3 of 3, paired within each rep. That is evidence it is not a regression
+and **it is not a measured speedup**, by the same standard §3b applied to stage 2.
+
+**The negative result is worth more than the change.** Removing **875 935 418** monomial multiplies
+from a 22.8-second stage moved it by about 360 ms — **under 0.4 ns a removed multiply**, which is
+less than a single `checked_add`. A ten-variable `Monomial` product cannot be that cheap, so it was
+not being performed: either LLVM eliminated the loop-carried redundancy already, or the multiply
+issued into slots the loop was spending on something else. The two are not separable from a
+duration, and nothing here distinguishes them.
+
+**So §3.0a's attribution needs splitting, and this is the half that was wrong.** §3.0a read the
+30.2 ns a term as "one `Monomial` multiply (recomputed per call rather than per surviving term) plus
+one `MonomialOrder::cmp`". The multiply half is now measured at **≤1.6% of the stage**. What is left
+in the span is the **comparison** and the **term copy** — 893 610 377 of each — and the per-term
+cost is theirs.
+
+**It ships anyway, on the same grounds stage 2 did, plus one this repository should care about more:
+the counter was lying.** Before the hoist, `merge_monomial_multiplies` reported 894 232 085
+multiplies that the machine was not performing — an instrument that would have funded a fix for a
+cost that does not exist, which is precisely the failure mode §3.0a's inference fell into. After it,
+the counter reports **19 364 937** and matches what the hardware does.
+
+### 3c.3 What stage 3 is now competing against
+
+Stage 1 is finished and its verdict is sharper than the four #440 asked for. The stage is
+**copy-bound in volume and compare-bound in cost**: 76.1% of the rewritten terms sit in the region
+that pays per element, and the window cannot reach them because the shifted tail genuinely
+straddles the working polynomial (§3b.1, now counted). Both cheap routes are now spent and **both
+measured inside the noise** — stage 2's window took the 14.2% prefix for ~7%, §3c.2's hoist took the
+48.9x multiply redundancy for ~1.6% — and what remains in the span is **893 610 377
+`MonomialOrder::cmp` calls and 1 174 314 651 term copies**, which §3c.2 narrows the per-term cost
+down to. Only two things touch those: a cheaper comparison (#317), or a structure that never
+materializes the working polynomial.
+
+That is Monagan–Pearce heap division, #440 stage 3. Reference of record under
+`docs/research/external-provenance-policy.md` §6: **Monagan and Pearce, *Sparse polynomial division
+using a heap*, J. Symbolic Comput. 46 (2011) 807–822**, and *Polynomial division using dynamic
+arrays, heaps, and packed exponent vectors*, CASC 2007, LNCS 4770, 295–315. No implementation was
+read and no code copied; any implementation would be from the published description.
+
+**The headroom, labelled as an extrapolation rather than a measurement.** The heap holds one pending
+entry per quotient term with an unexhausted divisor tail, so the live set goes from 2 199 terms to
+at most `k` entries, where `k` is the quotient length — on this instance 534 135 steps over 247
+elements, i.e. about **2 162** streams an element, `log2 k ≈ 11.1`. Total heap traffic is one
+insert and one pop per tail term merged: **18 296 667**, against the span's 893 610 377
+comparisons. At a sift cost of 1–2 comparisons a level that is **2.0e8–4.1e8** comparisons, a
+**2.2x–4.4x** reduction in monomial comparisons, and the 1.17 billion term copies go to **zero**.
+Against that: the comparisons become random access into a `k`-entry heap where today they are a
+sequential walk, which is the risk #440 named and which no count can settle.
+
+**And §3c.2 is a warning about that extrapolation, not a reason to trust it.** Two changes aimed at
+counted operations in this merge have now each predicted a large reduction in a count and delivered
+a ratio inside the noise. A third prediction from the same counters — however arithmetically sound —
+has to carry that record with it. The heap is worth building only with an A/B budgeted up front and
+a willingness to discard it on its numbers.
+
+**And the stage it would speed up is no longer F4's.** #471 replaced final interreduction with one
+Macaulay matrix at a measured 4.18x (§3a), so stage 3's value is for the division route that
+survives — FGLM border reduction, the differential oracles, `multi_div_rem`, and the lex
+shape-position bases where #478 measured division **25x** better than the matrix. The trigger #440
+wrote ("only if stage 2 leaves the copies dominant") is met and then some; the *priority* is lower
+than when it was written, because the instance that motivated it no longer runs this code by
+default.
+
 ---
 
 ## 3c. #477: the debt, paid where it is incurred
@@ -573,5 +710,7 @@ ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
 tools/benchlock.sh <tag> taskset -c 0-7 cargo bench --bench f4_stages -- interreduction
 
 # #440 stage 2's A/B is between two commits rather than two flags, so it needs two builds
-# from one tree into separate target directories, interleaved. See §3b.
+# from one tree into separate target directories, interleaved. See §3b. The same applies to
+# §3c.2's hoist; §3c's region split is counts and comes out of the `mq-counts` run above,
+# on the `regions:` and `merge ops:` lines.
 ```

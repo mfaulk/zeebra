@@ -730,6 +730,7 @@ fn sorted_terms<const N: usize, F: FiniteField>(
 /// Both inputs are sorted and the shifted tail stays sorted, because monomial orders are
 /// multiplicative. So this is a merge: linear in the two lengths, and writing sequentially into a
 /// reused buffer rather than allocating.
+///
 /// `COUNT` fills the merge-region counters in `counts`; it is a const generic so the uncounted path
 /// compiles the increments away and cannot drift from the code they describe.
 fn subtract_shifted<const N: usize, F: FiniteField, const COUNT: bool>(
@@ -786,31 +787,45 @@ fn subtract_shifted<const N: usize, F: FiniteField, const COUNT: bool>(
         start
     };
 
+    // The shifted tail term is computed once per `j`, in the outer loop, rather than once per
+    // iteration of the merge. `Ordering::Less` leaves `j` alone and is the overwhelmingly common
+    // branch — `docs/research/interreduction-cost.md` §3c measured the span the tail straddles at
+    // two orders of magnitude more working terms than tail terms — so recomputing the product
+    // inside the match repeated the same ten-`u32` multiply across the whole span.
     let mut i = start;
     let mut j = 0;
     while i < working.len() && j < tail.len() {
         if COUNT {
             counts.merge_monomial_multiplies += 1;
-            counts.merge_comparisons += 1;
         }
         let shifted = &tail[j].0 * monomial;
-        match order.cmp(&working[i].0, &shifted) {
-            Ordering::Less => {
-                scratch.push(working[i]);
-                i += 1;
+        loop {
+            if COUNT {
+                counts.merge_comparisons += 1;
             }
-            Ordering::Greater => {
-                scratch.push((shifted, F::zero() - coefficient * tail[j].1));
-                j += 1;
-            }
-            Ordering::Equal => {
-                let merged = working[i].1 - coefficient * tail[j].1;
-                // Terms that cancel are dropped, keeping the representation canonical.
-                if !merged.is_zero() {
-                    scratch.push((working[i].0, merged));
+            match order.cmp(&working[i].0, &shifted) {
+                Ordering::Less => {
+                    scratch.push(working[i]);
+                    i += 1;
+                    if i == working.len() {
+                        break;
+                    }
                 }
-                i += 1;
-                j += 1;
+                Ordering::Greater => {
+                    scratch.push((shifted, F::zero() - coefficient * tail[j].1));
+                    j += 1;
+                    break;
+                }
+                Ordering::Equal => {
+                    let merged = working[i].1 - coefficient * tail[j].1;
+                    // Terms that cancel are dropped, keeping the representation canonical.
+                    if !merged.is_zero() {
+                        scratch.push((working[i].0, merged));
+                    }
+                    i += 1;
+                    j += 1;
+                    break;
+                }
             }
         }
     }
@@ -1870,6 +1885,17 @@ mod tests {
                                 "the regions must partition the rewrite, {}",
                                 order.name()
                             );
+                            // And each shifted tail term is multiplied out at most once a step,
+                            // rather than once per working term the merge steps over it.
+                            prop_assert!(
+                                c.merge_monomial_multiplies
+                                    <= c.tail_terms_merged + 2 * c.reduction_steps,
+                                "{} multiplies for {} tail terms over {} steps, {}",
+                                c.merge_monomial_multiplies,
+                                c.tail_terms_merged,
+                                c.reduction_steps,
+                                order.name()
+                            );
                         }
                         Ok(())
                     },
@@ -1879,6 +1905,46 @@ mod tests {
         case::<2, PrimeFieldElement64<13>>();
         case::<3, PrimeFieldElement64<7>>();
         case::<4, PrimeFieldElement64<2147483647>>();
+    }
+
+    /// A merge that steps a long way over one shifted tail term multiplies it out once, not once
+    /// per working term stepped over.
+    #[test]
+    fn test_the_merge_multiplies_each_tail_term_once() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::Lexicographic;
+        let parse = |s: &str| MultivariatePolynomial::<1, F>::parse(s, ["x"]).unwrap();
+
+        // `x^30 - x^29 - x` shifts its tail to `{x, x^29}` at quotient 1, so the window's prefix
+        // is the single term `1` and the merge then walks `x^2 … x^15` against `x^29` — fourteen
+        // working terms for which `x^29` is the same product every time.
+        let dividend = parse(
+            "x^30 + x^15 + x^14 + x^13 + x^12 + x^11 + x^10 + x^9 + x^8 + x^7 + x^6 + x^5 \
+             + x^4 + x^3 + x^2 + x + 1",
+        );
+        let divisor = parse("x^30 - x^29 - x");
+        let (remainder, counts) =
+            dividend.normal_form_counted(std::slice::from_ref(&divisor), order);
+
+        assert_eq!(
+            remainder,
+            dividend
+                .multi_div_rem(std::slice::from_ref(&divisor), order)
+                .1
+        );
+        assert!(
+            counts.terms_in_merge_span >= 14,
+            "the merge has to actually walk the span: {}",
+            counts.terms_in_merge_span
+        );
+        assert!(
+            counts.merge_monomial_multiplies
+                <= counts.tail_terms_merged + 2 * counts.reduction_steps,
+            "{} multiplies for {} tail terms over {} steps",
+            counts.merge_monomial_multiplies,
+            counts.tail_terms_merged,
+            counts.reduction_steps
+        );
     }
 
     /// The region counters put the whole rewrite below the window when the shifted tail lands above
