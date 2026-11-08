@@ -457,13 +457,14 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                         counts.tail_terms_merged += reducer.tail.len();
                         counts.terms_rewritten += working.len();
                     }
-                    subtract_shifted(
+                    subtract_shifted::<N, F, COUNT>(
                         &mut working,
                         &mut scratch,
                         &reducer.tail,
                         &quotient_monomial,
                         quotient_coefficient,
                         order,
+                        counts,
                     );
                 }
                 None => remainder.push((lead_monomial, lead_coefficient)),
@@ -554,6 +555,26 @@ pub struct NormalFormCounts {
     /// steps. Against `tail_terms_merged` this is the ratio #440 is about: the merge is linear in
     /// the whole dividend whether or not the tail touches it.
     pub terms_rewritten: usize,
+    /// Of [`Self::terms_rewritten`], the ones below the merge window — copied wholesale by
+    /// `subtract_shifted`'s prefix `extend_from_slice`, with no comparison and no monomial
+    /// multiply. Large means the shifted tail clusters near the working polynomial's top.
+    pub terms_below_window: usize,
+    /// Of [`Self::terms_rewritten`], the ones inside the span the shifted tail straddles — one
+    /// monomial multiply and one `MonomialOrder::cmp` each, and the expensive region.
+    ///
+    /// **This is the counter #440 stage 1 was missing.** `docs/research/interreduction-cost.md`
+    /// §3.0a inferred from an end-to-end per-term cost that this region dominates, and §3b.2
+    /// recorded that the inference was not a measurement. These three fields measure it.
+    pub terms_in_merge_span: usize,
+    /// Of [`Self::terms_rewritten`], the ones above the span — copied wholesale by the trailing
+    /// `extend_from_slice` once the tail is exhausted.
+    pub terms_above_window: usize,
+    /// `Monomial` products computed inside `subtract_shifted`, summed over reduction steps: one
+    /// per merge-loop iteration, one for the window boundary, one per unmerged tail term.
+    pub merge_monomial_multiplies: usize,
+    /// `MonomialOrder::cmp` calls inside `subtract_shifted`, summed over reduction steps —
+    /// the merge loop's plus the window's binary search.
+    pub merge_comparisons: usize,
     /// The largest working polynomial seen, in terms. Swell's peak rather than its total.
     pub max_working_terms: usize,
     /// Terms in the remainders, summed over calls — the answer size.
@@ -571,6 +592,11 @@ impl NormalFormCounts {
         self.reduction_steps += other.reduction_steps;
         self.tail_terms_merged += other.tail_terms_merged;
         self.terms_rewritten += other.terms_rewritten;
+        self.terms_below_window += other.terms_below_window;
+        self.terms_in_merge_span += other.terms_in_merge_span;
+        self.terms_above_window += other.terms_above_window;
+        self.merge_monomial_multiplies += other.merge_monomial_multiplies;
+        self.merge_comparisons += other.merge_comparisons;
         self.max_working_terms = self.max_working_terms.max(other.max_working_terms);
         self.remainder_terms += other.remainder_terms;
     }
@@ -606,6 +632,39 @@ impl NormalFormCounts {
             0.0
         } else {
             self.terms_rewritten as f64 / self.tail_terms_merged as f64
+        }
+    }
+
+    /// The fraction of rewritten terms the merge window could not avoid comparing.
+    ///
+    /// The number that decides #440 stage 3. Near zero would mean the rewrite is memcpy and a heap
+    /// buys only bandwidth; near one means the shifted tail genuinely straddles the working
+    /// polynomial, no merge boundary removes the work, and only a structure that never materializes
+    /// the working polynomial can.
+    pub fn merge_span_share(&self) -> f64 {
+        if self.terms_rewritten == 0 {
+            0.0
+        } else {
+            self.terms_in_merge_span as f64 / self.terms_rewritten as f64
+        }
+    }
+
+    /// The fraction of rewritten terms the merge window copied without comparing — the prefix
+    /// below the smallest shifted tail term, which is exactly what stage 2's window recovered.
+    pub fn below_window_share(&self) -> f64 {
+        if self.terms_rewritten == 0 {
+            0.0
+        } else {
+            self.terms_below_window as f64 / self.terms_rewritten as f64
+        }
+    }
+
+    /// The fraction of rewritten terms copied above the span, once the shifted tail is exhausted.
+    pub fn above_window_share(&self) -> f64 {
+        if self.terms_rewritten == 0 {
+            0.0
+        } else {
+            self.terms_above_window as f64 / self.terms_rewritten as f64
         }
     }
 }
@@ -671,13 +730,17 @@ fn sorted_terms<const N: usize, F: FiniteField>(
 /// Both inputs are sorted and the shifted tail stays sorted, because monomial orders are
 /// multiplicative. So this is a merge: linear in the two lengths, and writing sequentially into a
 /// reused buffer rather than allocating.
-fn subtract_shifted<const N: usize, F: FiniteField>(
+///
+/// `COUNT` fills the merge-region counters in `counts`; it is a const generic so the uncounted path
+/// compiles the increments away and cannot drift from the code they describe.
+fn subtract_shifted<const N: usize, F: FiniteField, const COUNT: bool>(
     working: &mut Vec<(Monomial<N>, F)>,
     scratch: &mut Vec<(Monomial<N>, F)>,
     tail: &[(Monomial<N>, F)],
     monomial: &Monomial<N>,
     coefficient: F,
     order: MonomialOrder,
+    counts: &mut NormalFormCounts,
 ) {
     scratch.clear();
     scratch.reserve(working.len() + tail.len());
@@ -710,35 +773,66 @@ fn subtract_shifted<const N: usize, F: FiniteField>(
         0
     } else {
         let shifted_min = &tail[0].0 * monomial;
-        let start =
-            working.partition_point(|term| order.cmp(&term.0, &shifted_min) == Ordering::Less);
+        let start = working.partition_point(|term| {
+            if COUNT {
+                counts.merge_comparisons += 1;
+            }
+            order.cmp(&term.0, &shifted_min) == Ordering::Less
+        });
+        if COUNT {
+            counts.merge_monomial_multiplies += 1;
+            counts.terms_below_window += start;
+        }
         scratch.extend_from_slice(&working[..start]);
         start
     };
 
+    // The shifted tail term is computed once per `j`, in the outer loop, rather than once per
+    // iteration of the merge. `Ordering::Less` leaves `j` alone and is the overwhelmingly common
+    // branch — `docs/research/interreduction-cost.md` §3c measured the span the tail straddles at
+    // two orders of magnitude more working terms than tail terms — so recomputing the product
+    // inside the match repeated the same ten-`u32` multiply across the whole span.
     let mut i = start;
     let mut j = 0;
     while i < working.len() && j < tail.len() {
+        if COUNT {
+            counts.merge_monomial_multiplies += 1;
+        }
         let shifted = &tail[j].0 * monomial;
-        match order.cmp(&working[i].0, &shifted) {
-            Ordering::Less => {
-                scratch.push(working[i]);
-                i += 1;
+        loop {
+            if COUNT {
+                counts.merge_comparisons += 1;
             }
-            Ordering::Greater => {
-                scratch.push((shifted, F::zero() - coefficient * tail[j].1));
-                j += 1;
-            }
-            Ordering::Equal => {
-                let merged = working[i].1 - coefficient * tail[j].1;
-                // Terms that cancel are dropped, keeping the representation canonical.
-                if !merged.is_zero() {
-                    scratch.push((working[i].0, merged));
+            match order.cmp(&working[i].0, &shifted) {
+                Ordering::Less => {
+                    scratch.push(working[i]);
+                    i += 1;
+                    if i == working.len() {
+                        break;
+                    }
                 }
-                i += 1;
-                j += 1;
+                Ordering::Greater => {
+                    scratch.push((shifted, F::zero() - coefficient * tail[j].1));
+                    j += 1;
+                    break;
+                }
+                Ordering::Equal => {
+                    let merged = working[i].1 - coefficient * tail[j].1;
+                    // Terms that cancel are dropped, keeping the representation canonical.
+                    if !merged.is_zero() {
+                        scratch.push((working[i].0, merged));
+                    }
+                    i += 1;
+                    j += 1;
+                    break;
+                }
             }
         }
+    }
+    if COUNT {
+        counts.terms_in_merge_span += i - start;
+        counts.terms_above_window += working.len() - i;
+        counts.merge_monomial_multiplies += tail.len() - j;
     }
     scratch.extend_from_slice(&working[i..]);
     for (tail_monomial, tail_coefficient) in &tail[j..] {
@@ -1764,6 +1858,142 @@ mod tests {
             previous_swell = counts.swell_factor();
             assert_eq!(counts.divisor_tests_per_term(), 1.0);
         }
+    }
+
+    /// The three merge regions partition the rewritten terms exactly, on every reduction.
+    #[test]
+    fn test_the_merge_regions_partition_the_rewritten_terms() {
+        fn case<const N: usize, F: FiniteField>() {
+            let mut runner = TestRunner::default();
+            runner
+                .run(
+                    &(
+                        poly_strategy::<N, F>(10),
+                        vec(poly_strategy::<N, F>(5), 1..4),
+                    ),
+                    |(dividend, divisors)| {
+                        let divisors: Vec<_> =
+                            divisors.into_iter().filter(|d| !d.is_zero()).collect();
+                        if divisors.is_empty() {
+                            return Ok(());
+                        }
+                        for order in ALL_ORDERS {
+                            let (_, c) = dividend.normal_form_counted(&divisors, order);
+                            prop_assert_eq!(
+                                c.terms_below_window + c.terms_in_merge_span + c.terms_above_window,
+                                c.terms_rewritten,
+                                "the regions must partition the rewrite, {}",
+                                order.name()
+                            );
+                            // And each shifted tail term is multiplied out at most once a step,
+                            // rather than once per working term the merge steps over it.
+                            prop_assert!(
+                                c.merge_monomial_multiplies
+                                    <= c.tail_terms_merged + 2 * c.reduction_steps,
+                                "{} multiplies for {} tail terms over {} steps, {}",
+                                c.merge_monomial_multiplies,
+                                c.tail_terms_merged,
+                                c.reduction_steps,
+                                order.name()
+                            );
+                        }
+                        Ok(())
+                    },
+                )
+                .expect("the merge regions partition the rewritten terms");
+        }
+        case::<2, PrimeFieldElement64<13>>();
+        case::<3, PrimeFieldElement64<7>>();
+        case::<4, PrimeFieldElement64<2147483647>>();
+    }
+
+    /// A merge that steps a long way over one shifted tail term multiplies it out once, not once
+    /// per working term stepped over.
+    #[test]
+    fn test_the_merge_multiplies_each_tail_term_once() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::Lexicographic;
+        let parse = |s: &str| MultivariatePolynomial::<1, F>::parse(s, ["x"]).unwrap();
+
+        // `x^30 - x^29 - x` shifts its tail to `{x, x^29}` at quotient 1, so the window's prefix
+        // is the single term `1` and the merge then walks `x^2 … x^15` against `x^29` — fourteen
+        // working terms for which `x^29` is the same product every time.
+        let dividend = parse(
+            "x^30 + x^15 + x^14 + x^13 + x^12 + x^11 + x^10 + x^9 + x^8 + x^7 + x^6 + x^5 \
+             + x^4 + x^3 + x^2 + x + 1",
+        );
+        let divisor = parse("x^30 - x^29 - x");
+        let (remainder, counts) =
+            dividend.normal_form_counted(std::slice::from_ref(&divisor), order);
+
+        assert_eq!(
+            remainder,
+            dividend
+                .multi_div_rem(std::slice::from_ref(&divisor), order)
+                .1
+        );
+        assert!(
+            counts.terms_in_merge_span >= 14,
+            "the merge has to actually walk the span: {}",
+            counts.terms_in_merge_span
+        );
+        assert!(
+            counts.merge_monomial_multiplies
+                <= counts.tail_terms_merged + 2 * counts.reduction_steps,
+            "{} multiplies for {} tail terms over {} steps",
+            counts.merge_monomial_multiplies,
+            counts.tail_terms_merged,
+            counts.reduction_steps
+        );
+    }
+
+    /// The region counters put the whole rewrite below the window when the shifted tail lands above
+    /// every working term, and in the merge span when it straddles them.
+    #[test]
+    fn test_the_region_counters_locate_the_shifted_tail() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::Lexicographic;
+        let parse = |s: &str| MultivariatePolynomial::<1, F>::parse(s, ["x"]).unwrap();
+
+        // `x^9 + x^5 + x^4 + x^3` reduced by `x^9 - x^8` shifts the tail to `{x^8}`, above every
+        // surviving term — so the one reduction step's whole working polynomial is prefix.
+        let (_, high) = parse("x^9 + x^5 + x^4 + x^3")
+            .normal_form_counted(std::slice::from_ref(&parse("x^9 - x^8")), order);
+        assert_eq!(high.reduction_steps, 1);
+        assert_eq!(high.terms_below_window, 3, "all three terms are below x^8");
+        assert_eq!(high.terms_in_merge_span, 0);
+        assert_eq!(high.terms_above_window, 0);
+
+        // The same dividend reduced by `x^9 - 1` shifts the tail to `{1}`, below every surviving
+        // term — so nothing is prefix and the merge walks to the first tail term's position.
+        let (_, low) = parse("x^9 + x^5 + x^4 + x^3")
+            .normal_form_counted(std::slice::from_ref(&parse("x^9 - 1")), order);
+        assert_eq!(low.terms_below_window, 0, "1 is below every working term");
+        assert!(
+            low.terms_in_merge_span + low.terms_above_window > 0,
+            "the rewrite has to land in one of the other two regions"
+        );
+    }
+
+    /// An irreducible dividend takes no reduction step, so every merge-region counter stays zero.
+    #[test]
+    fn test_no_reduction_step_means_no_merge_work() {
+        type F = PrimeFieldElement64<13>;
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let dividend =
+            MultivariatePolynomial::<2, F>::parse("x + y", ["x", "y"]).expect("a polynomial");
+        let divisor =
+            MultivariatePolynomial::<2, F>::parse("x^5*y^5", ["x", "y"]).expect("a polynomial");
+
+        let (_, counts) = dividend.normal_form_counted(&[divisor], order);
+
+        assert_eq!(counts.reduction_steps, 0);
+        assert_eq!(counts.terms_below_window, 0);
+        assert_eq!(counts.terms_in_merge_span, 0);
+        assert_eq!(counts.terms_above_window, 0);
+        assert_eq!(counts.merge_monomial_multiplies, 0);
+        assert_eq!(counts.merge_comparisons, 0);
+        assert_eq!(counts.merge_span_share(), 0.0);
     }
 
     /// Accumulating counts across reductions adds the totals and takes the maximum of the peak,
