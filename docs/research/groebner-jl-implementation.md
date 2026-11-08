@@ -486,16 +486,31 @@ lex route returns the same basis and the same quotient dimension at every prime 
 accepts, up to `2^64 − 59` — which follows from §5.4: `LexBasis` is the *identical* F4 under a
 different ordering, because there is no FGLM to have a narrower bound.
 
-**One consequence for the corpus.** The Anemoi rungs carry
-`Equivalence::NoComparand { reason: "msolve and Singular both stop below 2^31" }`, and their field
-is `2^64 − 353`. That reason is true and incomplete: Groebner.jl represents that field and returns
-a correct basis there — the same six leading monomials and `vdim = 12` as the reference system at
-`2^30 + 3`. So the adapter's `supports()` says **yes**, because
+**One consequence for the corpus**, and it is recorded. The Anemoi rungs' field is `2^64 − 353`,
+and they used to carry `Equivalence::NoComparand { reason: "msolve and Singular both stop below
+2^31" }` — true, and incomplete, because Groebner.jl represents that field and returns a correct
+basis there: the same six leading monomials and `vdim = 12` as the reference system at `2^30 + 3`.
+So the adapter's `supports()` says **yes**, because
 [`ExternalSolver::supports`](../../src/grobner/external/contract.rs) is a statement about declared
 capability and nothing else, and `Equivalence::licenses_timing()` remains the gate on publishing a
-cross-library timing. The real constraint on an Anemoi row is not that no tool can represent it; it
-is that **nothing corroborates Groebner.jl above 2^31**, which is a different and weaker claim, and
-the corpus's recorded reason would be more accurate if it said so.
+cross-library timing. The constraint on an Anemoi row is not that no tool can represent it; it is
+that **nothing corroborates Groebner.jl above 2^31**, which is a different and weaker claim. The
+rungs now carry that claim instead:
+
+```rust
+Equivalence::SoleComparand {
+    tool: "Groebner.jl",
+    reason: "2^64 - 353 is above Sagebrush's 2^62 gate and msolve's and Singular's \
+             2^31, so Groebner.jl is the only external engine that reaches it",
+}
+```
+
+`SoleComparand` and `NoComparand` differ in exactly the way that matters here. `licenses_timing()`
+is **true** for `SoleComparand` — one engine at one field on one machine is a valid ratio against a
+checkable invariant — and `is_corroborated()` is false, so an Anemoi row is publishable *with that
+fact stated* rather than suppressed. Under `NoComparand` it was suppressed, which understated the
+evidence (`docs/research/cross-library-corpus.md` §"Anemoi's limit is corroboration, not
+representability").
 
 ### 5.4 Capability surface, confirmed by running it
 

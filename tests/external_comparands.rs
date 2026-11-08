@@ -1,6 +1,7 @@
 //! Live agreement between Zeebra and the two M25 comparands it drives through adapters.
 //!
-//! Every test here is `#[ignore]`d. The reason is the same one `src/grobner/differential/mod.rs`
+//! Every test that *drives a tool* is `#[ignore]`d — the handful that only read the frozen corpus
+//! run everywhere. The reason is the same one `src/grobner/differential/mod.rs`
 //! gives for its live Singular sweep: **CI has no Julia and no Sagebrush driver, and a test that
 //! silently passed when the tool is absent would be worse than no test.** The offline half of each
 //! adapter — capability bounds, script and input generation, marker parsing, the missing-binary
@@ -719,19 +720,20 @@ fn test_every_corpus_rung_either_agrees_with_zeebra_or_is_cleanly_unsupported() 
     }
 }
 
-/// Sagebrush refuses Anemoi's field; **Groebner.jl does not**, which the corpus's reason understates.
+/// Sagebrush refuses Anemoi's field and **Groebner.jl does not**, which is why the rung is sole-comparand.
 ///
-/// `corpus::anemoi_instance` is over `2^64 − 353` and the ladder records
-/// `Equivalence::NoComparand { reason: "msolve and Singular both stop below 2^31" }`. That reason
-/// is true and incomplete: Groebner.jl's native range is every prime below `typemax(UInt64)`
-/// (`src/groebner/parameters.jl:175`), so it **can** represent the field, and measured directly it
-/// returns a correct basis there — six leading monomials and `vdim = 12` on the reference system,
-/// identical to the same system at `2^30 + 3`.
+/// `corpus::anemoi_instance` is over `2^64 − 353`. Groebner.jl's native range is every prime below
+/// `typemax(UInt64)` (`src/groebner/parameters.jl:175`), so it **can** represent the field, and
+/// measured directly it returns a correct basis there — six leading monomials and `vdim = 12` on
+/// the reference system, identical to the same system at `2^30 + 3`. Sagebrush's own modulus gate
+/// is `2^62`, so for it this is a real capability gap.
 ///
-/// So `supports()` says yes, because [`ExternalSolver::supports`] is a statement about the tool's
-/// declared capability and nothing else. Whether a *cross-library timing* may be published is a
-/// different question, and `Equivalence::licenses_timing()` is where it belongs — claiming a
-/// capability gap that does not exist would be the "cannot versus slower" confusion run backwards.
+/// `supports()` therefore says yes for Groebner.jl, because [`ExternalSolver::supports`] is a
+/// statement about the tool's declared capability and nothing else; claiming a capability gap that
+/// does not exist would be the "cannot versus slower" confusion run backwards. What the one engine
+/// does not give is a third opinion, which is `is_corroborated()`'s question — see
+/// [`test_the_anemoi_rungs_are_sole_comparand_not_no_comparand`], which pins the corpus side
+/// without needing either tool installed.
 #[test]
 #[ignore = "needs the provisioned Julia and sagebrush-gb-driver"]
 fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it() {
@@ -767,15 +769,66 @@ fn test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it()
         );
     }
 
-    // The corpus's own gate is the thing that stops a timing being published, not `supports()`.
+    // The corpus's own gate is the thing that marks the row, not `supports()`.
     let entry = corpus::ladder()
         .into_iter()
         .find(|e| e.name == "anemoi64-cico-n1-fcico")
         .expect("the rung is on the ladder");
     assert!(
-        !entry.equivalence.licenses_timing(),
-        "Anemoi must remain unpublishable as a cross-library timing"
+        !entry.equivalence.is_corroborated(),
+        "one engine at Anemoi's field is not a third opinion"
     );
+}
+
+/// Both Anemoi rungs record `SoleComparand { tool: "Groebner.jl" }`, not `NoComparand`.
+///
+/// The distinction is the one the whole module turns on: `NoComparand` says *no engine can
+/// represent the field*, which is false here — Groebner.jl reaches `2^64 − 353`. So the row is
+/// publishable as a timing (`licenses_timing()`) and uncorroborated (`is_corroborated()` false),
+/// and a renderer must mark it on the second rather than suppress it on the first.
+///
+/// Unignored on purpose: it reads the frozen ladder and needs no external tool, so CI pins the
+/// reason that `test_anemoi_has_no_comparand_for_sagebrush_but_groebner_jl_can_represent_it`
+/// can only check where Julia is provisioned.
+#[test]
+fn test_the_anemoi_rungs_are_sole_comparand_not_no_comparand() {
+    let anemoi: Vec<_> = corpus::ladder()
+        .into_iter()
+        .filter(|e| e.family == "anemoi")
+        .collect();
+    assert_eq!(anemoi.len(), 2, "anemoi64-cico-n1-fcico and -n2-fcico");
+
+    for entry in anemoi {
+        match entry.equivalence {
+            corpus::Equivalence::SoleComparand { tool, reason } => {
+                assert_eq!(
+                    tool, "Groebner.jl",
+                    "{}: the one engine in range",
+                    entry.name
+                );
+                assert!(
+                    reason.contains("2^62") && reason.contains("2^31"),
+                    "{}: the reason must name both gates it clears, got {:?}",
+                    entry.name,
+                    reason
+                );
+            }
+            other => panic!(
+                "{}: Groebner.jl represents 2^64 - 353, so the rung is not no-comparand: {:?}",
+                entry.name, other
+            ),
+        }
+        assert!(
+            entry.equivalence.licenses_timing(),
+            "{}: one engine on one machine is still a valid ratio",
+            entry.name
+        );
+        assert!(
+            !entry.equivalence.is_corroborated(),
+            "{}: nothing corroborates Groebner.jl above 2^31",
+            entry.name
+        );
+    }
 }
 
 /// Neither comparand confuses `x1` with `x10`, which is the one error agreement cannot detect.
