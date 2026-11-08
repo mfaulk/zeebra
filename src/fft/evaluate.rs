@@ -73,7 +73,9 @@ pub fn evaluate<F: FiniteField>(p: &impl Polynomial<F>, w: &FFTDomain<F>) -> Vec
     let coefficients = p.coefficients();
     let mut values = vec![F::zero(); n];
     values[..coefficients.len()].copy_from_slice(coefficients);
-    transform_any(&mut values, w.powers());
+    // The domain's own prepared convolution domain, when it has one, which is what lets a prime
+    // size reach Bluestein without a `KnownOrder` bound here — see `with_bluestein` and #375.
+    transform_any(&mut values, w.powers(), w.bluestein_domain());
     values
 }
 

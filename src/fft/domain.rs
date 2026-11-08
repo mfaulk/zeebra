@@ -56,11 +56,36 @@ impl Display for DomainError {
 impl std::error::Error for DomainError {}
 
 /// An (I)FFT domain.
-#[derive(Clone, Debug, Eq, PartialEq)]
+///
+/// Optionally carries the convolution domain Bluestein's algorithm needs, which is what lets
+/// [`evaluate`](super::evaluate) reach the quasi-linear route at a prime size without a
+/// `KnownOrder` bound of its own — see [`Self::with_bluestein`].
+#[derive(Clone, Debug)]
 pub struct FFTDomain<F: FiniteField> {
     /// Powers of the generator: 1, g, g^2, ...
     powers: Vec<F>,
+
+    /// The convolution domain for Bluestein, when one has been prepared.
+    ///
+    /// `Box` rather than inline because the type is recursive, and the inner domain never carries
+    /// one of its own: it is a power of two, so the radix-2 kernel handles it and Bluestein is
+    /// never reached from inside it.
+    bluestein: Option<Box<FFTDomain<F>>>,
 }
+
+/// Two domains are equal when their points are, whatever either has cached.
+///
+/// Hand-written rather than derived, and that is the point: `bluestein` is a *prepared
+/// capability*, not part of the mathematical object. A derived `PartialEq` would make a domain
+/// stop being equal to itself after preparation, which would silently change the meaning of every
+/// existing assertion over domains.
+impl<F: FiniteField> PartialEq for FFTDomain<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.powers == other.powers
+    }
+}
+
+impl<F: FiniteField> Eq for FFTDomain<F> {}
 
 impl<F: FiniteField> FFTDomain<F> {
     /// An FFT domain.
@@ -75,7 +100,10 @@ impl<F: FiniteField> FFTDomain<F> {
             !powers.is_empty(),
             "an FFT domain must have at least one point"
         );
-        Self { powers }
+        Self {
+            powers,
+            bluestein: None,
+        }
     }
 
     /// An FFT domain of `size` points, the powers of a primitive `size`-th root of unity.
@@ -109,6 +137,7 @@ impl<F: FiniteField> FFTDomain<F> {
 
         Ok(Self {
             powers: powers_of(&generator, size),
+            bluestein: None,
         })
     }
 
@@ -170,6 +199,28 @@ impl<F: FiniteField> FFTDomain<F> {
     /// Returns an iterator over the elements of this domain.
     pub fn iter(&self) -> impl Iterator<Item = &F> {
         self.powers.iter()
+    }
+
+    /// The prepared convolution domain, if this domain carries one.
+    ///
+    /// `None` is the ordinary case and means the transform takes its quadratic fallback at any
+    /// prime-power factor. It is deliberately not an error: a field that is not
+    /// [`KnownOrder`](crate::KnownOrder) cannot have one, and Mersenne-31 — two-adicity 1 — cannot
+    /// host one at any size above two however the bound is written.
+    pub fn bluestein_domain(&self) -> Option<&FFTDomain<F>> {
+        self.bluestein.as_deref()
+    }
+
+    /// This domain with a convolution domain attached, taking it from another domain.
+    ///
+    /// For callers that already hold a suitable one and want to avoid building a second. The
+    /// contract [`bluestein_transform`](super::bluestein_transform) states is checked there, not
+    /// here: a convolution domain merely has to be a power of two at least
+    /// `bluestein_convolution_length(m)` for every prime-power factor `m` this domain decomposes
+    /// to, and *larger is fine*, which is what makes one cached domain serve every factor.
+    pub fn with_bluestein_domain(mut self, convolution: FFTDomain<F>) -> Self {
+        self.bluestein = Some(Box::new(convolution));
+        self
     }
 }
 

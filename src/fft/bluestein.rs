@@ -73,6 +73,34 @@ pub fn bluestein_convolution_domain<F: KnownOrder, R: RngCore + CryptoRng>(
     Ok(FFTDomain::from_generator(root, length))
 }
 
+/// `domain` with a convolution domain prepared, so the transform can reach Bluestein on its own.
+///
+/// This is the whole of #375's bound problem in one place. The *transform* needs nothing of the
+/// field but a ring — [`bluestein_transform`] is `FiniteField` — and only **building** the
+/// convolution domain needs [`KnownOrder`] and an rng, because it needs a primitive `L`-th root
+/// for a power of two `L`. So rather than tighten the bound on `transform_any`, `evaluate` and
+/// `interpolate` — which would propagate into the polynomial API and rule the transform out over
+/// every field that is not `KnownOrder` — the capability is attached to the **domain**, where the
+/// size already lives, by a builder that carries the bound alone.
+///
+/// The convolution domain is sized for `domain.size()`, and
+/// [`bluestein_convolution_length`]'s contract allows a *larger* `L` than a given factor needs, so
+/// one domain prepared here serves every prime-power factor the decomposition reaches, including
+/// the nested ones `good_thomas` recurses into.
+///
+/// # Errors
+/// [`RootOfUnityError`] when the field's two-adicity cannot host the convolution length — which
+/// is a fact about the field, not a misuse. Mersenne-31 has two-adicity 1 and so cannot host one
+/// at any size above two; that is why this returns a `Result` rather than panicking, and why
+/// [`FFTDomain::bluestein_domain`] returning `None` is an ordinary state.
+pub fn with_bluestein<F: KnownOrder, R: RngCore + CryptoRng>(
+    domain: FFTDomain<F>,
+    rng: &mut R,
+) -> Result<FFTDomain<F>, RootOfUnityError> {
+    let convolution = bluestein_convolution_domain::<F, R>(domain.size(), rng)?;
+    Ok(domain.with_bluestein_domain(convolution))
+}
+
 /// Transform `values` in place over `domain`, by Bluestein's algorithm.
 ///
 /// `domain` must be `1, w, ..., w^{n-1}` for a primitive `n`th root of unity `w`, for any `n`, and
@@ -337,7 +365,7 @@ mod tests {
         let mut by_bluestein = coefficients.clone();
         bluestein_transform(&mut by_bluestein, &domain, &convolution_domain);
         let mut by_prime_factor = coefficients;
-        transform_any(&mut by_prime_factor, domain.powers());
+        transform_any(&mut by_prime_factor, domain.powers(), None);
         assert_eq!(by_bluestein, by_prime_factor);
     }
 

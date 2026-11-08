@@ -11,15 +11,18 @@ mod transform;
 use crate::FiniteField;
 
 pub use bluestein::{
-    bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform,
+    bluestein_convolution_domain, bluestein_convolution_length, bluestein_transform, with_bluestein,
 };
 pub use domain::{DomainError, FFTDomain};
+// Measurement hooks for `examples/bluestein_crossover.rs`, not API.
 pub use evaluate::evaluate;
 pub use interpolate::{interpolate, try_interpolate, InterpolateError};
 pub use multiply::{
     fft_multiplication_crossover, multiply, multiply_above, multiply_over_domain,
     try_multiply_via_fft,
 };
+#[doc(hidden)]
+pub use prime_factor::{bluestein_crossover_unstable, dft_unstable};
 
 /// Split x into its even-indexed and odd-indexed elements.
 fn evens_and_odds<T: Clone>(x: &[T]) -> (Vec<T>, Vec<T>) {
