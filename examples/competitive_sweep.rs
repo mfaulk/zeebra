@@ -106,16 +106,18 @@ fn main() {
     // route is still reachable, and a bare `--interreduce-by-matrix` would then mean nothing.
     // Absent, the row is taken at whatever `F4Options::default()` says, which is the state every
     // historical row was taken in.
-    let interreduce_by_matrix: Option<bool> = value("--interreduce-by-matrix").map(|v| match v
-        .as_str()
-    {
-        "on" => true,
-        "off" => false,
-        other => {
-            eprintln!("--interreduce-by-matrix wants `on` or `off`, got {:?}", other);
-            std::process::exit(2);
-        }
-    });
+    let interreduce_by_matrix: Option<bool> =
+        value("--interreduce-by-matrix").map(|v| match v.as_str() {
+            "on" => true,
+            "off" => false,
+            other => {
+                eprintln!(
+                    "--interreduce-by-matrix wants `on` or `off`, got {:?}",
+                    other
+                );
+                std::process::exit(2);
+            }
+        });
     // Which corpus identity to sweep. A *published* characteristic only: a row at a field with no
     // frozen digest would be a figure whose problem nothing pins. See `PUBLISHED_CHARACTERISTICS`.
     let characteristic: u64 = value("--characteristic")

@@ -613,10 +613,12 @@ impl ExternalSolver for ZeebraSolver {
         } else {
             "off"
         };
-        Ok(ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION")).with_build(format!(
-            "in-process, same build as the harness; interreduce_by_matrix={}",
-            route
-        )))
+        Ok(
+            ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION")).with_build(format!(
+                "in-process, same build as the harness; interreduce_by_matrix={}",
+                route
+            )),
+        )
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
@@ -1014,8 +1016,14 @@ mod tests {
             .probe_version()
             .expect("in-process");
 
-        assert_eq!(off.build.as_deref(), Some("in-process, same build as the harness; interreduce_by_matrix=off"));
-        assert_eq!(on.build.as_deref(), Some("in-process, same build as the harness; interreduce_by_matrix=on"));
+        assert_eq!(
+            off.build.as_deref(),
+            Some("in-process, same build as the harness; interreduce_by_matrix=off")
+        );
+        assert_eq!(
+            on.build.as_deref(),
+            Some("in-process, same build as the harness; interreduce_by_matrix=on")
+        );
         assert_ne!(off.to_string(), on.to_string());
     }
 
