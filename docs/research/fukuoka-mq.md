@@ -489,18 +489,20 @@ positive-dimensional as published and a run of it is a run of a **slice**:
 | largest matrix | **13 602 × 19 132** |
 | peak live nonzeros | 14 329 816 (≈229 MB estimated; 1.38 GB process `VmHWM`) |
 | pairs reduced / elements added | 4 967 / 503 |
-| wall | 50.9 s (a second run of the same slice: 65.6 s) |
+| wall | **43.2 s** as committed; 43.2, 50.9 and 65.6 s over three runs |
 
-The stop is **deterministic and the wall clock is not**: both runs stopped at the same degree on the
-same entry count, 20 010 753, and differed by 29% in time. Only the first set of figures is a
-property of the instance.
+The stop is **deterministic and the wall clock is not**. All three runs stopped at the same degree
+on the same entry count, 20 010 753, with the same 13 602 x 19 132 matrix and the same 14 329 816
+peak — and spread 53% in time on a machine running other agents' work. Everything above the wall
+row is a property of the instance; the wall row is a property of the afternoon. The committed
+record is the run under `tools/benchlock.sh` that got the lock uncontended.
 
 Note the degree. Type VI `n = 15` crossed the same cap at **degree 9**; `n = 24` crosses it at
 **degree 6**, with a matrix 13 602 × 19 132 against that run's 20 315 × 20 146. Eight surplus
 variables rather than five does not push the wall out by three degrees of headroom — it pulls the
 wall in, because what grows is the width at every degree. Faugère solved this instance in 2015 in
 5 280 s with F5-FGb (§8.1); that is a published fact about the instance and **not** a comparison
-with the row above, which is a 51-second resource stop under a deliberate cap.
+with the row above, which is a 43-second resource stop under a deliberate cap.
 
 So the honest statement after #454 is narrower than "Zeebra reaches the challenge": the **importer**
 reaches it, the registry names its bytes, and the solver stops at degree 6 under this budget. What

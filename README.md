@@ -3785,7 +3785,7 @@ and a dimension that cannot be used is worse than `MqError::UnsupportedDimension
 
 One diagnostic slice of that instance — eight of the 24 variables fixed at a precommitted seed,
 which is the challenge's own route for a signature type — **stops on live-entry growth at degree
-6**: 20 010 753 entries against the 20 000 000 cap, largest matrix 13 602 x 19 132, 51 s. Type VI
+6**: 20 010 753 entries against the 20 000 000 cap, largest matrix 13 602 x 19 132, 43 s. Type VI
 `n = 15` crossed the same cap at degree *9*, so eight surplus variables rather than five pulls the
 wall in rather than pushing it out; what grows is the width at every degree. A deliberate resource
 stop, not a comparison with the published 5 280 s, and not a completion attempt.
