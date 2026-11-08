@@ -92,7 +92,7 @@ measurement method is unstated is a field two runs can disagree on without eithe
 |---|---|
 | Solver id | `singular`, `msolve`, `groebner.jl`, `sagebrush`, `zeebra`. `ExternalSolver::id()`. |
 | Version | Obtained by **running the tool**, once per sweep, through `probe_version()` — never read from a package manifest, which can describe a build that is not the one on the path. Singular reports a build number (`4.4.1`, build `44105`); Groebner.jl a package version; msolve a version string. The raw text is kept beside the parsed value so a misparse is recoverable. |
-| Source commit | For Zeebra: the SHA the measured binary was built from, `Environment::commit`, read with `git rev-parse` at run time — never a branch name, which stops identifying a binary as soon as the branch moves, and never a date, which at this repository's commit rate names no commit at all. For a comparand: the version or pin `external-comparands.md` records. A figure without it cannot be re-taken, which is #335; what a commit does and does not buy is §10. |
+| Source commit | For Zeebra: the SHA the measured binary was built from, `Environment::commit`, read with `git rev-parse` at run time — never a branch name, which stops identifying a binary as soon as the branch moves, and never a date, which at this repository's commit rate names no commit at all. A commit alone is not enough to be *resolvable* after the branch merges, so `Environment::from_git` also records `base_commit` and `patch_id` (§10.3, #505). For a comparand: the version or pin `external-comparands.md` records. A figure without any of it cannot be re-taken, which is #335; what a commit does and does not buy is §10. |
 | Build configuration | For Zeebra: the cargo profile and `RUSTFLAGS`, which is `Environment::build` in the existing scoreboard. For an external tool: how it was obtained (distribution package, source build) and the relevant flags. A source build at `-march=native` and a distribution build are different software. |
 | CPU ISA floor | The instruction-set baseline the binary was compiled for. This repo has measured a 4-byte-vector loss from an unset `-C target-cpu` (`util::isa_floor`, and the figures corrected in #185/#231) — a comparison between a tool built for its distribution's baseline and one built for the host is not a comparison of algorithms. Record it; where it cannot be determined for an external binary, record that it could not. **For a comparand this repository builds from source, match it rather than record it** — see below. |
 
@@ -660,7 +660,17 @@ records `load=` on its START and END lines for the second half of that. A figure
 sessions is not comparable with itself, which is what `Attribution::IncomparableFigures` exists to
 say.
 
-And a commit that is recorded is not necessarily a commit that can be checked out: three of the four
-competitive cohorts record branch commits that did not survive their pull request's squash merge, so
-"re-measure at `7adb29e`" is an instruction nobody can carry out. That is #505, and it is a defect
-in where the SHA is taken rather than in recording one.
+And a commit that is recorded is not necessarily a commit that can be checked out. Three of the four
+competitive cohorts — 315 of 387 rows — recorded branch commits that did not survive their pull
+request's merge, so "re-measure at `7adb29e`" was an instruction nobody could carry out: #335's
+letter met, its purpose not. That was a defect in *where* the SHA is taken rather than in recording
+one, and #505 fixed it. `Environment` now also records `base_commit`, the merge base against
+`origin/main`, which is an ancestor of `main` and cannot stop being one, and `patch_id`,
+`git patch-id --stable` over `base_commit..commit`, which names the measured delta by its diff and
+so survives the rebase or squash that invalidates a commit. `Environment::stamp_is_resolvable` is
+the criterion, deliberately not part of `comparable()` — two figures at one commit are comparable
+whether or not a reader can check that commit out. `Environment::from_git` fills all three.
+
+A record written before those fields existed reads back with both empty and reports as unresolvable,
+which is the fact about it rather than a defect in the reader. The register's transcribed rows are
+exactly that case, and no stamp can be retrofitted to them: their commit was never written down.
