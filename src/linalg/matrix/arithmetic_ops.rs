@@ -49,40 +49,83 @@ impl<T: Ring> Mul for &Matrix<T> {
 
         let n = rhs.num_columns;
         let depth = self.num_columns;
-        let mut product = vec![T::ZERO; self.num_rows * n];
-        // `ikj`, not `ijk`: with row-major storage the innermost loop is then an axpy over
-        // contiguous spans, rather than a stride of `n` down a column of the right operand.
+        let m = self.num_rows;
+        let mut product = vec![T::ZERO; m * n];
+        // A 2-by-8 register tile over `i` and `j`, accumulated across the whole `k` loop.
         //
-        // `k` is unrolled four deep because the permutation alone is not a free win. `ijk`
-        // accumulates one entry of the product in a register, where `ikj` reads and writes a whole
-        // row of it per `k`; measured, plain `ikj` was 11-18% slower at square sizes that fit in
-        // cache even while it was 2x faster out of cache. Four right-hand rows per load and store
-        // of the product row is what makes it faster at both.
-        for i in 0..self.num_rows {
-            let product_row = &mut product[i * n..][..n];
-            let mut k = 0;
-            while k + 4 <= depth {
-                let a0 = self[[i, k]];
-                let a1 = self[[i, k + 1]];
-                let a2 = self[[i, k + 2]];
-                let a3 = self[[i, k + 3]];
-                let b0 = &rhs.elements[k * n..][..n];
-                let b1 = &rhs.elements[(k + 1) * n..][..n];
-                let b2 = &rhs.elements[(k + 2) * n..][..n];
-                let b3 = &rhs.elements[(k + 3) * n..][..n];
-                for j in 0..n {
-                    product_row[j] += a0 * b0[j] + a1 * b1[j] + a2 * b2[j] + a3 * b3[j];
+        // `ikj` with `k` unrolled four deep reads and writes a whole row of the product per group
+        // of four `k`, which is what left it 8% behind `ijk` at square n=128 while being 2x ahead
+        // once the right operand passed L3. Tiling `j` as well holds the product entries in the
+        // tile until `k` is exhausted, so the product row is stored once per tile; and tiling two
+        // rows of the left operand together doubles the arithmetic each span of the right operand
+        // is loaded for, which is what pays for reading that operand down a column rather than
+        // along a row.
+        //
+        // The shape is tuned rather than chosen, and the tuning is most of the result. Measured
+        // over a 31-bit prime, pinned and interleaved, three reps: 2x8 is faster than `ikj` at
+        // every arm of `benches/linear_algebra.rs`, where 2x16 and 2x32 give back 26% and 16% on
+        // the 128 MiB arm, and a `j` tile with no `i` tile wins nowhere — widths 4 and 8 are
+        // slower at every square size, and 16 reaches parity in cache only to lose 7-11% once the
+        // right operand is past L3. Eight elements is also exactly one 64-byte cache line at 8
+        // bytes apiece, which is the obvious reading of why the wider tiles fall off, and not one
+        // these measurements establish.
+        const JT: usize = 8;
+        let mut i = 0;
+        while i + 2 <= m {
+            let a0 = &self.elements[i * depth..][..depth];
+            let a1 = &self.elements[(i + 1) * depth..][..depth];
+            let mut j0 = 0;
+            while j0 + JT <= n {
+                let mut acc0 = [T::ZERO; JT];
+                let mut acc1 = [T::ZERO; JT];
+                for (k, (&x0, &x1)) in a0.iter().zip(a1.iter()).enumerate() {
+                    let b = <&[T; JT]>::try_from(&rhs.elements[k * n + j0..][..JT]).unwrap();
+                    for ((s0, s1), &b_j) in acc0.iter_mut().zip(acc1.iter_mut()).zip(b.iter()) {
+                        *s0 += x0 * b_j;
+                        *s1 += x1 * b_j;
+                    }
                 }
-                k += 4;
+                product[i * n + j0..][..JT].copy_from_slice(&acc0);
+                product[(i + 1) * n + j0..][..JT].copy_from_slice(&acc1);
+                j0 += JT;
             }
-            while k < depth {
-                let a_ik = self[[i, k]];
-                let rhs_row = &rhs.elements[k * n..][..n];
-                for j in 0..n {
-                    product_row[j] += a_ik * rhs_row[j];
+            // The columns past the last whole tile, one at a time, for both rows at once.
+            for j in j0..n {
+                let mut s0 = T::ZERO;
+                let mut s1 = T::ZERO;
+                for (k, (&x0, &x1)) in a0.iter().zip(a1.iter()).enumerate() {
+                    let b_j = rhs.elements[k * n + j];
+                    s0 += x0 * b_j;
+                    s1 += x1 * b_j;
                 }
-                k += 1;
+                product[i * n + j] = s0;
+                product[(i + 1) * n + j] = s1;
             }
+            i += 2;
+        }
+        // An odd final row runs the same tile one row wide.
+        while i < m {
+            let a_row = &self.elements[i * depth..][..depth];
+            let mut j0 = 0;
+            while j0 + JT <= n {
+                let mut acc = [T::ZERO; JT];
+                for (k, &a) in a_row.iter().enumerate() {
+                    let b = <&[T; JT]>::try_from(&rhs.elements[k * n + j0..][..JT]).unwrap();
+                    for (s, &b_j) in acc.iter_mut().zip(b.iter()) {
+                        *s += a * b_j;
+                    }
+                }
+                product[i * n + j0..][..JT].copy_from_slice(&acc);
+                j0 += JT;
+            }
+            for j in j0..n {
+                let mut acc = T::ZERO;
+                for (k, &a) in a_row.iter().enumerate() {
+                    acc += a * rhs.elements[k * n + j];
+                }
+                product[i * n + j] = acc;
+            }
+            i += 1;
         }
         Self::Output {
             num_rows: self.num_rows,
@@ -98,9 +141,11 @@ impl_mul_variants!([T: Ring], Matrix<T>);
 mod tests {
     use super::Matrix;
     use crate::fields::{Zp541, Zp65537};
+    use crate::identities::Zero;
     use crate::linalg::MatrixParams;
     use crate::FiniteField;
     use proptest::prelude::*;
+    use rand::{prelude::StdRng, SeedableRng};
 
     const MAX_ROWS: usize = 10;
     const MAX_COLS: usize = 10;
@@ -213,5 +258,45 @@ mod tests {
         let a = Matrix::<Zp65537>::zero(2, 3);
         let b = Matrix::<Zp65537>::zero(4, 5);
         let _ = &a * &b;
+    }
+
+    #[test]
+    // The product agrees with the textbook `ijk` sum at dimensions that are not multiples of the
+    // kernel's blocking factors, so a mishandled `j` or `k` remainder cannot pass: the proptests
+    // above reach only 10 columns, where a tiled kernel runs almost entirely in its tail.
+    fn test_product_matches_reference_at_blocking_remainders() {
+        // 17 and 19 are coprime to every power of two, so each of m, k and n leaves a remainder
+        // under tile widths of 2, 4, 8 and 16; 16 and 32 are exact multiples, pinning the case
+        // where the tail is empty.
+        for (m, depth, n) in [
+            (17, 19, 23),
+            (1, 17, 1),
+            (3, 1, 7),
+            (16, 32, 16),
+            (17, 32, 33),
+            (33, 17, 16),
+        ] {
+            let a = random_rect::<Zp65537>(m, depth, 101);
+            let b = random_rect::<Zp65537>(depth, n, 103);
+
+            let mut expected = Matrix::<Zp65537>::zero(m, n);
+            for i in 0..m {
+                for j in 0..n {
+                    let mut sum = Zp65537::ZERO;
+                    for k in 0..depth {
+                        sum += a[[i, k]] * b[[k, j]];
+                    }
+                    expected[[i, j]] = sum;
+                }
+            }
+
+            assert_eq!(&a * &b, expected, "{m}x{depth} times {depth}x{n}");
+        }
+    }
+
+    fn random_rect<F: FiniteField>(rows: usize, columns: usize, seed: u64) -> Matrix<F> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let elements: Vec<F> = (0..rows * columns).map(|_| F::random(&mut rng)).collect();
+        Matrix::new(rows, columns, &elements)
     }
 }

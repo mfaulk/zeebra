@@ -1650,22 +1650,33 @@ assert_eq!(fibonacci.pow(10).unwrap()[[0, 1]], F::new(55));
 `Err(NotSquare)` for a non-square matrix, including at exponent zero, where there is no size the
 identity could take. `hconcat` and `vconcat` return `Err(IncompatibleShapes)` carrying both shapes.
 
-The product is `ikj` with `k` unrolled four deep, not the textbook `ijk`. Row-major storage makes
-`ijk`'s innermost loop stride the right operand by `num_columns`, a cache line per multiplication;
-`ikj`'s is an axpy over contiguous spans. `benches/linear_algebra.rs` measures it two ways: square
-sizes, and a family of `m x k` times `k x n` shapes holding the multiplication count at 2^26 so the
-only thing that varies is the right operand's footprint. **The permutation is not the free win it
-looks like.** It converts a kernel that is memory-bound out of cache into one that is ALU-bound at
-every footprint — over a 31-bit prime, pinned, three interleaved reps, the new kernel is flat at
-124-128 ms whether that operand is 256 KiB, 8 MiB or 128 MiB, where `ijk` goes 149 ms → 171 ms →
-252-267 ms — which is the §8.2 result in
-[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md) arrived at from the other
-side. But in cache it buys little and can cost: 1.31x at square n=32, neutral at n=64, **8% slower
-at n=128**, 1.11x at n=256, rising to 2.0x only once the right operand is past L3. `ijk` keeps one
-entry of the product in a register where `ikj` reads and writes a whole row of it per `k`, and in
-cache that register is worth more than the stride costs; the unroll — four right-hand rows per load
-and store of the product row — is what pays most of it back. Plain `ikj` measured 11-18% slower
-than `ijk` at square sizes that fit in cache.
+The product is a **2-by-8 register tile over `i` and `j`**, not the textbook `ijk` and not the `ikj`
+with `k` unrolled four deep that preceded it. Row-major storage makes `ijk`'s innermost loop stride
+the right operand by `num_columns`, a cache line per multiplication; `ikj`'s is an axpy over
+contiguous spans, but it reads and writes a whole row of the product per group of `k`, and that
+traffic is what the tile removes — a tile's entries stay put until `k` is exhausted, and two rows of
+the left operand share every span of the right operand that gets loaded.
+`benches/linear_algebra.rs` measures this two ways: square sizes, and a family of `m x k` times
+`k x n` shapes holding the multiplication count at 2^26 so the only thing that varies is the right
+operand's footprint.
+
+Over a 31-bit prime, pinned to one core, three interleaved reps under `tools/benchlock.sh`, the tile
+is faster than `ikj` at **every** arm — 1.07-1.11x at square n=32 through n=256, 1.06-1.11x while
+the right operand is in cache, 1.01-1.03x once it is past L3 — and it closes the one regression
+`ikj` carried, where `ijk` had been 8% faster at square n=128. **The shape is tuned, not derived,
+and the tuning is most of the result:** 2x16 and 2x32 give back 26% and 16% on the 128 MiB arm, and
+a `j` tile with no `i` tile wins nowhere, widths 4 and 8 being slower at every square size and 16
+reaching parity in cache only to lose 7-11% out of it. Eight elements is exactly one 64-byte cache
+line at 8 bytes apiece, which is the obvious reading of why the wider tiles fall off and not one
+these measurements establish.
+
+The kernel is **ALU-bound at every footprint** — the §8.2 signature in
+[`docs/MILESTONE-SIMD-PARALLELISM.md`](docs/MILESTONE-SIMD-PARALLELISM.md), reached from the other
+side — though less perfectly than `ikj` was: 117-127 ms across a working set spanning three orders
+of magnitude, a 6-8% spread where `ikj` held 1-2% and `ijk` spread 42-56% (150 ms → 178 ms →
+229 ms). Nothing is traded for that; the tile's in-cache gain is simply larger than its
+out-of-cache one. `Matrix::pow` remains the only caller in the crate, which is why this is a
+low-priority operator however it is written.
 
 Two gaps are deliberate. There is no mutable column iterator — handing out disjoint `&mut` down a
 strided column of a row-major buffer is where the borrow checker stops being free, and nothing in
