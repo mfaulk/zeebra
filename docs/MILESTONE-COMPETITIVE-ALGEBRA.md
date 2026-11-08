@@ -770,8 +770,9 @@ from the board's own rows*: `CompetitiveBoard::startup_floor(library)` is the sh
 library recorded, requiring four answered rows first, since one fast row is a fast row and not a
 floor. `Speedup` carries `baseline_floor_multiple`; `is_engine_comparison()` is false below **2.0**,
 because at that point half the comparand's wall is the cost of starting it and the other half cannot
-carry a conclusion through the 20% band; and `is_publishable()` is the **conjunction** of both gates,
-so a renderer cannot satisfy one and forget the other. The disqualified rows are **kept and marked**
+carry a conclusion through the 20% band; and `is_publishable()` is the **conjunction** of both gates
+— three since #518, which added the corpus's own `licenses_timing()` to it — so a renderer cannot
+satisfy one and forget the others. The disqualified rows are **kept and marked**
 rather than dropped — the renderer prints `NOT AN ENGINE COMPARISON: baseline is 1.0x its startup
 floor` — because the board is the artifact that stops someone recomputing the 450x from the raw
 numbers next year. A test reproduces the measured shape exactly: four Singular rows at 36.01–36.08 ms

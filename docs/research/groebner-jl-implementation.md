@@ -506,8 +506,9 @@ Equivalence::SoleComparand {
 which splits the question the way the evidence does: `licenses_timing()` is **true** — one engine
 at one field on one machine is a valid ratio against a checkable invariant — and
 `is_corroborated()` is **false**, because a two-way disagreement cannot name the odd one out.
-Resolved as the intended encoding in #386; what the board does *not* yet do is state either fact
-beside a published figure (#518).
+Resolved as the intended encoding in #386, and **stated beside the figure** since #518: the board's
+speedup table carries a provenance column reading `sole-comparand (Groebner.jl)` for these rungs
+and prints `NOT CORROBORATED` in the cell of any ratio they publish.
 
 ### 5.4 Capability surface, confirmed by running it
 

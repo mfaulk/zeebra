@@ -319,6 +319,20 @@ Two methods, two questions. `Equivalence::licenses_timing` asks whether a figure
 could name the odd engine out. `test_every_family_licenses_a_timing_and_only_some_are_corroborated`
 asserts both for every rung.
 
+**Both are read by the renderer**, which is what makes them a gate rather than a note to whoever
+opens `corpus.rs` (#518). `CompetitiveBoard::to_markdown`'s speedup table carries a **provenance**
+column per ratio and `Speedup::is_publishable` is the conjunction of all three gates, so:
+
+* a problem the corpus has no recorded equivalence for — anything that is not a ladder rung — is
+  **refused in the cell**, `NOT PUBLISHABLE: ... is not a corpus rung`, and counted in the summary;
+* `NoComparand` is refused the same way, carrying the variant's own `reason`;
+* a `SoleComparand` ratio renders with `NOT CORROBORATED` and the one engine's name beside it,
+  which is the "with the fact stated" half of the rule above.
+
+The refusals print the ratio and keep the row, as the startup-floor guard does: a dropped row is a
+gap a reader cannot see. Absent evidence is read the opposite way from an unknown startup floor,
+though — fail-closed, because here the refusal is visible.
+
 > **The distinction is the whole point of the field, because the two limits have different fixes.**
 > Representability needs a **new** tool. Corroboration needs a **second** tool at the same field.
 > A reader deciding whether to trust a row has to be told which one applies.

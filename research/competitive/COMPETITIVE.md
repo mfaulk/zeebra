@@ -435,192 +435,194 @@ Every row is one library's attempt at one task on one problem, **including the a
 
 Computed only for rows agreeing on problem digest, task, limits, machine and build, with **both** outcomes answered. A ratio whose two answers share no checked invariant is marked: the protocol does not permit publishing it.
 
-**184 pairs**: 145 disqualified by the startup floor, 0 with no checked invariant, 39 publishable — of which 3 inside the 20% noise band, 10 against a comparand that is not authoritative, and 27 that a conclusion may rest on.
+The **provenance** column is the corpus's own record of how the problem's ideal equivalence was established, which is the gate on quoting a figure for it at all. A problem with no recorded equivalence, or one no external engine can represent, is **refused here rather than omitted**; a ratio resting on a single external engine is published with that fact stated, because nothing can triangulate it.
 
-| problem | task | library | ratio | checked |
-|---|---|---|---:|---|
-| `katsura-4` | reduced-grobner-basis | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | singular | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | singular | 0.10x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | singular | 0.50x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `katsura-7` | lex-basis-by-conversion | singular | 0.56x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | singular | 0.04x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | lex-basis-by-conversion | singular | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | singular | 0.28x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `cyclic-6` | lex-basis-by-conversion | singular | 0.30x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | singular | 0.45x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `mq-random-6` | lex-basis-by-conversion | singular | 0.48x | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `mq-random-10` | reduced-grobner-basis | singular | 4.13x | 3 invariants agreed |
-| `mq-random-10` | lex-basis-by-conversion | singular | 3.57x | 3 invariants agreed |
-| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | lex-basis-by-conversion | singular | 0.12x | 3 invariants agreed |
-| `mq-planted-14` | reduced-grobner-basis | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | singular | 1.18x | 3 invariants agreed |
-| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | singular | 1.08x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 1.50x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 1.39x | 3 invariants agreed |
-| `katsura-4` | reduced-grobner-basis | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.96x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | lex-basis-by-conversion | sagebrush | 0.09x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | singular | 0.09x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | msolve | 0.37x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.64x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | sagebrush | 0.37x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | singular | 0.53x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | msolve | 2.63x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | groebner.jl | 15.89x | 3 invariants agreed |
-| `katsura-7` | reduced-grobner-basis | sagebrush | 2.61x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | lex-basis-by-conversion | singular | 0.58x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `katsura-7` | lex-basis-by-conversion | sagebrush | 2.85x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.20x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | singular | 0.05x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | msolve | 0.17x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.77x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | sagebrush | 0.17x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | lex-basis-by-conversion | singular | 0.07x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.23x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | singular | 0.26x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | msolve | 1.28x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.20x | 3 invariants agreed |
-| `cyclic-6` | reduced-grobner-basis | sagebrush | 1.28x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | lex-basis-by-conversion | singular | 0.31x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.52x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | singular | 0.50x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | msolve | 2.50x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner.jl | 10.97x | 3 invariants agreed |
-| `mq-random-6` | reduced-grobner-basis | sagebrush | 2.47x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | lex-basis-by-conversion | singular | 0.49x | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `mq-random-6` | lex-basis-by-conversion | sagebrush | 2.69x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-10` | reduced-grobner-basis | singular | 4.14x | 3 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | msolve | 119.32x | 2 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | groebner.jl | 347.83x | 3 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | sagebrush | 86.63x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `mq-random-10` | lex-basis-by-conversion | singular | 3.54x | 3 invariants agreed |
-| `mq-random-10` | lex-basis-by-conversion | sagebrush | 74.48x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | lex-basis-by-conversion | singular | 0.19x | 3 invariants agreed |
-| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.93x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `mq-planted-14` | reduced-grobner-basis | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.27x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | msolve | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | groebner.jl | 0.78x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | sagebrush | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | sagebrush | 0.07x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | singular | 1.39x | 3 invariants agreed |
-| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | msolve | 10.99x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | groebner.jl | 33.33x | 3 invariants agreed |
-| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | sagebrush | 5.53x | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
-| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | singular | 1.23x | 3 invariants agreed |
-| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | sagebrush | 5.52x | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
-| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 1.51x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | msolve | 14.32x | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
-| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | groebner.jl | 38.43x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | sagebrush | 9.56x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 1.46x | 3 invariants agreed |
-| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | sagebrush | 9.70x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `anemoi64-cico-n1-fcico` | reduced-grobner-basis | groebner.jl | 0.07x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `anemoi64-cico-n2-fcico` | reduced-grobner-basis | groebner.jl | 0.64x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.83x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-5` | lex-basis-by-conversion | sagebrush | 0.10x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | singular | 0.10x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | msolve | 0.35x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.21x | **NOT AN ENGINE COMPARISON: an operand is 1.5x its startup floor** |
-| `katsura-6` | reduced-grobner-basis | sagebrush | 0.34x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | singular | 0.51x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | msolve | 2.54x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | reduced-grobner-basis | groebner.jl | 14.89x | 3 invariants agreed |
-| `katsura-7` | reduced-grobner-basis | sagebrush | 2.52x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `katsura-7` | lex-basis-by-conversion | singular | 0.55x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `katsura-7` | lex-basis-by-conversion | sagebrush | 2.70x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.18x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | singular | 0.04x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | msolve | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.59x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `cyclic-5` | reduced-grobner-basis | sagebrush | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | lex-basis-by-conversion | singular | 0.06x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.20x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | singular | 0.28x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | msolve | 1.26x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.13x | 3 invariants agreed |
-| `cyclic-6` | reduced-grobner-basis | sagebrush | 1.25x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `cyclic-6` | lex-basis-by-conversion | singular | 0.29x | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
-| `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.45x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | singular | 0.52x | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | msolve | 2.84x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | reduced-grobner-basis | groebner.jl | 11.42x | 3 invariants agreed |
-| `mq-random-6` | reduced-grobner-basis | sagebrush | 2.84x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-6` | lex-basis-by-conversion | singular | 0.52x | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
-| `mq-random-6` | lex-basis-by-conversion | sagebrush | 2.83x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-random-10` | reduced-grobner-basis | singular | 4.06x | 3 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | msolve | 128.78x | 2 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | groebner.jl | 338.23x | 3 invariants agreed |
-| `mq-random-10` | reduced-grobner-basis | sagebrush | 88.68x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `mq-random-10` | lex-basis-by-conversion | singular | 3.86x | 3 invariants agreed |
-| `mq-random-10` | lex-basis-by-conversion | sagebrush | 78.35x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.05x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
-| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-10` | lex-basis-by-conversion | singular | 0.11x | 3 invariants agreed |
-| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.43x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
-| `mq-planted-14` | reduced-grobner-basis | singular | 0.00x | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.22x | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
-| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+**184 pairs**: 0 refused for want of a recorded ideal equivalence, 145 disqualified by the startup floor, 0 with no checked invariant, 39 publishable — of which 0 resting on a sole comparand and therefore uncorroborated, 3 inside the 20% noise band, 10 against a comparand that is not authoritative, and 27 that a conclusion may rest on.
+
+| problem | task | library | ratio | provenance | checked |
+|---|---|---|---:|---|---|
+| `katsura-4` | reduced-grobner-basis | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | singular | 0.10x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | singular | 0.50x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | singular | 0.56x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | singular | 0.04x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | singular | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | singular | 0.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | singular | 0.30x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | singular | 0.45x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | singular | 0.48x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.13x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | singular | 3.57x | live-oracle | 3 invariants agreed |
+| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 0.12x | known-solution | 3 invariants agreed |
+| `mq-planted-14` | reduced-grobner-basis | singular | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | singular | 1.18x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | singular | 1.08x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 1.50x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 1.39x | known-solution | 3 invariants agreed |
+| `katsura-4` | reduced-grobner-basis | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | singular | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.96x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | sagebrush | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | singular | 0.09x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | msolve | 0.37x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.64x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | sagebrush | 0.37x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | singular | 0.53x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | msolve | 2.63x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | groebner.jl | 15.89x | comparand-file | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | sagebrush | 2.61x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | singular | 0.58x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | sagebrush | 2.85x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.20x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | singular | 0.05x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | msolve | 0.17x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.77x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | sagebrush | 0.17x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | singular | 0.07x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.23x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | singular | 0.26x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | msolve | 1.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.20x | comparand-file | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | sagebrush | 1.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | singular | 0.31x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.52x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | singular | 0.50x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | msolve | 2.50x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner.jl | 10.97x | live-oracle | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | sagebrush | 2.47x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | singular | 0.49x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | sagebrush | 2.69x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.14x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 119.32x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 347.83x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 86.63x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 3.54x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 74.48x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.06x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 0.19x | known-solution | 3 invariants agreed |
+| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.93x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-14` | reduced-grobner-basis | singular | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.27x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | msolve | 0.06x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | groebner.jl | 0.78x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | reduced-grobner-basis | sagebrush | 0.06x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp0-planted` | lex-basis-by-conversion | sagebrush | 0.07x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | singular | 1.39x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | msolve | 10.99x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | groebner.jl | 33.33x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | reduced-grobner-basis | sagebrush | 5.53x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
+| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | singular | 1.23x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf2-rp2-planted` | lex-basis-by-conversion | sagebrush | 5.52x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | singular | 1.51x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | msolve | 14.32x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 2.0x its startup floor** |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | groebner.jl | 38.43x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | reduced-grobner-basis | sagebrush | 9.56x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | singular | 1.46x | known-solution | 3 invariants agreed |
+| `poseidon-t2-rf4-rp0-planted` | lex-basis-by-conversion | sagebrush | 9.70x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `anemoi64-cico-n1-fcico` | reduced-grobner-basis | groebner.jl | 0.07x | sole-comparand (Groebner.jl) | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `anemoi64-cico-n2-fcico` | reduced-grobner-basis | groebner.jl | 0.64x | sole-comparand (Groebner.jl) | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | msolve | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | groebner.jl | 0.23x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `katsura-4` | reduced-grobner-basis | sagebrush | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | singular | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-4` | lex-basis-by-conversion | sagebrush | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | singular | 0.02x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | msolve | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | groebner.jl | 0.83x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `katsura-5` | reduced-grobner-basis | sagebrush | 0.08x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | singular | 0.03x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-5` | lex-basis-by-conversion | sagebrush | 0.10x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | singular | 0.10x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | msolve | 0.35x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | groebner.jl | 3.21x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.5x its startup floor** |
+| `katsura-6` | reduced-grobner-basis | sagebrush | 0.34x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | singular | 0.11x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-6` | lex-basis-by-conversion | sagebrush | 0.38x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | singular | 0.51x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | msolve | 2.54x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | reduced-grobner-basis | groebner.jl | 14.89x | comparand-file | 3 invariants agreed |
+| `katsura-7` | reduced-grobner-basis | sagebrush | 2.52x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | singular | 0.55x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `katsura-7` | lex-basis-by-conversion | sagebrush | 2.70x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | singular | 0.00x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | msolve | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | groebner.jl | 0.18x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `cyclic-4` | reduced-grobner-basis | sagebrush | 0.01x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | singular | 0.04x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | msolve | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | groebner.jl | 1.59x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-5` | reduced-grobner-basis | sagebrush | 0.16x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | singular | 0.06x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-5` | lex-basis-by-conversion | sagebrush | 0.20x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | singular | 0.28x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | msolve | 1.26x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | reduced-grobner-basis | groebner.jl | 6.13x | comparand-file | 3 invariants agreed |
+| `cyclic-6` | reduced-grobner-basis | sagebrush | 1.25x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | singular | 0.29x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.4x its startup floor** |
+| `cyclic-6` | lex-basis-by-conversion | sagebrush | 1.45x | comparand-file | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | singular | 0.52x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | msolve | 2.84x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | reduced-grobner-basis | groebner.jl | 11.42x | live-oracle | 3 invariants agreed |
+| `mq-random-6` | reduced-grobner-basis | sagebrush | 2.84x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | singular | 0.52x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.6x its startup floor** |
+| `mq-random-6` | lex-basis-by-conversion | sagebrush | 2.83x | live-oracle | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-random-10` | reduced-grobner-basis | singular | 4.06x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | msolve | 128.78x | live-oracle | 2 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | groebner.jl | 338.23x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | reduced-grobner-basis | sagebrush | 88.68x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-random-10` | lex-basis-by-conversion | singular | 3.86x | live-oracle | 3 invariants agreed |
+| `mq-random-10` | lex-basis-by-conversion | sagebrush | 78.35x | live-oracle | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-6` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | groebner.jl | 0.08x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-6` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | singular | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-6` | lex-basis-by-conversion | sagebrush | 0.05x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | msolve | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | groebner.jl | 0.16x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.2x its startup floor** |
+| `mq-planted-10` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-10` | lex-basis-by-conversion | singular | 0.11x | known-solution | 3 invariants agreed |
+| `mq-planted-10` | lex-basis-by-conversion | sagebrush | 0.43x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
+| `mq-planted-14` | reduced-grobner-basis | singular | 0.00x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.1x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | msolve | 0.02x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.0x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | groebner.jl | 0.22x | known-solution | **NOT AN ENGINE COMPARISON: an operand is 1.3x its startup floor** |
+| `mq-planted-14` | reduced-grobner-basis | sagebrush | 0.01x | known-solution | 3 invariants agreed, but **NOT AUTHORITATIVE: sagebrush may not be a speedup denominator** |
 

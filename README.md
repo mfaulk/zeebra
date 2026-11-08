@@ -94,7 +94,10 @@ As the saying goes, you can either make software so simple that it obviously has
 - [x] A competitive board that refuses a ratio against a comparand's own startup floor, measured at
       35.91 ms for Singular, 10.29 ms for msolve and 10.36 ms for Sagebrush from the board's own
       rows — and that states its own roster and counts what its gates excluded, so a run that
-      silently lost an engine cannot read as a run that never had it
+      silently lost an engine cannot read as a run that never had it. Each ratio also carries the
+      corpus's own **provenance** verdict: a problem with no recorded ideal equivalence is refused
+      in the cell rather than omitted, and a ratio resting on a single external engine renders
+      `NOT CORROBORATED` beside it (#518)
 - [x] The board populated to **five libraries**: 180 measured records over the whole corpus ladder
       x both tasks x Zeebra, Singular 4.4.1, msolve 0.11.0, Groebner.jl 0.10.11 and Sagebrush, one
       row per process under the benchmark lock, all four externals agreeing term-for-term before any
