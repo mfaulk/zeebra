@@ -1,5 +1,9 @@
 # Classical benchmarks: the invariants are externally anchored, the timings are not
 
+**Measured at:** publication bound `f94b3df0` for Zeebra's own figures in §5; every external timing
+is quoted from its source — §2.1 and §2.2 from Steel's 2004 page, §2.3 from Magma's V2.27 topic page
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Deliverable for A7 (#199), a child of the benchmark-corpus epic #65. The question: do Zeebra's three
 synthetic generators — `cyclic`, `katsura`, `planted` — have external reference points, and if so
 what may honestly be compared against them?
@@ -87,6 +91,65 @@ wrong solution count, so the distinction is recorded rather than normalized away
 
 The page's HFE rows are A6's and are reported in #198, not here. The rationals rows are out of scope
 — Zeebra has no rational arithmetic and this document does not propose adding any.
+
+### 2.3 The subscriber-side topic page, which is twenty-two years newer
+
+`https://magma.maths.usyd.edu.au/magma/info/topic_gb` returns **HTTP 401** to this machine and still
+does; it is behind Magma's subscriber login, which is why #430 was filed as an owner action. The
+owner supplied it as a PDF on **2026-11-08**: sha256
+`39b69365d58dc0e71fd54f5218941433af6a89638f4f883bedd891005f240886`, 115 897 B, 3 pp., printed from
+the live page. It is Magma's own copyrighted page — quoted here, not committed.
+
+**#430's first question is answered, and the answer is better than expected: it carries maintained
+timings, not just documentation.** The machine line, verbatim:
+
+> All the timings given below are for runs on a 64-bit Dell workstation with a 4-core Intel Core
+> i7-7700 CPU (3.60 GHz); timings are given for runs in both the default single core case and the
+> parallel 4-core case.
+
+An i7-7700 is a 2017 part and the figures are Magma **V2.27**, against §2's Athlon XP and V2.11-8
+from 2004. Every figure is given twice, 1 core and 4:
+
+| system | field | 1 core | 4 cores | 4-core speedup | memory |
+|---|---|---:|---:|---:|---:|
+| Cyclic-9 | GF(32003) | 29.3 s | 10.2 s | 2.87x | — |
+| Cyclic-10 | GF(32003) | 1 957.1 s | 601.2 s | 3.26x | — |
+| Cyclic-9 | `ℚ` | 286.1 s | 144.3 s | 1.98x | 750 MB |
+| Cyclic-10 | `ℚ` | 16.1 h | 5.2 h | 3.10x | 46 GB |
+| HFE Challenge 1 (80 quadratics, 80 variables) | GF(2) | 85.1 s | 28.2 s | 3.02x | — |
+
+**What is and is not usable here.** There are **no Katsura rows**, no per-version columns, no
+repetition count, no memory figures for the finite-field rows, no input files and no build
+description beyond the CPU — so §4's three reasons still forbid a timing comparison, and this page
+does not change the verdict of §4 or §7 for Zeebra's own numbers. What it does change is the *era*
+of the only Magma anchor on record: Cyclic-9 over GF(32003) went from 1 453.6 s on a 2.087 GHz
+Athlon under V2.11-8 to **29.3 s on one core** under V2.27, a factor of 49.6 that is twenty-two
+years, two machines and sixteen versions wide and is attributable to none of them individually.
+
+**Two things on it are worth more than the timings.** The first is the parallel pair: Magma's F4
+gets **2.9x–3.3x from four cores** on the finite-field rows, and 2.0x on Cyclic-9 over `ℚ`. That is
+a published scaling figure for a competitor's F4 at a worker count Zeebra measures itself at, and it
+is the kind of quantity #412 and `resultant-elimination.md` §6.6 are about. The second is the dense
+variant, which the page dates and scopes:
+
+> A major new variant of the F4 algorithm was developed by A. Steel in 2013 and is applicable to
+> polynomial systems with rather dense inputs; this is a common case for attacking certain types of
+> cryptosystem and includes the HFE and MQQ cryptosystems and also Minrank systems.
+
+That is the "dense F4" of `minrank.md` §5.4 named and dated by its vendor, and it is #441's subject.
+The page also gives the HFE-80 matrix shape — "the largest matrix is 293,287×1,666,981 and many rows
+have hundreds of thousands of non-zero entries" — which is a structural datum of the kind #225 and
+#218 want, on the system #198 tracks.
+
+**#430's other two questions are owner decisions, and are now answered.**
+
+- **Magma is not available as a comparand.** The owner has no Magma access (2026-11-08). So no
+  adapter can be written, `tools/external/provision.sh` is unaffected, and every Magma figure in
+  this repository stays what it already is: read at source and quoted, never measured here. #441 and
+  #439 are documentary studies for the same reason.
+- **Macaulay 2 is not a priority** (owner, 2026-11-08). The roster stays the four provisioned
+  engines — Singular, msolve, Groebner.jl, Sagebrush. §2.1's Macaulay 2 0.9.2 column is a
+  Buchberger-era 2004 figure and nothing here depends on refreshing it.
 
 ## 3. Zeebra's invariants, measured
 
@@ -260,6 +323,10 @@ the finding in the direction of making the epic look unnecessary, and the epic i
   the decision and the argument. The engines are re-run here over that field rather than compared
   against §2.1's figures, which §4 still forbids.
 - **Rationals are out of scope**, stated so the `Q` rows are not mistaken for a gap.
+- **Quote §2.3's V2.27 figures rather than §2.1's 2004 column** wherever a Magma number is used as a
+  difficulty scale, and say which machine and core count it is. The 2004 column stays for the
+  invariants it carries (Cyclic-10's 34940, the GF(2) dimension) and for nothing else. Magma cannot
+  be measured here at all — no licence (§2.3) — so this is the whole of what is available.
 
 ## 7. Other collections, assessed against #65's bar
 
@@ -268,6 +335,7 @@ the finding in the direction of making the epic look unnecessary, and the epic i
 | collection | verdict |
 |---|---|
 | **Steel's Magma GB timings page** | **accept, for invariants only.** Cyclic-10's dimension 34940 and the GF(2) Cyclic rows are checkable values; the HFE rows go to #198, where they are much more valuable. |
+| **Magma's `info/topic_gb` page** (subscriber-side, §2.3) | **accept as a modern difficulty scale, reject as a comparand.** Its V2.27 figures on an i7-7700 are the only post-2004 Magma timings on record here and they come in 1-core and 4-core pairs, which is a usable published scaling figure. No instances, no repetitions, no build description, and no Katsura rows, so §4 still forbids a ratio against Zeebra. |
 | **Steel's *Dense Variant of the F4 Algorithm* page** (`/users/allan/densef4/`) | **defer to #218 and #225.** It is about representation, which is #218's open question, and the HFE-80 matrices it discusses are "moderately dense" over GF(2) — the datum #225 wants at 64×64 block granularity. Not a benchmark source. |
 | **SymbolicData** | **not assessed.** Deliberately: §3 found that the anchor Zeebra needs is an invariant, and a fourth catalogue of systems does not supply one. Reopen only if a specific instance with a published `dim R/I` is wanted. |
 | **msolve's published benchmarks** | **the right follow-up if a *modern* timing comparand is ever wanted**, which §4 argues is the only way to get one. Not pursued here; it would be its own issue, and it should be measured on one machine rather than quoted. |
