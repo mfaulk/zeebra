@@ -28,6 +28,7 @@ use std::{collections::BTreeMap, fmt::Write as _, time::Duration};
 
 use super::{
     contract::{order_from_tag, order_tag, Invariants, LimitStop, Limits, RunFailure, Unsupported},
+    corpus::{ladder, Equivalence},
     FieldSpec, Instance, RunReport, RunStatus, Verification,
 };
 use crate::{
@@ -812,6 +813,18 @@ pub struct Speedup {
     /// cannot see, and the board is the artifact that has to stop somebody recomputing the 501x
     /// from the raw numbers later.
     pub floor_multiple: Option<f64>,
+
+    /// The corpus's own record of how this problem's ideal equivalence was established.
+    ///
+    /// [`Equivalence::licenses_timing`] is the gate on publishing a figure at all and
+    /// [`Equivalence::is_corroborated`] is the fact a published one has to state. Both were
+    /// policy that nothing read: the renderer built every table from the stored records, so a
+    /// rung changing variant changed nothing about what the board published (#518).
+    ///
+    /// `None` where the problem is **not a corpus rung**, which is not the same as having weak
+    /// evidence: it is having none recorded. [`Self::licenses_timing`] therefore refuses it, and
+    /// the renderer says so in the cell rather than dropping the row.
+    pub equivalence: Option<Equivalence>,
 }
 
 impl Speedup {
@@ -856,12 +869,35 @@ impl Speedup {
             .is_none_or(|multiple| multiple >= Self::FLOOR_MULTIPLE_REQUIRED)
     }
 
-    /// Whether this ratio may be published: an engine comparison with a checked invariant.
+    /// Whether the corpus's evidence permits a cross-library figure for this problem at all.
     ///
-    /// The conjunction of the protocol's two gates, so a renderer cannot satisfy one and forget
-    /// the other.
+    /// Fail-closed on an **unrecorded** problem, which is the opposite of
+    /// [`Self::is_engine_comparison`]'s reading of an unknown startup floor — and deliberately:
+    /// refusing there would silently drop rows, while refusing here is visible in the cell. A
+    /// problem that is not a corpus rung has no recorded equivalence, and the corpus's rule for
+    /// that case is that no cross-library figure may be quoted for it.
+    pub fn licenses_timing(&self) -> bool {
+        self.equivalence
+            .is_some_and(|equivalence| equivalence.licenses_timing())
+    }
+
+    /// Whether a **third** opinion exists, so a disagreement could name the odd one out.
+    ///
+    /// False for an unrecorded problem and for the two single-engine variants. A publishable
+    /// ratio that is not corroborated is published **with the fact stated**, which is what the
+    /// renderer's cell carries.
+    pub fn is_corroborated(&self) -> bool {
+        self.equivalence
+            .is_some_and(|equivalence| equivalence.is_corroborated())
+    }
+
+    /// Whether this ratio may be published: recorded provenance, an engine comparison, and a
+    /// checked invariant.
+    ///
+    /// The conjunction of the protocol's gates, so a renderer cannot satisfy one and forget the
+    /// others.
     pub fn is_publishable(&self) -> bool {
-        self.is_engine_comparison() && self.shared_invariants > 0
+        self.licenses_timing() && self.is_engine_comparison() && self.shared_invariants > 0
     }
 }
 
@@ -933,6 +969,11 @@ impl CompetitiveBoard {
     pub fn speedups(&self, baseline: &str) -> Vec<Speedup> {
         let mut found = Vec::new();
         let baseline_floor = self.startup_floor(baseline);
+        // Built once rather than per pair: the ladder is a constructor, not a table lookup.
+        let provenance: BTreeMap<&'static str, Equivalence> = ladder()
+            .iter()
+            .map(|entry| (entry.name, entry.equivalence))
+            .collect();
         for reference in self.rows.iter().filter(|row| row.library == baseline) {
             if !reference.is_timing_evidence() {
                 continue;
@@ -971,6 +1012,7 @@ impl CompetitiveBoard {
                             .map(|floor| wall.as_secs_f64() / floor.as_secs_f64())
                     })
                     .min_by(|a, b| a.total_cmp(b)),
+                    equivalence: provenance.get(subject.problem.as_str()).copied(),
                 });
             }
         }
@@ -1101,18 +1143,31 @@ impl CompetitiveBoard {
                  build, with **both** outcomes answered. A ratio whose two answers share no \
                  checked invariant is marked: the protocol does not permit publishing it.\n\n",
             );
+            out.push_str(
+                "The **provenance** column is the corpus's own record of how the problem's ideal \
+                 equivalence was established, which is the gate on quoting a figure for it at \
+                 all. A problem with no recorded equivalence, or one no external engine can \
+                 represent, is **refused here rather than omitted**; a ratio resting on a single \
+                 external engine is published with that fact stated, because nothing can \
+                 triangulate it.\n\n",
+            );
 
             // The counts, before the table. Each gate already marks the rows it excludes, but a
             // marked row is only visible to a reader who tallies the column — and the headline of
             // this board is how *few* of its pairs survive both gates. Stated so the survivors
             // cannot be mistaken for the whole comparison.
+            // Provenance is tallied first and the two gates below exclude the rows it already
+            // refused, so the counts partition the pairs instead of overlapping.
+            let unlicensed = speedups.iter().filter(|s| !s.licenses_timing()).count();
             let disqualified = speedups
                 .iter()
-                .filter(|s| !s.is_engine_comparison())
+                .filter(|s| s.licenses_timing() && !s.is_engine_comparison())
                 .count();
             let unchecked = speedups
                 .iter()
-                .filter(|s| s.is_engine_comparison() && s.shared_invariants == 0)
+                .filter(|s| {
+                    s.licenses_timing() && s.is_engine_comparison() && s.shared_invariants == 0
+                })
                 .count();
             let publishable: Vec<&Speedup> =
                 speedups.iter().filter(|s| s.is_publishable()).collect();
@@ -1127,15 +1182,22 @@ impl CompetitiveBoard {
                 .iter()
                 .filter(|s| !s.has_authoritative_comparand())
                 .count();
+            // Counted among the publishable rather than against them: the corpus's rule is that
+            // a sole-comparand ratio is publishable with the fact stated, not that it is barred.
+            let uncorroborated = publishable.iter().filter(|s| !s.is_corroborated()).count();
             let _ = writeln!(
                 out,
-                "**{} pairs**: {} disqualified by the startup floor, {} with no checked \
-                 invariant, {} publishable — of which {} inside the 20% noise band, {} against a \
-                 comparand that is not authoritative, and {} that a conclusion may rest on.\n",
+                "**{} pairs**: {} refused for want of a recorded ideal equivalence, {} \
+                 disqualified by the startup floor, {} with no checked invariant, {} publishable \
+                 — of which {} resting on a sole comparand and therefore uncorroborated, {} \
+                 inside the 20% noise band, {} against a comparand that is not authoritative, \
+                 and {} that a conclusion may rest on.\n",
                 speedups.len(),
+                unlicensed,
                 disqualified,
                 unchecked,
                 publishable.len(),
+                uncorroborated,
                 in_band,
                 unauthoritative,
                 publishable
@@ -1145,32 +1207,21 @@ impl CompetitiveBoard {
                     .count()
             );
 
-            let _ = writeln!(out, "| problem | task | library | ratio | checked |");
-            let _ = writeln!(out, "|---|---|---|---:|---|");
+            let _ = writeln!(
+                out,
+                "| problem | task | library | ratio | provenance | checked |"
+            );
+            let _ = writeln!(out, "|---|---|---|---:|---|---|");
             for speedup in &speedups {
                 let _ = writeln!(
                     out,
-                    "| `{}` | {} | {} | {:.2}x | {} |",
+                    "| `{}` | {} | {} | {:.2}x | {} | {} |",
                     speedup.problem,
                     speedup.task,
                     speedup.subject,
                     speedup.ratio,
-                    if !speedup.is_engine_comparison() {
-                        format!(
-                            "**NOT AN ENGINE COMPARISON: an operand is {:.1}x its startup floor**",
-                            speedup.floor_multiple.unwrap_or_default()
-                        )
-                    } else if speedup.shared_invariants == 0 {
-                        "**NOT PUBLISHABLE: no invariant was checked**".to_string()
-                    } else if !speedup.has_authoritative_comparand() {
-                        format!(
-                            "{} invariants agreed, but **NOT AUTHORITATIVE: {} may not be a \
-                             speedup denominator**",
-                            speedup.shared_invariants, speedup.subject
-                        )
-                    } else {
-                        format!("{} invariants agreed", speedup.shared_invariants)
-                    }
+                    provenance_cell(speedup),
+                    verdict_cell(speedup),
                 );
             }
             out.push('\n');
@@ -1178,6 +1229,72 @@ impl CompetitiveBoard {
 
         out
     }
+}
+
+/// The corpus's equivalence tag, and the one external engine where there is only one.
+///
+/// The tag alone for the corroborated variants: naming the comparand file or the live oracle in
+/// every row would bury the one fact a reader has to act on, which is how many engines agreed.
+fn provenance_cell(speedup: &Speedup) -> String {
+    match speedup.equivalence {
+        None => "**none recorded**".to_string(),
+        Some(Equivalence::SoleComparand { tool, .. }) => {
+            format!("sole-comparand ({})", tool)
+        }
+        Some(equivalence) => equivalence.tag().to_string(),
+    }
+}
+
+/// What the row may claim, in the order the gates apply.
+///
+/// Provenance first, because a figure the corpus does not license is not improved by passing the
+/// floor gate or by agreeing on an invariant. Every refusal is **printed in the cell** rather than
+/// dropping the row: a dropped row is a gap a reader cannot see, and the board is the artifact
+/// that has to stop somebody recomputing the ratio from the raw numbers later.
+fn verdict_cell(speedup: &Speedup) -> String {
+    match speedup.equivalence {
+        None => {
+            return format!(
+                "**NOT PUBLISHABLE: `{}` is not a corpus rung, so no ideal equivalence is \
+                 recorded for it**",
+                speedup.problem
+            )
+        }
+        Some(Equivalence::NoComparand { reason }) => {
+            return format!(
+                "**NOT PUBLISHABLE: no cross-library check is possible — {}**",
+                reason
+            )
+        }
+        Some(_) => {}
+    }
+    if !speedup.is_engine_comparison() {
+        return format!(
+            "**NOT AN ENGINE COMPARISON: an operand is {:.1}x its startup floor**",
+            speedup.floor_multiple.unwrap_or_default()
+        );
+    }
+    if speedup.shared_invariants == 0 {
+        return "**NOT PUBLISHABLE: no invariant was checked**".to_string();
+    }
+    let mut cell = if speedup.has_authoritative_comparand() {
+        format!("{} invariants agreed", speedup.shared_invariants)
+    } else {
+        format!(
+            "{} invariants agreed, but **NOT AUTHORITATIVE: {} may not be a speedup denominator**",
+            speedup.shared_invariants, speedup.subject
+        )
+    };
+    // Stated, not withheld: the corpus's rule for a sole comparand is that the ratio is
+    // publishable *with this fact beside it*, and the board is where it has to appear.
+    if let Some(Equivalence::SoleComparand { tool, reason }) = speedup.equivalence {
+        let _ = write!(
+            cell,
+            "; **NOT CORROBORATED: {} is the only external engine here — {}**",
+            tool, reason
+        );
+    }
+    cell
 }
 
 /// The library cell: id, and its version where one was probed.
@@ -1695,12 +1812,15 @@ mod tests {
     fn test_a_ratio_against_a_startup_floor_is_not_an_engine_comparison() {
         let mut board = CompetitiveBoard::new();
         // Four Singular rows at its floor, plus one far above it: the shape the real sweep had.
+        // Named after real corpus rungs, because the provenance gate (#518) refuses a problem
+        // the corpus has no recorded ideal equivalence for and would mark these rows on that
+        // instead of on the floor.
         for (name, zeebra_ms, singular_ms) in [
-            ("a", 0.08, 36.01),
-            ("b", 0.14, 36.04),
-            ("c", 0.58, 36.05),
-            ("d", 0.55, 36.08),
-            ("e", 29963.0, 7290.0),
+            ("katsura-4", 0.08, 36.01),
+            ("katsura-5", 0.14, 36.04),
+            ("katsura-6", 0.58, 36.05),
+            ("katsura-7", 0.55, 36.08),
+            ("katsura-8", 29963.0, 7290.0),
         ] {
             board.add(named_row(name, "zeebra", answered(8), zeebra_ms));
             board.add(named_row(name, "singular", answered(8), singular_ms));
@@ -1739,7 +1859,7 @@ mod tests {
             .filter(|s| s.is_engine_comparison())
             .collect();
         assert_eq!(real.len(), 1);
-        assert_eq!(real[0].problem, "e");
+        assert_eq!(real[0].problem, "katsura-8");
         assert!(real[0].is_publishable());
         assert!(
             (real[0].ratio - 29963.0 / 7290.0).abs() < 1e-6,
@@ -1776,6 +1896,143 @@ mod tests {
             speedups[0].is_engine_comparison(),
             "an unknown floor must not be read as a disqualification"
         );
+    }
+
+    /// A ratio on a problem the corpus has no equivalence for is refused in the cell, not dropped.
+    ///
+    /// The gate the corpus states and nothing read (#518): `licenses_timing` and
+    /// `is_corroborated` had no consumer in the renderer, so a rung's provenance could not change
+    /// anything the board published. Unlike the startup floor, absent evidence here is a refusal —
+    /// it is visible, where dropping the row would not be.
+    #[test]
+    fn test_a_ratio_with_no_recorded_equivalence_is_refused_in_the_cell() {
+        let mut board = CompetitiveBoard::new();
+        board.add(named_row(
+            "not-a-corpus-rung",
+            "zeebra",
+            answered(64),
+            100.0,
+        ));
+        board.add(named_row(
+            "not-a-corpus-rung",
+            "singular",
+            answered(64),
+            400.0,
+        ));
+
+        let speedups = board.speedups("zeebra");
+        assert_eq!(speedups.len(), 1, "the pair is still computed");
+        assert_eq!(speedups[0].equivalence, None);
+        assert!(!speedups[0].licenses_timing());
+        assert!(!speedups[0].is_corroborated());
+        assert!(
+            !speedups[0].is_publishable(),
+            "an engine comparison with agreeing invariants is still unpublishable without \
+             recorded provenance"
+        );
+        assert!(
+            speedups[0].is_engine_comparison() && speedups[0].shared_invariants > 0,
+            "the other two gates pass, so provenance is the only thing refusing it"
+        );
+
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("is not a corpus rung"),
+            "the refusal names the problem\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("| **none recorded** |"),
+            "and the provenance column says there is none\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("0.25x"),
+            "the ratio is still rendered, so nobody recomputes it from the raw rows\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("1 refused for want of a recorded ideal equivalence"),
+            "and the summary counts it\n{}",
+            markdown
+        );
+    }
+
+    /// A sole-comparand ratio is published **with the fact stated**, which is the corpus's rule.
+    ///
+    /// Anemoi over `2^64 - 353` is the real case: Groebner.jl is the only external engine that
+    /// reaches the field, so the agreement is two-way and nothing can name the odd one out. Before
+    /// #518 such a row rendered exactly like a three-engine Katsura row.
+    #[test]
+    fn test_a_sole_comparand_ratio_is_published_with_the_fact_stated() {
+        let mut board = CompetitiveBoard::new();
+        for problem in ["anemoi64-cico-n1-fcico", "anemoi64-cico-n2-fcico"] {
+            board.add(named_row(problem, "zeebra", answered(5), 4_000.0));
+            board.add(named_row(problem, "groebner.jl", answered(5), 1_000.0));
+        }
+
+        let speedups = board.speedups("zeebra");
+        assert_eq!(speedups.len(), 2);
+        for speedup in &speedups {
+            assert!(
+                speedup.licenses_timing(),
+                "one engine still licenses a ratio"
+            );
+            assert!(!speedup.is_corroborated(), "nothing triangulates it");
+            assert!(
+                speedup.is_publishable(),
+                "publishable, with the fact stated"
+            );
+        }
+
+        let markdown = board.to_markdown();
+        assert!(
+            markdown.contains("sole-comparand (Groebner.jl)"),
+            "the provenance column names the one engine\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("NOT CORROBORATED"),
+            "and the cell states the fact beside the ratio\n{}",
+            markdown
+        );
+        assert!(
+            markdown.contains("2 resting on a sole comparand and therefore uncorroborated"),
+            "and the summary counts them among the publishable\n{}",
+            markdown
+        );
+    }
+
+    /// A family no external engine can represent is refused by name, with the corpus's reason.
+    ///
+    /// No ladder rung is `NoComparand` today — #386 moved the last of them to `SoleComparand` —
+    /// so the variant is exercised directly. It is the one the gate exists for: a refusal that
+    /// never fires on the current corpus still has to be the behaviour when a rung needs it.
+    #[test]
+    fn test_a_family_with_no_comparand_is_refused_by_name() {
+        let unpublishable = super::Speedup {
+            problem: "a-254-bit-family".to_string(),
+            task: Task::ReducedGrobnerBasis,
+            baseline: "zeebra".to_string(),
+            subject: "singular".to_string(),
+            ratio: 7.0,
+            shared_invariants: 2,
+            floor_multiple: Some(500.0),
+            equivalence: Some(super::Equivalence::NoComparand {
+                reason: "no surveyed engine reaches a 254-bit prime",
+            }),
+        };
+
+        assert!(!unpublishable.licenses_timing());
+        assert!(!unpublishable.is_publishable());
+        let cell = super::verdict_cell(&unpublishable);
+        assert!(
+            cell.contains("NOT PUBLISHABLE")
+                && cell.contains("no surveyed engine reaches a 254-bit prime"),
+            "the refusal carries the corpus's own reason: {}",
+            cell
+        );
+        assert_eq!(super::provenance_cell(&unpublishable), "no-comparand");
     }
 
     /// The board round-trips through its history form, contract and count included.
@@ -1867,12 +2124,12 @@ mod tests {
         let mut board = CompetitiveBoard::new();
         // Each library needs four answered rows before it has a floor at all, and the compared
         // rows must sit far above it or the floor gate is what marks them instead.
-        for problem in ["w-1", "x-1", "y-1", "z-1"] {
+        for problem in ["katsura-4", "katsura-5", "katsura-6", "katsura-7"] {
             board.add(named_row(problem, "zeebra", answered(64), 0.1));
             board.add(named_row(problem, "singular", answered(64), 0.1));
             board.add(named_row(problem, "sagebrush", answered(64), 0.1));
         }
-        for problem in ["a-1", "b-1", "c-1", "d-1"] {
+        for problem in ["cyclic-4", "cyclic-5", "cyclic-6", "cyclic-7"] {
             board.add(named_row(problem, "zeebra", answered(64), 5_000.0));
             board.add(named_row(problem, "singular", answered(64), 1_000.0));
             board.add(named_row(problem, "sagebrush", answered(64), 1_000.0));
@@ -1989,15 +2246,15 @@ mod tests {
         // Distinct first letters at a common length, because `named_row`'s digest perturbation
         // is a function of the name's length and first byte — same-shaped names collide into one
         // problem and the board then cross-compares every pairing of them.
-        for problem in ["a-1", "b-1", "c-1", "d-1"] {
+        for problem in ["katsura-4", "katsura-5", "katsura-6", "katsura-7"] {
             board.add(named_row(problem, "zeebra", answered(64), 0.05));
             board.add(named_row(problem, "singular", answered(64), 36.0));
         }
         // One pair far above it, and one inside the noise band.
-        board.add(named_row("e-1", "zeebra", answered(64), 29_963.0));
-        board.add(named_row("e-1", "singular", answered(64), 7_291.0));
-        board.add(named_row("f-1", "zeebra", answered(64), 1_000.0));
-        board.add(named_row("f-1", "singular", answered(64), 1_050.0));
+        board.add(named_row("cyclic-5", "zeebra", answered(64), 29_963.0));
+        board.add(named_row("cyclic-5", "singular", answered(64), 7_291.0));
+        board.add(named_row("cyclic-6", "zeebra", answered(64), 1_000.0));
+        board.add(named_row("cyclic-6", "singular", answered(64), 1_050.0));
 
         let markdown = board.to_markdown();
         assert!(
