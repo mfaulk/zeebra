@@ -367,6 +367,11 @@ the ladder, not the growth.
 > **Scoped by §6.6.** Everything in this section is at one worker, and the sign of the result
 > depends on that: §6.6 measures the subgroup route winning by 1.7–1.8x at 32 workers, because its
 > extra determinants parallelize and the reference route's Lagrange solve does not.
+>
+> **Dated by §6.13.** The *absolute* determinant figures below belong to one measurement session and
+> are about 1.2x faster than this binary delivers today — re-run at its own commit, 37 634.3 ms
+> became 47 944.4 ms. The **ratios** in the last column reproduce to 0.02 and are what this section
+> is for; do not divide a figure below by one taken later.
 
 Every row runs **both** routes on the same two polynomials in the same process and asserts the two
 answers are equal, so the comparison is free of build, machine and contention differences:
@@ -463,6 +468,18 @@ determinant — wall clock times workers, divided by 16 384:
 Per-determinant cost steps up 4% as soon as eight cores are busy and then moves 1–4% more out to
 32. **A memory-bandwidth limit would widen monotonically with the number of concurrent streams, and
 this does not** — it saturates at the point where the clock does. Two independent bounds agree:
+
+> **§6.13 confirms this table and corrects the argument under it.** The 4–9% **reproduces**:
+> re-measured on this section's own binary with the box otherwise idle, the same configuration gives
+> 1.058x at 8 workers and 1.063x at 32. §6.9's 31–44% was the same measurement taken while other
+> agents were building, and #319 is resolved as ambient load rather than as a disagreement about the
+> kernel.
+>
+> The two bounds below do not survive, though the conclusion they were offered for does. **The limit
+> is not the all-core clock**: §6.13 finds the effect monotone in the working set — nil at ~10 kB,
+> 4–6% at 105 kB, 15–21% at ~840 kB — and a clock moves everything at once. And the L3 figure is
+> wrong by 8x: this part has **8 CCDs of 32 MB each, shared by the 8 cores of a CCD**, so 256 MB is
+> a sum over eight caches no single worker can reach and the comparison has to be made per CCD.
 
 - **Working set.** One determinant holds an order-162 matrix of eight-byte elements, 210 KB, and
   `crout_lu_pivoting` returns `L`, `U` and `P` beside it: about 840 KB live per worker. At 32
@@ -799,6 +816,17 @@ it: the penalty is the same 1.44x at order 162 and at order 486, whose matrices 
 a bandwidth limit would not do. But the size of it disagrees with what is on record and this
 milestone did not resolve why. Treated as a finding, not repaired — #319.
 
+> **Resolved in §6.13, against this reading.** The 31–44% is **ambient load**: §6.6's own
+> configuration, re-run on both §6.6's binary (`93bb1c2`) and `1985504` with the box idle, gives
+> 1.058x–1.072x — §6.6's figure — and reproduces 1.343x/1.478x hours later with three other agents'
+> `cargo test --release` runs resident. `tools/benchlock.sh` serializes benchmarks and not builds,
+> so that load went straight through the lock and nothing in the log recorded it. The width penalty
+> is 6%; the contention is a separate factor of up to 1.4x on top.
+>
+> §6.6's conclusion is therefore **not** strengthened, and the all-core clock is **excluded** as the
+> mechanism: stages of one process on one core move by 1.00x, 1.04–1.06x and 1.15–1.21x according to
+> working-set size, which no clock change can do.
+
 #### The figures on record are ~1.2x faster than the same measurements today
 
 Worth stating plainly, because every ratio in §6 is quoted against one of them:
@@ -814,7 +842,15 @@ The first row is the same measurement, on the same registered row, through the s
 the same lock — only months and a commit range apart. Three of the four point the same way by about
 1.2x and the smallest order points the other way. **This is unexplained**, and until it is, a factor
 computed between a figure from §6.5 and a figure taken now carries a ~20% systematic that is not a
-property of either implementation. Filed as #318 rather than guessed at here. Two unrelated
+property of either implementation. Filed as #318 rather than guessed at here.
+
+> **Resolved in §6.13.** §6.5's own binary, re-run at its own commit, gives 45 159.7–47 944.4 ms and
+> not 37 634.3 ms, so no commit in the range can be responsible and the bisection this table's issue
+> proposed would land on nothing. The fourth row stops being anomalous once the effect is seen to be
+> monotone in the working set: §6.5's 256 order-18 determinants reproduce at **2.9 ms exactly**,
+> because 10 kB fits L1 and does not participate. The 0.92x in the table above is drift on a 2.9 ms
+> figure, not a signal pointing the other way. The residual 1.15–1.21x on an idle box is bounded to
+> the CCD-local candidates and not explained further. Two unrelated
 single-core processes were resident during part of the M25 sweep — `tools/benchlock.sh` serializes
 benchmarks and not builds — which inflates a measurement rather than deflating it, and so cannot
 explain a figure on record being *faster*.
@@ -1243,6 +1279,204 @@ That 7.5x gap is an upper bound on what a faster hasher could recover on the biv
 the bivariate path the triangle route already takes it, so #164's value is in the arities the
 triangle does not cover. The trivariate arm of `examples/multivariate_mul.rs` is where that would be
 read.
+
+### 6.13 #318 and #319 resolved, and they are two different things
+
+§6.9 left two findings open and M26 carried them unresolved: the figures on record are ~1.2x faster
+than the same measurements re-taken (#318), and core-time per determinant rises 31–44% at 32
+workers where §6.6 recorded 4–9% (#319). §6.9 read them as one question — "the same ~1.2x seen
+through the worker count". They are not. One is a session effect that survives an idle machine and
+one is ambient load that disappears with it, and the measurement that separates them is not the
+bisection #318 proposed.
+
+**The experiment.** #318's suggested shape was to bisect the commit range, on the reading that a
+figure which no longer reproduces indicts some commit in between. That inverts the burden: before
+asking *which commit* slowed it down, ask whether the **original commit itself** still delivers its
+own figure. So `93bb1c2` — the commit §6.5's table was taken at — was checked out into its own
+worktree, built, and re-run on one pinned core under `tools/benchlock.sh`, bare, which is the
+invocation that produced §6.5. Beside it, `1985504` — `main` as it stood that evening, 435 commits
+later — on the same core in the same session. Both ends are named by commit rather than by branch,
+because the point of the exercise is that a figure without its commit cannot be re-tested. The
+whole programme was then run twice, hours apart, which is how the second finding came out: the two
+runs disagree with each other, and what differed was what else was on the box.
+
+`examples/determinant_era` is the second instrument, written against the narrowest API that is
+byte-identical across the range so that one source file compiles against both libraries and only
+the library beneath it differs.
+
+**It does not reproduce, and the shape of what does not reproduce is the answer.** §6.5's own
+binary, its own rows, its own code path. The last column is the better of two sessions — the one
+with the box otherwise idle, which is the fairest comparison available to the figure on record:
+
+| row | measurement | live set | §6.5 on record | its own binary, quiet box | ratio |
+|---|---|---:|---:|---:|---:|
+| `rf2-rp0` | 256 order-18 determinants | ~10 kB | 2.9 ms | **2.9 ms** | **1.00x** |
+| `rf2-rp2` | `lagrange_interpolate`, 13 123 points | 105 kB | 1 529.4 ms | **1 589.3 ms** | **1.039x** |
+| `rf4-rp0` | `lagrange_interpolate`, 13 123 points | 105 kB | 1 512.8 ms | **1 596.0 ms** | **1.055x** |
+| `rf2-rp2` | 13 123 order-162 determinants, reference | ~840 kB | 37 634.3 ms | **45 426.8 ms** | **1.207x** |
+| `rf2-rp2` | 16 384 order-162 determinants, subgroup | ~840 kB | 48 054.4 ms | **55 709.2 ms** | **1.159x** |
+| `rf4-rp0` | 13 123 order-162 determinants, reference | ~840 kB | 37 959.3 ms | **45 159.7 ms** | **1.190x** |
+| `rf4-rp0` | 16 384 order-162 determinants, subgroup | ~840 kB | 49 175.7 ms | **56 332.7 ms** | **1.146x** |
+
+The same table taken earlier the same day, with three other agents' `cargo test --release` runs
+resident, gives 47 944.4 ms, 59 962.6 ms, 45 942.5 ms and 58 703.0 ms on the four determinant rows —
+1.19x to 1.27x instead of 1.15x to 1.21x — and 1.047x / 1.058x on the two interpolation rows, which
+barely move. **Contention makes #318 worse and is not what #318 is**; it is what #319 is, below.
+
+Three things follow immediately.
+
+- **The ~1.2x is not a regression.** It is present in the binary that produced the fast figure, so
+  no commit in the 435-commit range can be responsible for it and bisecting that range would land
+  on nothing. #318's suggested work is the wrong work, and this is the measurement that says so.
+- **It is not the all-core clock, and it is not any other uniform property of the machine.** Those
+  seven rows are stages of the *same processes*, on the *same core*, in the *same runs*. A clock
+  that had drifted 20% would move all seven by 20%. What actually happens is that the effect is
+  **monotone in the working set**: nil at ~10 kB, 4–6% at 105 kB, 15–21% at ~840 kB.
+- **Ratios taken inside one session reproduce.** §6.5's headline subgroup-versus-reference factors
+  were 1.40x, 1.23x and 1.25x; the same binary gives **1.41x, 1.18x and 1.20x** on a quiet box and
+  **1.40x, 1.21x and 1.23x** on a loaded one. The negative result of §6.5 is intact under both. What
+  does not survive is dividing a figure from one session by a figure from another.
+
+**The working-set boundary is this part's cache hierarchy, and §6.6 has the L3 wrong.** The box is a
+Threadripper PRO 5995WX: 64 physical cores on cpus 0–63 with SMT siblings on 64–127, 512 kB of
+private L2 per core, and **8 CCDs of 32 MB L3 each — shared by the 8 cores of a CCD, not by the
+box**. §6.6's working-set argument compares 27 MB against "this box's 256 MB L3" and concludes
+"bandwidth has no way to bind here". 256 MB is the sum over eight per-CCD caches; the figure
+a worker is actually bounded by is 32 MB, which is 8x smaller, and the comparison has to be made per
+CCD. With that correction the three measured regimes line up exactly:
+
+| stage | live set | where it lives | quiet box | loaded box |
+|---|---:|---|---:|---:|
+| order-18 determinant | ~10 kB | L1 | 1.00x | 1.00x |
+| `lagrange_interpolate`, 13 123 points | 105 kB | private 512 kB L2 | 1.04–1.06x | 1.05–1.06x |
+| order-162 determinant (`L`, `U`, `P` beside the matrix) | ~840 kB | **shared 32 MB CCD L3** | 1.15–1.21x | 1.19–1.27x |
+| order-1 458 determinant | ~68 MB | past the CCD L3, main memory | — | — |
+
+The effect appears exactly where the working set stops fitting the private L2 and becomes dependent
+on a cache eight cores and sixteen threads compete for — and the right-hand column says the same
+thing again, since adding load to the box moves only the row that depends on a shared resource.
+That bounds the candidate mechanisms to the CCD-local ones — co-residency in the shared L3, and the
+fabric and memory traffic that follows from missing it — and rules out the clock, the field
+arithmetic and the implementation.
+
+It does **not** identify which CCD-local candidate it is, and the persistent 1.15–1.21x on an idle
+box is therefore **bounded rather than explained**. A deliberate contrast — seven determinant
+workers on the measured core's own CCD against seven on another — did not separate them at the
+sample size the lock affords, and is recorded as inconclusive rather than dressed up. Two candidates
+are excluded outright: transparent hugepages are `madvise`-only on this host with
+`/proc/vmstat` reporting `thp_fault_alloc 0`, so THP is not in use by this workload and cannot have
+changed between the sessions; and the kernel source is byte-identical, so it is not the code.
+
+**The reproducibility bound, which is the usable output.** Even inside the current era the figure
+moves: `1985504` on the same row, route, core and lock measures 3.758 ms and 3.840 ms a
+determinant in two sessions hours apart, against the **3.439 ms** M25 recorded for exactly that
+measurement one day earlier. So the honest statement is not a correction factor but a bound:
+
+> *An order-162 determinant figure on this box reproduces to about ±10% within a session, to about
+> ±20% across sessions on an idle machine, and not at all better than ~1.5x once other agents are
+> building. Ratios taken inside one session reproduce to about 0.03. Do not divide a figure from one
+> session by a figure from another, and do not quote an absolute determinant time without the
+> session it came from.*
+
+That is what M27 needs and it is enough to make its own figures clean: every ratio §6 quotes
+*within* a section is inside the bound, and the two cross-session factors anyone had relied on —
+#289's 3.116 exponent and §6.9's 1.2x table — are the two that were already flagged.
+
+#### #319 is not an era at all. It is the load the lock does not exclude
+
+§6.6's own configuration — 13 123 determinants over 32 pinned cores — was run on §6.6's own library
+**twice in the same day, on the same two binaries, under the same lock**, and it gave two different
+answers:
+
+| workers | §6.6 on record | `93bb1c2`, `load≈14` | `93bb1c2`, box quiet | `1985504`, box quiet |
+|---:|---:|---:|---:|---:|
+| 1 | 3.007 ms | 3.666 ms | 3.446 ms | 4.052 ms |
+| 8 | 3.139 ms (1.044x) | 4.925 ms (**1.343x**) | 3.646 ms (**1.058x**) | 4.176 ms (1.031x) |
+| 32 | 3.270 ms (1.087x) | 5.420 ms (**1.478x**) | 3.662 ms (**1.063x**) | 4.342 ms (1.072x) |
+
+**§6.6's 4–9% reproduces.** 1.058x and 1.063x against its 1.044x and 1.087x, on its own binary, and
+1.031x / 1.072x on `1985504`. The 31–44% reproduces too — on the same binaries, in the same
+configuration, hours earlier, with three other agents' `cargo test --release` runs resident.
+
+**`tools/benchlock.sh` serializes benchmarks and it does not serialize builds.** That was always
+written down in the script's own header as a companion hazard; what was not appreciated is how large
+the effect is on *this* measurement. A 32-worker determinant sweep needs 32 cores to itself and a
+`cargo test --release` elsewhere in the repo is entitled to all of them, so the quantity §6.9
+recorded as a width penalty is a width penalty **times** whatever else was resident. The width
+penalty is 6%; the contention on top of it is up to 1.4x.
+
+So #319's conjecture — that it was #318 seen through the worker count — is **wrong**, and the two
+issues have different causes:
+
+- **#318 is a session effect that survives a quiet box.** The best figure obtained for §6.5's own
+  binary on an otherwise idle machine is 45 159.7 ms, against 37 634.3 ms on record: still 1.20x,
+  still confined to the L3-resident working set, with `lagrange_interpolate` at 1.039–1.055x and the
+  256 order-18 determinants at 2.9 ms exactly. Contention makes it worse — 47 944.4 ms at
+  `load≈14` — but removing the contention does not remove it.
+- **#319 is the contention, and nothing else.** There is no residual once the box is quiet.
+
+Which also disposes of the batch-length hypothesis, the other live candidate: §6.9's sweep gave each
+worker 16 determinants and §6.6 gave each 411, and a penalty read off a 58 ms burst need not be the
+one a sustained row settles at. Under load the 32-worker penalty was 1.678x / 1.549x / 1.478x at 16
+/ 411 / 411 determinants a worker — the batch length moves it 10% and the load moves it 40%. On a
+quiet box it is 1.06x at 411. Batch length is a second-order term on an effect that is mostly not
+there.
+
+The first-touch component §6.9 identified at order 1 458 is untouched by any of this and still
+real: it is what separates 1.52x from 1.31x *there*, where one worker's 68 MB live set exceeds its
+CCD's entire L3. At order 162, 840 kB does not fault.
+
+**What follows for the guard.** `CORE_TIME_PER_DOUBLING` stays at the uncontended **6.5%**, now
+confirmed rather than merely inherited. Folding the 1.4x in would make the law predict a figure no
+quiet machine produces, and mixing a kernel property with a machine state is the specific error this
+section exists to stop — #289's 3.116 "super-cubic" exponent was that mistake once already. The
+operator's exposure is real and belongs with the operator: **a 32-worker row on a loaded box costs
+up to 1.4x what the model says.** `tools/benchlock.sh` therefore now records `load=` on its START and
+END lines, so that a figure can be checked after the fact against the load it was taken under —
+which is exactly what no one could do for §6.9's table.
+
+#### What this changes, and what it does not
+
+- **§6.5, §6.6 and §6.9's figures are all correct, and belong to three sessions.** Nothing is
+  retracted. Every factor quoted *within* one of those sections stands; §6.5's 1.23x–1.40x in
+  particular reproduces to 0.03. What is void is any factor computed across them, and §6.9's own
+  3.116 "super-cubic" exponent was already found to be one of those.
+- **§6.6 is vindicated on its number and corrected on its reason.** Its 4–9% was right and this
+  milestone's 31–44% was ambient load. Its *argument* for the number does not survive: the limit is
+  not the all-core clock, which the working-set shape excludes, and its working-set bound compares
+  27 MB against a "256 MB L3" that no worker can reach.
+- **No implementation is implicated.** Through the real route the two libraries differ by
+  **1.051–1.086x** at one worker across two sessions — consistently in one direction, so there may
+  be a percent or two of real cost in the range, but nothing like the 1.2x and inside the 5% drift
+  §6.5 recorded between two runs of its own binary. `src/linalg/crout.rs`, `sylvester_determinant`
+  and `coefficients_in` are byte-identical across the range, which is the independent check.
+- **The cost model's constants are not changed.** `CORE_TIME_PER_DOUBLING = 0.065` was *confirmed*,
+  which is the result: it had been inherited from §6.6, contradicted by §6.9, and is now measured
+  again on an idle box at 1.058x and 1.063x. The 1.4x of contention is deliberately **not** folded
+  in — a law that predicted a figure no quiet machine produces would be the same category error as
+  #289's 3.116 — and is stated as an operator's obligation instead. `DETERMINANT_MS_AT_162 = 3.624`
+  stays too: re-anchoring it honestly needs §6.9's whole five-order sweep re-run in one session on a
+  quiet box, and doing half of it would leave the prefactor and the exponent in different sessions.
+  Filed rather than guessed at.
+- **The era has to be recorded with the figure, and so does the load.** `Environment::commit`
+  already distinguishes two rows for the same measurement and the cost-model register is
+  append-only for this reason, so that machinery was in place and only wanted a reason to be used;
+  the M27 re-measurements are appended rather than written over the M25 rows, both carrying
+  `Attribution::IncomparableFigures` — "one session against another", which is what the schema
+  already called this. The load was *not* recorded anywhere, which is why #319 took two runs to
+  find instead of one grep, and `tools/benchlock.sh` now writes `load=` on START and END.
+
+**Reproduce it.** The second instrument is in the tree, and the first end of the comparison needs a
+worktree at the commit whose figure is in question:
+
+```sh
+git worktree add --detach /tmp/era 93bb1c2
+cp examples/determinant_era.rs /tmp/era/examples/
+RUSTC_WRAPPER="" CARGO_TARGET_DIR=/tmp/era-target \
+  sh -c 'cd /tmp/era && cargo build --release --example determinant_era'
+ZEEBRA_MACHINE="$(hostname)" ZEEBRA_AFFINITY=8 tools/benchlock.sh era \
+  taskset -c 8 /tmp/era-target/release/examples/determinant_era --workers 1 --determinants 13123
+```
 
 ## 7. The deeper consequence
 

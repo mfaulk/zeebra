@@ -15,6 +15,11 @@
 # overlap were not taken under this protocol, and the log says so. The command's exit status is
 # passed through, so a failing measurement fails the caller.
 #
+# START and END also carry `load=`, the one-minute load average. This lock serializes benchmarks
+# and not builds, so `cargo test --release` in another worktree runs straight through it; #318 was
+# a figure that would not reproduce in the binary that produced it, and the ambient load is the
+# thing that differed and that the log did not record. See `bl_load`.
+#
 #   ZEEBRA_BENCHLOCK_DIR   where the lock and the log live (default `$HOME/.zeebra`). It must be
 #                          outside every worktree: a per-checkout lock serializes nothing, and a
 #                          log that a branch switch can remove is not an audit trail.
@@ -118,6 +123,32 @@ set -uo pipefail
 # ---------------------------------------------------------------------------------------------
 # The pure half: what an END line says, and why.
 # ---------------------------------------------------------------------------------------------
+
+# The one-minute load average, for the START and END lines.
+#
+# This lock serializes *benchmarks*. It does not serialize builds, and `cargo test --release` from
+# another agent's worktree is a build: several of them can be resident on every core while a
+# measurement under this lock believes itself alone. That is what #318 turned out to be — an
+# order-162 determinant figure that would not reproduce in the binary that produced it, because
+# what differed between the two sessions was the ambient load and nothing in the log said so.
+# Recording it does not serialize anything; it makes a figure checkable against the load it was
+# taken under, which is the whole claim this log exists to support.
+#
+# The path is a parameter so the tests can read a synthetic one, and an unreadable or malformed
+# `/proc/loadavg` renders `unknown` rather than a number nobody measured.
+# shellcheck disable=SC2120  # the path argument is passed only by the tests, which source this file
+bl_load() { # [loadavg-path]
+  local path="${1:-/proc/loadavg}" first
+  # Readability is checked before the redirection rather than after: a failed `<` is reported by
+  # the shell itself and `2>/dev/null` on the `read` does not suppress it, so the lock would print
+  # to stderr on a host without /proc.
+  [ -r "$path" ] || { printf 'unknown'; return 0; }
+  read -r first _ <"$path" || { printf 'unknown'; return 0; }
+  case "$first" in
+    '' | *[!0-9.]*) printf 'unknown' ;;
+    *) printf '%s' "$first" ;;
+  esac
+}
 
 # Named rather than numbered in the log, because a reader of an audit trail is asking "was this
 # killed", and 143 does not say so.
@@ -321,13 +352,13 @@ bl_main() {
   # Captured at START and not before: `setsid nohup ... &` reparents the run to init immediately,
   # so a launcher read any earlier would be the one that was always going to go away.
   BL_LAUNCH_PPID="$(bl_ppid)" || BL_LAUNCH_PPID=""
-  bl_note START "waited=$((BL_STARTED_AT - queued_at))s $BL_COMMAND_LINE"
+  bl_note START "waited=$((BL_STARTED_AT - queued_at))s load=$(bl_load) $BL_COMMAND_LINE"
 
   local child_status=0
   "$@" || child_status=$?
 
   BL_ENDED=1
-  bl_note END "$(bl_end_fields "$child_status" "$BL_SIGNALLED" "$(bl_launcher_state)") elapsed=$(($(date +%s) - BL_STARTED_AT))s $BL_COMMAND_LINE"
+  bl_note END "$(bl_end_fields "$child_status" "$BL_SIGNALLED" "$(bl_launcher_state)") elapsed=$(($(date +%s) - BL_STARTED_AT))s load=$(bl_load) $BL_COMMAND_LINE"
   return "$(bl_end_status "$child_status" "$BL_SIGNALLED" same)"
 }
 

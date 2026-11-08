@@ -49,6 +49,27 @@ lacks() { # <label> <needle> <haystack>
   esac
 }
 
+# --- bl_load ---------------------------------------------------------------
+
+load_file="$(mktemp)"
+trap 'rm -f "$load_file"' EXIT
+
+# The one-minute figure is taken from the first field and the rest of the line is ignored.
+printf '13.90 15.51 11.83 13/8646 3443045\n' >"$load_file"
+check "load: the one-minute average is the first field" 13.90 "$(bl_load "$load_file")"
+
+# A missing /proc/loadavg renders `unknown` rather than an empty field a reader would misread as 0.
+check "load: an unreadable path is unknown" unknown "$(bl_load "$load_file.absent")"
+
+# A malformed figure is refused, because a log line that says load=garbage is worse than one that
+# admits it does not know.
+printf 'not-a-number 1 1\n' >"$load_file"
+check "load: a non-numeric figure is unknown" unknown "$(bl_load "$load_file")"
+
+# An empty file is the same claim as a missing one, and must not render as the empty string.
+: >"$load_file"
+check "load: an empty file is unknown" unknown "$(bl_load "$load_file")"
+
 # --- bl_signal_name --------------------------------------------------------
 
 # The fatal signals are named rather than numbered in the log, because the reader of an audit
