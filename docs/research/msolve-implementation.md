@@ -772,6 +772,62 @@ exponent comparison. The hypothesis is worth implementing only if that fraction 
 `symbolic` is a large enough share to matter — which is instance-dependent: it is 23% of katsura-6
 lex but 5% of katsura-7 grlex. A counter-only experiment settles it before any kernel is written.
 
+**Measured (#331): the fraction is 94.1%–96.7%, and `Monomial<N>` does not have to grow.** The
+experiment is the one described above and nothing more — `F4Options::measure_divmask` builds the
+mask and replays each divisibility test against it *after* the real answer is known, so nothing a
+mask could get wrong can reach the basis, and
+`symbolic::tests::test_the_probe_does_not_change_the_divisor_selected` asserts that element for
+element. `cargo run --release --example f4_profile -- divmask`:
+
+| system | order | vars | bits/var | max exp | tests | negative | mask decided | of negative | of tests | tests/query |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| katsura-6 | lex | 6 | 5 | 2 | 1 122 335 | 1 119 590 | **1 085 205** | 96.9% | **96.7%** | 134.9 |
+| katsura-7 | grlex | 7 | 4 | 2 | 64 954 | 62 774 | 62 725 | 99.9% | 96.6% | 24.9 |
+| katsura-6 | grlex | 6 | 5 | 2 | 13 814 | 13 170 | 13 169 | 100.0% | 95.3% | 16.5 |
+| cyclic-5 | grevlex | 5 | 6 | 1 | 8 935 | 8 409 | 8 409 | 100.0% | 94.1% | 11.5 |
+
+The two controls are there to separate the technique from the instance. katsura-6 under **grlex** is
+the same ideal under the order where `symbolic` is small, and cyclic-5 is a different family; both
+land in the same 94%–96% band, so the hit rate is a property of divisibility testing in F4 rather
+than of katsura under lex.
+
+Four things the table says, in the order they matter.
+
+**The negatives are nearly everything.** 1 119 590 of 1 122 335 — **99.76%** — of katsura-6 lex's
+tests answer *not divisible*, and a mask can only ever shortcut those. So the one case the technique
+structurally cannot help is 0.24% of the work, and the 96.7% of *all* tests is barely below the
+96.9% of the negatives. H2's "is the fraction high" is answered yes on every instance tried.
+
+**The instance-dependence is sharper than the stage share alone.** katsura-6 lex performs **17x**
+the divisibility tests of katsura-7 grlex (1 122 335 against 64 954) *and* carries the 23% stage
+share against 5%. Both figures point the same way, which is the agreement H2 asked for and did not
+assume.
+
+**`Monomial<N>` does not have to carry a mask field, which removes the knock-on #331 flagged.** The
+lead masks live in a side array on the basis — msolve keeps them in `bs->lm` (`symbol.c:514`) and
+the probe here does the same — so the only mask a query has to *build* is the dividend's, once, and
+it amortizes over `tests/query`: **134.9** on katsura-6 lex, 11.5–24.9 elsewhere. A `u32` on every
+monomial would widen `Monomial<6>` from 24 to 28 bytes and interact with #62 and #317; the
+amortization says that is not the design to measure. Build the dividend's mask at the top of the
+divisor lookup and keep the leads beside the basis.
+
+**The calibration earns nothing on these inputs, and the table shows why rather than arguing it.**
+Each variable gets `32/vars` bits, and the largest exponent in any of these systems is **2** against
+4–6 bits per variable, so `steps = span/bits_per_variable` underflows to the `max(…, 1)` floor and
+the thresholds come out as unit steps — exactly what a fixed scheme would pick. msolve's calibration
+is for inputs whose exponent range is wide enough to need it, and none of Zeebra's classical rungs
+are. That is worth knowing before copying it: the measured 96% here is **not** evidence for
+calibrated thresholds, only for masking at all.
+
+**What is still unmeasured, and is the next step rather than an omission.** This bounds the
+*comparisons* a mask removes, not the *time*. `symbolic` is 23% of katsura-6 lex, and the divisor
+search is some share of that — the queue, the deduplication test and the row building are the rest —
+so the end-to-end saving is 23% × (divisor search's share of `symbolic`) × 96.7% × (1 − mask cost /
+compare cost), and only the first and third factors are known. A stage split one level finer, inside
+`symbolic`, is what would turn this into a projection; until then the honest statement is that the
+*mechanism* applies to 96.7% of the tests and the *payoff* is unquantified. The counters are exact
+and machine-independent, so none of that needs re-taking when it is.
+
 ### H3 — Sparse-FGLM is the one algorithmic replacement with a real asymptotic argument
 
 Zeebra's FGLM is classical (`src/grobner/fglm/conversion.rs:1-17`), msolve's is Faugère–Mou (§3.1).

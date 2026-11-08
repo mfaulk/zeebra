@@ -315,6 +315,17 @@ pub struct BatchStatistics {
     /// it did.
     pub divisor_scan_steps: usize,
 
+    /// Divisibility tests the divmask probe replayed; see
+    /// [`SymbolicCounts::divmask_tests`](super::SymbolicCounts::divmask_tests). Zero unless
+    /// [`F4Options::measure_divmask`](super::F4Options::measure_divmask) is set.
+    pub divmask_tests: usize,
+
+    /// Of those, the tests that answered not-divisible.
+    pub divmask_negative: usize,
+
+    /// Of those negatives, the tests a 32-bit calibrated mask would have decided.
+    pub divmask_decided: usize,
+
     /// Monomials symbolic preprocessing offered to its queue, before the deduplication test.
     pub monomials_enqueued: usize,
 
@@ -571,6 +582,25 @@ pub struct F4Statistics {
     /// Summed over every batch: basis elements examined across those tests.
     pub divisor_scan_steps: usize,
 
+    /// Summed over every batch: divisibility tests the divmask probe replayed.
+    ///
+    /// Equal to [`Self::divisor_scan_steps`] when
+    /// [`F4Options::measure_divmask`](super::F4Options::measure_divmask) is set and zero when it
+    /// is not, which is what makes the two figures below read against the population the shipping
+    /// path actually performs rather than against a second traversal of the basis.
+    pub divmask_tests: usize,
+
+    /// Summed over every batch: of those tests, the ones that answered not-divisible.
+    pub divmask_negative: usize,
+
+    /// Summed over every batch: of those negatives, the ones a 32-bit calibrated mask would have
+    /// decided without an exponent comparison.
+    ///
+    /// The #331 figure. [`Self::divmask_decided_share`] is it as a fraction, and the share worth
+    /// quoting is of [`Self::divmask_tests`] and not of [`Self::divmask_negative`]: a positive
+    /// answer is a test no mask can shortcut, and it is in the stage's cost regardless.
+    pub divmask_decided: usize,
+
     /// What the **final interreduction** cost in operations, as opposed to in time.
     ///
     /// `divisor_queries` and `divisor_scan_steps` above cover the *batch* path only, so the stage
@@ -796,6 +826,9 @@ impl F4Statistics {
         self.reducer_rows_reused += batch.reducer_rows_reused;
         self.divisor_queries += batch.divisor_queries;
         self.divisor_scan_steps += batch.divisor_scan_steps;
+        self.divmask_tests += batch.divmask_tests;
+        self.divmask_negative += batch.divmask_negative;
+        self.divmask_decided += batch.divmask_decided;
         self.monomials_enqueued += batch.monomials_enqueued;
         self.max_pending_monomials = self.max_pending_monomials.max(batch.max_pending_monomials);
         self.free_pivots += batch.free_pivots;
@@ -824,6 +857,20 @@ impl F4Statistics {
             0.0
         } else {
             self.reducer_rows_reused as f64 / self.reducer_rows as f64
+        }
+    }
+
+    /// The fraction of symbolic preprocessing's divisibility tests a 32-bit calibrated divisor
+    /// mask would have decided, in `[0, 1]`.
+    ///
+    /// Zero when the probe was off, which is also what it reports for a probe that decided
+    /// nothing. The two are told apart by [`Self::divmask_tests`] being zero or not, and a caller
+    /// that quotes this figure has to say which it had.
+    pub fn divmask_decided_share(&self) -> f64 {
+        if self.divmask_tests == 0 {
+            0.0
+        } else {
+            self.divmask_decided as f64 / self.divmask_tests as f64
         }
     }
 

@@ -454,6 +454,21 @@ pub struct F4Options {
     /// distort what it measures.
     pub measure_stages: bool,
 
+    /// Replay every divisibility test in symbolic preprocessing against a 32-bit divisor mask,
+    /// and count what the mask would have decided (#331).
+    ///
+    /// Measurement only: the mask is consulted **after** the answer is known and cannot reach the
+    /// return value, so a run with this set returns the same basis bit for bit. What it costs is a
+    /// second walk of the basis per divisor lookup, so the durations from such a run are not
+    /// quotable — the counters are exact and machine-independent, which is the trade
+    /// [`Self::count_interreduction`] already makes.
+    ///
+    /// Three counters come back on [`super::F4Statistics`]: the tests performed, how many answered
+    /// negative, and how many of *those* a mask with input-calibrated thresholds would have settled
+    /// without an exponent comparison. The third over the first is the figure that decides whether
+    /// a divmask is worth putting on every monomial; see `crate::grobner::f4::divmask`.
+    pub measure_divmask: bool,
+
     /// Count the operations final interreduction's reductions perform, into
     /// [`super::F4Statistics::interreduction`].
     ///
@@ -539,6 +554,7 @@ impl F4Options {
             certify: false,
             reducer_cache: CacheMode::Off,
             measure_stages: false,
+            measure_divmask: false,
             count_interreduction: false,
             interreduction: InterreductionRoute::Division,
             reduce_batch_rows: false,

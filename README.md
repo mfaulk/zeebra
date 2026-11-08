@@ -910,6 +910,7 @@ cargo run --release --example determinant_era      # one determinant, timed the 
 cargo run --release --example determinant_era -- --workers 1,8,32 --determinants 13123
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
+cargo run --release --example f4_profile -- divmask       # #331: the divisor-mask counters
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -937,6 +938,18 @@ modes take no configuration: `mq` is the digest-pinned `mq-random-10` stage spli
 bytes the identity digest is taken over — so an external engine's own counters can be taken on the
 same ideal and compared against these columns. `docs/research/groebner-jl-gap.md` is what that
 comparison produced.
+
+A third configuration-free mode answers a question rather than reporting a cost. `f4_profile --
+divmask` is #331's counter-only experiment: `F4Options::measure_divmask` builds a 32-bit divisor
+mask with thresholds calibrated from the input's own exponent range and replays every divisibility
+test in symbolic preprocessing against it **after** the real answer is known, so nothing a mask
+could get wrong can reach the basis — asserted element for element by
+`test_the_probe_does_not_change_the_divisor_selected`. It reports the tests performed, how many
+answered negative, and how many of those a mask would have settled without an exponent comparison,
+which is 94%–97% on every instance tried. The run pays a second walk of the basis per divisor
+lookup, so **its durations are not quotable**; the counters are exact and machine-independent,
+which is the trade `count_interreduction` already makes. See
+`docs/research/msolve-implementation.md` §4 H2 for the result and what it does and does not bound.
 
 `f4_memory` is the same question for bytes rather than for time, and it exists because the answer
 turned out not to be the matrix. It runs a tracking `#[global_allocator]` beside the solver's own
