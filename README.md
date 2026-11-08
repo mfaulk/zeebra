@@ -3409,6 +3409,17 @@ per run, the accumulated history, and a generated `SCOREBOARD.md`. `Json::parse`
 `Json::to_json` writes — round-tripping is asserted — so the history accumulates rather than being
 overwritten, with no dependency to read eighty lines of writer.
 
+**Reading an `environment.policy` written before #469.** Those records say `400 MB live`, and the
+budget that actually bound was **320 MB**: the runner set `max_live_bytes` to 400 MB and left
+`max_live_nonzeros` at its default 20 000 000, and the effective limit is the `min` of the two
+(#322) — 20 000 000 entries over the 16-byte entry every row on this board uses. So a
+`stopped_at_limit` row from before #469 must be reconciled against 320 MB, not against the figure
+its own policy string quotes. Nothing about those runs or their timings changed; the overstatement
+was in the prose alone, which is why the records are left as emitted rather than rewritten by hand
+(#334). Since #469 the string is derived from the options by `F4Options::live_budget_policy`, which
+reports the allowance that binds and names the budget it came from, so the two cannot drift apart
+again.
+
 #### The cost model: predicted against measured, with the difference attributed
 
 ```bash

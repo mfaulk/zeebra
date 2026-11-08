@@ -513,7 +513,7 @@ overstated it severalfold. The published tables are from the corrected build.
 ## 8. Resource policy
 
 Every table states its configuration. The budgets used throughout: `max_matrix_columns = 60_000`,
-`max_live_bytes = 400 MB`, `max_batches = 20_000`, which are the ones M21 measured with plus a batch
+`max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), `max_batches = 20_000`, which are the ones M21 measured with plus a batch
 ceiling that a small cap makes necessary — the same work split into many more matrices has to fail
 reproducibly rather than be killed by whoever is watching.
 

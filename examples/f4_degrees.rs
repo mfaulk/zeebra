@@ -424,10 +424,16 @@ fn fukuoka() {
 fn main() {
     println!("# F4 degree by degree");
     println!();
+    // The live budget is reported as the one that *binds*, not as whichever of the pair is
+    // assigned: the effective limit is the `min` of the two (#322), and this program sets
+    // `max_live_bytes` to 400 MB while leaving `max_live_nonzeros` at its default, so over the
+    // 16-byte entry every row here uses the cap is 320 MB and the 400 MB never applies (#469).
     println!(
         "Configuration: `F4Options::recommended()` with `profile_degrees` and `measure_stages` \
-         set, `max_matrix_columns = 60_000`, `max_live_bytes = 400 MB`. Order: grevlex throughout \
-         except where stated. Reproduce with `cargo run --release --example f4_degrees`."
+         set, `max_matrix_columns = {}`, {}. Order: grevlex throughout \
+         except where stated. Reproduce with `cargo run --release --example f4_degrees`.",
+        options().max_matrix_columns,
+        options().live_budget_policy::<Q>()
     );
     println!();
     println!(

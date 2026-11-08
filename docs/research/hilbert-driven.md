@@ -8,7 +8,7 @@ cargo run --release --example hilbert_driven -- <instance>     # one instance pe
 ```
 
 under `F4Options::recommended()` with `profile_degrees`, `max_matrix_columns = 60_000`,
-`max_live_bytes = 400 MB`, `max_batches = 20_000`, grevlex throughout. **Every row's basis is
+`max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), `max_batches = 20_000`, grevlex throughout. **Every row's basis is
 asserted equal to the uncapped baseline's, and every row is also run with `certify` on and asserted
 to pass** — a differing basis would be a defect, not a result.
 
