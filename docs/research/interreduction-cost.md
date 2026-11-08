@@ -5,8 +5,8 @@ those figures, recovered from git rather than recorded at the time
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§3c was
 taken at `489ccbd6` plus the change it measures**, recorded at the time rather than recovered,
 which is what #335 asked for. **§3d was taken on this branch's two commits before they were rebased
-onto `1154bf5b`** — the region-split counters (`c1e1b1d4` post-rebase) for the counts, and those
-against the hoist (`717e63aa`) for the A/B, two builds from one tree. The rebase brings in
+onto `4b0d2282`** — the region-split counters (`c24bcc01` post-rebase) for the counts, and those
+against the hoist (`132d20b8`) for the A/B, two builds from one tree. The rebase brings in
 `922deeb6`, which adds `F4Options::reduce_batch_rows` **off by default**, so it changes neither the
 path these figures describe nor their comparability with §3a and §3b.
 
