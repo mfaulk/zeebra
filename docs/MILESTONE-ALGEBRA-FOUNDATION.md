@@ -1,5 +1,8 @@
 # Milestone: Algebra Foundation and Performance
 
+**Measured at:** publication bound `bf73532d` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Status: complete, in review. Baseline commit `f56e5de`, 491 tests passing; 537 at the close of the milestone.
 
 This milestone solidifies the correctness of Zeebra's computational algebra core, establishes

@@ -1,5 +1,8 @@
 # M24 — Published Attack Reproduction and Cryptanalytic Frontier Extension
 
+**Measured at:** publication bound `95a1558d`…`900af4e7` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** complete. **Minimum and Strong met, Stretch not met** — §13.1 scores each against the
 criterion written before the work started. Every figure in this document is reproducible from §16;
 §10.1 records which of its own predictions held and which did not.

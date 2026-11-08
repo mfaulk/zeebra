@@ -1,5 +1,8 @@
 # Fukuoka MQ Challenge: the published generator, the format, and what the record actually records
 
+**Measured at:** publication bound `54205923`…`35083579` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for #70 (A1), M21-A (#92) and #197 (A5). Consumes the provenance conventions of
 `docs/research/external-provenance-policy.md` §9 and the four-claim ledger of
 `docs/research/minrank.md`.

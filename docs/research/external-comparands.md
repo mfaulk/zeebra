@@ -1,5 +1,8 @@
 # External comparands: what is installed, how to invoke it, and what each one means by "degrevlex"
 
+**Measured at:** publication bound `b6e6bc3a`…`baaa6fcc` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Provisioning and invocation record for M25 (#259, #260). This is the *operational* companion to
 `docs/research/external-provenance-policy.md`, which is the authority on what may be reused:
 msolve, Groebner.jl and Singular are GPL and are **run as separate processes only**

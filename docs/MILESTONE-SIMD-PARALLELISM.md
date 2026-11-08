@@ -1,5 +1,8 @@
 # Milestone: Hardware-Efficient Arithmetic — SIMD and Parallelism
 
+**Measured at:** publication bound `ef639645`…`c28b77f4` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** complete — M19-0 through M19-D landed; M19-E, M19-F and M19-G closed won't-do on
 measurements recorded in §6; #62 landed afterwards and is recorded in §8, which corrects §5.3's
 bandwidth reading and reopens the SIMD question at eight lanes; #159 landed after that and is

@@ -1,5 +1,8 @@
 # Milestone: Large Prime Fields and Cryptographic Algebra Readiness
 
+**Measured at:** publication bound `885e4f21`…`20b390d0` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** M20-0, M20-A, M20-B, M20-C and M20-D landed. The milestone's primary demonstration
 passes over both target fields: a planted zero-dimensional system goes through F4, the quotient
 algebra, FGLM and `solve_one`, and the returned point is verified against the original system.

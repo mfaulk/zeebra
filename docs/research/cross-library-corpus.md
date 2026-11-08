@@ -1,5 +1,8 @@
 # The cross-library corpus: the same ideal in every engine, and the two ways that silently fails
 
+**Measured at:** publication bound `f94b3df0` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
 

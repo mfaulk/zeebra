@@ -1,5 +1,8 @@
 # M26 — Algorithmic Elimination and Competitive Solver Performance
 
+**Measured at:** publication bound `91d32ece` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** planned.
 **Prerequisite:** M25, complete and merged — `MILESTONE-COMPETITIVE-ALGEBRA.md`, including its §13
 report.

@@ -1,5 +1,8 @@
 # Elimination beyond Gröbner bases: a feasibility assessment
 
+**Measured at:** publication bound `f2135cce`…`03b419f7` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for #68. A decision record in the style of #58 — the question answered once with the
 measurements attached — covering D1 (#82), D2 (#83), D3 (#84) and D4 (#85).
 

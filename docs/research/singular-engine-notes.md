@@ -1,5 +1,8 @@
 # Reading Singular's engine: six things it does that Zeebra does not
 
+**Measured at:** not measured here — its one figure is quoted from `hilbert-driven.md` §5, which carries the era
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 A source-reading record, in the style of `signature-based.md` §4.0 — read the primary source before
 contemplating an implementation. **No new code and no measurements here.** Every claim about
 Singular cites a file and line; every claim about Zeebra was checked against the tree rather than

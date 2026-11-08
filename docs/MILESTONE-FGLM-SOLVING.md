@@ -1,5 +1,8 @@
 # Milestone: FGLM and Zero-Dimensional Polynomial-System Solving
 
+**Measured at:** publication bound `a65bd7cb`…`328cf8e2` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** M17 complete. A system goes in and a verified solution comes out, by either of two
 routes, under budgets that fail with a structured error. The conversion agrees with direct lex F4,
 with both classical engines, and with 29 bases from Singular. §14 is the report; §12 marks each

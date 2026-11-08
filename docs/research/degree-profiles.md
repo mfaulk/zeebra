@@ -1,5 +1,8 @@
 # F4 degree by degree: the M22 baseline
 
+**Measured at:** publication bound `c2dde983` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for M22-0 (#74, #81). Every figure here comes from
 
 ```sh

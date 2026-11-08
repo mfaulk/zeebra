@@ -1,5 +1,8 @@
 # Milestone: Quotient-Algebra and FGLM Scalability
 
+**Measured at:** publication bound `aef9ab81`…`bcd2ec21` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 **Status:** complete — M18-0 through M18-5
 **Prerequisite:** M17, merged at `7c2fef7`
 **Objective:** make quotient-algebra construction faster and FGLM's memory smaller, without

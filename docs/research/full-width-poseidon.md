@@ -1,5 +1,8 @@
 # The official state width: what a `t = 16` CICO system does to F4, and where it stops
 
+**Measured at:** publication bound `b166e560` — the commits that published these figures,
+recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 Reference for M23-B (#138), which consumes #78 and #81.
 
 Every figure comes from
