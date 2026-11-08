@@ -681,12 +681,27 @@ Settled:
 
 Open:
 
-4. **Re-base `PrimeFieldElement128` on `montgomery_256`, or retire it.** §4.1 is the argument:
-   its multiply is 130.6 ns against 18.71 ns for a field four times as wide, because it allocates
-   and long-divides. The 4-limb code generalizes to 2 limbs with no new mathematics. The one
-   obstacle is that `PrimeFieldElement128` takes its modulus as a `const P: u128` generic while
-   `PrimeFieldElement256` takes a trait, so converting changes its public shape. Worth an issue;
-   out of M20's scope as written.
+4. ~~**Re-base `PrimeFieldElement128` on `montgomery_256`, or retire it.**~~ — **retired**, in
+   #163. §4.1 was the argument: its multiply is 130.6 ns against 18.71 ns for a field four times
+   as wide, because it allocates and long-divides. The resolution is the second branch rather than
+   the first, on two findings. The type has **no non-test caller** — tests, the `for_each_field!`
+   arm and the benchmark that measures it are all of them — and `PrimeModulus256` is
+   `[u64; 4]`, so a modulus in the 68–127 bit range is the low two limbs with the top two zero,
+   which `PrimeFieldElement256` already serves. The obstacle this item names, that converting
+   changes the type's public shape, became the reason not to: there was no caller to want the
+   `const P: u128` ergonomics.
+
+   The one candidate justification — an NTT-friendly prime in the range, `two_adicity` being a
+   property of the order rather than of the backing width — is served by `Proth68Fr`
+   (3·2^66 + 1, two-adicity 66) over `PrimeFieldElement256`. Measured at `ece0d05`, same modulus
+   both sides, 256 operations per iteration divided out: multiplication **136.8 ns → 14.01 ns**
+   and inversion **18.36 µs → 847 ns**, a 9.8x and 21.7x improvement for a declaration change.
+   `Proth68Fr` also beats BN254 `Fr` by 1.4x and 4.5x, since two CIOS limbs cost less than four.
+   `PrimeFieldElement128` is `#[deprecated]` rather than deleted, because it is `pub`.
+
+   One API gap surfaced and is tracked separately as #487: `root_of_unity` takes `n: u64`, so a
+   field of two-adicity above 63 — `Proth68Fr` is one — has roots of unity it cannot be asked
+   for. They are reachable through `two_adic_root_of_unity(log_n)`, so nothing is blocked.
 5. ~~**Byte-accounted resource limits**~~ — landed in M20-C (§5.2). Two new budgets beside the
    entry ones, `F4Options::max_live_bytes` and `FglmOptions::max_span_bytes`, both defaulting to
    the 320 MB the entry budgets already described at 16 bytes an entry. The `Backend::Dense`
