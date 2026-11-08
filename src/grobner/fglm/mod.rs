@@ -25,7 +25,10 @@ mod statistics;
 #[cfg(test)]
 mod reference_bases;
 
-pub use batch::{BatchOverflow, BorderBatch, BorderBatchSize, BorderBatchStatistics};
+pub use batch::{
+    measure_border_reduction, BatchOverflow, BorderBatch, BorderBatchSize, BorderBatchStatistics,
+    BorderReduction,
+};
 pub use border::{BorderIndex, ColumnTarget};
 pub use conversion::{
     fglm_to_lex, fglm_to_lex_checked, fglm_to_lex_with_options, is_grobner_basis,

@@ -39,11 +39,19 @@
 //! * *An Algorithm for Splitting Polynomial Systems Based on F4*, PASCO 2017, for F4-style
 //!   preprocessing in support of quotient-algebra normal forms.
 
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    time::Duration,
+};
+
 use crate::poly::MonomialMap;
 
 use crate::{
-    grobner::{f4::MonicBasis, fglm::FglmError},
-    FiniteField, Monomial, MonomialOrder,
+    grobner::{
+        f4::{MonicBasis, StageClock},
+        fglm::{BorderIndex, FglmError, QuotientBasis},
+    },
+    FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
 };
 
 /// How many border monomials to reduce in one batch.
@@ -129,6 +137,54 @@ pub struct BorderBatch {
 
     /// What to do when one of the above is crossed.
     pub on_overflow: BatchOverflow,
+
+    /// How to run a batch's target loop. See [`BorderReduction`].
+    pub reduction: BorderReduction,
+}
+
+/// How a batch's target loop is decomposed.
+///
+/// The targets of a batch are independent — the pivots are fixed before any of them is touched, so
+/// `NF(u_1)` cannot involve `u_2` — and the loop may therefore be split anywhere without changing
+/// an answer. Both variants are the *same arithmetic* in two decompositions, and both return the
+/// remainders in target order.
+///
+/// What a split costs is the `dirty_from` carry. [`reduce_targets`] keeps the previous target's
+/// leading column and zeroes only `[previous start, width)` before the next, and the border
+/// descends so that region shrinks across a batch. A group's first target has no predecessor and
+/// starts from a freshly zeroed buffer of the closure's full width, so `G` groups pay about `G`
+/// widths where one pays one — counted exactly in
+/// [`BorderBatchStatistics::buffer_cells_zeroed`].
+///
+/// **Neither variant is concurrent.** The decomposition is the half of parallelism that can be
+/// taken without putting `Send + Sync` on the conversion's whole public surface, and §6.8 of
+/// `docs/MILESTONE-FGLM-SCALABILITY.md` is why it was not worth paying for the other half:
+/// [`measure_border_reduction`] runs the groups on threads and the batches are too small for it to
+/// pay.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BorderReduction {
+    /// One group: the carry runs the length of the batch.
+    ///
+    /// The default, and the fastest, because the carry is a saving and a split gives it up.
+    #[default]
+    Sequential,
+
+    /// Contiguous groups, run one after another.
+    ///
+    /// Buys **nothing on its own** — it is the decomposition a parallel reduction would use with
+    /// the threads left out, so the carry's cost can be measured apart from the dispatch cost
+    /// instead of tangled with it. Zero and one both mean one group.
+    Grouped(usize),
+}
+
+impl BorderReduction {
+    /// Contiguous groups the targets are split into, which is one for the sequential path.
+    pub(super) fn groups(&self) -> usize {
+        match self {
+            Self::Sequential => 1,
+            Self::Grouped(groups) => (*groups).max(1),
+        }
+    }
 }
 
 impl Default for BorderBatch {
@@ -155,6 +211,7 @@ impl BorderBatch {
             max_columns: 200_000,
             max_nonzeros: 20_000_000,
             on_overflow: BatchOverflow::Fail,
+            reduction: BorderReduction::Sequential,
         }
     }
 
@@ -166,6 +223,7 @@ impl BorderBatch {
             max_columns: usize::MAX,
             max_nonzeros: usize::MAX,
             on_overflow: BatchOverflow::Fail,
+            reduction: BorderReduction::Sequential,
         }
     }
 
@@ -180,6 +238,11 @@ impl BorderBatch {
             on_overflow,
             ..self
         }
+    }
+
+    /// These limits with a different target-loop decomposition. See [`BorderReduction`].
+    pub fn with_reduction(self, reduction: BorderReduction) -> Self {
+        Self { reduction, ..self }
     }
 }
 
@@ -208,6 +271,38 @@ pub struct BorderBatchStatistics {
 
     /// The largest single batch's reducer entries, which is what bounds the live storage.
     pub peak_reducer_entries: usize,
+
+    /// Field-element cells the reduction buffers had zeroed, by allocation or by a clear.
+    ///
+    /// The `dirty_from` carry stated in the one unit the decompositions can be compared in. A
+    /// freshly allocated buffer is already zero, so a group of targets pays the closure's full
+    /// width once at its start and then only `[previous start, width)` per target — and
+    /// [`BorderBatch::reduction_groups`] groups pay about `G` widths where one pays one. Counted
+    /// always, like the other counters here, because one `usize` add per target is nothing beside
+    /// the column scan it accompanies.
+    pub buffer_cells_zeroed: usize,
+
+    /// Wall clock building the batches' symbolic closures.
+    ///
+    /// Zero unless [`FglmOptions::measure_stages`](super::FglmOptions::measure_stages) is set, and
+    /// a strict refinement of [`FglmStageTimings::border_symbolic`](super::FglmStageTimings) —
+    /// that field charges both halves of a batch together, these two split it.
+    pub closure_time: Duration,
+
+    /// Wall clock reducing the batches' targets against those closures.
+    ///
+    /// The other half of [`Self::closure_time`], and the half whose inner loop is independent per
+    /// target.
+    pub reduction_time: Duration,
+
+    /// The largest single batch's reduction time.
+    ///
+    /// **The figure that decides whether parallelising the target loop can pay**, which is why it
+    /// is peaked rather than summed: a parallel reduction dispatches once per batch, so what it has
+    /// to beat is one batch's work and not the stage's. §6.4 of
+    /// `docs/MILESTONE-SIMD-PARALLELISM.md` asks for exactly this measurement and §6.8 of
+    /// `docs/MILESTONE-FGLM-SCALABILITY.md` reports it.
+    pub peak_reduction_time: Duration,
 }
 
 impl BorderBatchStatistics {
@@ -219,6 +314,10 @@ impl BorderBatchStatistics {
         self.columns += other.columns;
         self.reducer_entries += other.reducer_entries;
         self.peak_reducer_entries = self.peak_reducer_entries.max(other.peak_reducer_entries);
+        self.buffer_cells_zeroed += other.buffer_cells_zeroed;
+        self.closure_time += other.closure_time;
+        self.reduction_time += other.reduction_time;
+        self.peak_reduction_time = self.peak_reduction_time.max(other.peak_reduction_time);
     }
 }
 
@@ -402,21 +501,115 @@ pub(super) fn closure<const N: usize, F: FiniteField>(
 /// and `[0, start)` stays zero. Targets arrive in the border's descending order, so `start` grows
 /// across a batch and the saving approaches the full width by its last target.
 ///
+/// # The split
+/// `groups` contiguous groups of targets, each with its own buffer and its own carry, and the
+/// remainders returned **in target order** regardless of it. Splitting is sound for the reason
+/// above: a target's answer is a function of the target and the closure alone. What it costs is the
+/// `dirty_from` carry — the groups are contiguous and the border descends, so monotonicity holds
+/// *inside* a group and only a group's first target pays the full width. Zero and one both mean one
+/// group, and more groups than targets means one target each.
+///
+/// The groups run one after another. That is deliberate: it is the decomposition a parallel
+/// reduction would use, with the thread-dispatch cost left out, so the carry's cost can be measured
+/// apart from it. §6.8 of `docs/MILESTONE-FGLM-SCALABILITY.md` reports both.
+///
+/// # Returns
+/// The remainders, and the field-element cells the groups' buffers had zeroed between them.
+///
 /// # Panics
 /// If a target is not in the closure, which means it was not among the monomials the closure was
 /// built from.
 pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
     targets: &[Monomial<N>],
     closure: &Closure<N, F>,
-) -> Vec<Remainder<N, F>> {
+    reduction: BorderReduction,
+) -> (Vec<Remainder<N, F>>, usize) {
+    let (mut results, block) = split(targets, reduction.groups());
+    let mut zeroed = 0usize;
+    for (slots, group) in results.chunks_mut(block).zip(targets.chunks(block)) {
+        zeroed += reduce_group(group, closure, slots);
+    }
+    (results, zeroed)
+}
+
+/// [`reduce_targets`] with one contiguous group per worker, each on its own scoped thread.
+///
+/// **Measurement only, and not reachable from a conversion.** Making the conversion able to call
+/// this means `F: Send + Sync` on `fglm_to_lex`, `QuotientAlgebra::new`,
+/// `solve_zero_dimensional_with_options` and the differential harness — the whole public surface
+/// that reaches a border batch — and §6.8 of `docs/MILESTONE-FGLM-SCALABILITY.md` measured that
+/// there is nothing to buy with it. The code is here because the refutation is a measurement rather
+/// than an argument, and it cannot be remeasured later from a path that does not exist.
+///
+/// Zero and one worker both run on this thread with no thread spawned at all.
+fn reduce_targets_on_workers<const N: usize, F: FiniteField + Send + Sync>(
+    targets: &[Monomial<N>],
+    closure: &Closure<N, F>,
+    workers: usize,
+) -> (Vec<Remainder<N, F>>, usize) {
+    if workers <= 1 {
+        return reduce_targets(targets, closure, BorderReduction::Sequential);
+    }
+
+    let (mut results, block) = split(targets, workers);
+
+    // Static blocks, like `sample_determinants`: every target is one descending scan of the same
+    // closure, so the blocks are comparable work by construction and a shared counter would only
+    // add contention. The per-group cell counts come back through a pre-sized vector for the same
+    // reason the remainders do — a running total behind a lock would be a figure that depended on
+    // the interleaving.
+    let mut cells: Vec<usize> = vec![0; results.chunks(block).len()];
+    std::thread::scope(|scope| {
+        for ((slots, group), count) in results
+            .chunks_mut(block)
+            .zip(targets.chunks(block))
+            .zip(cells.iter_mut())
+        {
+            scope.spawn(move || {
+                *count = reduce_group(group, closure, slots);
+            });
+        }
+    });
+    (results, cells.iter().sum())
+}
+
+/// Somewhere for every target's answer, and the block size `groups` implies.
+///
+/// **Pre-sized and written through contiguous blocks**, so each slot is written by exactly one group
+/// from exactly one target and the sequence is a function of `targets` alone — not of which group
+/// finished first. That is what makes a concurrent decomposition's answers the sequential one's,
+/// rather than something to be checked afterwards.
+///
+/// `div_ceil` so the blocks cover every target: a short tail means fewer groups than asked for,
+/// never more, and never a target left unreduced.
+fn split<const N: usize, F: FiniteField>(
+    targets: &[Monomial<N>],
+    groups: usize,
+) -> (Vec<Remainder<N, F>>, usize) {
+    let results: Vec<Remainder<N, F>> = vec![Vec::new(); targets.len()];
+    let block = targets.len().div_ceil(groups.max(1)).max(1);
+    (results, block)
+}
+
+/// One group of targets reduced into `slots`, returning the cells its buffer had zeroed.
+///
+/// The whole of the reduction's arithmetic, and the only place it lives: the sequential path is this
+/// called once and a split path is this called per group, so the two cannot compute differently.
+fn reduce_group<const N: usize, F: FiniteField>(
+    targets: &[Monomial<N>],
+    closure: &Closure<N, F>,
+    slots: &mut [Remainder<N, F>],
+) -> usize {
     let mut buffer: Vec<F> = vec![F::zero(); closure.columns.len()];
-    let mut results = Vec::with_capacity(targets.len());
 
     // The previous target's leading column, below which the buffer is known to be zero. Starts at
     // the width because a freshly allocated buffer is zero everywhere.
     let mut dirty_from = closure.columns.len();
 
-    for target in targets {
+    // The allocation above zeroed a full width, which is the group's share of the carry's cost.
+    let mut zeroed = closure.columns.len();
+
+    for (target, slot) in targets.iter().zip(slots) {
         let start = *closure
             .column_of
             .get(target)
@@ -425,6 +618,7 @@ pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
             buffer[..dirty_from].iter().all(|slot| slot.is_zero()),
             "the buffer below the previous target's column must still be zero"
         );
+        zeroed += closure.columns.len() - dirty_from;
         buffer[dirty_from..]
             .iter_mut()
             .for_each(|slot| *slot = F::zero());
@@ -454,7 +648,7 @@ pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
 
         // From `start`, not from zero: `buffer[start] = one` is the only seed and every write below
         // lands at a column at or after it, so nothing before `start` can be nonzero.
-        let remainder: Remainder<N, F> = buffer[start..]
+        *slot = buffer[start..]
             .iter()
             .enumerate()
             .filter(|(_, value)| !value.is_zero())
@@ -467,13 +661,18 @@ pub(super) fn reduce_targets<const N: usize, F: FiniteField>(
                 (closure.columns[column], *value)
             })
             .collect();
-        results.push(remainder);
     }
 
-    results
+    zeroed
 }
 
 /// One batch of border monomials reduced, and what it cost.
+///
+/// `measure` splits the batch's wall clock between the closure and the reduction. Two clock reads
+/// per batch, which is why it is a flag: the batch count is small, but a caller who is not
+/// measuring should not pay even that. The split is what §6.4 of
+/// `docs/MILESTONE-SIMD-PARALLELISM.md` asks anyone revisiting parallelism to start from — the size
+/// of a *batch's* parallelizable phase rather than a stage's share of the total.
 ///
 /// # Errors
 /// As [`closure`].
@@ -482,8 +681,15 @@ pub(super) fn reduce_batch<const N: usize, F: FiniteField>(
     basis: &MonicBasis<N, F>,
     order: MonomialOrder,
     limits: &BorderBatch,
+    measure: bool,
 ) -> Result<(Vec<Remainder<N, F>>, BorderBatchStatistics), FglmError> {
+    let mut clock = StageClock::new(measure);
     let closure = closure(targets, basis, order, limits)?;
+    let closure_time = clock.lap();
+
+    let (remainders, buffer_cells_zeroed) = reduce_targets(targets, &closure, limits.reduction);
+    let reduction_time = clock.lap();
+
     let statistics = BorderBatchStatistics {
         batches: 1,
         fallbacks: 0,
@@ -491,8 +697,12 @@ pub(super) fn reduce_batch<const N: usize, F: FiniteField>(
         columns: closure.columns(),
         reducer_entries: closure.reducer_entries(),
         peak_reducer_entries: closure.reducer_entries(),
+        buffer_cells_zeroed,
+        closure_time,
+        reduction_time,
+        peak_reduction_time: reduction_time,
     };
-    Ok((reduce_targets(targets, &closure), statistics))
+    Ok((remainders, statistics))
 }
 
 /// Fold one batch's statistics into a running total.
@@ -500,10 +710,70 @@ pub(super) fn accumulate(total: &mut BorderBatchStatistics, batch: &BorderBatchS
     total.add(batch);
 }
 
+/// What the whole border's batched reduction costs at a given worker count, and what it computed.
+///
+/// **A measurement entry point, not a route into the conversion.** It exists because the parallel
+/// decomposition's refutation in §6.8 of `docs/MILESTONE-FGLM-SCALABILITY.md` is a measurement, and
+/// a measurement that cannot be repeated is an assertion. `workers` above one runs the contiguous
+/// groups on scoped threads — which is why this and not
+/// [`fglm_to_lex_with_options`](super::fglm_to_lex_with_options) carries `F: Send + Sync`.
+///
+/// `digest` hashes every remainder in target order, so a caller compares worker counts for
+/// **bit-identical** answers with one equality rather than by holding `|∂B|` remainders. It is a
+/// within-process digest and not a stable wire format.
+///
+/// # Errors
+/// As [`closure`], and [`FglmError`] from enumerating the standard monomials.
+pub fn measure_border_reduction<const N: usize, F: FiniteField + Send + Sync>(
+    source_basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+    limits: &BorderBatch,
+    workers: usize,
+) -> Result<(BorderBatchStatistics, u64), FglmError> {
+    let quotient = QuotientBasis::new(source_basis, order, usize::MAX)?;
+    let targets = BorderIndex::new(&quotient).monomials().to_vec();
+
+    let nonzero: Vec<MultivariatePolynomial<N, F>> = source_basis
+        .iter()
+        .filter(|p| !p.is_zero())
+        .cloned()
+        .collect();
+    let monic = MonicBasis::new(&nonzero, order);
+
+    let mut total = BorderBatchStatistics::default();
+    let mut hasher = DefaultHasher::new();
+    for group in targets.chunks(limits.size.chunk(targets.len())) {
+        let mut clock = StageClock::new(true);
+        let closed = closure(group, &monic, order, limits)?;
+        let closure_time = clock.lap();
+
+        let (remainders, buffer_cells_zeroed) = reduce_targets_on_workers(group, &closed, workers);
+        let reduction_time = clock.lap();
+
+        for remainder in &remainders {
+            remainder.hash(&mut hasher);
+        }
+        total.add(&BorderBatchStatistics {
+            batches: 1,
+            fallbacks: 0,
+            reducer_rows: closed.reducer_rows(),
+            columns: closed.columns(),
+            reducer_entries: closed.reducer_entries(),
+            peak_reducer_entries: closed.reducer_entries(),
+            buffer_cells_zeroed,
+            closure_time,
+            reduction_time,
+            peak_reduction_time: reduction_time,
+        });
+    }
+    Ok((total, hasher.finish()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        closure, reduce_batch, reduce_targets, BatchOverflow, BorderBatch, BorderBatchSize,
+        closure, measure_border_reduction, reduce_batch, reduce_targets, BatchOverflow,
+        BorderBatch, BorderBatchSize, BorderReduction,
     };
     use crate::{
         fields::Zp2147483647,
@@ -644,8 +914,9 @@ mod tests {
                 let chunk = size.chunk(border.len());
                 let mut remainders = Vec::new();
                 for group in border.chunks(chunk) {
-                    let (batch, _) = reduce_batch(group, &monic, order, &BorderBatch::unbounded())
-                        .expect("within limits");
+                    let (batch, _) =
+                        reduce_batch(group, &monic, order, &BorderBatch::unbounded(), false)
+                            .expect("within limits");
                     remainders.extend(batch);
                 }
 
@@ -691,8 +962,8 @@ mod tests {
         let (_, _, border, monic) = setup(&katsura::<5, F>(), order);
         assert!(border.len() > 4);
 
-        let (together, _) =
-            reduce_batch(&border, &monic, order, &BorderBatch::unbounded()).expect("within limits");
+        let (together, _) = reduce_batch(&border, &monic, order, &BorderBatch::unbounded(), false)
+            .expect("within limits");
 
         for (position, target) in border.iter().enumerate() {
             let (alone, _) = reduce_batch(
@@ -700,6 +971,7 @@ mod tests {
                 &monic,
                 order,
                 &BorderBatch::unbounded(),
+                false,
             )
             .expect("within limits");
             assert_eq!(
@@ -713,8 +985,9 @@ mod tests {
         // answers, matched up by target rather than by position.
         let mut reversed = border.clone();
         reversed.reverse();
-        let (backwards, _) = reduce_batch(&reversed, &monic, order, &BorderBatch::unbounded())
-            .expect("within limits");
+        let (backwards, _) =
+            reduce_batch(&reversed, &monic, order, &BorderBatch::unbounded(), false)
+                .expect("within limits");
         for (position, target) in reversed.iter().enumerate() {
             let forwards = border.iter().position(|m| m == target).expect("a target");
             assert_eq!(
@@ -733,7 +1006,7 @@ mod tests {
             let (_, quotient, border, monic) = setup(&system, order);
             let closed =
                 closure(&border, &monic, order, &BorderBatch::unbounded()).expect("within limits");
-            for remainder in reduce_targets(&border, &closed) {
+            for remainder in reduce_targets(&border, &closed, BorderReduction::Sequential).0 {
                 for (monomial, coefficient) in &remainder {
                     assert!(
                         !coefficient.is_zero(),
@@ -769,9 +1042,14 @@ mod tests {
             // The border descends, so reversing it makes every `start` smaller than the last.
             let mut ascending = border.clone();
             ascending.reverse();
-            let together = reduce_targets(&ascending, &closed);
+            let together = reduce_targets(&ascending, &closed, BorderReduction::Sequential).0;
             for (position, target) in ascending.iter().enumerate() {
-                let alone = reduce_targets(std::slice::from_ref(target), &closed);
+                let alone = reduce_targets(
+                    std::slice::from_ref(target),
+                    &closed,
+                    BorderReduction::Sequential,
+                )
+                .0;
                 assert_eq!(
                     together[position], alone[0],
                     "NF({}) depends on the target reduced before it",
@@ -779,6 +1057,182 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Splitting the target loop into groups changes no remainder and no target's position.
+    ///
+    /// The requirement a parallel reduction would stand or fall on, stated against the one-group
+    /// path: the targets are independent, so any contiguous split must give **bit-identical**
+    /// answers in **target order**. Field arithmetic is exact, so there is no reassociation to
+    /// excuse a difference. Checked at more groups than there are targets, which is the degenerate
+    /// split of one target each.
+    #[test]
+    fn test_splitting_the_target_loop_changes_no_answer() {
+        fn check<const N: usize>(
+            name: &str,
+            system: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) {
+            let (_, _, border, monic) = setup(system, order);
+            if border.is_empty() {
+                return;
+            }
+
+            for size in [
+                BorderBatchSize::Fixed(1),
+                BorderBatchSize::Fixed(7),
+                BorderBatchSize::Fixed(64),
+                BorderBatchSize::Unbounded,
+            ] {
+                let chunk = size.chunk(border.len());
+                for group in border.chunks(chunk) {
+                    let closed = closure(group, &monic, order, &BorderBatch::unbounded())
+                        .expect("within limits");
+                    let (reference, _) =
+                        reduce_targets(group, &closed, BorderReduction::Sequential);
+                    for groups in [1usize, 2, 3, 4, 8, 16, 32, 128, 1_000] {
+                        let (got, _) =
+                            reduce_targets(group, &closed, BorderReduction::Grouped(groups));
+                        assert_eq!(
+                            got, reference,
+                            "{} under {:?} at {:?}: {} groups disagree with one",
+                            name, order, size, groups
+                        );
+                    }
+                    // Zero groups is one group rather than a division by zero.
+                    assert_eq!(
+                        reduce_targets(group, &closed, BorderReduction::Grouped(0)).0,
+                        reference
+                    );
+                }
+            }
+        }
+
+        for order in ORDERS {
+            for system in SYSTEMS {
+                check(system[0], &parse(system, ["x", "y"]), order);
+            }
+            check("katsura-3", &katsura::<3, F>(), order);
+        }
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        check("katsura-5", &katsura::<5, F>(), grevlex);
+        check("katsura-6", &katsura::<6, F>(), grevlex);
+        check("cyclic-5", &cyclic::<5, F>(), grevlex);
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        check("planted-6", &planted::<6, F>(&point), grevlex);
+    }
+
+    /// The cells a split zeroes are one full width per group plus each target's own dirty tail.
+    ///
+    /// The `dirty_from` accounting, pinned against a model built from the targets' leading columns
+    /// rather than from the implementation. This is the quantity the parallel decomposition gives
+    /// up: the model says `groups * width` for the buffers plus `width - previous start` per target
+    /// after a group's first, so a split pays about one extra width per extra group.
+    #[test]
+    fn test_a_split_costs_one_full_width_of_zeroing_per_group() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let (_, _, border, monic) = setup(&katsura::<6, F>(), order);
+        let closed =
+            closure(&border, &monic, order, &BorderBatch::unbounded()).expect("within limits");
+        let width = closed.columns();
+        assert!(border.len() > 16 && width > 16);
+
+        // What the two paths zero, from the targets' columns alone.
+        let model = |groups: usize| {
+            let block = border.len().div_ceil(groups.max(1)).max(1);
+            let mut cells = 0usize;
+            for group in border.chunks(block) {
+                cells += width;
+                let mut dirty_from = width;
+                for target in group {
+                    cells += width - dirty_from;
+                    dirty_from = closed.column_of[target];
+                }
+            }
+            cells
+        };
+
+        let one = reduce_targets(&border, &closed, BorderReduction::Sequential).1;
+        assert_eq!(one, model(1), "the one-group accounting");
+        for groups in [1usize, 2, 4, 8, 16, 32] {
+            let got = reduce_targets(&border, &closed, BorderReduction::Grouped(groups)).1;
+            assert_eq!(got, model(groups), "the accounting at {} groups", groups);
+        }
+
+        // And the direction: more groups zero more cells, by under a width each.
+        let two = reduce_targets(&border, &closed, BorderReduction::Grouped(2)).1;
+        assert!(two > one, "a second group must cost a buffer");
+        assert!(
+            two - one <= width,
+            "a second group costs at most one full width"
+        );
+    }
+
+    /// The parallel reduction's answers are the sequential ones, at every worker count.
+    ///
+    /// Determinism across thread counts, asserted directly rather than through a downstream basis:
+    /// the digest hashes every remainder in target order, so an answer that differed in one
+    /// coefficient or arrived in a different position changes it. Field arithmetic is exact, so
+    /// there is no reassociation to excuse a difference — and the counters must agree too, except
+    /// `buffer_cells_zeroed`, which **is** the carry and is expected to grow with the workers.
+    #[test]
+    fn test_the_parallel_reduction_is_bit_identical_at_every_worker_count() {
+        fn check<const N: usize>(
+            name: &str,
+            system: &[MultivariatePolynomial<N, F>],
+            order: MonomialOrder,
+        ) {
+            let basis = f4(system, order).expect("within limits");
+            for size in [
+                BorderBatchSize::Fixed(1),
+                BorderBatchSize::Fixed(7),
+                BorderBatchSize::Fixed(64),
+                BorderBatchSize::Unbounded,
+            ] {
+                let limits = BorderBatch::unbounded().with_size(size);
+                let (sequential, digest) =
+                    measure_border_reduction(&basis, order, &limits, 1).expect("within limits");
+
+                for workers in [1usize, 2, 3, 4, 8, 16, 32, 64, 128] {
+                    let (statistics, got) =
+                        measure_border_reduction(&basis, order, &limits, workers)
+                            .expect("within limits");
+                    assert_eq!(
+                        got, digest,
+                        "{} at {:?}: {} workers computed different remainders",
+                        name, size, workers
+                    );
+                    assert_eq!(
+                        statistics.reducer_entries, sequential.reducer_entries,
+                        "{} at {:?}: {} workers changed the closure",
+                        name, size, workers
+                    );
+                    assert!(
+                        statistics.buffer_cells_zeroed >= sequential.buffer_cells_zeroed,
+                        "{} at {:?}: {} workers zeroed fewer cells than one",
+                        name,
+                        size,
+                        workers
+                    );
+                }
+            }
+        }
+
+        let grevlex = MonomialOrder::GradedReverseLexicographic;
+        for order in ORDERS {
+            check("katsura-3", &katsura::<3, F>(), order);
+        }
+        check("katsura-5", &katsura::<5, F>(), grevlex);
+        check("katsura-6", &katsura::<6, F>(), grevlex);
+        check("cyclic-5", &cyclic::<5, F>(), grevlex);
+        let point: Vec<F> = [3u64, 5, 7, 11, 13, 17]
+            .iter()
+            .map(|v| F::new(*v))
+            .collect();
+        check("planted-6", &planted::<6, F>(&point), grevlex);
     }
 
     /// A limit that the closure crosses is a structured error naming which limit.
@@ -839,6 +1293,114 @@ mod tests {
             crate::grobner::fglm::QuotientAlgebra::new(&basis, order, &FglmOptions::unbounded())
                 .expect("finite");
         assert_eq!(algebra, reference, "the fallback changed the operators");
+    }
+
+    /// A measured conversion splits each batch's clock between the closure and the reduction.
+    ///
+    /// The finer split §6.4 of `docs/MILESTONE-SIMD-PARALLELISM.md` asks for: the two halves are
+    /// both nonzero, they do not exceed the `border_symbolic` figure that charges them together,
+    /// and the peak is one batch's reduction rather than the stage's. Unmeasured, the durations are
+    /// zero and the cell counter is not.
+    #[test]
+    fn test_a_measured_batch_splits_the_closure_from_the_reduction() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let basis = f4(&katsura::<6, F>(), order).expect("within limits");
+        let batched = FglmOptions::unbounded()
+            .with_operator_construction(crate::grobner::fglm::OperatorConstruction::BatchedBorder)
+            .with_border_batch(BorderBatch::unbounded().with_size(BorderBatchSize::Fixed(16)));
+
+        let mut measured = batched;
+        measured.measure_stages = true;
+        let (_, statistics) =
+            crate::grobner::fglm::QuotientAlgebra::new_with_statistics(&basis, order, &measured)
+                .expect("finite");
+        let batches = statistics.batches;
+
+        assert!(batches.batches > 1, "the split needs several batches");
+        assert!(!batches.closure_time.is_zero(), "the closure was not timed");
+        assert!(
+            !batches.reduction_time.is_zero(),
+            "the reduction was not timed"
+        );
+        assert!(
+            batches.closure_time + batches.reduction_time <= statistics.timings.border_symbolic,
+            "the halves exceed the figure that charges them together"
+        );
+        assert!(
+            batches.peak_reduction_time <= batches.reduction_time,
+            "a peak above the sum"
+        );
+        assert!(
+            !batches.peak_reduction_time.is_zero(),
+            "no batch's reduction was timed"
+        );
+        assert!(batches.buffer_cells_zeroed > 0, "no buffer was zeroed");
+
+        let (_, unmeasured) =
+            crate::grobner::fglm::QuotientAlgebra::new_with_statistics(&basis, order, &batched)
+                .expect("finite");
+        assert!(
+            unmeasured.batches.closure_time.is_zero()
+                && unmeasured.batches.reduction_time.is_zero()
+                && unmeasured.batches.peak_reduction_time.is_zero(),
+            "an unmeasured conversion read the clock"
+        );
+        assert_eq!(
+            unmeasured.batches.buffer_cells_zeroed, batches.buffer_cells_zeroed,
+            "the cell counter depends on whether the clock was read"
+        );
+    }
+
+    /// Splitting the reduction into groups leaves the operators and every other counter alone.
+    ///
+    /// The whole-conversion half of the equivalence: a split path must agree with the sequential
+    /// one on the operators *and* on the statistics that are not the carry's own accounting, so a
+    /// caller cannot tell which decomposition ran except by the cells it zeroed.
+    #[test]
+    fn test_a_split_reduction_changes_nothing_but_the_cells_it_zeroed() {
+        fn check<const N: usize>(name: &str, system: &[MultivariatePolynomial<N, F>]) {
+            let order = MonomialOrder::GradedReverseLexicographic;
+            let basis = f4(system, order).expect("within limits");
+            let batched = FglmOptions::unbounded().with_operator_construction(
+                crate::grobner::fglm::OperatorConstruction::BatchedBorder,
+            );
+            let (reference, reference_statistics) =
+                crate::grobner::fglm::QuotientAlgebra::new_with_statistics(&basis, order, &batched)
+                    .expect("finite");
+
+            for groups in [2usize, 4, 16, 128] {
+                let split = batched.with_border_batch(
+                    BorderBatch::unbounded().with_reduction(BorderReduction::Grouped(groups)),
+                );
+                let (algebra, statistics) =
+                    crate::grobner::fglm::QuotientAlgebra::new_with_statistics(
+                        &basis, order, &split,
+                    )
+                    .expect("finite");
+                assert_eq!(
+                    algebra, reference,
+                    "{}: {} groups changed the operators",
+                    name, groups
+                );
+                assert_eq!(
+                    statistics.batches.reducer_entries,
+                    reference_statistics.batches.reducer_entries,
+                    "{}: {} groups changed the closure",
+                    name,
+                    groups
+                );
+                assert!(
+                    statistics.batches.buffer_cells_zeroed
+                        > reference_statistics.batches.buffer_cells_zeroed,
+                    "{}: {} groups zeroed no more cells than one",
+                    name,
+                    groups
+                );
+            }
+        }
+
+        check("katsura-6", &katsura::<6, F>());
+        check("cyclic-5", &cyclic::<5, F>());
     }
 
     /// The failing policy returns the error rather than falling back.
