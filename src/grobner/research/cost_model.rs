@@ -616,8 +616,12 @@ pub enum Attribution {
 
     /// Measured, reproducible, and nobody knows why.
     ///
-    /// **A legitimate attribution.** #318 and #319 are both of this kind and both belong on the
-    /// board: a schema that forced a cause would have one invented for it.
+    /// **A legitimate attribution.** #318 and #319 were both of this kind and both belonged on the
+    /// board: a schema that forced a cause would have one invented for it. Both are now resolved —
+    /// §6.13 re-ran each figure's own binary and found the gap to be
+    /// [`Self::IncomparableFigures`], one session against another — and the M25 rows keep this
+    /// attribution anyway, because they were unexplained when taken and the register is
+    /// append-only. The resolution is a later row, not an edit to an earlier one.
     Unexplained {
         /// The issue tracking it, so the row points at where the work is.
         issue: String,
@@ -2196,6 +2200,7 @@ pub fn transcribed_rows() -> Vec<CostRow> {
     let build = "docs/research/resultant-elimination.md 6.8 (#243)";
     let law = "docs/research/resultant-elimination.md 6.9 (#289)";
     let collecting = "docs/research/resultant-elimination.md 6.12 (#243, merged)";
+    let resolved = "docs/research/resultant-elimination.md 6.13 (#318, #319)";
 
     // The documents state the machine and the policy and never a commit. Recorded as stated.
     let workstation = |policy: &str| Environment {
@@ -2949,6 +2954,125 @@ pub fn transcribed_rows() -> Vec<CostRow> {
             ..workstation("tools/benchlock.sh, 32 workers")
         })
         .with_reproduce("cargo run --release --example determinant_sweep -- --workers 32"),
+        // ---- #318 and #319 resolved: 6.13 re-ran each figure's own binary ----
+        // Appended rather than written over the two rows above, which is the append-only rule: the
+        // M25 rows were honestly unexplained when taken and the resolution is a later measurement,
+        // not a correction to an earlier one. These two carry a `commit`, which the transcribed
+        // rows cannot -- knowing which commit a figure came from is precisely what made the
+        // experiment possible.
+        CostRow::new(
+            "order-162 determinant on the 13 123-sample reference route, rf2-rp2, at 6.5's own \
+             commit",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp2",
+            resolved,
+        )
+        .with_formulation("the reference interpolation route, one worker, 6.5's own binary re-run")
+        .with_parameter("matrix order", 162)
+        .with_parameter("samples", 13_123)
+        .with_parameter("workers", 1)
+        .with_predicted_runtime(Figure::predicted(
+            Duration::from_nanos(2_868_000),
+            "6.5's figure on record -- 37 634.3 ms / 13 123 -- which this row tests by re-running \
+             the binary that produced it rather than by bisecting the range after it",
+            "docs/research/resultant-elimination.md 6.5",
+        ))
+        .with_measured_runtime(
+            Duration::from_nanos(3_462_000),
+            "45 426.8 ms / 13 123 samples at commit 93bb1c2 -- the commit 6.5's figure was taken \
+             at -- on one pinned core under the lock with the box otherwise idle. In the same run \
+             lagrange_interpolate is 1.039x and the 256 order-18 determinants are 1.00x. 47 944.4 \
+             ms for the same measurement at load 14",
+            resolved,
+        )
+        .with_attribution(Attribution::IncomparableFigures {
+            detail: "one session against another, which resolves #318. The figure does not \
+                     reproduce in the binary that produced it, so no commit in the 435-commit \
+                     range can be responsible and the bisection #318 proposed would land on \
+                     nothing. Nor is it the all-core clock or any other uniform property of the \
+                     machine: stages of the same process on the same core move by 1.00x at a \
+                     ~10 kB working set, 1.04-1.06x at 105 kB and 1.15-1.21x at ~840 kB, which is \
+                     monotone in the working set and lands exactly where it stops fitting the \
+                     private 512 kB L2. Through the real route the two libraries differ by \
+                     1.051-1.086x, inside the 5% drift 6.5 recorded between runs of its own \
+                     binary, and crout.rs, sylvester_determinant and coefficients_in are \
+                     byte-identical across the range. Unlike #319 this does NOT go away on an idle \
+                     box -- it is bounded to the CCD-local candidates and not explained further. \
+                     Ratios taken inside one session do reproduce: 6.5's 1.40x / 1.23x / 1.25x \
+                     came back as 1.41x / 1.18x / 1.20x"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(Environment {
+            commit: "93bb1c2".to_string(),
+            cpu: "64 physical, 128 logical, 8 CCDs x 32 MB L3, 512 kB L2 a core".to_string(),
+            ..workstation("tools/benchlock.sh, one pinned core")
+        })
+        .with_reproduce(
+            "git worktree add --detach /tmp/era 93bb1c2 && cp examples/determinant_era.rs \
+             /tmp/era/examples/ && tools/benchlock.sh era taskset -c 8 \
+             .../determinant_era --workers 1 --determinants 13123",
+        ),
+        CostRow::new(
+            "core-time penalty at 32 workers, order 162, at 6.6's own commit",
+            "resultant-elimination",
+            "poseidon31-cico-t16-rf2-rp2",
+            resolved,
+        )
+        .with_formulation("6.6's own configuration: 13 123 determinants over 32 pinned cores")
+        .with_parameter("matrix order", 162)
+        .with_parameter("samples", 13_123)
+        .with_parameter("workers", 32)
+        .with_predicted_quantity(Quantity {
+            name: "core-time penalty at 32 workers".to_string(),
+            unit: "per 10 000".to_string(),
+            figure: Figure::predicted(
+                10_870,
+                "6.6's 3.270 ms against 3.007 ms at one worker, carried forward as the expectation \
+                 for the same configuration",
+                "docs/research/resultant-elimination.md 6.6",
+            ),
+        })
+        .with_measured_quantity(
+            "core-time penalty at 32 workers",
+            "per 10 000",
+            10_630,
+            "3.662 ms against 3.446 ms at one worker, at commit 93bb1c2 on a 32-core pinned set \
+             with the box otherwise idle. 1.072x on main in the same session; 1.343x at 8 workers \
+             and 1.478x at 32 for the same configuration on the same binaries hours earlier, with \
+             three other agents' cargo test --release runs resident",
+            resolved,
+        )
+        .with_attribution(Attribution::IncomparableFigures {
+            detail: "THE PREDICTION HELD -- 0.978x, and the incomparability is between the two \
+                     MEASUREMENTS #319 was opened about, not between this row's own columns. \
+                     6.9's 31-44% was ambient load, which resolves #319 against 6.9's own reading \
+                     that it was #318 seen through the worker count. 6.6's 4-9% REPRODUCES on an \
+                     idle box, on 6.6's own binary and on main alike, so the 31-44% is not a \
+                     property of M25's harness, of its synthetic pair or of the batch length: it \
+                     is what the same measurement gives while other agents are building. \
+                     benchlock.sh serializes benchmarks and not builds, so that load runs straight \
+                     through the lock, and nothing in its log recorded it -- it now writes load= \
+                     on START and END. The width penalty is 6% and contention is a separate factor \
+                     of up to 1.4x on top, which is why CORE_TIME_PER_DOUBLING stays at 0.065. Two \
+                     corrections to 6.6's mechanism survive: the all-core clock is excluded by the \
+                     working-set shape, and 6.6's working-set bound compares 27 MB against '256 MB \
+                     L3' when this part has 8 CCDs of 32 MB shared by 8 cores each, so the figure a \
+                     worker is bounded by is 8x smaller. The first-touch component is still real \
+                     and still confined to order 1 458, where one worker's 68 MB live set exceeds \
+                     its CCD's whole L3"
+                .to_string(),
+        })
+        .with_limiting_stage(LimitingStage::DeterminantEvaluation)
+        .with_environment(Environment {
+            commit: "93bb1c2".to_string(),
+            concurrency: 32,
+            cpu: "64 physical, 128 logical, 8 CCDs x 32 MB L3, 512 kB L2 a core".to_string(),
+            ..workstation("tools/benchlock.sh, 32 pinned cores")
+        })
+        .with_reproduce(
+            "taskset -c 0-31 .../determinant_era --workers 1,8,32 --determinants 13123",
+        ),
     ]
 }
 

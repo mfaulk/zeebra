@@ -829,6 +829,9 @@ cargo run --release --example determinant_sweep    # the Sylvester determinant c
                                                    #   five matrix orders, fitted with residuals
 cargo run --release --example determinant_sweep -- --cost-only   # what the sweep would cost
 cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(n^2) kernel
+cargo run --release --example determinant_era      # one determinant, timed the same way at two
+                                                   #   commits and three widths (#318, #319)
+cargo run --release --example determinant_era -- --workers 1,8,32 --determinants 13123
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
@@ -3583,8 +3586,10 @@ share a column**, since #237 measured 21 674 MiB allocated against 13 996 MiB re
 batch" cannot be written in the same field. **Prediction error is derived** — nothing in
 `research/cost-model/results/history.json` is an error column, and `CostRow::prediction_errors`
 computes it from the predicted and measured fields. The history is append-only: a re-measurement is
-a new row with a new commit, which is what keeps #318's two figures for the same measurement both
-visible.
+a new row with a new commit, which is what keeps #318's three figures for the same measurement all
+visible — and that append-only rule is what let #318 be resolved, since the way to find out whether
+a figure still holds is to re-run the binary that produced it and record the answer beside the
+original rather than over it (`docs/research/resultant-elimination.md` §6.13).
 
 #### Elimination that is not a Gröbner basis
 
@@ -3721,6 +3726,20 @@ of reach by three orders of magnitude rather than by a factor the sample count c
 [`docs/research/resultant-elimination.md`](docs/research/resultant-elimination.md) §6.9, which also
 records that the figures on record are about 1.2x faster than the same measurements today, and that
 the 2.868 ms order-162 anchor every earlier projection used does not reproduce.
+
+**Why a figure does not reproduce, and what a ratio may be divided by.** §6.13 answers that, and
+`examples/determinant_era` is the instrument: one source file written against the API that is
+byte-identical across the commit range, so it compiles against an old library and a current one and
+only the library beneath it differs. Checking out the commit a figure came from and re-running it is
+what decides whether a stale figure indicts a commit or a session — and here it indicts the session:
+§6.5's own binary gives 45 159.7 ms where its table says 37 634.3 ms, so **no commit can be
+responsible and bisecting the range would land on nothing**. The effect is monotone in the working
+set (nil at ~10 kB, 4–6% at 105 kB, 15–21% at ~840 kB), which excludes the clock. The usable output
+is a bound: *an order-162 determinant figure reproduces to about ±10% within a session, ±20% across
+sessions on an idle box, and no better than ~1.5x once other agents are building; ratios taken
+inside one session reproduce to about 0.03.* The separate 31–44% width penalty of §6.9 was ambient
+load alone — `tools/benchlock.sh` serializes benchmarks and not builds — and §6.6's 4–9% reproduces
+on a quiet machine, so the lock now records `load=` on its START and END lines.
 
 #### External instances: the Fukuoka MQ Challenge
 

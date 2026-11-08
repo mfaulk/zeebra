@@ -149,6 +149,16 @@ const DEFAULT_WALL_BUDGET_SECONDS: usize = 1_800;
 /// synthetic sweep 3.624 ms. A cost model whose job is to refuse runs must not be anchored to the
 /// fastest figure ever recorded, so the anchor is the larger, current one and §6.9 records the
 /// unexplained 1.2x gap as a finding.
+///
+/// **Left at 3.624 by §6.13, which resolved that gap and could have re-anchored this.** The gap is
+/// a measurement session and not an implementation — §6.5's own binary re-run at its own commit
+/// gives 45 159.4–47 944.4 ms against the 37 634.3 ms on record — and the registered row measures
+/// 3.758–3.840 ms at one worker on `main`, so this anchor is mildly optimistic. It is not raised,
+/// because the `max` above pairs it with an exponent fitted over five orders in *one* session:
+/// re-anchoring at 162 alone would leave the prefactor and the exponent belonging to different
+/// sessions, which is the error §6.13 exists to stop. Re-anchoring honestly means re-running
+/// §6.9's five-order sweep in one session on a quiet box, which is a measurement rather than an
+/// edit.
 const DETERMINANT_MS_AT_162: f64 = 3.624;
 
 /// The matrix order that cost was measured at.
@@ -170,10 +180,28 @@ const ABOVE_L2_EXPONENT: f64 = 2.9953;
 /// How much core-time one determinant gains per doubling of the worker count, measured.
 ///
 /// Core-time per determinant — wall clock times workers — is not flat in the worker count on this
-/// box: §6.9 measures 2.404 s, 2.821 s and 3.148 s at order 1 458 on 1, 8 and 32 workers, which is
-/// about 6.5% a doubling and is the all-core clock rather than bandwidth. A budget guard that
-/// costed a 32-worker run at the single-worker figure would under-predict it by 30%, and a guard
-/// that under-predicts refuses nothing.
+/// box. A budget guard that costed a 32-worker run at the single-worker figure would under-predict
+/// it by 30%, and a guard that under-predicts refuses nothing.
+///
+/// **6.5% a doubling, and §6.13 confirmed it rather than raising it.** The figure came from §6.9's
+/// 2.404 s / 2.821 s / 3.148 s at order 1 458 on 1 / 8 / 32 workers. §6.6 had measured 4–9% out to
+/// 32 workers, §6.9 re-measured 31–44%, and #319 was that disagreement; §6.13 re-ran §6.6's exact
+/// configuration on §6.6's own binary and got **1.058x at 8 workers and 1.063x at 32** — §6.6's
+/// figure, reproduced. The 31–44% came back the same day on the same binaries **when other agents'
+/// `cargo test --release` runs were resident**: 1.343x and 1.478x. `tools/benchlock.sh` serializes
+/// benchmarks and not builds, so that load runs straight through the lock.
+///
+/// **So the width penalty is 6.5% a doubling and ambient contention is a separate factor of up to
+/// 1.4x on top of it.** This constant deliberately models the first and not the second. Folding
+/// contention in would make the law predict a number no quiet machine produces, and mixing a
+/// kernel property with a machine state is the error §6.13 exists to stop — the 3.116 "super-cubic"
+/// exponent of #289 was exactly that mistake. The consequence for an operator is a real one and
+/// belongs with the operator: **a 32-worker row on a loaded box costs up to 1.4x what this predicts,
+/// so run it under the lock with the box otherwise quiet, and check `load=` in the benchlock log
+/// afterwards.**
+///
+/// The mechanism is **not** the all-core clock, which §6.13 excludes: stages of one process on one
+/// core move by 1.00x, 1.04–1.06x and 1.20x according to working-set size, and no clock can do that.
 const CORE_TIME_PER_DOUBLING: f64 = 0.065;
 
 /// Euclidean core-time per determinant at [`EUCLID_MEASURED_ORDER`], milliseconds, **measured**.
@@ -253,9 +281,10 @@ fn kernel_core_ms(kernel: DeterminantKernel, matrix_order: usize, workers: usize
 
 /// The measured core-time penalty for running at `workers` workers, as a factor.
 ///
-/// Linear in `log2(workers)` through the three widths §6.9 measured, and extrapolated at the same
-/// slope beyond 32 rather than held flat: nothing wider has been measured, and flattening it would
-/// make the guard optimistic exactly where it has no evidence.
+/// Linear in `log2(workers)` through the widths measured, and extrapolated at the same slope beyond
+/// 32 rather than held flat: nothing wider has been measured, and flattening it would make the
+/// guard optimistic exactly where it has no evidence. See [`CORE_TIME_PER_DOUBLING`] for why the
+/// slope is the uncontended 6.5% and what an operator owes on top of it on a busy box.
 fn width_penalty(workers: usize) -> f64 {
     1.0 + CORE_TIME_PER_DOUBLING * (workers.max(1) as f64).log2()
 }
