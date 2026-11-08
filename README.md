@@ -888,7 +888,7 @@ cargo run --release --example interreduction_routes            # both interreduc
                                                    #   with the matrix route's own verdict
 cargo run --release --example interreduction_routes -- --orders --wall 60 katsura-6
                                                    # the same rung under grevlex, grlex and lex —
-                                                   #   where the two routes disagree (#507 §3c.2)
+                                                   #   where the two routes disagree (#507 §3e.2)
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
@@ -3270,7 +3270,7 @@ measures **3.63x** end to end on a box whose division side matches the board row
 measured on one 1.40x slower than it.
 
 #507 then took that A/B as a **five-engine board cohort** rather than a projection, and
-[`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) §3c is the result:
+[`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) §3e is the result:
 **8 333.1 ms** measured against 7 999 ms projected, **1.07x behind Singular** on
 `reduced-grobner-basis` and **parity on `lex-basis-by-conversion`** (1.09x ahead, inside the box's
 spread), with the matrix route ahead on
@@ -3291,7 +3291,11 @@ six columns, and the stage from 2 400 ms to **16.4 ms**. On the shipping divisio
 are **6.54x**. Unlike that flag it regresses no classical rung, including the katsura-5 lex case
 that costs the matrix route 25x. Both defaults are #507's to move, on a cohort rather than on one
 instance; §3c of [`docs/research/interreduction-cost.md`](docs/research/interreduction-cost.md) has
-the four-arm table and says why the figures do not move the default by themselves.
+the four-arm table and says why the figures do not move the default by themselves. #507 moved the
+route's and left this one to **#575**, because the two are not independent in the direction that
+matters: with batches left reduced the autoreduce matrix is 252 x 606 rather than 7 642 x 7 996, and
+that closure is where the route's unbudgeted memory goes — so `matrix` + `reduced` may cost neither
+the 13.1 GB nor the 437 MB, and both defaults then move together at 6.54x.
 
 ### Solving zero-dimensional systems
 

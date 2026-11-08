@@ -72,7 +72,7 @@ pub enum ReductionStrategy {
 /// on `mq-random-10`, against 11.6x–97.1x for every other stage, and §4 attributes the outlier to
 /// the stage computing the right thing the wrong way. The matrix route is the same computation
 /// Groebner.jl's `f4_autoreduce!` performs — and #507 measured it across the whole corpus ladder,
-/// where it splits cleanly on the order (`docs/research/interreduction-cost.md` §3c):
+/// where it splits cleanly on the order (`docs/research/interreduction-cost.md` §3e):
 ///
 /// | order | over the rungs above the noise floor | worst rung |
 /// |---|---|---|
@@ -82,7 +82,7 @@ pub enum ReductionStrategy {
 ///
 /// "Above the noise floor" is the thirteen rungs taking 0.5 ms or more. The four that run in
 /// 25–170 µs are excluded because their ratios cross 1.00x between runs of identical work — see
-/// §3d.2, which quotes the case.
+/// §3e.2, which quotes the case.
 ///
 /// The mechanism is shape position, and the matrix shape shows it: katsura-6 under lex builds a
 /// **7 983 × 8 015** matrix for a **six-element** basis, where grevlex builds 217 × 249 for

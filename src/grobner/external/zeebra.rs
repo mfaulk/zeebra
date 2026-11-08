@@ -617,10 +617,19 @@ impl ExternalSolver for ZeebraSolver {
             InterreductionRoute::Division => "division",
             InterreductionRoute::Matrix => "matrix",
         };
+        // `reduce_batch_rows` is named for the same reason and is not independent of the route:
+        // with batches left reduced the autoreduce matrix falls to a few hundred columns, so the
+        // route's cost is a different quantity. A row naming one flag and not the other would be a
+        // row whose configuration cannot be reconstructed.
         Ok(
             ToolVersion::new("zeebra", env!("CARGO_PKG_VERSION")).with_build(format!(
-                "in-process, same build as the harness; interreduction={}",
-                route
+                "in-process, same build as the harness; interreduction={}, batch-rows={}",
+                route,
+                if self.f4_options.reduce_batch_rows {
+                    "reduced"
+                } else {
+                    "echelon"
+                }
             )),
         )
     }
@@ -1023,11 +1032,28 @@ mod tests {
             assert_eq!(
                 probe(route).build.as_deref(),
                 Some(
-                    format!("in-process, same build as the harness; interreduction={expected}")
-                        .as_str()
+                    format!(
+                        "in-process, same build as the harness; \
+                         interreduction={expected}, batch-rows=echelon"
+                    )
+                    .as_str()
                 )
             );
         }
+
+        // The second flag is named too, because the two interact: with batches left reduced the
+        // autoreduce matrix the route chooses over is a few hundred columns rather than ~8 000.
+        let reduced = ZeebraSolver::new()
+            .with_f4_options(F4Options {
+                reduce_batch_rows: true,
+                ..F4Options::default()
+            })
+            .probe_version()
+            .expect("in-process");
+        assert_eq!(
+            reduced.build.as_deref(),
+            Some("in-process, same build as the harness; interreduction=division, batch-rows=reduced")
+        );
 
         assert_ne!(
             probe(InterreductionRoute::Division).to_string(),

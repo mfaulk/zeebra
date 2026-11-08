@@ -19,7 +19,7 @@ before #437 landed and nothing in the tree could say whether #437 moved it.
 > still the division route, so the sentence above still holds of the default path — but the board
 > now does carry matrix-route rows, each labelled in its `library_version`. §2.4's projection was
 > re-taken as a measured cohort and held to 2.0%; what keeps the default where it is turned out to
-> be unbudgeted memory rather than a missing A/B. `interreduction-cost.md` §3c and **#536**.
+> be unbudgeted memory rather than a missing A/B. `interreduction-cost.md` §3e and **#536**.
 
 ## 0. Four conventions, because three of the four discrepancies below are conventions
 
@@ -225,7 +225,7 @@ this struct follows."* So:
 `katsura-11`, each labelled in its `library_version` — and `F4Options::default()` still does not
 produce them: the option is now `InterreductionRoute`, and its default is still `Division`. So the
 29 011 ms figure remains the accurate description of the default path, for the reason in
-`interreduction-cost.md` §3c.3 rather than for want of an A/B.
+`interreduction-cost.md` §3e.3 rather than for want of an A/B.
 
 ### 2.4 The interreduction A/B at `53fbf50`, and it comes in at 3.63x rather than 4.18x
 
@@ -313,7 +313,7 @@ again.
 must be re-taken with the flag on before any of it is published.
 
 > **Re-taken, and the projection held.** #507 took the row as a five-engine cohort at one commit on
-> the pinned digest — `docs/research/interreduction-cost.md` §3c.0. Measured: **8 333.1 ms** mean of
+> the pinned digest — `docs/research/interreduction-cost.md` §3e.0. Measured: **8 333.1 ms** mean of
 > three against the 7 999 ms projected here, **4.2% out**, and **1.07x behind Singular** against the
 > 1.14x projected. End to end the cohort gives 3.74x on the means and **3.69x on the minima**, the
 > latter 1.8% from the 3.627x applied above. The division side's ratio against this cohort's own
@@ -325,7 +325,7 @@ must be re-taken with the flag on before any of it is published.
 > Singular. And **the default did not move anyway**: peak RSS, which `f4_profile` does not report,
 > goes 163.4 MB → 600.8 MB here and **534.6 MB → 13 148.3 MB on katsura-11**, with every budget
 > satisfied, because the refusal counts matrix entries and the entries are not where the memory
-> goes. §3c.3 and **#536**.
+> goes. §3e.3 and **#536**.
 
 ---
 

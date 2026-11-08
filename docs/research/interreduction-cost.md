@@ -939,6 +939,36 @@ Singular here and its matrix route **2.18x** — the same shape as `mq-random-10
 up, and the first `katsura-11` row the board has had at any characteristic.
 
 
+### 3e.5 What this does not settle: the two flags together
+
+**#477's `reduce_batch_rows` landed while this was in flight, and the combined default is not
+decided here.** §3c measures it at **4.92x** end to end on the division route — more than the route
+choice is worth on its own — and the two together at **6.54x**, and it regresses no classical rung,
+including the katsura-5 lex case that costs the matrix route 25x. `README.md` records both defaults
+as #507's to move.
+
+One of the two is moved here and one is not, for a stated reason: **the flags are not independent,
+and the interaction runs in the direction that could dissolve §3e.3's gate.** With batches left
+reduced, §3c measures the autoreduce matrix at **252 × 606** rather than 7 642 × 7 996 — and that
+closure is exactly what §3e.3 attributes the matrix route's memory to. So the plausible outcome is
+that `matrix` + `reduced` costs neither the 13.1 GB nor the 437 MB, in which case the gate is on a
+configuration nobody would ship and both defaults move together. The opposite outcome is equally
+possible and equally unmeasured.
+
+`competitive_sweep --reduce-batch-rows on|off` exists for that measurement, and the Zeebra row's
+`library_version` now names **both** flags, because a row naming one is a row whose configuration
+cannot be reconstructed. What is missing is the 2×2 itself, with peak RSS per arm. It was attempted
+and abandoned rather than published: the box reached a one-minute load average of **39.97** from
+other agents' builds partway through, and this cohort's Singular came in at **9 426.5 ms** against
+the clean cohort's 7 760.5 ms mean — 1.21x, which is larger than several of the ratios the table
+would have had to resolve. One arm completed before that and corroborates §3e.0 rather than adding
+to it: `division` + `echelon` at **29 988.1 ms / 163.1 MB**, inside the three-rep range of
+30 505.8–31 679.7 ms and on 163.4 MB.
+
+**#575** is the 2×2, and it is the gate on `reduce_batch_rows`'s default as #536 is the gate on the
+route's.
+
+
 ---
 
 ## 4. Reproducing

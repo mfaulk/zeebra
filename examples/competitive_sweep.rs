@@ -14,10 +14,11 @@
 //!     --interreduction division --measure --write     # the pre-#478 route, as a board row
 //! ```
 //!
-//! `--interreduction by-order|division|matrix` overrides F4's final-interreduction route for the
-//! Zeebra side only; absent, the row is taken at whatever `F4Options::default()` says. The value is
-//! recorded in the row's `library_version`, because the commit does not determine it and two rows
-//! that differ only in it agree on every field a ratio is checked against (#507).
+//! `--interreduction by-order|division|matrix` and `--reduce-batch-rows on|off` override F4's two
+//! interreduction-related strategy flags for the Zeebra side only; absent, the row is taken at
+//! whatever `F4Options::default()` says. Both values are recorded in the row's `library_version`,
+//! because the commit does not determine them and two rows that differ only in them agree on every
+//! field a ratio is checked against (#507).
 //!
 //! # Two modes, and only one of them produces a publishable figure
 //!
@@ -117,6 +118,19 @@ fn main() {
                 std::process::exit(2);
             }
         });
+    // Pay the main loop's interreduction debt where it is incurred (#477). Its own default is
+    // also #507's to move, and the two flags interact: with batches left reduced the autoreduce
+    // matrix falls from 7 642 x 7 996 to 252 x 606, which is the closure whose construction is
+    // where `interreduction=matrix`'s memory goes. So the decision needs the 2x2, not two 1x2s.
+    let reduce_batch_rows: Option<bool> = value("--reduce-batch-rows").map(|v| match v.as_str() {
+        "on" => true,
+        "off" => false,
+        other => {
+            eprintln!("--reduce-batch-rows wants `on` or `off`, got {:?}", other);
+            std::process::exit(2);
+        }
+    });
+
     // Which corpus identity to sweep. A *published* characteristic only: a row at a field with no
     // frozen digest would be a figure whose problem nothing pins. See `PUBLISHED_CHARACTERISTICS`.
     let characteristic: u64 = value("--characteristic")
@@ -243,6 +257,7 @@ fn main() {
                 measure,
                 only_engines.as_deref(),
                 interreduction,
+                reduce_batch_rows,
             );
         }
     }
@@ -283,6 +298,7 @@ fn run_one(
     measure: bool,
     only: Option<&[String]>,
     interreduction: Option<InterreductionRoute>,
+    reduce_batch_rows: Option<bool>,
 ) {
     let wanted = |engine: &str| only.is_none_or(|list| list.iter().any(|e| e == engine));
 
@@ -295,6 +311,9 @@ fn run_one(
         };
         if let Some(route) = interreduction {
             options.interreduction = route;
+        }
+        if let Some(reduced) = reduce_batch_rows {
+            options.reduce_batch_rows = reduced;
         }
         let mut zeebra = ZeebraSolver::new().with_f4_options(options);
         if measure {
