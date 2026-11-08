@@ -2,8 +2,8 @@
 //!
 //! <https://www.mqchallenge.org/>. Six problem types: GF(2), GF(2^8) and GF(31), each as an
 //! encryption family (`m = 2n`, overdetermined) and a signature family (`n ≈ 1.5m`,
-//! underdetermined). Only the GF(31) types are importable here — see [`MqField`] for why — and
-//! GF(31) needs no new arithmetic, since `PrimeFieldElement64<31>` already exists.
+//! underdetermined). The GF(31) and GF(2^8) types are importable here; GF(2) is not — see
+//! [`MqField`] for why.
 //!
 //! # The file format, as it actually is
 //!
@@ -20,6 +20,26 @@
 //! ```
 //!
 //! One line per polynomial, terminated by ` ;`, each carrying `n(n+1)/2 + n + 1` coefficients.
+//!
+//! # The base a coefficient is written in is decided by the header
+//!
+//! A GF(2^8) file does not say `GF(2^8)`. It states the quotient ring, verbatim:
+//!
+//! ```text
+//! Galois Field : GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1
+//! ```
+//!
+//! and its coefficients are **two-digit hex bytes**, not decimal. Those two facts are one defect
+//! apart rather than two: 100 of the 256 bytes have an all-decimal spelling, so relaxing the header
+//! check without also switching the base would turn a loud `BadHeader` into a system built from
+//! different field elements than the published one (#414). [`MqField::radix`] is therefore not a
+//! rendering choice — it is part of reading the file correctly.
+//!
+//! The upside is larger than the defect. Because the header *names the modulus*, the importer can
+//! **verify** it against the coefficient type rather than assume one, which is what
+//! [`MqInstance::check_coefficient_field`] does: the challenge's `x^8 + x^4 + x^3 + x^2 + 1` is not
+//! the AES modulus, and `fields::Gf256` is refused for a challenge file where `fields::Gf256Mq` is
+//! accepted. Nothing about a system built under the wrong one of the two looks wrong.
 //!
 //! **The layout is every monomial of degree at most two, in descending grevlex order.** That is
 //! what the file's own `Order` header says, and this module implements it by sorting with
@@ -64,13 +84,13 @@ pub enum MqField {
     /// recorded decision between the two representations of GF(2). See #197.
     Gf2,
 
-    /// Types II and V. **Not importable yet** — and the reason is a modulus, not an export.
+    /// Types II and V. Importable, and the modulus is **checked** rather than assumed.
     ///
-    /// `fields::ExtensionFieldElement` has been publicly exported since `8757b4a`, and the
-    /// challenge's own GF(2^8) — `x^8 + x^4 + x^3 + x^2 + 1`, which is **not** the AES modulus
-    /// `fields::Gf256` uses — is declared as `fields::Gf256Mq`. Reading these coefficient bytes
-    /// under the wrong one of the two would build a different system from the published one, so
-    /// the import waits on a test against a published answer file. See #197.
+    /// The challenge's own GF(2^8) — `x^8 + x^4 + x^3 + x^2 + 1`, which is **not** the AES modulus
+    /// `fields::Gf256` uses — is `fields::Gf256Mq`. Reading these coefficient bytes under the wrong
+    /// one of the two builds a different system from the published one and nothing about the result
+    /// looks wrong, so [`MqInstance::check_coefficient_field`] refuses a coefficient type whose
+    /// modulus is not the one the file's header states. See [`MqField::PUBLISHED_GF256_MODULUS`].
     Gf256,
 
     /// Types III and VI. `PrimeFieldElement64<31>`, which already exists — no new arithmetic is a
@@ -79,6 +99,13 @@ pub enum MqField {
 }
 
 impl MqField {
+    /// The modulus the challenge publishes for GF(2^8), as a bit pattern over GF(2).
+    ///
+    /// `x^8 + x^4 + x^3 + x^2 + 1`. Verified by evaluation rather than taken from prose: all 20
+    /// polynomials of type II `n = 10` seed 0 vanish at its published answer under this modulus and
+    /// **0 of 20** vanish under the AES `0x11B`. See `docs/research/fukuoka-mq.md` §3.4.
+    pub const PUBLISHED_GF256_MODULUS: u64 = 0x11D;
+
     /// The field's order.
     pub fn order(&self) -> u64 {
         match self {
@@ -88,29 +115,114 @@ impl MqField {
         }
     }
 
-    /// The base an answer file's elements are written in.
+    /// The base this field's elements are written in, in both the instance and the answer file.
     ///
-    /// GF(2^8) publishes its answer vectors as two-digit hex bytes — `[a3, 67, 64, ...]` — and the
-    /// prime-field types publish decimal. `format.html` and every `-answer` file agree; the hex is
-    /// not a rendering choice this crate makes, so it is not optional to read.
+    /// GF(2^8) publishes bytes as two hex digits — coefficient rows and answer vectors alike
+    /// (`[a3, 67, 64, ...]`) — and the prime-field types publish decimal. `format.html`, every
+    /// genuine instance file and every `-answer` file agree; the hex is not a rendering choice this
+    /// crate makes, so it is not optional to read. A decimal read of a hex byte does not fail, it
+    /// succeeds at a different element.
     ///
     /// GF(2) is 10 only because `0` and `1` are the same in every base.
-    pub fn answer_radix(&self) -> u32 {
+    pub fn radix(&self) -> u32 {
         match self {
             Self::Gf2 | Self::Gf31 => 10,
             Self::Gf256 => 16,
         }
     }
 
-    /// The `Galois Field :` header value this parses from.
-    fn parse(value: &str) -> Option<Self> {
-        match value.trim() {
-            "GF(2)" => Some(Self::Gf2),
-            "GF(256)" | "GF(2^8)" => Some(Self::Gf256),
-            "GF(31)" => Some(Self::Gf31),
+    /// The largest coefficient token this field admits, inclusive.
+    ///
+    /// `q` rather than `q - 1` over a prime field: `31` occurs literally in the published GF(31)
+    /// files and is congruent to zero (see the module docs). A binary field has no analogous wrap —
+    /// its coefficients are bytes written as exactly two hex digits — so there `q - 1` is the
+    /// ceiling and `100` is a malformed token rather than a reducible one.
+    pub fn max_coefficient(&self) -> u64 {
+        match self {
+            Self::Gf2 | Self::Gf31 => self.order(),
+            Self::Gf256 => self.order() - 1,
+        }
+    }
+
+    /// The `Galois Field :` header value, as a field and whatever modulus the header states.
+    ///
+    /// Three spellings occur. `GF(31)` and `GF(2)` name a prime field and state no modulus. A
+    /// binary field is spelled as the quotient ring it is — `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1`,
+    /// which is what every genuine type II and type V file prints — and the stated polynomial is
+    /// returned so that it can be checked against the coefficient type rather than assumed.
+    /// `GF(256)` and `GF(2^8)` are accepted as the field with no modulus stated, since a file that
+    /// names the field without naming its modulus can still only mean the published one.
+    fn parse_header(value: &str) -> Option<(Self, Option<u64>)> {
+        let value = value.trim();
+        if let Some((ring, modulus)) = value.split_once('/') {
+            if ring.trim() != "GF(2)[x]" {
+                return None;
+            }
+            let modulus = parse_gf2_polynomial(modulus)?;
+            // The modulus' degree is the extension degree, so it decides which field this is.
+            let field = match 63 - modulus.leading_zeros() {
+                1 => Self::Gf2,
+                8 => Self::Gf256,
+                _ => return None,
+            };
+            return Some((field, Some(modulus)));
+        }
+        match value {
+            "GF(2)" => Some((Self::Gf2, None)),
+            "GF(256)" | "GF(2^8)" => Some((Self::Gf256, None)),
+            "GF(31)" => Some((Self::Gf31, None)),
             _ => None,
         }
     }
+}
+
+/// The irreducible polynomial `F` reduces modulo, as a bit pattern, if that is derivable.
+///
+/// Derived from arithmetic rather than read off a type parameter, because the modulus of
+/// `fields::BinaryFieldElement<P>` is a const generic and no trait exposes it. In a binary field
+/// `KnownOrder::element_at` enumerates by bit pattern, so index `2` is `x`, and `x^m` is the
+/// modulus with its leading term dropped — which is the *defining relation* of the quotient ring,
+/// and the only thing that distinguishes two irreducible polynomials of the same degree.
+///
+/// `None` rather than a guess whenever that derivation does not apply: a field of odd
+/// characteristic, an order that is not a power of two, one wide enough that the index search is
+/// not worth running, or an enumeration that is not the bit pattern. Every one of those makes the
+/// caller refuse the import, which is the safe direction — the failure this exists to prevent is a
+/// coefficient read under the wrong modulus, not a refused one.
+fn binary_modulus_of<F: KnownOrder>() -> Option<u64> {
+    if F::characteristic_limbs() != [2] {
+        return None;
+    }
+    let order = u64::try_from(F::order_u128()?).ok()?;
+    // 2^16 bounds the search at 65536 element constructions. Every binary field this importer
+    // reaches is GF(2^8); a wider one would need the modulus exposed rather than derived.
+    if !order.is_power_of_two() || !(4..=1 << 16).contains(&order) {
+        return None;
+    }
+    let degree = u128::from(order.trailing_zeros());
+    let reduced = F::element_at(2)?.pow(degree);
+    let tail = (0..u128::from(order)).find(|&i| F::element_at(i).as_ref() == Some(&reduced))?;
+    Some(order | u64::try_from(tail).ok()?)
+}
+
+/// A polynomial over GF(2) written as `x^8 + x^4 + x^3 + x^2 + 1`, as a bit pattern.
+///
+/// Returns `None` on anything it does not fully understand, including a repeated term: a header
+/// this cannot read in full is a header to report, not one to read approximately.
+fn parse_gf2_polynomial(text: &str) -> Option<u64> {
+    let mut bits = 0u64;
+    for term in text.split('+') {
+        let exponent = match term.trim() {
+            "1" => 0,
+            "x" => 1,
+            term => term.strip_prefix("x^")?.trim().parse::<u32>().ok()?,
+        };
+        if exponent >= 64 || bits & (1 << exponent) != 0 {
+            return None;
+        }
+        bits |= 1 << exponent;
+    }
+    (bits != 0).then_some(bits)
 }
 
 impl Display for MqField {
@@ -152,6 +264,19 @@ pub enum MqError {
         declared: u64,
         /// The coefficient type's order, as limbs. A wide field is not representable as one `u64`.
         coefficient_field: Vec<u64>,
+    },
+
+    /// The coefficient type has the declared order but reduces modulo a different polynomial.
+    ///
+    /// The GF(2^8) analogue of [`Self::WrongCoefficientField`], and the sharper of the two: the
+    /// challenge's `x^8 + x^4 + x^3 + x^2 + 1` and the AES `x^8 + x^4 + x^3 + x + 1` give
+    /// isomorphic fields of the same order, so no order comparison separates them, and a system
+    /// built under the wrong one is a different system whose coefficients all look plausible.
+    WrongModulus {
+        /// The irreducible polynomial the instance's header states, as a bit pattern.
+        declared: u64,
+        /// The one the coefficient type reduces modulo, as a bit pattern.
+        coefficient_field: u64,
     },
 
     /// A coefficient line has the wrong length for the declared `n`.
@@ -215,6 +340,14 @@ impl Display for MqError {
             } => write!(
                 f,
                 "the instance is over GF({}) and the coefficient type has order {:?}",
+                declared, coefficient_field
+            ),
+            Self::WrongModulus {
+                declared,
+                coefficient_field,
+            } => write!(
+                f,
+                "the instance reduces modulo {:#x} and the coefficient type modulo {:#x}",
                 declared, coefficient_field
             ),
             Self::WrongCoefficientCount {
@@ -291,6 +424,14 @@ pub struct MqInstance {
     /// The base field.
     pub field: MqField,
 
+    /// The irreducible polynomial the `Galois Field :` header states, as a bit pattern over GF(2).
+    ///
+    /// `None` for a prime field, and also for a binary field whose header names only the field
+    /// (`GF(2^8)`). Where it is present it is **what the file says**, not what this crate expects:
+    /// a file declaring the AES modulus parses and records the AES modulus, and it is
+    /// [`Self::check_coefficient_field`] that decides whether a coefficient type matches it.
+    pub modulus: Option<u64>,
+
     /// `n`.
     pub variables: usize,
 
@@ -327,6 +468,7 @@ impl MqInstance {
     /// [`MqError`], naming the line and position wherever the input is at fault.
     pub fn parse(text: &str) -> Result<Self, MqError> {
         let mut field: Option<MqField> = None;
+        let mut modulus: Option<u64> = None;
         let mut variables: Option<usize> = None;
         let mut polynomials: Option<usize> = None;
         let mut seed: Option<u64> = None;
@@ -347,20 +489,21 @@ impl MqInstance {
                 let expected = Self::coefficients_per_polynomial(n);
                 let index = coefficients.len();
                 let mut row = Vec::with_capacity(expected);
-                let order_of_field = field
-                    .ok_or(MqError::MissingHeader {
-                        key: "Galois Field",
-                    })?
-                    .order();
+                let field = field.ok_or(MqError::MissingHeader {
+                    key: "Galois Field",
+                })?;
+                // Base 16 over GF(2^8), base 10 over a prime field. The header decides, and it is
+                // read before any coefficient row because a coefficient row cannot say.
+                let radix = field.radix();
+                let largest = field.max_coefficient();
                 for (position, token) in body.split_whitespace().enumerate() {
-                    // `0..=q` rather than `0..q`: `31` occurs in the published GF(31) files and is
-                    // congruent to zero. See the module docs.
-                    let value: u64 = token.parse().map_err(|_| MqError::BadCoefficient {
-                        polynomial: index,
-                        position,
-                        token: token.to_string(),
-                    })?;
-                    if value > order_of_field {
+                    let value =
+                        u64::from_str_radix(token, radix).map_err(|_| MqError::BadCoefficient {
+                            polynomial: index,
+                            position,
+                            token: token.to_string(),
+                        })?;
+                    if value > largest {
                         return Err(MqError::BadCoefficient {
                             polynomial: index,
                             position,
@@ -385,10 +528,13 @@ impl MqInstance {
             };
             match key.trim() {
                 "Galois Field" => {
-                    field = Some(MqField::parse(value).ok_or_else(|| MqError::BadHeader {
-                        key: "Galois Field",
-                        value: value.trim().to_string(),
-                    })?)
+                    let (parsed, stated) =
+                        MqField::parse_header(value).ok_or_else(|| MqError::BadHeader {
+                            key: "Galois Field",
+                            value: value.trim().to_string(),
+                        })?;
+                    field = Some(parsed);
+                    modulus = stated;
                 }
                 "Number of variables (n)" => {
                     variables = Some(value.trim().parse().map_err(|_| MqError::BadHeader {
@@ -426,6 +572,7 @@ impl MqInstance {
 
         Ok(Self {
             field,
+            modulus,
             variables,
             polynomials,
             seed,
@@ -448,7 +595,7 @@ impl MqInstance {
     /// shortened its own input would report a correct importer as broken or an incorrect one as
     /// fine depending on which way the garbage fell.
     pub fn parse_answer(&self, text: &str) -> Result<Vec<u64>, MqError> {
-        let radix = self.field.answer_radix();
+        let radix = self.field.radix();
         let order = self.field.order();
         let mut values = Vec::with_capacity(self.variables);
         for token in text
@@ -478,34 +625,30 @@ impl MqInstance {
 
     /// Whether `F` is the field the instance's header declares.
     ///
-    /// Two separate questions, and both have to be answered before a single coefficient is
-    /// converted. First, whether this crate can express the field at all — GF(2) and GF(2^8)
-    /// cannot be, for reasons of module visibility rather than mathematics. Second, whether the
+    /// Three separate questions, and all three have to be answered before a single coefficient is
+    /// converted. First, whether this crate can express the field at all — GF(2) cannot be, for
+    /// reasons of a recorded representation decision rather than mathematics. Second, whether the
     /// coefficient type the caller supplied *is* that field, which is the one a generic
-    /// `F: FiniteField` signature cannot ask and so cannot enforce.
+    /// `F: FiniteField` signature cannot ask and so cannot enforce. Third, over GF(2^8), whether it
+    /// reduces modulo the polynomial the file's header states — and that question is *not* answered
+    /// by the second, because the challenge's modulus and the AES one give fields of the same
+    /// order.
     ///
-    /// Compared as limb slices rather than as integers, because a field order need not fit a
-    /// `u64` — the comparison has to be correct for the wide fields M20 added, not only for the
-    /// ones this importer currently reaches.
+    /// Orders are compared as limb slices rather than as integers, because a field order need not
+    /// fit a `u64` — the comparison has to be correct for the wide fields M20 added, not only for
+    /// the ones this importer currently reaches.
     ///
     /// # Errors
-    /// [`MqError::UnsupportedField`] or [`MqError::WrongCoefficientField`].
+    /// [`MqError::UnsupportedField`], [`MqError::WrongCoefficientField`] or
+    /// [`MqError::WrongModulus`].
     pub fn check_coefficient_field<F: KnownOrder>(&self) -> Result<(), MqError> {
-        match self.field {
-            MqField::Gf31 => {}
-            MqField::Gf2 => {
-                return Err(MqError::UnsupportedField {
-                    field: self.field,
-                    because: "the GF(2) import path is unwritten; the field exists as fields::Zp2",
-                })
-            }
-            MqField::Gf256 => {
-                return Err(MqError::UnsupportedField {
-                    field: self.field,
-                    because: "the GF(2^8) import path is unwritten; the challenge's modulus, \
-                              which is not the AES one, exists as fields::Gf256Mq",
-                })
-            }
+        if self.field == MqField::Gf2 {
+            return Err(MqError::UnsupportedField {
+                field: self.field,
+                because: "the GF(2) import path is unwritten; the field exists as fields::Zp2 and \
+                          as fields::BinaryFieldElement, and which of the two to read it under is \
+                          an open decision (#197)",
+            });
         }
 
         let declared = self.field.order();
@@ -514,6 +657,23 @@ impl MqInstance {
                 declared,
                 coefficient_field: F::order_limbs().to_vec(),
             });
+        }
+
+        if self.field == MqField::Gf256 {
+            // A header that names the field without naming its modulus can still only mean the
+            // published one; a header that names a modulus is believed over this crate's
+            // expectation, which is what makes the check a verification rather than an assertion.
+            let declared = self.modulus.unwrap_or(MqField::PUBLISHED_GF256_MODULUS);
+            let found = binary_modulus_of::<F>().ok_or(MqError::WrongCoefficientField {
+                declared: self.field.order(),
+                coefficient_field: F::order_limbs().to_vec(),
+            })?;
+            if found != declared {
+                return Err(MqError::WrongModulus {
+                    declared,
+                    coefficient_field: found,
+                });
+            }
         }
         Ok(())
     }
@@ -564,20 +724,49 @@ impl MqInstance {
         self.check_coefficient_field::<F>()?;
 
         let layout = Self::monomial_layout::<N>();
-        Ok(self
-            .coefficients
-            .iter()
-            .map(|row| {
-                let terms: Vec<(Monomial<N>, F)> = layout
-                    .iter()
-                    .zip(row)
-                    .map(|(monomial, coefficient)| (*monomial, F::new(*coefficient)))
-                    .collect();
-                // Through `new`, which drops the terms whose coefficients reduced to zero — and
-                // `31` over GF(31) is one of those.
-                MultivariatePolynomial::new(&terms)
-            })
-            .collect())
+        let mut system = Vec::with_capacity(self.coefficients.len());
+        for (polynomial, row) in self.coefficients.iter().enumerate() {
+            let mut terms: Vec<(Monomial<N>, F)> = Vec::with_capacity(layout.len());
+            for (position, (monomial, coefficient)) in layout.iter().zip(row).enumerate() {
+                let element =
+                    self.element::<F>(*coefficient)
+                        .ok_or_else(|| MqError::BadCoefficient {
+                            polynomial,
+                            position,
+                            token: self.render_coefficient(*coefficient),
+                        })?;
+                terms.push((*monomial, element));
+            }
+            // Through `new`, which drops the terms whose coefficients are zero — and `31` over
+            // GF(31) is one of those.
+            system.push(MultivariatePolynomial::new(&terms));
+        }
+        Ok(system)
+    }
+
+    /// One file coefficient as a field element, or `None` if it is not one.
+    ///
+    /// **Not `FiniteField::new`, which over an extension is the prime-subfield embedding.**
+    /// `Gf256Mq::new(0xa7)` is `1`, so a byte-wise read through `new` collapses every coefficient
+    /// of a GF(2^8) instance to a bit and builds a system with the right shape and the wrong
+    /// contents. [`KnownOrder::element_at`] is the bijection onto the field, and for a binary field
+    /// it is the bit pattern the file writes.
+    ///
+    /// A prime field still goes through `new`, because the published GF(31) files carry the literal
+    /// token `31` — congruent to zero, and so outside `element_at`'s `0..q`.
+    fn element<F: KnownOrder>(&self, value: u64) -> Option<F> {
+        match self.field {
+            MqField::Gf2 | MqField::Gf31 => Some(F::new(value)),
+            MqField::Gf256 => F::element_at(u128::from(value)),
+        }
+    }
+
+    /// A coefficient rendered in the base the file writes it in, for an error message.
+    fn render_coefficient(&self, value: u64) -> String {
+        match self.field.radix() {
+            16 => format!("{:02x}", value),
+            _ => value.to_string(),
+        }
     }
 
     /// Hand the instance's system to `visitor` at whichever compiled dimension it needs.
@@ -633,10 +822,12 @@ pub trait MqVisitor<F: KnownOrder> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MqError, MqField, MqInstance, MqVisitor, SUPPORTED_DIMENSIONS};
+    use super::{
+        parse_gf2_polynomial, MqError, MqField, MqInstance, MqVisitor, SUPPORTED_DIMENSIONS,
+    };
     use crate::{
-        fields::PrimeFieldElement64, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
-        Zero,
+        fields::{Gf256, Gf256Mq, PrimeFieldElement64},
+        FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
 
     type F = PrimeFieldElement64<31>;
@@ -663,6 +854,33 @@ Order : graded reverse lex order
 0 1 0 0 0 0 0 0 30 1 ;
 0 0 30 0 0 1 0 0 0 26 ;
 ";
+
+    /// A hand-written GF(2^8) instance with the header a genuine type II or V file prints.
+    ///
+    /// Not challenge data, for the reason [`FIXTURE`] gives. Three variables, so the ten
+    /// coefficients are `x0^2, x0x1, x1^2, x0x2, x1x2, x2^2, x0, x1, x2, 1` descending grevlex, and
+    /// every one of them is a **two-digit hex byte**.
+    ///
+    /// Built to separate the two moduli and the two bases at once. At
+    /// `(x0, x1, x2) = (de, ad, be)`:
+    ///   `a7*x0x1 + x2^2 + 14    = 0` under `x^8+x^4+x^3+x^2+1`, and `61` under the AES modulus.
+    ///   `13*x0^2 + x1x2 + x0 + 21 = 0` under it, and `a9` under AES.
+    /// `13` is the all-decimal hex token: read as decimal thirteen rather than as `0x13`, the
+    /// second polynomial leaves `1c` at the same point.
+    const GF256_FIXTURE: &str = "\
+Galois Field : GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1
+Number of variables (n) : 3
+Number of polynomials (m) : 2
+Seed : 0
+Order : graded reverse lex order
+
+*********************
+00 a7 00 00 00 01 00 00 00 14 ;
+13 00 00 00 01 00 01 00 00 21 ;
+";
+
+    /// [`GF256_FIXTURE`]'s solution, in the form an `-answer` file publishes.
+    const GF256_ANSWER: &str = "[de, ad, be]\n";
 
     /// The layout is descending grevlex over all monomials of degree at most two.
     ///
@@ -873,6 +1091,7 @@ Order : graded reverse lex order
         }
         let ten = MqInstance {
             field: MqField::Gf31,
+            modulus: None,
             variables: 10,
             polynomials: 1,
             seed: None,
@@ -908,37 +1127,36 @@ Order : graded reverse lex order
         ));
     }
 
-    /// The fields this crate cannot express yet say so, naming what is missing.
+    /// GF(2) says it is not importable yet, naming what is missing.
     #[test]
-    fn test_the_binary_and_extension_fields_are_refused_by_name() {
-        for field in [MqField::Gf2, MqField::Gf256] {
-            // Built rather than parsed: the fixture's coefficients are out of range for GF(2), and
-            // what is under test is `system`'s refusal rather than the parse. Note this is
-            // reported *before* the coefficient-field mismatch that `F` also has — "there is no
-            // import path for GF(2^8)" is the more useful fact than "GF(31) is not GF(2^8)".
-            let instance = MqInstance {
-                field,
-                variables: 3,
-                polynomials: 1,
-                seed: None,
-                order: "graded reverse lex order".to_string(),
-                coefficients: vec![vec![0; MqInstance::coefficients_per_polynomial(3)]],
-            };
-            match instance.system::<3, F>() {
-                Err(MqError::UnsupportedField { field: f, because }) => {
-                    assert_eq!(f, field);
-                    // The reason used to be "`src/fields/binary_field.rs` is not publicly
-                    // exported". That export landed in `8757b4a`, so asserting on it would now
-                    // pin a false claim; what remains missing is the import path itself.
-                    assert!(because.contains("import path is unwritten"), "{}", because);
-                    assert!(
-                        !because.contains("not publicly exported"),
-                        "both field modules are public since 8757b4a: {}",
-                        because
-                    );
-                }
-                other => panic!("expected an unsupported field, got {:?}", other),
+    fn test_the_gf2_types_are_refused_by_name() {
+        // Built rather than parsed: the fixture's coefficients are out of range for GF(2), and
+        // what is under test is `system`'s refusal rather than the parse. Note this is reported
+        // *before* the coefficient-field mismatch that `F` also has — "there is no import path
+        // for GF(2)" is the more useful fact than "GF(31) is not GF(2)".
+        let instance = MqInstance {
+            field: MqField::Gf2,
+            modulus: None,
+            variables: 3,
+            polynomials: 1,
+            seed: None,
+            order: "graded reverse lex order".to_string(),
+            coefficients: vec![vec![0; MqInstance::coefficients_per_polynomial(3)]],
+        };
+        match instance.system::<3, F>() {
+            Err(MqError::UnsupportedField { field, because }) => {
+                assert_eq!(field, MqField::Gf2);
+                // The reason used to be "`src/fields/binary_field.rs` is not publicly exported".
+                // That export landed in `8757b4a`, so asserting on it would now pin a false
+                // claim; what remains missing is the import path itself.
+                assert!(because.contains("import path is unwritten"), "{}", because);
+                assert!(
+                    !because.contains("not publicly exported"),
+                    "both field modules are public since 8757b4a: {}",
+                    because
+                );
             }
+            other => panic!("expected an unsupported field, got {:?}", other),
         }
     }
 
@@ -948,7 +1166,7 @@ Order : graded reverse lex order
     /// disagree — a mis-filed download, which is otherwise indistinguishable from valid data.
     #[test]
     fn test_the_coefficient_range_follows_the_declared_field() {
-        // 30 is legal over GF(31) and GF(256), and not over GF(2).
+        // `30` is in range over GF(31), and over GF(256) where it is read as the byte 0x30.
         assert!(MqInstance::parse(FIXTURE).is_ok());
         assert!(MqInstance::parse(&FIXTURE.replace("GF(31)", "GF(256)")).is_ok());
         assert_eq!(
@@ -958,6 +1176,156 @@ Order : graded reverse lex order
                 position: 8,
                 token: "30".to_string()
             })
+        );
+        // Over GF(2^8) the ceiling is 0xff rather than the order, because a byte has no analogue
+        // of the `31` that occurs literally in the GF(31) files.
+        assert_eq!(
+            MqInstance::parse(&FIXTURE.replace("GF(31)", "GF(2^8)").replace("30", "100")),
+            Err(MqError::BadCoefficient {
+                polynomial: 0,
+                position: 8,
+                token: "100".to_string()
+            })
+        );
+    }
+
+    /// A GF(2) polynomial in the header's spelling becomes its bit pattern, or nothing.
+    #[test]
+    fn test_reading_a_gf2_polynomial_from_the_header() {
+        assert_eq!(
+            parse_gf2_polynomial(" x^8 + x^4 + x^3 + x^2 + 1 "),
+            Some(0x11D)
+        );
+        assert_eq!(parse_gf2_polynomial("x^8 + x^4 + x^3 + x + 1"), Some(0x11B));
+        assert_eq!(parse_gf2_polynomial("x + 1"), Some(0b11));
+        assert_eq!(parse_gf2_polynomial("1"), Some(1));
+        // A repeated term would cancel over GF(2), so reading it as a set of bits would be wrong.
+        assert_eq!(parse_gf2_polynomial("x^8 + x^8 + 1"), None);
+        assert_eq!(parse_gf2_polynomial("x^64 + 1"), None);
+        assert_eq!(parse_gf2_polynomial("y^8 + 1"), None);
+        assert_eq!(parse_gf2_polynomial("2x^8 + 1"), None);
+        assert_eq!(parse_gf2_polynomial(""), None);
+    }
+
+    /// The genuine GF(2^8) header parses, and the modulus it states is recorded verbatim.
+    #[test]
+    fn test_the_real_gf256_header_parses_and_records_its_modulus() {
+        let instance = MqInstance::parse(GF256_FIXTURE).expect("the real header parses");
+        assert_eq!(instance.field, MqField::Gf256);
+        assert_eq!(instance.modulus, Some(0x11D));
+        assert_eq!(instance.modulus, Some(MqField::PUBLISHED_GF256_MODULUS));
+
+        // What the file says, not what this crate expects: an AES-modulus declaration is a valid
+        // GF(2^8) declaration and is recorded as the one it is.
+        let aes = MqInstance::parse(
+            &GF256_FIXTURE.replace("x^8 + x^4 + x^3 + x^2 + 1", "x^8 + x^4 + x^3 + x + 1"),
+        )
+        .expect("an AES-modulus header is still a GF(2^8) header");
+        assert_eq!(aes.field, MqField::Gf256);
+        assert_eq!(aes.modulus, Some(0x11B));
+
+        // A field named without its modulus still parses, and states none.
+        let bare = MqInstance::parse(
+            &GF256_FIXTURE.replace("GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1", "GF(2^8)"),
+        )
+        .expect("`GF(2^8)` parses");
+        assert_eq!(bare.field, MqField::Gf256);
+        assert_eq!(bare.modulus, None);
+
+        // A header this cannot read in full is reported rather than read approximately.
+        assert_eq!(
+            MqInstance::parse(&GF256_FIXTURE.replace("x^4 + ", "x^4 * ")),
+            Err(MqError::BadHeader {
+                key: "Galois Field",
+                value: "GF(2)[x] / x^8 + x^4 * x^3 + x^2 + 1".to_string(),
+            })
+        );
+    }
+
+    /// GF(2^8) coefficients are read base 16, so an all-decimal hex token is not read as decimal.
+    ///
+    /// The half of #414 that would have been silent: of the 256 bytes, 100 have an all-decimal
+    /// spelling, so relaxing the header check alone would have built a different system rather
+    /// than failing.
+    #[test]
+    fn test_gf256_coefficients_are_read_base_sixteen() {
+        let instance = MqInstance::parse(GF256_FIXTURE).expect("parses");
+        // `a7` is not a decimal number at all: a decimal read fails here rather than lying.
+        assert_eq!(instance.coefficients[0][1], 0xa7);
+        // `13` is, and it means nineteen.
+        assert_eq!(instance.coefficients[1][0], 0x13);
+        assert_ne!(instance.coefficients[1][0], 13);
+        // The answer file is the same base, which is what `radix` says rather than two settings.
+        assert_eq!(
+            instance.parse_answer(GF256_ANSWER),
+            Ok(vec![0xde, 0xad, 0xbe])
+        );
+    }
+
+    /// A GF(2^8) system is built over the modulus the header states, and refused under any other.
+    ///
+    /// The acceptance criterion of #414, and the only check that separates the two moduli: they
+    /// give fields of the same order, so no order comparison sees the difference, and a system
+    /// built under the wrong one has plausible coefficients throughout.
+    #[test]
+    fn test_a_gf256_instance_is_built_over_the_modulus_its_header_states() {
+        let instance = MqInstance::parse(GF256_FIXTURE).expect("parses");
+        let answer = instance
+            .parse_answer(GF256_ANSWER)
+            .expect("the answer parses");
+        let point: Vec<Gf256Mq> = answer.iter().map(|v| Gf256Mq::new(*v)).collect();
+
+        let system = instance
+            .system::<3, Gf256Mq>()
+            .expect("the challenge modulus is accepted");
+        assert_eq!(system.len(), 2);
+        for (index, p) in system.iter().enumerate() {
+            assert!(
+                p.eval(&point).is_zero(),
+                "polynomial {} does not vanish at the fixture's answer: {}",
+                index,
+                p
+            );
+        }
+
+        // The AES modulus is the same order and a different field, and is refused by name.
+        assert_eq!(
+            instance.system::<3, Gf256>(),
+            Err(MqError::WrongModulus {
+                declared: 0x11D,
+                coefficient_field: 0x11B,
+            })
+        );
+
+        // And the refusal is load-bearing rather than fussy: read under AES, the same bytes do
+        // not vanish at the same point, so the two moduli are different systems.
+        let aes_point: Vec<Gf256> = answer.iter().map(|v| Gf256::new(*v)).collect();
+        let mut forced = instance.clone();
+        forced.modulus = Some(0x11B);
+        let under_aes = forced
+            .system::<3, Gf256>()
+            .expect("an AES-declared instance builds over AES");
+        assert!(
+            under_aes.iter().any(|p| !p.eval(&aes_point).is_zero()),
+            "the fixture must distinguish the two moduli, or the test proves nothing"
+        );
+    }
+
+    /// `FiniteField::new` is not the coefficient route over an extension.
+    ///
+    /// The trap this guards: `Gf256Mq::new(0xa7)` is the prime-subfield embedding, so it is `1`.
+    /// Building a GF(2^8) system through it collapses every byte to a bit and produces a system of
+    /// the right shape whose every coefficient is wrong.
+    #[test]
+    fn test_gf256_coefficients_do_not_go_through_the_prime_subfield_embedding() {
+        use crate::FiniteField;
+        assert_eq!(<Gf256Mq as FiniteField>::new(0xa7), Gf256Mq::one());
+        let instance = MqInstance::parse(GF256_FIXTURE).expect("parses");
+        let system = instance.system::<3, Gf256Mq>().expect("builds");
+        // `a7 * x0x1` survives as `a7`, which is what the embedding would have destroyed.
+        assert_eq!(
+            system[0].terms().get(&Monomial::new(&[1, 1, 0])).copied(),
+            Some(Gf256Mq::new(0xa7))
         );
     }
 
@@ -1005,6 +1373,7 @@ Order : graded reverse lex order
         let row = vec![0u64; MqInstance::coefficients_per_polynomial(n)];
         let instance = MqInstance {
             field: MqField::Gf31,
+            modulus: None,
             variables: n,
             polynomials: 2,
             seed: None,
@@ -1105,6 +1474,7 @@ Order : graded reverse lex order
     fn header_only(field: MqField, variables: usize) -> MqInstance {
         MqInstance {
             field,
+            modulus: None,
             variables,
             polynomials: 2 * variables,
             seed: Some(0),

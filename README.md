@@ -3655,20 +3655,29 @@ the 2.868 ms order-162 anchor every earlier projection used does not reproduce.
 `grobner::research::MqInstance` imports instances from the
 [Fukuoka MQ Challenge](https://www.mqchallenge.org/). The GF(31) families (types III and VI) need
 no new arithmetic — `PrimeFieldElement64<31>` already exists, and `Zp31` is the same field in four
-bytes — and the GF(2) and GF(2^8) families are refused by name, each for its own reason. **Not for
-want of an export**: `binary_field` and `extension_field` are public, and that claim was stale here
-long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2) needs only the import
-path written, against `Zp2` (§8 of the same document decides that). GF(2^8) needs the import path
-and three things in it: #377 settled `FiniteField::from_str` for `BinaryFieldElement`, but it reads
-a **decimal** integer as a bit pattern and a challenge coefficient is a two-digit **hex** byte, the
-real header is `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1` and `MqField::parse` does not match it
-(#414). The answer vectors are already handled: `MqInstance::parse_answer` is a method that takes
-its base from `MqField::answer_radix` — 16 over GF(2^8) — and returns `Result`, so a hex vector
-reads as the `n` bytes it names and a short or unreadable file is an error rather than a shorter
-`Vec` of wrong values (#415). The challenge's
-modulus, which is not the AES one, is `Gf256Mq`, and
-[`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §2.4 settles it against a published
-answer: all 20 polynomials of type II `n = 10` vanish under `0x11D` and none under `0x11B`.
+bytes. The GF(2^8) families (types II and V) import since #414; only GF(2) is still refused by
+name, and **not for want of an export**: `binary_field` and `extension_field` are public, and that
+claim was stale here long after it stopped being true (`docs/research/boolean-solving.md` §1). GF(2)
+needs only the import path written, against `Zp2` (§8 of the same document decides that).
+
+GF(2^8) took three things, and they had to land together. The real header is
+`GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1` rather than `GF(2^8)`, so no genuine file parsed at all.
+Coefficients are two-digit **hex** bytes, and because 100 of the 256 bytes have an all-decimal
+spelling, accepting the header without also switching the base would have turned a loud
+`BadHeader` into a system silently built from different field elements — `MqField::radix` now
+decides the base of a coefficient row and of an answer vector alike (#415 did the latter). And the
+coefficient route is `KnownOrder::element_at`, not `FiniteField::new`: over an extension the trait
+`new` is the prime-subfield embedding, so `Gf256Mq::new(0xa7)` is `1` and a byte-wise read through
+it would collapse every coefficient to a bit.
+
+The upside is bigger than the defect was. Because the header *states* the modulus,
+`MqInstance::check_coefficient_field` **verifies** it against the coefficient type instead of
+assuming one: it derives the type's own modulus from arithmetic and reports `MqError::WrongModulus`
+on a mismatch, so `Gf256` (AES, `0x11B`) is refused for a challenge file and `Gf256Mq` (`0x11D`) is
+accepted. No order comparison could separate them — the two fields have the same order.
+[`docs/research/fukuoka-mq.md`](docs/research/fukuoka-mq.md) §2.4 settles which is right against a
+published answer: all 20 polynomials of type II `n = 10` vanish under `0x11D` and none under
+`0x11B`.
 
 The coefficient layout is **every monomial of degree at most two in descending grevlex order**,
 which is what the file's own `Order` header names. It is implemented by sorting with
