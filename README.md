@@ -4267,8 +4267,18 @@ route solves it, so declining the conversion is a budget decision rather than an
 is recorded as a limit stop, not a failure (#347). `test_the_corpus_reaches_past_the_recommended_cap`
 and `test_every_planted_rung_has_a_declared_quotient_dimension` keep that relationship pinned to
 the ladder, so adding a planted rung forces the decision instead of silently invalidating a
-sentence. Five rungs — the poseidon and anemoi ones — have no recorded quotient dimension in this
-tree and are therefore outside that trap; that is #473.
+sentence — and the second now pins the **figures** as well as the names, since `CorpusEntry`
+carries the same numbers and an uncompared second copy is the duplication that trap is about.
+
+**The trap covers the whole ladder** (#473), not the planted family:
+`test_every_zero_dimensional_rung_declares_a_quotient_dimension` requires a declared dimension on
+every zero-dimensional rung and **refuses one** on a positive-dimensional rung, where a finite
+quotient dimension would be a figure about something else. The five rungs that had none — three
+poseidon, two anemoi — now carry one. `mq-random-14` is the single named exception, and not for
+want of recording: its *basis* does not finish here, Zeebra stopping at 20 006 072 live entries
+after 34.4 s and Singular at a 60 s wall, so there is no conversion to read a dimension off. It is
+named individually rather than exempted by family, so a rung added without a dimension fails the
+test instead of joining a silent exemption.
 
 Neither is a ceiling on the process. `F4Statistics::peak_live_bytes` reports what the budget
 enforces; `max_dense_buffer_bytes` reports what it deliberately omits — the dense buffer the

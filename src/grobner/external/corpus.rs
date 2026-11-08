@@ -1264,6 +1264,11 @@ pub fn ladder() -> Vec<CorpusEntry> {
             family: "mq-random",
             rung: Rung::Challenging,
             zero_dimensional: true,
+            // Zero-dimensional and the dimension is **unmeasured**, which is not an omission: the
+            // basis does not finish here, so there is no conversion to read one off. Zeebra stops
+            // at 20 006 072 live entries after 34.4 s and Singular at a 60 s wall
+            // (`research/competitive/COMPETITIVE.md`), both on the basis alone. Named in
+            // `fglm::options`'s `UNDECLARED_ZERO_DIMENSIONAL` so the coverage test stays total.
             quotient_dimension: None,
             equivalence: Equivalence::LiveOracle { tool: "Singular" },
             digests: &[
