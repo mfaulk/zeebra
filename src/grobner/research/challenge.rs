@@ -1365,6 +1365,24 @@ const CHOU_2015_III_N34: &[ReferencePoint] = &[ReferencePoint {
     software: "XL with block Wiedemann",
 }];
 
+/// The recorded solve of type V at `m = 16` seed 0 — the same size, the same solver, the other
+/// field.
+///
+/// `wall-total`, and **not** the 2023 figure the same size carries at seed 2: that one is
+/// `370 cpu seconds for each subsystem` of a hybrid attack, one of the five per-subsystem rows
+/// `docs/research/fukuoka-mq.md` §8.4 names, and quoting it as a total would understate the cost
+/// by the subsystem count. Seed 0 is this row's seed and its figure is a campaign total.
+const FAUGERE_2015_V_N24: &[ReferencePoint] = &[ReferencePoint {
+    source: "Fukuoka MQ Challenge submission details, details/details_V_20150403.html, accessed \
+             2026-11-07",
+    parameters: "type V, m = 16, n = 24, seed 0",
+    step: "whole solve, wall-clock total",
+    reported_time: "24648.2 seconds",
+    reported_memory: None,
+    hardware: "Intel Xeon E5-2670 v2 @ 2.50 GHz",
+    software: "F5 - FGb",
+}];
+
 const FAUGERE_2015_VI_N24: &[ReferencePoint] = &[ReferencePoint {
     source: "Fukuoka MQ Challenge submission details, details/details_VI_20150401.html, accessed \
              2026-11-07",
@@ -1962,9 +1980,13 @@ pub fn registry() -> Vec<ChallengeManifest> {
         }
     }
 
-    for (id, kind, n, m, sha256, external, reference_points, notes) in [
+    // The field is per row rather than per loop: it is in the identity digest, and types II and V
+    // are GF(2^8) where III and VI are GF(31). Hardcoding it was invisible while the registry held
+    // one field (#510).
+    for (id, field, kind, n, m, sha256, external, reference_points, notes) in [
         (
             "fukuoka-mq-III-n10-seed0",
+            "GF(31)",
             "III",
             10usize,
             20usize,
@@ -1977,6 +1999,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
         ),
         (
             "fukuoka-mq-III-n15-seed0",
+            "GF(31)",
             "III",
             15,
             30,
@@ -1987,6 +2010,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
         ),
         (
             "fukuoka-mq-III-n20-seed0",
+            "GF(31)",
             "III",
             20,
             40,
@@ -1997,6 +2021,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
         ),
         (
             "fukuoka-mq-VI-n10-seed0",
+            "GF(31)",
             "VI",
             10,
             7,
@@ -2008,6 +2033,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
         ),
         (
             "fukuoka-mq-VI-n15-seed0",
+            "GF(31)",
             "VI",
             15,
             10,
@@ -2022,6 +2048,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             // through challenge-3-53-0, so the range is n = 34..=53. The row was at n = 55 until
             // #501, which is type I's lower bound and an instance type III does not publish.
             "fukuoka-mq-III-n34-seed0",
+            "GF(31)",
             "III",
             34,
             68,
@@ -2046,6 +2073,7 @@ pub fn registry() -> Vec<ChallengeManifest> {
             // Type VI publishes m = 16..=35 and the generator computes n = m * 1.5, so the
             // smallest of them is n = 24.
             "fukuoka-mq-VI-n24-seed0",
+            "GF(31)",
             "VI",
             24,
             16,
@@ -2063,13 +2091,39 @@ pub fn registry() -> Vec<ChallengeManifest> {
              which is a result about that slice. No instance bytes and no answer vector are \
              committed; the checksum names the file tools/fetch-mq-challenge.sh fetches.",
         ),
+        (
+            // The other half of the same arm: type V publishes m = 16..=35 over GF(2^8), so its
+            // smallest real instance is the same n = 24 as type VI's. The field is the
+            // challenge's own GF(2^8) — x^8 + x^4 + x^3 + x^2 + 1, not the AES modulus — and the
+            // importer checks the header's modulus rather than assuming it (#510).
+            "fukuoka-mq-V-n24-seed0",
+            "GF(2^8)",
+            "V",
+            24,
+            16,
+            "fb4b6a3d27fb8263b1a9883745691f3836ad747a6a4052d28919ea5b1a213cc7",
+            // Solved externally: the hall of fame records type V m = 16..=21, and seed 0 at
+            // m = 16 is Faugère's 2015 F5-FGb submission three days after his type VI one. A
+            // witness here would be a reproduction.
+            ExternalStatus::SolvedExternally {
+                verified: "2015-04-03",
+            },
+            FAUGERE_2015_V_N24,
+            "Type V at m = 16: the smallest real challenge over GF(2^8), at the same n = 24 as \
+             the type VI row and therefore served by the same compiled dimension. \
+             Underdetermined and so positive-dimensional as published, like type VI. The \
+             published figure at this size and seed is a wall-clock total; the 370-second figure \
+             the same size carries at seed 2 is per subsystem of a hybrid attack and must never \
+             be quoted as a total (docs/research/fukuoka-mq.md section 8.4). No instance bytes \
+             and no answer vector are committed; a real challenge publishes no answer at all.",
+        ),
     ] {
         challenges.push(ChallengeManifest {
             id,
             schema: ChallengeManifest::SCHEMA,
             class: BenchmarkClass::Official,
             parameters: ChallengeParameters::MqSystem {
-                field: "GF(31)",
+                field,
                 kind,
                 n,
                 m,
@@ -2455,6 +2509,9 @@ mod tests {
             // #454. Appended, so the six frozen digests above keep both their order and their
             // values — and they did: notes and reference points are paperwork, not identity.
             ("fukuoka-mq-VI-n24-seed0", "e97e852ee8f0"),
+            // #510. Appended for the same reason, and the digest it would have had under the
+            // hardcoded "GF(31)" is not this one: the field is in the identity.
+            ("fukuoka-mq-V-n24-seed0", "540475b13ba8"),
         ];
         let registry = registry();
         assert_eq!(registry.len(), expected.len(), "a row was added or removed");
@@ -2875,14 +2932,15 @@ mod tests {
     ///
     /// `generateCoef_sig.h` assigns `m * 1.5` to an `int`, so `m = 17` is `n = 25` rather than 26.
     /// A row that wrote the rounded value, or that transposed `n` and `m`, would name an instance
-    /// the challenge does not publish while still passing every other check here.
+    /// the challenge does not publish while still passing every other check here. Both signature
+    /// families, because the generator is the same one: type V is the GF(2^8) half of it.
     #[test]
     fn test_the_signature_rows_use_the_generators_truncated_shape() {
         for manifest in registry() {
             let ChallengeParameters::MqSystem { kind, n, m, .. } = manifest.parameters else {
                 continue;
             };
-            if kind != "VI" {
+            if kind != "V" && kind != "VI" {
                 continue;
             }
             assert_eq!(n, 3 * m / 2, "{} is not floor(3m/2)", manifest.id);
@@ -2908,6 +2966,68 @@ mod tests {
                 "{} is at n = {}, which type III does not publish",
                 manifest.id,
                 n
+            );
+        }
+    }
+
+    /// Every MQ row names the field its own challenge type is published over.
+    ///
+    /// The field is in the identity digest, and it was written `"GF(31)"` at every call site while
+    /// the registry held only types III and VI — so the first GF(2^8) row would have been a
+    /// GF(31) row that happened to carry type V's `kind` (#510). Types I and IV are GF(2) and
+    /// types II and V are GF(2^8); the tuple in the loop is what decides, not the family.
+    #[test]
+    fn test_every_mq_row_names_its_types_field() {
+        for manifest in registry() {
+            let ChallengeParameters::MqSystem { field, kind, .. } = manifest.parameters else {
+                continue;
+            };
+            let published = match kind {
+                "I" | "IV" => "GF(2)",
+                "II" | "V" => "GF(2^8)",
+                "III" | "VI" => "GF(31)",
+                other => panic!("{} is not a challenge type", other),
+            };
+            assert_eq!(field, published, "{} is type {}", manifest.id, kind);
+        }
+    }
+
+    /// Both `n = 24` rows are registered: one per signature family, one per field.
+    ///
+    /// `m = 16` is `n = 24` in types V and VI alike, so the single compiled dimension serves two
+    /// fields — and until #510 only the GF(31) half of it had a row, because the scoreboard could
+    /// not run the other.
+    #[test]
+    fn test_both_signature_families_are_registered_at_the_smallest_real_size() {
+        for (id, kind, field) in [
+            ("fukuoka-mq-V-n24-seed0", "V", "GF(2^8)"),
+            ("fukuoka-mq-VI-n24-seed0", "VI", "GF(31)"),
+        ] {
+            let row = challenge(id).unwrap_or_else(|| panic!("{} is registered", id));
+            assert_eq!(row.class, BenchmarkClass::Official);
+            assert_eq!(row.objective, Objective::MqRoot);
+            let ChallengeParameters::MqSystem {
+                field: recorded,
+                kind: recorded_kind,
+                n,
+                m,
+                sha256,
+                ..
+            } = row.parameters
+            else {
+                panic!("{} is an MQ row", id)
+            };
+            assert_eq!((recorded, recorded_kind, n, m), (field, kind, 24, 16));
+            assert_eq!(sha256.len(), 64, "{} names real challenge bytes", id);
+            assert!(
+                matches!(row.external, ExternalStatus::SolvedExternally { .. }),
+                "{}: the hall of fame records m = 16 seed 0 in both families",
+                id
+            );
+            assert!(
+                crate::grobner::research::SUPPORTED_DIMENSIONS.contains(&n),
+                "{} names a dimension dispatch cannot reach",
+                id
             );
         }
     }

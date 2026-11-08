@@ -144,6 +144,7 @@ every id and digest, so redefining a row fails a test; adding one is a deliberat
 | `fukuoka-mq-VI-n15-seed0` | official | 15 | 10 | published with answer |
 | `fukuoka-mq-III-n34-seed0` | official | 34 | 68 | solved externally, 2015-08-04 |
 | `fukuoka-mq-VI-n24-seed0` | official | 24 | 16 | solved externally, 2015-04-01 |
+| `fukuoka-mq-V-n24-seed0` | official | 24 | 16 | solved externally, 2015-04-03 |
 
 `N − E = t − 2k = 12` on every Poseidon row with `k = 2`, whatever the rounds — the underdetermined
 direction M22-E found to matter more than state width does not shrink along the ladder, which is
@@ -173,6 +174,18 @@ records this exact instance as Faugère's 2015 F5-FGb submission, 5 280 s — so
 be a reproduction, which is the weaker and the honest reading. One diagnostic slice stops on
 live-entry growth at degree 6; `docs/research/fukuoka-mq.md` §4.4 has the figures and the slice
 policy.
+
+M27 (#510) added `fukuoka-mq-V-n24-seed0`: the **same `n = 24`, over GF(2^8)**. `m = 16` is `n = 24`
+in both signature families, so no new dimension was needed — what was needed was a runner that is
+not hardwired to GF(31), since `type Q` and every MQ visitor in `examples/scoreboard.rs` were
+written against `PrimeFieldElement64<31>` while the importer had handled the challenge's GF(2^8)
+since #414/#415. The visitors are generic over the coefficient type now and dispatch on
+`MqInstance::field`, and `ChallengeParameters::MqSystem`'s `field` is per row rather than the
+constant `"GF(31)"` it was at every call site — it is in the identity digest, so that constant
+would have made the first GF(2^8) row a GF(31) row carrying type V's `kind`. Both slices
+re-measured at one commit stop identically at degree 6 on the same 13 602 x 19 132 matrix, and the
+wall is 42.1 s against 105.1 s: **2.49x for the field alone**, with the computation held fixed.
+`docs/research/fukuoka-mq.md` §4.5.
 
 Two families are registered as `Official` with very different difficulty, and the status column is
 what separates them: the Fukuoka toy examples are published *with* their answers so an
