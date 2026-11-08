@@ -32,6 +32,14 @@ readonly GROEBNER_JL_VERSION=0.10.11
 readonly ABSTRACTALGEBRA_JL_VERSION=0.50.5
 readonly SAGEBRUSH_COMMIT=86d9f1c787030752dcaab1ddb8d99cf1b7fa5e1b
 
+# The ISA floor the Sagebrush driver is built at, which must match Zeebra's own.
+#
+# Zeebra's `.cargo/config.toml` sets `-C target-cpu=x86-64-v3` for x86_64; the driver is built
+# outside that worktree and inherits nothing, so the floor is passed explicitly (#385, and
+# `provision_sagebrush` for why). Overridable for a host that cannot run v3, but then **both**
+# sides have to move: a comparison is only a comparison of algorithms when the floors agree.
+readonly DRIVER_TARGET_CPU="${ZEEBRA_EXT_DRIVER_TARGET_CPU:-x86-64-v3}"
+
 # GMP 6.3.0 and MPFR 4.2.2 predate C23 and their configure probes call a declared-`()` function
 # with arguments, which GCC 15+ rejects outright rather than warning about ("too many arguments
 # to function 'g'; expected 0, have 6"). Without this GMP's configure ends in "could not find a
@@ -228,34 +236,41 @@ provision_sagebrush() {
   cp "$driver_src/Cargo.toml" "$PREFIX/sagebrush-driver/Cargo.toml"
   cp "$driver_src/src/main.rs" "$PREFIX/sagebrush-driver/src/main.rs"
 
-  log "building the Sagebrush Groebner driver"
+  log "building the Sagebrush Groebner driver at $DRIVER_TARGET_CPU"
   # RUSTC_WRAPPER="" defeats a globally configured sccache, which keys on CARGO_TARGET_DIR and
   # would otherwise produce a stale rlib here.
   #
   # This build is **outside Zeebra's worktree**, which is #352's third route to a lost ISA floor:
   # cargo resolves config from the invocation directory upward, so `cd "$PREFIX/sagebrush-driver"`
   # inherits none of `/.cargo/config.toml`, and `[profile.release]` comes from the driver's own
-  # `Cargo.toml` — which sets `opt-level = 3` and nothing else. So the comparand is built at
-  # baseline `x86-64` with no LTO, while Zeebra's own side of every comparison is built at
-  # `x86-64-v3` under fat LTO at one codegen unit. Confirmed on the installed binary: its only
-  # AVX2/BMI2 instructions are inside Sagebrush's and dashu's explicitly dispatched
-  # `dense_axpy_avx2` and `*_bmi2` kernels, which a baseline build contains too.
+  # `Cargo.toml`. Until #385 that meant the comparand was built at baseline `x86-64` with no LTO
+  # while Zeebra's own side of every comparison was built at `x86-64-v3` under fat LTO at one
+  # codegen unit — and `docs/research/external-comparison-protocol.md` is explicit that a
+  # comparison between a tool built for its distribution's baseline and one built for the host is
+  # not a comparison of algorithms.
   #
-  # Deliberately **not** changed here. `docs/research/external-comparison-protocol.md` wants each
-  # side's ISA floor recorded, and raising the comparand's would be the fairer configuration — but
-  # it would also change every recorded Sagebrush timing, so it needs a serialized re-measurement
-  # rather than a quiet flag. Tracked in #385; the README section "An out-of-tree measurement
-  # harness" has the recipe for when that decision is made.
+  # #385 resolved it by **matching the floor** rather than recording the asymmetry: the rustflag is
+  # passed here, the profile is restated in the driver's own `Cargo.toml`, and the recipe is the
+  # README's "An out-of-tree measurement harness". Raising the comparand's floor makes the
+  # comparand *faster*, so it is not a self-serving change.
+  #
+  # Two things make it checkable rather than asserted. The driver echoes its own compile-time
+  # `#isa floor:` — the only sound instrument, since a census of the artifact cannot tell an
+  # explicitly dispatched `#[target_feature]` kernel from a raised floor (#385) — and the adapter
+  # requires driver contract 3, so an installed binary predating this build is refused rather than
+  # measured. Every Sagebrush row recorded before this change was taken at the baseline floor and
+  # says so through its own `ToolVersion`; re-taking them is #520.
   (
     cd "$PREFIX/sagebrush-driver"
     RUSTC_WRAPPER="" \
     CARGO_TARGET_DIR="$PREFIX/cargo-target" \
     RUSTUP_TOOLCHAIN="${ZEEBRA_EXT_RUST_TOOLCHAIN:-stable}" \
-      cargo build --release
+      cargo build --release \
+        --config "target.\"cfg(target_arch = \\\"x86_64\\\")\".rustflags = [\"-C\", \"target-cpu=$DRIVER_TARGET_CPU\"]"
   ) > "$BUILD/sagebrush-driver.log" 2>&1
   ln -sf "$PREFIX/cargo-target/release/sagebrush-gb-driver" "$PREFIX/bin/sagebrush-gb-driver"
-  log "the driver is built at baseline x86-64 with opt-level=3: it is outside the worktree, so it"
-  log "inherits neither target-cpu=x86-64-v3 nor the release profile (#352)"
+  log "the driver is built at target-cpu=$DRIVER_TARGET_CPU, fat LTO, one codegen unit — the same"
+  log "floor and profile as Zeebra's side of the comparison (#385); it echoes #isa floor: per run"
   note "sagebrush-gb-driver"
 }
 

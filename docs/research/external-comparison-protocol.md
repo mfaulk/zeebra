@@ -90,7 +90,43 @@ measurement method is unstated is a field two runs can disagree on without eithe
 | Solver id | `singular`, `msolve`, `groebner.jl`, `sagebrush`, `zeebra`. `ExternalSolver::id()`. |
 | Version | Obtained by **running the tool**, once per sweep, through `probe_version()` — never read from a package manifest, which can describe a build that is not the one on the path. Singular reports a build number (`4.4.1`, build `44105`); Groebner.jl a package version; msolve a version string. The raw text is kept beside the parsed value so a misparse is recoverable. |
 | Build configuration | For Zeebra: the cargo profile and `RUSTFLAGS`, which is `Environment::build` in the existing scoreboard. For an external tool: how it was obtained (distribution package, source build) and the relevant flags. A source build at `-march=native` and a distribution build are different software. |
-| CPU ISA floor | The instruction-set baseline the binary was compiled for. This repo has measured a 4-byte-vector loss from an unset `-C target-cpu` (`util::isa_floor`, and the figures corrected in #185/#231) — a comparison between a tool built for its distribution's baseline and one built for the host is not a comparison of algorithms. Record it; where it cannot be determined for an external binary, record that it could not. |
+| CPU ISA floor | The instruction-set baseline the binary was compiled for. This repo has measured a 4-byte-vector loss from an unset `-C target-cpu` (`util::isa_floor`, and the figures corrected in #185/#231) — a comparison between a tool built for its distribution's baseline and one built for the host is not a comparison of algorithms. Record it; where it cannot be determined for an external binary, record that it could not. **For a comparand this repository builds from source, match it rather than record it** — see below. |
+
+#### A comparand built here is built like Zeebra's side
+
+"Record the floor" is the rule for a binary somebody else shipped. It is the wrong rule for a
+comparand whose build *this* repository owns, and the Sagebrush driver was the live instance (#385):
+`tools/external/provision.sh` builds it outside Zeebra's worktree, so it inherited neither
+`.cargo/config.toml` nor the workspace `[profile.release]`, and the comparand was compiled at
+baseline `x86-64` with no LTO while Zeebra's own side ran at `x86-64-v3` under fat LTO at one
+codegen unit.
+
+Resolved by **matching the floor**, not by recording the gap. Three parts, and the last two are
+what make it checkable rather than asserted:
+
+1. The rustflag is passed at the build site and the profile is restated in the driver's own
+   `Cargo.toml`, because profiles live in `Cargo.toml` and a copied `.cargo/config.toml` carries no
+   `[profile]` section. The recipe is the README's "An out-of-tree measurement harness".
+2. **The comparand reports its own floor.** `sagebrush-gb-driver` prints `#isa floor:` from a
+   compile-time `cfg!(target_feature = ..)` inside the binary that ran, and the adapter carries it
+   into the row's `ToolVersion`. The script states what it *asks for*; only the binary can state
+   what it *is*.
+3. **The marker is required.** It arrived with driver contract 3, so a binary installed before the
+   change is refused rather than measured — otherwise a stale baseline build would silently produce
+   rows that read as `x86-64-v3` because the script now says so.
+
+A static probe of the built artifact is **not** an acceptable substitute, and #385 records the
+measurements that killed one: rustc emits no GNU property note; "contains AVX2 or BMI2" is a false
+positive because explicitly dispatched `#[target_feature]` kernels put those instructions in a
+baseline build; and VEX share is a false negative in general because Rust's `std` is distributed
+prebuilt at baseline. An instrument that can say "definitely absent" but not "definitely present"
+gets read as the latter.
+
+Two consequences worth stating plainly. Raising a comparand's floor makes the **comparand** faster,
+so it is never a self-serving change. And it invalidates nothing that was recorded — the rows taken
+before it say what they were taken against — but it does mean those rows are not comparable to the
+current column at this standard, which is why re-taking them is its own serialized measurement
+(#520).
 
 ### Which hardware, and how much of it
 
