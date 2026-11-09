@@ -26,7 +26,7 @@ effect on matrix *shape*.
 
 ---
 
-## 0. The issue's premise is stale, and the conclusion survives on different evidence
+## 0. The issue's motivating figure was superseded; its conclusion survives on other evidence
 
 #262 opens with "Elimination is 65%–88% of an F4 run
 (`docs/MILESTONE-F4-OPTIMIZATION.md` §6.2), so it is where the epic's optimization effort will go."
@@ -293,7 +293,7 @@ than the run itself.
 does not predict end-to-end behaviour would be optimized at the expense of the thing that matters,
 which is an explicit non-goal of the milestone.
 
-## 5.1 What is being compared, and why these two arms
+### 5.1 What is being compared, and why these two arms
 
 Two **elimination kernels**, not two algorithms: `Backend::Sparse` is the sparse pivot loop and
 `Backend::Adaptive` is a dense row accumulator over sparse pivots. Same pivot rule, same row
@@ -317,7 +317,7 @@ Before any timing is taken, the example asserts that rebuilding the entry from i
 reproduces the captured matrix. A figure published from this mode therefore cannot be a figure about
 a matrix the live path does not build.
 
-## 5.2 The result
+### 5.2 The result
 
 `micro ratio` and `run ratio` are both sparse over adaptive, so **above 1.00x means the adaptive
 accumulator won**. `agree` is whether the two rankings picked the same backend.
@@ -372,7 +372,7 @@ batch's elimination is **58.8%** of the entire computation. `interreduction-cost
 the whole stage is therefore not surprising, and §6.2's 65-88% framing is stale in the direction of
 *understating* the share on this family, not overstating it.
 
-### What would have falsified it
+#### What would have falsified it
 
 A `**NO**` in the last column: an entry where the corpus prefers one backend and the whole run
 prefers the other. The rows that could plausibly have produced one are the five with run ratios
@@ -387,7 +387,7 @@ cost. It is a claim about one real kernel A/B over seventeen matrices. A change 
 *shape* — a pair criterion, a reducer policy, a selection strategy — is outside what a fixed set of
 matrices can see at all, and is the thing `examples/f4_profile.rs` and `benches/grobner.rs` are for.
 
-## 5.3 The conditions, and what they do and do not permit
+### 5.3 The conditions, and what they do and do not permit
 
 The run was taken inside `tools/benchlock.sh`, so nothing else measured against it, and `taskset -c
 0-15`-pinned so the two arms shared one core set.
