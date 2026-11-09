@@ -3,7 +3,8 @@
 **Measured at:** publication bound `bda7ed44`…`7aa9a9be` for §§1–9 — the commits that published
 those figures, recovered from git rather than recorded at the time
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). §10's own
-figures are at `93898118`, recorded when they were taken rather than recovered.
+figures are at `93898118`, recorded when they were taken rather than recovered. §8a.9's are at
+`19ff732c`, and are counts rather than timings — no clock, nothing pinned, reproducible anywhere.
 
 M24-C. The implementation half of candidate 1 of [`additional-benchmarks.md`](additional-benchmarks.md)
 §1, which ranks it first of four against a cap of five. This document records the sources actually
@@ -751,6 +752,13 @@ the FGLM budgets were the gate; they are the *second* gate. The conversion pre-f
 necessary and not sufficient, and an estimate that had only modelled the conversion would have been
 confidently wrong about why the rung was unreachable.
 
+> **The budget named in the quoted message is no longer the one that binds, and the 112 figure was
+> never the peak.** #575 moved `F4Options::default()` on 2026-11-08 and the stage within F4 moved
+> with it; the real peak is 1.20x the budget rather than one part in 180 000 over it.
+> [§8a.9](#8a9-the-binding-budget-re-attributed--and-it-is-a-property-of-the-configuration-323)
+> re-measures all of it and is the live record. The paragraph above is kept because the reasoning
+> it corrects is #286's and still worth reading.
+
 ### 8a.6 `N = 6` is a reproduction at `p = 65537`, not only a produced figure
 
 #286 was filed as "`N = 6`, the rung where the reference has no conversion figure", and §9 of this
@@ -1062,6 +1070,153 @@ before any Zeebra figure existed. The Zeebra figure, now in hand, adds this crat
 against it: **1.180 h end to end with a witness verified through the permutation**, a reproduction
 of the published 11 775.430 s conversion, and 12.5x behind msolve on the same machine.
 
+### 8a.9 The binding budget, re-attributed — and it is a property of the configuration (#323)
+
+§8a.5 closed with "the binding constraint at `N = 6` is F4, not FGLM", and #323 was filed to say so
+separately. **That claim survives. Everything underneath it has moved**, because #575 changed
+`F4Options::default()` on 2026-11-08 and the binding budget moved with it.
+
+Every figure in this subsection is a **count** — no clock, nothing pinned, reproducible from
+`19ff732c` plus this subsection's two subcommands:
+
+```sh
+cargo run --release --example anemoi_ladder budgets anemoi17-cico-n6
+cargo run --release --example anemoi_ladder peak anemoi17-cico-n6-pcico
+```
+
+`budgets` runs the rung under four configurations **at the default budgets**, which is cheap
+because a configuration that crosses one is refused early. `peak` lifts every resource budget and
+reports what the row needs, which is the expensive half and the only honest input to sizing a
+budget — see below for why.
+
+#### The four configurations, and the one strategy that matters
+
+The four vary `F4Options::default()`'s two interreduction flags, which #575 moved together. `both
+off` is the default as it stood before that commit, and is the configuration every `N <= 5` figure
+in §8a.3 and every figure in §8a.8 was taken under.
+
+| row | configuration | outcome at the default budgets | peak rows | peak live nonzeros |
+|---|---|---|---:|---:|
+| `n5-fcico` | `default` | **refused on `max_live_nonzeros`** | 21 545 | 13 617 391+ |
+| `n5-fcico` | `reduce_batch_rows: false` | completes, 109 elements | 88 166 | 1 543 889 |
+| `n5-fcico` | `interreduction: Division` | **refused on `max_live_nonzeros`** | 21 545 | 13 617 391+ |
+| `n5-fcico` | both off (pre-#575) | completes, 109 elements | 88 166 | 1 543 889 |
+| `n6-pcico` | `default` | refused on `max_live_nonzeros`, batch 41 | 13 434 | 9 889 465+ |
+| `n6-pcico` | both off (pre-#575) | refused on `max_live_nonzeros`, batch 41 | 33 599 | 13 455 206+ |
+| `n6-fcico` | `default` | refused on `max_live_nonzeros`, batch 8 | 15 774 | 4 341 466+ |
+| `n6-fcico` | both off (pre-#575) | **refused on `max_matrix_rows`**, batch 10 | 184 049 | 5 291 896+ |
+
+`+` marks a peak from a refused run, which is a lower bound: F4 stops the instant the budget is
+crossed, so the figure is the high-water mark of the batches that *completed*.
+
+`interreduction` is listed because it was varied and it changes **nothing** — every arm pairs with
+its `reduce_batch_rows` twin to the entry. The whole effect is `reduce_batch_rows`, and #575's own
+prediction, that leaving each batch's rows reduced removes the closure the final interreduction's
+matrix had to build, is what makes the second flag free here rather than merely cheap.
+
+One small drift worth stating rather than smoothing: the pre-#575 `n6-pcico` lower bound reads
+13 455 206 here against the **13 455 539** in §8a.5's quoted refusal. 333 entries in 13.5 million,
+on a build six commits of F4 work later — #305 and #436 both touch symbolic preprocessing, which is
+what chooses the rows. The lower bounds in this table are therefore era-sensitive in a way the
+completed peaks below are not, and the completed peaks are what the conclusions use.
+
+#### What `reduce_batch_rows` trades, measured
+
+`peak`, with the budgets lifted, so these are what the rows actually need rather than where they
+stopped:
+
+| row | configuration | peak rows | peak columns | peak live nonzeros | over the default allowance |
+|---|---|---:|---:|---:|---:|
+| `n5-fcico` | `default` | 27 570 | 30 606 | **22 530 520** | **1.13x** |
+| `n5-fcico` | pre-#575 | 88 166 | 91 258 | 1 543 889 | 0.08x |
+| `n6-pcico` | `default` | 23 211 | 35 246 | **24 011 204** | **1.20x** |
+| `n6-pcico` | pre-#575 | 82 608 | 97 388 | 28 435 493 | 1.42x |
+
+> **`reduce_batch_rows` buys rows with entries, and the exchange rate is not constant.** At `N = 6`
+> `PCICO` it is a win on both axes — 3.56x fewer rows *and* 1.18x fewer entries. At `N = 5` `FCICO`
+> it is 3.20x fewer rows for **14.59x more entries**. Same flag, same family, opposite sign on the
+> axis the default budget is written in.
+
+**The pre-#575 `n6-pcico` peak reproduces §8a.8's figure exactly — 28 435 493, byte for byte** —
+which is the cross-check that licenses the rest of the table. §8a.8 took it from a completed
+1.180 h solve on a `f4cb0da` build; this is a basis-only run on `19ff732c` six commits of F4 work
+later, and the two agree to the entry.
+
+#### The re-attribution, in three parts
+
+1. **The stage, within F4, has moved.** Before #575 the two models were refused on *different*
+   budgets: `FCICO` on `max_matrix_rows` in **symbolic preprocessing**, `PCICO` on
+   `max_live_nonzeros` in **batch elimination**. Under the default both are now refused on
+   `max_live_nonzeros`, so there is one stage to aim a budget at rather than two. §8a.8's framing of
+   the `FCICO` refusal as a preprocessing result is a statement about the pre-#575 configuration.
+2. **It binds one rung earlier than #323 recorded.** `N = 5` `FCICO` completed on the default at
+   1 543 889 live entries — 7.7% of the allowance, which is the figure `basis_options`' comment was
+   written around — and is now **refused**, needing 22 530 520. Nothing in the test suite or in CI
+   runs an Anemoi basis above `N = 2`, so the change was invisible. It is filed as #659.
+3. **FGLM is still the second gate, and is further from binding than it was.** Nothing here touches
+   the conversion: `D = 15 625` and the 3.64 GiB of dense blocks are functions of `D` alone, and
+   §8a.8's 4 226.5 s conversion stands. What changed is that the first gate now refuses sooner, so
+   the asymmetry §8a.5 recorded — FGLM's budgets are checked from `D` before any allocation, F4's
+   are discovered by doing the work — is sharper rather than softer.
+
+#### What a correctly aimed budget is, and why a refusal cannot size one
+
+**A refused run reports the live count at the instant it crossed, which is the limit plus a row.**
+That is `F4Error`'s documented behaviour and it makes every refusal read as a near miss:
+
+| row | the refusal says | the peak is | the refusal understates by |
+|---|---:|---:|---:|
+| `n6-pcico`, pre-#575 | 20 000 112 of 20 000 000 | 28 435 493 | **1.42x** |
+| `n6-pcico`, `default` | the limit plus a row | 24 011 204 | **1.20x** |
+| `n5-fcico`, `default` | the limit plus a row | 22 530 520 | **1.13x** |
+
+This is load-bearing for **#490**, which proposes lifting `max_live_nonzeros` to 25 000 000 and
+lists Anemoi `N = 6` `PCICO` as one of three rows that "would then finish", on the strength of its
+0.0006% overshoot. Sized against the peak instead:
+
+- under the **pre-#575** default the row needs 28 435 493 and **25 000 000 would have been refused
+  again** — the premise was wrong when it was written, for exactly the reason above;
+- under **today's** default it needs 24 011 204, so 25 000 000 does clear it — by **4.1%**, on a
+  quantity that moved 14.6x on another rung of the same family in a single commit.
+
+So the correctly aimed budget for this family under the current default is **≥ 24 011 204 live
+entries (385 MB at 16 bytes an entry)** for `N = 6` `PCICO` and **≥ 22 530 520 (361 MB)** for `N = 5`
+`FCICO`; `N = 6` `FCICO` is not yet measured (its lifted run was not taken — see §9). #490's
+25 000 000 is enough for both measured rows and is not a comfortable margin for either.
+
+#### The Magma preprocessing comparison does not survive the configuration change
+
+§8a.8 recorded a competitive finding: for a row Magma reduces inside a 173 808 x 189 401 matrix,
+this crate's symbolic preprocessing enumerated **more than 200 000 rows** and was refused. Under
+today's default the same row peaks at **15 774 rows** — 11.0x *fewer* than Magma's figure, and 7.9%
+of the budget it used to cross.
+
+That does not make this crate 11x better at preprocessing, and the reason is the caveat §8a.8
+already attached: Magma's number is its peak *reduced* matrix and Zeebra's is the row set
+preprocessing enumerated before reduction, so the two count different things and
+`reduce_batch_rows` acts directly on the difference. **The honest statement is that §8a.8's gap was
+a property of a configuration that is no longer the default, and that settling whether a gap remains
+needs the counting convention settled first.** It should not be carried into #263's gap map as a
+live deficit on the strength of §8a.8 alone.
+
+#### `ACICO` at the same rung, for scale
+
+The third model reaches the same `D = 15 625` inside every default budget (§10.3), and the margin is
+not marginal:
+
+| model at `D = 15 625` | peak live nonzeros | fraction of the 20 M allowance |
+|---|---:|---:|
+| `ACICO` | **879** | 0.0044% |
+| `PCICO` | 24 011 204 | 120% |
+| `FCICO` | > 20 000 000 | > 100% |
+
+`ACICO`'s peak grows **linearly** in `N` — 90, 583, 693, 755, 817, 879 at `N = 1 … 6`, about +62 a
+rung — against `PCICO`'s 16.3x per rung. So the rung is not the obstacle and never was the F4
+obstacle: **`D = 15 625` is reachable inside the default budgets today, in the model whose
+generator degrees do not compound.** What #323 attributed to F4 is attributable to F4 *for two of
+the three formulations of one permutation*, which is the same lesson §10.6 draws on the clock — the
+basis is a property of the model and the conversion is a property of `D`.
+
 ## 9. Open
 
 - **`ℓ > 1` and the named hash instances.** `AnemoiSponge-BN-254` and `AnemoiSponge-BLS12-381` use
@@ -1075,8 +1230,14 @@ of the published 11 775.430 s conversion, and 12.5x behind msolve on the same ma
   which is what #283 used them for.
 - **`N = 7`.** The published basis figures say the basis step is where the cost goes above `N = 6` —
   1 623 s `FCICO` and 26 402 s `PCICO` at `p = 2^64 − 353` — so the conversion stops being the
-  interesting half. And #323 records that the binding constraint at `N = 6` was already F4 rather
-  than FGLM, which is the ordering `N = 7` inherits.
+  interesting half. §8a.9 settles that the binding constraint at `N = 6` is F4 rather than FGLM and
+  that within F4 it is the live-entry budget in batch elimination, which is the ordering `N = 7`
+  inherits.
+- **`N = 6` `FCICO`'s peak.** §8a.9 measured the peaks for `N = 5` `FCICO` and `N = 6` `PCICO` and
+  not for `N = 6` `FCICO`, whose lifted run was not taken. It is the one row in the family with no
+  measured live-entry peak, so it is also the one whose budget cannot be sized from anything but an
+  extrapolation — which is the mistake §8a.5 charges #286's premise with. `anemoi_ladder peak
+  anemoi17-cico-n6-fcico` is the whole experiment.
 - **The 64-bit `N = 6` rows.** `anemoi64-cico-n6-{fcico,pcico}` and the `2^32 − 209` pair are
   registered and gated at `D = 15 625`, but only `p = 65537` was timed, because only it has a
   published conversion to reproduce. A measurement at the other two primes would be a produced
@@ -1161,14 +1322,14 @@ in §10.3 passing, which is why the two kinds of test are separate.
 
 `cargo run --release --example anemoi_acico structure`, machine-independent:
 
-| `α` | `N` | variables | basis | Proposition 2's leading monomials | `D` | proved `(α+2)^N` | `max_pair_degree` | step degrees |
-|---:|---:|---:|---:|---|---:|---:|---:|---|
-| 3 | 1 | 3 | 4 | **agrees** | 5 | 5 | 4 | `[3, 4, 4]` |
-| 3 | 2 | 5 | 7 | **agrees** | 25 | 25 | 6 | `[3, 4, 4, 6, 4, 4]` |
-| 3 | 3 | 7 | 10 | **agrees** | 125 | 125 | 6 | `[3, 4, 4, 6, 4, 4]` |
-| 3 | 4 | 9 | 13 | **agrees** | 625 | 625 | 6 | `[3, 4, 4, 6, 4, 4]` |
-| 3 | 5 | 11 | 16 | **agrees** | 3 125 | 3 125 | 6 | `[3, 4, 4, 6, 4, 4]` |
-| 3 | 6 | 13 | 19 | **agrees** | 15 625 | 15 625 | 6 | `[3, 4, 4, 6, 4, 4]` |
+| `α` | `N` | variables | basis | Proposition 2's leading monomials | `D` | proved `(α+2)^N` | `max_pair_degree` | step degrees | peak live nonzeros |
+|---:|---:|---:|---:|---|---:|---:|---:|---|---:|
+| 3 | 1 | 3 | 4 | **agrees** | 5 | 5 | 4 | `[3, 4, 4]` | 90 |
+| 3 | 2 | 5 | 7 | **agrees** | 25 | 25 | 6 | `[3, 4, 4, 6, 4, 4]` | 583 |
+| 3 | 3 | 7 | 10 | **agrees** | 125 | 125 | 6 | `[3, 4, 4, 6, 4, 4]` | 693 |
+| 3 | 4 | 9 | 13 | **agrees** | 625 | 625 | 6 | `[3, 4, 4, 6, 4, 4]` | 755 |
+| 3 | 5 | 11 | 16 | **agrees** | 3 125 | 3 125 | 6 | `[3, 4, 4, 6, 4, 4]` | 817 |
+| 3 | 6 | 13 | 19 | **agrees** | 15 625 | 15 625 | 6 | `[3, 4, 4, 6, 4, 4]` | 879 |
 
 Four things in that table are worth separating.
 
@@ -1196,10 +1357,13 @@ only as "the maximum degree reached during the GB computation" with no reduction
 the two numbers are not comparable and **only the flatness is**. Stated rather than silently
 reported as a 6-against-9 disagreement.
 
-**`N = 6` reaches a basis inside every default F4 budget.** #323 is the record of `FCICO`/`PCICO` at
-`N = 6` crossing three of F4's four budgets in succession, needing all four lifted, and taking 20 s
-of F4 in the one model that finished. `ACICO` reaches the same `D = 15 625` with `F4Options::default()`
-untouched. That is a budget comparison and so machine-independent — budgets are counts, not times.
+**`N = 6` reaches a basis inside every default F4 budget, by four orders of magnitude.** §8a.9 is
+the record of `FCICO`/`PCICO` at `N = 6` being refused on F4's live-entry budget, needing it lifted,
+and taking 20 s of F4 in the one model that finished. `ACICO` reaches the same `D = 15 625` with
+`F4Options::default()` untouched, at a peak of **879 live entries — 0.0044% of the 20 000 000
+allowance**, against `PCICO`'s measured 24 011 204 at 120% of it. The peak column above is also
+**linear in `N`**, about +62 a rung, where `PCICO`'s grows 16.3x a rung. That is a budget comparison
+and so machine-independent — budgets are counts, not times.
 
 ### 10.4 `α > 3` is no longer blocked, and the published WDRL structure reproduces too
 

@@ -4820,9 +4820,18 @@ number zeebra can be right or wrong about with no reference to a clock — and a
 ```sh
 cargo run --release --example anemoi_ladder list        # the ten rows and their published figures
 cargo run --release --example anemoi_ladder dimensions  # the gate; pins no environment, needs none
+cargo run --release --example anemoi_ladder budgets anemoi17-cico-n6     # which F4 budget binds
+cargo run --release --example anemoi_ladder peak anemoi17-cico-n6-pcico  # what it actually needs
 ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
     cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
 ```
+
+`budgets` and `peak` pin no environment either, because a budget is a count. They exist because a
+refused run reports the live-entry count at the **instant it crossed**, which is the limit plus a
+row and so reads as a near miss whatever the real peak is: Anemoi `N = 6` `PCICO` was refused at
+20 000 112 of 20 000 000 and needs 24 011 204. `budgets` is the cheap half — it runs the rung under
+four configurations at the default budgets, and a configuration that crosses one is refused early —
+and `peak` is the expensive half that lifts them. `docs/research/anemoi.md` §8a.9 is the record.
 
 `row` runs F4, then FGLM, then root finding, each timed separately — separately because the
 published finding is that the conversion costs 2 400x the basis at `N = 5`, and a combined figure
