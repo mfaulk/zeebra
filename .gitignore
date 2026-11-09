@@ -13,3 +13,8 @@ research/instances/
 # Python bytecode from tools/
 __pycache__/
 *.pyc
+
+# Per-worktree build directories. The README and CLAUDE.md both require a `CARGO_TARGET_DIR`
+# inside the caller’s own checkout for measurement, because the shared default is keyed by package
+# and profile rather than by checkout; those directories are build output like `/target` is.
+/target-*

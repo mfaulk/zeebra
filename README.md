@@ -805,6 +805,7 @@ cargo bench --bench fglm                 # order conversion: stages, pipeline, s
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
 cargo bench --bench sparse_polynomial    # multivariate arithmetic, four arities
 cargo bench --bench monomial_order       # MonomialOrder::cmp, three arms, two tie regimes
+cargo bench --bench pow_strategy         # FiniteField::pow's body, four arms, six exponent widths
 ```
 
 `monomial_order` is #317's gate rather than a coverage benchmark, and it has **three** arms where an

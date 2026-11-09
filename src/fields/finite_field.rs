@@ -34,6 +34,23 @@ fn big_uint_to_u128(value: &BigUInt) -> u128 {
     low | (high << 64)
 }
 
+/// The highest set bit up to which [`FiniteField::pow_limbs`] walks the exponent downward rather
+/// than upward — so exponents of 1 through 7, which is every small-exponent call site.
+///
+/// Neither walk dominates, which is #181's whole finding. The upward walk seeds its accumulator
+/// with one and so pays one multiplication *by* one; the downward walk needs no seed, because the
+/// highest bit is set by definition, but its squaring and its accumulate are the same value and so
+/// form one serial chain where the upward walk's are two values the pipeline overlaps. The seed is
+/// a fixed cost and the serialization grows with the exponent, so the downward walk wins while the
+/// exponent is short and loses once it is not.
+///
+/// Measured at both ends and set at the top of the measured downward-wins region rather than at a
+/// crossover: `2` is `d5`'s highest bit, and the next width measured is `e31`'s 30. Nothing in this
+/// crate uses an exponent between 8 and 2^30 — the small sites are degrees 1 to 5 and the wide ones
+/// are `q`-sized — so the unmeasured middle is excluded by the threshold rather than guessed at.
+/// `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2 has the table.
+const NARROW_EXPONENT_BITS: usize = 2;
+
 /// Why a string could not be parsed as a finite field element.
 ///
 /// Carries which character was rejected, so a caller can report the position of the problem
@@ -140,31 +157,17 @@ where
     /// A uniformly random field element.
     fn random<R: RngCore + CryptoRng>(rng: &mut R) -> Self;
 
-    /// a^b mod p
+    /// `self^b`. `0^0 = 1`.
+    ///
+    /// Exponentiation by squaring, by delegation to [`Self::pow_limbs`] — the same algorithm as a
+    /// loop. The body was recursive until #181. The recursion cost about `2 log2(b)` non-inlined
+    /// frames, which is nothing against an expensive multiplication and most of the call against
+    /// a cheap one: dropping it is **1.9x** at the ~31- and ~63-bit exponents
+    /// `PowerPermutation::invert` uses over a 31-bit or 64-bit field, and 1.4x at the degree-3 and
+    /// degree-5 exponents of `Monomial::eval`, `SparseMultiPoly::substitute` and Poseidon's
+    /// S-box. See `docs/MILESTONE-LARGE-PRIME-FIELDS.md` §4.1.2.
     fn pow(&self, b: u128) -> Self {
-        if self.is_zero() {
-            if b == 0 {
-                // 0^0 = 1.
-                return Self::one();
-            }
-            return Self::zero();
-        }
-
-        if b == 0 {
-            return Self::one();
-        }
-
-        // Exponentiation by squaring.
-        if b == 1 {
-            *self
-        } else if b.is_multiple_of(2) {
-            // b is even: a^b = a^(b/2) * a^(b/2)
-            let y = self.pow(b / 2);
-            y * y
-        } else {
-            // b is odd: a^b = a * a^(b-1)
-            *self * self.pow(b - 1)
-        }
+        self.pow_limbs(&[b as u64, (b >> 64) as u64])
     }
 
     /// `self^exponent`, with the exponent as little-endian 64-bit limbs.
@@ -175,12 +178,31 @@ where
     /// fixed-width value without trimming it.
     ///
     /// `0^0 = 1`, as in [`Self::pow`].
+    ///
+    /// Two walks, chosen on the exponent's width: see [`NARROW_EXPONENT_BITS`].
     fn pow_limbs(&self, exponent: &[u64]) -> Self {
         let Some(highest) = highest_set_bit(exponent) else {
             // A zero exponent, including for a zero base.
             return Self::one();
         };
 
+        if highest <= NARROW_EXPONENT_BITS {
+            // Downward. The highest bit is set by definition, so the accumulator starts at the
+            // base and the multiplication that would consume that bit never happens.
+            let mut result = *self;
+            for index in (0..highest).rev() {
+                result = result * result;
+                if bit(exponent, index) {
+                    result *= *self;
+                }
+            }
+            return result;
+        }
+
+        // Upward, from an accumulator seeded with one. The seed costs one multiplication *by*
+        // one, which is why the narrow case is not taken this way; what it buys is that the
+        // squaring and the accumulate are two different values rather than one, so the pipeline
+        // overlaps them instead of serializing them.
         let mut result = Self::one();
         let mut square = *self;
         for index in 0..=highest {
@@ -591,7 +613,10 @@ mod tests {
 
     use rand::{prelude::StdRng, SeedableRng};
 
-    use super::{default_primitive_element, fermat_inverse_via_recursive_pow, RootOfUnityError};
+    use super::{
+        default_primitive_element, fermat_inverse_via_recursive_pow, recursive_pow,
+        RootOfUnityError,
+    };
     use crate::{
         fields::{
             binary_field::BinaryFieldElement,
@@ -619,6 +644,38 @@ mod tests {
                             "1/{a} changed"
                         );
                     }
+                }
+            }
+        }
+    );
+
+    // `pow` returns exactly what the frozen recursive square-and-multiply returned, over every
+    // field and at every exponent width the call sites use.
+    for_each_field!(
+        fn pow_matches_the_recursive_pow_reference<F>() {
+            let mut rng = StdRng::seed_from_u64(181);
+            let mut values = vec![F::zero(), F::one()];
+            for _ in 0..8 {
+                values.push(F::random(&mut rng));
+            }
+            for a in values {
+                // 3 and 5 are every small-exponent site; the two wide ones are the width of
+                // `PowerPermutation`'s inverse exponent over a 31-bit and a 64-bit field; and 1
+                // and `u128::MAX` are the ends of the range `pow` accepts.
+                for b in [
+                    0u128,
+                    1,
+                    2,
+                    3,
+                    5,
+                    17,
+                    255,
+                    0x5A5A_5A5B,
+                    0x5A5A_5A5A_5A5A_5A5B,
+                    u64::MAX as u128,
+                    u128::MAX,
+                ] {
+                    assert_eq!(a.pow(b), recursive_pow(&a, b), "{a}^{b} changed");
                 }
             }
         }
@@ -732,16 +789,23 @@ mod tests {
         assert_eq!(F::characteristic_limbs(), &[2]);
     }
 
-    /// `pow_limbs` agrees with `pow` on every exponent both can express.
+    /// `pow_limbs` agrees with the frozen recursive reference on every exponent both can express.
+    ///
+    /// Against [`recursive_pow`] and not against `pow`, which since #181 *is* `pow_limbs` and so
+    /// would make this tautological.
     #[test]
     #[allow(deprecated)]
-    fn test_pow_limbs_agrees_with_pow() {
+    fn test_pow_limbs_agrees_with_the_recursive_reference() {
         type F = crate::fields::PrimeFieldElement128<221360928884514619393>;
         for value in [0u64, 1, 2, 3, 97, 12345] {
             let a = <F as FiniteField>::new(value);
-            for exponent in [0u128, 1, 2, 3, 17, 64, 255, 1 << 40, u64::MAX as u128] {
+            for exponent in [0u128, 1, 2, 3, 8, 17, 64, 255, 1 << 40, u64::MAX as u128] {
                 let limbs = [exponent as u64, (exponent >> 64) as u64];
-                assert_eq!(a.pow_limbs(&limbs), a.pow(exponent), "{value}^{exponent}");
+                assert_eq!(
+                    a.pow_limbs(&limbs),
+                    recursive_pow(&a, exponent),
+                    "{value}^{exponent}"
+                );
             }
         }
     }

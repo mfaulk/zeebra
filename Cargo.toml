@@ -128,6 +128,11 @@ name = "monomial_order"
 harness = false
 test = false
 
+[[bench]]
+name = "pow_strategy"
+harness = false
+test = false
+
 # Field arithmetic is a handful of small generic functions — `mul`, `add`, `is_zero` — called from
 # inner loops in other modules. Without cross-codegen-unit inlining the elimination kernels pay a
 # call per field operation, which is the case link-time optimization exists for. `codegen-units =
