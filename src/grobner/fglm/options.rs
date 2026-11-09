@@ -654,9 +654,8 @@ mod tests {
     /// tree, so there is no conversion to read a dimension off. Zeebra stops at 20 006 072 live
     /// nonzero entries after 34.4 s and Singular hits its 60 s wall
     /// (`research/competitive/COMPETITIVE.md`), on the basis alone and before any order
-    /// conversion. Unlike the other five rungs #473 named — three `poseidon-*` and two
-    /// `anemoi64-*`, all of which now carry a figure — this one cannot be closed by recording
-    /// something somebody already knows.
+    /// conversion. Unlike the other rungs #473 named, all of which now carry a figure, this one
+    /// cannot be closed by recording something somebody already knows.
     ///
     /// **Named individually rather than exempted by family**, which is the whole point: a rung
     /// added without a dimension fails the test below instead of joining a silent exemption.
@@ -666,7 +665,7 @@ mod tests {
     ///
     /// #473: the planted test above covers three of the ladder's rungs because the planted
     /// family's dimension is an identity in `N`. The envelope assertion it exists for is about the
-    /// corpus and not about one family, so a poseidon or anemoi rung added with no dimension used
+    /// corpus and not about one family, so a rung of another family added with no dimension used
     /// to trip nothing. Every such rung now carries one, so the assertion widens to all of them
     /// with [`UNDECLARED_ZERO_DIMENSIONAL`] as the one named exception.
     ///

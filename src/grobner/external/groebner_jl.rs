@@ -354,8 +354,7 @@ impl GroebnerJlSolver {
             Task::LexBasisByConversion
             | Task::UnivariateEliminant
             | Task::OneFiniteFieldSolution
-            | Task::AllFiniteFieldSolutions
-            | Task::CryptanalyticWitness => {
+            | Task::AllFiniteFieldSolutions => {
                 // `supports` refuses these, so reaching here is a harness bug rather than a run.
                 script.push_str("println(\"@unsupported 1\")\n");
             }
@@ -629,8 +628,7 @@ impl ExternalSolver for GroebnerJlSolver {
             Task::LexBasisByConversion
             | Task::UnivariateEliminant
             | Task::OneFiniteFieldSolution
-            | Task::AllFiniteFieldSolutions
-            | Task::CryptanalyticWitness => {
+            | Task::AllFiniteFieldSolutions => {
                 return Support::No(Unsupported::Task { task });
             }
         }
@@ -1004,7 +1002,6 @@ mod tests {
             Task::UnivariateEliminant,
             Task::OneFiniteFieldSolution,
             Task::AllFiniteFieldSolutions,
-            Task::CryptanalyticWitness,
         ] {
             assert!(
                 matches!(

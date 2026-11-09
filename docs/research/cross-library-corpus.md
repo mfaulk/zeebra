@@ -6,6 +6,12 @@ recovered from git rather than recorded at the time ([§10](external-comparison-
 Policy and status for #261. The corpus itself is `src/grobner/external/corpus.rs`; its digest
 manifest is produced by `corpus::manifest()` and frozen by `test_the_manifest_is_frozen`.
 
+> **Since #668** the public ladder is four families — Katsura, Cyclic, random MQ and planted MQ.
+> The Poseidon and Anemoi rungs described below left with the cryptanalysis research; a caller
+> supplies rungs like them through `CompetitiveBoard::with_corpus`. The sections about them are
+> kept as the record of what was measured, and the manifest excerpt in §8 predates the change.
+> `research/competitive/CURATION.md` records what was removed from the board's history.
+
 A cross-library comparison measures nothing unless every engine was given **the same ideal**. The
 two families everyone benchmarks on each have a naming convention that produces a *different* ideal
 without producing an error — the run succeeds, the timings look comparable, and the numbers are of

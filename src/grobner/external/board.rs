@@ -1,21 +1,25 @@
 //! The competitive board: one row per (problem, task, library), including the runs that failed.
 //!
-//! # Why this is not the cryptanalysis scoreboard
+//! # What it records
 //!
-//! [`research::Scoreboard`](crate::grobner::research::Scoreboard) answers "which of these ciphers
-//! has a verified break, and at what cost". Its identity check is against a registry of *published
-//! cryptanalytic problems*, its outcome vocabulary is about witnesses, and its `best.json` and
-//! `solved.json` are one-row-per-problem contracts that consumers already depend on. Adding a
-//! `library` dimension would silently change what both of those files claim, and `Comparison::of`
-//! has no variant for an input a tool cannot represent — which is the distinction this board
-//! exists to make. The argument in full is §6 of
-//! `docs/research/external-comparison-protocol.md`.
+//! Each row is one library's attempt at one problem, identified by the digest of the exact text
+//! every engine was handed — so two rows are the same problem only if they are the same bytes. Its
+//! outcome vocabulary distinguishes an input a tool cannot represent from one it failed on, which
+//! is the distinction a cross-library comparison exists to make; §6 of
+//! `docs/research/external-comparison-protocol.md` has the argument.
 //!
-//! What is reused is the set of conventions that make the existing board trustworthy: hand-rolled
-//! JSON through [`Json`], a generated Markdown renderer so the human-readable table cannot drift
-//! from the data, identity frozen by digest, an append-only history with its contract written into
-//! the file, and **unsuccessful runs recorded rather than dropped** — a board that kept only its
-//! successes would report each library's best cases as its behaviour.
+//! The conventions are the ones that make a board trustworthy: hand-rolled JSON through [`Json`],
+//! a generated Markdown renderer so the human-readable table cannot drift from the data, identity
+//! frozen by digest, an append-only history with its contract written into the file, and
+//! **unsuccessful runs recorded rather than dropped** — a board that kept only its successes would
+//! report each library's best cases as its behaviour.
+//!
+//! # Whose problems
+//!
+//! A ratio is published only for a problem whose ideal equivalence across engines is recorded, and
+//! that record is a [`CorpusEntry`]. The board consults the public [`ladder`] by default; a caller
+//! benchmarking systems of its own supplies their entries with [`CompetitiveBoard::with_corpus`]
+//! and gets the same gates.
 //!
 //! # The one arithmetic rule
 //!
@@ -28,7 +32,7 @@ use std::{collections::BTreeMap, fmt::Write as _, time::Duration};
 
 use super::{
     contract::{order_from_tag, order_tag, Invariants, LimitStop, Limits, RunFailure, Unsupported},
-    corpus::{ladder, Equivalence},
+    corpus::{ladder, CorpusEntry, Equivalence},
     FieldSpec, Instance, RunReport, RunStatus, Verification,
 };
 use crate::{
@@ -326,10 +330,10 @@ impl CompetitiveRecord {
     /// process, the other inherits the allocator and cache state of every row that ran before it in
     /// the same one. Left to `Environment::comparable` alone the board paired them, which doubled
     /// its own pair count and ratioed a cold row against a warm one. Checked here rather than in
-    /// `Environment` because that type is shared with the cryptanalysis scoreboard, whose own
-    /// comparability rules are #77's to change — written out in
+    /// `Environment` because that type is shared with other experiment records, whose own
+    /// comparability rules are theirs to change — written out in
     /// `docs/research/mq-comparison-methodology.md` §2, which also records that the startup floor
-    /// below is this board's and deliberately not the scoreboard's.
+    /// below is this board's.
     pub fn comparable_with(&self, other: &CompetitiveRecord) -> bool {
         self.problem_digest == other.problem_digest
             && self.task == other.task
@@ -749,8 +753,7 @@ fn invariants_from_json(value: Option<&Json>) -> Invariants {
 
 /// An [`Environment`] read back from the form [`Environment::to_json`] writes.
 ///
-/// `research::scoreboard` reads this inline inside `RunRecord::from_json` rather than exposing a
-/// reader, so this is the one place the shape is duplicated. Tolerant by design: a missing field
+/// Tolerant by design: a missing field
 /// becomes empty rather than failing the row, because an environment that was recorded
 /// incompletely is still better evidence than no row at all.
 fn environment_from_json(value: &Json) -> Environment {
@@ -912,12 +915,32 @@ impl Speedup {
 #[derive(Clone, Debug, Default)]
 pub struct CompetitiveBoard {
     rows: Vec<CompetitiveRecord>,
+    corpus: Vec<CorpusEntry>,
 }
 
 impl CompetitiveBoard {
     /// An empty board.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Extend the problems this board knows the provenance of beyond the public [`ladder`].
+    ///
+    /// A ratio is licensed only for a problem whose cross-engine equivalence is recorded, so rows
+    /// for a caller's own systems are refused until their [`CorpusEntry`] values are supplied
+    /// here. An entry whose name is also a ladder rung takes precedence over the rung.
+    pub fn with_corpus(mut self, entries: impl IntoIterator<Item = CorpusEntry>) -> Self {
+        self.corpus.extend(entries);
+        self
+    }
+
+    /// Each known problem's recorded equivalence: the ladder, then the caller's corpus.
+    fn provenance(&self) -> BTreeMap<&'static str, Equivalence> {
+        ladder()
+            .into_iter()
+            .chain(self.corpus.iter().cloned())
+            .map(|entry| (entry.name, entry.equivalence))
+            .collect()
     }
 
     /// Add a row. Every outcome is accepted, including the ones with no answer.
@@ -977,10 +1000,7 @@ impl CompetitiveBoard {
         let mut found = Vec::new();
         let baseline_floor = self.startup_floor(baseline);
         // Built once rather than per pair: the ladder is a constructor, not a table lookup.
-        let provenance: BTreeMap<&'static str, Equivalence> = ladder()
-            .iter()
-            .map(|entry| (entry.name, entry.equivalence))
-            .collect();
+        let provenance = self.provenance();
         for reference in self.rows.iter().filter(|row| row.library == baseline) {
             if !reference.is_timing_evidence() {
                 continue;
@@ -1039,10 +1059,7 @@ impl CompetitiveBoard {
     /// The board prints them in separate sections for that reason.
     pub fn engine_ratios(&self, baseline: &str) -> Vec<EngineRatio> {
         let mut found = Vec::new();
-        let provenance: BTreeMap<&'static str, Equivalence> = ladder()
-            .iter()
-            .map(|entry| (entry.name, entry.equivalence))
-            .collect();
+        let provenance = self.provenance();
         for reference in self.rows.iter().filter(|row| row.library == baseline) {
             if !reference.is_timing_evidence() {
                 continue;
@@ -1791,11 +1808,13 @@ mod tests {
     use crate::{
         grobner::{
             external::{
+                corpus::{CorpusEntry, Equivalence, Rung},
                 Answer, FieldSpec, Instance, Invariants, LimitStop, Limits, Measurement,
                 RunFailure, RunReport, RunStatus, Task, ToolVersion, Unsupported, Verification,
             },
-            research::{Environment, Json},
+            record::Environment,
         },
+        util::Json,
         MonomialOrder,
     };
     use std::time::Duration;
@@ -2631,15 +2650,35 @@ mod tests {
         );
     }
 
+    /// Two rungs over `2^64 - 353`, where Groebner.jl is the only external engine that reaches.
+    fn wide_rungs() -> Vec<CorpusEntry> {
+        ["wide64-n1", "wide64-n2"]
+            .into_iter()
+            .map(|name| CorpusEntry {
+                name,
+                family: "wide64",
+                rung: Rung::Easy,
+                zero_dimensional: true,
+                quotient_dimension: Some(5),
+                equivalence: Equivalence::SoleComparand {
+                    tool: "Groebner.jl",
+                    reason: "2^64 - 353 is above every other engine's ceiling",
+                },
+                digests: &[],
+            })
+            .collect()
+    }
+
     /// A sole-comparand ratio is published **with the fact stated**, which is the corpus's rule.
     ///
-    /// Anemoi over `2^64 - 353` is the real case: Groebner.jl is the only external engine that
-    /// reaches the field, so the agreement is two-way and nothing can name the odd one out. Before
-    /// #518 such a row rendered exactly like a three-engine Katsura row.
+    /// A field above `2^62` is the real case: Groebner.jl is the only external engine that reaches
+    /// it, so the agreement is two-way and nothing can name the odd one out. Before #518 such a row
+    /// rendered exactly like a three-engine Katsura row. The rungs are the caller's own, supplied
+    /// through [`CompetitiveBoard::with_corpus`].
     #[test]
     fn test_a_sole_comparand_ratio_is_published_with_the_fact_stated() {
-        let mut board = CompetitiveBoard::new();
-        for problem in ["anemoi64-cico-n1-fcico", "anemoi64-cico-n2-fcico"] {
+        let mut board = CompetitiveBoard::new().with_corpus(wide_rungs());
+        for problem in ["wide64-n1", "wide64-n2"] {
             board.add(named_row(problem, "zeebra", answered(5), 4_000.0));
             board.add(named_row(problem, "groebner.jl", answered(5), 1_000.0));
         }
@@ -2674,6 +2713,32 @@ mod tests {
             "and the summary counts them among the publishable\n{}",
             markdown
         );
+    }
+
+    /// A board without the caller's corpus refuses those rows, and the public ladder still applies
+    /// to a board that has one.
+    #[test]
+    fn test_a_callers_corpus_extends_the_ladder_without_replacing_it() {
+        let mut bare = CompetitiveBoard::new();
+        let mut extended = CompetitiveBoard::new().with_corpus(wide_rungs());
+        for board in [&mut bare, &mut extended] {
+            board.add(named_row("wide64-n1", "zeebra", answered(5), 4_000.0));
+            board.add(named_row("wide64-n1", "groebner.jl", answered(5), 1_000.0));
+            board.add(named_row("katsura-4", "zeebra", answered(5), 4_000.0));
+            board.add(named_row("katsura-4", "groebner.jl", answered(5), 1_000.0));
+        }
+        let licensed = |board: &CompetitiveBoard| -> Vec<String> {
+            board
+                .speedups("zeebra")
+                .into_iter()
+                .filter(|speedup| speedup.licenses_timing())
+                .map(|speedup| speedup.problem)
+                .collect()
+        };
+        assert_eq!(licensed(&bare), vec!["katsura-4".to_string()]);
+        let mut both = licensed(&extended);
+        both.sort();
+        assert_eq!(both, vec!["katsura-4".to_string(), "wide64-n1".to_string()]);
     }
 
     /// A family no external engine can represent is refused by name, with the corpus's reason.

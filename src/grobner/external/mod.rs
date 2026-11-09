@@ -2,10 +2,8 @@
 //!
 //! # What this is for
 //!
-//! Zeebra's cryptanalysis scoreboard answers "can this cipher be broken, and at what cost". This
-//! module answers a different question — "how does Zeebra's F4 compare with msolve, Groebner.jl,
-//! Sagebrush and Singular on the same ideal" — and the two have different failure modes, so they
-//! have different types. The distinction that organizes everything here is the one between
+//! This module answers "how does Zeebra's F4 compare with msolve, Groebner.jl, Sagebrush and
+//! Singular on the same ideal". The distinction that organizes everything here is the one between
 //! **cannot** and **slower**: a tool that will not accept a 64-bit prime field has not lost a
 //! race, and the single most common way a cross-library benchmark becomes false is by quoting a
 //! ratio against a comparand that could not represent the input.
@@ -23,8 +21,7 @@
 //!   reasoning about *whose* peak RSS a `/proc` reading is, which is the subtlest thing in this
 //!   module.
 //! * [`board`] — [`CompetitiveBoard`] and its record: the durable schema and the generated
-//!   Markdown renderer the rows land in. Lives at `research/competitive/`, deliberately apart
-//!   from the cryptanalysis scoreboard.
+//!   Markdown renderer the rows land in. Lives at `research/competitive/`.
 //! * [`corpus`] — the cross-library ladder, and the two naming hazards that produce a different
 //!   ideal without producing an error: Katsura's off-by-one indexing and affine-versus-homogenized
 //!   Cyclic. Both resolved against another engine's own distributed input files.

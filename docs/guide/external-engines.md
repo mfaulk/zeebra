@@ -251,9 +251,16 @@ The msolve adapter's corpus agreement test builds **Zeebra's side by parsing the
 and dispatching on **variable count**, so a corpus family added at a width already present — 4, 5,
 6, 7, 10 or 14 — gets an oracle with no edit. It is also the stronger check: the bytes parsed are
 the bytes every engine is handed, so a round-trip failure in either direction shows up as a
-disagreement rather than as a silently different problem. The rungs with no oracle are only the
-Poseidon and Anemoi ones, which carry their own fields (KoalaBear and `2^64 - 353`) and so need a
-second field *type* rather than a second match arm.
+disagreement rather than as a silently different problem. Every rung is at the reference field,
+so every rung has one; a rung added at another field would need a second field *type* rather than a
+second match arm.
+
+The ladder is the public benchmark set: Katsura, Cyclic, random MQ and planted MQ. A caller
+benchmarking systems of its own builds `CorpusEntry` values for them — each with its recorded
+`Equivalence` — and passes them to `CompetitiveBoard::with_corpus`, which applies the same
+publication gates to those rows as to the ladder's. The Zeebra adapter also compiles KoalaBear
+(`corpus::KOALABEAR_CHARACTERISTIC`) and `2^64 - 353` (`corpus::WIDE_64_CHARACTERISTIC`) at a few
+widths, for systems that are not on the ladder.
 
 That test is not `#[ignore]`d — it runs whenever msolve is installed — so by default it builds
 oracles only up to seven variables, which is 1.4 s for nine rungs where `mq-random-10` alone did
