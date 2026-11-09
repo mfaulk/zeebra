@@ -1,12 +1,20 @@
 # Structured Sylvester computation: five axes, and the one with an exponent in it
 
-**Measured at:** publication bound `5ebb5165`…`c19e8c12` — the commits that published these figures,
-recovered from git rather than recorded at the time ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**Measured at:** publication bound `5ebb5165`…`c19e8c12` for everything but §5.6.2 and §5.7 — the
+commits that published those figures, recovered from git rather than recorded at the time
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+
 §5.6.2's figures are **recorded rather than recovered**, and stamped so the stamp survives this
 branch's merge (#505): base commit `47b5ccd0`, which is an ancestor of `main` and cannot stop
 being one, plus the **blob** `9dba27fa0fe2` — `git hash-object examples/determinant_width.rs` —
 which names the measured source itself and so survives a rebase, a squash and a branch SHA that
 no longer exists.
+
+§5.7's are stamped the same way, which is the better convention and is adopted here rather than
+re-invented: base commit `aa7cff8a`, an ancestor of `main`, plus the blobs
+`1e50f36f7c4e` (`git hash-object examples/specialization_batch.rs`, the term-level
+instrument) and `b634dc281275` (`git hash-object src/grobner/research/resultant.rs`, the
+measured source).
 
 M25-D deliverable 3. `docs/research/resultant-elimination.md` §6.7 ranks "the determinant's
 per-sample cost" first among what is left and calls it "the only axis left with an asymptotic
@@ -681,6 +689,106 @@ Two further guards, because a fast kernel checked against itself is not checked:
   predicted run is a differential test of the remainder sequence rather than only the unit tests.
 - `DeterminantBatch` records its `kernel`. The two differ by three orders of magnitude at the same
   order, so a batch that does not name its kernel is a number nothing can be compared with.
+
+### 5.7 #598: the per-sample specialization, batched by forward differences
+
+**Measured at `aa7cff8a` plus the change itself** — see the header for the blob stamps that name
+the measured source directly, which is §5.6.2's convention and survives a rebase where a branch SHA
+does not. Two binaries from one tree into separate target directories, run interleaved
+`before, after, before, after`. One core (`taskset --cpu-list 12`), ISA floor
+`x86-64-v3 or better (AVX2)`.
+
+§5.6.0 found the Euclidean kernel's 3.21x width penalty and #412 went looking for the mechanism.
+What it found was not contention but arithmetic: `sylvester_resultant_euclid` evaluated **every**
+coefficient of the pair at **every** sample point, by Horner, and `fc`/`gc` are fixed for the whole
+sweep. #412 measured that at about two thirds of the per-determinant cost, and #598 is the fix.
+
+#### Why forward differences and not the transform
+
+#598 priced a transform route at ~40x on this term. That route needs the sample set to be a
+multiplicative subgroup, and `resultant.rs`'s own module comment records that **the subgroup route
+loses on this problem shape** — padding 13 123 samples to 16 384 costs more determinants than the
+Lagrange solve it removes. The route that runs therefore samples at *consecutive* field elements,
+where the available trick is #598's second suggestion: forward differences.
+
+On an arithmetic progression, `D^k p(x + h) = D^k p(x) + D^(k+1) p(x)`, so a table of the `e + 1`
+differences of a degree-`e` polynomial advances one point for `e` **additions** where Horner costs
+`e` multiply-adds. The operation count does not change; only the operation gets cheaper. That is
+why it was measured *before* it was written — a ratio near one would have meant not writing it.
+`examples/specialization_batch.rs` on the term alone:
+
+| field | degree 243, 4096 samples | degree 729, 4096 samples |
+|---|---:|---:|
+| KoalaBear, 4 bytes | **4.25x** | **3.10x** |
+| Goldilocks, 8 bytes | **4.54x** | **3.36x** |
+| BN254 `Fr`, 32 bytes | **3.70x** | **2.74x** |
+
+It also avoids a memory wall the issue does not mention. Materializing the whole `2(d + 1) x S`
+specialization would be about **690 MB** at `rf4-rp2` over an 8-byte field and 2.8 GB over BN254;
+a difference table is `O(d^2)` in total — about 4 MB at `d = 729` — and yields one sample's column
+per step, so it drops into the existing per-sample loop rather than replacing it with a batch.
+
+#### The shipped sweep could not measure it, and that is the finding to carry forward
+
+`examples/determinant_sweep.rs` builds its pairs as `random_bivariate(1, order / 2)` — **degree one
+in the surviving variable**, chosen so that "building the pair is not itself the measurement". That
+makes every coefficient polynomial linear, so specializing the pair at a point costs `order`
+multiply-adds against the remainder sequence's `order^2`: about `1/order` of the work. Measured
+end-to-end on that shape, medians of three interleaved repetitions:
+
+| order | before | after | |
+|---:|---:|---:|---|
+| 18 | 1.61 µs | 1.51 µs | 1.07x |
+| 162 | 26.61 µs | 22.71 µs | 1.17x |
+| 486 | 151.17 µs | 143.92 µs | 1.05x |
+| 1458 | 1.099 ms | 1.059 ms | 1.04x |
+| 4374 | 9.664 ms | 9.103 ms | 1.06x |
+
+Spreads of 1–12% on a 4–17% effect: **this instrument cannot separate the change from noise, by
+construction.** A sweep whose inputs are linear in the surviving variable is blind to any change to
+the specialization term, which is worth recording because it is the instrument every figure in
+§5.5 and §5.6 was taken on.
+
+#### A CICO-shaped arm, and the threshold the guard enforces
+
+`--shape cico` gives the pair equal degree in both variables, which is what a CICO row of `3^R`
+rounds has. Same protocol, medians of three:
+
+| order | degree | samples | difference table | before | after | |
+|---:|---:|---:|---|---:|---:|---|
+| 18 | 9 | 20 000 | built | 2.12 µs | **1.70 µs** | **1.25x** |
+| 162 | 81 | 500 | built | 82.86 µs | **45.99 µs** | **1.80x** |
+| 486 | 243 | 100 | **declined** | 653.38 µs | 647.13 µs | 1.01x |
+| 1458 | 729 | 8 | **declined** | 5.937 ms | 5.495 ms | 1.08x |
+
+The last two rows are not a regression and not noise about a win — they are the guard. A difference
+table needs at least `degree + 1` points to be built at all, and this sweep deliberately takes few
+determinants at high order so that it measures per-determinant cost. At order 486 it takes 100
+samples against a degree of 243, and at order 1458 it takes **eight**; both fall back to Horner per
+point, which is the pre-#598 behaviour exactly. The two rows that do build a table gain **1.25x and
+1.80x**, and the win grows with degree because more of the cost is specialization.
+
+**A real row is far inside the built regime.** `rf4-rp2` takes `S = 59 050` samples at `d = 729`,
+which is 81x the threshold the table needs. So the figures that bound the expectation for a row are
+the top two rows, not the bottom two.
+
+#### What this does not establish
+
+* **A row-level figure.** Everything above is the determinant stage in isolation. `resultant_cico`
+  is the row-level instrument and was not run; the end-to-end effect on a registered row is
+  therefore un-measured, and the 1.25x–1.80x above is a stage figure. A stage share is never a
+  speedup.
+* **The transform route.** Still priced at ~40x by #598's operation count and still unmeasured,
+  and still gated on the subgroup route being worth taking at all, which the module comment says it
+  is not on this shape.
+* **#412's two thirds.** The share this change attacks was measured by #412 on a real row at order
+  1458. The model here puts it nearer a third on a CICO-shaped synthetic pair, and the two have not
+  been reconciled.
+* **Any interaction with concurrency.** A worker's block is a sub-progression, so each worker builds
+  its own table — which means the `O(d^2)` setup is paid per worker and the amortization window
+  shrinks with the block. At 32 workers on a row of 59 050 samples each block still holds 1 845
+  points against a degree of 729, so the table is still built; at higher widths it would stop being.
+  Not measured, and §5.6.0's 3.21x width penalty is the reason to look.
 
 ## 6. Axis 5 — polynomial-matrix determinant algorithms
 

@@ -424,9 +424,7 @@ fn sample_determinants<F: FiniteField + Send + Sync>(
 ) -> Vec<F> {
     let mut values = vec![F::zero(); at.len()];
     if concurrency <= 1 {
-        for (slot, x) in values.iter_mut().zip(at) {
-            *slot = determinant_at(fc, gc, *x, kernel);
-        }
+        specialize_block(fc, gc, at, kernel, &mut values);
         return values;
     }
 
@@ -435,11 +433,7 @@ fn sample_determinants<F: FiniteField + Send + Sync>(
     let block = at.len().div_ceil(concurrency).max(1);
     std::thread::scope(|scope| {
         for (chunk, abscissae) in values.chunks_mut(block).zip(at.chunks(block)) {
-            scope.spawn(move || {
-                for (slot, x) in chunk.iter_mut().zip(abscissae) {
-                    *slot = determinant_at(fc, gc, *x, kernel);
-                }
-            });
+            scope.spawn(move || specialize_block(fc, gc, abscissae, kernel, chunk));
         }
     });
     values
@@ -929,6 +923,164 @@ pub fn sylvester_determinant_at<F: FiniteField>(
     Ok(sylvester_determinant(&fc, &gc, at))
 }
 
+/// Specializes a fixed coefficient vector at a run of sample points, one column at a time.
+///
+/// #598. `fc` and `gc` are built once per row and fixed for the whole sweep, so evaluating every
+/// coefficient at every sample by Horner is a multipoint evaluation done the slowest possible way
+/// — #412 measured it at about two thirds of the per-determinant cost.
+///
+/// # Forward differences, and why not the transform
+///
+/// #598 prices a transform route at ~40x on this term. It needs the sample set to be a
+/// multiplicative subgroup, and the module comment above records that the subgroup route **loses
+/// on this problem shape**: padding 13 123 samples to 16 384 costs more determinants than the
+/// Lagrange solve it removes. The route that runs samples at *consecutive* field elements, and on
+/// an arithmetic progression the available trick is forward differences.
+///
+/// `t[k]` holds the k-th forward difference at the current point; the value is `t[0]` and a step is
+/// `t[k] += t[k+1]` ascending, because `D^k p(x + h) = D^k p(x) + D^(k+1) p(x)`. The top difference
+/// of a degree-`e` polynomial is constant, so a step costs `e` **additions** where Horner costs `e`
+/// multiply-adds. The operation count is unchanged; only the operation gets cheaper, which is why
+/// this was measured before it was written: `examples/specialization_batch.rs` puts it at
+/// **2.7x-4.5x** across three fields at degrees 243 and 729.
+///
+/// # Why this holds no buffer
+///
+/// Materializing the whole `2(d + 1) x S` specialization would be about 690 MB at `rf4-rp2` over
+/// an 8-byte field and 2.8 GB over BN254 `Fr`. A difference table is `O(d^2)` in total - about
+/// 4 MB at `d = 729` - and yields one sample's column per step, so this drops into the existing
+/// per-sample loop rather than replacing it with a batch.
+struct Specializer<'a, F: FiniteField> {
+    polynomials: &'a [UnivariatePolynomial<F>],
+
+    /// The sample points, in the order they will be asked for.
+    at: &'a [F],
+
+    /// Difference tables, one per polynomial, or empty when that polynomial stays on Horner.
+    ///
+    /// Empty for every polynomial when the points are not an arithmetic progression - the subgroup
+    /// route's domain is geometric, and the off-domain validation points are random - so a
+    /// non-progression sample set reproduces the pre-#598 behaviour exactly.
+    tables: Vec<Vec<F>>,
+
+    /// How many columns have been produced.
+    produced: usize,
+}
+
+impl<'a, F: FiniteField> Specializer<'a, F> {
+    /// Prepare to walk `at`, using differences if `at` is an arithmetic progression.
+    fn new(polynomials: &'a [UnivariatePolynomial<F>], at: &'a [F]) -> Self {
+        let tables = if Self::is_progression(at) {
+            polynomials
+                .iter()
+                .map(|c| Self::difference_table(c, at))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Self {
+            polynomials,
+            at,
+            tables,
+            produced: 0,
+        }
+    }
+
+    /// Whether `at` is `x0, x0 + h, x0 + 2h, ...` for a single non-zero `h`.
+    ///
+    /// Checked rather than assumed from the route: one [`sample_determinants`] serves the
+    /// consecutive route, the subgroup route and the random off-domain points, and differencing a
+    /// geometric or random set would be silently wrong rather than merely slow.
+    fn is_progression(at: &[F]) -> bool {
+        if at.len() < 3 {
+            return false;
+        }
+        let step = at[1] - at[0];
+        if step.is_zero() {
+            return false;
+        }
+        at.windows(2).all(|pair| pair[1] - pair[0] == step)
+    }
+
+    /// `t[k] = D^k p(at[0])`, or empty when `at` is too short for the table to be built.
+    fn difference_table(p: &UnivariatePolynomial<F>, at: &[F]) -> Vec<F> {
+        let e = p.degree() as usize;
+        if at.len() < e + 1 {
+            return Vec::new();
+        }
+        let mut row: Vec<F> = at[..=e].iter().map(|x| p.eval(x)).collect();
+        // Repeated in-place differencing; descending `i` so each read of `row[i - 1]` precedes its
+        // overwrite. After pass `k`, `row[k]` is the k-th difference at `at[0]`.
+        for k in 0..=e {
+            for i in (k + 1..=e).rev() {
+                row[i] = row[i] - row[i - 1];
+            }
+        }
+        row
+    }
+
+    /// The next sample's coefficient vector, written into `out`.
+    ///
+    /// # Panics
+    /// If called more times than there are sample points.
+    fn next_into(&mut self, out: &mut Vec<F>) {
+        let index = self.produced;
+        assert!(
+            index < self.at.len(),
+            "asked for column {} of a {}-point sweep",
+            index,
+            self.at.len()
+        );
+        out.clear();
+        if self.tables.is_empty() {
+            out.extend(self.polynomials.iter().map(|c| c.eval(&self.at[index])));
+            self.produced += 1;
+            return;
+        }
+        for (column, table) in self.tables.iter_mut().enumerate() {
+            if table.is_empty() {
+                out.push(self.polynomials[column].eval(&self.at[index]));
+                continue;
+            }
+            // Read before advancing: the table is at position `index` on entry.
+            out.push(table[0]);
+            for k in 0..table.len() - 1 {
+                table[k] = table[k] + table[k + 1];
+            }
+        }
+        self.produced += 1;
+    }
+}
+
+/// One contiguous block of samples, specialized by [`Specializer`] and reduced by the kernel.
+///
+/// The block is what carries the difference tables, which is why this exists rather than the loop
+/// being inline: a worker's block is a sub-progression of the sweep's progression - same step, a
+/// later start - so each worker builds its own tables and the result is unchanged by how the blocks
+/// were cut. A block too short to build a table falls back to Horner per point, which is the
+/// pre-#598 behaviour and is also what a non-progression sample set gets.
+///
+/// Two buffers, reused across the whole block rather than allocated per sample. That is the other
+/// half of what #598 removes: the old route allocated two `Vec`s per determinant.
+fn specialize_block<F: FiniteField>(
+    fc: &[UnivariatePolynomial<F>],
+    gc: &[UnivariatePolynomial<F>],
+    at: &[F],
+    kernel: DeterminantKernel,
+    out: &mut [F],
+) {
+    debug_assert_eq!(at.len(), out.len());
+    let mut f_specializer = Specializer::new(fc, at);
+    let mut g_specializer = Specializer::new(gc, at);
+    let mut a: Vec<F> = Vec::with_capacity(fc.len());
+    let mut b: Vec<F> = Vec::with_capacity(gc.len());
+    for slot in out.iter_mut() {
+        f_specializer.next_into(&mut a);
+        g_specializer.next_into(&mut b);
+        *slot = determinant_of(&a, &b, kernel);
+    }
+}
+
 /// `det Syl(f, g)` with the surviving variable set to `at`.
 ///
 /// The Sylvester matrix of `f` of degree `m` and `g` of degree `n` is `(m + n)` square: `n` rows
@@ -938,13 +1090,24 @@ fn sylvester_determinant<F: FiniteField>(
     gc: &[UnivariatePolynomial<F>],
     at: F,
 ) -> F {
-    let m = fc.len() - 1;
-    let n = gc.len() - 1;
+    let a: Vec<F> = fc.iter().map(|c| c.eval(&at)).collect();
+    let b: Vec<F> = gc.iter().map(|c| c.eval(&at)).collect();
+    sylvester_determinant_of(&a, &b)
+}
+
+/// [`sylvester_determinant`] on coefficients already specialized at the point.
+///
+/// Split out by #598 so the specialization can be walked by [`Specializer`] across the sweep
+/// instead of recomputed per point. The arithmetic below is unchanged, which is what makes the
+/// batched route bit-identical rather than merely equivalent.
+fn sylvester_determinant_of<F: FiniteField>(a: &[F], b: &[F]) -> F {
+    let m = a.len() - 1;
+    let n = b.len() - 1;
     let size = m + n;
 
     // Highest power first, which is the usual layout.
-    let f_row: Vec<F> = (0..=m).rev().map(|i| fc[i].eval(&at)).collect();
-    let g_row: Vec<F> = (0..=n).rev().map(|i| gc[i].eval(&at)).collect();
+    let f_row: Vec<F> = (0..=m).rev().map(|i| a[i]).collect();
+    let g_row: Vec<F> = (0..=n).rev().map(|i| b[i]).collect();
 
     let mut elements = vec![F::zero(); size * size];
     for row in 0..n {
@@ -966,6 +1129,13 @@ fn sylvester_determinant<F: FiniteField>(
 ///
 /// The same scalar [`sylvester_determinant`] returns, for the same inputs, at `O(n²)` rather than
 /// `O(n³)` in the Sylvester order.
+///
+/// **Test-only since #598.** The sweep no longer specializes per point — [`Specializer`] walks the
+/// progression instead — so this and [`determinant_at`] survive as the per-point reference the
+/// batched route is differentially tested against. That is the same discipline [`DeterminantKernel`]
+/// and [`ResultantRoute`] are kept under: a figure is only a comparison if the thing it is compared
+/// against is still runnable.
+#[cfg(test)]
 fn sylvester_resultant_euclid<F: FiniteField>(
     fc: &[UnivariatePolynomial<F>],
     gc: &[UnivariatePolynomial<F>],
@@ -974,6 +1144,19 @@ fn sylvester_resultant_euclid<F: FiniteField>(
     let a: Vec<F> = fc.iter().map(|c| c.eval(&at)).collect();
     let b: Vec<F> = gc.iter().map(|c| c.eval(&at)).collect();
     resultant_from_coefficients(&a, &b)
+}
+
+/// One scalar resultant from coefficients already specialized at the point.
+///
+/// The specialization trap of `docs/research/structured-sylvester.md` §5.3 is handled downstream by
+/// `formal_determinant`, on these very slices - so batching the *production* of `a` and `b` cannot
+/// disturb it. That is the safety argument for #598: the batched route hands the kernels the same
+/// vectors, with the same lengths encoding the same formal degrees, bit for bit.
+fn determinant_of<F: FiniteField>(a: &[F], b: &[F], kernel: DeterminantKernel) -> F {
+    match kernel {
+        DeterminantKernel::Dense => sylvester_determinant_of(a, b),
+        DeterminantKernel::Euclidean => resultant_from_coefficients(a, b),
+    }
 }
 
 /// Which kernel evaluates one scalar resultant at one point.
@@ -1005,6 +1188,9 @@ impl Display for DeterminantKernel {
 }
 
 /// One scalar resultant at one point, by the named kernel.
+///
+/// **Test-only since #598**; see [`sylvester_resultant_euclid`].
+#[cfg(test)]
 fn determinant_at<F: FiniteField>(
     fc: &[UnivariatePolynomial<F>],
     gc: &[UnivariatePolynomial<F>],
@@ -1220,8 +1406,9 @@ mod tests {
     use super::{
         bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
         bivariate_resultant_predicted, bivariate_resultant_reference_with, cico_bivariate,
-        interpolation_route, predicted_resultant_degree, sylvester_determinant_at, DegreeSource,
-        DeterminantKernel, ResultantError, ResultantOptions, ResultantRoute,
+        determinant_at, interpolation_route, predicted_resultant_degree, sample_determinants,
+        sylvester_determinant_at, DegreeSource, DeterminantKernel, ResultantError,
+        ResultantOptions, ResultantRoute, Specializer,
     };
     use crate::{
         fields::{Mersenne31, PrimeFieldElement64, Zp13},
@@ -2528,6 +2715,162 @@ mod tests {
                     "degree {degree}, at {i}"
                 );
             }
+        }
+    }
+
+    /// A run of coefficient polynomials shaped like a CICO row's: `fc[j]` of degree `degree - j`.
+    fn coefficient_run<G: FiniteField>(degree: usize, seed: u64) -> Vec<UnivariatePolynomial<G>> {
+        use rand::{prelude::StdRng, SeedableRng};
+        let mut rng = StdRng::seed_from_u64(seed);
+        (0..=degree)
+            .map(|j| UnivariatePolynomial::<G>::rand((degree - j) as u64, &mut rng))
+            .collect()
+    }
+
+    /// The batched specialization is **bit-identical** to Horner at every sample.
+    ///
+    /// This is the test #598 rests on. `formal_determinant` does degree-sensitive case analysis on
+    /// the specialized slices — the specialization trap of `structured-sylvester.md` §5.3 — so the
+    /// batched route is safe exactly because it hands the kernels the same vectors, not merely
+    /// equivalent ones.
+    #[test]
+    fn test_the_batched_specialization_matches_horner_elementwise() {
+        type G = PrimeFieldElement64<2_147_483_647>;
+        for degree in [0usize, 1, 2, 3, 7, 12] {
+            let fc = coefficient_run::<G>(degree, 0x0598_0100 + degree as u64);
+            for points in [1usize, 2, 3, 5, 40] {
+                let at: Vec<G> = (0..points as u64).map(G::new).collect();
+                let mut specializer = Specializer::new(&fc, &at);
+                let mut column: Vec<G> = Vec::new();
+                for x in &at {
+                    specializer.next_into(&mut column);
+                    let expected: Vec<G> = fc.iter().map(|c| c.eval(x)).collect();
+                    assert_eq!(
+                        column, expected,
+                        "degree {}, {} points, at {}",
+                        degree, points, x
+                    );
+                }
+            }
+        }
+    }
+
+    /// The same over a progression whose step is not one, and one that starts away from zero.
+    #[test]
+    fn test_the_batched_specialization_handles_any_progression() {
+        type G = PrimeFieldElement64<2_147_483_647>;
+        let fc = coefficient_run::<G>(6, 0x0598_0101);
+        for (start, step) in [(0u64, 1u64), (5, 1), (0, 3), (100, 7)] {
+            let at: Vec<G> = (0..32).map(|i| G::new(start + i * step)).collect();
+            let mut specializer = Specializer::new(&fc, &at);
+            let mut column: Vec<G> = Vec::new();
+            for x in &at {
+                specializer.next_into(&mut column);
+                let expected: Vec<G> = fc.iter().map(|c| c.eval(x)).collect();
+                assert_eq!(column, expected, "start {}, step {}", start, step);
+            }
+        }
+    }
+
+    /// A sample set that is not a progression falls back to Horner and is still exact.
+    ///
+    /// The subgroup route's domain is geometric and the off-domain validation points are random,
+    /// so this is not a hypothetical: differencing either would be silently wrong.
+    #[test]
+    fn test_a_non_progression_sample_set_falls_back() {
+        type G = PrimeFieldElement64<2_147_483_647>;
+        let fc = coefficient_run::<G>(5, 0x0598_0102);
+
+        // Geometric, as the subgroup route produces.
+        let base = G::new(7);
+        let geometric: Vec<G> = (0..24u32).map(|i| base.pow(i as u128)).collect();
+        assert!(!Specializer::is_progression(&geometric));
+
+        // Scattered, as the off-domain validation points are.
+        let scattered: Vec<G> = [3u64, 17, 2, 99, 40, 11, 8]
+            .iter()
+            .map(|v| G::new(*v))
+            .collect();
+        assert!(!Specializer::is_progression(&scattered));
+
+        for at in [geometric, scattered] {
+            let mut specializer = Specializer::new(&fc, &at);
+            let mut column: Vec<G> = Vec::new();
+            for x in &at {
+                specializer.next_into(&mut column);
+                let expected: Vec<G> = fc.iter().map(|c| c.eval(x)).collect();
+                assert_eq!(column, expected);
+            }
+        }
+    }
+
+    /// What counts as a progression, including the cases that must not.
+    #[test]
+    fn test_progression_detection() {
+        type G = PrimeFieldElement64<2_147_483_647>;
+        let of = |v: &[u64]| -> Vec<G> { v.iter().map(|x| G::new(*x)).collect() };
+        assert!(Specializer::is_progression(&of(&[0, 1, 2, 3])));
+        assert!(Specializer::is_progression(&of(&[10, 13, 16])));
+        // A constant run has step zero, which no difference table can walk.
+        assert!(!Specializer::is_progression(&of(&[4, 4, 4, 4])));
+        // Too short to establish a step.
+        assert!(!Specializer::is_progression(&of(&[0, 1])));
+        assert!(!Specializer::is_progression(&of(&[0])));
+        assert!(!Specializer::is_progression(&of(&[])));
+        // A broken step anywhere disqualifies the whole run.
+        assert!(!Specializer::is_progression(&of(&[0, 1, 2, 4])));
+    }
+
+    /// `sample_determinants` is unchanged by #598, at every concurrency and on both kernels.
+    ///
+    /// The blocks now carry difference tables, so a worker's block is a sub-progression with a
+    /// later start — which is why the output has to be asserted independent of how the blocks were
+    /// cut, not merely correct at concurrency one.
+    #[test]
+    fn test_the_sweep_is_unchanged_by_batching_and_by_block_count() {
+        type G = PrimeFieldElement64<2_147_483_647>;
+        let fc = coefficient_run::<G>(4, 0x0598_0103);
+        let gc = coefficient_run::<G>(3, 0x0598_0104);
+        let at: Vec<G> = (0..37u64).map(G::new).collect();
+
+        for kernel in [DeterminantKernel::Dense, DeterminantKernel::Euclidean] {
+            // The per-point reference, which is what the sweep did before #598.
+            let expected: Vec<G> = at
+                .iter()
+                .map(|x| determinant_at(&fc, &gc, *x, kernel))
+                .collect();
+            for concurrency in [1usize, 2, 3, 4, 8, 37, 64] {
+                let actual = sample_determinants(&fc, &gc, &at, concurrency, kernel);
+                assert_eq!(
+                    actual, expected,
+                    "{:?} kernel at concurrency {}",
+                    kernel, concurrency
+                );
+            }
+        }
+    }
+
+    /// A block shorter than a polynomial's degree cannot hold a table, and falls back per point.
+    ///
+    /// Reached by asking for more workers than the progression has room for: at concurrency 37 over
+    /// 37 points every block is a single sample, which is below every table's length.
+    #[test]
+    fn test_blocks_too_short_for_a_table_still_agree() {
+        type G = PrimeFieldElement64<2_147_483_647>;
+        let fc = coefficient_run::<G>(9, 0x0598_0105);
+        let gc = coefficient_run::<G>(9, 0x0598_0106);
+        let at: Vec<G> = (0..12u64).map(G::new).collect();
+        let expected: Vec<G> = at
+            .iter()
+            .map(|x| determinant_at(&fc, &gc, *x, DeterminantKernel::Euclidean))
+            .collect();
+        for concurrency in [1usize, 6, 12, 24] {
+            assert_eq!(
+                sample_determinants(&fc, &gc, &at, concurrency, DeterminantKernel::Euclidean),
+                expected,
+                "concurrency {}",
+                concurrency
+            );
         }
     }
 }

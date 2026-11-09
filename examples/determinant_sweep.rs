@@ -213,6 +213,7 @@ fn draw(
     concurrency: usize,
     seed: u64,
     kernel: DeterminantKernel,
+    shape: Shape,
 ) -> DeterminantBatch {
     assert!(
         order.is_multiple_of(2),
@@ -223,8 +224,20 @@ fn draw(
     // Degree 1 in the surviving variable, `order / 2` in the eliminated one: the matrix order is
     // `deg_y(f) + deg_y(g)`, and a linear coefficient keeps the pair small enough that building it
     // is not itself the measurement.
-    let f = random_bivariate::<K, _>(1, half, &mut rng);
-    let g = random_bivariate::<K, _>(1, half, &mut rng);
+    //
+    // **`--shape cico` changes that, and #598 is why.** A linear coefficient makes each of the
+    // `order / 2 + 1` coefficient polynomials degree 1, so specializing the pair at a sample point
+    // is `order` multiply-adds against the remainder sequence's `order^2` — about `1/order` of the
+    // work. The sweep is therefore *blind by construction* to any change to the specialization,
+    // which is what #598 optimizes and what #412 measured at two thirds of the per-determinant
+    // cost on a real CICO row. A CICO row has degree `3^R` in **both** free inputs, so the shape
+    // below reproduces that: equal degree in the surviving and the eliminated variable.
+    let surviving = match shape {
+        Shape::Linear => 1,
+        Shape::Cico => half,
+    };
+    let f = random_bivariate::<K, _>(surviving, half, &mut rng);
+    let g = random_bivariate::<K, _>(surviving, half, &mut rng);
     // Abscissae away from 0 and 1, where a Sylvester entry could be degenerate by accident.
     let at: Vec<K> = (0..determinants).map(|i| K::new(i as u64 + 7)).collect();
     let (_, batch) = time_sylvester_determinants(&f, &g, 1, &at, concurrency, kernel)
@@ -257,9 +270,43 @@ fn report_fit(name: &str, points: &[&Point], fit: &PowerLawFit) {
     }
 }
 
+/// How much degree the pair carries in the *surviving* variable.
+///
+/// The lever #598 needs and the shipped sweep does not have — see the comment in `measure_order`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Shape {
+    /// Degree 1, the shape every figure in this sweep's history was taken at.
+    Linear,
+
+    /// Equal degree in both variables, as a CICO row of `3^R` rounds produces.
+    Cico,
+}
+
+impl std::fmt::Display for Shape {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Linear => write!(formatter, "linear"),
+            Self::Cico => write!(formatter, "cico"),
+        }
+    }
+}
+
+fn shape_flag() -> Shape {
+    let arguments: Vec<String> = std::env::args().collect();
+    match arguments.iter().position(|a| a == "--shape") {
+        Some(index) => match arguments.get(index + 1).map(String::as_str) {
+            Some("linear") => Shape::Linear,
+            Some("cico") => Shape::Cico,
+            other => panic!("--shape wants linear or cico, got {other:?}"),
+        },
+        None => Shape::Linear,
+    }
+}
+
 fn main() {
     let repeats = flag_value("--repeats").unwrap_or(3).max(1);
     let kernel = kernel_flag();
+    let shape = shape_flag();
     let concurrency = flag_value("--concurrency").unwrap_or(1).max(1);
     let wanted = flag_values("--order");
     let orders: Vec<usize> = if wanted.is_empty() {
@@ -269,6 +316,9 @@ fn main() {
     };
 
     println!("# M25 #289: the Sylvester determinant cost law, measured\n");
+    println!("Surviving-variable shape: **{shape}**. `linear` is every historical figure here;");
+    println!("`cico` gives the pair equal degree in both variables, which is what a CICO row has");
+    println!("and what makes the specialization term visible at all (#598).\n");
     println!(
         "Random bivariate pairs over KoalaBear, degree 1 in the surviving variable and `order / 2` \
          in the eliminated one, so the matrix order is the only thing that varies. {} independent \
@@ -344,6 +394,7 @@ fn main() {
                 concurrency,
                 0x5_e51u64.wrapping_add(order as u64) ^ (repeat as u64 + 1),
                 kernel,
+                shape,
             );
             point.matrix_bytes = batch.matrix_bytes;
             point.core.push(batch.core_per_determinant());
