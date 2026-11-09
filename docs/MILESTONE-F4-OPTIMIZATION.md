@@ -1859,6 +1859,14 @@ What is left:
   shifted monomial and discards the handle. #621 is the follow-up and states what must be measured
   before anything is implemented.
 
+  **The sort, which #330 made slower, is now unstable (#583).** The handout left the sort a vector
+  drained from a hash set rather than one in first-appearance order, and an adaptive merge sort had
+  nothing left to adapt to. pdqsort does not want runs: at base `87e11e72` with the source blobs
+  `research/msolve-implementation.md` §4.1 names, `sort_unstable_by` is 1.02x–1.24x faster on exactly
+  those vectors, which is 0.018 ms of katsura-6 lex's construction and taken because it is one line
+  rather than because it is visible. Handing the discovery order over as well — this issue's named
+  fix — is declined for the reasons that section gives under #583.
+
 Both are consequences of succeeding elsewhere, which is the normal shape of a performance
 milestone and the reason the stage breakdown was built in M16-0 rather than inferred at the end.
 

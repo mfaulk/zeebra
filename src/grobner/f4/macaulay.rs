@@ -105,7 +105,10 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         };
         timings.collect = clock.lap();
 
-        columns.sort_by(|a, b| order.cmp(b, a));
+        // The same sort as the shipping route, and it has to stay the same one: `collect` is the
+        // only phase this arm is meant to differ in, and the other three are what makes the A/B a
+        // control on itself.
+        columns.sort_unstable_by(|a, b| order.cmp(b, a));
         timings.sort = clock.lap();
 
         let column_of: MonomialMap<N, usize> = columns
@@ -210,7 +213,15 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
         timings.collect = clock.lap();
 
-        columns.sort_by(|a, b| order.cmp(b, a));
+        // Unstable because stability has nothing to decide here: every `MonomialOrder` variant,
+        // weighted included, reports `Equal` only for equal monomials, and the columns are
+        // distinct — so the descending sequence is unique and there is no tie for either sort to
+        // break (`test_the_column_order_does_not_depend_on_the_handout_order`, over the weighted
+        // variant too, since a tie-break is where strictness would be lost). It is worth 1.02-1.24x of
+        // the sort — pdqsort against an adaptive merge sort with nothing to adapt to, because #330
+        // began handing this vector over drained from a hash set instead of in the first-appearance
+        // order the old route pushed, and the runs the merge sort exploited went with it (#583).
+        columns.sort_unstable_by(|a, b| order.cmp(b, a));
         timings.sort = clock.lap();
 
         let column_of: MonomialMap<N, usize> = columns
@@ -288,7 +299,7 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         prefix: ScatterPrefix,
     ) -> ScatterPrefixTiming {
         let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
-        columns.sort_by(|a, b| order.cmp(b, a));
+        columns.sort_unstable_by(|a, b| order.cmp(b, a));
         let column_of: MonomialMap<N, usize> = columns
             .iter()
             .enumerate()
@@ -455,7 +466,7 @@ mod tests {
             f4::symbolic::{symbolic_preprocessing, MonicBasis, Preprocessed},
             pairs::CriticalPair,
         },
-        poly::{MonomialOrder, MonomialSet},
+        poly::{MonomialOrder, MonomialSet, WeightedOrder, WeightedTieBreak},
         Monomial, MultivariatePolynomial, One,
     };
 
@@ -571,6 +582,99 @@ mod tests {
                         order.cmp(&window[0], &window[1]),
                         std::cmp::Ordering::Greater,
                         "{:?} under {}: columns are not strictly descending",
+                        strings,
+                        order.name()
+                    );
+                }
+            }
+        }
+    }
+
+    /// The sorted column order is a function of the column *set*, not of the order the monomials
+    /// are handed over in.
+    ///
+    /// This is what licenses the unstable sort in `build_measured` (#583). An unstable sort may
+    /// permute elements its comparator calls equal, so it is deterministic here only because the
+    /// comparator calls no two distinct columns equal — a monomial order is strict on distinct
+    /// monomials. Sorting several permutations of a real column set and demanding the one answer
+    /// says so directly: were the order ever made non-strict, or the column set ever to admit a
+    /// duplicate, this goes red and the sort's output would depend on the hash set's iteration
+    /// order.
+    ///
+    /// Covers a weighted order as well as the three built-in ones, because `MonomialOrder` is
+    /// reachable here in all its variants and a tie-break is exactly where strictness would be
+    /// lost. All three tie-breaks, since they differ only on ties.
+    #[test]
+    fn test_the_column_order_does_not_depend_on_the_handout_order() {
+        static WEIGHTED_LEX: WeightedOrder =
+            WeightedOrder::new(&[1, 7, 49], WeightedTieBreak::Lexicographic);
+        static WEIGHTED_REVLEX: WeightedOrder =
+            WeightedOrder::new(&[3, 1, 2], WeightedTieBreak::ReverseLexicographic);
+        static WEIGHTED_LAST: WeightedOrder =
+            WeightedOrder::new(&[1, 7, 49], WeightedTieBreak::LastVariableFirst);
+
+        let systems: Vec<Vec<&str>> = vec![
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x*z - y^2", "x^3 - z^2"],
+        ];
+        let orders: Vec<MonomialOrder> = ALL_ORDERS
+            .into_iter()
+            .chain([
+                MonomialOrder::Weighted(&WEIGHTED_LEX),
+                MonomialOrder::Weighted(&WEIGHTED_REVLEX),
+                MonomialOrder::Weighted(&WEIGHTED_LAST),
+            ])
+            .collect();
+
+        for order in orders {
+            for strings in &systems {
+                let (_, matrix) = build(strings, order);
+                let sorted = matrix.columns().to_vec();
+                assert!(
+                    sorted.len() > 2,
+                    "{:?}: too few columns to permute",
+                    strings
+                );
+
+                let half = sorted.len() / 2;
+                let mut permutations: Vec<Vec<Monomial<3>>> = Vec::new();
+                permutations.push(sorted.iter().rev().copied().collect());
+                permutations.push({
+                    let mut rotated = sorted.clone();
+                    rotated.rotate_left(half);
+                    rotated
+                });
+                permutations.push(
+                    sorted[half..]
+                        .iter()
+                        .zip(&sorted[..half])
+                        .flat_map(|(high, low)| [*high, *low])
+                        .chain(sorted[2 * half..].iter().copied())
+                        .collect(),
+                );
+
+                for mut permutation in permutations {
+                    assert_eq!(
+                        permutation.len(),
+                        sorted.len(),
+                        "{:?} under {}: the permutation lost a column",
+                        strings,
+                        order.name()
+                    );
+                    assert_ne!(
+                        permutation,
+                        sorted,
+                        "{:?} under {}: the permutation is the sorted order already, so it \
+                         establishes nothing",
+                        strings,
+                        order.name()
+                    );
+                    permutation.sort_unstable_by(|a, b| order.cmp(b, a));
+                    assert_eq!(
+                        permutation,
+                        sorted,
+                        "{:?} under {}: the column order depends on the handout order",
                         strings,
                         order.name()
                     );
