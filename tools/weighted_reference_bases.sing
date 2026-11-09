@@ -1,0 +1,162 @@
+// Weighted Gröbner bases from Singular, emitted as Rust literals for Zeebra's test corpus.
+//
+// Run:
+//   Singular -q tools/weighted_reference_bases.sing > src/grobner/weighted_reference_bases.rs
+//
+// The sibling of `tools/reference_bases.sing`, for the orders #306 added. It exists because every
+// external adapter refuses a weighted order, so until now a weighted basis had no second-engine
+// oracle: it was checked against its own axioms, against grlex/grevlex at unit weights, and
+// against the published Griffin witnesses, but nothing independent recomputed one.
+//
+// == The spelling, measured rather than assumed (#624)
+//
+// `reference_bases.sing`'s header records the hazard this file is the answer to: "Singular's
+// ordering spelling and coefficient representative conventions have to be verified, not assumed."
+// Substituting the wrong weighted order returns a correct basis for a different question, which
+// agrees with nothing for the right reason. So each row below was measured, on monomials whose
+// weighted degrees tie and where only the tie-break can decide:
+//
+//   Zeebra `WeightedTieBreak`     Singular                         measured on
+//   ---------------------------   ------------------------------   --------------------------
+//   Lexicographic                 Wp(w) on (x_0,...,x_n-1)         x*z^2 vs y^3 at unit weights
+//                                                                  -> x*z^2, as Dp
+//   ReverseLexicographic          wp(w) on (x_0,...,x_n-1)         same pair -> y^3, as dp
+//   LastVariableFirst             Wp(w_n-1,...,w_0) on the
+//                                 REVERSED labelling
+//                                 (x_n-1,...,x_0)                  x^49 vs z at (1,7,49)
+//                                                                  -> z, where Wp(1,7,49) gives x^49
+//
+// Two things that table is load-bearing about.
+//
+//   * `wp` and `Wp` differ only in the tie-break direction, and at unit weights they are exactly
+//     `dp` and `Dp`. Confirmed on x*z^2 + y^3, the standard pair on which deglex and degrevlex
+//     disagree, and again at (1,7,49) on y^8 + x^7*z -- both of weighted degree 56 -- where
+//     `wp` leads with y^8 and `Wp` with x^7*z.
+//   * **`LastVariableFirst` has no direct Singular spelling.** It is "last variable first, larger
+//     exponent greater" -- FreeLunch Definition 2 -- which is lexicographic on the reversed
+//     variable labelling, and neither `wp` nor `Wp` is that. Reversing the variable list *and* the
+//     weight vector reaches it, and that is the only spelling here that is a relabelling rather
+//     than an ordering name. Getting this one wrong is the silent case the hazard note warns of:
+//     `Wp(1,7,49)` and `Wp(49,7,1)`-on-reversed both run and both return a correct basis.
+//
+// == What cannot be verified this way, and why
+//
+// **Not `research/griffin/freelunch-r4.txt` itself.** Its prime is 28407454060060787, and
+// Singular's `ring R = p,...` requires p < 2^31 -- the same ceiling `reference_bases.sing` records
+// and `differential/singular.rs` documents. So the Griffin system cannot be posed to Singular at
+// its own field at all, and what is verified here is the *convention*, at a surrogate prime, with
+// the Griffin weight vector. That is the same argument §9.1 of docs/MILESTONE-FGLM-SOLVING.md
+// makes for the unweighted references, and it is why this file carries weights (1,7,49) rather
+// than a convenient small vector.
+//
+// `short = 0` so that `x^2` and `2*x` print in the form Zeebra's parser accepts, as in the sibling.
+
+// A reduced basis, so set equality against Zeebra's reduced one is the right comparison.
+option(redSB);
+
+int failures = 0;
+
+// Two systems, because no single one separates all three conventions.
+//
+//   `griffin-shaped`  <x^7-y, y^7-z, x*z-1>.  wt(x^7)=wt(y)=7 and wt(y^7)=wt(z)=49, so two of the
+//                     three generators tie and the tie-break decides. Lexicographic and
+//                     ReverseLexicographic agree here; LastVariableFirst does not, and returns a
+//                     triangular basis -- which is the FreeLunch point in miniature.
+//   `tie-56`          <y^8 - x^7*z, x*y - 1>.  Both monomials of the first generator have weighted
+//                     degree 56, and there lex and revlex disagree: Lexicographic and
+//                     LastVariableFirst lead with x^7*z, ReverseLexicographic with y^8.
+//
+// Together the two distinguish all three, which is what makes the test that reads them
+// non-vacuous: a spelling mistake that swapped any pair would fail on one system or the other.
+
+// `system` is printed from the ideal's own generators rather than from a second string argument,
+// so the emitted Rust cannot drift from what Singular actually computed on.
+proc emit(string name, string tie, ideal I)
+{
+  ideal G = std(I);
+  int k;
+  "    ReferenceWeightedBasis {";
+  "        name: \"" + name + "\",";
+  "        tie_break: WeightedTieBreak::" + tie + ",";
+  "        system: &[";
+  for (k = 1; k <= ncols(I); k++) { "            \"" + string(I[k]) + "\","; }
+  "        ],";
+  "        basis: &[";
+  for (k = 1; k <= ncols(G); k++) { "            \"" + string(G[k]) + "\","; }
+  "        ],";
+  "    },";
+}
+
+"//! Weighted Grobner bases computed by Singular, committed as literals.";
+"//!";
+"//! **Generated. Do not edit by hand.** Regenerate with";
+"//!";
+"//! ```text";
+"//! Singular -q tools/weighted_reference_bases.sing > src/grobner/weighted_reference_bases.rs";
+"//! ```";
+"//!";
+"//! Singular's `std` is Buchberger/slimgb lineage, so these are independent of Zeebra's F4 in";
+"//! algorithm and not only in implementation. The spelling each row was computed under was";
+"//! **measured and not assumed** -- see `tools/weighted_reference_bases.sing` for the table, and";
+"//! for why `LastVariableFirst` is a reversed labelling rather than an ordering name.";
+"//!";
+"//! Every row is over `GF(" + string(32003) + ")` in three variables under the Griffin weight vector";
+"//! `(1, 7, 49)`. The prime is a surrogate: `research/griffin/freelunch-r4.txt` is at";
+"//! 28407454060060787, above the `2^31` ceiling Singular's prime fields stop at, so the Griffin";
+"//! system itself cannot be posed to Singular at all and what is pinned here is the convention.";
+"";
+"use crate::WeightedTieBreak;";
+"";
+"/// One ideal and the weighted Grobner basis Singular computed for it.";
+"pub(crate) struct ReferenceWeightedBasis {";
+"    /// The system's label, for an assertion message.";
+"    pub name: &'static str,";
+"    /// The tie-break Singular's spelling was verified to implement.";
+"    pub tie_break: WeightedTieBreak,";
+"    /// The generators, in Zeebra's parser syntax.";
+"    pub system: &'static [&'static str],";
+"    /// Singular's reduced basis under the weighted order.";
+"    pub basis: &'static [&'static str],";
+"}";
+"";
+"/// The surrogate prime every row is over.";
+"pub(crate) const WEIGHTED_REFERENCE_PRIME: u64 = 32003;";
+"";
+"/// The variables every row is in, in Zeebra's index order.";
+"pub(crate) const WEIGHTED_REFERENCE_VARIABLES: [&str; 3] = [\"x\", \"y\", \"z\"];";
+"";
+"/// The weight vector every row is under.";
+"pub(crate) const WEIGHTED_REFERENCE_WEIGHTS: [u32; 3] = [1, 7, 49];";
+"";
+"pub(crate) const WEIGHTED_REFERENCE_BASES: &[ReferenceWeightedBasis] = &[";
+
+// Lexicographic tie-break: Wp(w) on the declared order.
+ring Lex = 32003, (x,y,z), Wp(1,7,49);
+short = 0;
+ideal GriffinLex = x^7-y, y^7-z, x*z-1;
+ideal TieLex = y^8-x^7*z, x*y-1;
+emit("griffin-shaped", "Lexicographic", GriffinLex);
+emit("tie-56", "Lexicographic", TieLex);
+
+// ReverseLexicographic tie-break: wp(w) on the declared order.
+ring Rev = 32003, (x,y,z), wp(1,7,49);
+short = 0;
+ideal GriffinRev = x^7-y, y^7-z, x*z-1;
+ideal TieRev = y^8-x^7*z, x*y-1;
+emit("griffin-shaped", "ReverseLexicographic", GriffinRev);
+emit("tie-56", "ReverseLexicographic", TieRev);
+
+// LastVariableFirst: Wp on the REVERSED labelling, with the weight vector reversed to match.
+// The printed polynomials still name x, y, z, so they parse unchanged against Zeebra's index
+// order -- only the ordering Singular computed under is reversed.
+ring Lvf = 32003, (z,y,x), Wp(49,7,1);
+short = 0;
+ideal GriffinLvf = x^7-y, y^7-z, x*z-1;
+ideal TieLvf = y^8-x^7*z, x*y-1;
+emit("griffin-shaped", "LastVariableFirst", GriffinLvf);
+emit("tie-56", "LastVariableFirst", TieLvf);
+
+"];";
+"";
+if (failures > 0) { "// FAILURES: " + string(failures); }
+quit;

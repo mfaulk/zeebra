@@ -568,6 +568,31 @@ verifies the unweighted ones — the hazard §"Correctness oracle" of #306 names
 deliberately non-injective for weighted orders and `order_from_tag` refuses the tag back, which is
 what makes a weighted instance unconstructible from a textual contract.
 
+> **#624 verified Singular's, so the first of those two reasons no longer holds.** Measured on
+> monomials whose weighted degrees tie, where only the tie-break can decide:
+>
+> | Zeebra `WeightedTieBreak` | Singular | measured on |
+> |---|---|---|
+> | `Lexicographic` | `Wp(w)` | `x z^2` vs `y^3` at unit weights → `x z^2`, as `Dp` |
+> | `ReverseLexicographic` | `wp(w)` | the same pair → `y^3`, as `dp` |
+> | `LastVariableFirst` | `Wp(w` reversed`)` on the **reversed labelling** | `x^49` vs `z` at `(1,7,49)` → `z`, where `Wp(1,7,49)` gives `x^49` |
+>
+> The third row is the one this section's §"the order" predicted: reversing the variable labelling
+> "*is* reachable for free", and it is the only spelling here that is a relabelling rather than an
+> ordering name — so it cannot be returned from a function that just names an order, which is why
+> `singular_order` still refuses it. `tools/weighted_reference_bases.sing` pins all three and
+> `grobner::weighted_reference_bases` is the differential test, on two systems chosen so that
+> every pair of tie-breaks differs on one of them. Swapping any two labels fails it.
+>
+> **Not on the Griffin system itself.** `research/griffin/freelunch-r4.txt` is at
+> 28407454060060787 and Singular's prime fields stop below `2^31`, so that system cannot be posed
+> to Singular at any spelling. What is pinned is the convention, at a surrogate prime, under the
+> Griffin weight vector — the same argument §9.1 of `docs/MILESTONE-FGLM-SOLVING.md` makes for the
+> unweighted references.
+>
+> The adapters still refuse, and the second reason above is now the whole of why: a weighted
+> instance has no textual contract. That is **#625**.
+
 ### 10.2 The second half of the capability was mostly already there
 
 §4.2 says "Zeebra has no 'reduce against this given basis, in this given order' entry point exposed
