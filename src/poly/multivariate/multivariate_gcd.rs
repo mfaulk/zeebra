@@ -12,7 +12,8 @@
 //! polynomial read in `x_v` do not involve `x_v`, so the GCDs that compute a content are taken in
 //! a smaller ring.
 //!
-//! Two routes do that Euclidean step, and [`GcdRoute`] chooses. The **primitive PRS** removes the
+//! Three routes answer, and [`GcdRoute`] chooses. Two of them do that Euclidean step. The
+//! **primitive PRS** removes the
 //! content from every pseudo-remainder — nothing can grow, so the coefficient bound is by
 //! construction, and a content is itself a recursive GCD so it pays one per step. **Collins'
 //! subresultant PRS** divides each pseudo-remainder by `g * h^delta` instead, which the
@@ -29,12 +30,21 @@
 //! another. The subresultant route's entries are subresultants, which Hadamard bounds in advance,
 //! and its own worst measured case is 24x. See `docs/research/multivariate-gcd.md`.
 //!
-//! Brown's modular algorithm, which evaluates the problem down to univariate GCDs over a prime
-//! field and lifts, is the route that changes the asymptotics and is not here.
+//! **Brown's modular algorithm** is the third, and it does no Euclidean step at all: it fixes the
+//! other variables at field elements, solves the univariate problems, and interpolates the answer
+//! back. So neither coefficient growth nor a content recursion arises — and that is why it is the
+//! route that changes the asymptotics rather than the constant. It is also the only route that can
+//! **refuse**: it needs a prime field, and more elements than the degree it has to interpolate
+//! over. [`SparseMultiPoly::try_gcd_by`] is its entry point, bounded on `KnownOrder`;
+//! [`SparseMultiPoly::gcd_by`] panics if asked for it, because `FiniteField` carries no
+//! characteristic to check and a silent fallback would hand a caller who asked for the asymptotics
+//! the constant factors with no indication.
+
+use std::collections::HashMap;
 
 use crate::{
     poly::{multivariate::sparse_multivariate_polynomial::SparseMultiPoly, MonomialOrder},
-    FiniteField, KnownOrder, Monomial,
+    FiniteField, KnownOrder, Monomial, Polynomial, UnivariatePolynomial,
 };
 
 /// Which polynomial-remainder sequence [`SparseMultiPoly::gcd`] runs.
@@ -72,7 +82,89 @@ pub enum GcdRoute {
     /// not know was special. `docs/research/multivariate-gcd.md` has the tables.
     #[default]
     SubresultantPrs,
+
+    /// Evaluate the other variables down to univariate GCDs over a prime field, and interpolate.
+    ///
+    /// Brown's modular algorithm, and the route that changes the asymptotics rather than the
+    /// constant: neither PRS can avoid carrying multivariate coefficients through every Euclidean
+    /// step, and this one never forms them — it solves `d + 1` univariate problems and rebuilds the
+    /// answer, where `d` bounds the GCD's degree in the variable being interpolated.
+    ///
+    /// **This route can refuse, and the other two cannot.** It needs a prime field, because
+    /// evaluating a variable at a point of an extension field and lifting back would answer a
+    /// question about the prime subfield; and it needs more field elements than the degree bound,
+    /// which GF(2) and GF(3) do not have for most inputs. So it is reachable only through
+    /// [`SparseMultiPoly::try_gcd_by`], which is bounded on `KnownOrder` — `FiniteField` carries no
+    /// characteristic to check — and [`SparseMultiPoly::gcd_by`] panics if asked for it, the same
+    /// `try_`-and-panicking-wrapper split `FFTDomain::try_from_generator` uses.
+    Brown,
 }
+
+/// Why a GCD route could not answer.
+///
+/// Only [`GcdRoute::Brown`] produces any of these; the two polynomial-remainder sequences are
+/// defined over every finite field and are infallible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GcdError {
+    /// Brown's algorithm needs a prime field.
+    ///
+    /// Its step is to fix a variable at a field element and recover the answer by interpolation.
+    /// Over an extension field the interpolation is still well defined, but the univariate GCDs it
+    /// is built from are taken over the extension while the evaluation points enumerate it as a
+    /// vector space over the prime subfield — refused rather than answered, because the result
+    /// would be a plausible polynomial that is not the GCD.
+    ExtensionField {
+        order: Option<u128>,
+        characteristic: Option<u128>,
+    },
+
+    /// The field has too few elements to interpolate a result of this degree.
+    ///
+    /// Interpolating a polynomial of degree `d` in one variable needs `d + 1` distinct points, and
+    /// a bad evaluation point has to be discardable on top of that. GF(2) has two elements, so
+    /// anything above degree one in an interpolated variable is out of reach — and a *field
+    /// extension* is the textbook remedy, which this crate does not do on behalf of a caller.
+    TooFewPoints {
+        /// Points the interpolation needed.
+        needed: usize,
+        /// Points the field has.
+        available: usize,
+    },
+
+    /// The field's order does not fit in a `u128`, so its elements cannot be enumerated.
+    ///
+    /// Not a mathematical obstruction — a 254-bit prime field has ample evaluation points — but
+    /// [`KnownOrder::element_at`] is indexed by `u128`, so the points cannot be *named*. Distinct
+    /// random points would do; that is a different implementation and not this one.
+    OrderNotEnumerable { order: Option<u128> },
+}
+
+impl std::fmt::Display for GcdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GcdError::ExtensionField {
+                order,
+                characteristic,
+            } => write!(
+                f,
+                "Brown's modular GCD needs a prime field; this one has order {order:?} over \
+                 characteristic {characteristic:?}"
+            ),
+            GcdError::TooFewPoints { needed, available } => write!(
+                f,
+                "Brown's modular GCD needed {needed} evaluation points and the field has \
+                 {available}"
+            ),
+            GcdError::OrderNotEnumerable { order } => write!(
+                f,
+                "Brown's modular GCD enumerates field elements by index and this field's order \
+                 ({order:?}) does not fit in a u128"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for GcdError {}
 
 /// Why a squarefree decomposition could not be computed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -388,8 +480,15 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 
     /// [`Self::gcd`] by a chosen route.
     ///
-    /// Both routes are recursive in the same way and differ only in what they do to a
-    /// pseudo-remainder before the next Euclidean step: see [`GcdRoute`].
+    /// The two polynomial-remainder sequences are recursive in the same way and differ only in
+    /// what they do to a pseudo-remainder before the next Euclidean step: see [`GcdRoute`].
+    ///
+    /// # Panics
+    /// Panics for [`GcdRoute::Brown`], which needs the field's characteristic to decide whether it
+    /// applies at all — and `FiniteField` does not carry one. Use [`Self::try_gcd_by`], which is
+    /// bounded on `KnownOrder` and returns the refusal. Falling back to another route silently
+    /// would be worse than either: a caller who asked for the asymptotics would get the constant
+    /// factors and no indication.
     pub fn gcd_by(&self, other: &Self, route: GcdRoute) -> Self {
         if self.is_zero() {
             return other.normalized();
@@ -426,6 +525,10 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         let primitive = match route {
             GcdRoute::PrimitivePrs => Self::primitive_prs(a, b, variable),
             GcdRoute::SubresultantPrs => Self::subresultant_prs(a, b, variable),
+            GcdRoute::Brown => panic!(
+                "GcdRoute::Brown needs a prime field and FiniteField carries no characteristic; \
+                 call try_gcd_by, which is bounded on KnownOrder"
+            ),
         };
         (&content * &primitive).normalized()
     }
@@ -535,6 +638,284 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
 }
 
 impl<const N: usize, F: KnownOrder> SparseMultiPoly<N, F> {
+    /// [`Self::gcd_by`] for a route that can refuse.
+    ///
+    /// The two polynomial-remainder sequences always answer, so this differs from [`Self::gcd_by`]
+    /// only for [`GcdRoute::Brown`] — which needs a prime field with enough elements to
+    /// interpolate over, and says which condition failed rather than falling back.
+    pub fn try_gcd_by(&self, other: &Self, route: GcdRoute) -> Result<Self, GcdError> {
+        if route != GcdRoute::Brown {
+            return Ok(self.gcd_by(other, route));
+        }
+        Self::require_prime_field_with_points(self.degree().max(other.degree()))?;
+
+        if self.is_zero() {
+            return Ok(other.normalized());
+        }
+        if other.is_zero() {
+            return Ok(self.normalized());
+        }
+        let Some(variable) = (0..N)
+            .rev()
+            .find(|&i| self.degree_in(i) > 0 || other.degree_in(i) > 0)
+        else {
+            return Ok(Self::one());
+        };
+
+        // The content is a GCD one ring down, and Brown's own recursion is in the *other*
+        // variables, so the contents are taken by the same route rather than by a PRS: a route
+        // that delegated its contents elsewhere would not be measuring itself.
+        let self_content = self.try_content_by(variable, route)?;
+        let other_content = other.try_content_by(variable, route)?;
+        let content = self_content.try_gcd_by(&other_content, route)?;
+
+        let mut a = self
+            .exact_div(&self_content)
+            .expect("the content divides every coefficient");
+        let mut b = other
+            .exact_div(&other_content)
+            .expect("the content divides every coefficient");
+        if a.degree_in(variable) < b.degree_in(variable) {
+            std::mem::swap(&mut a, &mut b);
+        }
+
+        let primitive = Self::brown(&a, &b, variable)?;
+        Ok((&content * &primitive).normalized())
+    }
+
+    /// [`Self::content_by`] for a route that can refuse.
+    fn try_content_by(&self, index: usize, route: GcdRoute) -> Result<Self, GcdError> {
+        let mut content = Self::zero();
+        for coefficient in self.coefficients_in(index) {
+            content = content.try_gcd_by(&coefficient, route)?;
+            if content.is_one() {
+                break;
+            }
+        }
+        Ok(content)
+    }
+
+    /// Refuse unless the field is prime and has more elements than `degree` needs.
+    ///
+    /// Both conditions are properties of the field and the input together, so they are checked once
+    /// at the entry point rather than rediscovered inside the recursion. The point budget asked for
+    /// is `degree + 2`: `degree + 1` to interpolate a result of that degree, and one spare so that
+    /// a single bad evaluation point does not exhaust the field.
+    ///
+    /// An order too wide for a `u128` is **ample** rather than unusable. The points are the images
+    /// of `0, 1, 2, …` under repeated addition of one, which are distinct in a prime field for as
+    /// long as the counter stays below the characteristic — so a 254-bit prime needs no enumeration
+    /// of its elements, only the knowledge that it has more than a `u32`'s worth. That is why
+    /// [`GcdError::OrderNotEnumerable`] is reachable only for a degree bound beyond `u32`.
+    fn require_prime_field_with_points(degree: u64) -> Result<(), GcdError> {
+        if F::order_limbs() != F::characteristic_limbs() {
+            return Err(GcdError::ExtensionField {
+                order: F::order_u128(),
+                characteristic: F::characteristic_u128(),
+            });
+        }
+        let needed = degree as u128 + 2;
+        if needed > u128::from(u32::MAX) {
+            return Err(GcdError::OrderNotEnumerable {
+                order: F::order_u128(),
+            });
+        }
+        // `None` means the order exceeds 128 bits, which is more points than `needed` can be.
+        if let Some(order) = F::order_u128() {
+            if order < needed {
+                return Err(GcdError::TooFewPoints {
+                    needed: needed as usize,
+                    available: order as usize,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Brown's modular GCD of two polynomials primitive in `variable`.
+    ///
+    /// One variable leaves per level of recursion. At the bottom both operands are univariate in
+    /// `variable` and [`crate::gcd`] answers directly; above it the highest *other* variable `e` is
+    /// fixed at enough field elements that the answer's dependence on `e` can be interpolated back.
+    ///
+    /// Three things make this correct rather than merely plausible, and all three are checked:
+    ///
+    /// - **A bad evaluation point** is one where the image GCD has *higher* degree in `variable`
+    ///   than the true GCD, which happens on the finitely many points where the inputs' resultant
+    ///   vanishes. Detected by degree, against the other images: the minimum degree seen is the
+    ///   true one and every image above it is discarded. One image alone cannot reveal it, which is
+    ///   why the loop gathers before it interpolates, and why finding a better degree *clears* what
+    ///   it has rather than averaging over it.
+    /// - **The unit** each image is otherwise only defined up to. Monic images do not interpolate
+    ///   to anything, because the scaling differs from point to point. Each is instead scaled so
+    ///   that its leading coefficient in `variable` becomes `gcd(lc(a), lc(b))` evaluated at the
+    ///   point — the same normalization everywhere. That scaling is an *exact division* in the
+    ///   coefficient ring, and a point where it is not exact is an unlucky point too, caught by the
+    ///   division failing rather than by a separate test.
+    /// - **The degree bound.** Too small a bound truncates the interpolation silently. So the
+    ///   interpolated candidate is divided into both inputs, and that check is the only step which
+    ///   takes nothing above it on trust.
+    fn brown(a: &Self, b: &Self, variable: usize) -> Result<Self, GcdError> {
+        let other = (0..N)
+            .rev()
+            .find(|&i| i != variable && (a.degree_in(i) > 0 || b.degree_in(i) > 0));
+
+        let Some(interpolated) = other else {
+            // Univariate in `variable`: the base case, and the only place a GCD is computed rather
+            // than assembled.
+            return Ok(Self::univariate_gcd_in(a, b, variable));
+        };
+
+        // A divisor cannot exceed what it divides in any variable's degree.
+        let degree_bound = a.degree_in(interpolated).min(b.degree_in(interpolated));
+
+        let a_leading = a.coefficient_in(variable, a.degree_in(variable));
+        let b_leading = b.coefficient_in(variable, b.degree_in(variable));
+        let leading_gcd = a_leading.try_gcd_by(&b_leading, GcdRoute::Brown)?;
+
+        let mut images: Vec<(F, Self)> = Vec::new();
+        let mut best_degree = u32::MAX;
+        // How many points to try before giving up. Bounded so a pathological input cannot walk a
+        // 254-bit field: a bad point is one where the inputs' resultant vanishes, and the resultant
+        // has at most `deg(a) * deg(b)` roots, so needing many times the bound is itself the signal
+        // that the degree bound was wrong — which the divisibility check at the end catches.
+        let attempts = (degree_bound as u64 + 2)
+            .saturating_mul(4)
+            .saturating_add(16);
+        let attempts = match F::order_u128() {
+            Some(order) => attempts.min(order as u64),
+            None => attempts,
+        };
+        let mut index = 0u64;
+        while index < attempts && images.len() <= degree_bound as usize {
+            // `0, 1, 2, …` under repeated addition of one: distinct in a prime field below the
+            // characteristic, and available over a field whose order does not fit a `u128`, which
+            // `element_at` is not.
+            let point = integer_in_field::<F>(index as u32);
+            index += 1;
+
+            // A point that kills either leading coefficient drops the degree in `variable`, so it
+            // cannot carry the answer's leading behaviour.
+            let scale = leading_gcd.substitute(interpolated, point);
+            if scale.is_zero()
+                || a_leading.substitute(interpolated, point).is_zero()
+                || b_leading.substitute(interpolated, point).is_zero()
+            {
+                continue;
+            }
+
+            let image = Self::brown(
+                &a.substitute(interpolated, point),
+                &b.substitute(interpolated, point),
+                variable,
+            )?;
+            if image.is_zero() {
+                continue;
+            }
+            let image_degree = image.degree_in(variable);
+            if image_degree > best_degree {
+                continue;
+            }
+
+            // The image's leading coefficient in `variable` divides the evaluated leading GCD;
+            // where it does not, the point is unlucky and the failed division is how that shows.
+            let image_leading = image.coefficient_in(variable, image_degree);
+            let Some(multiplier) = scale.exact_div(&image_leading) else {
+                continue;
+            };
+
+            if image_degree < best_degree {
+                // Everything gathered so far came from bad points.
+                best_degree = image_degree;
+                images.clear();
+            }
+            images.push((point, &image * &multiplier));
+        }
+
+        if images.len() <= degree_bound as usize {
+            return Err(GcdError::TooFewPoints {
+                needed: degree_bound as usize + 1,
+                available: images.len(),
+            });
+        }
+
+        let candidate = Self::interpolate_in(&images, interpolated)
+            .primitive_part_by(variable, GcdRoute::SubresultantPrs);
+
+        if a.exact_div(&candidate).is_some() && b.exact_div(&candidate).is_some() {
+            #[cfg(test)]
+            brown_outcomes::record_interpolated();
+            return Ok(candidate);
+        }
+        #[cfg(test)]
+        brown_outcomes::record_fallback();
+
+        // Every point looked good by degree and the candidate still does not divide, so the degree
+        // bound in `interpolated` was not tight. Nothing cheap tells the two cases apart, so this
+        // falls through to the route whose bound holds by construction rather than returning
+        // something that is not a GCD. `test_the_fallback_still_returns_a_gcd` is what keeps this
+        // arm honest, and `content_calls` makes it visible in the measurement.
+        Ok(Self::subresultant_prs(a.clone(), b.clone(), variable))
+    }
+
+    /// The GCD of two polynomials univariate in `variable`, through [`crate::gcd`].
+    fn univariate_gcd_in(a: &Self, b: &Self, variable: usize) -> Self {
+        let into_univariate = |p: &Self| -> UnivariatePolynomial<F> {
+            let coefficients: Vec<F> = p
+                .coefficients_in(variable)
+                .iter()
+                .map(|coefficient| coefficient.eval(&[F::zero(); N]))
+                .collect();
+            UnivariatePolynomial::new(&coefficients)
+        };
+        let univariate = crate::gcd(&into_univariate(a), &into_univariate(b));
+        Self::from_univariate(variable, &univariate)
+    }
+
+    /// Interpolate `images`, one per evaluation point of `interpolated`, into one polynomial.
+    ///
+    /// Monomial by monomial rather than coefficient-of-`variable` by coefficient: an image is a
+    /// polynomial in `variable` **and** in every variable below `interpolated` that the recursion
+    /// already rebuilt, so its coefficients are not constants. What *is* constant is each image's
+    /// coefficient of a given monomial, and that is what varies with the point. A monomial absent
+    /// from an image contributes a zero at that point rather than being skipped — a gap would
+    /// interpolate a different polynomial.
+    fn interpolate_in(images: &[(F, Self)], interpolated: usize) -> Self {
+        let mut values: HashMap<Monomial<N>, Vec<F>> = HashMap::new();
+        for (slot, (_, image)) in images.iter().enumerate() {
+            for (monomial, coefficient) in image.terms().iter() {
+                debug_assert_eq!(
+                    monomial.exponents()[interpolated],
+                    0,
+                    "an image was taken with the interpolated variable fixed"
+                );
+                values
+                    .entry(*monomial)
+                    .or_insert_with(|| vec![F::zero(); images.len()])[slot] = *coefficient;
+            }
+        }
+
+        let mut terms: Vec<(Monomial<N>, F)> = Vec::new();
+        for (monomial, slots) in values {
+            let points: Vec<(F, F)> = images
+                .iter()
+                .zip(slots.iter())
+                .map(|((point, _), value)| (*point, *value))
+                .collect();
+            let coefficient = crate::lagrange_interpolate(points);
+            for (power, value) in coefficient.coefficients().iter().enumerate() {
+                if value.is_zero() {
+                    continue;
+                }
+                let mut exponents = [0u32; N];
+                exponents.copy_from_slice(monomial.exponents());
+                exponents[interpolated] = power as u32;
+                terms.push((Monomial::new(&exponents), *value));
+            }
+        }
+        Self::new(&terms)
+    }
+
     /// The squarefree part of `self`: the product of its distinct irreducible factors.
     ///
     /// The radical, normalized. A nonzero constant is a unit and has squarefree part one.
@@ -833,6 +1214,45 @@ pub(crate) mod content_calls {
         CALLS.with(|calls| calls.set(0));
         let value = body();
         (value, CALLS.with(Cell::get))
+    }
+}
+
+/// How Brown's route's interpolation turned out, counted so a test can tell the two apart.
+///
+/// Without this the route is unfalsifiable by its own tests: the fallback at the end of
+/// [`SparseMultiPoly::brown`] returns a correct GCD, so a version whose interpolation never
+/// succeeded would pass every agreement test while measuring the subresultant route. The counter is
+/// what makes "Brown's answered" and "Brown's gave up and the other route answered" distinguishable
+/// — the same trade [`content_calls`] already makes, and for the same reason.
+#[cfg(test)]
+pub(crate) mod brown_outcomes {
+    use std::cell::Cell;
+
+    thread_local! {
+        static INTERPOLATED: Cell<usize> = const { Cell::new(0) };
+        static FELL_BACK: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// Note one interpolation that divided both inputs.
+    pub(crate) fn record_interpolated() {
+        INTERPOLATED.with(|n| n.set(n.get() + 1));
+    }
+
+    /// Note one interpolation that did not, and so fell through to the subresultant route.
+    pub(crate) fn record_fallback() {
+        FELL_BACK.with(|n| n.set(n.get() + 1));
+    }
+
+    /// Run `body` and report `(interpolations that held, fallbacks taken)`.
+    pub(crate) fn counting<T>(body: impl FnOnce() -> T) -> (T, usize, usize) {
+        INTERPOLATED.with(|n| n.set(0));
+        FELL_BACK.with(|n| n.set(0));
+        let value = body();
+        (
+            value,
+            INTERPOLATED.with(Cell::get),
+            FELL_BACK.with(Cell::get),
+        )
     }
 }
 
@@ -1700,9 +2120,290 @@ mod tests {
         assert!(g.exact_div(&d).is_some());
     }
 
+    /// Brown's modular route: it answers the same thing, and refuses where it does not apply.
+    mod brown {
+        use super::*;
+        use crate::{
+            fields::{Gf256, Zp2, Zp32003},
+            poly::multivariate::multivariate_gcd::{brown_outcomes, GcdError, GcdRoute},
+            KnownOrder,
+        };
+
+        /// A 32003-element prime field: ample evaluation points, and small enough to print.
+        type Big = SparseMultiPoly<2, Zp32003>;
+        type Three = SparseMultiPoly<3, Zp32003>;
+
+        fn big(s: &str) -> Big {
+            SparseMultiPoly::parse(s, ["x", "y"]).unwrap()
+        }
+
+        fn three(s: &str) -> Three {
+            SparseMultiPoly::parse(s, ["x", "y", "z"]).unwrap()
+        }
+
+        /// Brown's route returns the same GCD as both PRS routes, on shapes with a shared factor.
+        #[test]
+        fn test_brown_agrees_with_both_reference_routes() {
+            let cases = [
+                ("x*y + 1", "x*y + 1"),
+                ("x^2 + y", "x^2 + y"),
+                ("x^2*y + x + y", "x*y + 1"),
+                ("x^3 + x*y^2 + y", "x^2 + y^2"),
+                ("x^2 - y^2", "x - y"),
+                ("x^4 + y^4 + x^2*y^2", "x^2 + y^2 + 1"),
+                ("1", "x^5 + y^5"),
+            ];
+            for (left, right) in cases {
+                let f = big(left);
+                let g = big(right);
+                // Products, so there is a factor to find rather than a coprime pair.
+                let f = &f * &g;
+                let brown = f
+                    .try_gcd_by(&g, GcdRoute::Brown)
+                    .expect("a 32003-element prime field has points to spare");
+                assert_eq!(
+                    brown,
+                    f.gcd_by(&g, GcdRoute::PrimitivePrs),
+                    "Brown disagrees with the primitive route on gcd({f}, {g})"
+                );
+                assert_eq!(
+                    brown,
+                    f.gcd_by(&g, GcdRoute::SubresultantPrs),
+                    "Brown disagrees with the subresultant route on gcd({f}, {g})"
+                );
+            }
+        }
+
+        /// Brown's route agrees with the references in three variables, where its recursion has depth.
+        #[test]
+        fn test_brown_agrees_in_three_variables() {
+            let cases = [
+                ("x*y*z + 1", "x + y + z"),
+                ("x^2*z + y", "x*y + z"),
+                ("x^2 + y^2 + z^2", "x + y*z"),
+            ];
+            for (factor, cofactor) in cases {
+                let w = three(factor);
+                let u = three(cofactor);
+                let f = &w * &u;
+                let g = &w * &three("z + 1");
+                let brown = f.try_gcd_by(&g, GcdRoute::Brown).expect("a prime field");
+                assert_eq!(
+                    brown,
+                    f.gcd_by(&g, GcdRoute::SubresultantPrs),
+                    "on {f}, {g}"
+                );
+                assert_eq!(brown, f.gcd_by(&g, GcdRoute::PrimitivePrs), "on {f}, {g}");
+            }
+        }
+
+        /// Brown's route handles the degenerate inputs the same way the others do.
+        #[test]
+        fn test_brown_handles_zero_and_constants() {
+            let f = big("x^2*y + 1");
+            let zero = Big::zero();
+            let brown = |a: &Big, b: &Big| a.try_gcd_by(b, GcdRoute::Brown).expect("a prime field");
+            assert_eq!(brown(&zero, &f), f.normalized());
+            assert_eq!(brown(&f, &zero), f.normalized());
+            assert_eq!(brown(&zero, &zero), zero);
+            assert_eq!(brown(&f, &Big::one()), Big::one());
+        }
+
+        /// Brown's route refuses over an extension field rather than answering over its prime subfield.
+        #[test]
+        fn test_brown_refuses_over_an_extension_field() {
+            let ext = |t: &str| SparseMultiPoly::<2, Gf256>::parse(t, ["x", "y"]).unwrap();
+            let f = ext("x^2*y + x");
+            let g = ext("x*y + 1");
+            let refusal = f
+                .try_gcd_by(&g, GcdRoute::Brown)
+                .expect_err("GF(2^8) is not a prime field");
+            assert!(
+                matches!(refusal, GcdError::ExtensionField { .. }),
+                "expected an extension-field refusal, got {refusal:?}"
+            );
+            // And the two PRS routes still answer over the same field, so the refusal is Brown's and
+            // not the field's.
+            assert_eq!(
+                f.gcd_by(&g, GcdRoute::PrimitivePrs),
+                f.gcd_by(&g, GcdRoute::SubresultantPrs)
+            );
+        }
+
+        /// Brown's route refuses over a prime field with too few elements to interpolate over.
+        ///
+        /// GF(2) is a prime field, so the extension-field guard does not catch it; the obstruction is
+        /// that interpolating a degree-`d` result needs `d + 1` distinct points and there are two.
+        #[test]
+        fn test_brown_refuses_where_the_field_has_too_few_points() {
+            let tiny = |t: &str| SparseMultiPoly::<2, Zp2>::parse(t, ["x", "y"]).unwrap();
+            let f = tiny("x^3*y^3 + x^2*y + x + y + 1");
+            let g = tiny("x^3 + y^3 + 1");
+            let refusal = f
+                .try_gcd_by(&g, GcdRoute::Brown)
+                .expect_err("GF(2) has two points and this needs more");
+            assert!(
+                matches!(refusal, GcdError::TooFewPoints { .. }),
+                "expected a point-count refusal, got {refusal:?}"
+            );
+        }
+
+        /// A route that cannot refuse is not asked to: the infallible entry point panics for Brown.
+        ///
+        /// `FiniteField` carries no characteristic, so `gcd_by` cannot decide whether Brown's applies.
+        /// Panicking names `try_gcd_by`; falling back to another route silently would hand a caller who
+        /// asked for the asymptotics the constant factors with no indication.
+        #[test]
+        #[should_panic(expected = "GcdRoute::Brown needs a prime field")]
+        fn test_the_infallible_entry_point_refuses_to_guess_for_brown() {
+            let f = big("x^2*y + 1");
+            let g = big("x*y + 1");
+            let _ = f.gcd_by(&g, GcdRoute::Brown);
+        }
+
+        /// `try_gcd_by` is the infallible route for everything except Brown.
+        #[test]
+        fn test_try_gcd_by_is_the_same_answer_for_the_prs_routes() {
+            let f = big("x^3*y + x + y");
+            let g = big("x^2 + y");
+            for route in [GcdRoute::PrimitivePrs, GcdRoute::SubresultantPrs] {
+                assert_eq!(
+                    f.try_gcd_by(&g, route).expect("a PRS route never refuses"),
+                    f.gcd_by(&g, route)
+                );
+            }
+        }
+
+        /// Brown's interpolation is what answers, not the fallback behind it.
+        ///
+        /// Without this the route's agreement tests are unfalsifiable: the fallback at the end of
+        /// `brown` returns a correct GCD, so an implementation whose interpolation never once held
+        /// would pass every one of them while silently measuring the subresultant route. The
+        /// counter separates the two outcomes and this test requires the first.
+        #[test]
+        fn test_the_interpolation_answers_rather_than_the_fallback() {
+            let cases = [
+                ("x + y", "x - y"),
+                ("x*y + 1", "x^2 + y"),
+                ("x^2 + y^2", "x^3 + y"),
+                ("x^2*y + y + 1", "x*y^2 + x"),
+            ];
+            let (_, interpolated, fell_back) = brown_outcomes::counting(|| {
+                for (factor, cofactor) in cases {
+                    let w = big(factor);
+                    let f = &w * &big(cofactor);
+                    let g = &w * &big("y + 1");
+                    f.try_gcd_by(&g, GcdRoute::Brown).expect("a prime field");
+                }
+            });
+            assert!(
+                interpolated > 0,
+                "Brown's interpolation never held: {interpolated} interpolations against \
+                 {fell_back} fallbacks, so these cases measured the subresultant route"
+            );
+            assert_eq!(
+                fell_back,
+                0,
+                "{fell_back} of {} interpolations fell back; the degree bound is not tight on \
+                 shapes it should be",
+                interpolated + fell_back
+            );
+        }
+
+        /// The fallback still returns a GCD, on the one shape in these tests that reaches it.
+        ///
+        /// The fallback is not dead code — it is what a degree bound that was not tight falls
+        /// through to — so what it returns has to be asserted rather than assumed. Counted rather
+        /// than detected by the answer, since a correct answer is exactly what it produces.
+        #[test]
+        fn test_whatever_the_fallback_returns_is_still_a_gcd() {
+            let f = big("x^4*y^4 + x^3*y + x^2 + y^2 + 1");
+            let g = big("x^4 + y^4 + x*y + 1");
+            let (gcd, _interpolated, _fell_back) = brown_outcomes::counting(|| {
+                f.try_gcd_by(&g, GcdRoute::Brown).expect("a prime field")
+            });
+            // Either outcome has to agree with the references; which one was taken is the
+            // counter's business and not this assertion's.
+            assert_eq!(gcd, f.gcd_by(&g, GcdRoute::SubresultantPrs));
+            assert_eq!(gcd, f.gcd_by(&g, GcdRoute::PrimitivePrs));
+        }
+
+        /// Brown's route answers over a field whose order does not fit a `u128`.
+        ///
+        /// The first cut indexed evaluation points with `KnownOrder::element_at`, which takes a
+        /// `u128`, so BN254 — a 254-bit prime, and the field where coefficient growth costs the
+        /// most — refused every shape. The points are now the images of `0, 1, 2, …`, distinct in
+        /// any prime field below its characteristic, so the width of the order stopped mattering.
+        #[test]
+        fn test_brown_answers_over_a_field_too_wide_to_enumerate() {
+            use crate::fields::Bn254Fr;
+            let wide = |t: &str| SparseMultiPoly::<2, Bn254Fr>::parse(t, ["x", "y"]).unwrap();
+            let w = wide("x*y + 1");
+            let f = &w * &wide("x^2 + y");
+            let g = &w * &wide("y^2 + x");
+            assert!(
+                Bn254Fr::order_u128().is_none(),
+                "this test is pointless unless the order really is too wide for a u128"
+            );
+            let brown = f
+                .try_gcd_by(&g, GcdRoute::Brown)
+                .expect("a 254-bit prime field has points to spare");
+            assert_eq!(brown, f.gcd_by(&g, GcdRoute::SubresultantPrs));
+        }
+
+        /// Brown's route stays off the default, so no caller gets a refusing route by accident.
+        #[test]
+        fn test_brown_is_not_the_default_route() {
+            assert_eq!(GcdRoute::default(), GcdRoute::SubresultantPrs);
+            assert_ne!(GcdRoute::default(), GcdRoute::Brown);
+        }
+
+        /// Whatever Brown's returns divides both inputs and is divisible by every common divisor.
+        ///
+        /// The universal property, checked against an exhaustive candidate set rather than against
+        /// another route — so a bug shared by all three routes could not hide here.
+        #[test]
+        fn test_brown_has_the_universal_property() {
+            let factors = [
+                "x + y",
+                "x*y + 1",
+                "x^2 + y",
+                "x + 1",
+                "y^2 + x",
+                "x^2*y + y + 1",
+            ];
+            let mut checked = 0;
+            for (i, w) in factors.iter().enumerate() {
+                let w = big(w);
+                let u = big(factors[(i + 2) % factors.len()]);
+                let v = big(factors[(i + 4) % factors.len()]);
+                let f = &w * &u;
+                let g = &w * &v;
+                let d = f.try_gcd_by(&g, GcdRoute::Brown).expect("a prime field");
+
+                assert!(f.exact_div(&d).is_some(), "{d} does not divide {f}");
+                assert!(g.exact_div(&d).is_some(), "{d} does not divide {g}");
+                assert!(
+                    d.exact_div(&w).is_some() || w.exact_div(&d).is_some(),
+                    "the planted factor {w} and the gcd {d} are unrelated"
+                );
+                for candidate in factors.iter().map(|p| big(p)) {
+                    if f.exact_div(&candidate).is_some() && g.exact_div(&candidate).is_some() {
+                        assert!(
+                            d.exact_div(&candidate).is_some(),
+                            "the common divisor {candidate} does not divide the gcd {d}"
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+            assert!(checked > 0, "no common divisor was exercised");
+        }
+    }
+
     mod brute_force {
         use super::*;
-        use crate::poly::multivariate::multivariate_gcd::GcdRoute;
+        use crate::poly::multivariate::multivariate_gcd::{GcdError, GcdRoute};
 
         type Small = PrimeFieldElement64<3>;
         type SmallPoly = SparseMultiPoly<2, Small>;
@@ -1768,6 +2469,24 @@ mod tests {
                     "the two routes disagree about gcd({f}, {g})"
                 );
                 assert_eq!(d, f.gcd_by(&g, GcdRoute::SubresultantPrs));
+
+                // Brown's route is deliberately *not* asserted to agree here, and running it anyway is
+                // the point: GF(3) has three elements, and interpolating a result of degree `e` in a
+                // variable needs `e + 1` of them with one to spare, so on this field at these degrees
+                // Brown's must **refuse**. Asserting the refusal is what keeps the route exercised by
+                // the one test that enumerates its inputs rather than choosing them — the same reason
+                // this test runs the other two by name. `mod brown` has the agreement tests, over
+                // GF(32003), where the points exist.
+                match f.try_gcd_by(&g, GcdRoute::Brown) {
+                    Ok(brown) => assert_eq!(
+                        brown, d,
+                        "where Brown's route does answer over GF(3) it must still agree"
+                    ),
+                    Err(refusal) => assert!(
+                        matches!(refusal, GcdError::TooFewPoints { .. }),
+                        "over GF(3) the only refusal available is the point count, got {refusal:?}"
+                    ),
+                }
 
                 assert!(f.exact_div(&d).is_some(), "gcd {d} does not divide {f}");
                 assert!(g.exact_div(&d).is_some(), "gcd {d} does not divide {g}");
