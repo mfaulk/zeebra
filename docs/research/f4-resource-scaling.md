@@ -2,9 +2,10 @@
 
 **Measured at:** §§1-10, publication bound `9d05baa2`…`cede98ac` — the commits that published those
 figures, recovered from git rather than recorded at the time
-([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§11** was
-measured at the tree this section's own change introduces, on branch
-`perf/536-interreduce-working-set` (#536): the figures and the code that produces them land in one
+([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§12** was
+measured at the tree that section's own change introduces, on branch
+`perf/536-interreduce-working-set` (#536), and **§13** at the tree its change introduces, on branch
+`perf/554-sparse-row-buffer` (#554): in both the figures and the code that produces them land in one
 commit, so the publication bound is that commit and its merge.
 
 Deliverable for M24-D (#215). One question, which no amount of argument could settle: when a
@@ -35,6 +36,15 @@ nothing, and — separately — **the budget is not what bounds the memory.**
 > of payload held in 18 126.4 MB of capacity — and the budget saw the construction's 172.6 MB.
 > Budgeting the elimination takes the same run to **1 083.7 MB**. §§1-10 are unaffected: the batch
 > loop's allowance already covered its own elimination.
+>
+> **M27 (#554) added §13**, which removes the amplification §12 only measured. The mechanism was not
+> the reserve but the **swap**: installing the reserved buffer in the row left the merge scratch
+> holding the row's old one, so the scratch's high-water capacity migrated into whichever row was
+> merged next however short that merge was. Copying the result back instead takes `katsura-11` from
+> 11.44x the payload to **1.81x** and from 13 145.9 MB to **2 759.5 MB**, with the interreduction
+> stage **2.1% faster** — the copy replaces an allocation rather than adding one. Two shrink policies
+> were measured against it and both cost more than they save. §12's figures stand as the
+> before-and-after's "before".
 
 ## 1. What M23 left open
 
@@ -1033,3 +1043,277 @@ cargo nextest run -E 'test(the_allowance_covers_the_elimination) \
 The budget on the second pass itself is #477's
 `test_the_budget_covers_the_back_substitution_pass`, which this section relies on and does not
 duplicate.
+
+## 13. The amplification removed (M27, #554)
+
+§12 attributed `katsura-11`'s 13.1 GB to one allocation and then budgeted the *payload*, leaving the
+amplification between the two for this section. The amplification is gone: the elimination's row
+buffers hold **1.81x** their payload where they held **11.44x**, and `katsura-11` by matrix peaks at
+**2 759.5 MB** where it peaked at **13 145.9 MB** — the same row operations, the same reduced basis,
+and the interreduction stage **2.1% faster** rather than slower.
+
+The last clause is the part that was not expected. #554 was filed asking for both axes because a
+policy that reallocates to save memory need not be a win, and it turned out there is no trade to
+make: the copy this change adds replaces an allocation it was already paying, so copy-back is ahead
+on memory **and** on time on all four rungs. The policies that *do* trade time for memory were
+measured too, and both cost more than they save (§13.4).
+
+### 13.1 The mechanism was not the reserve
+
+§12 named the reserve: `subtract_scaled` reserves `self.len() + other.len()` and installs that buffer
+in the row, "so a row whose entries cancelled down keeps the capacity the merge might have needed".
+That is true and it is not sufficient, because it bounds a row's capacity by its own merge, and a
+row's own merge cannot be more than twice its own length when the result is short — the result has
+at least `other.len() - self.len()` entries, so a *short* result requires `self.len()` to be the
+larger of the two. Reserve-and-keep alone therefore cannot exceed 2x, and the measured figure is
+11.44x.
+
+What produces 11.44x is the **swap**, and specifically what the swap does to the caller's scratch:
+
+```rust
+scratch.clear();
+scratch.reserve(self.entries.len() + other.entries.len());
+// ... merge ...
+std::mem::swap(&mut self.entries, scratch);   // the row gets the scratch's buffer, whatever its size
+```
+
+After the swap the scratch holds the row's *old* buffer, so the next merge reserves again, and the
+scratch's high-water capacity is handed to whichever row is merged next **however short that merge
+is**. One long merge early in a pass therefore sizes every later row's buffer, and back-substitution
+is exactly the pass that supplies one: it clears each pivot column out of every row holding it, with
+pivot rows that span the columns to their right.
+
+The unit test is the shortest statement of it — `test_a_short_merge_does_not_inherit_a_long_merges_buffer`
+does one 512-against-512 merge and then one two-against-two merge, and before this change the
+two-entry row came out holding capacity for 512. That is the 11.44x in nine lines, and no
+cancellation is needed to produce it.
+
+### 13.2 The four policies
+
+All four were built from one tree as four binaries, differing only in the lines after the merge
+loop, and every one of them produces bit-identical rows (§13.5).
+
+| policy | after the merge | what it costs |
+|---|---|---|
+| **swap** (before) | `mem::swap(&mut self.entries, scratch)` | no copy; the scratch's capacity migrates into the row and the scratch must regrow |
+| **copy-back** (shipped) | `self.entries.clear(); self.entries.extend_from_slice(scratch)` | one sequential `memcpy` of the merged length; saves the regrow, and the scratch becomes one buffer reused |
+| **swap + shrink** | the swap, then `shrink_to_fit()` when `capacity > 2 * len` | a reallocation on most row operations |
+| **copy-back + shrink** | copy-back, then the same shrink | the `memcpy` plus a reallocation when the row is over-sized |
+
+`copy-back` is the issue's second option ("copying the merge result back into the row's own buffer").
+The two shrink policies are its first ("`shrink_to_fit` when `capacity > k * len`"), applied on top of
+each installation policy so that the shrink and the installation are separable in the table.
+
+### 13.3 Both axes, on four rungs
+
+grevlex, GF(2147483647), pinned to cores 0-7, release at `-C target-cpu=x86-64-v3`, one rung and
+one arm per process under `tools/benchlock.sh`, with `--arm unbounded` so the elimination runs to
+completion and reports its own high-water. An entry is 16 B. **Policies interleaved within a round**
+and the mean of `n` rounds reported, each round's load bracket under 6 at both ends — see §13.6 for
+why one run per arm was not enough.
+
+`buffer capacity` is `EntryBufferPeak::capacity`, the total `Vec` capacity of the rows' entry
+buffers plus the merge scratch at the high-water; `x payload` is that against
+`EliminationStatistics::peak_nonzeros`, which is **identical across all four policies on every
+rung** and is the sense in which these are the same elimination.
+
+| rung | payload | policy | `n` | interreduction stage | total wall | buffer capacity | x payload | `VmHWM` |
+|---|---:|---|---:|---:|---:|---:|---:|---:|
+| `katsura-9` | 30.0 MB | swap (before) | 3 | 450.2 ms | 1 085.1 ms | 185.5 MB | 6.18x | 164.3 MB |
+| 7 977 x 8 233 | | **copy-back** | 3 | **420.5 ms** | **1 061.5 ms** | **53.5 MB** | **1.78x** | **72.3 MB** |
+| | | copy-back + shrink | 3 | 440.6 ms | 1 080.2 ms | 44.3 MB | 1.48x | 66.0 MB |
+| | | swap + shrink | 1 | 499.8 ms | 1 137.1 ms | 34.0 MB | 1.13x | 91.9 MB |
+| `katsura-10` | 202.3 MB | swap (before) | 5 | 4 407.9 ms | 9 631.4 ms | 1 571.3 MB | 7.77x | 1 217.9 MB |
+| 26 839 x 27 351 | | **copy-back** | 5 | **4 276.5 ms** | **9 411.3 ms** | **363.1 MB** | **1.79x** | **400.1 MB** |
+| | | copy-back + shrink | 5 | 4 453.0 ms | 9 682.4 ms | 309.0 MB | 1.53x | 376.6 MB |
+| | | swap + shrink | 1 | 5 470.9 ms | 10 651.3 ms | 225.8 MB | 1.12x | 597.4 MB |
+| `mq-random-10` | 37.4 MB | swap (before) | 3 | 2 248.1 ms | 7 912.0 ms | 678.8 MB | **18.13x** | 598.8 MB |
+| 7 642 x 7 996 | | **copy-back** | 3 | **2 204.3 ms** | **7 688.0 ms** | **72.3 MB** | **1.93x** | **160.0 MB** |
+| | | copy-back + shrink | 3 | 2 414.4 ms | 7 995.5 ms | 53.9 MB | 1.44x | 160.4 MB |
+| | | swap + shrink | 1 | 2 381.7 ms | 8 007.9 ms | 44.3 MB | 1.18x | 218.9 MB |
+| **`katsura-11`** | **1 584.9 MB** | swap (before) | 2 | 51 357.4 ms | 102 674.9 ms | **18 126.4 MB** | **11.44x** | **13 145.9 MB** |
+| 104 403 x 105 427 | | **copy-back** | 3 | **50 286.7 ms** | **101 065.3 ms** | **2 865.1 MB** | **1.81x** | **2 759.5 MB** |
+| | | copy-back + shrink | 3 | 53 534.0 ms | 104 965.8 ms | 2 494.4 MB | 1.57x | 2 634.6 MB |
+| | | swap + shrink | 1 | 85 601.0 ms | 136 901.7 ms | 1 743.4 MB | 1.10x | 4 506.5 MB |
+
+The `swap` row on `katsura-11` reproduces §12 to **0.01%** on `VmHWM` (13 145.9 MB against
+13 144.3 MB) and to the entry on every counter, which is what makes this a before-and-after of the
+policy rather than of the machine.
+
+### 13.4 The verdict
+
+**Copy-back ships, and the trade-off the issue expected does not exist.** The brief for #554 was to
+report both axes because "a merge that reallocates every step to save memory is not obviously a
+win". For copy-back there is nothing to trade: it is **faster on the interreduction stage on every
+rung** and it holds **2.27x to 4.76x less resident memory**.
+
+| rung | `VmHWM` reduction | interreduction stage | ranges disjoint? |
+|---|---:|---:|---|
+| `katsura-9` | **2.27x** | **-6.6%** | 407-440 against 439-462, touching |
+| `katsura-10` | **3.04x** | **-3.0%** | 4 236-4 311 against 4 371-4 458, **yes** |
+| `mq-random-10` | **3.74x** | **-1.9%** | 2 170-2 253 against 2 159-2 312, no |
+| **`katsura-11`** | **4.76x** | **-2.1%** | 50 061-50 465 against 51 310-51 405, **yes** |
+
+The copy is not free; it is *cheaper than what it replaces*. The merged length is copied once,
+sequentially, into a buffer the row already owns — and in exchange the scratch stops being handed
+away, so it grows once per pass instead of being re-grown at nearly every row operation. One
+`memcpy` against one `malloc` plus the `memcpy` the allocator's growth path performs anyway is not a
+close contest, and the measured direction is the same on all four rungs.
+
+**The shrink policies are the ones with a real trade-off, and neither is worth taking.**
+
+- **copy-back + shrink** buys a further **0% to 5.9%** of peak RSS (160.4 against 160.0 MB on
+  `mq-random-10`; 2 634.6 against 2 759.5 MB on `katsura-11`) for **3.9% to 9.5%** more
+  interreduction time. A genuine trade, and a poor one at that exchange rate: the amplification
+  copy-back leaves is already down to 1.78-1.93x, which is `Vec`'s own doubling against each row's
+  high-water length, and buying the last fraction of it back costs more than it saves.
+- **swap + shrink** is **dominated on both axes**, which is the result worth keeping. It reaches the
+  *lowest* buffer capacity of the four — 1.10x the payload on `katsura-11`, almost exactly the
+  payload — and the *highest* `VmHWM` of the three fixes, 4 506.5 MB against copy-back's 2 759.5 MB,
+  while costing **66.7%** more interreduction time. Both halves follow from the same thing: the
+  swap still hands the scratch away, so the shrink is returning to the allocator a buffer the next
+  merge immediately re-requests, and `VmHWM` counts pages touched rather than capacity held, so
+  churning address space does not lower it. **A capacity counter is not a memory measurement** — this
+  row is the proof, and it is why §13.3 reports `VmHWM` beside the counter rather than the counter
+  alone.
+
+### 13.4a What this costs at the shipped allowance
+
+The default does not lift the live-entry allowance, so `katsura-11` by matrix is still **refused at
+20 000 020 live entries** — the same threshold, since the payload counters do not move — and still
+falls back to division. What changes is what the attempt costs before it is refused:
+
+| policy | wall | interreduction stage | `VmHWM` | verdict |
+|---|---:|---:|---:|---|
+| swap (before) | 247 996.9 ms | 196 135.4 ms | **1 084.8 MB** | refused at 20 000 020, fell back |
+| **copy-back** | 232 304.6 ms | 181 667.7 ms | **691.0 MB** | refused at 20 000 020, fell back |
+
+So the refused attempt costs **1.57x less** resident memory, and §12.5's "remaining 550.7 MB over the
+division route's own peak is the attempt" becomes about 158 MB over it. The division route's own
+peak (533.0 MB, §12.4) is untouched by this change: it runs no matrices.
+
+### 13.4b What this does not claim
+
+- **Not that the amplification is zero.** It is 1.78-1.93x, and that is each row's own `Vec` growth
+  history: a buffer that doubled and then cancelled down is still resident at its doubled size.
+  Removing *that* is the shrink policies, which were measured and cost more than they save.
+- **Not that the matrix route should now be the default.** That is still #507's measurement. §13 moves
+  the route's memory cost down by 2.3-4.8x and its wall clock slightly down; whether that is enough
+  to flip the default is a cohort comparison this section does not run, and §12.6's warning stands —
+  a cohort re-taken after this change must read `fell_back` before quoting a row.
+- **Not that any other elimination was measured.** `subtract_scaled` is the inner loop of every
+  sparse elimination in the crate, and the four rungs here exercise it through F4's final
+  interreduction only. The batch loop uses the same merge and should benefit in the same direction;
+  that is unmeasured here, and §§9-11's attribution says the batch loop's peak is dominated by
+  symbolic preprocessing rather than by row buffers, so the benefit there is not expected to be
+  visible in `VmHWM`.
+
+### 13.5 That the rows did not move
+
+Three independent checks, because a wrong merge here is a silently wrong Gröbner basis rather than a
+crash:
+
+1. **A differential test against a dense reference.**
+   `test_subtract_scaled_matches_a_dense_reference` runs 360 `(row, row, factor)` cases over five
+   fields — GF(2), GF(13), GF(32003), GF(2147483647) and a 64-bit prime — against a reference that
+   widens both rows, subtracts at an index, and narrows the result, so it shares only the field
+   arithmetic and none of the merge's two-pointer logic, cancellation test, or buffer policy. The
+   cases are the ones that decide how much of the reservation is written: disjoint supports, identical
+   supports, an exact multiple that cancels to zero, a leading-column cancellation that moves the
+   leading column right, the zero row on either side and on both, random overlaps, and containment in
+   both directions. Field arithmetic is exact, so agreement is bit-identity.
+2. **The counters, across all four policies.** Every row in §13.3 reports the *same* elimination
+   payload, the same `peak_nonzeros`, the same matrix shape, and the same basis size as the baseline
+   on its rung. The number of row operations and the order they happen in are properties of the
+   algorithm, and a buffer policy that changed either would show up here.
+3. **#536's identity assertions, unchanged.** `test_the_matrix_route_reproduces_the_division_route`
+   and `test_the_allowance_covers_the_elimination_and_not_only_the_construction` are green, so the
+   interreduced basis and the refusal threshold are where #536 left them.
+
+
+
+### 13.6 Reproducing §13
+
+The four policies are four binaries from one tree, differing only in the lines after the merge loop
+in `SparseRow::subtract_scaled`. `copy-back` is what `main` ships; the other three are reached by
+substituting the body from §13.2's table.
+
+```sh
+export CARGO_TARGET_DIR=/path/outside/the/worktree RUSTC_WRAPPER=""
+unset RUSTFLAGS
+cargo build --release -j24 --example interreduce_working_set   # -j24: see the note below
+
+# One rung and one arm per process, because VmHWM is a per-process reading.
+for rung in katsura-9 katsura-10 mq-random-10 katsura-11; do
+  tools/benchlock.sh <tag> taskset --cpu-list 0-7 \
+    ./target/release/examples/interreduce_working_set "$rung" --arm unbounded
+done
+
+# The shipped allowance on the top rung, where the pass is refused and falls back.
+tools/benchlock.sh <tag> taskset --cpu-list 0-7 \
+  ./target/release/examples/interreduce_working_set katsura-11 --arm default
+```
+
+`mq-random-10` is new to this example in #554, built through `grobner::external::instance` at
+`REFERENCE_CHARACTERISTIC` under grevlex with its identity digest asserted, exactly as
+`examples/f4_profile.rs` builds it. katsura is one family with an unusually tall interreduction
+matrix and unusually heavy fill-in, and a buffer policy weighed on it alone would be weighed on one
+shape; `mq-random-10` is the corpus family closest to a cryptanalytic system and it is where the
+amplification was *worst* (18.13x against katsura-11's 11.44x).
+
+**Three campaigns, and why only the third is published — plus what the first two got wrong.** The
+method here was arrived at by two failures, and both are worth recording because the lock does not
+prevent either.
+
+1. **The load the lock does not serialize.** The first campaign ran inside one lock acquisition
+   while six agents shared this box, and the one-minute load average rose from 64 to **687** on 128
+   cores — driven by concurrent release builds, which `tools/benchlock.sh` deliberately does not
+   serialize. Its counters agree with the third to the entry and its `VmHWM` figures to within
+   **0.3%**, so the memory story was never in doubt; its wall times were wrong by up to **10%** and
+   in the wrong *direction* — they made copy-back look 4.6% faster than it is on `katsura-10` and
+   13% slower on the rung where a build storm landed mid-run. None of its wall times are reported.
+2. **The reading a caller gated on is stale by the time it holds the lock.** The second campaign
+   read the load before queueing, waited 1 143 s for the lock, and acquired it at 18.77. So the gate
+   has to be read **inside** the lock, after the queue wait — and again before every individual run,
+   and again at the end, because a 105-second run can start under the ceiling and be contaminated
+   before it finishes. That is exactly what happened to `copyback katsura-11`, whose first clean-start
+   run ended at load 52.65 and came back 13% slow; it was discarded and re-run.
+3. **One run per arm cannot resolve a few percent.** `katsura-10`'s single copy-back run landed
+   **9% above its own five-run mean** while inside the ceiling at both ends. The published walls are
+   therefore interleaved means — the policies cycled within a round so that a slow patch of the
+   machine hits every arm rather than whichever one was running — over five rounds on `katsura-10`
+   and three on the rest, every round's bracket under 6. Within that protocol the spread is **1.3%
+   to 2.0%** peak-to-peak, which is what makes a 2-3% difference reportable at all.
+
+Every published row's load bracket is under 6 at both ends, and the aggregation drops any run whose
+bracket exceeded it rather than averaging it in. A build on a machine this contended should be
+capped — `-j24` — for the same reason: an uncapped `cargo build --release` here is itself one of the
+storms that invalidated campaign one.
+
+**Re-validated at the merge target.** §13.3's binaries were built at `e20d79da`; `main` then gained
+[#330](https://github.com/mfaulk/zeebra/issues/330), which releases the interned monomial set as soon
+as the columns are built — a memory change on a measured path. §12.3 bounds that term at **0.07%** of
+`katsura-11`'s peak, and that bound was checked rather than assumed: both arms were rebuilt at the
+rebased tree and re-run interleaved.
+
+| rung | arm | `VmHWM` at `e20d79da` | at the merge target | x payload, both |
+|---|---|---:|---:|---:|
+| `katsura-10` | swap | 1 217.9 MB | 1 219.8 MB | 7.77x |
+| `katsura-10` | copy-back | 400.1 MB | 401.3 MB | 1.79x |
+| `mq-random-10` | swap | 598.8 MB | 597.9 MB | 18.13x |
+| `mq-random-10` | copy-back | 160.0 MB | 159.1 MB | 1.93x |
+| `katsura-11` | swap | 13 145.9 MB | 13 150.7 MB | 11.44x |
+| `katsura-11` | copy-back | 2 759.5 MB | 2 762.0 MB | 1.81x |
+
+Every `VmHWM` agrees to within **0.6%** and every capacity ratio to the reported precision, and
+`katsura-11`'s copy-back interreduction stage came back at 50 228.5 ms against the published
+50 286.7 ms, a **0.12%** difference. So #330 does not reach these figures and §13.3 describes the
+tree this change merges into.
+
+The policy's correctness is checked in the ordinary suite rather than here:
+
+```sh
+cargo nextest run -E 'test(subtract_scaled) + test(short_merge_does_not_inherit) \
+  + test(scratch_buffer_is_not_handed) + test(matrix_route_reproduces_the_division_route) \
+  + test(the_allowance_covers_the_elimination)'
+```

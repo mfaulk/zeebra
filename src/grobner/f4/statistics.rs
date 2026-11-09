@@ -33,12 +33,13 @@ pub struct MatrixInterreduction {
     pub peak_nonzeros: usize,
     /// Entries the rows' buffers were allocated for at that high-water.
     ///
-    /// The figure that explains the resident cost. On `katsura-11` the payload above is 1 584.9 MB
-    /// against a 13 144.3 MB process peak, and this is **18 126.4 MB** — more than the peak,
-    /// because capacity is reserved and `VmHWM` counts touched pages, so the one site covers the
-    /// whole of it. The gap is
-    /// [`SparseRow::subtract_scaled`](crate::linalg::sparse::SparseRow::subtract_scaled) reserving
-    /// the merge's worst case and nothing shrinking it afterwards (#536).
+    /// The figure that explains the resident cost. On `katsura-11` it was **18 126.4 MB** against a
+    /// 1 584.9 MB payload and a 13 144.3 MB process peak — more than the peak, because capacity is
+    /// reserved and `VmHWM` counts touched pages, so the one site covered the whole of it (#536).
+    /// #554 closed the gap by having
+    /// [`SparseRow::subtract_scaled`](crate::linalg::sparse::SparseRow::subtract_scaled) copy the
+    /// merge result back rather than install the buffer it reserved, which takes the same rung to
+    /// 1.81x the payload; what is left is each row's own `Vec` growth history.
     pub peak_entry_capacity: usize,
     /// Elements in the minimized basis, i.e. how many rows were seeds rather than reducers.
     pub elements: usize,

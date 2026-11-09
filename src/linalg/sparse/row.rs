@@ -92,10 +92,11 @@ impl<F: FiniteField> SparseRow<F> {
     /// Entries the row's buffer is *allocated* for, which is what the allocator holds.
     ///
     /// Apart from [`SparseRow::nonzeros`] because the two diverge and the difference is paid in
-    /// resident memory: [`SparseRow::subtract_scaled`] reserves the merge's worst case and swaps
-    /// the buffer in, so a row whose entries cancelled down to a handful keeps the capacity the
-    /// merge might have needed, and nothing shrinks it. Measured at **7.77x** the payload across one
-    /// interreduction matrix on `katsura-10` and 11.44x on `katsura-11` — see `docs/research/f4-resource-scaling.md` §12.
+    /// resident memory. The gap was **11.44x** on `katsura-11`'s interreduction matrix while
+    /// [`SparseRow::subtract_scaled`] installed the merge buffer in the row; it is **1.81x** there
+    /// since #554 copies the result back instead — see `docs/research/f4-resource-scaling.md` §§12
+    /// and 13. What remains is the row's own growth history: a `Vec` that doubled and then
+    /// cancelled down is still resident at its doubled size, and nothing shrinks it.
     pub fn capacity(&self) -> usize {
         self.entries.capacity()
     }
@@ -173,6 +174,25 @@ impl<F: FiniteField> SparseRow<F> {
     /// writing sequentially into a buffer the caller reuses across operations rather than
     /// allocating one per row operation. Columns that cancel are dropped, which is what keeps the
     /// representation canonical and lets `is_zero` be a length test.
+    ///
+    /// # Why the result is copied back rather than swapped in (#554)
+    ///
+    /// `scratch` stays the caller's. The merge result is copied into the row's own buffer, which
+    /// costs one sequential `memcpy` of the merged length over a `std::mem::swap`.
+    ///
+    /// The swap is what the 11.44x of `docs/research/f4-resource-scaling.md` §12 was, and the
+    /// mechanism is not that the reservation is too large — the merge genuinely may need
+    /// `self.len() + other.len()` slots. It is that handing the reserved buffer to the row leaves
+    /// `scratch` holding the row's *old* one, so `scratch` has to regrow at the next merge, and its
+    /// high-water capacity is then installed in whichever row is merged next however short that
+    /// merge is. One long merge early in a pass therefore sizes every later row's buffer: on
+    /// `mq-random-10` 37.4 MB of payload was held in 678.8 MB of capacity. Copying back keeps one
+    /// grown buffer instead of one per row, and bounds a row's capacity by `Vec`'s own doubling
+    /// against its own high-water length rather than by the longest pivot in the pass.
+    ///
+    /// The copy is not a cost: it replaces an allocation it was already paying, and §13 measures the
+    /// interreduction stage **1.9% to 6.6% faster** than the swap on all four rungs it was taken on,
+    /// at 2.3x to 4.8x less resident memory.
     pub fn subtract_scaled(&mut self, other: &Self, factor: &F, scratch: &mut Vec<(usize, F)>) {
         if factor.is_zero() || other.is_zero() {
             return;
@@ -206,7 +226,8 @@ impl<F: FiniteField> SparseRow<F> {
             scratch.push((*column, F::zero() - *factor * *coefficient));
         }
 
-        std::mem::swap(&mut self.entries, scratch);
+        self.entries.clear();
+        self.entries.extend_from_slice(scratch);
         debug_assert!(self.is_canonical(), "{:?} is not canonical", self.entries);
     }
 
@@ -306,7 +327,11 @@ impl std::error::Error for NotCanonical {}
 mod tests {
     use super::NotCanonical;
     use super::SparseRow;
-    use crate::{fields::Zp13, FiniteField, One, Zero};
+    use crate::{
+        fields::{Zp13, Zp18446744073709551557, Zp2, Zp2147483647, Zp32003},
+        FiniteField, One, Zero,
+    };
+    use rand::{prelude::StdRng, Rng, SeedableRng};
 
     type F = Zp13;
 
@@ -531,6 +556,227 @@ mod tests {
         }
         .to_string()
         .contains('3'));
+    }
+
+    /// One `(self, other, factor)` case, chosen to drive a named corner of the merge.
+    ///
+    /// The shapes are the ones that decide how much of the worst-case reservation is written:
+    /// disjoint supports write all of it, a full overlap writes half or less, and a cancellation
+    /// writes none.
+    fn merge_case<G: FiniteField>(
+        shape: usize,
+        rng: &mut StdRng,
+    ) -> (SparseRow<G>, SparseRow<G>, G) {
+        let coefficient = |rng: &mut StdRng| {
+            // Nonzero, so the rows stay canonical; drawn narrow so that small fields cancel often.
+            let mut value = G::new(rng.gen_range(1..64));
+            while value.is_zero() {
+                value = G::new(rng.gen_range(1..64));
+            }
+            value
+        };
+        let factor = coefficient(rng);
+        let width = rng.gen_range(1..40);
+        let support = |stride: usize, offset: usize| {
+            (0..width).map(|k| offset + stride * k).collect::<Vec<_>>()
+        };
+        let row = |columns: &[usize], rng: &mut StdRng| {
+            SparseRow::<G>::new(
+                &columns
+                    .iter()
+                    .map(|column| (*column, coefficient(rng)))
+                    .collect::<Vec<_>>(),
+            )
+        };
+
+        match shape % 9 {
+            // Disjoint supports: nothing cancels and the merge writes every reserved slot.
+            0 => {
+                let own = row(&support(2, 0), rng);
+                let other = row(&support(2, 1), rng);
+                (own, other, factor)
+            }
+            // Identical supports: every column is a candidate for cancellation.
+            1 => {
+                let columns = support(3, 0);
+                (row(&columns, rng), row(&columns, rng), factor)
+            }
+            // An exact multiple, which cancels to the zero row.
+            2 => {
+                let own = row(&support(1, 0), rng);
+                let mut other = own.clone();
+                other.scale(&factor.inverse());
+                (own, other, factor)
+            }
+            // The leading column cancels and the rest of the supports are disjoint, so the result's
+            // leading column moves right.
+            3 => {
+                let mut own_columns = vec![0usize];
+                own_columns.extend(support(2, 2));
+                let mut other_columns = vec![0usize];
+                other_columns.extend(support(2, 3));
+                let mut own = row(&own_columns, rng);
+                let other = row(&other_columns, rng);
+                let shared = other.coefficient(0) * factor;
+                let entries: Vec<(usize, G)> = own
+                    .entries()
+                    .iter()
+                    .map(|(column, value)| (*column, if *column == 0 { shared } else { *value }))
+                    .collect();
+                own = SparseRow::from_sorted(entries).expect("canonical");
+                (own, other, factor)
+            }
+            // The zero row on either side, and on both.
+            4 => (SparseRow::zero(), row(&support(1, 0), rng), factor),
+            5 => (row(&support(1, 0), rng), SparseRow::zero(), factor),
+            6 => (SparseRow::zero(), SparseRow::zero(), factor),
+            // Random supports with a random overlap.
+            7 => {
+                let own: Vec<usize> = (0..width).map(|_| rng.gen_range(0..64)).collect();
+                let other: Vec<usize> = (0..width).map(|_| rng.gen_range(0..64)).collect();
+                (row(&own, rng), row(&other, rng), factor)
+            }
+            // One support contained in the other, in both directions over the case sequence.
+            _ => {
+                let long = support(1, 0);
+                let short: Vec<usize> = long.iter().copied().step_by(3).collect();
+                let (a, b) = (row(&long, rng), row(&short, rng));
+                if shape.is_multiple_of(2) {
+                    (a, b, factor)
+                } else {
+                    (b, a, factor)
+                }
+            }
+        }
+    }
+
+    /// `subtract_scaled` agrees entry for entry with a dense reference, over one field.
+    ///
+    /// The reference shares only the field arithmetic: it widens both rows, subtracts coefficient
+    /// by coefficient at an index, and narrows the result, so it exercises none of the merge's
+    /// two-pointer logic, its cancellation test, or its buffer policy. Field arithmetic is exact,
+    /// so agreement is bit-identity and not a tolerance.
+    fn merge_agrees_with_a_dense_reference<G: FiniteField>(seed: u64) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut scratch = Vec::new();
+
+        for shape in 0..360 {
+            let (own, other, factor) = merge_case::<G>(shape, &mut rng);
+            let width = own
+                .trailing_column()
+                .unwrap_or(0)
+                .max(other.trailing_column().unwrap_or(0))
+                + 1;
+
+            let mut dense = own.to_dense(width);
+            for (column, coefficient) in other.entries() {
+                dense[*column] -= factor * *coefficient;
+            }
+            let expected = SparseRow::from_dense(&dense);
+
+            let mut row = own.clone();
+            row.subtract_scaled(&other, &factor, &mut scratch);
+            assert_eq!(
+                row.entries(),
+                expected.entries(),
+                "shape {} over {} entries: {:?} - {:?} * {:?}",
+                shape,
+                width,
+                own.entries(),
+                factor,
+                other.entries()
+            );
+        }
+    }
+
+    /// The merge is bit-identical to a dense reference over fields of five different widths.
+    ///
+    /// Across characteristics because the cancellation rate is a function of the field: over GF(2)
+    /// a shared column cancels half the time, over a 61-bit prime almost never, and the merge's
+    /// shortest and longest outputs are those two ends.
+    #[test]
+    fn test_subtract_scaled_matches_a_dense_reference() {
+        merge_agrees_with_a_dense_reference::<Zp2>(11);
+        merge_agrees_with_a_dense_reference::<Zp13>(12);
+        merge_agrees_with_a_dense_reference::<Zp32003>(13);
+        merge_agrees_with_a_dense_reference::<Zp2147483647>(14);
+        merge_agrees_with_a_dense_reference::<Zp18446744073709551557>(15);
+    }
+
+    /// A short merge does not inherit the buffer an earlier long merge grew.
+    ///
+    /// The invariant #554 is about, and it locates the mechanism more precisely than "the reserve
+    /// is too large": the reserve is for the merge the caller asked for, but installing that buffer
+    /// in the row leaves the *scratch* holding the row's old one, so the scratch's high-water
+    /// capacity is handed to whichever row is merged next, however short that merge is. One long
+    /// merge early in a pass therefore sizes every later row's buffer.
+    ///
+    /// The bound allows `Vec`'s amortized doubling, which is growth the row is entitled to.
+    #[test]
+    fn test_a_short_merge_does_not_inherit_a_long_merges_buffer() {
+        let mut scratch = Vec::new();
+
+        // One long merge, to put a large capacity in play.
+        let mut long =
+            SparseRow::from_sorted((0..512).map(|column| (2 * column, F::new(1))).collect())
+                .expect("canonical");
+        let other_long =
+            SparseRow::from_sorted((0..512).map(|column| (2 * column + 1, F::new(1))).collect())
+                .expect("canonical");
+        long.subtract_scaled(&other_long, &F::ONE, &mut scratch);
+        assert_eq!(long.nonzeros(), 1024);
+
+        // Then a short one, between two two-entry rows.
+        let mut row = SparseRow::new(&[(3, F::new(4)), (9, F::new(5))]);
+        let short = SparseRow::new(&[(3, F::new(2)), (11, F::new(6))]);
+        let before = row.capacity();
+        row.subtract_scaled(&short, &F::new(2), &mut scratch);
+
+        let allowed = (2 * before).max(2 * row.nonzeros()).max(4);
+        assert!(
+            row.capacity() <= allowed,
+            "a {}-entry row holds capacity for {} after a merge whose worst case was {}",
+            row.nonzeros(),
+            row.capacity(),
+            before + short.nonzeros()
+        );
+    }
+
+    /// The scratch buffer stays with the caller, so capacity does not migrate into the rows.
+    ///
+    /// The mechanism behind the 11.44x of `docs/research/f4-resource-scaling.md` §12 is not the
+    /// reserve on its own but the reserve *plus* installing that buffer in the row: the caller's
+    /// scratch is then the row's old buffer, so the next merge reserves again and the large buffers
+    /// accumulate across the matrix instead of being one buffer reused.
+    #[test]
+    fn test_the_scratch_buffer_is_not_handed_to_the_row() {
+        let mut scratch = Vec::new();
+        let pivot = SparseRow::from_sorted(
+            (0..256)
+                .map(|column| (column, F::new(1 + (column as u64 % 11))))
+                .collect(),
+        )
+        .expect("canonical");
+
+        // Many short rows, each merged against the one long pivot.
+        let mut rows: Vec<SparseRow<F>> = (0..32)
+            .map(|k| SparseRow::new(&[(k, F::new(3)), (300 + k, F::new(5))]))
+            .collect();
+        for row in rows.iter_mut() {
+            row.subtract_scaled(&pivot, &F::new(2), &mut scratch);
+        }
+
+        let payload: usize = rows.iter().map(SparseRow::nonzeros).sum();
+        let capacity: usize = rows.iter().map(SparseRow::capacity).sum();
+        assert!(
+            capacity <= 2 * payload,
+            "{} entries of payload are held in {} entries of capacity across {} rows",
+            payload,
+            capacity,
+            rows.len()
+        );
+        // One buffer, reused: the scratch is allowed to be as large as the largest merge.
+        assert!(scratch.capacity() >= 256, "the scratch was given away");
     }
 
     /// An out-of-range column cannot slip past `SparseMatrix::new` by being stored out of order.
