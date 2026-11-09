@@ -16,6 +16,7 @@
 use crate::{
     grobner::{
         f4::{
+            macaulay::MacaulayMatrix,
             options::{F4Error, F4Options},
             statistics::F4Statistics,
             symbolic::MonicBasis,
@@ -31,6 +32,17 @@ pub trait BatchObserver<const N: usize, F: FiniteField> {
     /// `basis` is the basis as it stands, and `pairs` the batch about to be reduced — after pair
     /// criteria have discarded what they can, so these are the pairs that reach a matrix.
     fn batch(&mut self, basis: &MonicBasis<N, F>, pairs: &[CriticalPair<N>]);
+
+    /// The matrix the batch built, handed over *before* elimination touches it.
+    ///
+    /// [`Self::batch`] gives the inputs a matrix can be rebuilt from; this gives the matrix
+    /// itself. The two are not interchangeable, and that is the point: rebuilding takes the
+    /// options and the cross-batch cache as arguments, so a harness that passes different ones
+    /// gets a different matrix and no error. What arrives here is the object F4 is about to
+    /// eliminate, so a measurement taken on it cannot be a measurement of something else.
+    ///
+    /// Defaulted to nothing, so an observer that only wants the inputs is unaffected.
+    fn matrix(&mut self, _matrix: &MacaulayMatrix<N, F>) {}
 }
 
 /// An observer that does nothing, for the ordinary path.

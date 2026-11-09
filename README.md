@@ -805,6 +805,7 @@ cargo bench                              # everything
 cargo bench --bench grobner              # one suite
 cargo bench --bench sparse_linear_algebra
 cargo bench --bench f4_stages
+cargo bench --bench f4_matrix_corpus     # elimination, one pinned real Macaulay matrix at a time
 cargo bench --bench fglm                 # order conversion: stages, pipeline, strategies,
                                          # dependence, the shipped configuration, verification
 cargo bench --bench polynomial_solving   # one solution against all of them, both routes
@@ -856,6 +857,17 @@ elimination under each backend, representation conversion, and a whole batch —
 batches a real computation produced rather than synthetic ones. `grobner` says whether something
 got faster; `f4_stages` says whether a change removed cost or moved it from one stage to another.
 
+`f4_matrix_corpus` is the per-matrix complement to it. `f4_stages` sums elimination over every batch
+of four instances over one field under `F4Options::baseline()`, which is the right unit for "did the
+stage get faster" and the wrong one for "which kernel is faster on which matrix": the shapes are
+summed over, the field is fixed, and `baseline()` builds matrices the shipping default never builds.
+This benchmark times **one named matrix at a time**, across five fields and three scaffolding
+regimes under both presets, with Criterion's throughput set from the matrix's nonzero count. Each
+matrix is captured out of a live run through the `BatchObserver::matrix` hook — it is the object F4
+handed to elimination, not a reconstruction — and is pinned by digest, so a benchmark here cannot
+report a figure about a matrix that moved. See
+[`docs/research/f4-matrix-corpus.md`](docs/research/f4-matrix-corpus.md).
+
 Wall-clock time alone does not say *why* a Gröbner computation got faster. For the algorithmic
 counters — pairs considered, pairs eliminated by Buchberger's first criterion, reductions, zero
 reductions, basis size:
@@ -877,6 +889,10 @@ cargo run --release --example hilbert_driven -- list
 cargo run --release --example m22_ablation          # every M22 strategy, one table per instance
 cargo run --release --example m22_ablation -- list
 cargo run --release --example f4_blocks            # F4, row arrangements of the Macaulay matrix
+cargo run --release --example f4_matrix_corpus -- list     # the pinned matrix corpus
+cargo run --release --example f4_matrix_corpus -- check    # capture it and verify every digest
+cargo run --release --example f4_matrix_corpus -- pin      # re-derive the pinned table
+cargo run --release --example f4_matrix_corpus -- predict  # does the corpus rank kernels as a run does
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
@@ -5559,6 +5575,16 @@ object the MQ literature's semiregularity assumption is about and is a *differen
 `grobner::trace_batches` runs a computation and returns every batch it reduced, each as the basis
 at the time plus the pairs selected. That is what lets a stage be benchmarked or counted on real
 input instead of on a synthetic approximation of it; `benches/f4_stages.rs` is built on it.
+
+`BatchObserver::matrix` is the companion hook, and the difference between the two is the point.
+`trace_batches` gives the *inputs* a matrix can be rebuilt from, and rebuilding takes the options
+and the cross-batch reducer cache as arguments — so a harness that passes different ones gets a
+different matrix and no error at all. `BatchObserver::matrix` instead hands over the matrix itself,
+before elimination touches it. `grobner::f4::matrix_corpus` is built on that: seventeen matrices
+from 61x72 to 12554x12020, spanning five field widths and three scaffolding regimes under both
+option presets, each pinned by digest, generated on demand with no bytes committed, and each
+asserted equal to what rebuilding from its own inputs produces. See
+[`docs/research/f4-matrix-corpus.md`](docs/research/f4-matrix-corpus.md).
 
 Field elements reject non-canonical representatives on deserialization. Every value this crate
 serializes round-trips unchanged, but bytes encoding an integer outside `[0, P)` are an error
