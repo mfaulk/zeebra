@@ -54,7 +54,7 @@ pub use feistel_mimc::{
 };
 pub use feistel_mimc_cico::{
     dispatch_feistel_mimc_cico, verify_against_feistel_mimc_trace, FeistelMimcCico,
-    FeistelMimcCicoVisitor, FeistelMimcModel,
+    FeistelMimcCicoVisitor, FeistelMimcModel, LADDER_PLANT as FEISTEL_MIMC_LADDER_PLANT,
 };
 pub use griffin::{FixtureError, FreeLunchSystem, FREELUNCH_PRIME, FREELUNCH_R4, FREELUNCH_R5};
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};

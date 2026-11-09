@@ -64,8 +64,18 @@ use crate::{
             ANEMOI_64_PRIME,
         },
         anemoi_cico::{AnemoiCico, AnemoiModel},
+        feistel_mimc::{
+            FeistelMimc, FeistelMimcError, FeistelMimcParameters, BOUNTY_ROUNDS as FEISTEL_BOUNTY,
+            FEISTEL_MIMC_PRIME, WITHDRAWN_ROUNDS as FEISTEL_WITHDRAWN,
+        },
+        feistel_mimc_cico::{FeistelMimcCico, FeistelMimcModel, LADDER_PLANT},
         manifest::Claim,
         poseidon::{CicoInstance, Poseidon, PoseidonError, PoseidonParameters, KOALABEAR_PRIME},
+        rescue_prime::{
+            BountyInstance, RescuePrime, RescuePrimeError, RescuePrimeParameters,
+            BOUNTY_INSTANCES, RESCUE_PRIME_PRIME,
+        },
+        rescue_prime_cico::RescuePrimeCico,
         Json,
     },
     util::sha256_hex,
@@ -302,6 +312,48 @@ pub enum ChallengeParameters {
         model: AnemoiModel,
     },
 
+    /// Feistel-MiMC CICO, with the **algebraic model inside the identity**.
+    ///
+    /// The model is a field for the reason [`Self::AnemoiCico`]'s is, and the gap here is wider
+    /// than Anemoi's: at `r = 7` [`FeistelMimcModel::PerRound`] is seven cubics for F4 and
+    /// [`FeistelMimcModel::Univariate`] is one generator of degree `3^7 = 2187` for a root-finder.
+    /// Same solution set — `docs/research/mimc-rescue.md` §3.3 asserts it — and two problems a
+    /// solver meets completely differently, so two digests must not collide on them.
+    FeistelMimcCico {
+        /// The field modulus.
+        prime: u64,
+        /// The S-box exponent.
+        alpha: u32,
+        /// Rounds `r`. The state is always two words and `k = 1`.
+        rounds: usize,
+        /// Which algebraic model.
+        model: FeistelMimcModel,
+        /// The target, on the **trailing** output word.
+        ///
+        /// [`CicoTarget::Stated`] is the bounty objective's zero; [`CicoTarget::PlantedFrom`]
+        /// carries the plant, because a planted instance's target is a function of it.
+        target: CicoTarget,
+    },
+
+    /// Rescue-Prime CICO, with the **bounty instance's name inside the identity**.
+    ///
+    /// The name and not `(t, N)`: the two `t = 3` instances share `MDS3` and have different
+    /// round-constant tables, so `(t, N)` does not determine the problem. See
+    /// [`BountyInstance`](super::BountyInstance).
+    RescuePrimeCico {
+        /// The field modulus.
+        prime: u64,
+        /// The S-box exponent.
+        alpha: u32,
+        /// Which bounty instance the constants come from.
+        instance: BountyInstance,
+        /// State width `t`, which the specification calls `m`. Determined by `instance`, and
+        /// carried in the identity so a row can be read without resolving the name.
+        t: usize,
+        /// Rounds `N` actually run, at most the instance's own.
+        rounds: usize,
+    },
+
     /// A published multivariate quadratic system, identified by the bytes of its file.
     MqSystem {
         /// The field, as the source names it.
@@ -329,6 +381,8 @@ impl ChallengeParameters {
         match self {
             Self::PoseidonCico { .. } | Self::PoseidonCicoUnregisterable { .. } => "poseidon-cico",
             Self::AnemoiCico { .. } => "anemoi-cico",
+            Self::FeistelMimcCico { .. } => "feistel-mimc-cico",
+            Self::RescuePrimeCico { .. } => "rescue-prime-cico",
             Self::MqSystem { .. } => "fukuoka-mq",
         }
     }
@@ -353,12 +407,7 @@ impl ChallengeParameters {
                     format!("r_f {}", r_f),
                     format!("r_p {}", r_p),
                 ];
-                lines.push(match target {
-                    CicoTarget::Stated(constants) => format!("target stated {}", join(constants)),
-                    CicoTarget::PlantedFrom { inputs, free } => {
-                        format!("target planted inputs={} free={}", join(inputs), join(free))
-                    }
-                });
+                lines.push(target_line(target));
                 lines
             }
             Self::PoseidonCicoUnregisterable {
@@ -392,6 +441,34 @@ impl ChallengeParameters {
                 // The line that keeps two systems for one primitive apart.
                 format!("model {}", model.tag()),
             ],
+            Self::FeistelMimcCico {
+                prime,
+                alpha,
+                rounds,
+                model,
+                target,
+            } => vec![
+                format!("prime {}", prime),
+                format!("alpha {}", alpha),
+                format!("rounds {}", rounds),
+                // As for Anemoi: the line that keeps two formulations of one primitive apart.
+                format!("model {}", model.tag()),
+                target_line(target),
+            ],
+            Self::RescuePrimeCico {
+                prime,
+                alpha,
+                instance,
+                t,
+                rounds,
+            } => vec![
+                format!("prime {}", prime),
+                format!("alpha {}", alpha),
+                // The name, because (t, N) does not determine the constants.
+                format!("instance {}", instance.tag()),
+                format!("t {}", t),
+                format!("rounds {}", rounds),
+            ],
             Self::MqSystem {
                 field,
                 kind,
@@ -407,6 +484,20 @@ impl ChallengeParameters {
                 format!("seed {}", seed),
                 format!("file-sha256 {}", sha256),
             ],
+        }
+    }
+}
+
+/// A CICO target as one canonical line, shared by every family that has one.
+///
+/// One function rather than one arm per family: the digest's whole job is to tell a stated target
+/// from a planted one, and two families spelling that line differently would be two conventions to
+/// keep in step.
+fn target_line(target: &CicoTarget) -> String {
+    match target {
+        CicoTarget::Stated(constants) => format!("target stated {}", join(constants)),
+        CicoTarget::PlantedFrom { inputs, free } => {
+            format!("target planted inputs={} free={}", join(inputs), join(free))
         }
     }
 }
@@ -761,6 +852,9 @@ impl ChallengeManifest {
             | ChallengeParameters::PoseidonCicoUnregisterable { t, .. } => *t,
             // Anemoi's state is 2l words, l of them constrained at each end.
             ChallengeParameters::AnemoiCico { l, .. } => 2 * l,
+            // A Feistel network's state is its two branches, whatever the round count.
+            ChallengeParameters::FeistelMimcCico { .. } => 2,
+            ChallengeParameters::RescuePrimeCico { t, .. } => *t,
             ChallengeParameters::MqSystem { .. } => 0,
         }
     }
@@ -823,6 +917,90 @@ impl ChallengeManifest {
         Ok(self.anemoi_cico_instance::<F>()?.anemoi.derived_digest())
     }
 
+    /// The Feistel-MiMC CICO instance this problem names, built from its own parameters.
+    ///
+    /// Executable for the reason [`Self::anemoi_cico_instance`] is: a runner takes the instance
+    /// from here, so no second copy of the plant or the round count can drift from this one.
+    ///
+    /// # Errors
+    /// [`FeistelMimcError::NoRounds`] if the manifest is not a Feistel-MiMC CICO problem —
+    /// reported rather than panicked because a caller iterating the registry will hit it.
+    /// Otherwise whatever [`FeistelMimc::new`] reports, including
+    /// [`FeistelMimcError::FieldMismatch`] when `F` is not the field the parameters name.
+    pub fn feistel_mimc_cico_instance<F: KnownOrder>(
+        &self,
+    ) -> Result<FeistelMimcCico<F>, FeistelMimcError> {
+        let ChallengeParameters::FeistelMimcCico {
+            prime,
+            alpha,
+            rounds,
+            model,
+            target,
+        } = &self.parameters
+        else {
+            return Err(FeistelMimcError::NoRounds);
+        };
+        let mimc = FeistelMimc::<F>::new(FeistelMimcParameters {
+            prime: *prime,
+            alpha: *alpha,
+            rounds: *rounds,
+        })?;
+        Ok(match target {
+            // One constrained output word, so one constant. An empty list reads as the stated
+            // zero, which is what the bounty asks for.
+            CicoTarget::Stated(constants) => {
+                let mut instance = FeistelMimcCico::new(mimc, *model);
+                instance.target = F::new(constants.first().copied().unwrap_or(0));
+                instance
+            }
+            // `free` is the plant: the single free input word. `inputs` is the trailing zero the
+            // objective fixes, which the constructor supplies itself.
+            CicoTarget::PlantedFrom { free, .. } => {
+                FeistelMimcCico::planted(mimc, *model, F::new(free.first().copied().unwrap_or(0)))
+            }
+        })
+    }
+
+    /// A digest of the SHAKE128-derived Feistel-MiMC round constants.
+    ///
+    /// The Feistel-MiMC counterpart of [`Self::anemoi_derived_digest`], and it pins the one thing
+    /// the parameters cannot: `SEED_LIMBS` and the rejection rule in the derivation. A change to
+    /// either would redefine every registered row while leaving its identity digest alone.
+    ///
+    /// # Errors
+    /// As [`Self::feistel_mimc_cico_instance`].
+    pub fn feistel_mimc_derived_digest<F: KnownOrder>(&self) -> Result<String, FeistelMimcError> {
+        Ok(self.feistel_mimc_cico_instance::<F>()?.mimc.derived_digest())
+    }
+
+    /// The Rescue-Prime CICO instance this problem names, built from its own parameters.
+    ///
+    /// # Errors
+    /// [`RescuePrimeError::NoRounds`] if the manifest is not a Rescue-Prime CICO problem.
+    /// Otherwise whatever [`RescuePrime::new`] reports, including
+    /// [`RescuePrimeError::FieldMismatch`] when `F` is not the field the parameters name.
+    pub fn rescue_prime_cico_instance<F: KnownOrder>(
+        &self,
+    ) -> Result<RescuePrimeCico<F>, RescuePrimeError> {
+        let ChallengeParameters::RescuePrimeCico {
+            prime,
+            alpha,
+            instance,
+            rounds,
+            ..
+        } = &self.parameters
+        else {
+            return Err(RescuePrimeError::NoRounds);
+        };
+        let rescue = RescuePrime::<F>::new(RescuePrimeParameters {
+            prime: *prime,
+            alpha: *alpha,
+            instance: *instance,
+            rounds: *rounds,
+        })?;
+        Ok(RescuePrimeCico::new(rescue))
+    }
+
     /// The Poseidon parameters, for a CICO problem.
     pub fn poseidon_parameters(&self) -> Option<PoseidonParameters> {
         match &self.parameters {
@@ -858,6 +1036,12 @@ impl ChallengeManifest {
             ChallengeParameters::AnemoiCico {
                 l, rounds, model, ..
             } => Some(model.variables(*rounds, *l)),
+            // `r` for the per-round model, one for the univariate: the whole difference in kind.
+            ChallengeParameters::FeistelMimcCico { rounds, model, .. } => {
+                Some(model.variables(*rounds))
+            }
+            // `t − 1` free input words plus `t` inverse S-box outputs per round.
+            ChallengeParameters::RescuePrimeCico { t, rounds, .. } => Some((t - 1) + rounds * t),
             ChallengeParameters::MqSystem { n, .. } => Some(*n),
         }
     }
@@ -874,6 +1058,11 @@ impl ChallengeManifest {
             ChallengeParameters::AnemoiCico {
                 l, rounds, model, ..
             } => Some(model.equations(*rounds, *l)),
+            ChallengeParameters::FeistelMimcCico { rounds, model, .. } => {
+                Some(model.equations(*rounds))
+            }
+            // `t` cubics per round plus one linear output constraint.
+            ChallengeParameters::RescuePrimeCico { t, rounds, .. } => Some(rounds * t + 1),
             ChallengeParameters::MqSystem { m, .. } => Some(*m),
         }
     }
@@ -917,6 +1106,19 @@ impl ChallengeManifest {
                 return Err(PoseidonError::WrongStateWidth {
                     expected: 0,
                     found: 2 * l,
+                })
+            }
+            // Likewise: `feistel_mimc_cico_instance` and `rescue_prime_cico_instance` are theirs.
+            ChallengeParameters::FeistelMimcCico { .. } => {
+                return Err(PoseidonError::WrongStateWidth {
+                    expected: 0,
+                    found: 2,
+                })
+            }
+            ChallengeParameters::RescuePrimeCico { t, .. } => {
+                return Err(PoseidonError::WrongStateWidth {
+                    expected: 0,
+                    found: *t,
                 })
             }
         };
@@ -1261,7 +1463,17 @@ pub fn dispatch_cico<F: KnownOrder, V: CicoVisitor<F>>(
     // A CICO problem of a family this dispatcher does not generate. Refused by family rather than
     // reported as "not a CICO problem", which would be a false statement about an Anemoi row:
     // `dispatch_anemoi_cico` is its dispatcher.
-    if let ChallengeParameters::AnemoiCico { .. } = manifest.parameters {
+    //
+    // The same for Feistel-MiMC and Rescue-Prime: both are CICO problems, both have their own
+    // dispatcher, and both name the trailing-word objective this crate's `CicoInstance` cannot
+    // express — so an objective refusal would also be true and would be the less useful of the
+    // two answers, since it reads as "unsupported" where "wrong dispatcher" is the fix.
+    if matches!(
+        manifest.parameters,
+        ChallengeParameters::AnemoiCico { .. }
+            | ChallengeParameters::FeistelMimcCico { .. }
+            | ChallengeParameters::RescuePrimeCico { .. }
+    ) {
         return Err(ChallengeError::OtherCicoFamily {
             family: manifest.parameters.family(),
         });
@@ -1753,6 +1965,206 @@ const LADDER: [(usize, usize); 9] = [
     (6, 2),
     (6, 4),
 ];
+
+/// The EF ZK Hash Function Cryptanalysis Bounties, as this registry read them.
+///
+/// One program for both families, because it is one program: `bounties21` posed Poseidon,
+/// Feistel-MiMC, Rescue-Prime and Reinforced Concrete together under a single objective and a
+/// single deadline. `docs/research/ef-cryptanalysis.md` §0 pins the bytes of the page and of
+/// `hm2021`, the linked parameter tables that are the only published results for it.
+const ZK_HASH_BOUNTIES: ChallengeProgram = ChallengeProgram {
+    name: "EF ZK Hash Function Cryptanalysis Bounties 2021-2022",
+    version: "bounties21 with its linked parameter tables hm2021, read 2026-11-08; submissions \
+              closed 2022-11-30 and the page carries no closing statement, so every reward figure \
+              below is EXPIRED by the program's own terms. See docs/research/prize-ledger.md",
+    url: "https://www.zkhashbounties.info/",
+    reward: None,
+    redistribution: "the objective, the round counts and the bounty figures are published on the \
+                     program's page and on its linked hackmd; Feistel-MiMC's round constants are \
+                     derived rather than redistributed, and Rescue-Prime's are transcribed from \
+                     the MIT-licensed reference into research/rescue-prime/bounty-constants.txt",
+};
+
+/// How a Feistel-MiMC CICO answer is checked without trusting anything that produced it.
+const FEISTEL_MIMC_VERIFIER: &str =
+    "FeistelMimcCico::is_solution runs Perm(x, 0) and reads the trailing output word, which is \
+     the reference's own check - `output[output.len() - 1] == 0` and nothing else. So the check \
+     goes through the permutation rather than through either algebraic model, and is independent \
+     of which of the two a run used. docs/research/mimc-rescue.md section 3.3 is the chain.";
+
+/// How a Rescue-Prime CICO answer is checked without trusting anything that produced it.
+const RESCUE_PRIME_VERIFIER: &str =
+    "RescuePrime::is_cico_solution runs the permutation on (free..., 0) and checks the trailing \
+     output word is zero, which is the reference's own check. Independent of the y^alpha = x \
+     formulation the system is built from, so a faithfulness defect in the model cannot make a \
+     wrong answer verify. docs/research/mimc-rescue.md section 4.2.";
+
+/// The hackmd page that is the only published source of 2021 results.
+const HM2021_SOURCE: &str = "hm2021, Algebraic Hash Function Bounties, the Real Attack Cost \
+                             column; https://hackmd.io/l2JT8AQITJ2xRZpGErPnzA, read 2026-11-08";
+
+/// Why no 2021 figure is a comparand.
+///
+/// `hm2021` publishes six wall-clock times and **no machine for any of them**, which
+/// `docs/research/ef-cryptanalysis.md` §11 records as not established. A time without its hardware
+/// is a difficulty ladder, so the field says that rather than being left to look like an omission.
+const HM2021_NO_HARDWARE: &str = "not stated; hm2021 publishes no machine for any 2021 figure, so \
+                                  this is a difficulty ladder and not a comparand \
+                                  (docs/research/ef-cryptanalysis.md section 11)";
+
+/// The same for the solver: `hm2021` names neither a program nor a version.
+const HM2021_NO_SOFTWARE: &str = "not stated; hm2021 names no solver and no version, only that \
+                                  the designers know of nothing better than equation solving";
+
+/// The executed attack on the withdrawn Feistel-MiMC `r = 14`.
+///
+/// The figure belongs to the *instance* rather than to an algebraic model — `hm2021` says nothing
+/// about a formulation — so both of that rung's model rows carry it, and the `parameters` field
+/// names the instance and not the model.
+const HM2021_FEISTEL_R14: &[ReferencePoint] = &[ReferencePoint {
+    source: HM2021_SOURCE,
+    parameters: "Feistel-MiMC, alpha = 3, r = 14, the withdrawn ladder",
+    step: "whole solve, as the Real Attack Cost column reports it",
+    reported_time: "3 minutes, at 2^33 operations",
+    reported_memory: None,
+    hardware: HM2021_NO_HARDWARE,
+    software: HM2021_NO_SOFTWARE,
+}];
+
+/// The executed attack on the withdrawn Feistel-MiMC `r = 18`.
+const HM2021_FEISTEL_R18: &[ReferencePoint] = &[ReferencePoint {
+    source: HM2021_SOURCE,
+    parameters: "Feistel-MiMC, alpha = 3, r = 18, the withdrawn ladder",
+    step: "whole solve, as the Real Attack Cost column reports it",
+    reported_time: "6 hours, at 2^40 operations",
+    reported_memory: None,
+    hardware: HM2021_NO_HARDWARE,
+    software: HM2021_NO_SOFTWARE,
+}];
+
+/// The executed attack on Rescue-Prime `EASY1`, the only one of the five with a measured cost.
+const HM2021_RESCUE_EASY1: &[ReferencePoint] = &[ReferencePoint {
+    source: HM2021_SOURCE,
+    parameters: "Rescue-Prime EASY1, alpha = 3, t = 3, N = 4",
+    step: "whole solve, as the Real Attack Cost column reports it",
+    reported_time: "4 days, at 2^43 operations",
+    reported_memory: None,
+    hardware: HM2021_NO_HARDWARE,
+    software: HM2021_NO_SOFTWARE,
+}];
+
+/// The Feistel-MiMC round counts registered as specified instances.
+///
+/// The **union** of the two published ladders rather than either of them, because `r = 22` is the
+/// hardest withdrawn rung and the easiest authoritative one and the digest covers the mathematics:
+/// one problem that two programs named, not two problems.
+/// `test_the_specified_feistel_ladder_is_the_union_of_both` pins that against the reference's own
+/// two arrays.
+const FEISTEL_SPECIFIED: [usize; 9] = [6, 10, 14, 18, 22, 25, 30, 35, 40];
+
+/// The easiest authoritative rung, which every reduced Feistel-MiMC row names as what it reduced.
+const FEISTEL_EASIEST_AUTHORITATIVE: usize = 22;
+
+/// The frozen reduced Feistel-MiMC ladder: round counts below every specified instance.
+///
+/// `r = 6` and `r = 10` are absent because they **are** withdrawn specified instances, registered
+/// as such — the same reason the Poseidon [`LADDER`] omits `(6, 6)`. The top rung is `r = 7`
+/// because that is where `docs/research/mimc-rescue.md` §7.1's per-round model meets its column
+/// budget and §7.2's univariate route is 12x cheaper, which is the crossover worth having an
+/// identity for.
+const FEISTEL_REDUCED: [usize; 6] = [1, 2, 3, 4, 5, 7];
+
+/// The frozen reduced Rescue-Prime round counts, uniform across all five instances.
+///
+/// Uniform so the rungs are comparable across the two widths and the five constant tables, and
+/// strictly below `EASY1`'s `N = 4`, which is the smallest specified round count — so no reduced
+/// row can be read as a specified instance at any instance.
+const RESCUE_REDUCED: [usize; 3] = [1, 2, 3];
+
+/// The bounty `hm2021` lists for a Feistel-MiMC round count, where it lists one.
+///
+/// `None` for `r = 6` and `r = 10`: `hm2021` keeps only the two withdrawn rungs that fell, so
+/// those two have no published figure at all and inventing one would be the easiest possible way
+/// to misreport this program.
+fn feistel_reward(rounds: usize) -> Option<&'static str> {
+    match rounds {
+        14 => Some("$6,000"),
+        18 => Some("$12,000"),
+        22 => Some("$2,000"),
+        25 => Some("$4,000"),
+        30 => Some("$6,000"),
+        35 => Some("$12,000"),
+        40 => Some("$26,000"),
+        // The withdrawn rungs hm2021 does not tabulate.
+        _ => None,
+    }
+}
+
+/// What the outside world has recorded about a Feistel-MiMC round count.
+///
+/// Only `r = 14` and `r = 18` fell. Neither is dated: `hm2021` publishes the cost and no date, so
+/// the date carried here is the **bound** the reference's own history gives — the parameters were
+/// replaced on 2021-12-20, which cannot have happened before the break that caused it.
+fn feistel_external(rounds: usize) -> ExternalStatus {
+    match rounds {
+        14 | 18 => ExternalStatus::SolvedExternally {
+            verified: "2021-12-20 at the latest, when the reference replaced these parameters; \
+                       hm2021 records the executed cost and no date",
+        },
+        _ => ExternalStatus::NoneRecorded {
+            as_of: "2026-11-08",
+        },
+    }
+}
+
+/// The published executed-attack figures for a Feistel-MiMC round count, if any.
+fn hm2021_feistel_points(rounds: usize) -> &'static [ReferencePoint] {
+    match rounds {
+        14 => HM2021_FEISTEL_R14,
+        18 => HM2021_FEISTEL_R18,
+        // Every other cost column in hm2021 is the designers' own 3^r formula, not a measurement,
+        // and must not be registered as one.
+        _ => NO_REFERENCE_POINTS,
+    }
+}
+
+/// The bounty `hm2021` lists for a Rescue-Prime instance.
+fn rescue_reward(instance: BountyInstance) -> &'static str {
+    match instance {
+        BountyInstance::Easy1 => "$2,000",
+        BountyInstance::Easy2 => "$4,000",
+        BountyInstance::Medium => "$6,000",
+        BountyInstance::Hard1 => "$12,000",
+        BountyInstance::Hard2 => "$26,000",
+    }
+}
+
+/// What the outside world has recorded about a Rescue-Prime instance.
+///
+/// `EASY1` alone fell, and `hm2021` dates it no more than it dates the Feistel-MiMC breaks. The
+/// bound here is the program's own submission deadline rather than a replacement commit, because
+/// these parameters were never replaced.
+fn rescue_external(instance: BountyInstance) -> ExternalStatus {
+    match instance {
+        BountyInstance::Easy1 => ExternalStatus::SolvedExternally {
+            verified: "2022-11-30 at the latest, the program's submission deadline; hm2021 \
+                       records the executed cost and no date",
+        },
+        _ => ExternalStatus::NoneRecorded {
+            as_of: "2026-11-08",
+        },
+    }
+}
+
+/// The published executed-attack figure for a Rescue-Prime instance, if any.
+fn hm2021_rescue_points(instance: BountyInstance) -> &'static [ReferencePoint] {
+    match instance {
+        BountyInstance::Easy1 => HM2021_RESCUE_EASY1,
+        // The other four cost columns are the designers' own formula from the Rescue-Prime
+        // specification section 2.5 with alpha, N and m substituted in.
+        _ => NO_REFERENCE_POINTS,
+    }
+}
 
 /// Every problem M23 is measured against.
 ///

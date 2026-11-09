@@ -32,7 +32,8 @@ use zeebra::{
         analyze,
         research::{
             verify_against_feistel_mimc_trace, FeistelMimc, FeistelMimcCico, FeistelMimcModel,
-            FeistelMimcParameters, FEISTEL_MIMC_BOUNTY_ROUNDS, FEISTEL_MIMC_WITHDRAWN_ROUNDS,
+            FeistelMimcParameters, FEISTEL_MIMC_BOUNTY_ROUNDS, FEISTEL_MIMC_LADDER_PLANT,
+            FEISTEL_MIMC_WITHDRAWN_ROUNDS,
         },
         solve_one_planned, F4Options, PlannedSolveOptions, SolveOptions, SolveOutcome, SolvePolicy,
     },
@@ -43,7 +44,10 @@ use zeebra::{
 type F = Zp18446744073709551557;
 
 /// The input every planted row plants from, so the ladder's rungs are comparable.
-const PLANT: u64 = 0x5eed_1234_5678_9abc;
+///
+/// Shared with the registry's planted rows rather than chosen here: the plant is part of a planted
+/// instance's identity, so two copies could silently measure two different problems.
+const PLANT: u64 = FEISTEL_MIMC_LADDER_PLANT;
 
 fn options() -> PlannedSolveOptions {
     PlannedSolveOptions {

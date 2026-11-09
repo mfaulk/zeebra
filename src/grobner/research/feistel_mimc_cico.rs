@@ -89,6 +89,14 @@ impl FeistelMimcModel {
     }
 }
 
+/// The input the planted ladder plants its target from.
+///
+/// Part of a planted instance's identity, because the target **is** a function of the plant: two
+/// plants are two different problems. Named once here so the registry's planted rows and
+/// `examples/feistel_mimc_cico.rs` cannot disagree — a row whose plant differed from the example's
+/// would be a row nothing was ever measured against.
+pub const LADDER_PLANT: u64 = 0x5eed_1234_5678_9abc;
+
 /// A Feistel-MiMC CICO instance: a permutation, a model, and a target.
 ///
 /// The bounty objective is `Perm(X, 0) = (Y, 0)` with `Y` unconstrained — CICO(1) on the
