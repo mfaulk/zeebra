@@ -1290,6 +1290,26 @@ bracket exceeded it rather than averaging it in. A build on a machine this conte
 capped — `-j24` — for the same reason: an uncapped `cargo build --release` here is itself one of the
 storms that invalidated campaign one.
 
+**Re-validated at the merge target.** §13.3's binaries were built at `e20d79da`; `main` then gained
+[#330](https://github.com/mfaulk/zeebra/issues/330), which releases the interned monomial set as soon
+as the columns are built — a memory change on a measured path. §12.3 bounds that term at **0.07%** of
+`katsura-11`'s peak, and that bound was checked rather than assumed: both arms were rebuilt at the
+rebased tree and re-run interleaved.
+
+| rung | arm | `VmHWM` at `e20d79da` | at the merge target | x payload, both |
+|---|---|---:|---:|---:|
+| `katsura-10` | swap | 1 217.9 MB | 1 219.8 MB | 7.77x |
+| `katsura-10` | copy-back | 400.1 MB | 401.3 MB | 1.79x |
+| `mq-random-10` | swap | 598.8 MB | 597.9 MB | 18.13x |
+| `mq-random-10` | copy-back | 160.0 MB | 159.1 MB | 1.93x |
+| `katsura-11` | swap | 13 145.9 MB | 13 150.7 MB | 11.44x |
+| `katsura-11` | copy-back | 2 759.5 MB | 2 762.0 MB | 1.81x |
+
+Every `VmHWM` agrees to within **0.6%** and every capacity ratio to the reported precision, and
+`katsura-11`'s copy-back interreduction stage came back at 50 228.5 ms against the published
+50 286.7 ms, a **0.12%** difference. So #330 does not reach these figures and §13.3 describes the
+tree this change merges into.
+
 The policy's correctness is checked in the ordinary suite rather than here:
 
 ```sh
