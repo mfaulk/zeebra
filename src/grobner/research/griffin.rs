@@ -16,8 +16,9 @@
 //! publishes comes out only if that tie-break is FreeLunch's.
 
 use crate::{
-    fields::KnownOrder, FiniteField, Monomial, MonomialOrder, MultivariatePolynomial,
-    WeightedOrderError, WeightedTieBreak,
+    fields::KnownOrder, lagrange_interpolate, linalg::Matrix, FiniteField, Monomial, MonomialOrder,
+    MultivariatePolynomial, NormalFormError, Polynomial, UnivariatePolynomial, WeightedOrderError,
+    WeightedTieBreak,
 };
 
 /// The prime of the FreeLunch Griffin instance `(t, α) = (12, 3)`, 55 bits.
@@ -171,7 +172,250 @@ impl<const N: usize, F: KnownOrder> FreeLunchSystem<N, F> {
     pub fn order(&self) -> Result<MonomialOrder, WeightedOrderError> {
         MonomialOrder::weighted(&self.weights, WeightedTieBreak::LastVariableFirst)
     }
+
+    /// The modelling equations `p_1, …, p_{N-1}`, whose leading monomials are `x_i^α`.
+    pub fn modelling(&self) -> &[MultivariatePolynomial<N, F>] {
+        &self.generators[..self.generators.len() - 1]
+    }
+
+    /// `g`, the last generator, whose leading monomial is `x_0^{α_0}`.
+    pub fn eliminant_generator(&self) -> &MultivariatePolynomial<N, F> {
+        &self.generators[self.generators.len() - 1]
+    }
+
+    /// `α`, read off the leading monomial `x_1^α` of the first modelling equation.
+    ///
+    /// Taken from the system rather than from a header field so that it cannot disagree with the
+    /// polynomials it describes. Returns `None` at `N = 1`, where there is no modelling equation.
+    pub fn alpha(&self) -> Option<u32> {
+        let order = self.order().ok()?;
+        Some(
+            self.modelling()
+                .first()?
+                .leading_monomial(order)
+                .exponents()[1],
+        )
+    }
+
+    /// `H`: the `D_H = α^{N-1}` monomials in `x_1, …, x_{N-1}` of every exponent below `α`.
+    ///
+    /// `LM(p_i) = x_i^α` for each `i ≥ 1`, and those leading monomials are pairwise coprime, so
+    /// `{p_1, …, p_{N-1}}` is a Gröbner basis of the ideal it generates and `H` is the set of
+    /// standard monomials of that ideal in the tail variables. `R/⟨p_1, …, p_{N-1}⟩` is therefore
+    /// a **free** `F_p[x_0]`-module with basis `H` — which is the structure FreeLunch's `matGen`
+    /// stage works in, and the reason `polyDet` is `D_H × D_H` rather than `D_I × D_I`.
+    pub fn module_basis(&self) -> Vec<Monomial<N>> {
+        let Some(alpha) = self.alpha() else {
+            return vec![Monomial::new(&[0u32; N])];
+        };
+        let mut basis = vec![[0u32; N]];
+        for variable in 1..N {
+            basis = basis
+                .into_iter()
+                .flat_map(|exponents| {
+                    (0..alpha).map(move |power| {
+                        let mut next = exponents;
+                        next[variable] = power;
+                        next
+                    })
+                })
+                .collect();
+        }
+        basis.iter().map(|e| Monomial::new(e)).collect()
+    }
+
+    /// FreeLunch's `matGen`: the `D_H × D_H` matrix over `F_p[x_0]` of `g` acting on `H`.
+    ///
+    /// `R/⟨p_1, …, p_{N-1}⟩` is free over `F_p[x_0]` on [`module_basis`](Self::module_basis), and
+    /// the image of `⟨g⟩` in it is generated over `F_p[x_0]` by `{NF(g·h) : h ∈ H}`. Writing those
+    /// `D_H` normal forms in the `H` coordinates gives a matrix `M(x_0)` with
+    /// `R/I ≅ coker M(x_0)`, so `deg det M = D_I` and `det M ∈ I ∩ F_p[x_0]`.
+    ///
+    /// The reduction is [`normal_form_modulo`](MultivariatePolynomial::normal_form_modulo) against
+    /// the modelling equations, whose leading monomials are pairwise coprime — so the basis it is
+    /// handed is certified a Gröbner basis by inspection and **no Gröbner engine runs here**.
+    ///
+    /// # Errors
+    /// [`MatGenError`] if the ring has no tail variable, if the weighted order is malformed, or if
+    /// a reduction fails or leaves a monomial outside the `H` span.
+    pub fn module_matrix(&self) -> Result<ModuleMatrix<N, F>, MatGenError> {
+        if N < 2 {
+            return Err(MatGenError::NoTailVariable);
+        }
+        let order = self.order().map_err(MatGenError::Order)?;
+        let basis = self.module_basis();
+        let index: std::collections::HashMap<Monomial<N>, usize> =
+            basis.iter().enumerate().map(|(i, h)| (*h, i)).collect();
+        let g = self.eliminant_generator();
+
+        let mut columns = Vec::with_capacity(basis.len());
+        for h in &basis {
+            let shift = MultivariatePolynomial::new(&[(*h, F::one())]);
+            let reduced = (&shift * g)
+                .normal_form_modulo(self.modelling(), order)
+                .map_err(MatGenError::NormalForm)?;
+
+            let mut column: Vec<Vec<F>> = vec![Vec::new(); basis.len()];
+            for (monomial, coefficient) in reduced.terms() {
+                let mut tail = [0u32; N];
+                tail.copy_from_slice(monomial.exponents());
+                let degree = tail[0] as usize;
+                tail[0] = 0;
+                let row = *index
+                    .get(&Monomial::new(&tail))
+                    .ok_or(MatGenError::OutsideTheModuleBasis)?;
+                if column[row].len() <= degree {
+                    column[row].resize(degree + 1, F::zero());
+                }
+                column[row][degree] = *coefficient;
+            }
+            columns.push(
+                column
+                    .into_iter()
+                    .map(|c| UnivariatePolynomial::new(&c))
+                    .collect(),
+            );
+        }
+        Ok(ModuleMatrix { basis, columns })
+    }
+
+    /// FreeLunch's `polyDet`: `det M(x_0)`, a nonzero element of `I ∩ F_p[x_0]` of degree `D_I`.
+    ///
+    /// Computed by evaluation and interpolation over the scalar field rather than by any
+    /// polynomial-matrix arithmetic: `deg det M + 1` scalar `D_H × D_H` determinants through
+    /// [`Matrix::determinant`], then one Lagrange interpolation. `D_H` is `α^{N-1}` — 3 at `r = 4`
+    /// and 9 at `r = 5` — so the determinants are tiny and the cost is the interpolation, which is
+    /// why `docs/research/griffin-freelunch.md` §4.1 concluded no polynomial-matrix determinant
+    /// subsystem is needed for this instance class.
+    ///
+    /// The result generates `I ∩ F_p[x_0]` only up to the extraneous factors a determinant can
+    /// carry; what is guaranteed is membership, which is what makes the published witnesses a
+    /// test of it.
+    ///
+    /// # Errors
+    /// As [`module_matrix`](Self::module_matrix), plus [`MatGenError::Determinant`] if a scalar
+    /// determinant is refused and [`MatGenError::NotEnoughPoints`] if the field is too small to
+    /// interpolate the degree bound.
+    pub fn eliminant(&self) -> Result<UnivariatePolynomial<F>, MatGenError> {
+        self.module_matrix()?.determinant()
+    }
 }
+
+/// FreeLunch's `matGen` output: `D_H` normal forms as a matrix over `F_p[x_0]`.
+#[derive(Clone, Debug)]
+pub struct ModuleMatrix<const N: usize, F: FiniteField> {
+    /// `H`, the free `F_p[x_0]`-module basis of `R/⟨p_1, …, p_{N-1}⟩`.
+    pub basis: Vec<Monomial<N>>,
+
+    /// `columns[j][i]` is the `F_p[x_0]` coordinate of `basis[i]` in `NF(g · basis[j])`.
+    pub columns: Vec<Vec<UnivariatePolynomial<F>>>,
+}
+
+impl<const N: usize, F: FiniteField> ModuleMatrix<N, F> {
+    /// `D_H`, the matrix order.
+    pub fn order(&self) -> usize {
+        self.basis.len()
+    }
+
+    /// The `F_p[x_0]` coefficients the matrix stores, i.e. what `matGen` costs in memory.
+    ///
+    /// The quantity `docs/research/griffin-freelunch.md` §4.2 projects as `α_0 · D_H` per column.
+    pub fn coefficients(&self) -> usize {
+        self.columns
+            .iter()
+            .flatten()
+            .map(|p| p.coefficients().len())
+            .sum()
+    }
+
+    /// `Σ_j max_i deg M_ij`, the Hadamard-style bound on `deg det M`.
+    pub fn determinant_degree_bound(&self) -> usize {
+        self.columns
+            .iter()
+            .map(|column| {
+                column
+                    .iter()
+                    .map(|p| if p.is_zero() { 0 } else { p.degree() as usize })
+                    .max()
+                    .unwrap_or(0)
+            })
+            .sum()
+    }
+
+    /// `det M(x_0)`, by evaluation and interpolation. See [`FreeLunchSystem::eliminant`].
+    ///
+    /// # Errors
+    /// [`MatGenError::Determinant`] if a scalar determinant is refused, and
+    /// [`MatGenError::NotEnoughPoints`] if the field has fewer elements than the degree bound
+    /// needs samples.
+    pub fn determinant(&self) -> Result<UnivariatePolynomial<F>, MatGenError> {
+        let n = self.order();
+        let samples = self.determinant_degree_bound() + 1;
+        let mut points = Vec::with_capacity(samples);
+        let mut at = F::zero();
+        for _ in 0..samples {
+            let mut entries = Vec::with_capacity(n * n);
+            for row in 0..n {
+                for column in 0..n {
+                    entries.push(self.columns[column][row].eval(&at));
+                }
+            }
+            let value = Matrix::new(n, n, &entries)
+                .determinant()
+                .map_err(|_| MatGenError::Determinant)?;
+            points.push((at, value));
+            at += F::one();
+            // `at` wrapping back to zero means the field ran out of distinct abscissae before
+            // the degree bound was covered, which interpolation would otherwise assert on.
+            if at.is_zero() && points.len() < samples {
+                return Err(MatGenError::NotEnoughPoints { samples });
+            }
+        }
+        Ok(lagrange_interpolate(points))
+    }
+}
+
+/// Why FreeLunch's `matGen` or `polyDet` could not be run on a fixture.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MatGenError {
+    /// The ring has only `x_0`, so there is no modelling equation and no module basis.
+    NoTailVariable,
+
+    /// The fixture's weight vector is not an admissible order.
+    Order(WeightedOrderError),
+
+    /// A reduction against the modelling equations was refused.
+    NormalForm(NormalFormError),
+
+    /// A reduced normal form carried a monomial outside the `H` span, so the modelling equations
+    /// are not the Gröbner basis this routine assumes.
+    OutsideTheModuleBasis,
+
+    /// A scalar determinant was refused, which for a square matrix cannot happen.
+    Determinant,
+
+    /// The field has fewer elements than the determinant's degree bound needs sample points.
+    NotEnoughPoints { samples: usize },
+}
+
+impl std::fmt::Display for MatGenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoTailVariable => write!(f, "the ring has no variable beyond x_0"),
+            Self::Order(e) => write!(f, "the fixture's order is not admissible: {}", e),
+            Self::NormalForm(e) => write!(f, "a reduction was refused: {}", e),
+            Self::OutsideTheModuleBasis => {
+                write!(f, "a normal form left the span of the module basis")
+            }
+            Self::Determinant => write!(f, "a scalar determinant was refused"),
+            Self::NotEnoughPoints { samples } => {
+                write!(f, "the field has fewer than {} elements", samples)
+            }
+        }
+    }
+}
+
+impl std::error::Error for MatGenError {}
 
 fn parse_usize(field: Option<&&str>, line: usize) -> Result<usize, FixtureError> {
     field
@@ -230,8 +474,12 @@ mod tests {
     use super::{FreeLunchSystem, FREELUNCH_PRIME, FREELUNCH_R4, FREELUNCH_R5};
     use crate::{
         fields::PrimeFieldElement64,
-        grobner::{fglm::QuotientBasis, leading_monomials_are_pairwise_coprime},
-        FiniteField, Monomial, MonomialOrder, WeightedTieBreak, Zero,
+        grobner::{
+            buchberger_with_statistics, f4_with_options, fglm::QuotientBasis,
+            leading_monomials_are_pairwise_coprime, F4Options, PairCriteria,
+        },
+        FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, Polynomial, WeightedTieBreak,
+        Zero,
     };
 
     type F = PrimeFieldElement64<FREELUNCH_PRIME>;
@@ -397,6 +645,241 @@ mod tests {
             assert!(
                 reduced.eval(witness).is_zero(),
                 "the reduced g does not vanish at a published witness"
+            );
+        }
+    }
+
+    /// F4 builds **no matrix at all** under `≺_G`, at both round counts.
+    ///
+    /// This is #202's architectural question answered by measurement rather than by argument.
+    /// "The order removes F4" is a claim about work performed, so it is checked against the
+    /// statistics F4 reports: every pair is selected, every pair is discharged by Buchberger's
+    /// first criterion, and no Macaulay matrix is ever constructed. The shipped configuration is
+    /// enough on its own — `PairCriteria::default()` *is* `PRODUCT_ONLY`, so nothing here depends
+    /// on the chain criterion or on Gebauer–Möller.
+    #[test]
+    fn test_f4_does_no_reduction_at_all_under_the_weighted_order() {
+        // k generators give C(k, 2) pairs, and all of them must be discharged.
+        fn check<const N: usize>(fixture: &str, pairs: usize) {
+            let system = FreeLunchSystem::<N, F>::parse(fixture).unwrap();
+            let order = system.order().unwrap();
+            let k = system.generators.len();
+            assert_eq!(k * (k - 1) / 2, pairs);
+            assert_eq!(PairCriteria::default(), PairCriteria::PRODUCT_ONLY);
+
+            let (basis, statistics) =
+                f4_with_options(&system.generators, order, &F4Options::default()).unwrap();
+
+            assert_eq!(statistics.pairs_considered, pairs);
+            assert_eq!(statistics.pairs_eliminated_by_product_criterion, pairs);
+            assert_eq!(statistics.criteria.total(), pairs);
+
+            // The claim: no linear algebra happened.
+            assert_eq!(statistics.pairs_reduced, 0);
+            assert_eq!(statistics.batches, 0);
+            assert_eq!(statistics.max_matrix_rows, 0);
+            assert_eq!(statistics.max_matrix_columns, 0);
+            assert_eq!(statistics.max_live_nonzeros, 0);
+            assert_eq!(statistics.elements_added, 0);
+            assert_eq!(basis.len(), k);
+        }
+
+        check::<2>(FREELUNCH_R4, 1);
+        check::<3>(FREELUNCH_R5, 3);
+    }
+
+    /// With every criterion switched off, F4 does build matrices — and returns the same basis.
+    ///
+    /// The control for the test above, and the measurement of what the criterion is worth. Zero
+    /// batches under the criteria only means something if the same engine on the same input does
+    /// non-trivial work without them: at `r = 5` this reduces all three S-polynomials, every one
+    /// to zero, adds nothing to the basis, and gets there through a Macaulay matrix of several
+    /// thousand rows and columns. So the order does not make the *ideal* easy — it makes the
+    /// first criterion applicable, and that is what removes the linear algebra.
+    #[test]
+    fn test_without_the_criteria_f4_reduces_the_pairs_to_zero_for_the_same_basis() {
+        let system = FreeLunchSystem::<3, F>::parse(FREELUNCH_R5).unwrap();
+        let order = system.order().unwrap();
+        let options = F4Options {
+            criteria: PairCriteria::NONE,
+            ..F4Options::default()
+        };
+        let (basis, statistics) = f4_with_options(&system.generators, order, &options).unwrap();
+
+        assert_eq!(statistics.criteria.total(), 0);
+        assert_eq!(
+            statistics.pairs_reduced, 3,
+            "the three pairs of the three generators"
+        );
+        assert!(statistics.batches > 0, "a matrix was built");
+        assert!(
+            statistics.max_matrix_rows > 1_000 && statistics.max_matrix_columns > 1_000,
+            "the saved matrix is thousands of rows and columns, not a rounding note: {}x{}",
+            statistics.max_matrix_rows,
+            statistics.max_matrix_columns
+        );
+        assert_eq!(
+            statistics.elements_added, 0,
+            "every S-polynomial reduced to zero"
+        );
+
+        let (certified, _) =
+            f4_with_options(&system.generators, order, &F4Options::default()).unwrap();
+        assert_eq!(basis, certified, "the criteria did not change the answer");
+    }
+
+    /// The basis F4 returns under `≺_G` is the input system itself, made monic.
+    ///
+    /// Zero work and the right answer are separate claims: a computation that returned a *smaller*
+    /// basis would also report zero batches. The input generators are already interreduced — no
+    /// tail monomial of any one is divisible by another's leading monomial — so the reduced
+    /// Gröbner basis, which is unique for the ideal and the order, is the input.
+    #[test]
+    fn test_the_basis_under_the_weighted_order_is_the_input_system() {
+        let system = FreeLunchSystem::<3, F>::parse(FREELUNCH_R5).unwrap();
+        let order = system.order().unwrap();
+        let (basis, _) = f4_with_options(&system.generators, order, &F4Options::default()).unwrap();
+
+        let monic =
+            |f: &MultivariatePolynomial<3, F>| f.scale(&f.leading_coefficient(order).inverse());
+        let mut expected: Vec<_> = system.generators.iter().map(monic).collect();
+        let mut got: Vec<_> = basis.iter().map(monic).collect();
+        let key = |f: &MultivariatePolynomial<3, F>| f.leading_monomial(order);
+        expected.sort_by(|a, b| order.cmp(&key(a), &key(b)));
+        got.sort_by(|a, b| order.cmp(&key(a), &key(b)));
+        assert_eq!(got, expected);
+    }
+
+    /// Buchberger agrees: three pairs, three product-criterion eliminations, zero S-polynomials.
+    ///
+    /// The second engine matters because F4 batches pairs and could in principle skip a degree
+    /// without reporting it. Buchberger takes pairs off a queue one at a time, so its counters are
+    /// the direct account of "no reduction was performed".
+    #[test]
+    fn test_buchberger_discharges_every_pair_by_the_first_criterion() {
+        for (label, pairs) in [("r4", 1usize), ("r5", 3usize)] {
+            let (statistics, generators) = if label == "r4" {
+                let system = FreeLunchSystem::<2, F>::parse(FREELUNCH_R4).unwrap();
+                let order = system.order().unwrap();
+                let (_, statistics) = buchberger_with_statistics(&system.generators, order);
+                (statistics, system.generators.len())
+            } else {
+                let system = FreeLunchSystem::<3, F>::parse(FREELUNCH_R5).unwrap();
+                let order = system.order().unwrap();
+                let (_, statistics) = buchberger_with_statistics(&system.generators, order);
+                (statistics, system.generators.len())
+            };
+            assert_eq!(statistics.pairs_considered, pairs, "{}", label);
+            assert_eq!(
+                statistics.pairs_eliminated_by_product_criterion, pairs,
+                "{}",
+                label
+            );
+            assert_eq!(statistics.pairs_reduced, 0, "{}", label);
+            assert_eq!(statistics.zero_reductions, 0, "{}", label);
+            assert_eq!(statistics.elements_added, 0, "{}", label);
+            assert_eq!(generators * (generators - 1) / 2, pairs, "{}", label);
+        }
+    }
+
+    /// `matGen` produces a `D_H × D_H` matrix over `F_p[x_0]`, with `D_H = α^{N-1}`.
+    ///
+    /// The stage `docs/research/griffin-freelunch.md` §4.2 names as the attack's real blocker,
+    /// and the one the order alone does not provide. The shape is the claim: `D_H` is 3 at
+    /// `r = 4` and 9 at `r = 5`, not `D_I`'s 441 and 9261, which is why §4.1 concluded that
+    /// evaluation–interpolation over the scalar field is the right algorithm for `polyDet`.
+    #[test]
+    fn test_matgen_has_the_published_module_rank() {
+        let r4 = FreeLunchSystem::<2, F>::parse(FREELUNCH_R4).unwrap();
+        assert_eq!(r4.alpha(), Some(3));
+        let m4 = r4.module_matrix().unwrap();
+        assert_eq!(m4.order(), 3, "D_H = alpha^1");
+        assert_eq!(m4.basis.len(), 3);
+
+        let r5 = FreeLunchSystem::<3, F>::parse(FREELUNCH_R5).unwrap();
+        assert_eq!(r5.alpha(), Some(3));
+        let m5 = r5.module_matrix().unwrap();
+        assert_eq!(m5.order(), 9, "D_H = alpha^2");
+        // Every row index is a tail monomial with both exponents below alpha.
+        for h in &m5.basis {
+            assert_eq!(h.exponents()[0], 0);
+            assert!(h.exponents()[1] < 3 && h.exponents()[2] < 3);
+        }
+    }
+
+    /// `polyDet` has degree exactly `D_I`, by a route that never computes a Gröbner basis.
+    ///
+    /// `R/I` is the cokernel of `matGen`'s matrix over `F_p[x_0]`, so `deg det M = D_I`. That
+    /// makes the determinant's degree a fifth independent route to 441 and 9261 — and an
+    /// end-to-end check on `matGen`, since a wrong normal form would almost surely shift it.
+    #[test]
+    fn test_polydet_has_degree_equal_to_the_quotient_dimension() {
+        let r4 = FreeLunchSystem::<2, F>::parse(FREELUNCH_R4).unwrap();
+        assert_eq!(r4.eliminant().unwrap().degree() as usize, 441);
+
+        let r5 = FreeLunchSystem::<3, F>::parse(FREELUNCH_R5).unwrap();
+        assert_eq!(r5.eliminant().unwrap().degree() as usize, 9261);
+    }
+
+    /// The `r = 5` eliminant vanishes at **both published witnesses'** `x_0` coordinates.
+    ///
+    /// The end-to-end faithfulness gate for the whole attack rather than for the system alone:
+    /// `det M ∈ I ∩ F_p[x_0]` by the adjugate identity, so it must vanish at the first coordinate
+    /// of every solution — and these two values are printed in the FreeLunch appendix. `sysGen`
+    /// (the checked-in fixture), `matGen` and `polyDet` all have to be right for this to hold,
+    /// and no Gröbner basis was computed anywhere along the way.
+    #[test]
+    fn test_the_r5_eliminant_vanishes_at_both_published_witnesses() {
+        let system = FreeLunchSystem::<3, F>::parse(FREELUNCH_R5).unwrap();
+        let eliminant = system.eliminant().unwrap();
+        assert!(!eliminant.is_zero());
+        assert_eq!(system.witnesses.len(), 2);
+        for witness in &system.witnesses {
+            assert!(
+                eliminant.eval(&witness[0]).is_zero(),
+                "the eliminant does not vanish at a published witness's x_0"
+            );
+        }
+        // A control: it does not vanish at an unrelated point, so the check above is not vacuous.
+        assert!(!eliminant.eval(&F::new(2)).is_zero());
+    }
+
+    /// `matGen`'s coefficient count is the `α_0 · D_H` per column the projection assumed.
+    ///
+    /// §4.2 projected `matGen`'s memory from `α_0` and `D_H` without building it. Measured here:
+    /// the matrix holds within a small factor of `α_0 · D_H²` field elements, which is the figure
+    /// that projection rests on, so the `r = 6` and `r = 7` extrapolations have a measured base.
+    #[test]
+    fn test_matgen_stores_about_alpha0_times_d_h_squared_coefficients() {
+        for (label, measured, alpha0, d_h) in [
+            (
+                "r4",
+                FreeLunchSystem::<2, F>::parse(FREELUNCH_R4)
+                    .unwrap()
+                    .module_matrix()
+                    .unwrap()
+                    .coefficients(),
+                147usize,
+                3usize,
+            ),
+            (
+                "r5",
+                FreeLunchSystem::<3, F>::parse(FREELUNCH_R5)
+                    .unwrap()
+                    .module_matrix()
+                    .unwrap()
+                    .coefficients(),
+                1029,
+                9,
+            ),
+        ] {
+            let projected = alpha0 * d_h * d_h;
+            assert!(
+                measured <= 2 * projected && measured * 2 >= projected,
+                "{}: measured {} against the projected {}",
+                label,
+                measured,
+                projected
             );
         }
     }
