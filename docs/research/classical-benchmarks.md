@@ -2,7 +2,11 @@
 
 **Measured at:** publication bound `f94b3df0` for Zeebra's own figures in §5; every external timing
 is quoted from its source — §2.1 and §2.2 from Steel's 2004 page, §2.3 from Magma's V2.27 topic page
-([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+([the protocol's §10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
+**§10's `GF(2)` values are invariants rather than timings** — Krull dimensions, quotient dimensions
+and basis sizes, none of which depends on the machine or the clock — measured at `590eee15` across
+Zeebra, msolve 0.11.0, Singular, Groebner.jl and Sagebrush. §10 publishes **no** wall-clock figure,
+which §4 forbids against the 2004 column and §7 reaffirms.
 
 Deliverable for A7 (#199), a child of the benchmark-corpus epic #65. The question: do Zeebra's three
 synthetic generators — `cyclic`, `katsura`, `planted` — have external reference points, and if so
@@ -367,4 +371,133 @@ to be quoted; see #198 for why that rule exists.
   comparand yet. #218 has since made characteristic two work, so that is now possible.
   **`GF(32003)` has since been measured (#426)**: it is a published corpus characteristic, and
   `research/competitive/` carries Zeebra, Singular, msolve, Groebner.jl and Sagebrush over it on the
-  whole Katsura/Cyclic/MQ ladder. GF(2) remains unmeasured here.
+  whole Katsura/Cyclic/MQ ladder. **`GF(2)` has since been measured too (#427)** — §10.
+
+---
+
+## 10. GF(2): the Cyclic invariants, measured (#427)
+
+**No wall-clock comparison against §2.2's figures is drawn here, and none may be.** §4's three
+reasons stand and §7 graded Steel's page "accept, for invariants only". What §2.2 is good for is the
+one checkable claim on it — "The ideal has dimension 4" at Cyclic 10 — and that is a *Krull*
+dimension, not the vector-space dimension the `GF(32003)` note reports. §2.2 already drew that
+distinction; this section acts on it.
+
+### 10.1 Zeebra gained a Krull dimension, because it did not have one
+
+Checking Steel's 4 needed a quantity the crate could not compute. `IdealClass` is three-valued —
+`Unit`, `ZeroDimensional`, `PositiveDimensional` — and `PositiveDimensional` carries no integer, so
+"positive-dimensional" was the most that could be said about any of the degenerate rungs below.
+`fglm::krull_dimension` is the addition: for a monomial ideal, `dim R/J` is the size of the largest
+set of variables containing no leading monomial's support, which is a branch-and-bound over subsets
+that collapses after `N` checks whenever the ideal is zero-dimensional. It agrees with Singular's
+`dim` and Groebner.jl's `Groebner.dimension` wherever both were run.
+
+### 10.2 The invariants, four ways
+
+All values measured on this machine, none cited. Controls at `GF(32003)` reproduce the published
+70, 156 and 924 exactly, which is what licenses the `GF(2)` column beside them.
+
+| rung | `GF(32003)` control | `GF(2)` Krull dim | `GF(2)` `D` | `GF(2)` grevlex basis | agreeing engines |
+|---|---|---:|---:|---:|---|
+| `cyclic-4` | positive-dim, Krull 1 | 1 | — | 7 | Zeebra, Singular |
+| `cyclic-5` | zero-dim, `D = 70` | 0 | 70 | 20 | Zeebra, msolve, Singular, Groebner.jl, Sagebrush |
+| `cyclic-6` | zero-dim, `D = 156` | **2** | — | 19 | Zeebra, msolve, Singular, Groebner.jl |
+| `cyclic-7` | zero-dim, `D = 924` | 0 | **728** | 173 | Zeebra, msolve, Singular, Groebner.jl |
+| `cyclic-8` | positive-dim, Krull 1 | **3** | — | 191 | msolve, Groebner.jl |
+| `cyclic-9` | positive-dim (Backelin) | **2** | — | 1228 | msolve, Groebner.jl |
+
+**Two findings here are worth more than the rows.**
+
+The first is that **Backelin's squarefree criterion is a characteristic-zero statement.** It says
+cyclic-`n` has finitely many roots exactly when `n` is squarefree, and §3.1 records Zeebra agreeing
+with it at three rungs. Mod 2 it fails: `6 = 2 · 3` is squarefree and `cyclic-6` over `GF(2)` has
+Krull dimension 2. `corpus::test_backelins_criterion_does_not_survive_the_reduction_mod_two` is the
+assertion, and the criterion's test in `corpus.rs` is now scoped to the characteristics where it
+holds rather than asserted universally.
+
+The second is that **the reduction is not uniformly destructive, and that is why a blanket
+characteristic would have been wrong.** `cyclic-4` and `cyclic-5` are completely unmoved — Krull 1
+and `D = 70`, the same instances' invariants at `2^31 − 1`. `cyclic-7` stays zero-dimensional and
+changes its count. `cyclic-6` changes class. `cyclic-8` stays positive-dimensional and changes its
+dimension, from 1 to 3 — which is the case a `zero_dimensional: bool` cannot express and the reason
+`corpus::Degeneracy` records a Krull dimension instead.
+
+### 10.3 Whether the field equations are included: **no, in every published row**
+
+Over `GF(2)` the field equations `x^2 − x` are available, and an ideal with them adjoined is **a
+different ideal**. The README's phrasing is that they "make a quotient dimension count base-field
+points"; `src/grobner/field_equations.rs` implements them and
+`field_equations::the_quotient_dimension_counts_gf2_points_only_with_field_equations` is the
+demonstration that the count changes.
+
+**Steel's rows do not adjoin them, so no row in §10.2 does either.** Consequences, stated rather
+than left to be inferred:
+
+- `D = 728` at `cyclic-7` counts zeros over the algebraic closure of `GF(2)` **with multiplicity**.
+  It is *not* the number of `GF(2)`-rational points, and it must not be read as one.
+- A row that did adjoin them would be recorded by `Instance::transformation`, which is inside the
+  identity digest (`Instance::canonical`). So the two ideals can never collide on a digest and a
+  figure cannot migrate between them silently.
+  `corpus::test_no_published_row_carries_a_field_equation_transformation` is the guard on the whole
+  published corpus, not only the `GF(2)` part.
+
+This is the same silent-wrongness class as the `0x11D`/`0x11B` modulus #197 settled: a plausible
+number for an ideal nobody named.
+
+### 10.4 Which engines accept characteristic two
+
+Task 2's question, answered by running each engine rather than by reading its bounds. The field
+logic in `src/grobner/external/` reasoned about **upper** bounds only, so before this `GF(2)` was
+reported as the widest band on the board — the maximum corroboration at every task. One engine makes
+that false.
+
+| engine | basis at `GF(2)` | eliminant at `GF(2)` | conversion at `GF(2)` |
+|---|---|---|---|
+| Zeebra | yes — now compiled, Cyclic widths 4–10 | yes | yes |
+| msolve 0.11.0 | **yes**, verified to `cyclic-9` | **no — does not terminate** | n/a (no lex order at any field) |
+| Singular | yes, `dim`/`vdim` correct | yes | yes |
+| Groebner.jl | yes, and reports the Krull dimension | n/a (no FGLM in 0.10.11) | n/a |
+| Sagebrush | yes, both the `f4` and `fglm` routes | n/a (no eliminant) | yes |
+
+**msolve's eliminant is the one restriction, and it is a non-termination rather than a refusal.**
+Its sparse-FGLM needs the ideal in shape position; when the staircase is not generic enough its
+default remedy (`-c 2`) permutes the variables and then adjoins a *random* linear form. Over `GF(2)`
+there is no randomness to draw on — every nonzero coefficient is 1 — so the retry redraws from
+candidates that have already failed, and the loop has no exit. Measured on `cyclic-5` over `GF(2)`:
+74 140 `TIMINGS` blocks and 156 MB of verbose output in one minute, with the F4 basis itself
+complete almost immediately. The same input under `-c 0` quits at once with "Computation failed",
+which is the honest answer the default mode never reaches.
+
+This is the mirror image of msolve's *upper* eliminant bound, where above `1515531529` the
+sparse-FGLM failure is likewise laundered into an unbounded retry. So `msolve.rs` now declares
+`MIN_CHARACTERISTIC_ELIMINANT` beside `MAX_CHARACTERISTIC_ELIMINANT`, and `supports` refuses the
+task at `GF(2)` with a reason before any subprocess starts. Without that the sweep's wall limit
+would have recorded a **timing lower bound** for a computation that was never going to finish —
+`Unsupported`, not `StoppedByLimit`, is the difference.
+
+**The floor is declared as a necessary and not a sufficient condition, and the evidence for that is
+recorded rather than smoothed over.** At `p ≥ 3` the retry is probabilistic in both the prime and
+the instance: on `cyclic-5` the eliminant returns at `p = 7, 13, 17, 251` and `32003`, and **does
+not return at `p = 3, 5` or `11`**. A prime above the floor is therefore no promise of termination
+and the wall limit remains the backstop there; a prime below it is a promise of non-termination,
+which is the only part that may be declared as a bound. Inventing a clean "small primes fail" cutoff
+would have been wrong at `p = 11`.
+
+### 10.5 `cyclic-10` against Steel's Krull dimension 4
+
+Steel's Cyclic 10 over `GF(2)` is the rung this section exists for, and it is **the hardest rung on
+the whole corpus** — his own run took 12.3 hours and 9.3 GB of a 750 MHz Sunfire, and that was
+Magma's F4, the fastest engine in his table by an order of magnitude.
+
+**Not resolved at hand-off; the attempt and its stage are recorded, which is what #427 asks for.**
+`corpus::test_where_zeebras_cyclic_ladder_stops_over_gf2` is the attempt as a runnable test,
+printing a basis size and a Krull dimension per rung and refusing where it must. What is settled is
+everything up to it: the ladder is externally corroborated through `cyclic-9`, where two independent
+modern engines agree on both a 1228-element basis and Krull dimension 2.
+
+What that buys for Steel's 4 is a **consistency check rather than a confirmation**. His figure is
+the one rung above a sequence this document can now vouch for, and the sequence makes a dimension of
+4 at `cyclic-10` unremarkable where it would have looked anomalous against §2.1's zero-dimensional
+`GF(32003)` row: at `GF(2)` the Cyclic ladder is positive-dimensional at 6, 8 and 9 and
+zero-dimensional only at 5 and 7. **It is not yet checked, and it is not reported as checked.**

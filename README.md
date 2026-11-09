@@ -60,9 +60,14 @@ As the saying goes, you can either make software so simple that it obviously has
       594 KB, and an owned accumulator grows in place
 - [x] A cross-library corpus of six families whose ideal equivalence is checked before any timing
       is published, with the Katsura indexing and affine-versus-homogenized Cyclic conventions
-      resolved against msolve's own distributed input files — now at **two** reference
-      characteristics, `2^31 − 1` and `GF(32003)`, each rung frozen at each, because a rung at
-      another prime is another ideal and not the same one under a parameter
+      resolved against msolve's own distributed input files — now at **three** reference
+      characteristics, `2^31 − 1`, `GF(32003)` and `GF(2)`, each rung frozen at each it is published
+      at, because a rung at another prime is another ideal and not the same one under a parameter.
+      `GF(2)` is published for **Cyclic only**: characteristic two moves the invariants rather than
+      the clock — `cyclic-6` drops from zero-dimensional with `D = 156` to **Krull dimension 2** and
+      `cyclic-7`'s `D` from the proved 924 to **728** — so Backelin's squarefree criterion turns out
+      to be a characteristic-zero statement, and `fglm::krull_dimension` is the quantity the crate
+      needed to say so
 - [x] The ladder to `katsura-11` and `cyclic-10`, with the quotient dimension **asserted** per rung
       against the published record rather than merely reported: `2^(N−1)` exact at eight consecutive
       Katsura rungs, 70/156/**924** for Cyclic against Björck–Fröberg and Backelin–Fröberg, and the

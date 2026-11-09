@@ -464,22 +464,70 @@ digest rather than carried, and that is the right home for it.
 
 ---
 
-## 6. Characteristic two is blocked on a convention, not on effort
+## 6. Characteristic two: `GF(2)` is a published identity, `GF(2^k)` is still blocked
 
-`GF(2^k)` for `k > 1` is **not** in the corpus, and the reason is the one `FieldSpec` already
-encodes: two engines' default `GF(2^8)` need not be the same ring. Different Conway or defining
-polynomials give isomorphic but not identical representations, so a basis compared element by
-element across them disagrees for no mathematical reason, and an invariant like the leading
-monomials can genuinely differ.
+### 6a. `GF(2)` is the corpus's third published characteristic, for Cyclic only (#427)
+
+`corpus::BINARY_CHARACTERISTIC` is `2`, and the Cyclic rungs `cyclic-4` … `cyclic-10` each carry a
+frozen digest there alongside their `GF(32003)` and `2^31 − 1` ones. It is the **cheapest reachable
+external anchor** on Steel's page: his `GF(32003)` Cyclic 7 and Cyclic 8 carry `(Hom)` and are the
+homogenized system, a different ideal, while the `GF(2)` block carries no such mark and so names the
+affine system `benchmark_systems::cyclic` generates (`classical-benchmarks.md` §4).
+
+**Publication is now per rung, not per characteristic**, and that change is #427's finding rather
+than its convenience. A characteristic may only be published at where the rung's *invariants* are
+true, and characteristic two is the first one where they are not simply the generic ones:
+
+| rung | `2^31 − 1` / `32003` | `GF(2)` |
+|---|---|---|
+| `cyclic-4` | positive-dimensional, Krull 1 | **same** — Krull 1 |
+| `cyclic-5` | zero-dim, `D = 70` | **same** — zero-dim, `D = 70` |
+| `cyclic-6` | zero-dim, `D = 156` | **Krull dimension 2** |
+| `cyclic-7` | zero-dim, `D = 924` (proved) | zero-dim, **`D = 728`** |
+| `cyclic-8` | positive-dimensional, Krull 1 | **Krull dimension 3** |
+| `cyclic-9` | positive-dimensional (Backelin) | **Krull dimension 2** |
+
+So **Backelin's squarefree criterion is a characteristic-zero statement**: it predicts `cyclic-6`
+zero-dimensional, and mod 2 it is not. `test_backelins_criterion_does_not_survive_the_reduction_mod_two`
+is that assertion, and `corpus::DEGENERACIES` is where the per-characteristic invariants live —
+sparse, because characteristic two and Cyclic are the whole of it. `CorpusEntry::zero_dimensional_at`
+and `quotient_dimension_at` are the accessors a row must go through.
+
+Katsura, random MQ and planted MQ are therefore **generated** at `GF(2)` and **not published**
+there — the middle tier of §4's table, honest instances whose identity is not frozen and from which
+no figure may be quoted. Katsura's generators carry coefficient 2, and `planted_point`'s `3 + 2i`
+collapses to all-ones mod 2, which destroys the coordinate distinctness the planted family's oracle
+depends on. `test_characteristic_two_is_published_for_cyclic_alone` pins the split.
+
+**No published row adjoins the field equations.** `x^2 − x` is available over `GF(2)` and *changes
+the ideal* — the README's phrasing is that field equations "make a quotient dimension count
+base-field points" — and Steel's rows do not have them, so neither do these. A row that did would
+carry `Instance::transformation`, which is inside the digest, so the two could never be confused for
+one another; `test_no_published_row_carries_a_field_equation_transformation` is the guard. The
+`D = 728` above is therefore a count over the algebraic closure with multiplicity, **not** a count of
+`GF(2)`-points.
+
+### 6b. `GF(2^k)` for `k > 1` is still blocked on a convention, not on effort
+
+The reason is the one `FieldSpec` already encodes: two engines' default `GF(2^8)` need not be the
+same ring. Different Conway or defining polynomials give isomorphic but not identical
+representations, so a basis compared element by element across them disagrees for no mathematical
+reason, and an invariant like the leading monomials can genuinely differ. #197 settled Zeebra's own
+side of this by test — `Gf256` is the AES modulus and `Gf256Mq` the Fukuoka one, isomorphic and
+explicitly not interchangeable — but that settles one engine, not a convention.
 
 So an entry needs, for each engine: the defining polynomial it uses by default, how to override it,
 and a verified statement that the override took. `FieldSpec::extension` requires the defining
-polynomial for exactly this reason, and `SingularSolver::supports` currently returns
+polynomial for exactly this reason, and `SingularSolver::supports` returns
 `Unsupported::ExtensionField` rather than guessing — which is the right behaviour until the
 convention is established the way `tools/reference_bases.sing` establishes Singular's ordering and
 printing conventions.
 
-`GF(2)` itself is not affected: it is a prime field and `Zp2` already exercises it.
+One concrete hazard is already on record from #262: a digest taken over Macaulay-matrix **entries
+alone** could not tell `GF(2)` from `GF(2^8)` on Cyclic, because Cyclic's `±1` coefficients make
+those matrices equal entry for entry. The corpus is not exposed to it — `Instance::canonical`
+includes `FieldSpec::canonical`, so the characteristic and extension degree are inside the identity
+digest, and `test_two_fields_with_identical_entries_digest_differently` pins the matrix-corpus side.
 
 ---
 
