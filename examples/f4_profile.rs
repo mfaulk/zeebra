@@ -20,6 +20,7 @@
 //! cargo run --release --example f4_profile -- mq-matrix    # #471: the two interreduction routes
 //! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
 //! cargo run --release --example f4_profile -- construction # #330: construction, split four ways
+//! cargo run --release --example f4_profile -- scatter     # #582: the scatter, split four ways
 //! ```
 //!
 //! `mq-instance` emits the digest-pinned instance rather than a measurement, so that an external
@@ -37,7 +38,7 @@ use zeebra::{
     grobner::{
         benchmark_systems::{cyclic, katsura, planted},
         external::{instance, REFERENCE_CHARACTERISTIC},
-        f4::{symbolic_preprocessing, MacaulayMatrix},
+        f4::{symbolic_preprocessing, MacaulayMatrix, ScatterPrefix},
         f4_with_options, trace_batches, CacheMode, ConstructionTimings, F4Options, F4Statistics,
         InterreductionRoute, PairCriteria, ReducerSelection, ReductionStrategy,
     },
@@ -751,7 +752,7 @@ fn construction_split() {
     ];
 
     println!(
-        "{:<12} {:<8} {:<12} {:>9} {:>8} {:>8} {:>7} {:>7} {:>8} {:>7} {:>9} {:>9}",
+        "{:<12} {:<8} {:<12} {:>9} {:>8} {:>8} {:>7} {:>7} {:>8} {:>8} {:>8} {:>7} {:>9} {:>9}",
         "system",
         "order",
         "config",
@@ -761,6 +762,8 @@ fn construction_split() {
         "sort",
         "map",
         "scatter",
+        "rows",
+        "assm",
         "con%",
         "criterion",
         "removable"
@@ -790,7 +793,7 @@ fn construction_split() {
             };
             let split = s.stages.construction_split;
             println!(
-                "{:<12} {:<8} {:<12} {:>9.2} {:>8.2} {:>8.2} {:>7.2} {:>7.2} {:>8.2} {:>6.0}% {:>8.0}% {:>8.0}%",
+                "{:<12} {:<8} {:<12} {:>9.2} {:>8.2} {:>8.2} {:>7.2} {:>7.2} {:>8.2} {:>8.2} {:>8.2} {:>6.0}% {:>8.0}% {:>8.0}%",
                 name,
                 order.name(),
                 config_name,
@@ -800,6 +803,8 @@ fn construction_split() {
                 millis(split.sort),
                 millis(split.map),
                 millis(split.scatter),
+                millis(split.scatter_rows),
+                millis(split.scatter_assemble),
                 100.0 * millis(s.stages.construction) / millis(s.total),
                 100.0 * split.handout_share(),
                 100.0 * split.removable_share()
@@ -938,6 +943,156 @@ fn construction_routes() {
 
     arm!("cyclic-5", MonomialOrder::Lexicographic, cyclic::<5, F>());
     arm!("katsura-5", MonomialOrder::Lexicographic, katsura::<5, F>());
+    arm!("katsura-6", MonomialOrder::Lexicographic, katsura::<6, F>());
+    arm!(
+        "katsura-6",
+        MonomialOrder::GradedReverseLexicographic,
+        katsura::<6, F>()
+    );
+    arm!(
+        "katsura-7",
+        MonomialOrder::GradedLexicographic,
+        katsura::<7, F>()
+    );
+}
+
+/// #582: where the row scatter's time goes — shift, lookup, row build, assembly.
+///
+/// The scatter's two halves are clocked by `build_measured`. The three steps *inside* the row half
+/// are per term, where `Instant::now()` costs more than the work it would time, so they come from
+/// `ScatterPrefix`'s nested ablation and are read off as differences between adjacent arms.
+///
+/// The `Row` arm is the shipping loop verbatim, so the `ablat` column against `rows` is a control
+/// on the whole method: if those two disagree, the differences beside them mean nothing. Arm order
+/// rotates per repetition and each arm is min-reduced over its own runs, because a monotone drift
+/// in this box's state would otherwise land entirely on whichever arm runs last.
+fn scatter_split() {
+    const REPETITIONS: usize = 7;
+
+    println!(
+        "{:<12} {:<8} {:>7} {:>9} {:>8} {:>9} {:>8} {:>8} {:>9} {:>8} {:>8}",
+        "system",
+        "order",
+        "batches",
+        "scatter/ms",
+        "rows",
+        "assm",
+        "ablat",
+        "shift",
+        "lookup",
+        "rowbuild",
+        "lookup%"
+    );
+
+    macro_rules! arm {
+        ($name:expr, $order:expr, $system:expr) => {{
+            let order = $order;
+            let system = $system;
+            let traced = F4Options {
+                measure_stages: true,
+                ..configuration("recommended").expect("a named configuration")
+            };
+            let trace = match trace_batches(&system, order, &traced) {
+                Ok((_, _, trace)) => Some(trace),
+                Err(_) => {
+                    println!("{:<12} {:<8} did not finish", $name, order.name());
+                    None
+                }
+            };
+            if let Some(trace) = trace {
+                // Preprocessed once per batch, outside every arm: preprocessing is a different
+                // stage and charging it here would bury the differences this table is made of.
+                let batches: Vec<_> = trace
+                    .batches()
+                    .iter()
+                    .map(|batch| {
+                        let preprocessed = symbolic_preprocessing(&batch.basis, &batch.pairs);
+                        (batch.basis.clone(), preprocessed)
+                    })
+                    .collect();
+
+                let mut floor = [Duration::MAX; 4];
+                let mut assemble_floor = Duration::MAX;
+                let mut checksums = [0u64; 3];
+
+                for repetition in 0..REPETITIONS {
+                    let mut elapsed = [Duration::ZERO; 4];
+                    let mut assemble = Duration::ZERO;
+                    for slot in 0..4 {
+                        let which = (slot + repetition) % 4;
+                        let prefix = match which {
+                            0 => Some(ScatterPrefix::Shift),
+                            1 => Some(ScatterPrefix::ShiftAndLookup),
+                            2 => Some(ScatterPrefix::Row),
+                            _ => None,
+                        };
+                        for (basis, preprocessed) in &batches {
+                            match prefix {
+                                Some(prefix) => {
+                                    let timing = MacaulayMatrix::scatter_prefix_for_benchmark(
+                                        basis,
+                                        preprocessed,
+                                        order,
+                                        prefix,
+                                    );
+                                    elapsed[which] += timing.elapsed;
+                                    checksums[which] =
+                                        checksums[which].wrapping_add(timing.checksum);
+                                }
+                                None => {
+                                    let (_, split) = MacaulayMatrix::build_measured(
+                                        basis,
+                                        preprocessed,
+                                        order,
+                                        usize::MAX,
+                                        usize::MAX,
+                                        true,
+                                    )
+                                    .expect("an unbounded construction cannot exceed its budget");
+                                    elapsed[3] += split.scatter_rows;
+                                    assemble += split.scatter_assemble;
+                                }
+                            }
+                        }
+                    }
+                    for (best, run) in floor.iter_mut().zip(elapsed) {
+                        *best = (*best).min(run);
+                    }
+                    assemble_floor = assemble_floor.min(assemble);
+                }
+
+                // An arm the optimizer emptied would report a plausible time and no output.
+                assert!(
+                    checksums.iter().all(|sum| *sum != 0),
+                    "an ablation arm produced nothing"
+                );
+
+                let [shift, lookup, ablation, rows] = floor;
+                // Adjacent arms are nested prefixes, so a difference is one step's cost. Saturating
+                // because on a step whose cost is near the measurement's own noise the ordering can
+                // invert, and a negative duration would be a lie rather than a surprise.
+                let lookup_cost = lookup.saturating_sub(shift);
+                let row_build = ablation.saturating_sub(lookup);
+                let scatter = rows + assemble_floor;
+                println!(
+                    "{:<12} {:<8} {:>7} {:>10.2} {:>8.2} {:>9.2} {:>8.2} {:>8.2} {:>9.2} {:>8.2} {:>7.0}%",
+                    $name,
+                    order.name(),
+                    batches.len(),
+                    millis(scatter),
+                    millis(rows),
+                    millis(assemble_floor),
+                    millis(ablation),
+                    millis(shift),
+                    millis(lookup_cost),
+                    millis(row_build),
+                    100.0 * millis(lookup_cost) / millis(scatter)
+                );
+            }
+        }};
+    }
+
+    arm!("cyclic-5", MonomialOrder::Lexicographic, cyclic::<5, F>());
     arm!("katsura-6", MonomialOrder::Lexicographic, katsura::<6, F>());
     arm!(
         "katsura-6",
@@ -1297,7 +1452,7 @@ fn main() {
              counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's
              batch row form A/B), mq-instance (its canonical text), divmask
              (#331's divisor-mask counters), construction (#330's four-way split of
-             the construction stage)"
+             the construction stage), scatter (#582's four-way split of the scatter)"
         );
         return;
     }
@@ -1338,6 +1493,27 @@ fn main() {
         println!("### The handout against the rehashing it replaces, one process, one build");
         println!();
         construction_routes();
+        return;
+    }
+
+    if argument == "scatter" {
+        // #582: construction is now the scatter, and nothing had ever been inside it.
+        println!();
+        println!("## #582: the row scatter, split four ways");
+        println!();
+        println!("ISA: {}", zeebra::util::isa_floor());
+        println!(
+            "`rows` and `assm` are the scatter's two clocked halves: the per-row loop and\n\
+             `SparseMatrix::new` plus the row-provenance copy. `shift`, `lookup` and `rowbuild`\n\
+             are per *term* and come from a nested ablation instead, because a clock read costs\n\
+             more than a term's work: each arm is a prefix of the next and adjacent arms are\n\
+             differenced. `ablat` is the ablation's full arm, which is the shipping loop verbatim,\n\
+             so `ablat` against `rows` is the control. `lookup%` is the per-term map lookup over\n\
+             the whole scatter — under a third, #582 says to close and stop working on\n\
+             construction."
+        );
+        println!();
+        scatter_split();
         return;
     }
 

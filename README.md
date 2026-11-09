@@ -957,6 +957,7 @@ cargo run --release --example determinant_width -- --count-allocations   # calls
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 cargo run --release --example f4_profile -- divmask       # #331: the divisor-mask counters
+cargo run --release --example f4_profile -- scatter       # #582: the row scatter, split four ways
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
 
@@ -987,6 +988,18 @@ four ways (#330): the distinct-monomial set, the column sort, the monomial-to-co
 row scatter, then measures the current route against the one it replaced in one process on one
 build. `docs/research/groebner-jl-gap.md` is what the `mq-instance` comparison produced;
 `docs/research/msolve-implementation.md` §4.1 is what the `construction` split settled.
+
+`scatter` goes one level further in (#582), because the `construction` split left the scatter at
+89% of the stage and no counter had ever been inside it. Two of its four parts are clocked —
+`scatter_rows`, the per-row loop, and `scatter_assemble`, `SparseMatrix::new` plus the
+row-provenance copy. The other two, the multiplier shift and the per-term column lookup, are per
+*term*, where `Instant::now()` costs more than the work it would time; they come from
+`ScatterPrefix`, a **nested ablation** whose arms are prefixes of the real loop and whose adjacent
+differences are one step's cost. The full arm is the shipping loop verbatim, so the table prints it
+beside the clocked `scatter_rows` as a control: if those two disagree, nothing beside them means
+anything. Each arm carries a checksum that an emptied arm cannot produce
+(`test_the_scatter_ablation_arms_do_the_scatters_work` pins each one to a quantity derived from the
+built matrix), the arm order rotates per repetition, and each arm is min-reduced over its own runs.
 
 A third configuration-free mode answers a question rather than reporting a cost. `f4_profile --
 divmask` is #331's counter-only experiment: `F4Options::measure_divmask` builds a 32-bit divisor
