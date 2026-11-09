@@ -22,7 +22,7 @@ use crate::{
     fft::multiply_over_domain,
     fields::{two_adic::two_adic_decomposition, RootOfUnityError},
     interpolate,
-    poly::univariate::{roots::roots, Polynomial, UnivariatePolynomial},
+    poly::univariate::{gcd::gcd, roots::roots, Polynomial, UnivariatePolynomial},
     FFTDomain, FiniteField, KnownOrder,
 };
 
@@ -93,7 +93,17 @@ pub struct GraeffeStats {
     pub stored_coefficients: usize,
     /// The degree of the fully transformed polynomial, after reduction.
     pub final_degree: u32,
-    /// The order of the subgroup the forward phase left the roots in.
+    /// The orders of the odd-order forward steps taken, in the order taken — [PC] Algorithm 3.
+    ///
+    /// Empty when the order-2 phase already left an enumerable subgroup, which is the KoalaBear
+    /// case and every field whose odd part is small. Non-empty is the Goldilocks case: each entry
+    /// is a prime dividing the odd part, and their product is what divides the subgroup order the
+    /// search would otherwise have faced.
+    pub odd_steps: Vec<u64>,
+    /// The order of the subgroup the search ran over, after the odd-order steps.
+    ///
+    /// The odd part of `q - 1` divided by the product of [`Self::odd_steps`], so it is the odd
+    /// part exactly when no odd step was taken.
     pub subgroup_order: u128,
     pub subgroup_route: SubgroupRoute,
     /// Candidates the subgroup search produced, each of which the descent then un-squares.
@@ -301,7 +311,7 @@ pub fn graeffe_l<F: KnownOrder, R: RngCore + CryptoRng>(
 /// permutation call. For a standalone root finder the gcd descent costs `k` folds instead, each
 /// linear in the degree it folds.
 ///
-/// The three phases, and what each costs:
+/// The four phases, and what each costs:
 ///
 /// 1. **Forward.** `k = two_adicity` order-2 steps, each three transforms of size
 ///    `>= deg + 1`. After step `i` the polynomial is reduced modulo `x^beta_i - 1` with
@@ -310,15 +320,25 @@ pub fn graeffe_l<F: KnownOrder, R: RngCore + CryptoRng>(
 ///    `beta_i - 1`. Once `beta_i` falls below the degree it **halves every step**, so the sum of
 ///    transform sizes is `ceil(log2((q - 1) / d)) + 2` times the largest rather than `k` times it
 ///    — a real saving, but one that is only large when `(q - 1) / d` is small. [P937] §5.3.
-/// 2. **Subgroup search.** The roots are now in the subgroup of order `s`, the odd part of
-///    `q - 1`. Found by enumeration when `s` is small and by [`roots`] on the reduced polynomial
-///    when it is not — see [`SubgroupRoute`]. **The method only pays over a field whose odd part
-///    is small**: over Goldilocks `s = 2^32 - 1` exceeds any degree of interest, the progressive
-///    reduction never bites, and this reduces to the quadratic route it was meant to replace.
-///    That is why [PC] Algorithm 3 reaches for odd-order steps over Goldilocks and why
-///    [`graeffe_l`] exists.
-/// 3. **Descent.** `mu_k = alpha^(2^k)` is known; `mu_{i-1}` is the common root of `G_{2^(i-1)}`
-///    and `x^2 - mu_i`, which is [PC] Algorithm 2 line 8 at `q_i = 2`. **The un-squaring
+/// 2. **Odd-order forward steps**, [PC] Algorithm 3 — #593. The order-2 phase leaves the roots
+///    in the subgroup of order `s`, the odd part of `q - 1`, and when `s` is large that subgroup
+///    cannot be enumerated: over Goldilocks `s = 2^32 - 1` exceeds any degree of interest, so the
+///    search below degraded to the quadratic route the method exists to replace — 99.6% of the
+///    call at degree 4 096, measured in `docs/research/graeffe-root-finding.md` §6.5. An order-`q`
+///    step maps the order-`s` subgroup onto the order-`s/q` one, so steps at the small prime
+///    factors of `s` shrink the search geometrically. Over Goldilocks that is `3 * 5 * 17 * 257`,
+///    leaving **65 537**, which is enumerable. [`plan_odd_steps`] chooses them, and chooses
+///    **none** unless they get the residual below the crossover — a step that leaves the search on
+///    the gcd route anyway is a transform paid for nothing.
+/// 3. **Subgroup search.** Found by enumeration when the residual order is small and by [`roots`]
+///    on the reduced polynomial when it is not — see [`SubgroupRoute`]. The crossover is a
+///    property of the degree as well as the order: enumerating costs `s (d + 1)` against the gcd
+///    route's `log q (d + 1)^2`, so over Goldilocks the odd steps pay from about `d = 1 024` and
+///    not below it.
+/// 4. **Descent.** The odd steps come off first, by [`un_power`]'s `gcd(g, x^q - mu)` — [PC]
+///    Algorithm 3 lines 10-14, and multi-valued, so [`descend_mixed`] branches over the preimages.
+///    Then the squares: `mu_k = alpha^(2^k)` is known; `mu_{i-1}` is the common root of
+///    `G_{2^(i-1)}` and `x^2 - mu_i`, which is [PC] Algorithm 2 line 8 at `q_i = 2`. **The un-squaring
 ///    ambiguity is decided by the polynomial, not guessed**: reducing `G_{2^(i-1)}` modulo
 ///    `x^2 - mu_i` leaves `a x + b`, and `-b/a` is the one of the two square roots of `mu_i` that
 ///    `G_{2^(i-1)}` vanishes at. Both square roots lie in the right subgroup, so either, when both
@@ -420,6 +440,7 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
         total_transform_elements: 0,
         stored_coefficients: 0,
         final_degree: f.degree(),
+        odd_steps: Vec::new(),
         subgroup_order,
         subgroup_route: SubgroupRoute::GcdRootFinder { degree: 0 },
         candidates: 0,
@@ -488,8 +509,54 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
         stats.max_transform_size = stats.max_transform_size.max(points);
         stats.total_transform_elements += 3 * points;
     }
+    // === forward: odd-order steps, [PC] Algorithm 3 ===
+    //
+    // The order-2 phase above leaves every base-field root in the subgroup of order `odd_part`.
+    // Where that is small the search below enumerates it and this phase is empty; where it is not,
+    // each order-`q` step maps the order-`s` subgroup onto the order-`s/q` one and so divides the
+    // work the search faces. The polynomial *before* each step is retained, because inverting the
+    // step needs it: `gcd(before, x^q - mu)` is what identifies which of `mu`'s `q` preimages the
+    // polynomial vanishes at.
+    let (odd_steps, _planned_residual) =
+        plan_odd_steps::<F>(subgroup_order, retained.last().unwrap_or(base).degree());
+    let mut odd_retained: Vec<(u64, UnivariatePolynomial<F>)> = Vec::with_capacity(odd_steps.len());
+    let mut odd_residual = subgroup_order;
+    let mut taken: Vec<u64> = Vec::with_capacity(odd_steps.len());
+    for &q in &odd_steps {
+        let current = odd_retained
+            .last()
+            .map(|(_, polynomial)| polynomial)
+            .unwrap_or_else(|| retained.last().unwrap_or(base));
+        // A transform this field cannot host is a **cost** and not a refusal: the search below
+        // still works at whatever order the steps reached, so the phase stops here rather than
+        // failing a call that the order-2 route alone would have answered. `graeffe_l` needs a
+        // primitive `q`-th root and a domain for the degree-`q d` product, and a field that has
+        // neither is one this phase cannot help.
+        let Ok(transformed) = graeffe_l(current, q, rng) else {
+            break;
+        };
+        taken.push(q);
+        odd_residual /= q as u128;
+        // The roots now lie in the subgroup of order `odd_residual`, so exponents may be reduced
+        // modulo it — the same identity the order-2 phase folds on, at the orders this phase
+        // leaves. A no-op at every degree Goldilocks is called at, and correct where it is not.
+        let folded = usize::try_from(odd_residual)
+            .ok()
+            .and_then(|beta| fold_if_needed(&transformed, Some(beta)));
+        odd_retained.push((q, folded.unwrap_or(transformed)));
+        stats.transforms += 1;
+    }
+    // `odd_residual` rather than the plan's `residual_order`, so a phase that stopped early
+    // reports the order the search will actually face.
+    let residual_order = odd_residual;
+    stats.odd_steps = taken;
+    stats.subgroup_order = residual_order;
+
     stats.forward_time = forward_start.elapsed();
-    let fully_transformed = retained.last().unwrap_or(base);
+    let fully_transformed = odd_retained
+        .last()
+        .map(|(_, polynomial)| polynomial)
+        .unwrap_or_else(|| retained.last().unwrap_or(base));
     stats.final_degree = fully_transformed.degree();
     // What this call holds, which excludes the caller's `f`: the retained `G_(2^i)` for
     // `i = 1..=k`, plus the folded `G_(2^0)` only when the fold actually materialized one.
@@ -502,10 +569,11 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
     // === the subgroup search ===
 
     let subgroup_start = Instant::now();
+    let residual_limbs = [residual_order as u64, (residual_order >> 64) as u64];
     let candidates = subgroup_roots(
         fully_transformed,
-        &odd_part,
-        subgroup_order,
+        &residual_limbs,
+        residual_order,
         &mut stats,
         rng,
     );
@@ -516,11 +584,9 @@ pub fn graeffe_root_with_stats<F: KnownOrder, R: RngCore + CryptoRng>(
 
     let descent_start = Instant::now();
     for candidate in candidates {
-        if let Some(root) = descend(base, &retained, candidate, rng) {
-            if f.eval(&root).is_zero() {
-                stats.descent_time = descent_start.elapsed();
-                return Ok((Some(root), stats));
-            }
+        if let Some(root) = descend_mixed(f, base, &retained, &odd_retained, candidate, rng) {
+            stats.descent_time = descent_start.elapsed();
+            return Ok((Some(root), stats));
         }
     }
     stats.descent_time = descent_start.elapsed();
@@ -643,6 +709,163 @@ fn subgroup_roots<F: KnownOrder, R: RngCore + CryptoRng>(
         .into_iter()
         .filter(|candidate| candidate.pow_limbs(odd_part).is_one())
         .collect()
+}
+
+/// The prime factors of `s` below `bound`, smallest first, with multiplicity.
+///
+/// Trial division, which is the right algorithm here for a reason rather than for simplicity:
+/// what the caller needs is the factors small enough to be worth a Graeffe step, and a factor
+/// above `bound` is one whose transform would cost more than the subgroup search it saves. So the
+/// bound is the point and a general factorization would be work thrown away. Over Goldilocks
+/// `s = 2^32 - 1` this returns `[3, 5, 17, 257]` and leaves 65 537 behind — that last factor is
+/// prime and above the bound, which is exactly the residue [PC] Algorithm 3 enumerates.
+fn small_odd_factors(mut s: u128, bound: u64) -> Vec<u64> {
+    let mut factors = Vec::new();
+    let mut candidate: u128 = 3;
+    while candidate <= bound as u128 && candidate * candidate <= s {
+        while s.is_multiple_of(candidate) {
+            factors.push(candidate as u64);
+            s /= candidate;
+        }
+        candidate += 2;
+    }
+    // What is left is prime, so it is a factor too — but only report it if it is small enough to
+    // be worth a step, which is the same test the loop applied to the others.
+    if s > 1 && s <= bound as u128 {
+        factors.push(s as u64);
+    }
+    factors
+}
+
+/// Whether a subgroup of `order` is cheaper to enumerate than to hand to the gcd root finder.
+///
+/// The one place this comparison is written down, so [`plan_odd_steps`] and [`subgroup_roots`]
+/// cannot disagree about which route a given order takes — a planner that chose steps against a
+/// different rule than the search applies would take steps that buy nothing.
+fn enumeration_is_cheaper<F: KnownOrder>(order: u128, degree: u32) -> bool {
+    let terms = degree as f64 + 1.0;
+    let order_bits = 64.0 * F::order_limbs().len() as f64;
+    order as f64 * terms <= order_bits * terms * terms
+}
+
+/// Odd-order steps that leave a subgroup worth enumerating, and the order they leave — Algorithm 3.
+///
+/// The order-2 phase drives every base-field root into the subgroup of order `s`, the odd part of
+/// `q - 1`. When `s` is small that subgroup is enumerable and nothing more is needed; when it is
+/// not, the search degrades to the quadratic root finder on a polynomial of the input's degree,
+/// which `docs/research/graeffe-root-finding.md` §6.5 measures at **99.6% of the call** over
+/// Goldilocks. An order-`q` step maps the order-`s` subgroup onto the order-`s/q` one, so taking
+/// steps at the small prime factors of `s` shrinks the search geometrically.
+///
+/// Factors are taken smallest first and only while the residual is still not worth enumerating, so
+/// a field that needs one step pays for one. Nothing is taken when the subgroup is already
+/// enumerable, which keeps KoalaBear on exactly the route it had.
+fn plan_odd_steps<F: KnownOrder>(subgroup_order: u128, degree: u32) -> (Vec<u64>, u128) {
+    if enumeration_is_cheaper::<F>(subgroup_order, degree) {
+        return (Vec::new(), subgroup_order);
+    }
+
+    // The bound on a factor worth a step. An order-`q` transform multiplies `q` scaled copies of
+    // the polynomial, so its cost grows with `q` while the subgroup it removes shrinks by the same
+    // factor — and a step is worth taking while the first is the smaller. `1 << 16` keeps every
+    // factor of a 64-bit field's odd part that is worth one and excludes Goldilocks' 65 537, whose
+    // step would cost more than enumerating it.
+    const STEP_ORDER_BOUND: u64 = 1 << 16;
+
+    let mut residual = subgroup_order;
+    let mut steps = Vec::new();
+    for factor in small_odd_factors(subgroup_order, STEP_ORDER_BOUND) {
+        if enumeration_is_cheaper::<F>(residual, degree) {
+            break;
+        }
+        residual /= factor as u128;
+        steps.push(factor);
+    }
+
+    // **All or nothing.** If the factors available do not get the residual down to something worth
+    // enumerating, the steps buy nothing: the search still takes the gcd route, on a polynomial of
+    // the same degree, and the transforms are pure overhead on top of it — which is precisely the
+    // criticism §6.5 makes of the order-2 iteration over Goldilocks. Over Goldilocks at degree 256
+    // this is the live case: the residual floor is 65 537 and enumerating it only becomes cheaper
+    // than the gcd route around degree 1 024, so a smaller instance stays on exactly the route it
+    // had before #593.
+    if !enumeration_is_cheaper::<F>(residual, degree) {
+        return (Vec::new(), subgroup_order);
+    }
+    (steps, residual)
+}
+
+/// The roots of `g` that are `q`-th roots of `mu`: `gcd(g, x^q - mu)` — [PC] Algorithm 3 lines 10-14.
+///
+/// The order-2 descent has a shortcut — reduce `g` modulo `x^2 - mu` in one pass, since `x^2 = mu`
+/// — and that shortcut is what [`un_square`] is. It does not generalize: at order `q` the quotient
+/// has `q` preimages and reading off a linear remainder no longer identifies one, so this runs the
+/// gcd that [`un_square`] exists to avoid.
+///
+/// **Multi-valued, and that is why it returns a vector.** `mu` has up to `q` preimages in the
+/// field and `g` may vanish at more than one of them; which one continues to a root of the
+/// original polynomial is not decidable here, so every one is returned and the caller branches.
+/// The gcd's degree bounds the breadth and is in practice one.
+fn un_power<F: KnownOrder, R: RngCore + CryptoRng>(
+    g: &UnivariatePolynomial<F>,
+    mu: &F,
+    q: u64,
+    rng: &mut R,
+) -> Vec<F> {
+    let mut coefficients = vec![F::zero(); q as usize + 1];
+    coefficients[0] = -*mu;
+    coefficients[q as usize] = F::one();
+    let shifted = UnivariatePolynomial::new(&coefficients);
+
+    let common = gcd(g, &shifted);
+    if common.degree() == 0 {
+        return Vec::new();
+    }
+    roots(&common, rng)
+}
+
+/// A root of `f` from a candidate in the final subgroup, inverting the odd steps then the squares.
+///
+/// Two phases, because the two kinds of step invert differently: the odd-order steps come off with
+/// [`un_power`]'s gcd and the order-2 steps with [`un_square`]'s one-pass reduction.
+///
+/// **Depth-first over the odd steps, because [`un_power`] is multi-valued.** An order-`q` step has
+/// up to `q` preimages and the polynomial may vanish at several; which one descends to a root of
+/// `f` is not decidable at that level, so every branch is tried. The order-2 phase needs no
+/// branching — [`un_square`] identifies its preimage from the polynomial — so it runs once per
+/// leaf, and the verification against `f` is what decides the leaf.
+///
+/// The breadth is bounded by the gcd's degree and is one in every case measured; the depth is the
+/// number of odd steps, four over Goldilocks. With no odd steps this is the order-2 descent and a
+/// single verification, which is what it was before #593.
+fn descend_mixed<F: KnownOrder, R: RngCore + CryptoRng>(
+    f: &UnivariatePolynomial<F>,
+    base: &UnivariatePolynomial<F>,
+    retained: &[UnivariatePolynomial<F>],
+    odd_retained: &[(u64, UnivariatePolynomial<F>)],
+    mu: F,
+    rng: &mut R,
+) -> Option<F> {
+    match odd_retained.split_last() {
+        // Every odd step inverted: finish through the squares and let `f` decide.
+        None => {
+            let root = descend(base, retained, mu, rng)?;
+            f.eval(&root).is_zero().then_some(root)
+        }
+        // `polynomial` is the input to this step, so its roots are the preimages to choose from.
+        Some(((q, _), earlier)) => {
+            let polynomial = earlier
+                .last()
+                .map(|(_, p)| p)
+                .unwrap_or_else(|| retained.last().unwrap_or(base));
+            for preimage in un_power(polynomial, &mu, *q, rng) {
+                if let Some(root) = descend_mixed(f, base, retained, earlier, preimage, rng) {
+                    return Some(root);
+                }
+            }
+            None
+        }
+    }
 }
 
 /// `alpha` from `alpha^(2^k)`, by un-squaring against each retained `G_{2^i}` in turn.
@@ -1197,28 +1420,87 @@ mod tests {
         );
     }
 
-    /// Over Goldilocks the reduction never bites, which is why [PC] wrote a second algorithm.
+    /// Over Goldilocks the two-adic reduction never bites, and the odd-order steps are what make
+    /// the subgroup enumerable — #593, [PC] Algorithm 3.
     ///
-    /// The odd part of `q - 1` is `2^32 - 1`, above any degree of interest, so every one of the 32
-    /// steps runs at the input degree and the subgroup search falls back to the gcd route.
+    /// The odd part of `q - 1` is `2^32 - 1 = 3 * 5 * 17 * 257 * 65537`, above any degree of
+    /// interest, so all 32 order-2 steps run at the input degree and leave a subgroup of
+    /// 4 294 967 295 elements that cannot be enumerated. Driving `beta` through `3 * 5 * 17 * 257`
+    /// leaves **65 537**, which can, and that is the whole of what Algorithm 3 buys here.
     #[test]
-    fn test_the_reduction_does_not_bite_over_goldilocks() {
+    fn test_the_odd_steps_make_the_goldilocks_subgroup_enumerable() {
         let mut rng = StdRng::seed_from_u64(59);
-        let degree = 256;
+        // 1 024 and not 256, because the crossover is a property of the degree. Enumerating the
+        // 65 537-element residue costs `65537 (d+1)` and the gcd route `64 (d+1)^2`, so the first
+        // is cheaper only from `d + 1 >= 1024` — below that the steps would buy nothing and
+        // `plan_odd_steps` declines to take them. §6.5's 256-row staying on the old route is
+        // therefore correct rather than a miss, and `test_small_goldilocks_instances_keep_the_old_route`
+        // is the other side of it.
+        let degree = 1024;
         let f = with_planted_roots::<Goldilocks, _>(degree, &[Goldilocks::one()], &mut rng);
-        let (_root, stats) = graeffe_root_with_stats(&f, &mut rng).expect("a domain exists");
+        let (root, stats) = graeffe_root_with_stats(&f, &mut rng).expect("a domain exists");
 
-        assert_eq!(stats.graeffe_steps, 32);
+        assert_eq!(stats.graeffe_steps, 32, "the order-2 phase is unchanged");
+        assert_eq!(
+            stats.odd_steps,
+            vec![3, 5, 17, 257],
+            "the small factors of the odd part, smallest first"
+        );
+        assert_eq!(
+            stats.subgroup_order, 65_537,
+            "the residual order the search actually runs over"
+        );
+        assert_eq!(
+            stats.subgroup_route,
+            SubgroupRoute::Enumerated { points: 65_537 },
+            "which is the point: the quadratic fallback is gone"
+        );
+        assert!(
+            stats.transforms >= 3 * 32 + 4,
+            "three transforms per order-2 step and one per odd step: {}",
+            stats.transforms
+        );
+        // *A* root, not *the* planted one: `with_planted_roots` multiplies the planted factors
+        // into a random cofactor, which has roots of its own, and `graeffe_root` returns whichever
+        // candidate descends first. What must hold is that it is a root.
+        let root = root.expect("the mixed-order descent returned a root");
+        assert!(f.eval(&root).is_zero(), "{root:?} is not a root of f");
+    }
+
+    /// Below the crossover the odd steps are declined, so a small instance keeps the old route.
+    ///
+    /// The steps are worth taking only when they make the residual subgroup cheaper to enumerate
+    /// than the gcd route is to run, and at degree 256 over Goldilocks they do not: the residual
+    /// floor is 65 537 and the gcd route on a degree-256 polynomial is cheaper than 65 537
+    /// evaluations of it. Taking them anyway would be four transforms of pure overhead on top of
+    /// the same search — which is exactly the criticism §6.5 makes of the order-2 iteration here,
+    /// and it would be dishonest to repeat it one phase later.
+    #[test]
+    fn test_small_goldilocks_instances_keep_the_old_route() {
+        let mut rng = StdRng::seed_from_u64(59);
+        let f = with_planted_roots::<Goldilocks, _>(256, &[Goldilocks::one()], &mut rng);
+        let (root, stats) = graeffe_root_with_stats(&f, &mut rng).expect("a domain exists");
+
+        assert!(stats.odd_steps.is_empty(), "{:?}", stats.odd_steps);
         assert_eq!(stats.subgroup_order, 4_294_967_295);
-        assert_eq!(stats.final_degree as usize, degree);
         assert_eq!(
             stats.subgroup_route,
             SubgroupRoute::GcdRootFinder { degree: 256 }
         );
-        assert_eq!(
-            stats.total_transform_elements,
-            3 * 32 * stats.max_transform_size
-        );
+        assert_eq!(stats.transforms, 3 * 32, "no odd transform was paid for");
+        let root = root.expect("the order-2 route returned a root");
+        assert!(f.eval(&root).is_zero(), "{root:?} is not a root of f");
+    }
+
+    /// The descent inverts an odd-order step, which is the half of Algorithm 3 that was missing.
+    ///
+    /// `graeffe_l` landed without a caller in the descent because inverting an order-`q` step
+    /// needs `gcd(g, x^q - mu)` rather than the order-2 trick of reducing mod `x^2 - mu`. This
+    /// drives the whole mixed-order route over Goldilocks at three degrees and checks the root
+    /// against the polynomial, which is the only thing that cannot pass vacuously.
+    #[test]
+    fn test_planted_roots_are_recovered_over_goldilocks_through_odd_steps() {
+        planted_roots_are_recovered::<Goldilocks>(&[256, 512, 1024], 29);
     }
 
     /// Every root of a product of distinct known linear factors is recovered by deflation.

@@ -1204,6 +1204,12 @@ and validated, but is **not** wired into `graeffe_root`'s descent, because the b
 mixed order `R = 2^32 · 3 · 5 · 17 · 257` needs the gcd descent at odd `q_i` as well — [PC]
 Algorithm 3 lines 10–14 — and that is a separate PR. Recorded as open in §11.
 
+> **Wired in by #593 — §6.6.** The odd-order steps and the gcd descent at odd `q_i` both land, and
+> over Goldilocks the route becomes `Enumerated { points: 65537 }` where this section measured
+> `GcdRootFinder`. One correction to the paragraph above, which §6.6 is mostly about: the steps pay
+> **from about degree 1 024 and not below it**, so the 256-row in the table above stays on the gcd
+> route and is right to. The crossover is a property of the degree as well as of `p − 1`.
+
 One more measured detail, because it cuts against §4.4.4's estimate: over Goldilocks the peak heap
 at degree 4 096 is **2.56 MB measured against 1.31 MB estimated, a 1.95x under-prediction** —
 `estimated_bytes` models the forward iteration and the subgroup search here is `roots`, whose own
@@ -1215,6 +1221,84 @@ property of the field's `p − 1`, not of the degree.** KoalaBear's odd part of 
 registered challenge's field the good case, and §2.5's "smooth but shallow" verdict reads the wrong
 way round — the shallow two-adicity is a ceiling on transform size, but the single small odd factor
 is precisely what the root finder wants.
+
+### 6.6 #593: the odd-order steps, wired in — and the crossover is a degree
+
+[PC] Algorithm 3's two missing halves both land: the odd-order forward steps, and the gcd descent at
+odd `q_i` that inverts them. `graeffe_l` had been implemented and validated since §10 row 4 with no
+caller in the descent, for the reason §6.5 gives — the backward phase needed `gcd(g, x^q − mu)`
+rather than the order-2 shortcut of reducing modulo `x^2 − mu`.
+
+**What changed, exactly.** Over Goldilocks `s = 2^32 − 1 = 3 · 5 · 17 · 257 · 65537`. Steps at
+`3, 5, 17, 257` leave a residual subgroup of **65 537**, and the search enumerates it:
+
+| | before #593 | after #593 |
+|---|---|---|
+| order-2 steps | 32 | 32 |
+| odd-order steps | — | **4**, at `3, 5, 17, 257` |
+| transforms | 96 | **100** |
+| subgroup order faced | 4 294 967 295 | **65 537** |
+| route at degree 1 024 | `GcdRootFinder { degree: 1024 }` | **`Enumerated { points: 65537 }`** |
+
+Every figure in that table is a **count**, exact and machine-independent, which is why it is here
+and §6.6.2's timings are not. The counts are asserted by
+`test_the_odd_steps_make_the_goldilocks_subgroup_enumerable`.
+
+#### 6.6.1 The steps pay from about degree 1 024, and are declined below it
+
+§6.5 reads as though the odd steps are simply what Goldilocks needs. They are not unconditionally:
+**the crossover is a property of the degree as well as of `p − 1`.** Enumerating the residual costs
+`s_residual (d + 1)` and the gcd route costs `log q (d + 1)^2`, so with `s_residual = 65 537` and
+`log q = 64` the first is cheaper only from
+
+```text
+65537 (d + 1) <= 64 (d + 1)^2        <=>        d + 1 >= 1024
+```
+
+Below that the four transforms would be paid and the search would still take the gcd route — which
+is precisely the criticism §6.5 makes of the order-2 iteration over Goldilocks, and it would be
+no better one phase later. So `plan_odd_steps` takes the steps **all or nothing**: if the factors
+available do not get the residual below the crossover, it takes none, and a degree-256 Goldilocks
+instance keeps exactly the route and the 96 transforms it had. `test_small_goldilocks_instances_keep_the_old_route`
+asserts that side, including the transform count, so the decline cannot silently become a cost.
+
+This also reads §6.5's own table correctly in hindsight: its 256-row is below the crossover, so that
+row would not have moved and the method's floor there is the gcd route's.
+
+Two smaller decisions, both recorded in the source rather than inferred:
+
+* **A factor is worth a step only below `2^16`.** An order-`q` transform multiplies `q` scaled
+  copies, so its cost grows with `q` while the subgroup it removes shrinks by the same factor.
+  The bound keeps `3, 5, 17, 257` and excludes Goldilocks' own `65 537`, whose step would cost more
+  than enumerating it — which is the residue Algorithm 3 is written to leave behind.
+* **A transform the field cannot host is a cost, not a refusal.** `graeffe_l` needs a primitive
+  `q`-th root and a domain for the degree-`q d` product; where it fails the phase stops at whatever
+  order it reached and the search runs there, rather than failing a call the order-2 route alone
+  would have answered. Found by `test_a_field_without_the_two_adicity_refuses`, which a first
+  version broke by propagating the error.
+
+#### 6.6.2 What is not measured, and why
+
+**The timing curve beside §6.5's is not taken.** §10 row 11's fourth deliverable asks for the
+Goldilocks curve reported against the fallback it replaces, and that is a wall-clock measurement
+this machine could not produce honestly: over the hours this work ran, the one-minute load average
+sat between **592 and 1 261**, from other agents' linkers, which `tools/benchlock.sh` does not
+serialize because they are builds rather than measurements. §6.5's own figures were taken single-shot
+on one pinned core under the lock, and a comparison against them from a box in this state would be
+a comparison of load.
+
+What is reported instead is the part that does not depend on the box: the counts above, and the
+route. A reader wanting the curve should re-run
+
+```sh
+tools/benchlock.sh <tag> taskset --cpu-list 8 \
+  cargo run --release --example graeffe_root -- goldilocks degrees=1024,2048,4096
+```
+
+on a quiet machine and report it beside §6.5's rows, which were taken that way. The expectation it
+should test is **not** that the forward stage gets cheaper — it gets four transforms more expensive
+— but that the subgroup stage stops being 99.6% of the call.
+
 
 ## 7. Required size against reachable size, and the go/no-go
 
@@ -2044,7 +2128,7 @@ onward requires it merged.
 | 8 | the round-skipping parametrization (§9.1 component 3) and `cico_univariate` | 4 (`cico_bivariate`'s pattern) | the parametrized family's constrained coordinates are the input constants at every point, asserted against `permutation_plus_linear` | **landed, #209** — `src/grobner/research/univariate_cico.rs`; the oracle is the first row of §9.5.2's table. Note the row's original wording said "last coordinate", which is the paper's input position and not Zeebra's: `CicoInstance` constrains the **first** `k` |
 | 9 | an `examples/graeffe_cico.rs` ladder: one family end-to-end on *reduced* rows, reporting §9.2's per-stage costs and `BenchmarkClass::Engineering` | 6, 8 | every witness verified through `CicoInstance::is_solution` | **landed, #210** — §9.6. Ten rows, 17 838 families; the three witnesses are all on the `k = 1` row, and §9.6.3 is why there are none on the others. Record-writing deliberately left to a follow-up |
 | 10 | extend `docs/research/graeffe-root-finding.md` with §9.2's figures as **measured** rather than estimated; re-take §6.1 as a post-#161 curve | 2, 9 | — | **partly landed**: §4.4, §4.5, §6.4 and §6.5 are the root-finding half, measured **both pre- and post-#161**. §6.1's own curve is still the pre-#161 one and awaits a re-take; §9.2's other rows still await row 8 |
-| 11 | `graeffe_root` over a field whose odd part is large: [PC] Algorithm 3's odd-order forward steps and the gcd descent at odd `q_i`, wiring row 4 into row 6 | 4, 6 | planted roots over Goldilocks at a degree where §6.5's quadratic fallback does not finish | open — §6.5 is the measurement that motivates it |
+| 11 | `graeffe_root` over a field whose odd part is large: [PC] Algorithm 3's odd-order forward steps and the gcd descent at odd `q_i`, wiring row 4 into row 6 | 4, 6 | planted roots over Goldilocks at a degree where §6.5's quadratic fallback does not finish | **landed, #593** — §6.6. The route changes to `Enumerated { points: 65537 }` from degree 1 024; the oracle is `test_planted_roots_are_recovered_over_goldilocks_through_odd_steps`. The **timing curve beside §6.5's is not taken** and §6.6.2 says why |
 
 **#161 has since merged**, so row 2 and the §6.1 half of row 10 are unblocked rather than blocked.
 Row 1 was the first PR; rows 3, 4, 6 and the root-finding half of 10 are the second, measured
@@ -2082,9 +2166,11 @@ against both kernels.
   is what made `r` a parameter worth sweeping, and the gcd descent removes the scan, so
   `r = 2^two_adicity` with `s` the odd part is forced. §10 row 7 is closed as answered rather than
   swept.
-- **Open**: `graeffe_root` over a field whose odd part is large — §6.5 measures Goldilocks spending
-  98% of the call in a subgroup search the reduction never shrinks, and §10 row 11 is the
-  Algorithm-3-shaped fix. Also open: whether a `k = 3` family or a hybrid beats both ends of §9.3's
+- **Closed, #593**: `graeffe_root` over a field whose odd part is large. §6.5 measured Goldilocks
+  spending 98% of the call in a subgroup search the reduction never shrinks; §6.6 is the
+  Algorithm-3-shaped fix, and the subgroup it faces drops from 4 294 967 295 to **65 537** from
+  degree 1 024 up. The **timing** half of §10 row 11 is still open and §6.6.2 says why — it needs a
+  quiet box, and this one was not. Also open: whether a `k = 3` family or a hybrid beats both ends of §9.3's
   trade; whether #161's kernel exposes the blocked phase boundary §8 point 3 needs; and whether the
   retained `G_{2^i}` of §6.4 can be dropped for the batched `NTT_r` scan §3.9 costs out, which trades
   384 MB and 62.7 ms for 134 MB and 3.6 s.
