@@ -4,8 +4,11 @@
 //! effect on the kernel is confounded with its effect on matrix *shape*, because faster candidates
 //! change the pairs the next batch sees. A fixed set of matrices removes the confound. Synthetic
 //! sparse matrices do not substitute for it — an F4 matrix is wide, short-rowed, has a block that
-//! is unit upper triangular by construction, and carries between 40% and 99% scaffolding rows, and
-//! no density sweep reproduces that.
+//! is unit upper triangular by construction, and carries between 32.5% and 99.7% scaffolding rows
+//! across the entries below, and no density sweep reproduces that.
+//!
+//! `docs/research/f4-matrix-corpus.md` is the corpus table, what it costs, and what it does not
+//! cover.
 //!
 //! # Nothing here is a reconstruction
 //!
@@ -50,8 +53,9 @@
 //!
 //! ```text
 //! cargo run --release --example f4_matrix_corpus -- list     # the corpus, as pinned
+//! cargo run --release --example f4_matrix_corpus -- check    # capture it and verify every digest
 //! cargo run --release --example f4_matrix_corpus -- pin      # re-derive the pinned table
-//! cargo run --release --example f4_matrix_corpus -- predict   # the predictiveness check
+//! cargo run --release --example f4_matrix_corpus -- predict  # the predictiveness check
 //! ```
 
 use crate::{

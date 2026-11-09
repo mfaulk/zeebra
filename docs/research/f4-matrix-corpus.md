@@ -1,10 +1,17 @@
 # The F4 matrix corpus: real Macaulay matrices, pinned, and whether they predict
 
-**Measured at:** `PIN_SHA` — the commit this branch's figures were taken at, recorded at the time
-rather than recovered (#335). One machine, one build, `RUSTFLAGS` unset, `RUSTC_WRAPPER` empty, a
-private `CARGO_TARGET_DIR`, arms interleaved within one process. Load was gated inside
-`tools/benchlock.sh` per run and re-checked at the end; the figures and the gate readings are in
-[§5](#5-the-predictiveness-check).
+**Measured at:** `680692f2`, on base `0882def9` — recorded at the time rather than recovered (#335).
+Every later commit on this branch changes prose and doc comments only. One machine, one `release`
+build (`lto = "fat"`, `codegen-units = 1`), `RUSTFLAGS` unset, `RUSTC_WRAPPER` empty, a private
+`CARGO_TARGET_DIR`, `taskset -c 0-15`, arms interleaved within one process, three repetitions,
+medians. Load was gated **inside** `tools/benchlock.sh` and read again at the end;
+[§5.3](#53-the-conditions-and-what-they-do-and-do-not-permit) gives both readings and says what they
+permit — which is the ranking and not the magnitudes.
+
+The counters in [§2](#2-the-corpus) and the costs in [§4](#4-what-it-costs) are not timings and do
+not depend on any of that; shapes, nonzero counts, digests, fill-in ratios and ranks are exact and
+reproduce from `cargo run --release --example f4_matrix_corpus -- pin` at any commit where the
+corpus has not moved, which is what `test_every_entry_is_pinned_and_in_its_regime` asserts.
 
 This is #262. It delivers a fixed set of the Macaulay matrices F4 really builds, so that an
 elimination or construction kernel can be iterated on in milliseconds instead of through
@@ -276,7 +283,134 @@ than the run itself.
 
 ## 5. The predictiveness check
 
-PIN_PREDICT
+#262's acceptance requires this, and requires it recorded **including if it fails**: a corpus that
+does not predict end-to-end behaviour would be optimized at the expense of the thing that matters,
+which is an explicit non-goal of the milestone.
+
+## 5.1 What is being compared, and why these two arms
+
+Two **elimination kernels**, not two algorithms: `Backend::Sparse` is the sparse pivot loop and
+`Backend::Adaptive` is a dense row accumulator over sparse pivots. Same pivot rule, same row
+operation count, different inner loop. `Backend::Dense` is deliberately not an arm — it cannot run
+the whole corpus ([§2](#2-the-corpus)), and an arm that is absent on the largest entry would make
+the ranking depend on which matrices happened to fit.
+
+For each entry, two rankings are taken in one process:
+
+- **micro** — `eliminate_to` on the captured matrix under each backend, under the plan, row form and
+  entry allowance the entry's own preset selects. Nothing else moves.
+- **run** — `f4_with_options` on the whole instance, under the same preset with only `elimination`
+  changed.
+
+Three repetitions, **arms interleaved within each repetition**, medians reported. The quantity the
+check is about is the *sign* of each ratio, not its magnitude: the two rankings either pick the same
+backend or they do not. That is deliberately robust to a noisy machine, and it had to be —
+[§5.3](#53-the-conditions-and-what-they-do-and-do-not-permit).
+
+Before any timing is taken, the example asserts that rebuilding the entry from its own inputs
+reproduces the captured matrix. A figure published from this mode therefore cannot be a figure about
+a matrix the live path does not build.
+
+## 5.2 The result
+
+`micro ratio` and `run ratio` are both sparse over adaptive, so **above 1.00x means the adaptive
+accumulator won**. `agree` is whether the two rankings picked the same backend.
+
+| label | shape | nz | micro sparse | micro adaptive | micro ratio | run sparse | run adaptive | run ratio | agree |
+|---|---|---|---|---|---|---|---|---|---|
+| `katsura-7/grevlex/m31/default` | 361x369 | 10 546 | 3.890 ms | 1.773 ms | **2.19x** | 12.755 ms | 8.106 ms | **1.57x** | yes |
+| `katsura-7/grevlex/m31/baseline` | 6810x6862 | 112 200 | 64.652 ms | 13.036 ms | **4.96x** | 701.495 ms | 310.171 ms | **2.26x** | yes |
+| `katsura-6/lex/m31/baseline` | 1954x945 | 64 756 | 34.876 ms | 15.612 ms | **2.23x** | 364.329 ms | 215.806 ms | **1.69x** | yes |
+| `cyclic-6/grevlex/m31/default` | 159x175 | 6 529 | 1.012 ms | 0.712 ms | **1.42x** | 7.623 ms | 6.333 ms | **1.20x** | yes |
+| `cyclic-6/lex/m31/default` | 1026x1048 | 29 696 | 4.243 ms | 3.575 ms | **1.19x** | 95.305 ms | 85.537 ms | **1.11x** | yes |
+| `katsura-7/grevlex/p64/default` | 361x369 | 10 546 | 3.929 ms | 1.970 ms | **1.99x** | 13.087 ms | 8.426 ms | **1.55x** | yes |
+| `cyclic-6/grevlex/p64/default` | 159x175 | 6 529 | 1.107 ms | 0.779 ms | **1.42x** | 8.040 ms | 6.702 ms | **1.20x** | yes |
+| `katsura-6/lex/p64/baseline` | 1954x945 | 64 756 | 38.304 ms | 18.253 ms | **2.10x** | 402.433 ms | 253.736 ms | **1.59x** | yes |
+| `katsura-6/grevlex/bn254/default` | 144x152 | 2 461 | 2.223 ms | 1.880 ms | **1.18x** | 6.517 ms | 5.696 ms | **1.14x** | yes |
+| `cyclic-5/grevlex/bn254/baseline` | 635x379 | 8 372 | 24.116 ms | 19.905 ms | **1.21x** | 101.981 ms | 85.366 ms | **1.19x** | yes |
+| `mq-random-6/grevlex/p31x64/default` | 757x756 | 16 074 | 11.520 ms | 4.163 ms | **2.77x** | 25.879 ms | 14.736 ms | **1.76x** | yes |
+| `mq-random-6/grevlex/p31x64/baseline` | 3305x3342 | 66 032 | 70.876 ms | 12.589 ms | **5.63x** | 373.017 ms | 170.895 ms | **2.18x** | yes |
+| `mq-random-10/grevlex/p31x64/default` | 12554x12020 | 783 737 | 26 944.371 ms | 3 168.882 ms | **8.50x** | 34 015.100 ms | 5 393.497 ms | **6.31x** | yes |
+| `cyclic-6/grevlex/gf2/default` | 130x163 | 2 314 | 0.310 ms | 0.195 ms | **1.59x** | 2.356 ms | 2.057 ms | **1.15x** | yes |
+| `cyclic-7/grevlex/gf2/default` | 1146x795 | 84 450 | 62.670 ms | 28.650 ms | **2.19x** | 488.381 ms | 266.199 ms | **1.83x** | yes |
+| `cyclic-6/grevlex/gf256/default` | 130x163 | 2 314 | 0.489 ms | 0.345 ms | **1.42x** | 2.934 ms | 2.540 ms | **1.16x** | yes |
+| `cyclic-5/lex/gf256/default` | 61x72 | 438 | 0.041 ms | 0.033 ms | **1.26x** | 0.816 ms | 0.776 ms | **1.05x** | yes |
+
+**It predicts. 17 of 17 rankings agree, and the agreement is stronger than the criterion asked
+for.**
+
+The criterion was that both rankings pick the same backend. They do, on every entry. But the
+magnitudes line up too, and in a way that is worth stating because it is the direction a
+microbenchmark ought to err in:
+
+- **Rank correlation between the two ratio columns is Spearman rho = 0.930**, with 13 discordant
+  pairs of 136. A corpus that merely picked the same winner would have rho near zero and still have
+  passed.
+- **The micro ratio is above the run ratio on every single entry**, by 1.02x to 2.58x. That is not a
+  coincidence and it is not noise: the whole run contains symbolic preprocessing, construction,
+  candidate extraction, pair bookkeeping and interreduction, none of which the backend touches, so
+  Amdahl's law caps the end-to-end effect below the kernel's own. **The corpus therefore
+  over-states a kernel win and never under-states one**, which is the safe direction: a change this
+  corpus says is worthless is worthless end to end, and a change it says is worth 5x may be worth
+  2x.
+- **The ordering of the entries by how much the kernel matters is itself informative.**
+  `mq-random-10` is 8.50x in the kernel and 6.31x end to end — the two are nearly equal, because on
+  that instance the kernel *is* the run. `cyclic-5/lex/gf256` is 1.26x and 1.05x, because at 438
+  entries there is almost nothing for a kernel to do. That spread is the corpus doing its job: the
+  same change ranks the same way everywhere and matters a hundredfold more in one place than
+  another, and a single-instance A/B could not have shown either.
+
+One figure from this table is a direct confirmation of §0's correction. `mq-random-10`'s single
+largest batch takes **3 168.882 ms of the 5 393.497 ms** whole run under the adaptive backend — one
+batch's elimination is **58.8%** of the entire computation. `interreduction-cost.md` §3g.3's ~93% for
+the whole stage is therefore not surprising, and §6.2's 65-88% framing is stale in the direction of
+*understating* the share on this family, not overstating it.
+
+### What would have falsified it
+
+A `**NO**` in the last column: an entry where the corpus prefers one backend and the whole run
+prefers the other. The rows that could plausibly have produced one are the five with run ratios
+under 1.20x — `cyclic-5/lex/gf256` at 1.05x, `cyclic-6/lex/m31` at 1.11x, the BN254 pair at 1.14x
+and 1.19x, and the GF(2)/GF(2^8) cyclic-6 pair at 1.15x and 1.16x — where the end-to-end effect is
+small enough that the sign could flip on a noisy machine. None did, and all five are *small matrices
+on which the corpus also reported a small effect*, so the two measurements agree about there being
+little to see rather than disagreeing about what is there.
+
+The check is **not** a general claim that any microbenchmark over this corpus predicts end-to-end
+cost. It is a claim about one real kernel A/B over seventeen matrices. A change that altered matrix
+*shape* — a pair criterion, a reducer policy, a selection strategy — is outside what a fixed set of
+matrices can see at all, and is the thing `examples/f4_profile.rs` and `benches/grobner.rs` are for.
+
+## 5.3 The conditions, and what they do and do not permit
+
+The run was taken inside `tools/benchlock.sh`, so nothing else measured against it, and `taskset -c
+0-15`-pinned so the two arms shared one core set.
+
+**The box was busy, and the one-minute load average is not the quantity that says how busy.** At the
+start of the run it read **2 090.41** with **16 of 9 892** threads runnable, `procs_blocked` 0, and
+four processes in `D` state. A 64-core machine with 16 runnable threads is a quarter loaded; a
+one-minute average of 2 090 on that machine is counting tasks in uninterruptible wait on a tmpfs
+that is 75% full of other agents' build output, not tasks waiting for a core. The gate inside the
+lock therefore reads `procs_running` and `procs_blocked` and requires six consecutive clear samples,
+and records the average beside them rather than gating on it. Both readings:
+
+```text
+START  2026-11-09T06:29:28Z  running=16 blocked=0 dstate=2 loadavg1=2090.41 runnable_total=16/9892
+END    2026-11-09T06:33:26Z  running=5  blocked=0 dstate=4 loadavg1=2049.59 runnable_total=5/9496
+```
+
+What that permits and what it does not:
+
+- **Permitted: the ranking.** Both arms of every pair ran in the same process, interleaved, on the
+  same pinned cores, within seconds of each other. A machine-wide slowdown moves both arms of a
+  ratio together and cannot change its sign unless the ratio is already within noise — which is
+  reported per row rather than averaged away.
+- **Not permitted: the magnitudes as absolute cost.** No figure in
+  [§5.2](#52-the-result) should be quoted as "elimination takes X ms"; the figures in
+  `docs/MILESTONE-F4-OPTIMIZATION.md` §8.5 and `docs/research/interreduction-cost.md` §3c were taken
+  on a quiet machine and these were not.
+- **Not permitted: a ratio close to 1.00x read as a direction.** Those rows are reported as what they
+  are.
 
 ---
 
@@ -288,12 +422,12 @@ entry is `mq-random-10` at 783 737 nonzeros. GBLA's published matrices reach 184
 blocking and cache residency decide a kernel. Going there means `mq-random-14` or `katsura-11`, which
 `docs/research/f4-resource-scaling.md` §12 and §13 show are already at the memory ceiling as whole
 runs — so a larger entry needs the capture to stream rather than hold the basis, which it does not
-do today. **Follow-up filed.**
+do today. **Filed as #640, Priority High.**
 
 **#269 (H13) is named for a stage share that moved.** Its title is "F4 elimination kernels — the
 65-88% stage". That number is §6.2's, under what is now `baseline()`. On the default it is 7–17% of
 the katsura and cyclic rungs and ~93% of `mq-random-10`. The issue is still worth doing and the
-title is now misleading about *where*. **Follow-up filed.**
+title is now misleading about *where*. **Filed as #639, Priority Medium.**
 
 **The GF(2) entries measure one bit per 32, not a bitsliced kernel.** `Zp2` is
 `PrimeFieldElement32<2>`, so a GF(2) matrix entry here is a `(usize, u32)` pair — the decision and
