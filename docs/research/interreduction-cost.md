@@ -17,7 +17,7 @@ comparison and touches no part of the F4 path, so it is independent of every oth
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
 
-**[§3e](#3e-the-adjudication-436s-four-mechanisms-and-what-became-of-the-510x-ceiling) adjudicates
+**[§3g](#3g-the-adjudication-436s-four-mechanisms-and-what-became-of-the-510x-ceiling) adjudicates
 #436's four candidate mechanisms against everything below and says what is left of the 5.10x
 ceiling.** Read it first if that is the question; it takes no new measurement and cites only what
 the rest of this note establishes.
@@ -780,7 +780,7 @@ Four things the next agent should carry into step 2, all established here or whi
 4. **The monomial gets bigger either way.** `degree()` returns `u64` and casts before summing
    specifically to avoid overflow, so `u64` preserves semantics exactly at +8 bytes; a `u32` degree
    with the checked-add discipline `monomial_arithmetic.rs` already uses costs +4 and changes the
-   overflow contract. §3e measured the `u64` layout. Growth cuts against #237/#304, so step 2's A/B
+   overflow contract. §3f measured the `u64` layout. Growth cuts against #237/#304, so step 2's A/B
    has to carry **peak RSS** beside the time.
 
 **Scheduling, which is why step 2 is not in this change.**
@@ -1197,7 +1197,7 @@ one.
 
 ---
 
-## 3e. The adjudication: #436's four mechanisms, and what became of the 5.10x ceiling
+## 3g. The adjudication: #436's four mechanisms, and what became of the 5.10x ceiling
 
 #436 asked for one thing — *profile within `normal_form` on `mq-random-10` at the recorded digest,
 divisor-search steps against arithmetic, and report which of three candidate mechanisms the cost is,
@@ -1209,12 +1209,12 @@ measurements will look.
 or §3d of this note, at the commits its own header declares; the arithmetic over them is labelled as
 arithmetic.
 
-### 3e.1 The four mechanisms
+### 3g.1 The four mechanisms
 
 | # | mechanism | verdict | what settles it |
 |---|---|---|---|
 | 1 | the divisor search inside `normal_form` | **refuted** | §3 — **37.5** divisor tests a term popped, **22 587 181** across all 247 elements |
-| 2 | repeated work across elements | **still unmeasured** | nothing. See §3e.2 |
+| 2 | repeated work across elements | **still unmeasured** | nothing. See §3g.2 |
 | 3 | the `O(n²)` loop shape itself | **confirmed as the count, refuted as the cost** | §3 — 534 135 reduction steps is real; §3.1 — the cost is per-step, not per-step-count |
 | 4 | the per-step full-dividend merge (#440) | **confirmed, and it is the cost** | §3 — 64.2x amplification, **1 174 314 651** terms rewritten; §3d — 76.1% of them in the compared span |
 
@@ -1247,7 +1247,7 @@ the noise — stage 2's window ~7% (§3b), §3d.2's multiply hoist ~1.6% — and
 performed at all. What is left in the span is the comparison and the copy, which is #562 (heap
 division) and #317 (a cheaper comparison), and neither is this issue's.
 
-### 3e.2 What candidate 2 still lacks, precisely
+### 3g.2 What candidate 2 still lacks, precisely
 
 Element `i` and element `i + 1` are reduced against almost the same divisor set and nothing is
 cached between them. **No counter in this note distinguishes work that is repeated across calls from
@@ -1263,7 +1263,7 @@ ships today and **1 415 ms** with `reduce_batch_rows` on, **2 400 ms** with `int
 on, and **16.4 ms** with both (§3c) — so the headroom any cache could recover is bounded by whatever
 #507 settles the default to be. It is filed separately rather than left inside a closed issue.
 
-### 3e.3 The 5.10x ceiling: spent in the lab, intact in the product
+### 3g.3 The 5.10x ceiling: spent in the lab, intact in the product
 
 #349 put final interreduction at **80.4%** of `mq-random-10`, an Amdahl ceiling of **5.10x** if the
 stage became free. Arithmetic over §3c's four arms, which are flags on one build and therefore
@@ -1297,7 +1297,7 @@ decision rather than an implementation one**. That decision is #507's, in a coho
 single-instance A/B, and #536 is the gate on half of it: the matrix route's working set is 13.1 GB on
 katsura-11 with every budget satisfied.
 
-### 3e.4 So #436's framing was right about the stage and wrong about the remedy
+### 3g.4 So #436's framing was right about the stage and wrong about the remedy
 
 "This loop, not the storage" was correct and is confirmed twice over — 99.94% in `92a262d`, 99.97%
 here (§3), against `minimize_grobner_basis`'s 10.71 ms, which is what retired #304 as a time
@@ -1315,7 +1315,7 @@ that loop. Every change that moved this stage came from outside it:
 - Both changes **inside** `normal_form`, aimed at counted operations in the hot merge, measured
   inside the noise: ~7% and ~1.6%.
 
-That is the transferable finding, and it is worth more than the verdicts in §3e.1: in this engine,
+That is the transferable finding, and it is worth more than the verdicts in §3g.1: in this engine,
 two fixes aimed at the operation the counters said was hot each returned a ratio inside the noise,
 and both large wins came from not generating the operation. §3d.2's warning applies to #562 for
 exactly this reason.
