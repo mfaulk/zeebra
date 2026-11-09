@@ -551,4 +551,5 @@ bash tools/test/rss-guard-test.sh
 ```
 
 `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` must be set or the records key wrong, and `--all` is never
-passed. Commands are as of writing; `README.md` is authoritative for example invocations.
+passed. Commands are as of writing; `docs/guide/benchmarking.md` is authoritative for example
+invocations.

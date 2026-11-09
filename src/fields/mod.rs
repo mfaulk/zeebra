@@ -58,8 +58,8 @@ pub type Gf13Pow4 = ExtensionFieldElement<13, 4, Modulus13Pow4>;
 //
 // A residue below 2^32 fits in four bytes, and the dense elimination kernel is bandwidth-bound
 // once the matrix leaves L2, so the same computation over one of these moves half the bytes it
-// does over the 64-bit-backed type of the same modulus. See the README section "A 32-bit prime
-// field" for what that is worth measured, and `examples/field_width.rs` for the instrument.
+// does over the 64-bit-backed type of the same modulus. See `docs/guide/finite-fields.md`,
+// "A 32-bit prime field", for what that is worth measured, and `examples/field_width.rs` for the instrument.
 
 /// GF(2). The coefficient field of Fukuoka MQ Challenge types I and IV, and of LowMC and HFE.
 ///

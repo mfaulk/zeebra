@@ -34,8 +34,8 @@ use crate::{
 ///
 /// This type reduces a 256-bit product by 256-bit software long division, one `__udivti3` per
 /// multiplication, which makes it the slowest multiply in the crate — slower than the 254-bit
-/// field that is four times its width. See the README's field-arithmetic table for the measured
-/// factors.
+/// field that is four times its width. See `docs/guide/finite-fields.md`'s field-arithmetic table for
+/// the measured factors.
 ///
 /// Converting it to Montgomery form was considered and declined (#163): `PrimeModulus256` takes
 /// its modulus as `[u64; 4]`, so any prime between 2^64 and 2^128 is just the low two limbs with

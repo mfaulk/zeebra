@@ -232,8 +232,8 @@ conflict for git to refuse. The `merge-staleness` job warns when the gap since
 your run touches files you also changed; that warning is **advisory and does not
 block**, so acting on it is yours to do: rebase onto current `origin/main` and
 let CI run again before merging. Branches are not gated on being current because
-the cost is measured and unaffordable — see the README section "Testing the
-merged result". And if your change touches the external comparands, the corpus or
+the cost is measured and unaffordable — see `docs/guide/development.md`,
+"Testing the merged result". And if your change touches the external comparands, the corpus or
 the challenge registry, run the coverage assertion from that section before
 merging: CI has no msolve, so those tests pass on the runner without being run.
 
