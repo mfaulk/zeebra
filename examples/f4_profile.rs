@@ -1319,6 +1319,233 @@ fn competitive_mq(options: &F4Options) {
 
 /// #331: what a 32-bit calibrated divisor mask would have decided in symbolic preprocessing.
 ///
+/// #585 stage 1: how much of `symbolic` is the divisor search, as a projection.
+///
+/// The end-to-end saving a divisor mask could buy is
+///
+/// ```text
+///   symbolic's share of the run            (measured, 23% on katsura-6 lex)
+///     x  the divisor search's share of symbolic      <- this binary
+///     x  the mask's hit rate                 (measured by `divmask`, 96.7%)
+///     x  (1 - mask cost / exponent-compare cost)     <- stage 2's, if there is one
+/// ```
+///
+/// and #585 gates the kernel on the second factor rather than building first. If the divisor
+/// search is a small share of `symbolic`, a 96.7% hit rate on it is a null result and the axis
+/// retires.
+///
+/// # Why this is a projection and says so
+///
+/// Timing the search directly would mean a clock per divisibility test, and `measure_stages`
+/// already reads one four times per *batch* for a reason — per-test timing would measure itself.
+/// So this multiplies two things that are each cheap to get honestly:
+///
+/// - `divisor_scan_steps`, which the shipped scan increments once per test unconditionally, at one
+///   add per test. Free, exact, machine-independent.
+/// - a per-step cost, taken by running `MonicBasis::find_divisor_with` — **the shipped scan
+///   itself**, not a reconstruction of it — over a real basis and dividing by the steps it reports.
+///   The counter the cost is divided by is the same counter the projection multiplies, so the loop
+///   overhead, the early exit and the branch behaviour are all inside the figure rather than
+///   assumed away.
+///
+/// The product is a *projection* and is labelled one in the output. What makes it trustworthy
+/// enough to gate a decision on is that both factors come from the shipped code at the shipped
+/// optimization level in the same binary.
+///
+/// # The two bounds
+///
+/// A negative answer exits `checked_div` early and a positive one compares every variable, so the
+/// per-step cost is not one number. Both are measured and the projection is reported as a range:
+/// the search cannot be cheaper than the all-negative figure implies nor dearer than the
+/// all-positive one, and `divmask`'s measured negative share says which end the truth sits near.
+fn symbolic_split() {
+    println!();
+    println!("## #585 stage 1: the divisor search's share of `symbolic`, projected");
+    println!();
+    println!("ISA: {}", zeebra::util::isa_floor());
+    println!();
+    println!("`symbolic/ms` and `run/ms` are measured. `steps` is the exact count the shipped");
+    println!("scan increments, one add per divisibility test. `ns/step-` and `ns/step+` are the");
+    println!("per-step cost of `MonicBasis::find_divisor_with` itself over a real basis, divided");
+    println!("by the steps it reported, for an all-negative and an all-positive population — a");
+    println!("negative answer exits early, so the two bracket the truth.");
+    println!();
+    println!("`search%` is the projection: steps x per-step cost, over the measured `symbolic`.");
+    println!("It is a **projection, not a measurement**, which is the honest label #585 asks for.");
+    println!("`of run%` carries it to the whole run, which is the factor the mask's 96.7% hit");
+    println!("rate would multiply.");
+    println!();
+    println!(
+        "{:<12} {:<8} {:>5} {:>11} {:>9} {:>13} {:>9} {:>9} {:>16} {:>12}",
+        "system",
+        "order",
+        "vars",
+        "symbolic/ms",
+        "run/ms",
+        "steps",
+        "ns/step-",
+        "ns/step+",
+        "search% of sym",
+        "of run%"
+    );
+    println!(
+        "{}",
+        [14usize, 10, 7, 13, 11, 15, 11, 11, 18, 14]
+            .iter()
+            .map(|w| "-".repeat(*w))
+            .collect::<Vec<_>>()
+            .join("|")
+    );
+
+    macro_rules! go {
+        ($n:literal, $label:expr, $system:expr, $order:expr, $order_name:expr) => {{
+            let system: Vec<MultivariatePolynomial<$n, F>> = $system;
+            // `measure_stages` only, never `measure_divmask`: that one replays every scan and
+            // would be timing a different program.
+            let options = F4Options {
+                measure_stages: true,
+                ..F4Options::default()
+            };
+            let (basis, statistics) = f4_with_options(&system, $order, &options)
+                .expect("the instance finishes under the default budget");
+
+            let (negative_ns, positive_ns) = per_step_cost::<$n>(&basis, $order);
+            let steps = statistics.divisor_scan_steps as f64;
+            let symbolic_ms = millis(statistics.stages.symbolic);
+            let run_ms = millis(statistics.total);
+            // The projection, at both ends of the per-step bracket.
+            let low_ms = steps * negative_ns / 1e6;
+            let high_ms = steps * positive_ns / 1e6;
+            let share = |ms: f64| if symbolic_ms > 0.0 { 100.0 * ms / symbolic_ms } else { 0.0 };
+            let of_run = |ms: f64| if run_ms > 0.0 { 100.0 * ms / run_ms } else { 0.0 };
+
+            println!(
+                "{:<12} {:<8} {:>5} {:>11.2} {:>9.2} {:>13} {:>9.1} {:>9.1} {:>7.1}-{:>6.1}%                  {:>5.1}-{:>5.1}%",
+                $label,
+                $order_name,
+                $n,
+                symbolic_ms,
+                run_ms,
+                statistics.divisor_scan_steps,
+                negative_ns,
+                positive_ns,
+                share(low_ms),
+                share(high_ms),
+                of_run(low_ms),
+                of_run(high_ms)
+            );
+        }};
+    }
+
+    go!(
+        6,
+        "katsura-6",
+        katsura::<6, F>(),
+        MonomialOrder::Lexicographic,
+        "lex"
+    );
+    go!(
+        7,
+        "katsura-7",
+        katsura::<7, F>(),
+        MonomialOrder::GradedLexicographic,
+        "grlex"
+    );
+    go!(
+        6,
+        "katsura-6",
+        katsura::<6, F>(),
+        MonomialOrder::GradedLexicographic,
+        "grlex"
+    );
+    go!(
+        5,
+        "cyclic-5",
+        cyclic::<5, F>(),
+        MonomialOrder::GradedReverseLexicographic,
+        "grevlex"
+    );
+
+    println!();
+    println!("The two `symbolic`-share columns are the second factor of #585's product. Carried");
+    println!("through the other three — symbolic's share of the run, the 96.7% hit rate, and the");
+    println!("mask's own cost, which stage 2 would have to measure — they bound what a shipped");
+    println!("mask could save end to end.");
+}
+
+/// The per-step cost of the shipped divisor scan, in nanoseconds, as (all-negative, all-positive).
+///
+/// Runs `MonicBasis::find_divisor_with` — the function symbolic preprocessing calls — and divides
+/// by the `divisor_scan_steps` it reports, so the quotient is the real loop's cost per test rather
+/// than an isolated `checked_div`.
+///
+/// The all-positive population asks for each basis element's own leading monomial, which divides
+/// and so makes the scan compare every variable before returning. The all-negative one asks for a
+/// monomial built to be divisible by nothing in the basis — one with a single variable at exponent
+/// one, below every lead — so every step fails and exits early.
+fn per_step_cost<const N: usize>(
+    basis: &[MultivariatePolynomial<N, F>],
+    order: MonomialOrder,
+) -> (f64, f64) {
+    use zeebra::grobner::f4::MonicBasis;
+    use zeebra::grobner::{ReducerSelection, SymbolicCounts};
+    use zeebra::Monomial;
+
+    let monic = MonicBasis::new(basis, order);
+    let leads: Vec<Monomial<N>> = basis
+        .iter()
+        .map(|element| element.leading_monomial(order))
+        .collect();
+    // Divisible by nothing: a single variable at exponent one is below every lead of a basis whose
+    // elements all have positive degree, and the asserted step count below is what checks that the
+    // population really is all-negative rather than merely intended to be.
+    let mut exponents = [0u32; N];
+    exponents[N - 1] = 1;
+    let miss = Monomial::new(&exponents);
+
+    let cost = |queries: &[Monomial<N>], repetitions: usize| -> (f64, usize) {
+        let mut counts = SymbolicCounts::default();
+        let start = Instant::now();
+        for _ in 0..repetitions {
+            for query in queries {
+                std::hint::black_box(monic.find_divisor_with(
+                    query,
+                    ReducerSelection::FirstApplicable,
+                    &mut counts,
+                ));
+            }
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        (elapsed, counts.divisor_scan_steps)
+    };
+
+    // Enough repetitions that the clock is not the measurement, and the step count scales with it
+    // so the quotient does not care how many there were.
+    let repetitions = 2_000;
+    let (negative_seconds, negative_steps) = cost(&[miss], repetitions * leads.len().max(1));
+    let (positive_seconds, positive_steps) = cost(&leads, repetitions);
+
+    // The all-negative population must have scanned the whole basis every time, or it was not
+    // all-negative and the bracket's lower end is wrong.
+    assert_eq!(
+        negative_steps,
+        repetitions * leads.len().max(1) * leads.len(),
+        "the miss monomial was divisible by something, so this is not an all-negative population"
+    );
+
+    let per = |seconds: f64, steps: usize| {
+        if steps == 0 {
+            0.0
+        } else {
+            seconds * 1e9 / steps as f64
+        }
+    };
+    (
+        per(negative_seconds, negative_steps),
+        per(positive_seconds, positive_steps),
+    )
+}
+
 /// Counters only, which is what the issue asks for: `F4Options::measure_divmask` replays each
 /// divisibility test against the mask *after* the real answer is known, so nothing a mask could get
 /// wrong can reach the basis. The run is therefore slower than a shipping one and its durations are
@@ -1450,7 +1677,7 @@ fn main() {
         println!(
             "modes: mq (the #349 competitive MQ stage split), mq-counts (its operation
              counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's
-             batch row form A/B), mq-instance (its canonical text), divmask
+             batch row form A/B), mq-instance (its canonical text), divmask,\n             symbolic-split (#585 stage 1)
              (#331's divisor-mask counters), construction (#330's four-way split of
              the construction stage), scatter (#582's four-way split of the scatter)"
         );
@@ -1556,6 +1783,12 @@ fn main() {
         println!("rung the matrix interreduction route regresses 25x on.");
         println!();
         compare_batch_row_forms_on_the_rungs();
+        return;
+    }
+
+    if argument == "symbolic-split" {
+        // #585 stage 1. A projection, labelled as one; see `symbolic_split`.
+        symbolic_split();
         return;
     }
 

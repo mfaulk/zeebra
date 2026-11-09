@@ -984,6 +984,9 @@ cargo run --release --example determinant_width -- --count-allocations   # calls
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 cargo run --release --example f4_profile -- divmask       # #331: the divisor-mask counters
+cargo run --release --example f4_profile -- symbolic-split  # #585: what share of symbolic
+                                                   #   preprocessing the divisor search is
+cargo run --release --example f4_profile -- mq-rows      # #477: reduced row echelon per batch
 cargo run --release --example f4_profile -- scatter       # #582: the row scatter, split four ways
 cargo run --release --example column_sort_routes   # #583: the column sort, stable against unstable
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
@@ -1050,6 +1053,17 @@ which is 94%–97% on every instance tried. The run pays a second walk of the ba
 lookup, so **its durations are not quotable**; the counters are exact and machine-independent,
 which is the trade `count_interreduction` already makes. See
 `docs/research/msolve-implementation.md` §4 H2 for the result and what it does and does not bound.
+
+`f4_profile -- symbolic-split` is the other half of that question, and the half that settled it.
+`divmask` counts the tests a mask would answer; `symbolic-split` prices them, by multiplying
+`divisor_scan_steps` — exact, and free, because the shipped scan increments it once per
+divisibility test — by a per-step cost taken from timing `MonicBasis::find_divisor_with` over a
+real basis and dividing by the steps that same scan reports. It prints a **range**, because a
+negative answer exits early and a positive one compares every variable, and it labels its own
+output a projection rather than a measurement. The answer is a null result: the divisor search is
+2.5%–4.7% of `symbolic` on three of four instances and 24%–30% on the fourth, which bounds even a
+*free* mask at under 6% of one run and under 1% of the other three. §4 H2 has the table and why
+#585's stage 2 was closed rather than built.
 
 `f4_memory` is the same question for bytes rather than for time, and it exists because the answer
 turned out not to be the matrix. It runs a tracking `#[global_allocator]` beside the solver's own
