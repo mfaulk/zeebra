@@ -66,10 +66,11 @@ pub struct EntryBufferPeak {
     /// Entries the rows' buffers, plus the merge scratch, were *allocated* for at the high-water.
     ///
     /// [`EliminationStatistics::peak_nonzeros`] is what the mathematics needs; this is what the
-    /// allocator holds, and the two are not close. [`SparseRow::subtract_scaled`] reserves the
-    /// merge's worst case and swaps the buffer in, so a row that cancelled down keeps the capacity
-    /// the merge might have needed and nothing shrinks it — 11.44x the payload on `katsura-11`'s
-    /// interreduction matrix (#536, #554).
+    /// allocator holds, and the two need not be close. The gap was **11.44x** on `katsura-11`'s
+    /// interreduction matrix while [`SparseRow::subtract_scaled`] installed the buffer it reserved
+    /// in the row, which left the merge scratch's high-water capacity to migrate into whichever row
+    /// was merged next; it is **1.81x** there since #554 copies the result back instead (#536,
+    /// #554, `docs/research/f4-resource-scaling.md` §§12-13).
     ///
     /// Reported rather than budgeted: a budget has to count a quantity a caller can reason about on
     /// another machine, which is the payload. This is the amplification between it and the bytes.

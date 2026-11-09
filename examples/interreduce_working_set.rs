@@ -11,6 +11,7 @@
 //! cargo run --release --example interreduce_working_set -- katsura-11 --arm unbounded
 //! cargo run --release --example interreduce_working_set -- katsura-11 --arm default
 //! cargo run --release --example interreduce_working_set -- katsura-8 --arm division
+//! cargo run --release --example interreduce_working_set -- mq-random-10 --arm unbounded
 //! ```
 //!
 //! - `unbounded` lifts the live-entry allowance clear of the pass, so the elimination runs to
@@ -26,6 +27,7 @@ use zeebra::{
     fields::Zp2147483647,
     grobner::{
         benchmark_systems::{cyclic, katsura},
+        external::{instance, REFERENCE_CHARACTERISTIC},
         f4_reported, F4Options, F4Statistics, InterreductionRoute, MatrixRefusal,
     },
     util::{isa_floor, peak_resident_bytes},
@@ -167,6 +169,42 @@ fn run<const N: usize>(
     }
 }
 
+/// The digest the `mq-random-10` records in `research/competitive/results/history.json` carry.
+const MQ_RANDOM_10_DIGEST: &str =
+    "72d0ad315fc25409792625465578d18329597d3ee183e75f257774d9215803b2";
+
+/// The digest-pinned `mq-random-10` system, built through the comparison corpus.
+///
+/// Added for #554, whose candidates have to be weighed on something other than katsura: katsura's
+/// interreduction matrix is unusually tall and its fill-in unusually heavy, and a buffer policy
+/// tuned on it alone would be tuned on one shape. The digest assertion is `f4_profile`'s, for the
+/// same reason it is there — a figure taken on a differently generated instance of the same name is
+/// not comparable with the recorded ones.
+fn mq_random_10() -> Vec<MultivariatePolynomial<10, F>> {
+    let built = instance(
+        "mq-random-10",
+        REFERENCE_CHARACTERISTIC,
+        MonomialOrder::GradedReverseLexicographic,
+    )
+    .expect("mq-random-10 is a corpus rung with a compiled dimension");
+    assert_eq!(
+        built.digest(),
+        MQ_RANDOM_10_DIGEST,
+        "the generated instance is not the recorded one"
+    );
+
+    let names: Vec<&str> = built.variables.iter().map(String::as_str).collect();
+    let mut compiled = [""; 10];
+    compiled.copy_from_slice(&names[..10]);
+    built
+        .system
+        .iter()
+        .map(|text| {
+            MultivariatePolynomial::parse(text, compiled).expect("this crate rendered this text")
+        })
+        .collect()
+}
+
 fn main() {
     println!(
         "# #536: the matrix interreduction route's working set\n\n- built for {}",
@@ -225,6 +263,7 @@ fn main() {
         "katsura-11" => run("katsura-11", &katsura::<11, F>(), arm, order, wall),
         "cyclic-6" => run("cyclic-6", &cyclic::<6, F>(), arm, order, wall),
         "cyclic-7" => run("cyclic-7", &cyclic::<7, F>(), arm, order, wall),
+        "mq-random-10" => run("mq-random-10", &mq_random_10(), arm, order, wall),
         other => eprintln!("{other} is not a rung this example compiles"),
     }
 }

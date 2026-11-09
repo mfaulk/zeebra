@@ -4829,6 +4829,12 @@ pages, so that one site covers the whole of it. The budget was looking at the co
 172.6 MB. `MatrixInterreduction::peak_nonzeros` and `peak_entry_capacity` report the two; `cargo run
 --release --example interreduce_working_set` reproduces them.
 
+**That amplification is gone.** §13 removed it: `SparseRow::subtract_scaled` copies the merge result
+back into the row's own buffer rather than installing the buffer it reserved, so the caller's merge
+scratch stays one grown buffer instead of migrating its capacity into every row the pass touches.
+The two counters are unchanged — the row operations are the same operations — and the capacity falls
+from 11.44x the payload to 1.81x on `katsura-11`, 18.13x to 1.93x on `mq-random-10`.
+
 #### What the computation did before it ran out of room
 
 `f4` and `f4_with_options` discard their counters on the error path, which is the case where they
