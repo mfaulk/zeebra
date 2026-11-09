@@ -901,6 +901,9 @@ cargo run --release --example boolean_density      # what a GF(2) entry costs, a
 cargo run --release --example boolean_density -- 6 8
 cargo run --release --example xl_dimensions        # XL's matrix at the degree it needs, against F4's
 cargo run --release --example xl_dimensions -- 38  # the published record's instance
+cargo run --release --example crossbred_dimensions # crossbred's admissible parameters and its
+                                                   # total work across every guess, against F4's
+cargo run --release --example crossbred_dimensions -- 10 15 20
 cargo run --release --example pair_criteria        # what each pair criterion discards, F4
 cargo run --release --example pair_criteria -- buchberger
 cargo run --release --example certification_criteria  # what they discard from a certification pass
@@ -1215,6 +1218,19 @@ reproduces the published `n = 10` file's 66 coefficients. The finding is a cross
 XL's matrix is *smaller* than F4's measured peak at `n = 10` and `n = 15`, 1.34x at `n = 20`, 22.3x
 at `n = 24`, and 850 GiB at `n = 38`. See
 [`docs/research/xl-block-wiedemann.md`](docs/research/xl-block-wiedemann.md).
+
+`crossbred_dimensions` does the same job for the crossbred family (#75), and for the same reason:
+whether a triple `(D, d, k)` works at all is a coefficient of a bivariate series and the matrix
+shapes are monomial counts, so the answer is reachable from construction without a solver. It is
+validated against every published parameter choice the four sources carry — Joux-Vitse's Table 1
+column for column, Vidal-Delaplace-Ionica's Tables 1, 2 and 6, and Baena et al.'s Example 2 — and
+refuses to print a figure if any of them fails. The accounting reports **`q^(n-k)` as its own
+term**, because crossbred's cost is the sum over all guesses and not the size of the reduced
+system. The finding is a no-go on reachable instances: on Fukuoka type III at `n = 15` the
+cheapest admissible triple needs 30.6 hours against F4's measured 7.8 seconds, under a rate
+assumption chosen to favour crossbred throughout. The one interesting row is `n = 20`, where
+crossbred's preprocessing matrix is a tenth of F4's peak and F4 does not finish at all — a memory
+wall traded for a time wall. See [`docs/research/crossbred.md`](docs/research/crossbred.md).
 
 `f4_selection` compares every reducer-selection policy and the cache against one common baseline,
 on one line each: the closure size, the largest matrix, the peak live entries, the row operations,
