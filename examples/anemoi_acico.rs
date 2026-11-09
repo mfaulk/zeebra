@@ -103,6 +103,12 @@ struct Row {
     proved: u128,
     max_pair_degree: u64,
     step_degrees: Vec<u64>,
+
+    /// Peak live nonzero entries, against `F4Options::default()`'s 20 000 000 allowance.
+    ///
+    /// Reported because "the basis is free" is a claim about a budget as well as a clock, and this
+    /// is the budget Anemoi's other two models are refused on at this rung (#323).
+    peak_live_nonzeros: usize,
 }
 
 /// The expected leading-monomial set, from Proposition 2 (DRL, `α = 3`) or Proposition 3 (WDRL).
@@ -148,16 +154,17 @@ fn row<const N: usize>(alpha: u32, rounds: usize, weighted: bool) -> Row {
         dimension,
         proved: *proved_acico_quotient_dimension(alpha, rounds, 1).value(),
         max_pair_degree: statistics.max_pair_degree,
+        peak_live_nonzeros: statistics.max_live_nonzeros,
         step_degrees: statistics.step_degrees,
     }
 }
 
 fn print_rows(rows: &[Row], proposition: &str) {
-    println!("| `α` | `N` | variables | basis | {proposition} | `D` | proved `(α+2)^N` | agrees | `max_pair_degree` | step degrees |");
-    println!("|---:|---:|---:|---:|---|---:|---:|---|---:|---|");
+    println!("| `α` | `N` | variables | basis | {proposition} | `D` | proved `(α+2)^N` | agrees | `max_pair_degree` | step degrees | peak live nonzeros |");
+    println!("|---:|---:|---:|---:|---|---:|---:|---|---:|---|---:|");
     for row in rows {
         println!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {:?} |",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {:?} | {} |",
             row.alpha,
             row.rounds,
             row.variables,
@@ -176,6 +183,7 @@ fn print_rows(rows: &[Row], proposition: &str) {
             },
             row.max_pair_degree,
             row.step_degrees,
+            row.peak_live_nonzeros,
         );
     }
 }

@@ -1,6 +1,6 @@
 //! The runner for the registered Anemoi ladder, read in the order that keeps it honest.
 //!
-//! Three subcommands, and the split between them is the point.
+//! The split between the subcommands is the point.
 //!
 //! - `list` prints the registered rows with their published per-step figures.
 //! - `dimensions [id-substring]` computes `dim F_p[x]/I` and checks it against `(α + 2)^N`.
@@ -10,6 +10,12 @@
 //! - `shape [id-substring]` asks whether `R/I` is in shape position in the lex-last variable, and
 //!   whether the shape route's lex basis is the classical conversion's. **Machine-independent** for
 //!   the same reason `dimensions` is — a minimal-polynomial degree is not a timing.
+//! - `budgets [id-substring]` says which F4 budget binds at a rung, under each of four
+//!   configurations. **Machine-independent** — every figure is a count — and cheap, because a
+//!   configuration that crosses a budget is refused early.
+//! - `peak <id>` lifts every resource budget and reports what the row actually needs. The
+//!   expensive half of `budgets`, and the only honest input to sizing a budget: a refusal reports
+//!   the limit plus a row, which reads as a near miss whatever the real peak is (#323).
 //! - `row <id>` runs one row through F4, FGLM and root finding, each timed separately, and
 //!   **refuses to print a single number** unless `ZEEBRA_MACHINE` and `ZEEBRA_AFFINITY` are set.
 //!
@@ -23,6 +29,8 @@
 //! cargo run --release --example anemoi_ladder dimensions
 //! cargo run --release --example anemoi_ladder dimensions n6
 //! cargo run --release --example anemoi_ladder shape n3
+//! cargo run --release --example anemoi_ladder budgets anemoi17-cico-n6
+//! cargo run --release --example anemoi_ladder peak anemoi17-cico-n6-pcico
 //! ZEEBRA_MACHINE=... ZEEBRA_AFFINITY=... tools/benchlock.sh \
 //!     cargo run --release --example anemoi_ladder row anemoi64-cico-n3-fcico
 //! ```
@@ -44,7 +52,8 @@ use zeebra::{
             anemoi_cico::{dispatch_anemoi_cico, AnemoiCico, AnemoiCicoVisitor},
             challenge, published_quotient_dimension, registry, ChallengeManifest,
         },
-        solve_from_lex_basis, F4Options, HilbertSeries, SolveOptions, SolveOutcome,
+        solve_from_lex_basis, F4Options, HilbertSeries, InterreductionRoute, SolveOptions,
+        SolveOutcome,
     },
     util::peak_resident_bytes,
     KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial,
@@ -84,6 +93,13 @@ fn main() {
         "list" => list(),
         "dimensions" => dimensions(arguments.get(1).map(String::as_str)),
         "shape" => shape(arguments.get(1).map(String::as_str)),
+        "budgets" => budgets(arguments.get(1).map(String::as_str)),
+        "peak" => {
+            let id = arguments
+                .get(1)
+                .expect("usage: anemoi_ladder peak <challenge-id>");
+            peak(id);
+        }
         "msolve" => {
             let id = arguments
                 .get(1)
@@ -98,7 +114,8 @@ fn main() {
         }
         other => panic!(
             "usage: anemoi_ladder [list | dimensions [id-substring] | shape [id-substring] | \
-             msolve <challenge-id> | row <challenge-id>]; got {other}"
+             budgets [id-substring] | peak <challenge-id> | msolve <challenge-id> | \
+             row <challenge-id>]; got {other}"
         ),
     }
 }
@@ -481,6 +498,236 @@ enum ShapeOutcome {
     NotReached(String),
 }
 
+/// Which F4 budget binds at this rung, and under which configuration — counts, so no clock.
+///
+/// #322 and #323 were both filed after a budget was discovered by being refused at it, and both
+/// treated the crossing as a property of the *system*. It is a property of the system **and the
+/// strategies**: the budgets below are identical in `F4Options::baseline` and
+/// `F4Options::recommended`, so every line here is the same four numbers against a different
+/// computation, and a row that is refused under one configuration and completes under another
+/// localizes the cost to the strategy rather than to the rung.
+///
+/// Every run is at the **default budgets**, which is what makes this cheap: a configuration that
+/// crosses one is refused early, and one that does not completes and reports a true peak. The
+/// peak from a refused run is a lower bound — F4 stops the instant the limit is crossed, so the
+/// live count it reports is the limit plus a row, which is why Anemoi `N = 6` `PCICO` looked like
+/// a near miss at 20 000 112 of 20 000 000 and peaks 1.42x higher. `peak <id>` lifts the budgets
+/// to measure the real one, and is separate because that is the expensive half.
+///
+/// Filter, for the same reason `shape` has one: the `n5` and `n6` rows are where the question is.
+fn budgets(filter: Option<&str>) {
+    println!("# which F4 budget binds, by rung and by configuration\n");
+    println!(
+        "| row | variables | configuration | outcome | batches | peak rows | peak columns | \
+         peak live nonzeros | budget pressure |"
+    );
+    println!("|---|---:|---|---|---:|---:|---:|---:|---|");
+    let mut checked = 0;
+    for manifest in anemoi_rows() {
+        if let Some(filter) = filter {
+            if !manifest.id.contains(filter) {
+                continue;
+            }
+        }
+        let prime = manifest.anemoi_parameters().expect("an Anemoi row").prime;
+        with_field!(prime, one_budget_row(&manifest));
+        checked += 1;
+    }
+    assert!(checked > 0, "no registered Anemoi row matched the filter");
+    println!(
+        "\nEvery figure is a count and reproduces on any machine. `+` marks a peak from a refused \
+         run, which is a lower bound. Budget pressure is `F4Statistics::near_budget` at 80% \
+         against the configuration's own budgets (#468), worst first. The configurations vary one \
+         strategy each from `F4Options::default()`; `both off` is the default as it stood before \
+         #575 moved the two interreduction flags together."
+    );
+}
+
+/// The configurations one rung is run under, each at the default budgets.
+///
+/// Named for what they vary from `F4Options::default()`, not for what they are, because the
+/// question is which strategy moves the binding budget.
+fn budget_configurations() -> Vec<(&'static str, F4Options)> {
+    let default = F4Options::default();
+    vec![
+        ("`default`", default.clone()),
+        (
+            "`reduce_batch_rows: false`",
+            F4Options {
+                reduce_batch_rows: false,
+                ..default.clone()
+            },
+        ),
+        (
+            "`interreduction: Division`",
+            F4Options {
+                interreduction: InterreductionRoute::Division,
+                ..default.clone()
+            },
+        ),
+        (
+            "both off (the pre-#575 default)",
+            F4Options {
+                reduce_batch_rows: false,
+                interreduction: InterreductionRoute::Division,
+                ..default
+            },
+        ),
+    ]
+}
+
+/// One row, once per configuration, printed as it goes.
+///
+/// Printed inside the loop rather than collected, because a configuration that does not return is
+/// the result for that line and a collected table would lose every line before it.
+struct Budgets {
+    id: String,
+    variables: usize,
+}
+
+impl<F: KnownOrder> AnemoiCicoVisitor<F> for Budgets {
+    type Output = ();
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        for (name, options) in budget_configurations() {
+            let (basis, statistics) = f4_reported(system, order, &options);
+            let outcome = match &basis {
+                Ok(basis) => format!("completes, {} elements", basis.len()),
+                Err(e) => format!("refused on `{}`", e.limit_name()),
+            };
+            let pressure: Vec<String> = statistics
+                .near_budget(&options, 0.8)
+                .iter()
+                .map(|approach| {
+                    format!(
+                        "{} at {:.0}%",
+                        approach.budget,
+                        100.0 * approach.utilisation()
+                    )
+                })
+                .collect();
+            println!(
+                "| `{}` | {} | {} | {} | {} | {} | {} | {}{} | {} |",
+                self.id,
+                self.variables,
+                name,
+                outcome,
+                statistics.batches,
+                statistics.max_matrix_rows,
+                statistics.max_matrix_columns,
+                statistics.max_live_nonzeros,
+                if basis.is_ok() { "" } else { "+" },
+                pressure.join("; "),
+            );
+        }
+    }
+}
+
+/// One row's configurations, dispatched on the compiled variable count.
+fn one_budget_row<F: KnownOrder>(manifest: &ChallengeManifest) {
+    let instance = manifest
+        .anemoi_cico_instance::<F>()
+        .expect("the registered field");
+    dispatch_anemoi_cico::<F, _>(
+        &instance,
+        Budgets {
+            id: manifest.id.to_string(),
+            variables: manifest.variables().expect("a size"),
+        },
+    )
+    .expect("a compiled variable count")
+}
+
+/// What one row's F4 actually needs, with every resource budget lifted out of the way.
+///
+/// The expensive half of `budgets`, and separate from it for that reason: a refusal is cheap and a
+/// peak is not. **A peak is the only honest input to sizing a budget.** #490 proposes lifting
+/// `max_live_nonzeros` to 25 000 000 on the strength of three workloads that crossed 20 000 000 by
+/// under 0.05%, and Anemoi `N = 6` `PCICO` is one of them — but that 0.0006% is the overshoot of a
+/// run stopped at the limit, and the row's real peak is 28 435 493 (anemoi.md §8a.8). The lift
+/// would be refused again.
+///
+/// Reported per configuration, because the peak is a property of the strategies too.
+fn peak(id: &str) {
+    let manifest = anemoi_rows()
+        .into_iter()
+        .find(|c| c.id == id)
+        .unwrap_or_else(|| panic!("no registered Anemoi row is called {id}"));
+    println!("# {id}: what F4 needs, budgets lifted\n");
+    println!(
+        "| configuration | outcome | batches | peak rows | peak columns | peak live nonzeros | \
+         peak live MB | over the default allowance |"
+    );
+    println!("|---|---|---:|---:|---:|---:|---:|---:|");
+    let prime = manifest.anemoi_parameters().expect("an Anemoi row").prime;
+    with_field!(prime, one_peak(&manifest));
+    println!(
+        "\nBudgets lifted to {} live entries and {} matrix rows/columns; the strategies are each \
+         configuration's own and are not lifted, because a peak measured under a different \
+         reduction route is a peak for a different computation. The last column is the peak over \
+         `F4Options::default()`'s live-entry allowance -- what a correctly sized budget has to \
+         clear, as against what a refusal reports.",
+        LIFTED_LIVE_ENTRIES, LIFTED_MATRIX_SHAPE
+    );
+}
+
+/// Live entries the `peak` subcommand admits: 6.4 GB at 16 bytes, against a 4.53 GB observed peak
+/// for the heaviest row this family has reached (anemoi.md §8a.8).
+const LIFTED_LIVE_ENTRIES: usize = 400_000_000;
+
+/// Rows and columns the `peak` subcommand admits, 20x the default. `FCICO` `N = 6` crossed the
+/// 200 000 default in symbolic preprocessing (anemoi.md §8a.8), so this budget has to be lifted
+/// too or the row is refused before any entry is counted.
+const LIFTED_MATRIX_SHAPE: usize = 4_000_000;
+
+/// Every resource budget lifted, with `strategies`' strategies left exactly as they are.
+fn lifted(strategies: F4Options) -> F4Options {
+    F4Options {
+        max_matrix_rows: LIFTED_MATRIX_SHAPE,
+        max_matrix_columns: LIFTED_MATRIX_SHAPE,
+        ..strategies.with_live_entries::<A64>(LIFTED_LIVE_ENTRIES)
+    }
+}
+
+/// One row's peak profile per configuration.
+struct Peak;
+
+impl<F: KnownOrder> AnemoiCicoVisitor<F> for Peak {
+    type Output = ();
+
+    fn visit<const N: usize>(self, system: &[MultivariatePolynomial<N, F>]) {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let allowance = F4Options::default().live_entry_allowance::<F>();
+        for (name, strategies) in budget_configurations() {
+            let (basis, statistics) = f4_reported(system, order, &lifted(strategies));
+            println!(
+                "| {} | {} | {} | {} | {} | {}{} | {} | {:.2}x |",
+                name,
+                match &basis {
+                    Ok(basis) => format!("completes, {} elements", basis.len()),
+                    Err(e) => format!("refused on `{}`", e.limit_name()),
+                },
+                statistics.batches,
+                statistics.max_matrix_rows,
+                statistics.max_matrix_columns,
+                statistics.max_live_nonzeros,
+                if basis.is_ok() { "" } else { "+" },
+                statistics.max_live_nonzeros * statistics.bytes_per_entry / 1_000_000,
+                statistics.max_live_nonzeros as f64 / allowance as f64,
+            );
+        }
+    }
+}
+
+/// One row's peak profile, dispatched on the compiled variable count.
+fn one_peak<F: KnownOrder>(manifest: &ChallengeManifest) {
+    let instance = manifest
+        .anemoi_cico_instance::<F>()
+        .expect("the registered field");
+    dispatch_anemoi_cico::<F, _>(&instance, Peak).expect("a compiled variable count")
+}
+
 /// The registered Anemoi rows, in registry order.
 fn anemoi_rows() -> Vec<ChallengeManifest> {
     registry()
@@ -846,18 +1093,31 @@ fn write_msolve<F: KnownOrder>(manifest: &ChallengeManifest) {
     dispatch_anemoi_cico::<F, _>(&instance, Emit).expect("a compiled dimension");
 }
 
-/// The F4 options for a row at this round count, with the one budget that binds at `N = 6` lifted.
+/// The F4 options for a row at this round count, with the budgets that bind at `N = 6` lifted.
 ///
 /// `F4Options::recommended`'s `max_live_nonzeros` of 20 M — 320 MB at 16 bytes an entry — is not a
-/// generous limit here and not a mistaken one either: `N = 5` peaks at 1.54 M live nonzeros, 7.7%
-/// of it, and `N = 6` `PCICO` crosses it at **20 000 112** entries during batch 41 at pair degree
-/// 13. One part in 180 000 over. The default is right for a library call and wrong for a run whose
-/// whole purpose is to reach the next rung, so this lifts it for `N >= 6` and leaves every other
-/// budget alone.
+/// generous limit here and not a mistaken one either, and `N = 6` crosses it in both models. The
+/// default is right for a library call and wrong for a run whose whole purpose is to reach the
+/// next rung, so this lifts it for `N >= 6`.
+///
+/// **Three of the four budgets below were sized against refusals, and section 8a.9 re-measured the
+/// peaks they were standing in for.** Two consequences, neither of which moves a number here:
+///
+///   * the live-entry lift is the only one the default still needs. #575 cut `N = 6` `PCICO`'s
+///     peak matrix from 82 608 x 97 388 rows to 23 211 x 35 246 and `FCICO`'s row count by 11.7x,
+///     so `max_matrix_rows` and `max_matrix_columns` no longer bind at this rung under the
+///     default — they bind under `reduce_batch_rows: false`, which this runner does not set but a
+///     reader comparing against `F4Options::baseline` would;
+///   * 200 000 000 is 8.3x the measured `PCICO` peak of 24 011 204 rather than the 10x-over-a-near-
+///     miss it was written as. The margin is the point and is kept: the quantity moved by 14.6x on
+///     one rung in one commit (section 8a.9), so a lift sized tightly against today's peak would
+///     be a lift that has to be revisited.
 ///
 /// Lifted for `N >= 6` only, so the `N <= 5` figures in `docs/research/anemoi.md` section 8a.3 stay
 /// reproducible from this binary: a budget that never binds does not change a result, but a run
-/// taken under different options is not the same measurement and should not look like one.
+/// taken under different options is not the same measurement and should not look like one. Section
+/// 8a.9 records that `N = 5` `FCICO` **no longer** completes under the default, which is a change
+/// in the default rather than in this function.
 fn basis_options(rounds: usize) -> F4Options {
     let recommended = F4Options::recommended();
     if rounds < 6 {
