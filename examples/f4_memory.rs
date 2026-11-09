@@ -42,7 +42,7 @@ use zeebra::{
         benchmark_systems::{cyclic, katsura},
         f4::{
             macaulay::MacaulayMatrix,
-            symbolic::{symbolic_preprocessing_with, MonicBasis, ReducerCache},
+            symbolic::{symbolic_preprocessing_with, MonicBasis, MonomialHandle, ReducerCache},
         },
         f4_observed_reported,
         research::mq::MqInstance,
@@ -120,7 +120,8 @@ struct BatchProbe {
     basis_elements: usize,
     basis_terms: usize,
 
-    /// Peak live heap of symbolic preprocessing, including the queue and the two monomial sets.
+    /// Peak live heap of symbolic preprocessing, including the queue, the two monomial structures
+    /// and the per-term handles #621 added.
     symbolic_peak: usize,
 
     /// Rows the closure needed, or the row budget if it refused.
@@ -294,11 +295,35 @@ fn attribution<const N: usize>(
             ),
         });
         sites.push(Site {
-            name: "  of which: examined + covered sets",
-            bytes: worst.divisor_queries * (monomial_bytes + 1) * 2,
+            name: "  of which: examined map + covered set",
+            bytes: worst.divisor_queries * (2 * monomial_bytes + size_of::<MonomialHandle>() + 2),
             method: format!(
-                "{} distinct monomials x ({} + 1) B x 2 sets",
+                "{} distinct monomials x ({} + {} + 1) B map + ({} + 1) B set",
+                worst.divisor_queries,
+                monomial_bytes,
+                size_of::<MonomialHandle>(),
+                monomial_bytes
+            ),
+        });
+        sites.push(Site {
+            name: "  of which: monomial arena",
+            bytes: worst.divisor_queries * monomial_bytes,
+            method: format!(
+                "{} distinct monomials x {} B, the column set handed to construction",
                 worst.divisor_queries, monomial_bytes
+            ),
+        });
+        // #621's memory price, which is the thing that issue said to establish before implementing:
+        // one handle per matrix entry, live from preprocessing until `release_monomials`. Compare it
+        // against the entry row below — it is a quarter of it, because a handle is four bytes and a
+        // `(usize, F)` entry is at least sixteen.
+        sites.push(Site {
+            name: "  of which: per-term handles (#621)",
+            bytes: worst.entries * size_of::<MonomialHandle>(),
+            method: format!(
+                "{} row terms x {} B, released with the arena after construction",
+                worst.entries,
+                size_of::<MonomialHandle>()
             ),
         });
         sites.push(Site {

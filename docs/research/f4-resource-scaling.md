@@ -354,6 +354,11 @@ is `(usize, Zp31)` = **16 B**.
 | unnamed remainder | ~515 | 3.7% | allocator slack and completed batches' column structures |
 | **measured `VmHWM`** | **13 996** | 100% | the example's own `util::peak_resident_bytes`, read after F4 returned |
 
+The row names are the ones the harness printed at the stamp above. `examined` is a map rather than a
+set since #621, so a run today prints it, the monomial arena and the per-term handles as three rows
+in place of the one; the quantity is the same structure and the 0.04% is unaffected at this scale,
+because a handle is four bytes against `Monomial<20>`'s eighty.
+
 **Two readings of `VmHWM`, 4 MB apart, and which is which.** The shares above are against the
 example's own in-process read, 13 996 MB, taken after F4 returns — that is the figure the
 percentages divide by. The external poller, sampling `/proc/<pid>/status` every 200 ms while the run

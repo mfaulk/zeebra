@@ -63,8 +63,8 @@ pub use statistics::{
 };
 pub use symbolic::{
     symbolic_preprocessing, symbolic_preprocessing_with, symbolic_preprocessing_within, CacheMode,
-    MonicBasis, MonicElement, Preprocessed, PreprocessedRow, ReducerCache, RowBudgetExceeded,
-    RowKind, SymbolicCounts,
+    MonicBasis, MonicElement, MonomialHandle, Preprocessed, PreprocessedRow, ReducerCache,
+    RowBudgetExceeded, RowKind, SymbolicCounts,
 };
 
 use std::time::Instant;

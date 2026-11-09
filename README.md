@@ -1017,6 +1017,7 @@ cargo run --release --example f4_profile -- symbolic-split  # #585: what share o
                                                    #   preprocessing the divisor search is
 cargo run --release --example f4_profile -- mq-rows      # #477: reduced row echelon per batch
 cargo run --release --example f4_profile -- scatter       # #582: the row scatter, split four ways
+cargo run --release --example f4_profile -- handles       # #621: handles against the hash read
 cargo run --release --example column_sort_routes   # #583: the column sort, stable against unstable
 timeout 900 cargo run --release --example buchberger_reach -- katsura-6 lex all
 ```
@@ -1055,16 +1056,27 @@ build. `docs/research/groebner-jl-gap.md` is what the `mq-instance` comparison p
 row-provenance copy. The other two, the multiplier shift and the per-term column lookup, are per
 *term*, where `Instant::now()` costs more than the work it would time; they come from
 `ScatterPrefix`, a **nested ablation** whose arms are prefixes of the real loop and whose adjacent
-differences are one step's cost. The full arm is the shipping loop verbatim, so the table prints it
+differences are one step's cost. The full arm is that loop verbatim, so the table prints it
 beside the clocked `scatter_rows` as a control: if those two disagree, nothing beside them means
 anything. Each arm carries a checksum that an emptied arm cannot produce
 (`test_the_scatter_ablation_arms_do_the_scatters_work` pins each one to a quantity derived from the
 built matrix), the arm order rotates per repetition, and each arm is min-reduced over its own runs.
 
+Since #621 the loop those arms describe is **not** the shipping one, so the mode clocks
+`MacaulayMatrix::build_hashed_scatter_for_benchmark` rather than `build_measured` and keeps
+reporting what #582 reported. `handles` is the A/B between the two. Symbolic preprocessing interns
+every shifted row monomial to deduplicate its own work queue, so it now assigns each a handle — an
+index into a first-appearance arena — and `Preprocessed` carries the handle of every row term in one
+flat vector. Construction inverts the column sort's permutation into an array keyed by handle, and
+the scatter reads a column by indexed load: no monomial is formed and no hash is probed. Both arms
+read the same `Preprocessed`, built once per batch outside the timing, and every pair of matrices is
+asserted equal. The table's `entries/col` column is the ratio #621's kill criterion rested on,
+because the per-entry lookup can be removed at most once per entry.
+
 `column_sort_routes` is the smallest of these questions and the last of #583's: whether
 construction's column sort should be stable. It replays a `recommended` trace, snapshots the column
-vector each batch hands the sort — `preprocessed.monomials` drained in hash-set order, which is what
-construction itself collects — and sorts the same snapshot both ways, interleaved with the arm order
+vector each batch hands the sort — `preprocessed.monomials`, which is what construction itself
+collects — and sorts the same snapshot both ways, interleaved with the arm order
 rotated and each arm min-reduced. The arms assert **equal output** as well as timing it, because
 stability can only matter where the comparator reports a tie and a figure for two different column
 orders would mean nothing. `sort_unstable_by` wins on every instance tried, so it is what

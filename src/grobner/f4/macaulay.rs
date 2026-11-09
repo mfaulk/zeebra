@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     grobner::f4::statistics::{ConstructionTimings, StageClock},
-    grobner::f4::symbolic::{MonicBasis, Preprocessed, PreprocessedRow, RowKind},
+    grobner::f4::symbolic::{MonicBasis, MonomialHandle, Preprocessed, PreprocessedRow, RowKind},
     linalg::sparse::{SparseMatrix, SparseRow},
     poly::{MonomialMap, MonomialOrder, MonomialSet},
     FiniteField, Monomial, MultivariatePolynomial,
@@ -30,12 +30,16 @@ pub enum BuildBudgetExceeded {
     Nonzeros { nonzeros: usize, limit: usize },
 }
 
-/// How much of the row scatter's per-term work to do, for #582's nested ablation.
+/// How much of the pre-#621 row scatter's per-term work to do, for #582's nested ablation.
 ///
 /// Each variant is a **prefix** of the next, so the cost of one step is the difference between two
 /// adjacent arms. See
 /// [`MacaulayMatrix::scatter_prefix_for_benchmark`] for why the split is an ablation rather than
 /// another pair of counters.
+///
+/// These are the steps of the scatter as it was before #621 — shift, hash, write — so the control
+/// beside them is [`MacaulayMatrix::build_hashed_scatter_for_benchmark`] and not `build_measured`,
+/// whose loop forms no monomial and reads no hash.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScatterPrefix {
     /// Shift each row's terms by its multiplier, and consume the result.
@@ -45,7 +49,8 @@ pub enum ScatterPrefix {
     ShiftAndLookup,
 
     /// Shift, look up, collect the per-row `Vec` and build the `SparseRow`: the whole of the
-    /// shipping loop, so this arm doubles as a control against `scatter_rows`.
+    /// pre-#621 loop, so this arm doubles as a control against
+    /// [`MacaulayMatrix::build_hashed_scatter_for_benchmark`]'s `scatter_rows`.
     Row,
 }
 
@@ -191,6 +196,11 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
     ///
     /// `scatter` is in turn the sum of `scatter_rows` and `scatter_assemble` (#582), which costs
     /// one extra clock read per matrix on the measured path and none on the default one.
+    ///
+    /// # Panics
+    /// If `preprocessed` was not produced from `basis`: the handle run of each row is located by
+    /// the term count of the basis element the row names, so a mismatch is caught by the slice
+    /// split rather than silently producing a different matrix.
     pub fn build_measured(
         basis: &MonicBasis<N, F>,
         preprocessed: &Preprocessed<N>,
@@ -202,15 +212,25 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         let mut clock = StageClock::new(measure);
         let mut timings = ConstructionTimings::default();
 
-        // The distinct monomials of every row, taken from the set symbolic preprocessing already
+        // The distinct monomials of every row, taken from the arena symbolic preprocessing already
         // interned rather than hashed a second time here (#330). The two sets are equal by
         // construction — see `Preprocessed::monomials` — so this is a copy of `num_columns`
         // monomials in place of one hash insert per row monomial, and row monomials outnumber
         // columns by whatever the matrix's average column density is.
+        //
+        // Each monomial is paired with its handle, which is its index in the arena, so that the
+        // sort below carries the handle along to wherever it puts the column. Pairing rather than
+        // sorting a permutation of handles separately keeps the comparator reading the monomial
+        // directly, which is the sort #583 measured.
         if preprocessed.monomials.len() > max_columns {
             return Err(BuildBudgetExceeded::Columns { limit: max_columns });
         }
-        let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
+        let mut sorted: Vec<(Monomial<N>, MonomialHandle)> = preprocessed
+            .monomials
+            .iter()
+            .copied()
+            .zip(0 as MonomialHandle..)
+            .collect();
         timings.collect = clock.lap();
 
         // Unstable because stability has nothing to decide here: every `MonomialOrder` variant,
@@ -221,29 +241,45 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         // the sort — pdqsort against an adaptive merge sort with nothing to adapt to, because #330
         // began handing this vector over drained from a hash set instead of in the first-appearance
         // order the old route pushed, and the runs the merge sort exploited went with it (#583).
-        columns.sort_unstable_by(|a, b| order.cmp(b, a));
+        //
+        // Comparing on the monomial alone and not on the pair: the handles are distinct, so
+        // including them would give the comparator a tie-break to apply and make the sort's output
+        // depend on it. There is no tie to break, and a comparator that says so is the one the
+        // unstable sort is licensed by.
+        sorted.sort_unstable_by(|a, b| order.cmp(&b.0, &a.0));
         timings.sort = clock.lap();
 
-        let column_of: MonomialMap<N, usize> = columns
-            .iter()
-            .enumerate()
-            .map(|(index, monomial)| (*monomial, index))
-            .collect();
+        // Handle to column: a flat array, in place of #330's `MonomialMap<N, usize>`. The handle is
+        // already the monomial's index, so all this has to record is the permutation the sort
+        // applied — four bytes per column against a hash entry per column, and an indexed load per
+        // entry against a hash probe per entry, which is #621.
+        let mut column_of: Vec<MonomialHandle> = vec![0; sorted.len()];
+        let mut columns: Vec<Monomial<N>> = Vec::with_capacity(sorted.len());
+        for (column, (monomial, handle)) in sorted.into_iter().enumerate() {
+            column_of[handle as usize] = column as MonomialHandle;
+            columns.push(monomial);
+        }
         timings.map = clock.lap();
 
         // Entries written so far, so a matrix that is small in each dimension but dense cannot
         // slip past the row and column budgets.
         let mut nonzeros = 0usize;
         let mut sparse_rows: Vec<SparseRow<F>> = Vec::with_capacity(preprocessed.rows.len());
+        let mut handles: &[MonomialHandle] = &preprocessed.term_handles;
         for row in &preprocessed.rows {
-            let terms = basis.element(row.basis_index).terms.len();
-            nonzeros += terms;
+            let terms = &basis.element(row.basis_index).terms;
+            nonzeros += terms.len();
             if nonzeros > max_nonzeros {
                 return Err(BuildBudgetExceeded::Nonzeros {
                     nonzeros,
                     limit: max_nonzeros,
                 });
             }
+            // A row's handles are the next run of `term_handles`, one per term of the basis
+            // element. `split_at` is what asserts the layout: a `Preprocessed` from another basis
+            // runs the vector short and panics here instead of building the wrong matrix.
+            let (row_handles, rest) = handles.split_at(terms.len());
+            handles = rest;
             sparse_rows.push({
                 // A row's terms arrive descending by the order and the columns are descending too,
                 // so the column indices come out increasing — exactly the order a sparse row
@@ -251,13 +287,15 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
                 // distinct and its coefficients nonzero, so the entries are canonical by
                 // construction and `from_sorted_unchecked` is the right constructor; a
                 // `debug_assert` inside it keeps that reasoning honest.
-                let entries: Vec<(usize, F)> = basis
-                    .shifted_terms(row.basis_index, &row.multiplier)
-                    .map(|(monomial, coefficient)| {
-                        let column = *column_of
-                            .get(&monomial)
-                            .expect("every row monomial is a column");
-                        (column, coefficient)
+                //
+                // The shifted monomial is never formed. Preprocessing already met it, interned it
+                // and recorded the handle, so the multiplier shift is not needed either — only the
+                // coefficient, which the multiplier does not touch.
+                let entries: Vec<(usize, F)> = row_handles
+                    .iter()
+                    .zip(terms.iter())
+                    .map(|(handle, (_, coefficient))| {
+                        (column_of[*handle as usize] as usize, *coefficient)
                     })
                     .collect();
                 SparseRow::from_sorted_unchecked(entries)
@@ -276,13 +314,73 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         Ok((built, timings))
     }
 
+    /// #621's pre-handle route: rederive each row monomial from its multiplier and read its column
+    /// out of a `MonomialMap` built over the sorted columns.
+    ///
+    /// A reimplementation kept only so the two scatters can be measured against each other in **one
+    /// process on one build**, for the same reason
+    /// [`MacaulayMatrix::build_rehashing_for_benchmark`] exists. It shares that route's `collect`
+    /// and `sort` with nothing but the pairing removed, so the arms differ in `map` and
+    /// `scatter_rows` and in nothing else. Nothing in the shipping path calls it, and
+    /// `test_the_two_scatter_routes_agree` asserts it returns the same matrix as
+    /// [`MacaulayMatrix::build`].
+    pub fn build_hashed_scatter_for_benchmark(
+        basis: &MonicBasis<N, F>,
+        preprocessed: &Preprocessed<N>,
+        order: MonomialOrder,
+        measure: bool,
+    ) -> (Self, ConstructionTimings) {
+        let mut clock = StageClock::new(measure);
+        let mut timings = ConstructionTimings::default();
+
+        let mut columns: Vec<Monomial<N>> = preprocessed.monomials.to_vec();
+        timings.collect = clock.lap();
+
+        columns.sort_unstable_by(|a, b| order.cmp(b, a));
+        timings.sort = clock.lap();
+
+        let column_of: MonomialMap<N, usize> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, monomial)| (*monomial, index))
+            .collect();
+        timings.map = clock.lap();
+
+        let mut sparse_rows: Vec<SparseRow<F>> = Vec::with_capacity(preprocessed.rows.len());
+        for row in &preprocessed.rows {
+            let entries: Vec<(usize, F)> = basis
+                .shifted_terms(row.basis_index, &row.multiplier)
+                .map(|(monomial, coefficient)| {
+                    let column = *column_of
+                        .get(&monomial)
+                        .expect("every row monomial is a column");
+                    (column, coefficient)
+                })
+                .collect();
+            sparse_rows.push(SparseRow::from_sorted_unchecked(entries));
+        }
+        timings.scatter_rows = clock.lap();
+
+        let built = Self {
+            matrix: SparseMatrix::new(columns.len(), sparse_rows),
+            columns,
+            rows: preprocessed.rows.clone(),
+        };
+        timings.scatter_assemble = clock.lap();
+        timings.scatter = timings.scatter_rows + timings.scatter_assemble;
+
+        (built, timings)
+    }
+
     /// Time one prefix of the scatter's per-term work, for #582's ablation.
     ///
     /// The scatter's inner steps are per *term*, and `Instant::now()` costs more than the term's
     /// work does, so a counter around each step would measure the clock. The arms are therefore
     /// **nested prefixes** of the real loop, timed whole and differenced: `ShiftAndLookup` less
     /// `Shift` is the per-term map lookup, `Row` less `ShiftAndLookup` is the per-row `Vec` and
-    /// the `SparseRow` build, and `build_measured`'s `scatter_assemble` is the rest.
+    /// the `SparseRow` build, and `scatter_assemble` is the rest. The loop is
+    /// [`MacaulayMatrix::build_hashed_scatter_for_benchmark`]'s, which is what #582 measured; the
+    /// shipping scatter has read its columns through handles since #621.
     ///
     /// The columns and the map are built outside the timing, because they are
     /// [`ConstructionTimings`]'s other phases and charging them here would bury the difference.
@@ -298,7 +396,7 @@ impl<const N: usize, F: FiniteField> MacaulayMatrix<N, F> {
         order: MonomialOrder,
         prefix: ScatterPrefix,
     ) -> ScatterPrefixTiming {
-        let mut columns: Vec<Monomial<N>> = preprocessed.monomials.iter().copied().collect();
+        let mut columns: Vec<Monomial<N>> = preprocessed.monomials.to_vec();
         columns.sort_unstable_by(|a, b| order.cmp(b, a));
         let column_of: MonomialMap<N, usize> = columns
             .iter()
@@ -821,13 +919,17 @@ mod tests {
         }
     }
 
-    /// Symbolic preprocessing's monomial set is exactly the matrix's column set.
+    /// Symbolic preprocessing's monomial arena is exactly the matrix's column set, with no repeats.
     ///
     /// This is the invariant #330's column handout rests on: if it holds, construction can take
     /// the set preprocessing already interned instead of hashing every row monomial a second time.
-    /// Asserted over every order and over a batch with reducer rows, because the set is grown in
+    /// Asserted over every order and over a batch with reducer rows, because the arena is grown in
     /// two places — the seed rows' terms and each reducer row's terms as it is admitted — and a
     /// batch with no reducers would exercise only the first.
+    ///
+    /// Distinctness is asserted and not assumed, because since #621 the arena is a `Vec` whose
+    /// indices are the handles the scatter reads columns through: a repeated monomial would give
+    /// one column two handles, and the `column_of` array would then disagree with itself.
     #[test]
     fn test_preprocessing_interns_exactly_the_column_set() {
         for order in ALL_ORDERS {
@@ -850,7 +952,97 @@ mod tests {
 
             let matrix = MacaulayMatrix::<3, F>::build(&basis, &preprocessed, order);
             let built: MonomialSet<3> = matrix.columns().iter().copied().collect();
-            assert_eq!(preprocessed.monomials, built, "{}", order.name());
+            let interned: MonomialSet<3> = preprocessed.monomials.iter().copied().collect();
+            assert_eq!(interned, built, "{}", order.name());
+            assert_eq!(
+                interned.len(),
+                preprocessed.monomials.len(),
+                "{}: the arena repeats a monomial",
+                order.name()
+            );
+        }
+    }
+
+    /// Every row term's handle names the monomial that term actually becomes, in row-major order.
+    ///
+    /// The layout `build_measured` reads is implied rather than stored — a row's handles are the
+    /// next `terms.len()` of one flat vector — so the thing that can go wrong is an off-by-one that
+    /// shifts every later row. Walking the vector independently and comparing against
+    /// `shifted_terms` is what catches that; the length check catches a run that is short or long.
+    #[test]
+    fn test_term_handles_name_every_row_term_in_row_order() {
+        for order in ALL_ORDERS {
+            let (basis, preprocessed) = batch(&["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"], order);
+
+            let mut offset = 0usize;
+            for (index, row) in preprocessed.rows.iter().enumerate() {
+                for (term, (monomial, _)) in basis
+                    .shifted_terms(row.basis_index, &row.multiplier)
+                    .enumerate()
+                {
+                    let handle = preprocessed.term_handles[offset + term];
+                    assert_eq!(
+                        preprocessed.monomials[handle as usize],
+                        monomial,
+                        "{}: row {} term {} has the wrong handle",
+                        order.name(),
+                        index,
+                        term
+                    );
+                }
+                offset += basis.element(row.basis_index).terms.len();
+            }
+            assert_eq!(
+                offset,
+                preprocessed.term_handles.len(),
+                "{}: the handle vector is not one run per row",
+                order.name()
+            );
+        }
+    }
+
+    /// The handle scatter and the pre-#621 hashing scatter return the identical matrix.
+    ///
+    /// This is what makes the A/B in `examples/f4_profile handles` a measurement of cost rather
+    /// than of two different matrices, and it is the differential test the restructuring is pinned
+    /// by: equality of the whole `MacaulayMatrix` covers the columns, their order, every row's
+    /// entries and the row provenance, which is everything elimination and extraction read. Over a
+    /// weighted order too, because the handle is carried through the sort by a comparator that
+    /// ignores it and #306's variants are where a comparator can stop being strict.
+    #[test]
+    fn test_the_two_scatter_routes_agree() {
+        static WEIGHTED: WeightedOrder =
+            WeightedOrder::new(&[1, 7, 49], WeightedTieBreak::Lexicographic);
+
+        let systems: Vec<Vec<&str>> = vec![
+            vec!["x^3 - y", "x^2 - z", "x - y*z", "y^2 - 1"],
+            vec!["x + y + z", "x*y + x*z + y*z", "x*y*z - 1"],
+            vec!["3*x^2 + 5*y", "7*x*y + 11*y", "2*y^2 - 1"],
+            vec!["x^2*y + z", "y^2*z + x", "x*z^2 + y", "x*y*z - 1"],
+        ];
+        let orders: Vec<MonomialOrder> = ALL_ORDERS
+            .into_iter()
+            .chain([MonomialOrder::Weighted(&WEIGHTED)])
+            .collect();
+
+        for order in orders {
+            for strings in &systems {
+                let (basis, preprocessed) = batch(strings, order);
+                let handles = MacaulayMatrix::<3, F>::build(&basis, &preprocessed, order);
+                let (hashed, _) = MacaulayMatrix::<3, F>::build_hashed_scatter_for_benchmark(
+                    &basis,
+                    &preprocessed,
+                    order,
+                    false,
+                );
+                assert_eq!(handles, hashed, "{:?} under {}", strings, order.name());
+                assert!(
+                    handles.nonzeros() > 0,
+                    "{:?} under {}: an empty matrix establishes nothing",
+                    strings,
+                    order.name()
+                );
+            }
         }
     }
 
@@ -885,7 +1077,12 @@ mod tests {
         }
     }
 
-    /// Releasing the interned set empties it and leaves the rest of the batch's data intact.
+    /// Releasing the interning products empties the arena *and* the handles, and leaves the rest
+    /// of the batch's data intact.
+    ///
+    /// The handles are the larger of the two by the column density, so #536's release discipline is
+    /// what keeps #621 from trading a hash pass for a working-set increase; a `release_monomials`
+    /// that freed only the arena would leave `num_nonzeros` words live through elimination.
     #[test]
     fn test_releasing_the_interned_set_keeps_the_rest_of_the_batch() {
         let order = MonomialOrder::GradedReverseLexicographic;
@@ -897,9 +1094,11 @@ mod tests {
         let rows = preprocessed.rows.clone();
         let leads = preprocessed.leading_monomials.clone();
         assert!(!preprocessed.monomials.is_empty());
+        assert!(preprocessed.term_handles.len() > preprocessed.monomials.len());
 
         preprocessed.release_monomials();
         assert!(preprocessed.monomials.is_empty());
+        assert!(preprocessed.term_handles.is_empty());
         assert_eq!(preprocessed.rows, rows);
         assert_eq!(preprocessed.leading_monomials, leads);
     }
