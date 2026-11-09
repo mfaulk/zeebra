@@ -14,11 +14,13 @@
 # to an open instance, so there is nothing to check a witness against but the coefficient vectors
 # themselves.
 #
-# Types I and IV are not fetched: they are GF(2), which `MqField` still refuses by name — the field
-# exists two ways and which one the importer should use is #197's decision.
+# All six types' toy examples are fetched since #197: the GF(2) families (I and IV) import over
+# `fields::Zp2` and the GF(2^8) ones (II and V) over `fields::Gf256Mq`. The toy sizes are not the
+# same per type — I, II and III publish n = 10, 15, 20 and IV, V and VI publish n = 5, 10, 15 —
+# which is why the archive list below is written out rather than looped over a common range.
 #
-#   tools/fetch-mq-challenge.sh            # type III n=10,15,20; type VI n=5,10,15; types V and
-#                                          # VI at m=16
+#   tools/fetch-mq-challenge.sh            # every type's toy examples; types V and VI at m=16;
+#                                          # type III at n=34
 #   tools/fetch-mq-challenge.sh --verify   # check the checksums of what is already there
 #
 set -euo pipefail
@@ -30,7 +32,26 @@ DEST="${ZEEBRA_MQ_DIR:-research/instances/mq}"
 # Checksums of the individual instance files this repository's tests and manifests name. Recorded
 # so that a result can say which bytes it was computed against; the archives themselves are not
 # checksummed because the site may repackage them.
+# Recorded 2026-11-09 for types I, II, IV and V (#197); the type III, VI and real-challenge sums
+# predate it. Every toy instance ships a companion `-answer` file — unlike the real challenges — so
+# the answers checksummed here are the independent correctness oracle the tests evaluate against.
 read -r -d '' CHECKSUMS <<'EOF' || true
+c100943e1d9a0683e0ed8db03eade2fad52b99242a2221a3e4af4a1600cc49a9  ToyExample-type1-n10-seed0
+34b710dd62543d217d60a08b7e2d7481bf1356d2f4d976e5aec0e7f9792e7d5e  ToyExample-type1-n10-seed0-answer
+c4b929b2bce0a3380a0de70a26dd4f631677bd80c6253aa2eb757606b6e960d3  ToyExample-type1-n15-seed0
+e2373bf100bcd3a88c89bf4b89900081c993882b76321c182cf3c7c917a03b35  ToyExample-type1-n20-seed0
+1bfd90a6d45894b62a78ff72bd056f108c137fd28d11405397180c4e6790c4ae  ToyExample-type2-n10-seed0
+1fae717599ff212852fe67415942e2f3d2adfec8fc968ac32b727ed92517bd0d  ToyExample-type2-n10-seed0-answer
+8712976537fdb09e54ba7b85831c7f9f6ec6729897ba36df31ba66ee9633b539  ToyExample-type2-n15-seed0
+e1a6426d6e9f4f4e6fb966ef623c0040331b3fb4cc387e7b340c2cb79aee9bdb  ToyExample-type2-n20-seed0
+cc03c5fc6d669d683557f20ca8dd2431781cfa7de06bfbc5416ed68ff484fb14  ToyExample-type4-n5-seed0
+be419a56101101c46259241432d6a8b9ea6c5d4a056fd161f3cab5ea83872f2d  ToyExample-type4-n5-seed0-answer
+29b587e7d06ae2fc25d905b20747f3d82fab43bd96be70f3d62f520ac20f0231  ToyExample-type4-n10-seed0
+71684e22afb96654a4c88ce6ae791b2409bc898ac05a1b28b5bcac0b5b7a8a7d  ToyExample-type4-n15-seed0
+e3698bdbbcfabc3ec27c7fbf703f07ab86f47f070b16566bd7b513796a5a324f  ToyExample-type5-n5-seed0
+31a690418d15efd82cfa0cf3f4a565e5b3b996ff4c10e32d220bd1d27993dbb3  ToyExample-type5-n5-seed0-answer
+fb9f0b108c60a4dcbc3a4ea7e9b3343909cb8bd4b4a5c61ab53c6a2da58cb29a  ToyExample-type5-n10-seed0
+712ae912e6c63911e4b04e55550b1f38d1faa0ea1cfbf7c9e6188b00ca210cd2  ToyExample-type5-n15-seed0
 9436e45dbd4247f152681e954f1db19d92e8cf5e76b2bc35530bed74aae522ba  ToyExample-type3-n10-seed0
 1b60acfdcc406c418cafe63e50deec23f5a8b0d29ed7701df56f9eedb4648fd8  ToyExample-type3-n10-seed0-answer
 1dcee7e5e1a5dad4885471fed133158d6bce7a61822ed4aa39a1f91c9264b97b  ToyExample-type3-n15-seed0
@@ -66,13 +87,26 @@ if [ "${1:-}" = "--verify" ]; then
     exit $?
 fi
 
-# The sizes the site actually publishes per type, which are not the same for both: type III has
-# n = 10, 15, 20 and type VI has n = 5, 10, 15. Listed rather than looped over a common range, so a
-# missing size is a change on their side rather than a 404 here.
+# The sizes the site actually publishes per type, which are not the same for all six: the
+# encryption types (I, II, III) have n = 10, 15, 20 and the signature types (IV, V, VI) have
+# n = 5, 10, 15. Listed rather than looped over a common range, so a missing size is a change on
+# their side rather than a 404 here. Each archive holds five seeds and an answer file per seed.
 ARCHIVES="
+ToyExample-type1-n10.tar.bz2
+ToyExample-type1-n15.tar.bz2
+ToyExample-type1-n20.tar.bz2
+ToyExample-type2-n10.tar.bz2
+ToyExample-type2-n15.tar.bz2
+ToyExample-type2-n20.tar.bz2
 ToyExample-type3-n10.tar.bz2
 ToyExample-type3-n15.tar.bz2
 ToyExample-type3-n20.tar.bz2
+ToyExample-type4-n5.tar.bz2
+ToyExample-type4-n10.tar.bz2
+ToyExample-type4-n15.tar.bz2
+ToyExample-type5-n5.tar.bz2
+ToyExample-type5-n10.tar.bz2
+ToyExample-type5-n15.tar.bz2
 ToyExample-type6-n5.tar.bz2
 ToyExample-type6-n10.tar.bz2
 ToyExample-type6-n15.tar.bz2

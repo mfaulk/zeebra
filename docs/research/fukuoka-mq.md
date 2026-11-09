@@ -11,7 +11,10 @@ Reference for #70 (A1), M21-A (#92) and #197 (A5). Consumes the provenance conve
 
 #70 added §0, §2.5 and §7–§13, and rewrote §2, §3 and §6. The numbering of §1–§6 is unchanged from
 the previous revision, because ten other files cite it; the new material is appended rather than
-interleaved. #454 appended §4.4 and rewrote §6's dimension bullet.
+interleaved. #454 appended §4.4 and rewrote §6's dimension bullet. **#197 appended §14** — the
+per-type instance inventory, the unsolved/unreproduced/published-with-answer distinction, the fields
+answer and the F4-versus-XL analysis — and rewrote §1's importability table, since all six types'
+toy examples now import.
 
 If you are here for one question — *can an instance be reproduced without downloading it?* — the
 answer is **yes, from three integers and a published file of π**, and §7 has the recipe, the
@@ -96,14 +99,20 @@ Two further results that are provenance rather than generation:
 `YDHTS15` §1 and `site`. For quadratic `f_1 … f_m` in `n` variables over a finite field `F`, find
 `v ∈ F^n` with `f_i(v) = 0` for all `i`. Six families, in two shapes:
 
-| type | field | shape | published range | importable here |
-|---|---|---|---|---|
-| I | GF(2) | encryption, `m = 2n` | `n = 55…100` | **no** — no import path (§6) |
-| II | GF(2^8) | encryption, `m = 2n` | `n = 35…54` | **no** — the GF(2^8) path exists (§2.5) but no compiled dimension reaches `n ≥ 35` |
-| III | GF(31) | encryption, `m = 2n` | `n = 34…53` | **yes** |
-| IV | GF(2) | signature, `n ≈ 1.5m` | `m = 55…100` | **no** — as type I |
-| V | GF(2^8) | signature, `n ≈ 1.5m` | `m = 16…35` | **yes at `m = 16`** — `n = 24`, the same arm type VI uses (§4.5) |
-| VI | GF(31) | signature, `n ≈ 1.5m` | `m = 16…35` | **yes** |
+| type | field | shape | published range | coefficient type | importable here |
+|---|---|---|---|---|---|
+| I | GF(2) | encryption, `m = 2n` | `n = 55…100` | `Zp2` | **toys only** — `n = 55` is past every compiled dimension (§14.1) |
+| II | GF(2^8) | encryption, `m = 2n` | `n = 35…54` | `Gf256Mq` | **toys only** — the GF(2^8) path exists (§2.5) but no compiled dimension reaches `n ≥ 35` |
+| III | GF(31) | encryption, `m = 2n` | `n = 34…53` | `Zp31` | **toys, and the real `n = 34`** |
+| IV | GF(2) | signature, `n ≈ 1.5m` | `m = 55…100` | `Zp2` | **toys only** — as type I |
+| V | GF(2^8) | signature, `n ≈ 1.5m` | `m = 16…35` | `Gf256Mq` | **toys, and the real `m = 16`** — `n = 24`, the same arm type VI uses (§4.5) |
+| VI | GF(31) | signature, `n ≈ 1.5m` | `m = 16…35` | `Zp31` | **toys, and the real `m = 16`** |
+
+**Every type's toy examples import since #197**, which the previous revision of this table denied
+for types I, II and IV: the GF(2) families read over `fields::Zp2` and the GF(2^8) ones over
+`fields::Gf256Mq`, and `SUPPORTED_DIMENSIONS` is `[5, 10, 15, 20, 24]` — the union of the published
+toy sizes plus the smallest real signature instance. What stops types I, II and IV at their *real*
+sizes is the dimension, not the field. §14 is the per-instance detail.
 
 The ranges are counted from `site`'s own download links: 100 instance files each for types II, III,
 V and VI (five seeds × twenty sizes) and 230 each for types I and IV (five seeds × forty-six
@@ -643,7 +652,10 @@ also what every published type V and type VI solve did.
   coefficients per polynomial, reach the compiled dimension, and refuse the AES modulus. Type II
   starts at `n = 35` and is still out of reach. **Registering and running the type V row is not
   done**: the scoreboard's MQ path is hardwired to `PrimeFieldElement64<31>`, so it needs a field
-  dispatch first — #510.
+  dispatch first — #510. **And both `m = 16` instances are checkable after all** (#197, §14.2):
+  this bullet's premise that an open instance has no oracle is true of the *instance file* and false
+  of these two *instances*, whose 2015 answer vectors are published on their submission detail
+  pages and do vanish on them.
 - **The exported-module story is finished and is no longer a reason for anything.** The previous
   revision of §1 still said "the binary and extension field modules exist and are not publicly
   exported" two paragraphs after correcting exactly that claim. Both modules have been public since
@@ -652,14 +664,20 @@ also what every published type V and type VI solve did.
   `grep -n 'todo!()' src/fields/` is now empty and `KnownOrder::element_at` exists for the
   enumeration callers. Note for the importer that `BinaryFieldElement::from_str` reads a **decimal**
   integer as a bit pattern, so it is not the route for a hex challenge token.
-- **GF(2) import** needs the import path and the toy dimensions types I and IV publish, which are
-  `n = 10, 15, 20` and `n = 5, 10, 15` respectively (§1) — and §7.2 confirms both reproduce from
-  the generator. The field exists two ways — `fields::Zp2` (`PrimeFieldElement32<2>`, which keeps
-  the wide-remainder path because `2^32` is not invertible modulo an even number) and
-  `BinaryFieldElement<0b11>` — and which one the importer should use **has now been recorded once**:
-  [`boolean-solving.md`](boolean-solving.md) §8 decides `GF(2)` is `Zp2` throughout, this importer
-  included, and `tests/boolean_readiness.rs` pins the two as one field at twice the storage. What
-  remains for #197 is the import path and the toy dimensions, not the representation.
+- **GF(2) import is done** (#197). The field exists two ways — `fields::Zp2`
+  (`PrimeFieldElement32<2>`, which keeps the wide-remainder path because `2^32` is not invertible
+  modulo an even number) and `BinaryFieldElement<0b11>` — and
+  [`boolean-solving.md`](boolean-solving.md) §8 decided `GF(2)` is `Zp2` throughout, this importer
+  included, with `tests/boolean_readiness.rs` pinning the two as one field at twice the storage.
+  With the representation settled the refusal in `check_coefficient_field` had nothing left to
+  protect and was removed: **the order alone identifies GF(2)**, since there is one field of order
+  two and `x + 1` is the only irreducible of degree one, so unlike GF(2^8) there is no modulus to
+  check. The toy dimensions types I and IV publish are `n = 10, 15, 20` and `n = 5, 10, 15` (§1),
+  so `SUPPORTED_DIMENSIONS` gained `5`; §7.2 confirms both families reproduce from the generator,
+  and `mq::tests::test_the_published_gf2_instances_import` asserts type I `n = 10` and type IV
+  `n = 5` vanish at their published answers. Their real sizes start at `n = 55` / `m = 55`, so what
+  blocks them now is the compiled dimension and the 16-bytes-per-bit sparse entry (§14.3), not the
+  field.
 - **Characteristic 2 is no longer untested in the solver.** `grep -rl "BinaryFieldElement" src/grobner/`
   used to be empty. `grobner::tests::test_the_whole_pipeline_over_gf2` and its `Gf256` twin now take
   a planted system through F4, Buchberger agreement, FGLM, both routes to lex, and `solve_one`, with
@@ -962,6 +980,22 @@ The hardware is the same machine `YDHTS15` §5 used for its own calibration expe
 6-core Intel Xeon E5-4617 at 2.9 GHz"), which is consistent with these being the challenge team's
 own setup runs.
 
+**Two more comparands exist at a reachable size, and this section's title overstated its case**
+(#197, §14.2). `n = 24` is compiled (§4.4, §4.5), so the two real `m = 16` seed-0 solves are also
+at a size this crate reaches — and both are **Gröbner engines**, which makes them the closest
+comparand class the board offers:
+
+| instance | solver | date | algorithm | hardware | published time |
+|---|---|---|---|---|---|
+| type VI `m = 16` (`n = 24`) seed 0 | J.-C. Faugère (INRIA) | 2015-04-01 | **F5 — FGb** | Intel Xeon E5-2670 v2 @ 2.50 GHz | **5 280 s** |
+| type V `m = 16` (`n = 24`) seed 0 | J.-C. Faugère (INRIA) | 2015-04-03 | **F5 — FGb** | Intel Xeon E5-2670 v2 @ 2.50 GHz | **24 648.2 s** |
+
+The same caveat as above applies and applies harder: these are **not** comparisons, the runs
+Zeebra has taken at `m = 16` are resource diagnostics under a deliberate entry cap rather than
+attempts at these figures, and §4.4 and §4.5 say so. What the two rows establish is the same useful
+fact — a target known to exist, reached by an F4/F5-family implementation on one 2015 machine — plus
+the answer vectors §14.2 turns into a test.
+
 ### 8.3 Why the hall of fame is an undercount
 
 `site`'s own rules, quoted so nobody reads the tables as a census:
@@ -1179,8 +1213,12 @@ effort: the Fukuoka challenge is unusually well documented and still live.
   Spot-checking was not done: the file does not begin at π's binary point, so a check would need the
   offset, which is not published.
 - **Whether the published answers for the solved real instances actually satisfy those instances.**
-  Not checked — it would mean downloading up to `n = 38` challenge files, and the import path for
-  the GF(2^8) half does not exist (§6). The toy-size answers were checked and all pass (§2.4, §7.2).
+  **Settled for the two instances this crate imports** (#197, §14.2): both `m = 16` seed-0 answer
+  vectors, transcribed from their 2015 detail pages, vanish on all 16 polynomials of
+  `challenge-5-16-0` and `challenge-6-16-0` —
+  `mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers`. Not checked above
+  `n = 24`, which is a compiled-dimension limit rather than a field one; the toy-size answers were
+  checked and all pass (§2.4, §7.2, §14.2).
 - **Why the two 2025 type VI rows' totals do not follow from their own subsystem counts and
   averages** (§8.4). The notes omit the parallelism; the implied figures are 7.6 and 15.8.
 - **Whether any `(size, seed)` pair without a record has in fact been solved.** Unfalsifiable from
@@ -1199,3 +1237,205 @@ effort: the Fukuoka challenge is unusually well documented and still live.
 | the π recipe read directly off decimal or base-32 digits of π | computed π's binary expansion independently by the Machin arctan series (verified against the known decimal and hex digits) and searched its base-32, base-32-mod-31, decimal-pair and base-256 expansions for the first eight coefficients of type III `n=10` seed 0 and type II `n=10` seed 0 | **not found**, in streams of 1 598 base-32, 1 200 decimal-pair and 998 base-256 digits. Superseded and explained by §7.1: the offset is `type*n` and the stride is `(seed+n)*10+type`, so no contiguous reading of π could have matched |
 | a published answer for an unsolved instance | — | **none exists, by construction.** `site` rule 4: for types I–III the team plants and keeps one answer; for types IV–VI "the MQ challenge team do not know the answers". So the only answers for signature types are the ones solvers submitted, which is exactly the 37 detail pages (§9) |
 | the challenge's own GF(31) verifier, run against its own data | built `CoefVerifier_enc` and ran `./coefVerifier 3 10 0` | **mismatched 1 214 of 1 300 coefficients.** Not an environment problem — §7.3 isolates it to a `while (coef == 31)` loop that the published data does not have, and removing it gives an exact match |
+
+---
+
+## 14. Types I–V: the instances, their three states, and what the records say (#197)
+
+Appended by #197 (A5). Four questions, and the first answer is that **nothing on the record board
+moved**: `site` and `format` were re-fetched 2026-11-09 and are **byte-identical** to the
+2026-11-07 read in §0 — same sha256, same length. So the six record rows below are the same rows
+#197 tabulated on 2026-11-06, and the statuses #74 and #76 quote from 2026-11-04 are superseded only
+in the two places #197 already named (type II is now Verbel 2026/09/28, type VI now 2025/10/16).
+A byte-identical refetch is a stronger statement than a matching table: it rules out a changed row
+this document would have had to notice.
+
+`submissions` was re-read the same day (same sha256 as §0) and two of the per-solve detail pages
+were fetched for the first time; their checksums are in
+`mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers`.
+
+### 14.1 Question 1: the instances, per type, with what is importable
+
+Toy sizes are **not** the same per type, which is the trap this question exists to avoid: the
+encryption types (I, II, III) publish `n = 10, 15, 20` and the signature types (IV, V, VI) publish
+`n = 5, 10, 15`. Every toy archive holds **five seeds and one answer file per seed**, verified by
+listing all 12 type-I/II/IV/V archives on 2026-11-09. `tools/fetch-mq-challenge.sh` now fetches all
+six types and checksums one instance per size.
+
+| type | field | shape | toy sizes (`n`) | toy `m` | smallest real | record | compiled here |
+|---|---|---|---|---|---|---|---|
+| I | GF(2) | encryption | 10, 15, 20 | 20, 30, 40 | `n = 55` | `n = 83` seed 0 | toys only |
+| II | GF(2^8) | encryption | 10, 15, 20 | 20, 30, 40 | `n = 35` | `n = 38` seed 0 | toys only |
+| III | GF(31) | encryption | 10, 15, 20 | 20, 30, 40 | `n = 34` | `n = 38` seed 3 | toys + `n = 34` |
+| IV | GF(2) | signature | 5, 10, 15 | 3, 7, 10 | `m = 55` (`n = 82`) | `m = 76` seed 0 | toys only |
+| V | GF(2^8) | signature | 5, 10, 15 | 3, 7, 10 | `m = 16` (`n = 24`) | `m = 21` seed 0 | toys + `m = 16` |
+| VI | GF(31) | signature | 5, 10, 15 | 3, 7, 10 | `m = 16` (`n = 24`) | `m = 24` seed 0 | toys + `m = 16` |
+
+**The signature toys do not obey the `n = floor(3m/2)` truncation that §1 asserts for every recorded
+solve.** `m = 3` gives `floor(4.5) = 4`, and the published file is `n = 5`; `m = 7 → n = 10` and
+`m = 10 → n = 15` do obey it. §1's claim is scoped to recorded *solves*, all of which are real
+instances, so there is no contradiction — but a reader deriving a toy's `m` from its `n` by the
+truncation would get `m = 3` right and `n = 5` wrong, so the toy table above is listed rather than
+computed.
+
+**Near-term targets, in order.** The useful ordering is by what Zeebra can both run and check:
+
+1. **Type II `n = 10, 15, 20` seeds 0–4** — GF(2^8) encryption toys, overdetermined, `D = 1`
+   expected, answers published, every size already a compiled dimension, and §8.2's 2015 Magma F4
+   figure of **75.60 s** for `n = 20` seed 0 is a published comparand at the same instance. This is
+   the single best-specified unclaimed target on the board for this crate.
+2. **Type I `n = 10, 15, 20` and type IV `n = 5, 10, 15`** — the GF(2) toys, which import since
+   #197. Field equations belong in the ideal here (§6) and are cheap at `q = 2`.
+3. **Type V `n = 5, 10, 15`** — GF(2^8) signature toys; `n = 15` seed 0 has a published Magma F4
+   figure of 2 879.450 s (§8.2) and is underdetermined, so it is the slice method of §5 at a size
+   with an answer.
+4. **Type V/VI `m = 16`** — already registered and already imported (§4.4, §4.5); what #197 adds is
+   that they are checkable (§14.2).
+
+### 14.2 Question 2: the three states the board does not distinguish
+
+#197's distinction, and the finding is that state **(c) is much larger than the toy examples**.
+
+- **(a) Above the record — unsolved by anyone.** Sizes strictly greater than the record row.
+- **(b) At or below the record, no published answer.** A `(size, seed)` pair with no submission
+  detail page. Per §8.3 this means "not recorded", *not* "not solved", so it is an upper bound on
+  the record's reach and not a lower bound on difficulty.
+- **(c) Published with its answer.** Two disjoint sources, and the second was missed by every
+  previous revision of this document: the **toy archives**, which ship an answer file per seed; and
+  **every recorded real solve**, because the challenge publishes the submitted answer vector on the
+  submission's detail page. That holds for all six types — type I's `n = 83` detail page carries its
+  83-bit vector — so a solved real instance has an independent oracle even though its *instance
+  file* ships none.
+
+| type | (a) above the record | (b) at/below, no published answer | (c) published with an answer |
+|---|---|---|---|
+| I | `n = 84…100` | the unlinked pairs in `n = 55…83` | toys `n = 10, 15, 20`; 15 real solves from `n = 55` up |
+| II | `n = 39…54` | the unlinked pairs in `n = 35…38` | toys; 3 real solves, smallest `n = 35` seeds 0 and 2 |
+| III | `n = 39…53` | the unlinked pairs in `n = 34…38` | toys; 7 real solves, smallest `n = 34` seeds 0 and 1 |
+| IV | `m = 77…100` | the unlinked pairs in `m = 55…76` | toys `n = 5, 10, 15`; 14 real solves from `m = 63` up |
+| V | `m = 22…35` | the unlinked pairs in `m = 16…21` | toys; 11 real solves, smallest **`m = 16` seeds 0, 1, 2** |
+| VI | `m = 25…35` | the unlinked pairs in `m = 16…24` | toys; 8 real solves, smallest **`m = 16` seeds 0, 1** |
+
+The (c) counts are the submission rows carrying a `details_<TYPE>_<DATE>.html` link, counted
+directly from `submissions`' pinned bytes on 2026-11-09: 15, 3, 7, 14, 11, 8 — **58** in all.
+Note this does **not** reconcile with the 37-row fixture of §8 (29 linked rows across types II, III,
+V and VI against the fixture's 37 solves), because a detail page can report more than one solve —
+Sakata and Takagi's 2025/10/16 page covers `m = 23` and `m = 24`. The fixture counts solves and
+this counts pages, and neither number has been re-derived against the other. **Treat 58 as a page
+count and not as a solve count**, and see §14.5 for the follow-up.
+
+**The two real instances this crate has registered are in state (c), which §6 denied.** §6 said a
+real challenge "ship[s] no answer file, so there is nothing to check a witness against but the
+coefficient vectors themselves". True of the *file*, false of the *instance* at `m = 16`: both
+seed-0 instances were solved by J.-C. Faugère with F5/FGb on 2015/4/1 and 2015/4/3, and their
+answer vectors are on the detail pages. Transcribed and evaluated, **all 16 polynomials of each
+vanish** — so `fukuoka-mq-V-n24-seed0` and its type VI twin have an independent correctness oracle,
+not merely a self-consistency check. This is the highest-value single consequence of #197 for the
+scoreboard: a future solve of either is verifiable against a third party rather than against
+Zeebra's own import.
+
+**Where Zeebra's near-term value is.** Entirely in (c), and within (c) the toys plus the two
+`m = 16` instances. Nothing in (a) is reachable — the gap is 11 sizes in the best case (type V
+`m = 22` against a compiled `n = 24` ceiling that `m = 17` already exceeds at `n = 25`) — and (b) is
+unverifiable by construction, so a (b) result would be a claim with no oracle behind it.
+
+### 14.3 Question 3: which fields need new support — now "none", which it was not when asked
+
+#197 states "the answer is *not* 'none'", and that was correct when filed. It is no longer. All six
+base fields are supported, verified, and reachable by the importer:
+
+| type | field | coefficient type | what settles it |
+|---|---|---|---|
+| I, IV | GF(2) | `fields::Zp2` | order 2 is unique; representation decided in `boolean-solving.md` §8 |
+| II, V | GF(2^8) | `fields::Gf256Mq` | `X8_X4_X3_X2_1` = `0x11D`, **checked** against the file header (§2.4) |
+| III, VI | GF(31) | `fields::Zp31` | pre-existed; `PrimeFieldElement64<31>` and `PrimeFieldElement32<31>` |
+
+What closed the gap, none of it under #197: `0x11D` and the `Gf256Mq` alias plus the header check
+(#414, #415), `FiniteField::new`/`from_str` for the characteristic-two fields, which were `todo!()`
+(#377), and the generic coefficient type in the scoreboard's MQ visitors (#510). #197 contributed
+the GF(2) import path — one refusal removed, once the representation decision it was waiting on
+existed — and `n = 5`, so `SUPPORTED_DIMENSIONS` is `[5, 10, 15, 20, 24]`.
+
+**The question has been superseded by two others, and they are not about fields.**
+
+1. **Compiled dimension.** Real sizes start at `n = 24` (types V, VI), `n = 34` (III), `n = 35` (II)
+   and `n = 55` (I, IV), and the next signature size above `m = 16` is `m = 17` at `n = 25`. Every
+   type is now blocked on `const N`, and every arm costs a monomialization of the whole multivariate
+   stack.
+2. **GF(2) storage.** A sparse entry is `(usize, F)` padded to 16 bytes at any field width
+   (`boolean-solving.md` §9), so over GF(2) that is **16 bytes per bit** — a 128× overhead against a
+   packed representation. Arithmetic is not what bounds a real type I or IV instance; this is.
+
+So the honest form of the answer is: no new *field* is required, and recording that is the point,
+because "which field is missing" was the question that blocked types I, II, IV and V for two
+previous issues and it no longer blocks anything.
+
+### 14.4 Question 4: F4 versus XL versus hybrid — the hypothesis, corrected
+
+The board's six record algorithms, which are the whole of the evidence:
+
+| type | shape | field | record algorithm |
+|---|---|---|---|
+| I | encryption `m = 2n` | GF(2) | hpXbred |
+| IV | signature `n ≈ 1.5m` | GF(2) | hpXbred |
+| II | encryption `m = 2n` | GF(2^8) | XL + block Wiedemann |
+| III | encryption `m = 2n` | GF(31) | XL + block Wiedemann |
+| V | signature `n ≈ 1.5m` | GF(2^8) | improved F4 (smaller matrices) |
+| VI | signature `n ≈ 1.5m` | GF(31) | HDF4 + MF4, both F4 variants |
+
+#197's hypothesis — "F4 variants win on the signature families and lose on the encryption ones" —
+is **supported, with one correction that changes what it implies.** The split is not shape against
+algorithm across the board; it is **field first, then shape**:
+
+- **Over GF(2), one algorithm family holds both shapes.** hpXbred takes types I *and* IV, so shape
+  predicts nothing there. The discriminating variable is `q`. hpXbred is a Crossbred-style hybrid:
+  fix `k` variables, enumerate `q^k` assignments, solve each remainder cheaply. At `q = 2` the
+  enumeration is as cheap as it can be and bit-slices many points per machine word, so the hybrid
+  can afford a large `k` and buy a large drop in the algebraic degree. At `q = 31` or `q = 256` the
+  same `k` costs `31^k` or `256^k`, the guessing budget collapses, and pure-algebra solvers take the
+  field back. The GF(2) column is explained by field size and not by shape at all.
+- **Within GF(2^8) and GF(31), shape decides, and the mechanism is overdetermination.** Encryption
+  is `m = 2n`: heavily overdetermined, so the Macaulay matrix reaches solvable rank at a low degree
+  and the whole computation becomes *one* very large sparse linear solve. That is precisely block
+  Wiedemann's regime, and the hardware on the record rows agrees — two-socket EPYC with 16 DIMMs
+  for type II, 49.45 GB VmPeak for type III. Signature is `n ≈ 1.5m`: underdetermined, `q^(n-m)`
+  solutions, the ideal is positive-dimensional, and there is **no zero-dimensional system to hand
+  to XL** until `n − m` variables are specialized. After specialization the system is square — `m`
+  equations in `m` unknowns — which is the regime where XL's overdetermination advantage is gone,
+  and where degree-by-degree full reduction (F4) is competitive. And because a slice can be
+  inconsistent, the work is **many medium problems rather than one enormous one**, which favours
+  F4's lower per-instance overhead and fits the type V record's hardware: two 32 GB GPUs, not a
+  terabyte of RAM.
+
+Both halves are consistent with this document's own measurements: §5 and §4.2–§4.3 are the slice
+method, and §8.4 records that every published type V and type VI solve did the same thing.
+
+**What it means for Zeebra, which is the reason the question was asked.** Zeebra's only verified
+non-GF(31)-toy witness is on an underdetermined type VI slice — i.e. squarely in the regime where
+F4 variants hold the published record, and where the published comparand at the sizes it reaches is
+itself a Gröbner engine: both `m = 16` seed-0 solves are **F5/FGb**, at 5 280 s (type VI) and
+24 648.2 s (type V) on a 2015 Xeon E5-2670 v2. So the near-term targets should be signature-family
+slices, where being an F4 implementation is an advantage. Conversely, a real type II or III instance
+is not a faster-F4 problem: the record there belongs to a different algorithm doing one huge sparse
+solve, and matching it would mean building that, which is #368's territory and not this one's. The
+one line that cuts across this is type V's record being set by an F4 variant on two consumer GPUs —
+evidence that F4-shaped work is not inherently un-acceleratable. That is **#225**'s question and is
+deliberately not argued here.
+
+### 14.5 Question 5, and what #197 leaves open
+
+Done under #197: all six types' toys import and are checksummed; the GF(2) path exists; `n = 5` is
+compiled; the modulus is a test rather than an argument (§2.4, and
+`mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus`); the two real
+`m = 16` instances are verified against third-party answers.
+
+Open, and filed rather than left here:
+
+- **Extend the §8 fixture to types I and IV.** It covers II, III, V and VI by an explicit scope
+  choice, and types I and IV have 15 and 14 linked detail pages carrying full answer vectors. Their
+  hpXbred rows are also the only hybrid-enumeration comparands on the board, which §14.4 leans on.
+- **Reconcile the solve count with the page count** — 37 against 58 (§14.2). One is a solve count
+  and one a page count and neither has been re-derived against the other.
+- **Compiled dimensions above 24**, which is now what blocks every type rather than any field.
+- **Packed GF(2) storage**, at 16 bytes per bit today.
+- No solving result is claimed anywhere in §14, which is #197's own acceptance criterion.

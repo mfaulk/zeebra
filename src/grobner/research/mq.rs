@@ -76,16 +76,19 @@ use crate::{KnownOrder, Monomial, MonomialOrder, MultivariatePolynomial};
 /// Which base field an instance is over.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MqField {
-    /// Types I and IV. **Not importable yet** — but no longer for want of a field.
+    /// Types I and IV. Importable, over `fields::Zp2`.
     ///
-    /// `fields::Zp2` is `PrimeFieldElement32<2>` and `fields::BinaryFieldElement` has been
-    /// publicly exported since `8757b4a`. What is missing is the import path itself and the toy
-    /// dimensions these families publish, which differ from type III's and type VI's. See #197.
-    ///
-    /// **Which representation is no longer open**: `docs/research/boolean-solving.md` §8 decided
-    /// `GF(2)` is `Zp2` throughout, including in this importer, and
+    /// The order alone settles the field — there is one field of order two — so unlike
+    /// [`Self::Gf256`] there is no modulus to check. `docs/research/boolean-solving.md` §8 decided
+    /// the representation is `Zp2` (`PrimeFieldElement32<2>`) rather than
+    /// `BinaryFieldElement<0b11>`, on storage rather than behaviour, and
     /// `tests/boolean_readiness.rs::gf2_by_either_route_is_one_field_at_twice_the_storage` pins
     /// the two as one field at twice the storage.
+    ///
+    /// Type I publishes toy sizes `n = 10, 15, 20` and type IV `n = 5, 10, 15` — which is why
+    /// [`SUPPORTED_DIMENSIONS`] carries 5. **Field equations belong in the ideal here**: over
+    /// GF(2) `x_i^2 - x_i` has degree 2, so `grobner::field_equations` is cheap and a solving
+    /// degree stated without it is not comparable to any published figure.
     Gf2,
 
     /// Types II and V. Importable, and the modulus is **checked** rather than assumed.
@@ -107,7 +110,9 @@ impl MqField {
     ///
     /// `x^8 + x^4 + x^3 + x^2 + 1`. Verified by evaluation rather than taken from prose: all 20
     /// polynomials of type II `n = 10` seed 0 vanish at its published answer under this modulus and
-    /// **0 of 20** vanish under the AES `0x11B`. See `docs/research/fukuoka-mq.md` §3.4.
+    /// **0 of 20** vanish under the AES `0x11B` — asserted by
+    /// [`tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus`]. See
+    /// `docs/research/fukuoka-mq.md` §2.4.
     pub const PUBLISHED_GF256_MODULUS: u64 = 0x11D;
 
     /// The field's order.
@@ -251,12 +256,6 @@ pub enum MqError {
     /// A header's value does not parse.
     BadHeader { key: &'static str, value: String },
 
-    /// The base field is one this crate cannot yet express as a coefficient type.
-    UnsupportedField {
-        field: MqField,
-        because: &'static str,
-    },
-
     /// The coefficient type is not the field the instance declares.
     ///
     /// **The check that keeps an import faithful.** A GF(31) instance built over GF(7) is a
@@ -335,9 +334,6 @@ impl Display for MqError {
             Self::BadHeader { key, value } => {
                 write!(f, "the `{}` header does not parse: {:?}", key, value)
             }
-            Self::UnsupportedField { field, because } => {
-                write!(f, "{} is not importable yet: {}", field, because)
-            }
             Self::WrongCoefficientField {
                 declared,
                 coefficient_field,
@@ -412,18 +408,22 @@ impl std::error::Error for MqError {}
 
 /// Variable counts this build can turn into polynomials.
 ///
-/// The three toy-example sizes plus **24**, which is where the real challenge starts in a type this
-/// crate can import: both signature families publish `m = 16..=35`, the generator computes
+/// Every published toy-example size plus **24**, which is where the real challenge starts in a type
+/// this crate can import: both signature families publish `m = 16..=35`, the generator computes
 /// `n = m * 1.5`, and `m = 16` therefore gives `n = 24`. So one arm serves two fields — type VI over
 /// GF(31) and type V over GF(2^8). Below it every importable instance is a toy example published so
 /// an implementation can check itself.
+///
+/// **The toy sizes are not the same per type** and the union is `{5, 10, 15, 20}`: types I, II and
+/// III publish `n = 10, 15, 20`, and types IV, V and VI publish `n = 5, 10, 15`. `5` is here for
+/// the signature families' smallest toy, which carries only `m = 3` polynomials in 5 unknowns.
 ///
 /// The list stops there rather than covering the published ranges. Type III's real range is
 /// `n = 34..=53` and type I's is `n = 55..=100`, both far past anything the solvers reach; compiling
 /// a dimension that cannot be used would be worse than
 /// [`MqError::UnsupportedDimension`](MqError::UnsupportedDimension) naming it. Each entry costs a
 /// monomorphization of the whole multivariate stack at that `N`.
-pub const SUPPORTED_DIMENSIONS: &[usize] = &[10, 15, 20, 24];
+pub const SUPPORTED_DIMENSIONS: &[usize] = &[5, 10, 15, 20, 24];
 
 /// A parsed instance, before a compile-time dimension is chosen.
 ///
@@ -636,32 +636,28 @@ impl MqInstance {
 
     /// Whether `F` is the field the instance's header declares.
     ///
-    /// Three separate questions, and all three have to be answered before a single coefficient is
-    /// converted. First, whether this crate can express the field at all — GF(2) cannot be, for
-    /// reasons of a recorded representation decision rather than mathematics. Second, whether the
-    /// coefficient type the caller supplied *is* that field, which is the one a generic
-    /// `F: FiniteField` signature cannot ask and so cannot enforce. Third, over GF(2^8), whether it
-    /// reduces modulo the polynomial the file's header states — and that question is *not* answered
-    /// by the second, because the challenge's modulus and the AES one give fields of the same
-    /// order.
+    /// Two questions, and both have to be answered before a single coefficient is converted.
+    /// First, whether the coefficient type the caller supplied *is* the declared field, which is
+    /// the one a generic `F: FiniteField` signature cannot ask and so cannot enforce. Second, over
+    /// GF(2^8), whether it reduces modulo the polynomial the file's header states — and that
+    /// question is *not* answered by the first, because the challenge's modulus and the AES one
+    /// give fields of the same order.
+    ///
+    /// **The order alone settles GF(2) and GF(31), and does not settle GF(2^8).** There is one
+    /// field of order 2 and one of order 31, so a type of that order is that field however it is
+    /// implemented; `x + 1` is the only irreducible of degree one, so `Zp2` and
+    /// `BinaryFieldElement<0b11>` are checked identically here. Which of the two the importer
+    /// *should* be handed is a storage question decided in
+    /// `docs/research/boolean-solving.md` §8 — `Zp2`, at half the size — and not a correctness
+    /// question this check can or should enforce.
     ///
     /// Orders are compared as limb slices rather than as integers, because a field order need not
     /// fit a `u64` — the comparison has to be correct for the wide fields M20 added, not only for
     /// the ones this importer currently reaches.
     ///
     /// # Errors
-    /// [`MqError::UnsupportedField`], [`MqError::WrongCoefficientField`] or
-    /// [`MqError::WrongModulus`].
+    /// [`MqError::WrongCoefficientField`] or [`MqError::WrongModulus`].
     pub fn check_coefficient_field<F: KnownOrder>(&self) -> Result<(), MqError> {
-        if self.field == MqField::Gf2 {
-            return Err(MqError::UnsupportedField {
-                field: self.field,
-                because: "the GF(2) import path is unwritten; the field exists as fields::Zp2 and \
-                          as fields::BinaryFieldElement, and which of the two to read it under is \
-                          an open decision (#197)",
-            });
-        }
-
         let declared = self.field.order();
         if F::order_limbs() != [declared] {
             return Err(MqError::WrongCoefficientField {
@@ -721,7 +717,6 @@ impl MqInstance {
     ///
     /// # Errors
     /// [`MqError::DimensionMismatch`] if `N` is not the instance's `n`;
-    /// [`MqError::UnsupportedField`] if the field is not yet expressible at all;
     /// [`MqError::WrongCoefficientField`] if `F` is not that field.
     pub fn system<const N: usize, F: KnownOrder>(
         &self,
@@ -797,6 +792,7 @@ impl MqInstance {
         visitor: V,
     ) -> Result<V::Output, MqError> {
         match self.variables {
+            5 => Ok(visitor.visit(&self.system::<5, F>()?)),
             10 => Ok(visitor.visit(&self.system::<10, F>()?)),
             15 => Ok(visitor.visit(&self.system::<15, F>()?)),
             20 => Ok(visitor.visit(&self.system::<20, F>()?)),
@@ -843,7 +839,7 @@ mod tests {
         parse_gf2_polynomial, MqError, MqField, MqInstance, MqVisitor, SUPPORTED_DIMENSIONS,
     };
     use crate::{
-        fields::{Gf256, Gf256Mq, PrimeFieldElement64},
+        fields::{Gf256, Gf256Mq, PrimeFieldElement64, Zp2},
         FiniteField, Monomial, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
 
@@ -1144,13 +1140,15 @@ Order : graded reverse lex order
         ));
     }
 
-    /// GF(2) says it is not importable yet, naming what is missing.
+    /// A GF(2) instance builds a system over `Zp2`, and refuses a coefficient type of another order.
     #[test]
-    fn test_the_gf2_types_are_refused_by_name() {
+    fn test_the_gf2_types_import_under_zp2() {
         // Built rather than parsed: the fixture's coefficients are out of range for GF(2), and
-        // what is under test is `system`'s refusal rather than the parse. Note this is reported
-        // *before* the coefficient-field mismatch that `F` also has — "there is no import path
-        // for GF(2)" is the more useful fact than "GF(31) is not GF(2)".
+        // what is under test is `system`, not the parse. `x0*x1 + x0 + x1 + 1 = (x0+1)(x1+1)` over
+        // GF(2), whose layout at n = 3 is
+        // `x0^2, x0x1, x1^2, x0x2, x1x2, x2^2, x0, x1, x2, 1`. Its roots are exactly the points
+        // with `x0 = 1` or `x1 = 1`, so one root and one non-root pin the coefficient positions
+        // as well as the field.
         let instance = MqInstance {
             field: MqField::Gf2,
             modulus: None,
@@ -1158,23 +1156,31 @@ Order : graded reverse lex order
             polynomials: 1,
             seed: None,
             order: "graded reverse lex order".to_string(),
-            coefficients: vec![vec![0; MqInstance::coefficients_per_polynomial(3)]],
+            coefficients: vec![vec![0, 1, 0, 0, 0, 0, 1, 1, 0, 1]],
         };
-        match instance.system::<3, F>() {
-            Err(MqError::UnsupportedField { field, because }) => {
-                assert_eq!(field, MqField::Gf2);
-                // The reason used to be "`src/fields/binary_field.rs` is not publicly exported".
-                // That export landed in `8757b4a`, so asserting on it would now pin a false
-                // claim; what remains missing is the import path itself.
-                assert!(because.contains("import path is unwritten"), "{}", because);
-                assert!(
-                    !because.contains("not publicly exported"),
-                    "both field modules are public since 8757b4a: {}",
-                    because
-                );
-            }
-            other => panic!("expected an unsupported field, got {:?}", other),
-        }
+
+        let system = instance
+            .system::<3, Zp2>()
+            .expect("GF(2) imports under Zp2 — the representation #197 decided on");
+        assert_eq!(system.len(), 1);
+        let root = [Zp2::one(), Zp2::zero(), Zp2::zero()];
+        assert!(
+            system[0].eval(&root).is_zero(),
+            "the GF(2) coefficients were not read as written"
+        );
+        let non_root = [Zp2::zero(), Zp2::zero(), Zp2::one()];
+        assert!(!system[0].eval(&non_root).is_zero());
+
+        // There is only one field of order two, so the order alone settles the field and no
+        // modulus check is needed — but a coefficient type of another order is still refused.
+        assert!(matches!(
+            instance.system::<3, F>(),
+            Err(MqError::WrongCoefficientField { declared: 2, .. })
+        ));
+        assert!(matches!(
+            instance.system::<3, Gf256Mq>(),
+            Err(MqError::WrongCoefficientField { declared: 2, .. })
+        ));
     }
 
     /// The coefficient range follows the declared field, so GF(2) refuses a GF(31) coefficient.
@@ -1626,6 +1632,245 @@ Order : graded reverse lex order
             .expect("n = 24 is compiled over GF(2^8) too");
         assert_eq!((n, equations), (24, 16));
         assert!(terms > 0 && terms <= 325);
+    }
+
+    /// Both real `m = 16` challenges vanish at the answer vector their solver published.
+    ///
+    /// **`#[ignore]`d for the reason [`test_a_published_instance_is_reproduced`] gives.**
+    ///
+    /// ```sh
+    /// tools/fetch-mq-challenge.sh
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::research::mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers
+    /// ```
+    ///
+    /// **A real challenge file ships no answer, but a *solved* real challenge has one anyway**: the
+    /// challenge publishes the submitted answer vector on the submission's detail page, and both
+    /// `m = 16` seed-0 instances were solved in 2015 by J.-C. Faugère with F5/FGb. So the two
+    /// instances this crate has registered are not open instances with nothing to check against —
+    /// they have an independent correctness oracle, which is what this test is. The vectors are
+    /// transcribed from the detail pages rather than fetched, the way the solve figures in
+    /// `research/fukuoka-mq/solved-instances.tsv` are; the instance files they are evaluated
+    /// against are the ones `tools/fetch-mq-challenge.sh` checksums.
+    ///
+    /// | instance | page | sha256 of the page | solver, date |
+    /// |---|---|---|---|
+    /// | type V `m = 16` seed 0 | `details/details_V_20150403.html` | `91b17742511b284f8d698e1022c4da80f1816c361ef805810cc143e7116f2ea3` | J.-C. Faugère, 2015/4/3 |
+    /// | type VI `m = 16` seed 0 | `details/details_VI_20150401.html` | `deac13ac0cc087da92e3adc4a84b27e60a0408505f98967995542b3aeb03be11` | J.-C. Faugère, 2015/4/1 |
+    ///
+    /// Both read 2026-11-09. This asserts the *import*, not a solve: the point is supplied rather
+    /// than found, and #197 claims no solving result.
+    #[test]
+    #[ignore = "needs tools/fetch-mq-challenge.sh; the instance data is not redistributable"]
+    fn test_the_real_m16_challenges_vanish_at_their_published_answers() {
+        let directory =
+            std::env::var("ZEEBRA_MQ_DIR").unwrap_or_else(|_| "research/instances/mq".to_string());
+        let read = |name: &str| {
+            let path = format!("{}/{}", directory, name);
+            std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                panic!("run tools/fetch-mq-challenge.sh first: {}: {}", path, e)
+            })
+        };
+
+        // Type VI over GF(31), written in decimal on the detail page.
+        let six = MqInstance::parse(&read("challenge-6-16-0")).expect("type VI parses");
+        assert_eq!(
+            (six.field, six.variables, six.polynomials),
+            (MqField::Gf31, 24, 16)
+        );
+        let answer: [u64; 24] = [
+            3, 4, 16, 4, 1, 0, 11, 2, 6, 23, 16, 26, 6, 23, 2, 1, 17, 30, 21, 5, 17, 0, 24, 9,
+        ];
+        let point: Vec<F> = answer
+            .iter()
+            .map(|&t| six.element(t).expect("a GF(31) residue"))
+            .collect();
+        let system = six.system::<24, F>().expect("n = 24 over GF(31)");
+        assert_eq!(system.len(), 16);
+        for (index, p) in system.iter().enumerate() {
+            assert!(
+                p.eval(&point).is_zero(),
+                "type VI m = 16 polynomial {} does not vanish at the published answer",
+                index
+            );
+        }
+
+        // Type V over GF(2^8), written in hex on the detail page — transcribed as the bytes it
+        // spells, and read at the challenge's own modulus.
+        let five = MqInstance::parse(&read("challenge-5-16-0")).expect("type V parses");
+        assert_eq!(
+            (five.field, five.variables, five.polynomials),
+            (MqField::Gf256, 24, 16)
+        );
+        let answer: [u64; 24] = [
+            0x73, 0, 0, 0, 0, 0, 0, 0, 0, 0x98, 0xF6, 0xDC, 0xCB, 0x42, 0x52, 0x01, 0xA3, 0xA5,
+            0xB2, 0x62, 0xEC, 0x89, 0x8F, 0xD6,
+        ];
+        let point: Vec<Gf256Mq> = answer
+            .iter()
+            .map(|&t| five.element(t).expect("a GF(2^8) byte"))
+            .collect();
+        let system = five.system::<24, Gf256Mq>().expect("n = 24 over GF(2^8)");
+        assert_eq!(system.len(), 16);
+        for (index, p) in system.iter().enumerate() {
+            assert!(
+                p.eval(&point).is_zero(),
+                "type V m = 16 polynomial {} does not vanish at the published answer",
+                index
+            );
+        }
+    }
+
+    /// The published GF(2^8) answer vanishes under the challenge's `0x11D` and under no other.
+    ///
+    /// **`#[ignore]`d for the reason [`test_a_published_instance_is_reproduced`] gives.**
+    ///
+    /// ```sh
+    /// tools/fetch-mq-challenge.sh
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::research::mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus
+    /// ```
+    ///
+    /// This is the test #197 asked for in place of an argument. `Gf256` and `Gf256Mq` are both
+    /// GF(2^8) and are isomorphic, so no shape check and no order check can tell them apart — the
+    /// *only* thing that distinguishes a correct import from a silently wrong one is whether the
+    /// challenge's own answer file is a root of the system the import builds. Type II `n = 10`
+    /// seed 0: **all 20** polynomials vanish under the challenge modulus and **none of the 20** do
+    /// under the AES one. The AES system is built by hand through [`MqInstance::element`] rather
+    /// than through [`MqInstance::system`], because `system` refuses it — which is the point, and
+    /// is asserted here too.
+    #[test]
+    #[ignore = "needs tools/fetch-mq-challenge.sh; the instance data is not redistributable"]
+    fn test_the_published_answer_vanishes_only_under_the_challenges_modulus() {
+        let directory =
+            std::env::var("ZEEBRA_MQ_DIR").unwrap_or_else(|_| "research/instances/mq".to_string());
+        let stem = format!("{}/ToyExample-type2-n10-seed0", directory);
+        let text = std::fs::read_to_string(&stem)
+            .unwrap_or_else(|e| panic!("run tools/fetch-mq-challenge.sh first: {}: {}", stem, e));
+        let answer_text =
+            std::fs::read_to_string(format!("{}-answer", stem)).expect("the companion answer file");
+
+        let instance = MqInstance::parse(&text).expect("a published instance parses");
+        assert_eq!(instance.field, MqField::Gf256);
+        assert_eq!(instance.modulus, Some(MqField::PUBLISHED_GF256_MODULUS));
+        assert_eq!((instance.variables, instance.polynomials), (10, 20));
+        let tokens = instance
+            .parse_answer(&answer_text)
+            .expect("the published answer parses base 16");
+        assert_eq!(tokens.len(), 10);
+
+        // Under the challenge's own modulus, through the checked path.
+        let right: Vec<Gf256Mq> = tokens
+            .iter()
+            .map(|&t| instance.element(t).expect("a GF(2^8) byte"))
+            .collect();
+        let system = instance.system::<10, Gf256Mq>().expect("0x11D is accepted");
+        assert_eq!(system.len(), 20);
+        assert_eq!(
+            system.iter().filter(|p| p.eval(&right).is_zero()).count(),
+            20,
+            "the published answer must be a root of every polynomial under 0x11D"
+        );
+
+        // Under the AES modulus the checked path refuses, so the comparison is built by hand.
+        assert!(
+            instance.check_coefficient_field::<Gf256>().is_err(),
+            "the AES modulus is not the challenge's and must be refused"
+        );
+        let layout = MqInstance::monomial_layout::<10>();
+        let wrong: Vec<Gf256> = tokens
+            .iter()
+            .map(|&t| instance.element(t).expect("a GF(2^8) byte"))
+            .collect();
+        let aes: Vec<MultivariatePolynomial<10, Gf256>> = instance
+            .coefficients
+            .iter()
+            .map(|row| {
+                let terms: Vec<(Monomial<10>, Gf256)> = layout
+                    .iter()
+                    .zip(row)
+                    .map(|(m, &c)| (*m, instance.element(c).expect("a GF(2^8) byte")))
+                    .collect();
+                MultivariatePolynomial::new(&terms)
+            })
+            .collect();
+        assert_eq!(
+            aes.iter().filter(|p| p.eval(&wrong).is_zero()).count(),
+            0,
+            "reading the same bytes under the AES modulus must destroy the root — a nonzero count \
+             here would mean the two moduli are not distinguishable by this oracle"
+        );
+    }
+
+    /// The GF(2) families import: both type I and type IV toys vanish at their published answers.
+    ///
+    /// **`#[ignore]`d for the reason [`test_a_published_instance_is_reproduced`] gives.**
+    ///
+    /// ```sh
+    /// tools/fetch-mq-challenge.sh
+    /// cargo test --release --lib -- --ignored --exact \
+    ///     grobner::research::mq::tests::test_the_published_gf2_instances_import
+    /// ```
+    ///
+    /// Type I `n = 10` seed 0 is the encryption shape (`m = 2n = 20`) and type IV `n = 5` seed 0
+    /// the signature shape (`m = 3`), so both GF(2) families and both of their toy dimensions are
+    /// covered — `n = 5` is the size [`SUPPORTED_DIMENSIONS`] gained for them. Not solved: #197
+    /// claims no solving result.
+    #[test]
+    #[ignore = "needs tools/fetch-mq-challenge.sh; the instance data is not redistributable"]
+    fn test_the_published_gf2_instances_import() {
+        let directory =
+            std::env::var("ZEEBRA_MQ_DIR").unwrap_or_else(|_| "research/instances/mq".to_string());
+        let read = |name: &str| {
+            let path = format!("{}/{}", directory, name);
+            std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                panic!("run tools/fetch-mq-challenge.sh first: {}: {}", path, e)
+            })
+        };
+
+        // Type I: encryption, m = 2n, the toy at the smallest size type I publishes.
+        let one = MqInstance::parse(&read("ToyExample-type1-n10-seed0")).expect("type I parses");
+        assert_eq!(one.field, MqField::Gf2);
+        assert_eq!(
+            one.modulus, None,
+            "GF(2) states no modulus; its order is one"
+        );
+        assert_eq!((one.variables, one.polynomials), (10, 20));
+        let answer = one
+            .parse_answer(&read("ToyExample-type1-n10-seed0-answer"))
+            .expect("the published answer parses base 10");
+        let point: Vec<Zp2> = answer
+            .iter()
+            .map(|&t| one.element(t).expect("a GF(2) bit"))
+            .collect();
+        let system = one.system::<10, Zp2>().expect("GF(2) at n = 10 over Zp2");
+        for (index, p) in system.iter().enumerate() {
+            assert!(
+                p.eval(&point).is_zero(),
+                "type I polynomial {} does not vanish at the published answer",
+                index
+            );
+        }
+
+        // Type IV: signature, and n = 5 is the dimension added for it.
+        let four = MqInstance::parse(&read("ToyExample-type4-n5-seed0")).expect("type IV parses");
+        assert_eq!(four.field, MqField::Gf2);
+        assert_eq!((four.variables, four.polynomials), (5, 3));
+        let answer = four
+            .parse_answer(&read("ToyExample-type4-n5-seed0-answer"))
+            .expect("the published answer parses");
+        let point: Vec<Zp2> = answer
+            .iter()
+            .map(|&t| four.element(t).expect("a GF(2) bit"))
+            .collect();
+        let system = four.system::<5, Zp2>().expect("GF(2) at n = 5 over Zp2");
+        for (index, p) in system.iter().enumerate() {
+            assert!(
+                p.eval(&point).is_zero(),
+                "type IV polynomial {} does not vanish at the published answer",
+                index
+            );
+        }
     }
 
     /// An instance header with no coefficients, for the answer parser's sake.
