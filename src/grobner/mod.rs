@@ -13,8 +13,12 @@ pub mod planning;
 pub mod reference;
 pub mod research;
 mod s_polynomial;
+// Singular's weighted bases, committed as literals. Test data only: nothing on a shipping path
+// reads it, and `weighted_reference_bases::tests` is the differential check #624 asked for.
 mod solve;
 mod solve_zero_dimensional;
+#[cfg(test)]
+mod weighted_reference_bases;
 
 pub use buchberger::{
     buchberger, buchberger_with_criteria, buchberger_with_statistics,

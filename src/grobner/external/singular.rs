@@ -49,9 +49,12 @@ fn singular_order(order: MonomialOrder) -> &'static str {
         MonomialOrder::Lexicographic => "lp",
         MonomialOrder::GradedLexicographic => "Dp",
         MonomialOrder::GradedReverseLexicographic => "dp",
-        // Singular does have `wp`/`Wp`, but its weighted spelling and its choice of coefficient
-        // representatives are exactly the conventions this file's header says must be verified
-        // rather than assumed. Unverified, so refused in `supports` and unreachable here.
+        // #624 verified the spelling — `wp(w)` is the `ReverseLexicographic` tie-break, `Wp(w)`
+        // is `Lexicographic`, and `LastVariableFirst` is `Wp` on the reversed variable labelling
+        // with the weights reversed to match, which is a relabelling and so cannot be returned
+        // from a function that only names an order. Still unreachable because `supports` refuses
+        // a weighted instance for want of a textual contract (#625), and wiring the reversed
+        // labelling needs `fn script` to reverse the variable list too.
         MonomialOrder::Weighted(_) => unreachable!("{}", WEIGHTED_UNSUPPORTED),
     }
 }
@@ -312,9 +315,11 @@ impl ExternalSolver for SingularSolver {
     }
 
     fn supports(&self, instance: &Instance, task: Task) -> Support {
-        // Weighted orders (#306) are refused rather than approximated: no adapter here has a
-        // verified spelling for one, and substituting an unweighted order would answer a
-        // different question with a basis that looks right.
+        // Weighted orders (#306) are refused — but since #624 not for want of a spelling. This
+        // tool's is verified and pinned: `wp`/`Wp` are the two tie-break directions and
+        // `LastVariableFirst` is `Wp` on a reversed labelling. What is missing is the textual
+        // contract an instance would carry one in, which is #625; see
+        // `order_is_unsupported_externally`.
         if order_is_unsupported_externally(instance.order) {
             return Support::No(Unsupported::Order {
                 order: instance.order,

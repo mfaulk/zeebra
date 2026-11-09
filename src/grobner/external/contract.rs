@@ -427,14 +427,28 @@ pub fn order_tag(order: MonomialOrder) -> &'static str {
 /// thing, and so that a future adapter that forgets the guard fails loudly at the one place
 /// where a wrong answer would otherwise be a plausible-looking basis in the wrong order.
 pub const WEIGHTED_UNSUPPORTED: &str =
-    "a weighted order has no verified spelling in this tool; `supports` refuses one before a \
-     script is built";
+    "a weighted order has no textual contract to be posed from (#625); `supports` refuses one \
+     before a script is built";
 
 /// True if `order` is one no external adapter here can be posed under.
 ///
 /// Weighted orders are refused at the adapter boundary rather than approximated. Substituting
 /// degrevlex for a weighted order would return a correct basis for a different question, and a
 /// differential oracle that answers a different question agrees with nothing for the right reason.
+///
+/// # What #624 changed, and what it did not
+///
+/// Singular's weighted spelling **is** now verified — `wp(w)` is the `ReverseLexicographic`
+/// tie-break, `Wp(w)` is `Lexicographic`, and `LastVariableFirst` is `Wp` on the *reversed*
+/// variable labelling with the weight vector reversed to match. All three are measured and pinned
+/// by `tools/weighted_reference_bases.sing`, and `grobner::weighted_reference_bases` is the
+/// differential test that reads them.
+///
+/// This still returns `true`, because the blocker moved rather than lifted: [`order_tag`] answers
+/// `"weighted"` for every weight vector and [`order_from_tag`] refuses it back, so an instance
+/// carrying a weighted order **has no textual contract** — no digest, no record key, no comparand
+/// row. Declaring the capability here would make a `Support::Yes` that nothing can reach. That is
+/// #625.
 pub fn order_is_unsupported_externally(order: MonomialOrder) -> bool {
     matches!(order, MonomialOrder::Weighted(_))
 }
