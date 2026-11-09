@@ -779,6 +779,40 @@ mod tests {
         Limits::wall(Duration::from_secs(60))
     }
 
+    /// Zeebra answers a `GF(2)` Cyclic rung, and refuses a width it does not compile there as an
+    /// **adapter** limit rather than an engine one.
+    #[test]
+    fn test_zeebra_answers_a_gf2_cyclic_rung_and_names_its_adapter_limit() {
+        use crate::grobner::external::corpus::BINARY_CHARACTERISTIC;
+
+        let cyclic = instance("cyclic-5", BINARY_CHARACTERISTIC, GREVLEX).expect("builds");
+        assert_eq!(cyclic.field.characteristic, 2);
+        let mut solver = ZeebraSolver::new();
+        assert!(matches!(
+            solver.supports(&cyclic, Task::ReducedGrobnerBasis),
+            Support::Yes
+        ));
+        let report = solver.run(&cyclic, Task::ReducedGrobnerBasis, &limits());
+        let answer = match &report.status {
+            RunStatus::Complete(answer) => answer,
+            other => panic!("expected Complete, got {:?}", other),
+        };
+        // The 70 points survive the reduction mod 2, and four external engines agree.
+        assert_eq!(answer.invariants.quotient_dimension, Some(70));
+
+        // `katsura-11` has no compiled GF(2) instantiation, because GF(2) is published for Cyclic
+        // alone. The refusal must say it is this file's limit and not Zeebra's.
+        let katsura = instance("katsura-11", BINARY_CHARACTERISTIC, GREVLEX).expect("builds");
+        match solver.supports(&katsura, Task::ReducedGrobnerBasis) {
+            Support::No(Unsupported::Representation { detail }) => assert!(
+                detail.contains("adapter monomorphization limit"),
+                "{}",
+                detail
+            ),
+            other => panic!("expected an adapter-limit refusal, got {:?}", other),
+        }
+    }
+
     /// Zeebra answers a corpus rung with a basis and the invariants a cross-check compares.
     #[test]
     fn test_zeebra_answers_a_corpus_rung_with_invariants() {

@@ -874,4 +874,29 @@ mod tests {
             728
         );
     }
+
+    /// `cyclic-5`'s invariants are **unmoved** by the reduction mod 2 — still `D = 70` — which is
+    /// why the corpus records no degeneracy for it and why characteristic two is not uniformly
+    /// destructive. msolve, Singular, Groebner.jl and Sagebrush all agree here.
+    #[test]
+    fn test_cyclic_5_keeps_its_seventy_points_over_gf2() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let binary = f4(&cyclic::<5, Zp2>(), order).expect("within limits");
+        assert_eq!(classify_ideal(&binary, order), IdealClass::ZeroDimensional);
+        assert_eq!(krull_dimension(&binary, order), Some(0));
+        assert_eq!(
+            QuotientBasis::new(&binary, order, usize::MAX)
+                .expect("finite")
+                .dimension(),
+            70
+        );
+        // The same count as at the reference prime, where the published value is also 70.
+        let reference = f4(&cyclic::<5, F>(), order).expect("within limits");
+        assert_eq!(
+            QuotientBasis::new(&reference, order, usize::MAX)
+                .expect("finite")
+                .dimension(),
+            70
+        );
+    }
 }
