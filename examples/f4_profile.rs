@@ -21,6 +21,7 @@
 //! cargo run --release --example f4_profile -- mq-instance   # that instance's canonical text
 //! cargo run --release --example f4_profile -- construction # #330: construction, split four ways
 //! cargo run --release --example f4_profile -- scatter     # #582: the scatter, split four ways
+//! cargo run --release --example f4_profile -- handles     # #621: handles against the hash read
 //! ```
 //!
 //! `mq-instance` emits the digest-pinned instance rather than a measurement, so that an external
@@ -956,16 +957,180 @@ fn construction_routes() {
     );
 }
 
+/// #621: the handle scatter against the hashing scatter it replaces, one process, one build.
+///
+/// Both arms read the same `Preprocessed`, which is built once per batch outside the timing — the
+/// handles are a side effect of preprocessing's own deduplication test, so charging preprocessing
+/// to the construction arms would bury the difference and double-count work neither arm does.
+///
+/// The arms differ in `map` and `scatter`, and in nothing else: `collect` pairs each monomial with
+/// its handle on the handle arm and copies the arena alone on the hashing arm, and both sorts call
+/// the same comparator on the same monomials. `entries/col` is the quantity #621 stated its kill
+/// criterion on — the per-entry lookup can be removed at most once per entry, and entries
+/// outnumber columns by that ratio — so it is reported beside the times rather than derived
+/// elsewhere.
+///
+/// Arm order rotates per repetition and each arm is min-reduced over its own runs, because a
+/// monotone drift in this box's state would otherwise land entirely on whichever arm runs last.
+/// The matrices are asserted equal, which is what makes this a measurement of cost rather than of
+/// two different matrices.
+fn scatter_routes() {
+    const REPETITIONS: usize = 7;
+
+    println!(
+        "{:<12} {:<8} {:<9} {:>7} {:>8} {:>9} {:>8} {:>7} {:>7} {:>8} {:>9} {:>8}",
+        "system",
+        "order",
+        "route",
+        "batches",
+        "entries",
+        "entries/col",
+        "build/ms",
+        "collect",
+        "sort",
+        "map",
+        "scatter",
+        "speedup"
+    );
+
+    macro_rules! arm {
+        ($name:expr, $order:expr, $system:expr) => {{
+            let order = $order;
+            let system = $system;
+            let traced = F4Options {
+                measure_stages: true,
+                ..configuration("recommended").expect("a named configuration")
+            };
+            let trace = match trace_batches(&system, order, &traced) {
+                Ok((_, _, trace)) => Some(trace),
+                Err(_) => {
+                    println!("{:<12} {:<8} did not finish", $name, order.name());
+                    None
+                }
+            };
+            if let Some(trace) = trace {
+                let batches: Vec<_> = trace
+                    .batches()
+                    .iter()
+                    .map(|batch| {
+                        let preprocessed = symbolic_preprocessing(&batch.basis, &batch.pairs);
+                        (batch.basis.clone(), preprocessed)
+                    })
+                    .collect();
+
+                // The shape, taken once and outside every arm. Both routes build the same matrix,
+                // so there is one answer.
+                let mut entries = 0usize;
+                let mut columns = 0usize;
+                for (basis, preprocessed) in &batches {
+                    let handled = MacaulayMatrix::build(basis, preprocessed, order);
+                    let (hashed, _) = MacaulayMatrix::build_hashed_scatter_for_benchmark(
+                        basis,
+                        preprocessed,
+                        order,
+                        false,
+                    );
+                    assert_eq!(handled, hashed, "the two routes must build the same matrix");
+                    entries += handled.nonzeros();
+                    columns += handled.num_columns();
+                }
+
+                let mut floor = [Duration::MAX; 2];
+                let mut splits = [ConstructionTimings::default(); 2];
+                for repetition in 0..REPETITIONS {
+                    let mut elapsed = [Duration::ZERO; 2];
+                    let mut split = [ConstructionTimings::default(); 2];
+                    for slot in 0..2 {
+                        let which = (slot + repetition) % 2;
+                        for (basis, preprocessed) in &batches {
+                            let started = Instant::now();
+                            let one = if which == 0 {
+                                MacaulayMatrix::build_hashed_scatter_for_benchmark(
+                                    basis,
+                                    preprocessed,
+                                    order,
+                                    true,
+                                )
+                                .1
+                            } else {
+                                MacaulayMatrix::build_measured(
+                                    basis,
+                                    preprocessed,
+                                    order,
+                                    usize::MAX,
+                                    usize::MAX,
+                                    true,
+                                )
+                                .expect("an unbounded construction cannot exceed its budget")
+                                .1
+                            };
+                            elapsed[which] += started.elapsed();
+                            split[which].add(&one);
+                        }
+                    }
+                    for index in 0..2 {
+                        if elapsed[index] < floor[index] {
+                            floor[index] = elapsed[index];
+                            splits[index] = split[index];
+                        }
+                    }
+                }
+
+                for (index, route) in ["hashing", "handles"].into_iter().enumerate() {
+                    println!(
+                        "{:<12} {:<8} {:<9} {:>7} {:>8} {:>11.2} {:>8.2} {:>7.2} {:>7.2} {:>8.2} {:>9.2} {:>7.2}x",
+                        $name,
+                        order.name(),
+                        route,
+                        batches.len(),
+                        entries,
+                        entries as f64 / columns.max(1) as f64,
+                        millis(floor[index]),
+                        millis(splits[index].collect),
+                        millis(splits[index].sort),
+                        millis(splits[index].map),
+                        millis(splits[index].scatter),
+                        floor[0].as_secs_f64() / floor[index].as_secs_f64()
+                    );
+                }
+            }
+        }};
+    }
+
+    arm!("cyclic-5", MonomialOrder::Lexicographic, cyclic::<5, F>());
+    arm!("katsura-5", MonomialOrder::Lexicographic, katsura::<5, F>());
+    arm!("katsura-6", MonomialOrder::Lexicographic, katsura::<6, F>());
+    arm!(
+        "katsura-6",
+        MonomialOrder::GradedReverseLexicographic,
+        katsura::<6, F>()
+    );
+    arm!(
+        "katsura-7",
+        MonomialOrder::GradedLexicographic,
+        katsura::<7, F>()
+    );
+    arm!(
+        "katsura-7",
+        MonomialOrder::GradedReverseLexicographic,
+        katsura::<7, F>()
+    );
+}
+
 /// #582: where the row scatter's time goes — shift, lookup, row build, assembly.
 ///
-/// The scatter's two halves are clocked by `build_measured`. The three steps *inside* the row half
-/// are per term, where `Instant::now()` costs more than the work it would time, so they come from
-/// `ScatterPrefix`'s nested ablation and are read off as differences between adjacent arms.
+/// The scatter's two halves are clocked by `build_hashed_scatter_for_benchmark`, which is the
+/// scatter as #582 measured it. The three steps *inside* the row half are per term, where
+/// `Instant::now()` costs more than the work it would time, so they come from `ScatterPrefix`'s
+/// nested ablation and are read off as differences between adjacent arms.
 ///
-/// The `Row` arm is the shipping loop verbatim, so the `ablat` column against `rows` is a control
+/// The `Row` arm is that route's loop verbatim, so the `ablat` column against `rows` is a control
 /// on the whole method: if those two disagree, the differences beside them mean nothing. Arm order
 /// rotates per repetition and each arm is min-reduced over its own runs, because a monotone drift
 /// in this box's state would otherwise land entirely on whichever arm runs last.
+///
+/// Since #621 the shipping scatter reads a handle rather than shifting and hashing, so this table
+/// describes the route #621 replaced. `f4_profile handles` is the A/B between the two.
 fn scatter_split() {
     const REPETITIONS: usize = 7;
 
@@ -1040,15 +1205,18 @@ fn scatter_split() {
                                         checksums[which].wrapping_add(timing.checksum);
                                 }
                                 None => {
-                                    let (_, split) = MacaulayMatrix::build_measured(
-                                        basis,
-                                        preprocessed,
-                                        order,
-                                        usize::MAX,
-                                        usize::MAX,
-                                        true,
-                                    )
-                                    .expect("an unbounded construction cannot exceed its budget");
+                                    // The *hashing* route, not `build_measured`: since #621 the
+                                    // shipping scatter reads a handle and the ablation arms shift
+                                    // and hash, so `build_measured` would not be a control on
+                                    // them. This keeps #582's table reproducible and the
+                                    // `ablat`-against-`rows` check meaningful.
+                                    let (_, split) =
+                                        MacaulayMatrix::build_hashed_scatter_for_benchmark(
+                                            basis,
+                                            preprocessed,
+                                            order,
+                                            true,
+                                        );
                                     elapsed[3] += split.scatter_rows;
                                     assemble += split.scatter_assemble;
                                 }
@@ -1679,7 +1847,8 @@ fn main() {
              counts), mq-matrix (#471's interreduction route A/B), mq-rows (#477's
              batch row form A/B), mq-instance (its canonical text), divmask,\n             symbolic-split (#585 stage 1)
              (#331's divisor-mask counters), construction (#330's four-way split of
-             the construction stage), scatter (#582's four-way split of the scatter)"
+             the construction stage), scatter (#582's four-way split of the scatter),
+             handles (#621's A/B of the handle scatter against the hashing one)"
         );
         return;
     }
@@ -1720,6 +1889,25 @@ fn main() {
         println!("### The handout against the rehashing it replaces, one process, one build");
         println!();
         construction_routes();
+        return;
+    }
+
+    if argument == "handles" {
+        // #621: the per-entry hash read the scatter was 81-89%, against reading the column off the
+        // handle symbolic preprocessing already assigned.
+        println!();
+        println!("## #621: the handle scatter against the hashing scatter");
+        println!();
+        println!("ISA: {}", zeebra::util::isa_floor());
+        println!(
+            "One process, one build, arms interleaved with the order rotated per repetition and\n\
+             each min-reduced over its own runs. Both arms read the same `Preprocessed`, built\n\
+             once per batch outside the timing. Every pair of matrices asserted equal.\n\
+             `entries/col` is #621's kill criterion: under 2.0 the restructuring buys nothing,\n\
+             because the per-entry lookup can be removed at most once per entry."
+        );
+        println!();
+        scatter_routes();
         return;
     }
 
