@@ -979,6 +979,13 @@ cargo run --release --example interreduction_routes            # both interreduc
 cargo run --release --example interreduction_routes -- --orders --wall 60 katsura-6
                                                    # the same rung under grevlex, grlex and lex —
                                                    #   where the two routes disagree (#507 §3e.2)
+cargo run --release --example interreduction_repeats           # the division route's repeat rate:
+                                                   #   reduction steps whose work an earlier
+                                                   #   element's reduction already did (#569).
+                                                   #   Counts, not durations — load-independent
+cargo run --release --example interreduction_repeats -- katsura-6 --order lex
+                                                   # the same on the one path the division route
+                                                   #   still ships on under the default
 tools/benchlock.sh agentD cargo bench              # anything measured, under the exclusive lock
 cargo run --release --example resultant_cico       # a resultant against F4 on the same slices
                                                    #   (two four-round rows, predicted sample count)
@@ -1099,6 +1106,19 @@ runs to completion and reports its elimination's own high-water mark, `--arm def
 allowance where that pass refuses and falls back, and `--arm division` is the comparand the memory
 ratio is against. It is the instrument [#536](https://github.com/mfaulk/zeebra/issues/536) was
 settled with; `docs/research/f4-resource-scaling.md` §12 has the table it produced.
+
+`interreduction_repeats` asks a third question about the same stage, and it is a **count** rather
+than a measurement: how much of the division route's work is work an earlier basis element's
+reduction already did. It replays the basis entering the stage — the last traced batch's basis plus
+that batch's candidates — and reports, per reduction step, whether the
+`(quotient monomial, reducer leading monomial)` pair recurred and whether the reducer's tail was
+unchanged, which is the only case a cache could have served. Two input arms per rung, with
+`reduce_batch_rows` the only difference, because the input decides the stage. Because the output is
+operation counts and not durations it is **exact, deterministic and load-independent**, so it needs
+no interleaving and no quiet machine — it runs under `tools/benchlock.sh` out of politeness rather
+than for validity. It settled [#569](https://github.com/mfaulk/zeebra/issues/569), the last
+unadjudicated candidate mechanism from #436: the repeat rate is **98.57%** and the verdict is still
+not to build the cache, for the reasons in `docs/research/interreduction-cost.md` §3i.
 
 `f4_degrees` is M22-0's baseline: one table per system giving, for each lcm degree, the pairs
 selected and discarded, the split of matrix rows into reducer scaffolding and pair halves, **the

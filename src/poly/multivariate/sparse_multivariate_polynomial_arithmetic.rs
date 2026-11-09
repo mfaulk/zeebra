@@ -372,7 +372,8 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
     /// sorted sequence of terms by a monomial preserves their order.
     pub fn normal_form(&self, divisors: &[Self], order: MonomialOrder) -> Self {
         let mut counts = NormalFormCounts::default();
-        self.normal_form_counting::<false>(divisors, order, &mut counts)
+        let mut repeats = CrossCallRepeats::default();
+        self.normal_form_counting::<false>(divisors, order, &mut counts, &mut repeats)
     }
 
     /// [`normal_form`](Self::normal_form), also returning what it cost in operations.
@@ -393,8 +394,27 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         order: MonomialOrder,
     ) -> (Self, NormalFormCounts) {
         let mut counts = NormalFormCounts::default();
-        let remainder = self.normal_form_counting::<true>(divisors, order, &mut counts);
+        let mut repeats = CrossCallRepeats::default();
+        let remainder =
+            self.normal_form_counting::<true>(divisors, order, &mut counts, &mut repeats);
         (remainder, counts)
+    }
+
+    /// [`normal_form_counted`](Self::normal_form_counted) accumulating into a caller's counters,
+    /// so that a *sequence* of reductions can be described by one record.
+    ///
+    /// The [`CrossCallRepeats`] tracker is the reason this exists: it is the only counter here
+    /// that cannot be summed after the fact, because what it measures is a relation **between**
+    /// calls. #569 asks how much of the final interreduction's work recurs across basis elements,
+    /// and that question is unanswerable from per-call counts however they are folded together.
+    pub fn normal_form_counted_into(
+        &self,
+        divisors: &[Self],
+        order: MonomialOrder,
+        counts: &mut NormalFormCounts,
+        repeats: &mut CrossCallRepeats<N>,
+    ) -> Self {
+        self.normal_form_counting::<true>(divisors, order, counts, repeats)
     }
 
     fn normal_form_counting<const COUNT: bool>(
@@ -402,6 +422,7 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
         divisors: &[Self],
         order: MonomialOrder,
         counts: &mut NormalFormCounts,
+        repeats: &mut CrossCallRepeats<N>,
     ) -> Self {
         // A zero divisor can never reduce anything, so drop them here rather than testing in the
         // inner loop. `multi_div_rem` reaches the same conclusion by failing to divide.
@@ -423,7 +444,18 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
             counts.calls += 1;
             counts.reducers += reducers.len();
             counts.dividend_terms += working.len();
+            repeats.begin_call();
         }
+
+        // One fingerprint per reducer, taken once a call rather than once a step. A reducer's
+        // tail is fixed for the whole call — the reducer set is rebuilt from the divisors on
+        // entry — so this is the cheapest place the identity of the tail can be captured, and
+        // `CrossCallRepeats` needs it to tell a repeated pair from a *reusable* one.
+        let tail_fingerprints: Vec<u64> = if COUNT {
+            reducers.iter().map(|r| tail_fingerprint(&r.tail)).collect()
+        } else {
+            Vec::new()
+        };
 
         while let Some((lead_monomial, lead_coefficient)) = working.pop() {
             if COUNT {
@@ -435,6 +467,7 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
             // knowing. `COUNT` is a const generic, so the uncounted path compiles this to the
             // bare `find_map` — which it has to, since this closure runs once per reducer per
             // term popped and is the innermost loop in the stage.
+            let tests_before_scan = if COUNT { counts.divisor_tests } else { 0 };
             let applicable = reducers.iter().find_map(|reducer| {
                 if COUNT {
                     counts.divisor_tests += 1;
@@ -456,6 +489,16 @@ impl<const N: usize, F: FiniteField> SparseMultiPoly<N, F> {
                         counts.reduction_steps += 1;
                         counts.tail_terms_merged += reducer.tail.len();
                         counts.terms_rewritten += working.len();
+                        // The scan stops at the reducer it applies, so the tests it performed
+                        // name that reducer's index. Derived rather than carried, because the
+                        // alternative is an `enumerate` inside the closure that runs once per
+                        // reducer per term popped — the innermost loop in the stage.
+                        let index = counts.divisor_tests - tests_before_scan - 1;
+                        repeats.record_step(
+                            quotient_monomial,
+                            reducer.lead_monomial,
+                            tail_fingerprints[index],
+                        );
                     }
                     subtract_shifted::<N, F, COUNT>(
                         &mut working,
@@ -745,6 +788,147 @@ impl NormalFormCounts {
             0.0
         } else {
             self.terms_above_window as f64 / self.terms_rewritten as f64
+        }
+    }
+}
+
+/// A 64-bit identity for a reducer's tail, so that two reduction steps against the same leading
+/// monomial can be told apart when the polynomial behind it has been rewritten in between.
+///
+/// Hashed rather than compared because the tracker holds one sighting per `(quotient, reducer)`
+/// pair and keeping the tail itself would hold the whole basis's monomial support per pair. Two
+/// distinct tails colliding would overstate reuse; over the ~500 000 steps `mq-random-10`'s
+/// interreduction takes, the birthday bound on that is below 1e-8, and a collision can only
+/// happen inside one pair's bucket.
+fn tail_fingerprint<const N: usize, F: FiniteField>(tail: &[(Monomial<N>, F)]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    tail.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// How much of a *sequence* of reductions is work some earlier reduction in the sequence already
+/// did.
+///
+/// # What a repeat is, and why two counters
+///
+/// A reduction step is determined by the term it cancels and the divisor it cancels it with: the
+/// step subtracts `quotient_monomial * reducer`, and the only part of that a later step could
+/// reuse is the shifted tail `quotient_monomial * reducer.tail`. So the identity of a step's
+/// reusable half is the pair **(quotient monomial, reducer leading monomial)**, and
+/// [`repeated_steps`](Self::repeated_steps) counts the steps whose pair a previous step already
+/// took.
+///
+/// That is necessary and not sufficient. The final interreduction rewrites each basis element
+/// **in place** as it goes (`reduce_grobner_basis`), so the reducer behind a given leading
+/// monomial is a different polynomial before and after its own turn, and a pair recurring says
+/// nothing on its own about whether the work behind it recurred.
+/// [`repeated_steps_with_the_same_tail`](Self::repeated_steps_with_the_same_tail) is the counter
+/// that answers #569: it is the steps a cache could actually have served.
+///
+/// # Why this is not a field of [`NormalFormCounts`]
+///
+/// Every counter there is per-call and summed, which is exactly why #569 could not be answered
+/// from them: 247 reductions against overlapping divisor sets sum identically to 247 unrelated
+/// ones. This tracker is a relation between calls, so it has to be threaded through them rather
+/// than folded afterwards — and it is not `Copy`, which `NormalFormCounts` is and several of its
+/// holders rely on.
+///
+/// Populated only on the counted path, behind the same `COUNT` const generic as the rest, so the
+/// shipping path neither builds the map nor fingerprints a tail.
+#[derive(Clone, Debug, Default)]
+pub struct CrossCallRepeats<const N: usize> {
+    /// The call index and tail fingerprint of the first step to take each pair.
+    first_seen: std::collections::HashMap<(Monomial<N>, Monomial<N>), (usize, u64)>,
+    calls: usize,
+    steps: usize,
+    repeated: usize,
+    repeated_same_tail: usize,
+    repeated_within_call: usize,
+}
+
+impl<const N: usize> CrossCallRepeats<N> {
+    /// Open a new reduction, so that a repeat can be attributed within or across calls.
+    pub fn begin_call(&mut self) {
+        self.calls += 1;
+    }
+
+    /// Record one reduction step: the quotient monomial, the reducer's leading monomial, and
+    /// `tail_fingerprint` of the tail that step merged.
+    pub fn record_step(&mut self, quotient: Monomial<N>, reducer_lead: Monomial<N>, tail: u64) {
+        self.steps += 1;
+        let call = self.calls;
+        match self.first_seen.entry((quotient, reducer_lead)) {
+            std::collections::hash_map::Entry::Vacant(slot) => {
+                slot.insert((call, tail));
+            }
+            std::collections::hash_map::Entry::Occupied(slot) => {
+                let (first_call, first_tail) = *slot.get();
+                self.repeated += 1;
+                if first_tail == tail {
+                    self.repeated_same_tail += 1;
+                }
+                if first_call == call {
+                    self.repeated_within_call += 1;
+                }
+            }
+        }
+    }
+
+    /// Reductions opened.
+    pub fn calls(&self) -> usize {
+        self.calls
+    }
+
+    /// Reduction steps seen, across every call — the denominator of both rates below, and equal
+    /// to [`NormalFormCounts::reduction_steps`] over the same sequence.
+    pub fn steps(&self) -> usize {
+        self.steps
+    }
+
+    /// Distinct `(quotient monomial, reducer leading monomial)` pairs — the size a cache keyed on
+    /// the pair would have to reach.
+    pub fn distinct_pairs(&self) -> usize {
+        self.first_seen.len()
+    }
+
+    /// Steps whose pair an earlier step already took.
+    pub fn repeated_steps(&self) -> usize {
+        self.repeated
+    }
+
+    /// Of [`repeated_steps`](Self::repeated_steps), the ones whose reducer tail was byte-identical
+    /// to the first sighting's — **the steps a cache across calls could have served**.
+    pub fn repeated_steps_with_the_same_tail(&self) -> usize {
+        self.repeated_same_tail
+    }
+
+    /// Of [`repeated_steps`](Self::repeated_steps), the ones inside a single call.
+    ///
+    /// Expected to be zero: within one reduction the popped monomials strictly descend, and a
+    /// pair determines the monomial it cancels. Reported rather than assumed, so that "every
+    /// repeat is a repeat across calls" is a reading of the data instead of an argument about it.
+    pub fn repeated_steps_within_one_call(&self) -> usize {
+        self.repeated_within_call
+    }
+
+    /// [`repeated_steps`](Self::repeated_steps) as a fraction of [`steps`](Self::steps).
+    pub fn repeat_rate(&self) -> f64 {
+        if self.steps == 0 {
+            0.0
+        } else {
+            self.repeated as f64 / self.steps as f64
+        }
+    }
+
+    /// [`repeated_steps_with_the_same_tail`](Self::repeated_steps_with_the_same_tail) as a
+    /// fraction of [`steps`](Self::steps) — **#569's repeat rate**, and the upper bound on the
+    /// share of reduction steps any cache across elements could remove.
+    pub fn reusable_rate(&self) -> f64 {
+        if self.steps == 0 {
+            0.0
+        } else {
+            self.repeated_same_tail as f64 / self.steps as f64
         }
     }
 }
@@ -2341,5 +2525,182 @@ mod tests {
         // A zero element has no leading monomial and cannot be certified.
         let with_zero = [parse("x^3 - y"), MultivariatePolynomial::<3, F>::zero()];
         assert!(!leading_monomials_are_pairwise_coprime(&with_zero, order));
+    }
+}
+
+/// #569: what the cross-call repeat counter counts, pinned on reductions small enough to count
+/// by hand.
+#[cfg(test)]
+mod cross_call_repeat_tests {
+    use crate::{
+        fields::PrimeFieldElement64,
+        poly::{CrossCallRepeats, MonomialOrder, NormalFormCounts},
+        MultivariatePolynomial,
+    };
+
+    type F = PrimeFieldElement64<13>;
+
+    fn parse(text: &str) -> MultivariatePolynomial<1, F> {
+        MultivariatePolynomial::parse(text, ["x"]).expect("a polynomial")
+    }
+
+    /// One reduction on its own has nothing to repeat against: every step is a first sighting.
+    #[test]
+    fn test_a_single_call_reports_no_repeats() {
+        let order = MonomialOrder::Lexicographic;
+        let mut counts = NormalFormCounts::default();
+        let mut repeats = CrossCallRepeats::default();
+
+        parse("x^4").normal_form_counted_into(
+            std::slice::from_ref(&parse("x - 1")),
+            order,
+            &mut counts,
+            &mut repeats,
+        );
+
+        assert_eq!(repeats.calls(), 1);
+        assert_eq!(repeats.steps(), counts.reduction_steps);
+        assert_eq!(repeats.repeated_steps(), 0);
+        assert_eq!(repeats.distinct_pairs(), counts.reduction_steps);
+        assert_eq!(repeats.repeat_rate(), 0.0);
+    }
+
+    /// Popped monomials strictly descend within a call, so a `(quotient, reducer)` pair cannot
+    /// recur inside one reduction — which is what makes every repeat this counter reports a
+    /// repeat *across* calls.
+    #[test]
+    fn test_no_pair_recurs_within_one_call() {
+        let order = MonomialOrder::Lexicographic;
+        let divisors = [parse("x^3 - x^2 - x - 1"), parse("x^2 - x - 1")];
+        let mut counts = NormalFormCounts::default();
+        let mut repeats = CrossCallRepeats::default();
+
+        parse("x^12 + x^9 + x^5").normal_form_counted_into(
+            &divisors,
+            order,
+            &mut counts,
+            &mut repeats,
+        );
+
+        assert!(counts.reduction_steps > 1, "a reduction with several steps");
+        assert_eq!(repeats.repeated_steps_within_one_call(), 0);
+    }
+
+    /// The same reduction run twice against the same divisors repeats every step, and every
+    /// repeat is reusable because the divisor tails did not change between the calls.
+    #[test]
+    fn test_the_same_reduction_twice_repeats_every_step_reusably() {
+        let order = MonomialOrder::Lexicographic;
+        let divisor = parse("x^2 - x - 1");
+        let mut counts = NormalFormCounts::default();
+        let mut repeats = CrossCallRepeats::default();
+
+        for _ in 0..2 {
+            parse("x^8").normal_form_counted_into(
+                std::slice::from_ref(&divisor),
+                order,
+                &mut counts,
+                &mut repeats,
+            );
+        }
+
+        let steps_per_call = counts.reduction_steps / 2;
+        assert!(steps_per_call > 0);
+        assert_eq!(repeats.calls(), 2);
+        assert_eq!(repeats.repeated_steps(), steps_per_call);
+        assert_eq!(repeats.repeated_steps_with_the_same_tail(), steps_per_call);
+        assert_eq!(repeats.repeat_rate(), 0.5);
+        assert_eq!(repeats.reusable_rate(), 0.5);
+    }
+
+    /// And the tail fingerprint is what separates a repeat from a *reusable* repeat: the same
+    /// pair against a reducer whose tail has since been rewritten counts as repeated and not as
+    /// reusable, which is the distinction the interreduction loop's in-place update creates.
+    #[test]
+    fn test_a_rewritten_tail_repeats_without_being_reusable() {
+        let order = MonomialOrder::Lexicographic;
+        let mut counts = NormalFormCounts::default();
+        let mut repeats = CrossCallRepeats::default();
+
+        // Both divisors lead in `x^2`, so `x^4` takes the same two `(quotient, reducer lead)`
+        // pairs under either — but their tails differ, so neither step is reusable.
+        for tail in ["x^2 - x - 1", "x^2 - 2*x - 3"] {
+            parse("x^4").normal_form_counted_into(
+                std::slice::from_ref(&parse(tail)),
+                order,
+                &mut counts,
+                &mut repeats,
+            );
+        }
+
+        assert_eq!(repeats.calls(), 2);
+        assert!(repeats.repeated_steps() > 0, "the pairs recur");
+        assert_eq!(
+            repeats.repeated_steps_with_the_same_tail(),
+            0,
+            "no repeat is reusable, because every tail was rewritten"
+        );
+        assert_eq!(repeats.reusable_rate(), 0.0);
+    }
+
+    /// The fingerprint recorded belongs to the reducer that was *applied*, not to the first one
+    /// scanned — the index is derived from the scan length, so an off-by-one here would silently
+    /// attribute one reducer's tail to another.
+    #[test]
+    fn test_the_fingerprint_follows_the_applied_reducer_not_the_first_scanned() {
+        let order = MonomialOrder::Lexicographic;
+        // `x^7` leads above `x^4` and can never apply, so the applicable reducer is at index 1.
+        // Its tail differs between the calls while `x^7`'s empty tail does not: reading the
+        // fingerprint off index 0 would report these repeats as reusable.
+        let mut counts = NormalFormCounts::default();
+        let mut differing = CrossCallRepeats::default();
+        for tail in ["x^2 - x - 1", "x^2 - 2*x - 3"] {
+            parse("x^4").normal_form_counted_into(
+                &[parse("x^7"), parse(tail)],
+                order,
+                &mut counts,
+                &mut differing,
+            );
+        }
+        assert!(differing.repeated_steps() > 0, "the pairs recur");
+        assert_eq!(differing.repeated_steps_with_the_same_tail(), 0);
+
+        // And the key is the reducer's leading monomial rather than its position, so moving the
+        // same reducer down the divisor list keeps the repeat reusable.
+        let mut counts = NormalFormCounts::default();
+        let mut moved = CrossCallRepeats::default();
+        for divisors in [
+            vec![parse("x^7"), parse("x^2 - x - 1")],
+            vec![parse("x^2 - x - 1"), parse("x^7")],
+        ] {
+            parse("x^4").normal_form_counted_into(&divisors, order, &mut counts, &mut moved);
+        }
+        assert!(moved.repeated_steps() > 0);
+        assert_eq!(
+            moved.repeated_steps_with_the_same_tail(),
+            moved.repeated_steps(),
+            "the same divisor at a different index is the same reusable work"
+        );
+    }
+
+    /// The counted entry point that keeps no tracker agrees with the one that does, on both the
+    /// remainder and the operation counts — the tracker observes the reduction and cannot change
+    /// it.
+    #[test]
+    fn test_tracking_repeats_changes_neither_the_answer_nor_the_counts() {
+        let order = MonomialOrder::Lexicographic;
+        let divisors = [parse("x^3 - x - 1"), parse("x^2 - 1")];
+        let dividend = parse("x^11 + x^7 + 1");
+
+        let (plain, plain_counts) = dividend.normal_form_counted(&divisors, order);
+
+        let mut counts = NormalFormCounts::default();
+        let mut repeats = CrossCallRepeats::default();
+        let tracked =
+            dividend.normal_form_counted_into(&divisors, order, &mut counts, &mut repeats);
+
+        assert_eq!(tracked, plain);
+        assert_eq!(counts, plain_counts);
+        assert_eq!(repeats.steps(), counts.reduction_steps);
     }
 }

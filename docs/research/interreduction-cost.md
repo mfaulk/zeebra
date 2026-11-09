@@ -16,7 +16,10 @@ comparison and touches no part of the F4 path, so it is independent of every oth
 `3d0e3759`**, with the binary rebuilt at that commit and its printed `commit:` checked against
 `git rev-parse --short HEAD` before anything was trusted — a loop left running across a rebase
 stamps rows with a tree it was not built from, which happened once while taking §3h and is why
-those rows were discarded.
+those rows were discarded. **§3i was taken at base `c6f01f97` plus the instrument it
+introduces** and **re-taken, unchanged to the digit, at base `19ff732c`** after #262 and #625 moved
+`reduce_batch` and the external contract under it; it publishes **counts only**, so unlike every
+other section here it is independent of the machine and of the load it ran under.
 
 Measurement record for #452, which exists because the stage with the largest Amdahl ceiling in this
 repository had neither a sub-stage split, a benchmark, nor an operation counter.
@@ -1228,7 +1231,7 @@ arithmetic.
 | # | mechanism | verdict | what settles it |
 |---|---|---|---|
 | 1 | the divisor search inside `normal_form` | **refuted** | §3 — **37.5** divisor tests a term popped, **22 587 181** across all 247 elements |
-| 2 | repeated work across elements | **still unmeasured** | nothing. See §3g.2 |
+| 2 | repeated work across elements | **confirmed as a mechanism, not worth caching** | §3i — **98.57%** of 534 135 steps repeat with an identical tail, over **1.56%** of the rewrite |
 | 3 | the `O(n²)` loop shape itself | **confirmed as the count, refuted as the cost** | §3 — 534 135 reduction steps is real; §3.1 — the cost is per-step, not per-step-count |
 | 4 | the per-step full-dividend merge (#440) | **confirmed, and it is the cost** | §3 — 64.2x amplification, **1 174 314 651** terms rewritten; §3d — 76.1% of them in the compared span |
 
@@ -1276,6 +1279,13 @@ said is that its subject has shrunk: the loop it would cache across is 25 744 ms
 ships today and **1 415 ms** with `reduce_batch_rows` on, **2 400 ms** with `interreduce_by_matrix`
 on, and **16.4 ms** with both (§3c) — so the headroom any cache could recover is bounded by whatever
 #507 settles the default to be. It is filed separately rather than left inside a closed issue.
+
+> **Counted, in §3i.** #569 built the repeat rate this section says is missing: **98.57%** of the
+> 534 135 reduction steps repeat a `(quotient monomial, reducer)` pair an earlier element's
+> reduction took, every one of them with an identical tail. The mechanism is real — and what
+> repeats is the shifted-tail *construction*, which is 1.56% of the rewrite and which §3d.2 already
+> measured as free, while the merge that is the cost cannot be cached at all. The remedy also
+> already shipped, as the matrix route rather than as a cache. §3i.
 
 ### 3g.3 The 5.10x ceiling: spent in the lab, intact in the product
 
@@ -1467,6 +1477,196 @@ interreduction is no longer where it lives.
 
 ---
 
+## 3i. #569: candidate 2, counted — 98.57% of the steps repeat, and it is the cheap half that does
+
+Pinned at base `19ff732c` plus the instrument this section introduces, recorded at the time —
+and **taken twice**, at `c6f01f97` and again after rebasing onto `19ff732c`, because #262's
+refactor of `reduce_batch` and #625's change to the external contract both sit on the path the
+input comes down. Every figure below is identical across the two, which is what makes the rebase a
+non-event rather than an assumption.
+**Counts only**, which is why this section is a measurement rather than a benchmark: `benchlock`
+logged its runs at a one-minute load average of **934 to 1 052**, on a box that had been between
+1 500 and 2 100 for hours. An operation count does not care. Every figure below is exact,
+deterministic, and reproducible at any load — the property this note's own header already names as
+the reason it treats counts as the result and durations as context. Under `tools/benchlock.sh`,
+`taskset -c 0-7`, `RUSTFLAGS` unset, `RUSTC_WRAPPER=""`, a per-worktree `CARGO_TARGET_DIR`, and the
+`-C target-cpu=x86-64-v3` floor verified in the artifact by `tools/vec_census.sh` — the same
+protocol as every other section, kept because a count taken off-protocol is a count nobody can
+place, not because the lock changes the number.
+
+#436's second candidate was the one its other three were adjudicated without (§3g.1, §3g.2):
+element `i` and element `i + 1` are reduced against almost the same divisor set, nothing is cached
+between them, and no counter in this note could tell work repeated across calls from work that is
+not. `NormalFormCounts` is per-call and summed, so 247 related reductions sum identically to 247
+unrelated ones.
+
+### 3i.0 The first reading, before any rate: on the shipping default the loop does not run
+
+`f4_profile -- mq-counts` at this commit, which is `F4Options::default()` with
+`count_interreduction` on — the same invocation §3's figures came from:
+
+```text
+system       order      elts   red/%     popped       ans        tails     rewritten  maxwrk steps
+mq-random-10 grevlex     247    0.00          0         0            0             0       0     0
+
+    divisor tests 0 over 0 terms popped against 0 reducers a call
+```
+
+**Every counter is zero, over 247 elements.** #575 moved `recommended()` to
+`InterreductionRoute::ByOrder` together with `reduce_batch_rows`; the order here is graded, so the
+stage is one Macaulay matrix and the `O(n²)` division loop candidate 2 is about is never entered.
+The same counters read 534 135 steps and 1.17 G term rewrites in §3. That is not a smaller number —
+it is the absence of the thing being counted.
+
+So #569's own escape hatch, *"entitled to close this as not worth measuring if the default has
+moved"*, is live. It is **not** taken, because the rate is cheap and because "the loop no longer
+runs on this rung" does not say whether the loop was redundant. The second question is the one #436
+asked, and leaving it open would leave the only unadjudicated row in §3g.1 unadjudicated for a
+reason that is about scheduling rather than about reductions.
+
+### 3i.1 The instrument
+
+`CrossCallRepeats` (`src/poly/multivariate/sparse_multivariate_polynomial_arithmetic.rs`), behind
+the same `COUNT` const generic as every other counter here, so the shipping path neither builds the
+map nor fingerprints a tail. It is threaded through the calls rather than folded after them,
+because what it measures is a relation *between* calls — which is exactly why §3g.2 could not be
+reanalysed into it.
+
+A reduction step subtracts `quotient_monomial * reducer`. The only part of that a later step could
+reuse is the **shifted tail** `quotient_monomial * reducer.tail`, so the identity of a step's
+reusable half is the pair **(quotient monomial, reducer leading monomial)**, and `repeat%` is the
+share of steps whose pair an earlier step already took.
+
+That is necessary and not sufficient, because the loop rewrites each element in place as it goes:
+the polynomial behind a given leading monomial is a different polynomial before and after its own
+turn. So each sighting also carries a 64-bit fingerprint of the tail that was merged, and `reuse%`
+is the share of steps repeating a pair **with an identical tail** — the steps a cache could actually
+have served. Two counters, because the second is the one that bounds a fix and because one counter
+could not have found that they coincide (§3i.3).
+
+Three properties of the instrument are asserted rather than argued:
+
+* `repeats.steps() == counts.reduction_steps` on every row, checked in the harness. The tracker and
+  the step counter see the same steps, or the instrument is faulty rather than informative.
+* `within` — repeats inside a single call — is **zero** on every row. Popped monomials strictly
+  descend within a reduction and a pair determines the monomial it cancels, so every repeat
+  reported is a repeat *across elements*, which is what candidate 2 is about. Reported rather than
+  assumed.
+* **The fingerprint belongs to the reducer that was applied.** The applied reducer's index is
+  *derived* from the scan length rather than carried, so that nothing is added to the closure that
+  runs once per reducer per term popped — and an off-by-one there would attribute one reducer's tail
+  to another and inflate `reuse%` silently.
+  `test_the_fingerprint_follows_the_applied_reducer_not_the_first_scanned` pins it in both
+  directions: a differing tail at a later index is not reusable, and the same divisor moved to a
+  different index still is.
+
+The input is the last traced batch's basis **plus that batch's candidates**, replayed — exactly
+what `f4_into` hands the stage. That it is the right input is checkable from the data and not only
+from the argument: the `echelon` arm takes **247** calls and **534 135** reduction steps, merges
+**18 296 667** tail terms and rewrites **1 174 314 651**, which are §3's four figures to the digit.
+
+### 3i.2 The repeat rate
+
+`examples/interreduction_repeats.rs`, the division route on both arms, `reduce_batch_rows` the only
+difference between them. `cache%` is tail terms against terms rewritten: the share of the stage's
+term traffic a cache of shifted tails could address **at all**, whatever its hit rate.
+
+| rung | arm | calls | steps | pairs | repeat% | reuse% | tails | rewritten | cache% |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **mq-random-10** grevlex | echelon | 247 | 534 135 | 7 641 | **98.57** | **98.57** | 18 296 667 | 1 174 314 651 | 1.56 |
+| mq-random-10 grevlex | reduced | 247 | 281 | 28 | 90.04 | 90.04 | 93 160 | 94 199 | 98.90 |
+| katsura-5 lex | echelon | 5 | 257 | 191 | 25.68 | 25.68 | 3 855 | 9 703 | 39.73 |
+| katsura-5 lex | reduced | 5 | 122 | 85 | 30.33 | 30.33 | 1 830 | 3 695 | 49.53 |
+| katsura-6 lex | echelon | 6 | 1 548 | 1 084 | 29.97 | 29.97 | 47 988 | 149 025 | 32.20 |
+| katsura-6 lex | reduced | 6 | 913 | 611 | 33.08 | 33.08 | 28 303 | 78 595 | 36.01 |
+| cyclic-5 lex | echelon | 11 | 684 | 453 | 33.77 | 33.77 | 4 456 | 29 258 | 15.23 |
+| cyclic-5 lex | reduced | 11 | 142 | 102 | 28.17 | 28.17 | 895 | 2 828 | 31.65 |
+
+`within` is zero on every row and is omitted from the table for that reason.
+
+### 3i.3 Candidate 2 is confirmed as a mechanism, and confirmed hard
+
+On the configuration every figure in §3 was taken under, **98.57%** of the stage's reduction steps
+repeat a pair an earlier element's reduction already took, and every one of those repeats carries an
+identical tail. 534 135 steps over **7 641** distinct pairs is a **69.9x** redundancy, and a cache
+that removed all of it would need 7 641 entries — small enough that memory is not the objection.
+
+So candidate 2 is **not** refuted the way candidate 1 was. The work is repeated, massively, and
+#436 was right to list it. §3g.1's second row stops being "still unmeasured".
+
+**And `reuse%` equals `repeat%` exactly on all eight rows, which is structural rather than lucky.**
+Divisibility implies `≤` in any monomial order, so a reducer can apply only to a monomial at or
+above its own leading one — and every monomial the reduction of element `i` pops is at or below
+`i`'s leading monomial. Only reducers *below* `i` can therefore ever apply, and the ascending sort
+means those have already been rewritten into their final form. **A reducer whose tail is still going
+to change is one that cannot be used.**
+`buchberger::interreduction_stop_tests::test_every_repeat_in_the_interreduction_loop_is_reusable`
+pins it, because nothing in `normal_form` enforces it: it is a property of the order *this loop*
+hands its divisors in, and a change there would make the two counters diverge silently.
+
+### 3i.4 But the half that repeats is the half §3d already measured as free
+
+A cache keyed on the pair stores the shifted tail. What it saves is **constructing** that tail — the
+monomial products and the coefficient multiplies. What it cannot save is **merging** it into the
+working polynomial, because the working polynomial is different at every step. §3d is unambiguous
+about which of the two the stage's cost is:
+
+| on `mq-random-10`, echelon | count | share of the rewrite |
+|---|---:|---:|
+| terms rewritten by the merge | 1 174 314 651 | 100% |
+| of them, in the span that pays a `MonomialOrder::cmp` each (§3d) | 893 610 377 | 76.1% |
+| divisor-tail terms merged — **everything a cache could hold** | 18 296 667 | **1.56%** |
+
+So the ceiling on a cache with a **100%** hit rate is 1.56% of the stage's term traffic — and §3d.2
+already measured a change in precisely that region. Hoisting the per-iteration monomial product
+removed **875 935 418** multiplies, **46x more** than a perfect cache could remove, and moved the
+stage by **1.0158x median against a base-side spread of 1.0100x**, with the conclusion that the
+multiplies were not being performed at all. A cache across elements is a second attempt at the same
+≤1.6%, with a worse constant: it pays a hash lookup and a clone per hit to avoid work the hardware
+was issuing into spare slots.
+
+**The `reduced` arm's 98.90% is not a counter-example, and reading it as one is the trap.** There
+the cacheable share is high because the working polynomials are tiny — almost every rewritten term
+*is* a tail term. But the whole arm rewrites **94 199** terms against the echelon arm's
+1 174 314 651, which is **12 466x** less. A high share of nothing is nothing.
+
+### 3i.5 The verdict: confirmed, and not worth implementing — because it has already been paid
+
+**Not reusable** is the wrong way to write this verdict and **not worth caching** is the right one.
+Three bounds, any one of which closes it:
+
+1. **The shipping default does not run the loop** — zero steps on `mq-random-10` at this commit
+   (§3i.0). On every graded order the stage is a matrix, and **the matrix is the cache**: it reduces
+   each monomial once for the whole basis instead of once per element. The 98.57% is the
+   quantitative explanation of *why* #471's route wins 3.78x on this rung and why #575 moved the
+   default. Candidate 2's remedy shipped; it did not ship as a cache.
+2. **On the input the default produces there is almost nothing left to repeat.** 281 steps against
+   the echelon arm's 534 135: #477's candidates arrive in normal form, so the stage has no work to
+   redo. Caching across 281 steps is not a project.
+3. **On the one path the division route still ships — lex — the rate is a third, not 98%.** 122 to
+   1 548 steps a rung at 25.68%–33.08%. The redundancy candidate 2 names is a property of the
+   *graded* shape, which is the shape the matrix route now handles. That the lex rungs are also the
+   ones in shape position (§3e.2) is consistent with this and is not separately established here.
+
+**No implementation**, per #569's own discipline and §3d.2's standing warning. This is the third
+prediction these counters have produced about the hot merge; the first two returned ~7% and ~1.6%,
+and this one has a smaller ceiling than either of them had before it started.
+
+### 3i.6 What this does not settle
+
+* **Whether any reuse exists inside the matrix route.** Different structure, different redundancy,
+  and nothing here measures it.
+* **Any rung but these four.** `mq-random-10` under grevlex, and katsura-5, katsura-6 and cyclic-5
+  under lex. The lex rungs are chosen because `ByOrder` routes lex to division; the other graded
+  rungs are unmeasured and would read zero steps under the default for the same reason
+  `mq-random-10` does.
+* **The repeat's cost in time.** Deliberately. A duration from this instrument would be a duration
+  of the counted path, about a third slower than the shipping one, and §3d.2's lesson is that a
+  count removed is not a cost removed. The 1.56% is a ceiling computed from §3's counts, not a
+  measurement of a change nobody made.
+
+---
+
 ## 4. Reproducing
 
 ```sh
@@ -1516,6 +1716,23 @@ tools/benchlock.sh <tag> taskset -c 0-7 \
   cargo run --release --example interreduction_routes -- --orders --wall 60 \
   katsura-4 katsura-5 katsura-6 katsura-7 cyclic-4 cyclic-5 \
   mq-planted-6 mq-planted-10 mq-planted-14 mq-random-6
+
+# §3i's repeat rate. Counts only, so it is load-independent and needs no interleaving; it
+# runs under the lock out of politeness rather than for validity. Two input arms per rung,
+# `reduce_batch_rows` the only difference, the division route on both. See §3i.
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example interreduction_repeats
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example interreduction_repeats -- \
+    katsura-5 katsura-6 cyclic-5 --order lex
+
+# §3i.0's zero: the same `mq-counts` invocation §3's counters came from, at a commit where the
+# default routes this rung's interreduction to the matrix. Every counter reads zero.
+ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
+  tools/benchlock.sh <tag> taskset -c 0-7 \
+  cargo run --release --example f4_profile -- mq-counts
 
 # §3e's board rows. One row per process, so the peak-RSS figure is attributable; the
 # memory figures in §3e.3 come from here and not from the sweep above.
