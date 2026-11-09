@@ -1,7 +1,13 @@
 # The F4 matrix corpus: real Macaulay matrices, pinned, and whether they predict
 
 **Measured at:** `680692f2`, on base `0882def9` — recorded at the time rather than recovered (#335).
-Every later commit on this branch changes prose and doc comments only. One machine, one `release`
+The branch was then rebased onto `ced9cb51`, which brings in #583's `sort_unstable_by` on the
+Macaulay columns (+108/-4 in `macaulay.rs`) and #490's live-entry budget. **Every pinned digest in
+[§2](#2-the-corpus) was re-derived after the rebase and is unchanged**, which is what licenses
+quoting the pre-rebase timings: a monomial order is strict on distinct monomials and the columns are
+distinct, so the unstable sort has no tie to break and produces the identical permutation — and the
+corpus is what establishes that rather than the argument. Every other commit on this branch changes
+prose and doc comments only. One machine, one `release`
 build (`lto = "fat"`, `codegen-units = 1`), `RUSTFLAGS` unset, `RUSTC_WRAPPER` empty, a private
 `CARGO_TARGET_DIR`, `taskset -c 0-15`, arms interleaved within one process, three repetitions,
 medians. Load was gated **inside** `tools/benchlock.sh` and read again at the end;
@@ -436,6 +442,17 @@ its cost are recorded in `docs/research/boolean-solving.md` §8. Those entries a
 elimination could cost; a packed representation would be a different kernel on the same matrices,
 which is exactly the comparison this corpus makes cheap, and is H14's question rather than this
 issue's.
+
+**There is no file format, and that is a decision rather than an omission.** #262's deliverables ask
+for "a dump/load path for F4 matrices behind the observer hook, with a documented format"; its
+research questions and acceptance criteria ask for the opposite ("prefer a generator plus pinned
+parameters over committed binary matrices", "no large binaries added to the repository"). The
+generated route is what landed, for the reasons in [§1](#1-what-the-corpus-is-and-what-it-is-not)
+and because the one external comparand a format existed to read is gone
+([§3](#3-gblas-published-matrices-the-catalogue-survives-the-data-does-not)). **Filed as #646,
+Priority Low**, which also records when it should be reopened — an external comparand reappearing,
+an entry too expensive to regenerate, or wanting to hand a matrix to a tool outside this crate, for
+which GBLA's own SMS export is the smaller first step.
 
 **No Fukuoka MQ instance.** Types II and V are the published GF(2^8) MQ systems and the natural
 wide-characteristic-two entries, but they come from `research/instances/`, which
