@@ -26,10 +26,13 @@ use crate::{
     grobner::{
         f4::{
             macaulay::{BuildBudgetExceeded, MacaulayMatrix},
+            observer::{BatchObserver, Ignore},
             options::{F4Error, F4Options, ReductionStrategy},
-            statistics::{BatchStatistics, StageClock},
+            statistics::{BatchStatistics, StageClock, StageTimings},
             structured::{eliminate_to, BlockPlan, RowForm},
-            symbolic::{symbolic_preprocessing_with, MonicBasis, ReducerCache, RowKind},
+            symbolic::{
+                symbolic_preprocessing_with, MonicBasis, Preprocessed, ReducerCache, RowKind,
+            },
         },
         pairs::CriticalPair,
     },
@@ -99,14 +102,68 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     options: &F4Options,
     cache: &mut ReducerCache<N>,
 ) -> Result<BatchOutcome<N, F>, F4Error> {
-    let mut clock = StageClock::new(options.measure_stages);
-    let mut stages = crate::grobner::f4::statistics::StageTimings::default();
+    reduce_batch_observed_in(basis, pairs, order, options, cache, &mut Ignore)
+}
 
-    // The entry and byte budgets are collapsed to one entry allowance here, so that construction
-    // and elimination are checked against a single number and cannot drift apart as either check
-    // moves. Which budget produced it decides which error a crossing reports.
-    let allowance = options.live_entry_allowance::<F>();
+/// What symbolic preprocessing and construction produced, before elimination.
+///
+/// Returned as a whole rather than as a matrix, because a caller that wants the matrix in order to
+/// measure it also wants the two counts that describe its shape, and recomputing the reducer share
+/// outside here would be a second definition of it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BuiltMatrix<const N: usize, F: FiniteField> {
+    /// The matrix as built, with its rows in the order preprocessing produced them.
+    pub matrix: MacaulayMatrix<N, F>,
 
+    /// The rows' provenance and the leading monomials they cover.
+    ///
+    /// [`Preprocessed::monomials`] has been released: the columns are in the matrix, so nothing
+    /// reads it, and holding it would inflate the working set a measurement is taken against.
+    pub preprocessed: Preprocessed<N>,
+
+    /// Of [`MacaulayMatrix::num_rows`], the rows that are reduction scaffolding rather than halves
+    /// of a critical pair.
+    pub reducer_rows: usize,
+}
+
+/// Symbolic preprocessing and matrix construction: the two stages that decide what the matrix is.
+///
+/// **The only construction site.** [`reduce_batch_in`] calls this, so a harness that builds a
+/// matrix through it builds the matrix F4 builds — not a reconstruction that agrees today and
+/// drifts when an option, a default or the reducer policy moves. `matrix_corpus.rs` asserts the
+/// agreement against matrices captured out of a live run through
+/// [`BatchObserver::matrix`](super::observer::BatchObserver::matrix), so a divergence fails a test
+/// rather than quietly producing a number about the wrong matrix.
+///
+/// `cache` is the cross-batch state, and passing a fresh one is not neutral: under a
+/// [`CacheMode`](super::symbolic::CacheMode) that is on, the rows a batch gets depend on what
+/// earlier batches populated. Replaying batch *k* from an empty cache therefore need not reproduce
+/// batch *k* of the run — which is why the corpus records the options each matrix came from.
+///
+/// # Errors
+/// As [`reduce_batch`], for the two stages it covers.
+pub fn build_batch_matrix<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    order: MonomialOrder,
+    options: &F4Options,
+    cache: &mut ReducerCache<N>,
+) -> Result<BuiltMatrix<N, F>, F4Error> {
+    let mut clock = StageClock::new(false);
+    let mut stages = StageTimings::default();
+    build_batch_matrix_in(basis, pairs, order, options, cache, &mut clock, &mut stages)
+}
+
+/// As [`build_batch_matrix`], charging its stages to a clock the caller already started.
+fn build_batch_matrix_in<const N: usize, F: FiniteField>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    order: MonomialOrder,
+    options: &F4Options,
+    cache: &mut ReducerCache<N>,
+    clock: &mut StageClock,
+    stages: &mut StageTimings,
+) -> Result<BuiltMatrix<N, F>, F4Error> {
     // Every budget is enforced while the thing it bounds is being built, not after it exists.
     // Symbolic preprocessing discovers rows one at a time and matrix construction writes entries
     // one row at a time, so both can refuse to continue; checking afterwards would mean paying the
@@ -123,12 +180,12 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
     })?;
     stages.symbolic = clock.lap();
 
-    let (mut matrix, construction_split) = MacaulayMatrix::build_measured(
+    let (matrix, construction_split) = MacaulayMatrix::build_measured(
         basis,
         &preprocessed,
         order,
         options.max_matrix_columns,
-        allowance,
+        options.live_entry_allowance::<F>(),
         options.measure_stages,
     )
     .map_err(|exceeded| match exceeded {
@@ -147,6 +204,54 @@ pub fn reduce_batch_in<const N: usize, F: FiniteField>(
         .iter()
         .filter(|row| row.kind == RowKind::Reducer)
         .count();
+
+    Ok(BuiltMatrix {
+        matrix,
+        preprocessed,
+        reducer_rows,
+    })
+}
+
+/// As [`reduce_batch_in`], handing the matrix to `observer` before elimination.
+///
+/// The main loop calls this, so an observer attached to a computation sees the real matrices. The
+/// hook is defaulted to nothing and the function is generic over the observer, so the ordinary
+/// path pays nothing for it.
+///
+/// # Errors
+/// As [`reduce_batch`].
+pub fn reduce_batch_observed_in<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
+    basis: &MonicBasis<N, F>,
+    pairs: &[CriticalPair<N>],
+    order: MonomialOrder,
+    options: &F4Options,
+    cache: &mut ReducerCache<N>,
+    observer: &mut O,
+) -> Result<BatchOutcome<N, F>, F4Error> {
+    let mut clock = StageClock::new(options.measure_stages);
+    let mut stages = StageTimings::default();
+
+    // The entry and byte budgets are collapsed to one entry allowance here, so that construction
+    // and elimination are checked against a single number and cannot drift apart as either check
+    // moves. Which budget produced it decides which error a crossing reports.
+    let allowance = options.live_entry_allowance::<F>();
+
+    let BuiltMatrix {
+        mut matrix,
+        preprocessed,
+        reducer_rows,
+    } = build_batch_matrix_in(basis, pairs, order, options, cache, &mut clock, &mut stages)?;
+
+    // Before elimination, which is in place: an observer that took the matrix afterwards would
+    // take the echelon form and call it the input.
+    //
+    // The lap is discarded, so whatever the observer spends is charged to no stage rather than to
+    // elimination. On the shipping path the hook is `Ignore`'s empty body and the lap reads zero;
+    // off it, a capture clones the matrix, and a stage table whose elimination column included
+    // that clone would say the measurement cost belongs to the thing being measured.
+    observer.matrix(&matrix);
+    clock.lap();
+
     let rows = matrix.num_rows();
     let columns = matrix.num_columns();
 

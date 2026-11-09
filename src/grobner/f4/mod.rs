@@ -27,6 +27,7 @@ pub mod divmask;
 pub mod hilbert_driven;
 pub(crate) mod interreduce;
 pub mod macaulay;
+pub mod matrix_corpus;
 pub mod observer;
 pub mod options;
 pub mod reduction;
@@ -43,11 +44,19 @@ pub use degrees::{DegreeProfile, DegreeStatistics};
 pub use divmask::{DivmaskCalibration, DIVMASK_BITS};
 pub use hilbert_driven::{HilbertSelection, SelectionLimits};
 pub use macaulay::{BuildBudgetExceeded, MacaulayMatrix, ScatterPrefix, ScatterPrefixTiming};
+pub use matrix_corpus::{
+    capture_matrix, corpus, digest_of, fingerprint_of, rebuild_matrix, walk_corpus,
+    walk_corpus_with, BatchSelector, CapturedMatrix, CorpusError, CorpusVisitor, Drift,
+    MatrixFingerprint, MatrixSpec, OptionsPreset, Regime,
+};
 pub use observer::{trace_batches, BatchObserver, BatchTrace, TracedBatch};
 pub use options::{
     F4Error, F4Options, InterreductionRoute, ReducerSelection, ReductionStrategy, StopKind,
 };
-pub use reduction::{reduce_batch, reduce_batch_in, BatchOutcome};
+pub use reduction::{
+    build_batch_matrix, reduce_batch, reduce_batch_in, reduce_batch_observed_in, BatchOutcome,
+    BuiltMatrix,
+};
 pub use statistics::{
     BatchStatistics, ConstructionTimings, F4Statistics, HilbertCounts, MatrixInterreduction,
     MatrixRefusal, StageClock, StageTimings,
@@ -464,7 +473,8 @@ fn f4_into<const N: usize, F: FiniteField, O: BatchObserver<N, F>>(
 
         observer.batch(&monic, &batch);
 
-        let outcome = reduce_batch_in(&monic, &batch, order, options, &mut cache)?;
+        let outcome =
+            reduce_batch_observed_in(&monic, &batch, order, options, &mut cache, observer)?;
         statistics.record(&outcome.statistics);
         // Beside `record`, which is what increments `batches`, so the sequence and the count stay
         // the same length by construction rather than by agreement.

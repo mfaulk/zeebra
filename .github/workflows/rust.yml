@@ -140,6 +140,22 @@ jobs:
           cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
             -E 'test(=grobner::buchberger::tests::test_optimized_agrees_with_reference_on_slow_systems) + test(=grobner::f4::tests::test_f4_on_larger_systems)'
 
+      # The F4 matrix corpus, captured whole: every entry's digest against its pinned one, every
+      # entry's regime band against its measured scaffolding share, and every entry rebuilt from
+      # its own inputs and asserted equal to the matrix the live run handed to elimination (#262).
+      # 15.3s in release and impractical in debug, which is why it is `#[ignore]`d rather than
+      # part of the fast suite.
+      #
+      # Pull requests are covered too, by a different route: `bench-smoke` below runs
+      # `benches/f4_matrix_corpus.rs`, which drives the same `walk_corpus` and so verifies every
+      # digest on every pull request. What this step adds is the regime bands and the rebuild
+      # assertion.
+      - name: The F4 matrix corpus is as pinned
+        if: github.event_name != 'pull_request'
+        run: |
+          cargo nextest run --profile ci --cargo-profile ci-release --lib --run-ignored=only \
+            -E 'test(=grobner::f4::matrix_corpus::tests::test_every_entry_is_pinned_and_in_its_regime)'
+
   bench-smoke:
     name: Benchmarks run
     # Runs on pull requests too, since #586. It used to be `push` and `workflow_dispatch` only, on
