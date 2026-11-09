@@ -1187,25 +1187,87 @@ mod tests {
         );
     }
 
-    /// Raising the budget past the quotient dimension lets the same rung through.
+    /// Raising the dimension cap surfaces the **memory** budget, by name.
     ///
-    /// Evidence that the stop above is the **cap** and not the instance: the default of 4 096 was
-    /// chosen when the corpus's largest quotient dimension was cyclic-6's 156, and the corpus has
-    /// since grown a 16 384-dimensional rung. The refusal is correct behaviour; the default is
-    /// now mis-set relative to the corpus it guards.
+    /// This is what the test above's stop being a *cap* actually looks like, and #623 is why it is
+    /// written this way rather than asserting the rung completes.
+    ///
+    /// `max_quotient_dimension` is documented as "not the limit that bounds memory ... the
+    /// pre-enumeration tripwire", with `max_span_entries` and `max_span_bytes` as the real bound —
+    /// see [`RECOMMENDED_MAX_QUOTIENT_DIMENSION`]. `mq-planted-14`'s quotient dimension is 16 384,
+    /// and `largest_quotient_dimension_within(RECOMMENDED_MAX_SPAN_ENTRIES)` is **3 162**, so the
+    /// rung is 5.2x outside the memory envelope *by design*. **No setting of the tripwire can admit
+    /// it**; only disabling the memory budget could, and that `D^2 + D(D+1)` is 536 887 296 cells
+    /// — about 4 GB over a 64-bit prime field.
+    ///
+    /// So the property worth pinning is the one the two-layer design promises and a caller hitting
+    /// these caps depends on: raise the tripwire and the *next* cap announces itself, naming
+    /// itself, still as a limit stop rather than a failure. The original test asserted completion
+    /// instead, which was true only in the window between the corpus growing this rung and
+    /// `b2283f1e` adding the dependence-test budget — it has failed ever since, invisibly, because
+    /// it was `#[ignore]`d.
+    ///
+    /// **Not ignored any more.** It was marked "needs minutes and gigabytes", which described the
+    /// conversion it no longer reaches: the span budget is checked from `D` before anything is
+    /// allocated, so this runs in about 0.2 s. An ignored test is not evidence, which was #623's
+    /// complaint; this one now runs in CI.
     #[test]
-    #[ignore = "a 16384-dimensional conversion needs minutes and gigabytes"]
-    fn test_raising_the_budget_lets_the_same_rung_through() {
+    fn test_raising_the_dimension_cap_surfaces_the_memory_budget() {
+        use crate::grobner::fglm::{
+            largest_quotient_dimension_within, RECOMMENDED_MAX_SPAN_ENTRIES,
+        };
+
+        // The premise, asserted rather than asserted-in-prose: this rung is outside the memory
+        // envelope whatever the tripwire says, so a test expecting completion could not pass.
+        const DIMENSION: usize = 16_384;
+        let admissible = largest_quotient_dimension_within(RECOMMENDED_MAX_SPAN_ENTRIES);
+        assert!(
+            DIMENSION > admissible,
+            "this rung's dimension {} is within the span budget's {}, so the test no longer \
+             describes the situation it was written for",
+            DIMENSION,
+            admissible
+        );
+
         let built = instance("mq-planted-14", REFERENCE_CHARACTERISTIC, GREVLEX).expect("builds");
         let mut solver = ZeebraSolver::new().with_fglm_options(crate::grobner::FglmOptions {
             max_quotient_dimension: 32_768,
             ..crate::grobner::FglmOptions::default()
         });
         let report = solver.run(&built, Task::LexBasisByConversion, &limits());
+
+        match &report.status {
+            RunStatus::StoppedByLimit(stop) => {
+                let detail = stop.to_string();
+                // The span budget, not the dimension cap the test above gets.
+                assert!(
+                    detail.contains("dependence test"),
+                    "the stop should now name the dependence-test budget: {}",
+                    detail
+                );
+                // The cell count is `D^2 + D(D+1)`, which is what makes this a fact about the
+                // dimension rather than a number to be re-copied when something drifts.
+                let cells = DIMENSION * DIMENSION + DIMENSION * (DIMENSION + 1);
+                assert!(
+                    detail.contains(&cells.to_string()),
+                    "the stop should carry the {} cells this dimension needs: {}",
+                    cells,
+                    detail
+                );
+                assert!(
+                    detail.contains(&RECOMMENDED_MAX_SPAN_ENTRIES.to_string()),
+                    "the stop should carry the limit it crossed: {}",
+                    detail
+                );
+            }
+            other => panic!(
+                "raising the dimension cap should surface the next cap as a limit stop, got {:?}",
+                other
+            ),
+        }
         assert!(
-            matches!(report.status, RunStatus::Complete(_)),
-            "{:?}",
-            report.status
+            !report.status.is_timing_evidence(),
+            "a limit stop is a lower bound, never a measurement"
         );
     }
 

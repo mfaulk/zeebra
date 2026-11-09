@@ -352,8 +352,29 @@ guards.**
 
 Singular converts the same instance in 45.8 s using 10.4 GB, so the problem is solvable and
 Zeebra's refusal is a self-imposed bound rather than an inability. The refusal itself is **correct
-behaviour** — a refused budget is not a wrong answer — and raising the cap to 32 768 lets the rung
-through (`test_raising_the_budget_lets_the_same_rung_through`, `#[ignore]`d for cost).
+behaviour** — a refused budget is not a wrong answer.
+
+> **Correction (#623).** The sentence that stood here said "raising the cap to 32 768 lets the rung
+> through", citing `test_raising_the_budget_lets_the_same_rung_through`. **It does not, and that
+> test had been failing silently ever since `b2283f1e` added the dependence-test budget** — it was
+> `#[ignore]`d, so nothing noticed. `max_quotient_dimension` is the pre-enumeration tripwire and
+> **not** the limit that bounds memory; `max_span_entries` is, and
+> `largest_quotient_dimension_within(20_000_000)` is **3 162**, so this rung's 16 384 is 5.2x
+> outside the memory envelope whatever the tripwire is set to. Raising it only moves the stop to
+> the span budget, which asks for `D^2 + D(D+1) = 536 887 296` cells against a limit of 20 000 000
+> — about 4 GB over a 64-bit prime field. Letting the rung through means raising *that*, which is a
+> different and much larger decision than the one this paragraph described.
+>
+> The test now pins what actually happens and is **no longer ignored**, since the span budget is
+> checked from `D` before anything is allocated and the whole thing runs in 0.2 s:
+> `test_raising_the_dimension_cap_surfaces_the_memory_budget`.
+>
+> The paragraph above it is also stale on a second point: `max_quotient_dimension`'s rationale is
+> no longer "26x cyclic-6's 156". #348 made it **derived** from the span budget — the next power of
+> two at or above `largest_quotient_dimension_within(RECOMMENDED_MAX_SPAN_ENTRIES)` — precisely so
+> that a default justified by a corpus figure could not go stale again, and
+> `test_the_dimension_cap_is_derived_from_the_span_budget` guards it. The finding that the default
+> is mis-set relative to this rung stands; its stated reason does not.
 
 Three actions fell out, and the first two were defects:
 
