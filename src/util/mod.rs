@@ -8,8 +8,10 @@ mod impl_sub_variants;
 mod isa_floor;
 mod peak_memory;
 mod sha256;
+mod shake128;
 
 pub use duplicates::contains_duplicates;
 pub use isa_floor::{has_isa_floor, isa_floor};
 pub use peak_memory::peak_resident_bytes;
 pub use sha256::{sha256_hex, Sha256};
+pub use shake128::Shake128;
