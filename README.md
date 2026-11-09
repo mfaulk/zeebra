@@ -2212,8 +2212,11 @@ geometric, and an evaluation–interpolation resultant needs an arbitrary point 
 
 The exponent is **1.6 and not 1**, and that is a bound rather than a shortfall: near 1 needs the
 transform, the transform needs `KnownOrder` and an RNG, and #162's own scope requires the
-`FiniteField` bound this is written against. #559 is the issue to decide between relaxing the
-criterion and adding a `KnownOrder` specialization.
+`FiniteField` bound this is written against. #559 settled that in favour of the bound — the
+criterion now asks for the multiplication exponent, which `log2(3) = 1.585` against a measured
+1.46 – 1.62 meets — and #606 holds the deferred `KnownOrder` specialization, gated on a measurement
+of what a transform would buy. Mersenne-31 has two-adicity 1, so the Karatsuba path stays whatever
+that measurement says.
 
 The `div` and `roots` rows moved in #193, which put Newton inversion of the reversed divisor behind
 a measured crossover: `div`'s exponent fell from 2 to 1.6, its reach doubled over KoalaBear and
@@ -2337,14 +2340,16 @@ actually takes below it. It is now 4096 / 512 / 512 by element width; see the cr
 below.
 
 Interpolation at arbitrary abscissae — what an evaluation-interpolation resultant needs — is
-quadratic: it was cubic, at 2^10 and 2^9, until #162 built the numerator product `prod (x - x_i)`
-once and divided it down by synthetic division. An evaluation-interpolation resultant turns out not
+**sub-quadratic**: it was cubic, at 2^10 and 2^9, until #162 stage 1 built the numerator product
+`prod (x - x_i)` once and divided it down by synthetic division, and stage 2 added the subproduct
+tree above a measured crossover. An evaluation-interpolation resultant turns out not
 to need arbitrary abscissae at all, since it chooses where it samples — `bivariate_resultant_ntt`
 takes its Sylvester determinants on a power-of-two subgroup and recovers the polynomial with one
 `interpolate` — but on the CICO slices the determinants dominate either way.
 [`docs/research/fast-univariate.md`](docs/research/fast-univariate.md) has the full curves, the
-superseded figures, the gap list, and what each stage would need to go further; the subproduct tree
-that would make it `O(n log^2 n)` is not written.
+superseded figures, the gap list, and what each stage would need to go further; what the tree
+reaches is `O(M(n) log n)` with a Karatsuba `M` and not `O(n log^2 n)`, because its bound is
+`FiniteField` — see the `lagrange_interpolate` row above and #559.
 
 The published Graeffe-transform root finder that those stages serve is read and scoped in
 [`docs/research/graeffe-root-finding.md`](docs/research/graeffe-root-finding.md), with the algorithm

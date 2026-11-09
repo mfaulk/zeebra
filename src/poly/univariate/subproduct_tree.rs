@@ -22,12 +22,14 @@
 //! off — a modulus of degree `d` into a remainder of degree below `2d` — so the top levels take the
 //! Newton route and the small nodes near the leaves fall back to long division on their own.
 //!
-//! **The exponent this reaches is the multiplication exponent, not 1.** #162's acceptance asks for
+//! **The exponent this reaches is the multiplication exponent, not 1.** #162's acceptance asked for
 //! "near 1", which needs the transform; the transform needs a `2^k`-th root of unity, hence
 //! [`crate::KnownOrder`] and randomness, which the same issue's Scope rules out ("`KnownOrder` is
-//! not required ... the bound should stay `FiniteField`"). Those two requirements are in tension
-//! and this module resolves it the way the bound demands: everything here needs nothing of the
-//! field but a ring, and the measured exponent is ~1.6. See #559.
+//! not required ... the bound should stay `FiniteField`"). #559 settled those competing
+//! requirements in favour of the bound: the criterion now asks for the multiplication exponent,
+//! which the measured ~1.6 meets. Everything here needs nothing of the field but a ring. #606 holds
+//! the deferred `KnownOrder` specialization, which would have to sit beside this path rather than
+//! replace it — Mersenne-31 has two-adicity 1, so Karatsuba is the only route that field has.
 //!
 //! # The three algorithms
 //!
