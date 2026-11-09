@@ -9,8 +9,9 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     grobner::{
-        research::specialization::{satisfies, Specialization},
-        solve_one_planned, PlannedSolveOptions, SolveError, SolveOutcome, SolvePlan,
+        solve_one_planned,
+        transform::specialization::{satisfies, Specialization},
+        PlannedSolveOptions, SolveError, SolveOutcome, SolvePlan,
     },
     KnownOrder, MultivariatePolynomial,
 };
@@ -101,7 +102,7 @@ impl<const N: usize, F: KnownOrder> Display for SliceOutcome<N, F> {
 /// use zeebra::{
 ///     fields::Zp2147483647,
 ///     grobner::{
-///         research::{solve_slice, SliceOutcome, Specialization},
+///         transform::{solve_slice, SliceOutcome, Specialization},
 ///         PlannedSolveOptions,
 ///     },
 ///     FiniteField, MultivariatePolynomial,
@@ -172,7 +173,7 @@ mod tests {
     use crate::{
         fields::Zp2147483647,
         grobner::{
-            research::specialization::Specialization, solve_one, PlannedSolveOptions, SolveError,
+            solve_one, transform::specialization::Specialization, PlannedSolveOptions, SolveError,
             SolvePolicy,
         },
         FiniteField, MultivariatePolynomial, Zero,
