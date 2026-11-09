@@ -21,7 +21,7 @@ use crate::{
         pairs::{divides, CriterionCounts, PairCriteria, PairQueue},
         s_polynomial::s_polynomial,
     },
-    poly::{MonomialOrder, NormalFormCounts},
+    poly::{CrossCallRepeats, MonomialOrder, NormalFormCounts},
     FiniteField, Monomial, MultivariatePolynomial,
 };
 
@@ -343,6 +343,32 @@ pub fn interreduce_for_benchmark<const N: usize, F: FiniteField>(
     reduce_grobner_basis(g, order)
 }
 
+/// [`interreduce_for_benchmark`], counting what the stage did and which of it repeats.
+///
+/// #569's measurement entry point: the division route over a basis F4 produced, with
+/// [`NormalFormCounts`] for the stage and [`CrossCallRepeats`] for the part of it that is work an
+/// earlier element's reduction already performed. Counts, not durations — the per-reducer counter
+/// costs about a third of the run, so the returned report's clocks must not be quoted.
+///
+/// Public for the same reason [`interreduce_for_benchmark`] is: an example is an external crate
+/// and cannot reach `pub(crate)`.
+#[doc(hidden)]
+pub fn interreduce_counting_repeats_for_benchmark<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+) -> (
+    Vec<MultivariatePolynomial<N, F>>,
+    NormalFormCounts,
+    CrossCallRepeats<N>,
+) {
+    let mut report = InterreductionReport::default();
+    let mut repeats = CrossCallRepeats::default();
+    let reduced =
+        reduce_grobner_basis_repeat_counted(g, order, || false, &mut report, &mut repeats)
+            .expect("the stop predicate is constant false");
+    (reduced, report.counts, repeats)
+}
+
 /// The matrix interreduction route over the same input, for the same reason.
 ///
 /// Paired with [`interreduce_for_benchmark`] so a benchmark can time the two routes over one
@@ -452,7 +478,14 @@ pub(crate) fn reduce_grobner_basis_until<const N: usize, F: FiniteField>(
     should_stop: impl FnMut() -> bool,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
     let mut report = InterreductionReport::default();
-    reduce_grobner_basis_reporting::<N, F, false, false>(g, order, should_stop, &mut report)
+    let mut repeats = CrossCallRepeats::default();
+    reduce_grobner_basis_reporting::<N, F, false, false>(
+        g,
+        order,
+        should_stop,
+        &mut report,
+        &mut repeats,
+    )
 }
 
 /// [`reduce_grobner_basis_until`], filling in a [`InterreductionReport`].
@@ -465,7 +498,8 @@ pub(crate) fn reduce_grobner_basis_measured<const N: usize, F: FiniteField>(
     should_stop: impl FnMut() -> bool,
     report: &mut InterreductionReport,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
-    reduce_grobner_basis_reporting::<N, F, true, false>(g, order, should_stop, report)
+    let mut repeats = CrossCallRepeats::default();
+    reduce_grobner_basis_reporting::<N, F, true, false>(g, order, should_stop, report, &mut repeats)
 }
 
 /// [`reduce_grobner_basis_measured`], also counting operations.
@@ -484,7 +518,24 @@ pub(crate) fn reduce_grobner_basis_counted<const N: usize, F: FiniteField>(
     should_stop: impl FnMut() -> bool,
     report: &mut InterreductionReport,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
-    reduce_grobner_basis_reporting::<N, F, true, true>(g, order, should_stop, report)
+    let mut repeats = CrossCallRepeats::default();
+    reduce_grobner_basis_reporting::<N, F, true, true>(g, order, should_stop, report, &mut repeats)
+}
+
+/// [`reduce_grobner_basis_counted`], also tracking which of the stage's reduction steps repeat
+/// work an earlier element's reduction already did.
+///
+/// #569's instrument. The tracker is a relation between calls rather than a per-call count, so it
+/// is threaded through the loop instead of being folded into [`InterreductionReport`] — which is
+/// `Copy` and summed, the property that made the question unanswerable from the existing counters.
+pub(crate) fn reduce_grobner_basis_repeat_counted<const N: usize, F: FiniteField>(
+    g: Vec<MultivariatePolynomial<N, F>>,
+    order: MonomialOrder,
+    should_stop: impl FnMut() -> bool,
+    report: &mut InterreductionReport,
+    repeats: &mut CrossCallRepeats<N>,
+) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
+    reduce_grobner_basis_reporting::<N, F, true, true>(g, order, should_stop, report, repeats)
 }
 
 fn reduce_grobner_basis_reporting<
@@ -497,6 +548,7 @@ fn reduce_grobner_basis_reporting<
     order: MonomialOrder,
     mut should_stop: impl FnMut() -> bool,
     report: &mut InterreductionReport,
+    repeats: &mut CrossCallRepeats<N>,
 ) -> Result<Vec<MultivariatePolynomial<N, F>>, InterreductionStopped> {
     let minimize_started = MEASURE.then(Instant::now);
     let mut minimal = minimize_grobner_basis(g, order);
@@ -559,7 +611,9 @@ fn reduce_grobner_basis_reporting<
             reduced.swap(i, last);
             let p = std::mem::take(&mut reduced[last]);
             let remainder = if COUNT {
-                let (remainder, counts) = p.normal_form_counted(&reduced[..last], order);
+                let mut counts = NormalFormCounts::default();
+                let remainder =
+                    p.normal_form_counted_into(&reduced[..last], order, &mut counts, repeats);
                 report.counts.add(&counts);
                 remainder
             } else {
@@ -589,9 +643,13 @@ fn reduce_grobner_basis_reporting<
 mod interreduction_stop_tests {
     use super::{
         reduce_grobner_basis, reduce_grobner_basis_counted, reduce_grobner_basis_measured,
-        reduce_grobner_basis_until, InterreductionReport,
+        reduce_grobner_basis_repeat_counted, reduce_grobner_basis_until, InterreductionReport,
     };
-    use crate::{fields::Zp13, poly::MonomialOrder, MultivariatePolynomial};
+    use crate::{
+        fields::Zp13,
+        poly::{CrossCallRepeats, MonomialOrder},
+        MultivariatePolynomial,
+    };
 
     const VARS: [&str; 2] = ["x", "y"];
 
@@ -683,6 +741,71 @@ mod interreduction_stop_tests {
             "at least one test per term"
         );
         assert!(counts.max_working_terms > 0);
+    }
+
+    /// #569's tracker sees the same steps and the same basis the counted route does, and every
+    /// repeat it reports is a repeat across calls rather than inside one.
+    #[test]
+    fn test_the_repeat_tracker_observes_the_stage_without_changing_it() {
+        let order = MonomialOrder::GradedReverseLexicographic;
+        let plain = reduce_grobner_basis(basis(), order);
+
+        let mut report = InterreductionReport::default();
+        let mut repeats = CrossCallRepeats::default();
+        let tracked = reduce_grobner_basis_repeat_counted(
+            basis(),
+            order,
+            || false,
+            &mut report,
+            &mut repeats,
+        )
+        .expect("a never-stopping predicate cannot stop");
+
+        assert_eq!(tracked, plain, "the tracker cannot change the basis");
+        assert_eq!(repeats.calls(), report.counts.calls);
+        assert_eq!(repeats.steps(), report.counts.reduction_steps);
+        assert_eq!(
+            repeats.repeated_steps_within_one_call(),
+            0,
+            "popped monomials strictly descend within a call, so no pair can recur inside one"
+        );
+    }
+
+    /// Every repeat this loop produces is **reusable**: the tail counter never falls below the
+    /// repeat counter.
+    ///
+    /// Not a coincidence, and the reason is the ascending sort. Divisibility implies `≤` in any
+    /// monomial order, so a reducer can only apply to a monomial at or above its own leading one —
+    /// and every monomial the reduction of element `i` pops is at or below `i`'s leading monomial.
+    /// So only reducers below `i` ever apply, and the ascending order means those have already
+    /// been rewritten into their final form. A reducer whose tail is still going to change is one
+    /// that cannot be used. Pinned here because nothing in `normal_form` enforces it — it is a
+    /// property of the order this loop hands it divisors in, and a change to that order would make
+    /// the two counters diverge silently.
+    #[test]
+    fn test_every_repeat_in_the_interreduction_loop_is_reusable() {
+        let order = MonomialOrder::Lexicographic;
+        // Leading monomials `y^3 < x^2*y^2 < x^3` under lex, pairwise non-divisible so
+        // minimization keeps all three, and `x*y^3` in the tail of the upper two — so the pair
+        // `(x, y^3)` is taken once while reducing `x^2*y^2 + x*y^3` and again while reducing
+        // `x^3 + x*y^3`, which is a repeat across elements and the smallest one there is.
+        let g: Vec<MultivariatePolynomial<2, Zp13>> = ["y^3 - 1", "x^2*y^2 + x*y^3", "x^3 + x*y^3"]
+            .iter()
+            .map(|t| MultivariatePolynomial::parse(t, VARS).expect("a bivariate polynomial"))
+            .collect();
+
+        let mut report = InterreductionReport::default();
+        let mut repeats = CrossCallRepeats::default();
+        reduce_grobner_basis_repeat_counted(g, order, || false, &mut report, &mut repeats)
+            .expect("a never-stopping predicate cannot stop");
+
+        assert!(repeats.repeated_steps() > 0, "pairs have to recur at all");
+        assert_eq!(
+            repeats.repeated_steps_with_the_same_tail(),
+            repeats.repeated_steps(),
+            "a reducer this loop can apply is one it has already finished rewriting"
+        );
+        assert_eq!(repeats.reusable_rate(), repeats.repeat_rate());
     }
 
     /// Timing and counting are separate entry points, and the timing one does not pay for the
