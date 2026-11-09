@@ -362,7 +362,7 @@ Note the last column: factoring overtakes everything at `α = 3, N = 8` (14 567 
 1 213 s). So the wall moves from conversion to **root finding**, which is `src/poly/univariate/` and
 `docs/research/fast-univariate.md` §4.4's "quadratic, and it is the binding stage".
 
-### 3.4.2 Shape position is proven, not assumed
+### 3.4.2 Shape position is proven, not assumed — and the proof is incomplete
 
 §3.4 said `ACICO` "admits a proof that the system is in shape position". Confirmed: §5 of the eprint
 proves the Shape form for a class of constrained zero-dimensional ideals, and §6.2 applies it to
@@ -375,6 +375,17 @@ The condition is general rather than Anemoi-specific — systems whose polynomia
 **That is syntactically checkable**, so zeebra could establish shape position for a generated system
 without running `src/grobner/fglm/shape.rs`' detector at all — and conversely, a family where the
 condition holds but the detector misses it is a detector defect. #201 owns this.
+
+> **Corrected under #201, and the last two sentences are the ones that go.** The syntactic condition
+> does **not** establish shape position, and the "detector defect" test has no instance to run on.
+> Theorem 8 omits the hypothesis its own proof invokes from Theorem 7 — injectivity of the
+> projection onto the target coordinate — and its two stated hypotheses are implied by
+> zero-dimensionality alone under a graded order, so as printed it would make every
+> zero-dimensional ideal shape-form. `docs/research/anemoi.md` §10.5 is the full reading, with a
+> counterexample from this crate's own corpus. What survives is the syntactic half as a **cheap
+> pre-filter**, shipped as `grobner::shape_position_hypotheses`, and the separating condition as a
+> computation. The strict form of the degree condition quoted above is also *not* satisfied by
+> `ACICO`'s own `y` variables, which is why Corollary 2 argues by back-substitution.
 
 ## 4. Griffin and the FreeLunch line
 

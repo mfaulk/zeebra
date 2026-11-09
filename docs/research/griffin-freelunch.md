@@ -243,7 +243,10 @@ why **#306** carries it and costs it once.
 A weighted order alone is not sufficient for the method, though. §4 explains what else is needed.
 
 **Landed in #306, and the cost estimate above was wrong** — the blast radius turned out to be five
-`match` arms rather than a signature change. See §10.1.
+`match` arms rather than a signature change. See §10.1. The second consumer collected: #201 ran
+`ACICO` at `α ∈ {5, 7, 11}` over WDRL with no further order work, reproducing eprint 2025/814's
+Proposition 3 leading monomials and Proposition 4's `(α + 2)^N` on nine rows
+(`docs/research/anemoi.md` §10.4).
 
 ## 3. Gate 2b: the grevlex comparand, measured
 

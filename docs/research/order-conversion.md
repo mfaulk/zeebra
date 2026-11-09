@@ -52,8 +52,8 @@ working from a 2026-10 picture.
 | **Q3**: is the lex walk or border reduction binding on cryptanalytic systems? "Unknown today, because no cryptanalytic system has been profiled through `fglm_profile.rs`." | **Answered; the gap is closed.** `anemoi.md` §8a.4: at `D = 3 125` the lex walk and dependence test are **82.8%** (`FCICO`) and **92.3%** (`PCICO`), rising monotonically with the rung — 56.7% → 74.2% → 82.8% at `N = 3, 4, 5`. |
 | **Q5**: measure operator sparsity before arguing | **Reported, and it is not where the cost is.** §8a.4: 3 444 of `N·D = 31 250` columns are dense (11.0%), operator bytes 0.150 GiB against the dense blocks' 0.146 GiB. See §6.3 for the one figure here that does not check out. |
 | **Q6**: if border reduction binds, defer to #167 | **Both halves gone.** It does not bind (16.7%), and §6.8 closed #167 won't-do: at the default batch size one worker is the fastest row on every system in the corpus, and the splittable half of katsura-7's border stage is **24%**, not 52%. |
-| **Q2**: does shape position hold on the cryptanalytic families? "the single most concrete question in the issue" | **Answered for `FCICO`/`PCICO` in §4 below, and it does.** `ACICO` is still owned by [#201](https://github.com/mfaulk/zeebra/issues/201), which is open. |
-| depends on #201 for an instance that reaches conversion | **No longer.** `FCICO`/`PCICO` are registered at three characteristics and `N = 1..6`, and the ladder runner exists. #201 remains the only route to `ACICO`, whose shape position is *proved*. |
+| **Q2**: does shape position hold on the cryptanalytic families? "the single most concrete question in the issue" | **Answered for `FCICO`/`PCICO` in §4 below, and it does.** `ACICO` has since been answered by #201 — and it also found that the "proof" behind it is incomplete; see `anemoi.md` §10.5. |
+| depends on #201 for an instance that reaches conversion | **No longer.** `FCICO`/`PCICO` are registered at three characteristics and `N = 1..6`, and the ladder runner exists. #201 has since landed `ACICO` — but **not** as a proved shape-position family: `anemoi.md` §10.5 shows eprint 2025/814's Theorem 8 omits the hypothesis its own proof invokes, and exhibits an in-crate counterexample to the hypotheses as printed. |
 
 Two things arrived that #224 did not anticipate, and both are load-bearing below:
 
@@ -209,6 +209,15 @@ simply wrong. That is how `examples/fglm_ablation.rs` validates every other FGLM
    reported as a defect. `FCICO`/`PCICO` carry no shape-position proof — eprint 2025/814's
    syntactic condition is `ACICO`'s — so this is not the proving instance #201 owns. But it is the
    first cryptanalytic family the detector has been offered, and it fires.
+
+   > **Updated by #201.** `ACICO` is not the proving instance either, and the reason is not about
+   > this crate: `anemoi.md` §10.5 reads Theorem 8's printed hypotheses, shows they are implied by
+   > zero-dimensionality alone under a graded order, and exhibits a zero-dimensional ideal in this
+   > crate's own corpus that discharges all of them and is **not** in shape position. The
+   > hypothesis that does the work — injectivity of the projection onto the target coordinate — is
+   > carried by Theorem 7 and omitted by Theorem 8, and it is exactly what `shape.rs` measures. So
+   > "a detector miss on a provable family would be a defect" has no instance to be tested on, and
+   > the syntactic condition is a cheap *pre-filter* rather than a decision procedure.
 2. **#58's trigger has its shape-position half satisfied on a real family.** `wiedemann-krylov.md`
    §2.2 defers FGLM-Krylov until the corpus reaches large `D` **and** those instances are in shape
    position. Anemoi reaches `D = 15 625` at `N = 6` and is in shape position at every rung tested.
@@ -627,9 +636,11 @@ family that motivated the question. The expensive superset is not the first thin
 - **#368 (M26-B)** stays as it is, and its stage-1 stage-split gate is **passed** (§2). §4 passes the
   shape-position half of #58's trigger too. Nothing here widens its scope and its three limits stand.
 - **#273 (H17)** is where `fglm::shape` becomes selectable, per `competitive-baseline.md` §9.
-- **#201 (C5)** keeps `ACICO`, whose shape position is *proved* syntactically and whose detector miss
-  would be a defect. §4 is a different and weaker result: a family with no proof, on which the
-  detector fires.
+- **#201 (C5)** has landed `ACICO`. Its shape position is **not** proved syntactically — see
+  `anemoi.md` §10.5 — so §4's result is not the weaker of two kinds after all; both families rest on
+  the same computed separating condition, and only `ACICO` also has the syntactic half discharged
+  deductively. `grobner::shape_position_hypotheses` is that half, and #201 routes the
+  pre-filter-in-the-planner idea here and to #273.
 - **#202 (C6)** keeps FreeLunch, answered in the negative by `griffin-freelunch.md` §4.2.
 
 ---
