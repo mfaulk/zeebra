@@ -10,6 +10,7 @@ pub mod anemoi;
 pub mod anemoi_cico;
 pub mod challenge;
 pub mod cost_model;
+pub mod crossbred;
 pub mod feistel_mimc;
 pub mod feistel_mimc_cico;
 pub mod griffin;
@@ -46,6 +47,11 @@ pub use cost_model::{
     retained_run_stems, select_runs_by_stem, Attribution, CostModelBoard, CostRow, Figure,
     FigureBasis, Intermediate, LimitingStage, NextSizeProjection, PredictionError, Quantity,
     RunSelectionError, SchemaError, SelectedRuns, COST_MODEL_HISTORY_CONTRACT,
+};
+pub use crossbred::{
+    best_parameters, first_non_positive, monomial_series, monomials_up_to, preprocessing_shape,
+    semiregular_series, work, Admissibility, CrossbredError, CrossbredSeries, PreprocessingShape,
+    WorkAccounting, WorkOptions, DEFAULT_LINEAR_ALGEBRA_EXPONENT, DEFAULT_WORD_BITS,
 };
 pub use feistel_mimc::{
     FeistelMimc, FeistelMimcError, FeistelMimcParameters,
