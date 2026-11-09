@@ -460,6 +460,14 @@ that false.
 | Groebner.jl | yes, and reports the Krull dimension | n/a (no FGLM in 0.10.11) | n/a |
 | Sagebrush | yes, both the `f4` and `fglm` routes | n/a (no eliminant) | yes |
 
+Every "yes" above was run, not inferred. The basis column is **five-way** at `cyclic-5` — Zeebra,
+msolve, Singular, Groebner.jl and Sagebrush all return a 20-element grevlex basis and all four that
+report a quotient dimension give 70. The conversion column is **two-way**: Singular's `fglm` and
+Sagebrush's `fglm` route each produce an **11-element lex basis** over `GF(2)`, with Singular
+confirming `dim 0` and `vdim 70` after the conversion. So
+`corroboration_for(LexBasisByConversion, 2)` is `TwoWay` and that is a measured statement rather
+than an arithmetic consequence of the ceilings.
+
 **msolve's eliminant is the one restriction, and it is a non-termination rather than a refusal.**
 Its sparse-FGLM needs the ideal in shape position; when the staircase is not generic enough its
 default remedy (`-c 2`) permutes the variables and then adjoins a *random* linear form. Over `GF(2)`
