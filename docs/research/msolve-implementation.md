@@ -1,9 +1,11 @@
 # msolve 0.11.0: what it actually does, and which of it Zeebra may reimplement
 
 **Measured at:** `dbab79eb`, reproduced at `3139025d`; §4.1's scatter split is stamped base
-`a756eb95` and its column-sort A/B base `87e11e72`, each plus source blobs, per #505 (see the
-subsections for the blobs). The only Zeebra timings published here are §4.1's settlement of H1, that
-split and that A/B. Every other figure is read from msolve's source or quoted from a cited paper.
+`a756eb95` and its column-sort A/B base `87e11e72`, and §4 H2's divisor-search projection base
+`ced9cb51` plus blob `7781cc636114` (`git hash-object examples/f4_profile.rs`), each
+per #505 (see the subsections for the rest of the blobs). The only Zeebra timings published here are
+§4.1's settlement of H1, that split, that A/B, and H2's projection. Every other figure is read from
+msolve's source or quoted from a cited paper.
 
 Source-grounded study for #264, a child of epic #256. The companion documents are
 `docs/research/external-comparands.md` (how msolve is provisioned and invoked) and
@@ -1041,14 +1043,52 @@ is for inputs whose exponent range is wide enough to need it, and none of Zeebra
 are. That is worth knowing before copying it: the measured 96% here is **not** evidence for
 calibrated thresholds, only for masking at all.
 
-**What is still unmeasured, and is the next step rather than an omission.** This bounds the
-*comparisons* a mask removes, not the *time*. `symbolic` is 23% of katsura-6 lex, and the divisor
-search is some share of that — the queue, the deduplication test and the row building are the rest —
-so the end-to-end saving is 23% × (divisor search's share of `symbolic`) × 96.7% × (1 − mask cost /
-compare cost), and only the first and third factors are known. A stage split one level finer, inside
-`symbolic`, is what would turn this into a projection; until then the honest statement is that the
-*mechanism* applies to 96.7% of the tests and the *payoff* is unquantified. The counters are exact
-and machine-independent, so none of that needs re-taking when it is.
+**The payoff, measured by #585 stage 1 — and it retires the axis.** The paragraph that stood here
+said this bounds the *comparisons* a mask removes and not the *time*, and named the missing factor:
+the end-to-end saving is `23% × (divisor search's share of symbolic) × 96.7% × (1 − mask cost /
+compare cost)`, with only the first and third known. The second is now measured, by
+`f4_profile -- symbolic-split`.
+
+**Measured at `ced9cb51` plus the change that adds that mode.** `divisor_scan_steps` is exact and
+free — the shipped scan increments it once per divisibility test — and the per-step cost comes from
+timing `MonicBasis::find_divisor_with` itself over a real basis and dividing by the steps it
+reports, so loop overhead and the early exit are inside the figure. Reported as a range because a
+negative answer exits `checked_div` early and a positive one compares every variable. It is a
+**projection**, labelled as one.
+
+| instance | `symbolic` | run | steps | ns/step | search of `symbolic` | **of the run** |
+|---|---:|---:|---:|---:|---:|---:|
+| katsura-6 lex | 2.96 ms | 15.32 ms | 399 292 | 1.8–2.2 | 24.0–29.9% | **4.6–5.8%** |
+| katsura-7 grlex | 2.36 ms | 24.37 ms | 48 885 | 1.6–1.8 | 3.4–3.8% | 0.3–0.4% |
+| katsura-6 grlex | 0.40 ms | 2.57 ms | 10 729 | 0.9–1.1 | 2.5–3.0% | 0.4–0.5% |
+| cyclic-5 grevlex | 0.18 ms | 1.02 ms | 7 808 | 0.8–1.1 | 3.4–4.7% | 0.6–0.8% |
+
+**The fourth factor does not need measuring, because the third column bounds the answer without
+it.** Set `mask cost = 0` — a free mask, which is the most generous assumption available — and the
+end-to-end saving is at most `4.6–5.8% × 96.7% = 4.4–5.6%` on katsura-6 lex and **under 0.8%** on
+every other instance tried. That is the ceiling on a technique that needs a side array on
+`MonicBasis`, a mask build per query, and a second code path through the divisor search that
+`test_dispatch_agrees_with_the_reference_scans` has to hold element-for-element.
+
+And the real mask is not free. The per-step cost being **0.8–2.2 ns** is the sharper half of the
+finding: that is a handful of cycles for an early-exiting `[u32; N]` compare with its operands in
+L1, which is the *same order* as the load-and-AND a mask check would replace it with. So `(1 − mask
+cost / compare cost)` is small on exactly the instances where the rest of the product is small, and
+the only instance with a visible share — katsura-6 lex — is the one whose 23% stage share #585
+already flagged as unrepresentative.
+
+**Verdict: stage 2 is not justified, and #585's own criterion is what says so.** It reserved the
+right to close on this result — "if the divisor search turns out to be a small share of `symbolic`,
+record that and close. A 96.7% hit rate on 2% of the stage is a null result, and it is worth as much
+as a win because it retires the axis." Three of four instances are at 2.5–4.7% of `symbolic`; the
+fourth is 24–30% of a stage that is itself 23% of one run. The mechanism applies to 96.7% of the
+tests, as H2 asked and #331 confirmed, and the work it applies to is too small to pay for the
+machinery.
+
+What would reopen it: an instance whose divisor search is a *large* share of `symbolic` **and**
+whose `symbolic` is a large share of the run — both at once, which none of these four is. The
+counters stay exact and machine-independent, and `measure_divmask` stays, so a future instance can
+be checked against this table without re-taking it.
 
 ### H3 — Sparse-FGLM is the one algorithmic replacement with a real asymptotic argument
 
