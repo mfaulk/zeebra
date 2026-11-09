@@ -398,7 +398,7 @@ set of variables containing no leading monomial's support, which is a branch-and
 that collapses after `N` checks whenever the ideal is zero-dimensional. It agrees with Singular's
 `dim` and Groebner.jl's `Groebner.dimension` wherever both were run.
 
-### 10.2 The invariants, four ways
+### 10.2 The invariants, and which engines agree on each
 
 All values measured on this machine, none cited. Controls at `GF(32003)` reproduce the published
 70, 156 and 924 exactly, which is what licenses the `GF(2)` column beside them.
@@ -411,7 +411,7 @@ All values measured on this machine, none cited. Controls at `GF(32003)` reprodu
 | `cyclic-7` | zero-dim, `D = 924` | 0 | **728** | 173 | Zeebra, msolve, Singular, Groebner.jl |
 | `cyclic-8` | positive-dim, Krull 1 | **3** | — | 191 | msolve, Groebner.jl |
 | `cyclic-9` | positive-dim (Backelin) | **2** | — | 1228 | msolve, Groebner.jl |
-| `cyclic-10` | zero-dim, `D = 34940` (Steel) | **4** — Steel's published value, §10.5 | — | 2271 | msolve basis; Singular `dim` and the independent-set rule |
+| `cyclic-10` | zero-dim, `D = 34940` (Steel) | **4** — Steel's published value, §10.5 | — | 2271 | msolve and Groebner.jl (2271 each); three dimension routes |
 
 **Two findings here are worth more than the rows.**
 
@@ -511,17 +511,22 @@ against rather than merely recorded.** §3.1's cyclic counts are agreements with
 literature; this one is against a specific claim on a specific page that nothing here could
 previously evaluate, because the crate had no Krull dimension to evaluate it with (§10.1).
 
-How it was obtained, and why it is reported as confirmed rather than as corroborated-in-kind:
+How it was obtained. **Two engines computed the basis independently, and three independent
+dimension computations over it agree**, which is why this is reported as confirmed rather than as
+corroborated-in-kind:
 
 1. **msolve 0.11.0** computed the grevlex basis over `GF(2)`: **2271 elements**, single-threaded and
    pinned, reaching `rc=0` well inside its wall cap at about 4 GB resident.
-2. **Singular** read that basis as a reduced standard basis and reported `dim` = **4**.
-3. The **largest-independent-set rule** applied directly to the 2271 leading monomials — the same
-   computation `fglm::krull_dimension` implements — independently gave **4**.
+2. **Groebner.jl** computed the basis from the same generators by its own F4, pinned and capped:
+   **2271 elements**, the same count, and its own `Groebner.dimension` reported **4**.
+3. **Singular** read msolve's basis as a reduced standard basis and reported `dim` = **4**.
+4. The **largest-independent-set rule** over msolve's 2271 leading monomials — the computation
+   `fglm::krull_dimension` implements — gave **4**.
 
-Two routes over one basis, and they are genuinely independent: Singular's `dim` is its own code on
-its own representation, and the independent-set computation reads only the leading monomials. No
-`+1`/`−1` convention is in play, because 4 is neither 0 nor `N`.
+Nothing here shares an implementation. Two separate F4s agree on the basis size; Singular's `dim` is
+its own code on its own representation; Groebner.jl's dimension is a third; and the independent-set
+computation reads nothing but leading monomials. No `+1`/`−1` convention is in play either, because
+4 is neither 0 nor `N`.
 
 **The degeneracy at this rung is total, and it is the cleanest illustration of why §10.2's
 per-characteristic invariants were necessary.** The same `cyclic-10`:

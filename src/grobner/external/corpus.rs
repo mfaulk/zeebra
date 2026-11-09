@@ -450,7 +450,10 @@ const DEGENERACIES: &[(&str, u64, Degeneracy)] = &[
             // `D = 34940`, so the degeneracy is total: a finite point count becomes a fourfold.
             krull_dimension: 4,
             quotient_dimension: None,
-            corroborated_by: "msolve 0.11.0 basis; Singular dim and the independent-set rule agree",
+            // Two engines computed the basis independently and agree on 2271 elements; three
+            // independent dimension computations over it agree on 4.
+            corroborated_by: "msolve 0.11.0 and Groebner.jl (2271 elements each); \
+                              Groebner.jl dimension, Singular dim, independent-set rule",
         },
     ),
 ];
