@@ -3,7 +3,8 @@
 **Measured at:** publication bound `29ce42b4`…`b9c104be` for everything but §4.3.3 — the commits
 that published those figures, recovered from git rather than recorded at the time
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
-was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered.
+was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
+its `from_zeros` subsection at `bccad1fc` plus that change.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1278,6 +1279,45 @@ rejected**, because what it is worth is not known:
 * **The `FiniteField` path stays whatever #606 concludes.** Mersenne-31 has two-adicity 1 (§1.1),
   so a power-of-two transform is ruled out there at every degree above two and Karatsuba is the
   only route that field has.
+
+##### #560: `from_zeros` gets the tree, and its stated justification was wrong
+
+**Measured at `bccad1fc` plus the change itself**, same protocol and instrument as above.
+
+`DensePolynomial::from_zeros` folded the linear factors in one at a time, and that fold is `O(n^2)`
+**however good the multiplication gets**: it multiplies a growing product by a *two-coefficient*
+operand, which is below every `karatsuba_base_case` tier, so every step is the schoolbook loop
+whatever the product has grown to. #231's measured 2.83x on it came from `schoolbook_into`'s loop
+order, not from the recursion. The tree's root is the same product at `O(M(n))`.
+
+`examples/subproduct_crossover.rs` grew a third arm for it, because the work is not interpolation's
+— this builds the tree and stops:
+
+| field | fold exponent | tree exponent | n = 4096 | first clear win |
+|---|---:|---:|---:|---:|
+| Mersenne-31 in a `u32` | 1.872 | **1.295** | **5.63x** | n = 512 |
+| Mersenne-31 in a `u64` | 1.971 | **1.464** | **10.37x** | n = 64 |
+| Goldilocks | 1.977 | **1.481** | **9.55x** | n = 64 |
+| BN254 `Fr` | 1.993 | **1.581** | **12.54x** | n = 4 |
+
+**Three tiers, and a single constant would have been a regression.** Interpolation's crossover is
+nearly flat across widths (64/128); this one moves by **32x** — 256 / 32 / 8. The first version of
+#560 used 32 everywhere, which over a 4-byte element puts the tree in charge from 33 where the fold
+is still 1.6x faster at 64 and 1.25x at 128. The sweep starts at `n = 2` for this arm alone, because
+over a 32-byte element the tree already wins at 16, which is the other arms' floor.
+
+**The issue's stated justification does not hold, and the measurement is what found it.** #560 says
+`roots`, `fglm` and the graeffe path all call `from_zeros`, putting it "on the critical path of the
+stage that binds". They do not. Every occurrence in `src/` outside the definition is a doc comment,
+a re-export, or inside a `#[cfg(test)] mod tests` — `from_zeros` has **no library caller at all**,
+and its only non-test user in the repository is `examples/graeffe_root.rs`. So:
+
+- `roots` is **not** re-measured, because it cannot have changed. That is #560's last acceptance
+  criterion and it is void rather than skipped.
+- The change is a public-API improvement, not a stage improvement. There is no stage figure to
+  report and this section does not imply one.
+- It is still worth having: the API is public, the fold was asymptotically wrong, the per-width
+  tiers mean no size regresses, and the tree it needs was already here.
 
 ##### What this does not establish
 

@@ -43,8 +43,8 @@ use std::{
 use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     fields::{Bn254Fr, Mersenne31, PrimeFieldElement64},
-    interpolate_quadratic_unstable, subproduct_evaluate_unstable, subproduct_interpolate_unstable,
-    tree_crossover_unstable,
+    from_zeros_crossover_unstable, interpolate_quadratic_unstable, product_of_factors_unstable,
+    subproduct_evaluate_unstable, subproduct_interpolate_unstable, tree_crossover_unstable,
     util::peak_resident_bytes,
     FiniteField, Polynomial, UnivariatePolynomial,
 };
@@ -408,12 +408,123 @@ fn evaluation<F: FiniteField>(seed: u64, max_log: u32) {
     );
 }
 
+/// `prod (x - z)` as the tree's root, against the naive fold `from_zeros` used to be.
+///
+/// A third sweep because the work is different from interpolation's and so is the crossover: this
+/// builds the tree and stops, where interpolation also evaluates the derivative down it and
+/// accumulates the transposed form back up. #560.
+///
+/// The fold is `O(n^2)` and cannot be rescued by a better multiplication — it multiplies a growing
+/// product by a two-coefficient operand, below every Karatsuba base-case tier, so every step is the
+/// schoolbook loop. That is why this is the one arm here whose comparand is a *fold* rather than a
+/// second algorithm.
+fn from_zeros<F: FiniteField>(seed: u64, max_log: u32) {
+    let compiled_in = from_zeros_crossover_unstable::<F>();
+
+    println!("\nfrom_zeros: the product of n linear factors");
+    println!(
+        "| {:>5} | {:>8} | {:>12} | {:>12} | {:>8} | {:>8} | {:>7} | {:>7} |",
+        "log2", "n", "fold/s", "tree/s", "speedup", "rule", "fold e", "tree e"
+    );
+    println!("{}", rule(&[7, 10, 14, 14, 10, 10, 9, 9]));
+
+    let mut fold_points: Vec<(usize, Duration)> = Vec::new();
+    let mut tree_points: Vec<(usize, Duration)> = Vec::new();
+    let mut crossover: Option<usize> = None;
+
+    // From `2^1`, not `2^FIRST_LOG`: over a 32-byte element the tree already wins at 16, the other
+    // sweeps' floor, so starting there would bound this crossover from above without pinning it.
+    for log_n in 1..=max_log {
+        let n = 1usize << log_n;
+        let zeros: Vec<F> = points::<F>(n, seed ^ u64::from(log_n))
+            .into_iter()
+            .map(|(x, _y)| x)
+            .collect();
+
+        let fold = |z: &[F]| -> UnivariatePolynomial<F> {
+            z.iter().fold(UnivariatePolynomial::<F>::one(), |p, x| {
+                p * UnivariatePolynomial::new(&[x.neg(), F::one()])
+            })
+        };
+        assert_eq!(
+            product_of_factors_unstable(&zeros),
+            fold(&zeros),
+            "the tree's root disagrees with the fold at n = {n}"
+        );
+
+        let mut best = (Duration::MAX, Duration::MAX);
+        let mut spent = Duration::ZERO;
+        let mut taken = 0;
+        while taken < MAX_REPETITIONS && spent < PAIR_BUDGET {
+            let start = Instant::now();
+            std::hint::black_box(fold(&zeros));
+            let f = start.elapsed();
+
+            let start = Instant::now();
+            std::hint::black_box(product_of_factors_unstable(&zeros));
+            let t = start.elapsed();
+
+            best.0 = best.0.min(f);
+            best.1 = best.1.min(t);
+            spent += f + t;
+            taken += 1;
+        }
+
+        let local = |previous: &Vec<(usize, Duration)>, time: Duration| match previous.last() {
+            Some((_, before)) if before.as_secs_f64() > 0.0 => {
+                format!("{:.2}", (time.as_secs_f64() / before.as_secs_f64()).log2())
+            }
+            _ => "-".to_string(),
+        };
+        let fold_exponent = local(&fold_points, best.0);
+        let tree_exponent = local(&tree_points, best.1);
+        let speedup = best.0.as_secs_f64() / best.1.as_secs_f64();
+        if crossover.is_none() && speedup > 1.1 {
+            crossover = Some(n);
+        }
+
+        println!(
+            "| {:>5} | {:>8} | {:>12.6} | {:>12.6} | {:>8.2} | {:>8} | {:>7} | {:>7} |",
+            log_n,
+            n,
+            best.0.as_secs_f64(),
+            best.1.as_secs_f64(),
+            speedup,
+            if n > compiled_in { "tree" } else { "fold" },
+            fold_exponent,
+            tree_exponent,
+        );
+        fold_points.push((n, best.0));
+        tree_points.push((n, best.1));
+    }
+
+    match crossover {
+        Some(n) => println!("- measured: the tree is first faster by more than 10% at n = {n}"),
+        None => println!(
+            "- measured: the fold wins at every size up to 2^{max_log} - a null result, to report \
+             as one"
+        ),
+    }
+    println!(
+        "- the compiled-in constant is {compiled_in}, so `from_zeros` takes the tree from n = {}",
+        compiled_in + 1
+    );
+    let tail = fold_points.len() / 2;
+    println!(
+        "- fitted exponent over the largest {} rows: fold {:.3}, tree {:.3}",
+        fold_points.len() - tail,
+        exponent(&fold_points[tail..]),
+        exponent(&tree_points[tail..]),
+    );
+}
+
 /// One field's sweeps, with its element width stated.
 fn measure_field<F: FiniteField>(name: &str, seed: u64, max_log: u32) {
     println!("\n\n## {name}");
     println!("\n- an element is {} bytes", std::mem::size_of::<F>());
     interpolation::<F>(seed, max_log);
     evaluation::<F>(seed ^ 0x1620, max_log);
+    from_zeros::<F>(seed ^ 0x0560, max_log);
 }
 
 fn main() {

@@ -22,6 +22,23 @@ use proptest::{
 
 use crate::{FiniteField, Polynomial, UnivariatePolynomial};
 
+/// `prod (x - z)` by folding one linear factor at a time, as the comparand for the subproduct tree.
+///
+/// Here for the reason the module comment gives: `DensePolynomial::from_zeros` **was** this fold,
+/// and `subproduct_tree`'s tests checked the tree's root against it. #560 gave `from_zeros` the
+/// tree above a measured crossover, which would have made those tests compare the tree with
+/// itself — the same defect #231 had to fix in `karatsuba` and `fft::multiply`, and the same one
+/// [`schoolbook_product`] exists for.
+///
+/// Deliberately the naive fold and not a faster equivalent. It multiplies a growing product by a
+/// two-coefficient operand, which is below every Karatsuba base-case tier, so every step is the
+/// schoolbook loop and the result shares no code with the tree it checks.
+pub fn product_of_linear_factors<F: FiniteField>(zeros: &[F]) -> UnivariatePolynomial<F> {
+    zeros.iter().fold(UnivariatePolynomial::<F>::one(), |p, z| {
+        p * UnivariatePolynomial::new(&[z.neg(), F::one()])
+    })
+}
+
 /// The product of two polynomials, by the definition, as the comparand for every faster route.
 ///
 /// Written out here rather than taken from `Mul` because `Mul` stopped being independent of what it

@@ -2528,7 +2528,7 @@ every size.
 |---|---:|---:|
 | `roots`, the binding univariate stage | **1.32x–1.67x** | **1.44x–1.66x** |
 | `lcm` | 1.17x–1.65x | 1.14x–1.66x |
-| `from_zeros` | **2.83x** | 1.04x |
+| `from_zeros` *(superseded by #560, below)* | **2.83x** | 1.04x |
 | one product | 2.08x–6.49x | 2.56x–7.31x |
 | `div_with_remainder` *(control, no longer one)* | 0.99x | 1.00x |
 
@@ -2541,7 +2541,17 @@ called, which is what made the later route's gain attributable.
 Getting there needed two things first, both of which are the interesting part. The agreement tests
 in `karatsuba` and `fft::multiply` compared against `&a * &b`, which would have made them check an
 implementation against itself, so they were re-based onto an independent oracle in
-`test_support`. And dispatching the operator initially measured **0.74x** on `from_zeros` — the
+**The `from_zeros` row is superseded.** #560 gave it the subproduct tree above a measured
+per-width crossover, because the fold is `O(n^2)` however good the multiplication gets — it
+multiplies a growing product by a two-coefficient operand, below every Karatsuba base-case tier, so
+every step is the schoolbook loop. The exponent goes from ~1.99 to 1.30–1.58 and the product of
+4 096 factors is **5.6x to 12.5x** faster depending on the width. Three tiers and not one: the
+crossover moves 32x across the widths here (256 / 32 / 8) where interpolation's barely moves, and a
+single constant would have made the 4-byte field 1.6x *slower* at n = 64. Note that `from_zeros` has
+no library caller — every use in `src/` outside its definition is a doc comment, a re-export or a
+test — so this is a public-API improvement and not a stage one.
+
+And dispatching the operator initially measured **0.74x** on `from_zeros` — the
 small-product regression the issue predicted — which turned out to be `schoolbook_into` iterating
 the longer operand outside; swapping that made the same shape **2.5x** instead. The transform still
 cannot live on `Mul`, because choosing a domain needs `KnownOrder` and randomness.

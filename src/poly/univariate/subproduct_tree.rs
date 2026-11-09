@@ -282,6 +282,60 @@ pub(crate) fn interpolate<F: FiniteField>(points: &[(F, F)]) -> UnivariatePolyno
     tree.combine(&scaled)
 }
 
+/// Zeros above which [`product_of_factors`] beats the naive fold, for an element of at most 4
+/// bytes. Measured by `examples/subproduct_crossover.rs`, not derived.
+///
+/// Separate from [`tree_crossover`] and not reused from it, because the work is different: this
+/// builds the tree and returns the root, where interpolation also evaluates the derivative down it
+/// and accumulates the transposed form back up. A crossover read off one is not the other's — and
+/// measured, they are not: interpolation's is nearly flat across widths at 64/128, where this one
+/// moves by **32x**.
+///
+/// A single constant here would have been a regression. The first version of #560 used 32 for every
+/// width, which over a 4-byte element puts the tree in charge from 33 where the fold is still
+/// **1.6x faster** at 64 and 1.25x at 128.
+pub(crate) const FROM_ZEROS_CROSSOVER_32_BIT: usize = 256;
+
+/// The same, for an element of 5 to 8 bytes. Mersenne-31 in a `u64` and Goldilocks agreed.
+pub(crate) const FROM_ZEROS_CROSSOVER_64_BIT: usize = 32;
+
+/// The same, for an element wider than 8 bytes, measured over BN254 `Fr`.
+pub(crate) const FROM_ZEROS_CROSSOVER_WIDE: usize = 8;
+
+/// The measured crossover for `F`, the single source of truth for `from_zeros`'s dispatch.
+pub(crate) fn from_zeros_crossover<F: FiniteField>() -> usize {
+    match std::mem::size_of::<F>() {
+        0..=4 => FROM_ZEROS_CROSSOVER_32_BIT,
+        5..=8 => FROM_ZEROS_CROSSOVER_64_BIT,
+        _ => FROM_ZEROS_CROSSOVER_WIDE,
+    }
+}
+
+/// `prod (x - z)` as the tree's root and nothing else.
+///
+/// `sum_k 2^k M(n/2^k)` is geometric in Karatsuba's exponent, so this is `O(M(n))` where the naive
+/// fold is `O(n^2)` — the fold multiplies a growing product by a two-coefficient operand, which is
+/// below every Karatsuba base-case tier, so every one of its steps is the schoolbook loop however
+/// large the product has become (#560).
+///
+/// # Panics
+/// If `zeros` is empty; `DensePolynomial::from_zeros` answers that case before reaching here.
+pub(crate) fn product_of_factors<F: FiniteField>(zeros: &[F]) -> UnivariatePolynomial<F> {
+    SubproductTree::build(zeros).root().clone()
+}
+
+/// [`product_of_factors`], reachable from an example binary so the crossover can be swept.
+#[doc(hidden)]
+pub fn product_of_factors_unstable<F: FiniteField>(zeros: &[F]) -> UnivariatePolynomial<F> {
+    product_of_factors(zeros)
+}
+
+/// [`from_zeros_crossover`], reachable from an example binary.
+#[doc(hidden)]
+pub fn from_zeros_crossover_unstable<F: FiniteField>() -> usize {
+    from_zeros_crossover::<F>()
+}
+
 /// [`interpolate`], reachable from an example binary so the crossover can be swept.
 #[doc(hidden)]
 pub fn subproduct_interpolate_unstable<F: FiniteField>(
@@ -339,9 +393,11 @@ mod tests {
         xs.into_iter().map(|x| (x, F::random(rng))).collect()
     }
 
-    /// The root is the product of the linear factors, against `from_zeros`'s naive fold — which
-    /// is left quadratic deliberately so that it stays an independent oracle here. #560 is the
-    /// issue to make it use this tree.
+    /// The root is the product of the linear factors, against the naive fold.
+    ///
+    /// Against `test_support::product_of_linear_factors` and **not** `from_zeros`, which since
+    /// #560 dispatches to this very tree above a crossover — comparing against it would have been
+    /// comparing the tree with itself.
     #[test]
     fn test_the_root_is_the_product_of_the_factors() {
         type F = PrimeFieldElement64<2_147_483_647>;
@@ -350,11 +406,49 @@ mod tests {
             let xs: Vec<F> = (0..n).map(|_| F::random(&mut rng)).collect();
             assert_eq!(
                 *SubproductTree::build(&xs).root(),
-                UnivariatePolynomial::<F>::from_zeros(&xs),
+                crate::test_support::product_of_linear_factors(&xs),
                 "n = {}",
                 n
             );
         }
+    }
+
+    /// `from_zeros` agrees with the naive fold on both sides of its crossover.
+    ///
+    /// The sizes are derived from the constant, so this keeps covering both arms if it is
+    /// re-measured.
+    #[test]
+    fn test_from_zeros_agrees_with_the_fold_either_side_of_its_crossover() {
+        type F = PrimeFieldElement64<2_147_483_647>;
+        let crossover = super::from_zeros_crossover::<F>();
+        let mut rng = StdRng::seed_from_u64(0x0056_0001);
+        for n in [
+            1usize,
+            crossover / 2,
+            crossover,
+            crossover + 1,
+            2 * crossover,
+        ] {
+            let xs: Vec<F> = (0..n).map(|_| F::random(&mut rng)).collect();
+            let expected = crate::test_support::product_of_linear_factors(&xs);
+            assert_eq!(
+                UnivariatePolynomial::<F>::from_zeros(&xs),
+                expected,
+                "n = {}",
+                n
+            );
+            assert_eq!(super::product_of_factors(&xs), expected, "n = {}", n);
+        }
+    }
+
+    /// `from_zeros` of nothing is one, which the tree cannot answer because it has no root.
+    #[test]
+    fn test_from_zeros_of_an_empty_set_is_one() {
+        type F = PrimeFieldElement64<2_147_483_647>;
+        assert_eq!(
+            UnivariatePolynomial::<F>::from_zeros(&[]),
+            UnivariatePolynomial::<F>::one()
+        );
     }
 
     /// Every node is the product of exactly the leaves beneath it, which is the invariant both
@@ -373,7 +467,7 @@ mod tests {
                 for (index, node) in nodes.iter().enumerate() {
                     let start = index * span;
                     let end = (start + span).min(n);
-                    let expected = UnivariatePolynomial::<F>::from_zeros(&xs[start..end]);
+                    let expected = crate::test_support::product_of_linear_factors(&xs[start..end]);
                     assert_eq!(
                         *node, expected,
                         "n = {}, level {}, node {}",
