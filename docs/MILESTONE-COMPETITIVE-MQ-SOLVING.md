@@ -1,4 +1,4 @@
-# M27 — Competitive MQ Solving and Published-Instance Frontier
+# M27 — Competitive MQ Solving
 
 **Measured at:** publication bound `2205c7db`…`5e1b8ea9` — the commits that published these figures,
 recovered from git rather than recorded at the time ([§10](research/external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)).
@@ -44,10 +44,12 @@ What has landed and is *not* recorded in M26's plan:
 | landed | the figure | where it is recorded |
 |---|---|---|
 | the Euclidean remainder sequence in `src/` | **2 094x** at order 1 458 (137x at 162, 649x at 486); fitted exponent **1.8452** against dense's 2.9431 ± 0.0183 | `structured-sylvester.md:370-392` |
-| `rf4-rp2` run and **solved** | `verified_witness`, **328.219 s**, peak RSS **825 307 136 B** | `research/scoreboard/runs/poseidon31-cico-t16-rf4-rp2--resultant--slice-12-fixed--seed-1---c32--ad7ec4a.json` |
 | #351's root finding at degree 59 049 | `roots` **153.2 s** — **46% below** the ~285 s extrapolation; deflation **0.50 s** | `graeffe-root-finding.md:1988-2016` |
 | #304 / #437, basis held once | `mq-random-10` **29 919 → 29 011 ms**, ~3% | commit `92a262d` |
 | #395 / #409, `max_wall_time` honored during interreduction | — | commit `e6161d6` |
+
+*One row — the `rf4-rp2` Poseidon witness and its scoreboard record — was moved out with the
+cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 What has **not** landed, and what each absence costs M27:
 
@@ -200,30 +202,8 @@ it gives ~386x.
 
 ### 1.2 The Fukuoka resource stop is stale, and its own research document says the question is open
 
-`fukuoka-mq-III-n20-seed0` is recorded as `stopped_at_limit`, `max_live_nonzeros` at degree 5:
-**20 001 424 entries needed against a limit of 20 000 000** — over by one part in 14 045 — at commit
-`b166e56`, 67.496 s, peak live nonzeros 12 212 087, matrix 10 297 x 10 147, 19 422 pairs reduced,
-1 278 elements added.
-
-That record **predates #305**. At the time it was taken, the run reached **13 996 MB** resident and
-then refused on a 186 MB matrix: 88.4% of peak RSS was one `VecDeque<Monomial<20>>` in symbolic
-preprocessing, and the budgeted quantity — matrix entries — was **1.3%** of what the run cost.
-#305 moved the queue's high-water from 162 188 194 monomials to **40 929** and peak RSS from
-13 996 MB to **1 496.5 MB**, 9.4x, and 7–10% faster.
-
-`f4-resource-scaling.md:623-628` then says, in terms:
-
-> The obstacle to the degree-5 batch was previously time **and** a 14 GB working set; it is now time
-> alone, at a working set an order of magnitude smaller. Whether a much longer budget and an
-> external supervisor would finish that batch is a question this document cannot answer and did not
-> previously have any reason to ask.
-
-And the target is known to exist: **Magma V2.19-9's F4 solved this exact instance — type III n=20
-seed 0 — in 259.27 s** on a 1 TB machine, 2015-03-20 (`fukuoka-mq.md:644`). That is not a comparand
-and licenses no ratio. What it establishes is better than a time: **the instance is solvable by F4
-on one machine.**
-
-**This is M27's single most actionable frontier finding, and it costs one short run to act on.**
+*This section (the Fukuoka challenge frontier finding) was moved out with the cryptanalysis research
+in #668; it is preserved at commit 9532a9a2.*
 
 ### 1.3 Two claims in circulation that this plan corrects
 
@@ -253,16 +233,15 @@ letting two agents discover it separately. The reopening for interreduction is #
 
 ## 2. Objectives
 
-1. **Complete an externally specified, independently verified challenge instance beyond Zeebra's
-   current frontier** — `fukuoka-mq-III-n20-seed0` first, after a cheap re-diagnosis establishes
-   what now binds it.
+1. *An objective on a published challenge instance was moved out with the cryptanalysis research in
+   #668; it is preserved at commit 9532a9a2.*
 2. **Deliver a measured 2x end-to-end improvement on `mq-random-10`** with a bit-identical reduced
    basis, or a recorded verdict naming the measured term that refuses it.
 3. **Establish whether Zeebra's F4 does asymptotically more work than a comparand on the same
    ideal.** This is one cheap measurement and it determines whether any data-structure work can
    reach parity.
-4. **Complete the Fukuoka GF(2^8) representation, import, answer-parse and oracle path**, so types
-   II and V become reachable at all.
+4. *An objective on the Fukuoka challenge import path was moved out with the cryptanalysis research
+   in #668; it is preserved at commit 9532a9a2.*
 5. **Extend the competitive corpus to a second reference field and a second comparison task**, so
    the board measures more than one prime and more than one objective.
 6. **Take one algorithmic decision on evidence** — one bounded prototype, or an explicit record that
@@ -288,8 +267,9 @@ any of it be believed.
 | **Bit-packed GF(2) / GF(2^e) linear algebra (#272)** | Real and well-sized — one bit of information occupies 16 bytes, and the kernel is fully generic with no char-2 path. But **Zeebra's importable Fukuoka types are III and VI, both GF(31)**, so it does not help the frontier this milestone targets. The GF(2) types are not importable. Carried as the first M28 candidate |
 | **GPU and out-of-core (#69, #86–#89, #225)** | No named kernel, workload, predicted benefit or benchmark. Unchanged from M26 |
 | **Griffin/FreeLunch (#202, #306)** | Buys one family. Deferred, not rejected |
-| **A second Poseidon parameter combination** | `rf4-rp4` ≥ 490.5 d and `rf6-rp0` 16.15 h; and the row that is reachable was already taken in M26. M27 adds Poseidon work only as #410's guard correction, which is a safety fix |
-| **`rf6-rp0` and eight-round rows** | Unchanged: four walls, three of them serial quadratic stages |
+
+*Two rows on further Poseidon round counts and their cost projections were moved out with the
+cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 ---
 
@@ -310,7 +290,7 @@ any of it be believed.
 | #415 | M27-B | `parse_answer` has no error channel at all, so a hex answer yields nine wrong coordinates silently |
 | #421 | M27-B | A `Gf256Mq` arm in the oracle dispatch. **Not a one-line change**, see §5.3 |
 | #420 | M27-B | Generate from `(type, n, seed)` rather than retaining bytes. Achievable exactly for types I–III |
-| #70, #197 | M27-B | The Fukuoka parents. **#70 closed 2026-11-08**: its F4 baseline is recorded in `fukuoka-mq.md` §4 — 111 ms on the published type III `n = 10`, `D = 1`, the published answer recovered — and the "deferred" note described the M26 freeze window, not the state. #197 is its successor and names #414/#415 as blockers of its GF(2^8) half, both since merged |
+| #70, #197 | M27-B | The Fukuoka parents. **#70 closed 2026-11-08**: its F4 baseline is recorded in fukuoka-mq.md §4 (moved out in #668) — 111 ms on the published type III `n = 10`, `D = 1`, the published answer recovered — and the "deferred" note described the M26 freeze window, not the state. #197 is its successor and names #414/#415 as blockers of its GF(2^8) half, both since merged |
 | #425 | **M27-C, first** | `text_instance` labels an instance with a characteristic it did not generate over. Blocks #426, and affects **three** constructors, not the two the issue names — §5.4 |
 | #426 | M27-C | GF(32003). Larger than it looks: it is what makes msolve an **eliminant** comparand for the first time — §5.4 |
 | #424 | M27-C | Extend the Katsura and Cyclic ladders to the published rungs |
@@ -371,12 +351,8 @@ to register anything and recommends challenge C's *shape* as the first step).
 relies on that policy in §5.3 for the Fukuoka "no grant" class, so whoever opens that PR should know
 M27 cites it. Both are M27-I's to raise, not M27's to do.
 
-**#200 is not deferred and is not an M27 objective.** It is an owner decision point with a clock:
-the Poseidon Attack Reward Program 2026 requires a paper public on ePrint by **2026-12-31**, and its
-bar is an improvement to previously published attacks. M26 already recorded that **a faster
-implementation of an established algorithm does not qualify**. M27 schedules no submission, makes no
-submission, and does not treat a prize as an optimization objective. The decision is preserved and
-left to the owner.
+*A paragraph on an attack reward programme was moved out with the cryptanalysis research in #668; it
+is preserved at commit 9532a9a2.*
 
 ### 4.4 Shared code areas that make concurrent implementation unsafe
 
@@ -427,25 +403,10 @@ label:
    Amdahl ceiling M27-A's entire target rests on is therefore inherited rather than current, and
    this is the measurement that fixes it. Until then, 80.4% and 5.10x are carried as **pre-#437**
    figures and labelled so.
-2. **The cryptanalysis frontier, by class, never summed.** `Official`: the hardest completed is a
-   Fukuoka toy example published with its answer. `FaithfulReduction`: `poseidon31-cico-t16-rf4-rp2`.
-   `Engineering`: the three planted Poseidon rows. The scoreboard's own rule — "the three classes
-   are never added together" — is what this table exists to respect.
-3. **The `rf4-rp2` row, from the retained record and from nothing else.** There are currently
-   **three** inconsistent cost tables for it, and M27-0 picks one and says so:
-
-   | term | **retained record** (`ad7ec4a`) | #410's re-costing | the figure in circulation |
-   |---|---:|---:|---:|
-   | total | **328.219 s** | — | 362 s |
-   | generation / symbolic | **289.374 s (88.2%)** | 324.0 s (73%) | 320.8 s |
-   | determinants / sampling | **6.535 s** | 65.5 s *core* | 6.57 s |
-   | interpolation | **29.323 s** | 36.0 s *extrapolated* | 31.7 s |
-   | off-domain validation | **2.774 s** | 18.6 s | — |
-   | root finding | **0.212 s** | 0.5 s | 0.19 s |
-   | peak RSS | **825 307 136 B** | — | ~726 MB |
-
-   The retained record is authoritative. The others are a core-time re-costing and an unretained
-   run, and they are kept beside it rather than erased — the cost-model register's append-only rule.
+2. *An item on the cryptanalysis frontier by class was moved out with the cryptanalysis research in
+   #668; it is preserved at commit 9532a9a2.*
+3. *An item reconciling the `rf4-rp2` Poseidon row's cost tables was moved out with the
+   cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 4. **Each selected target's barrier**, by stage reached and the actual reason for stopping. Runtime
    alone is not an indicator of progress toward a solution.
 5. **The competitive baseline per engine**, now that #435 has merged: the `7adb29e` cohort's walls
@@ -608,92 +569,8 @@ differential oracle for the new one.
 
 ### 5.3 M27-B — the Fukuoka frontier, and the GF(2^8) path
 
-**Issues:** #453 (the re-diagnosis), #322 (prerequisite), #414, #415, #421, #420, #454, #70, #197.
-**Primary files:** `src/grobner/research/mq.rs`, `src/fields/`, `src/grobner/differential/`,
-`examples/mq_challenge.rs`, `tools/fetch-mq-challenge.sh`.
-
-**Step 1 — re-diagnose III n=20 before authorizing anything.** #322 lands first, because the
-effective limit is `min(max_live_nonzeros, max_live_bytes / 16)` and both knobs are 20 M at the
-default, so raising one does nothing. And #322 is now **three** budgets, not two: its own comments
-record `max_matrix_rows` discovered by a separate refusal, so "three of F4's four relevant budgets
-[were] discovered by separate refusals". **The remedy M27 wants from #322 is its option 5 — a
-pre-flight that reports every budget a configuration would cross** — because a diagnosis that
-discovers the second barrier by hitting it has to be run again.
-
-#322 also reaches further than this workstream: it is **a cliff sitting where the interesting
-problems are.** Three independent workloads brush the same default from the other side — Anemoi
-`N = 6` over by one part in 178 571, `mq-random-10` by one in 72 202, and
-`poseidon31-cico-t16-rf4-rp2` by one in 2 222, whose *as-generated* row consequently reads
-`no verified witness` on the published scoreboard. For comparison, Magma's published run on the
-same Anemoi `FCICO N = 6` row peaks at 173 808 x 189 401, **inside** the 200 000 Zeebra refused at.
-
-Then one supervised run at current `main`, under `tools/benchlock.sh` with `tools/rss-guard.sh`
-watching the measured binary by `comm` and `--kill-pid`, never `pgrep -f`. Report: what binds now,
-at what degree, with what peak RSS and what attribution. The old record reached its stop in 67.5 s,
-so the diagnostic is cheap.
-
-**The outcome decides the rest of the workstream, and the branches are keyed to issues:**
-
-| what binds | consequence |
-|---|---|
-| time alone, with a working set in the low GB | a costed single run with an owner authorization under §9, targeting the first **official-class** completion in the registry |
-| the entry budget again, now agreeing with the resource consumed | the barrier is matrix size at degree 5; M27-D's gate acquires its instance, and XL (#76) acquires external support |
-| the basis held twice (60.4% at the degree-5 rung) | a representation question, and it is M27-A's — the two workstreams converge |
-| something unmeasured | the diagnosis is the deliverable, and no large run is authorized |
-
-**Step 2 — the GF(2^8) path, which is three coupled changes and not three independent ones.**
-
-- **#414 is two changes that must land together.** `MqField::parse` matches only `"GF(2)"`,
-  `"GF(256)"`, `"GF(2^8)"`, so the real header `GF(2)[x] / x^8 + x^4 + x^3 + x^2 + 1` is rejected;
-  and coefficients are parsed with `token.parse::<u64>()` with a `value > order` range check.
-  **Relaxing the header without switching to base 16 turns a loud `BadHeader` into a silently wrong
-  system**, because `08`, `13` and `99` all parse as decimal and pass the range check.
-  `MqField::parse` is also private, so nothing can opt in today.
-- **The modulus is `0x11D`, not AES's `0x11B`**, and this is settled from the data rather than
-  argued: type II n=10 seed 0's published answer makes **20 of 20** polynomials vanish under
-  `0x11D` and **0 of 20** under `0x11B`, reproduced across all five seeds at n=10, n=15 seed 0, and
-  type V n=5 all five seeds. The fields are isomorphic and the arithmetic differs on more than
-  50 000 of the 65 025 nonzero operand pairs. `fields::Gf256Mq` already exists and is already
-  asserted distinct from `Gf256`. **An order check cannot catch a mix-up** — `order_limbs() == [256]`
-  accepts either.
-- **#415 has no error channel.** `parse_answer` splits on non-digits and returns a bare `Vec<u64>`,
-  so a hex answer silently yields the wrong number of wrong values.
-- **#421 is not a one-line arm.** `test_the_fixtures_cover_every_field_and_variable_count` requires
-  a fixture for every member of `SUPPORTED_FIELDS`, so a `Binary { modulus: 0x11D }` arm needs a
-  `FIXTURES_GF256_MQ` table generated against Singular in the same change, and **three** separate
-  field lists updated: `check.rs:42-50`, the `by_field!` and `verify_by_field!` macro arms, and
-  `sweep.rs:508-516`. `CaseField::binary(0x11D)` already exists and already matches `Gf256Mq`
-  correctly.
-
-**Step 3 — provenance, and regeneration rather than retention.** The Fukuoka data is the sole
-occupant of the provenance policy's **"no grant"** class: "All Rights Reserved", no licence,
-may be read locally and **may not be redistributed, vendored, or committed.** What may be retained
-is checksums, derived facts, and run records. So #420's generator is the right shape — and it is
-**partly impossible**, which the schema must express:
-
-- The recipe is exact for types I–III and reproduces coefficient-for-coefficient (verified at
-  **zero mismatches in 27 530 coefficients** across all six types).
-- For signature types IV–VI the official `generateCoef_sig.h` consumes one extra π value per
-  polynomial, desynchronizing every later polynomial, so **the constant column is not reproducible**
-  and `guidance`'s claim that the signature verifier checks the constants is false.
-- The shipped GF(31) verifier additionally has a `while (coef == 31)` rejection loop the published
-  data does not have, so it disagrees with reality on **1 214 of 1 300** coefficients at n=10.
-- A corpus entry for this source is therefore `(type, n, seed)` + π's digest + the instance's
-  digest — **two unrelated artifacts, both needing a place** — and a non-prime field's modulus must
-  be **mandatory** rather than optional, because order alone is ambiguous between two different
-  problems.
-
-**Step 4 — the dimension ladder.** `SUPPORTED_DIMENSIONS` is `[10, 15, 20]`, the toy sizes. The
-smallest *real* challenge in an importable type is **type VI m=16 → n=24** (the generator computes
-`n = floor(3m/2)`). Reaching it is a const-generic dispatch addition, and it is what turns the
-Fukuoka work from toy-example reproduction into challenge participation.
-
-**What this workstream may not claim.** That a slice result is a result about the instance — type VI
-n=10's witness is `slice(3 fixed, seed 7)` and must stay labelled. That type VI n=15 found no
-solution — its outcome is `stopped_at_limit`, "all 8 slices stopped at a resource limit, so none of
-them tested whether it contains a solution", and `success_rate_basis_points` is deliberately `None`.
-That crossing a larger degree is nearer a solution — `SCOREBOARD.md:87` says the degree table is a
-diagnostic, not a progress bar. And no ratio against Magma's 259.27 s, ever.
+*This workstream (the Fukuoka challenge frontier and its import path) was moved out with the
+cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ### 5.4 M27-C — a second field, a second task, and the corpus defects
 
@@ -907,15 +784,8 @@ it.
 
 ### 6.3 Gate M27-B — the diagnosis authorizes the run, not the other way round
 
-#322 lands before the re-diagnosis, because the coupled cap makes a one-knob change a no-op.
-The re-diagnosis lands before any large run is costed. **A run is authorized by a cost model that
-includes its dominant term** — #410 exists because one did not — and by an owner decision recorded
-before launch.
-
-The GF(2^8) path is gated on its own correctness, in this order: **#414's two halves together**
-(header and base-16, because either alone is worse than neither), then **#415's error channel**,
-then **#421's arm plus its fixture table**. A published instance must parse, and a malformed or
-mismatched one must fail explicitly.
+*This gate (M27-B's Fukuoka run authorization) was moved out with the cryptanalysis research in
+#668; it is preserved at commit 9532a9a2.*
 
 ### 6.4 Gate M27-C — #425 before #426 before the second task
 
@@ -1000,9 +870,9 @@ writers.
 
 | agent | worktree | branch | issues | primary files |
 |---|---|---|---|---|
-| **BASELINE** | `zb-m27-baseline` | `docs/m27-baseline` | #451, #318, #319, #410, #412 | `docs/research/` (new baseline note), `examples/resultant_cico.rs`, `research/cost-model/` |
+| **BASELINE** | `zb-m27-baseline` | `docs/m27-baseline` | #451, #318, #319, #410, #412 | `docs/research/` (new baseline note), `examples/resultant_cico.rs` and `research/cost-model/` (both moved out in #668) |
 | **NORMALFORM** | `zb-m27-normalform` | `perf/m27-normal-form` | #452, #447, #440, #436, #331, #317 | `src/poly/multivariate/**`, `src/grobner/buchberger.rs`, `benches/sparse_polynomial.rs`, `benches/f4_stages.rs` |
-| **FUKUOKA** | `zb-m27-fukuoka` | `feat/m27-fukuoka` | #322, #453, #414, #415, #421, #420, #454 | `src/grobner/research/mq.rs`, `src/fields/`, `src/grobner/differential/**`, `examples/mq_challenge.rs` |
+| **FUKUOKA** | `zb-m27-fukuoka` | `feat/m27-fukuoka` | #322, #453, #414, #415, #421, #420, #454 | `src/grobner/research/mq.rs` and `examples/mq_challenge.rs` (both moved out in #668), `src/fields/`, `src/grobner/differential/**` |
 | **CORPUS** | `zb-m27-corpus` | `feat/m27-corpus` | #425, #426, #456, #424, #428, #427, #429, #332, #341, #385, #386, #446 | `src/grobner/external/**`, `examples/competitive_sweep.rs`, `research/competitive/` |
 | **RESEARCH** | `zb-m27-research` | `research/m27-algorithms` | #457, #74, #76, #273, #442, #439, #441 | `docs/research/` (new notes), `src/grobner/f4/mod.rs:356` for #442 only |
 | integration | orchestrator checkout | — | #458, #334, #335 | **this document**, `README.md`, scoreboard and competitive regeneration, runner contracts |
@@ -1035,7 +905,7 @@ writers.
 | **#447** | **live**, `agent:claimed` | M27-A's gate 0 is **already being worked**. NORMALFORM must `verify` before claiming it and should start from #440 stage 1 if it is still held |
 | **#425** | **live**, `agent:claimed` | M27-C's first step is **already being worked**. CORPUS starts from #426's preparation and waits |
 | #369 | live | `goofy-questing-lagoon@feat/369-populate-competitive-board` — this is PR #435. **M27 does not touch it** |
-| #70 | **closed** | was `zb-r3-prov@docs/70-fukuoka-mq-provenance`, with "F4 baseline deferred (machine frozen for M26)". That lease went stale and the branch was never pushed; the baseline it deferred had meanwhile landed in `fukuoka-mq.md` §4, so #70 closed on evidence rather than being re-worked. FUKUOKA treated it as a parent, not as work |
+| #70 | **closed** | was `zb-r3-prov@docs/70-fukuoka-mq-provenance`, with "F4 baseline deferred (machine frozen for M26)". That lease went stale and the branch was never pushed; the baseline it deferred had meanwhile landed in fukuoka-mq.md §4 (moved out in #668), so #70 closed on evidence rather than being re-worked. FUKUOKA treated it as a parent, not as work |
 
 A board-membership audit at `d9121c0` suggested several open issues were missing project rows.
 **That reading was wrong, and the cause is now fixed:** #448 was `orient`'s open-issue read not
@@ -1093,10 +963,8 @@ reached its stop in 67.5 s; the supervised re-run is budgeted at **≤ 30 min wa
 exceeding either terminates it); #426's and #424's corpus sweeps at their rung sizes; any
 `competitive_sweep --measure` row at an existing rung.
 
-**Not authorized without a fresh decision:** any Fukuoka III n=20 completion attempt (unbudgeted
-until the re-diagnosis returns — Magma's 259.27 s on a 1 TB machine is not a budget for this
-machine); any type VI n=15 campaign past the diagnostic; `rf6-rp0` (16.15 h); every eight-round row
-(`rf4-rp4` ≥ 490.5 d); any Anemoi rung past `N = 6`.
+*The list of challenge campaigns and round-count projections not authorized was moved out with the
+cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ---
 
@@ -1104,17 +972,16 @@ machine); any type VI n=15 campaign past the diagnostic; `rf6-rp0` (16.15 h); ev
 
 **Minimum.**
 
-1. M27-0's baseline frozen with commits, affinity and machine, and the `rf4-rp2` row resolved to one
-   authoritative table.
+1. M27-0's baseline frozen with commits, affinity and machine.
 2. ~~#447's work counts measured~~ — **met before implementation began** (`a1867a7`): the counts
    agree, the 344x decomposes into 4.89x / 5.03x / 14.0x, and the JIT question is settled at ~2%.
 3. §5.2a's matrix interreduction landed with a bit-identical reduced basis and the stage share
    re-measured, **or** a recorded verdict naming what refused it; and #440 stage 1's counters on
    record settling whether `normal_form`'s cost is swell or scan.
-4. The Fukuoka III n=20 barrier re-diagnosed at current `main`, with #322 landed, and what binds it
-   named with its attribution.
-5. The Fukuoka GF(2^8) path complete: #414's two halves, #415's error channel, and #421's arm with
-   its fixture table — a published instance parses, and a malformed one fails explicitly.
+4. *A criterion on the Fukuoka III n=20 barrier was moved out with the cryptanalysis research in
+   #668; it is preserved at commit 9532a9a2.*
+5. *A criterion on the Fukuoka GF(2^8) import path was moved out with the cryptanalysis research in
+   #668; it is preserved at commit 9532a9a2.*
 6. #425 fixed and #426 landed, so the corpus has a second reference field.
 7. #428's floor-free statistic implemented, or a recorded refusal on its resolution.
 8. #318/#319 resolved or explicitly bounded; the board and documentation truthful.
@@ -1126,9 +993,8 @@ machine); any type VI n=15 campaign past the diagnostic; `rf6-rp0` (16.15 h); ev
   naming the measured term that refuses it. §5.2a's estimate is **~5.0x**, which would land ahead of
   Singular on this row; 2x is the criterion because a ceiling bounds the conceivable, not the
   achievable.
-- **One previously uncompleted published Fukuoka instance verified**, ideally
-  `fukuoka-mq-III-n20-seed0`, independently verified against the published coefficient vectors —
-  **or** a costed, authorized attempt whose stop reason is measured and attributed.
+- *A criterion on completing a published Fukuoka instance was moved out with the cryptanalysis
+  research in #668; it is preserved at commit 9532a9a2.*
 - A **measured narrowing of one competitive gap** on a workload clear of the startup floor, at
   task equivalence, with the invariants agreed.
 - M27-D's gate taken: one bounded prototype chosen with its cost-benefit on record, **or** an
@@ -1138,11 +1004,10 @@ machine); any type VI n=15 campaign past the diagnostic; `rf6-rp0` (16.15 h); ev
 
 - Competitive parity or a lead over an established system on a substantial workload under equivalent
   conditions, full correct computation, task-equivalent.
-- A verified solution to a cryptanalysis instance materially beyond Zeebra's previous frontier —
-  which for the **official** class means the first such completion in the registry.
 - An algorithmic advance that changes the practical resource-scaling behaviour on real MQ problems,
   demonstrated end to end.
-- A reproduction or meaningful improvement of a published cryptanalytic attack.
+- *Two criteria on cryptanalysis instances and published attacks were moved out with the
+  cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 **A kernel-level win alone does not satisfy the stretch criterion**, and neither does exhausting the
 5.10x ceiling — that would put Zeebra ahead of Singular and still 17x–68x behind three other
@@ -1163,8 +1028,6 @@ parity is reachable by implementation at all.
 - That Groebner.jl's ratios are precise, while whether Julia's JIT lands inside its inner timer is
   unestablished. Direction and order of magnitude only.
 - That a slice result is a result about the instance it was sliced from.
-- That type VI n=15 has no solution. Eight slices crossed a resource limit, so **none of them tested
-  whether it contains one**, and the success-rate interval is deliberately absent.
 - That crossing a larger degree is nearer a solution.
 - That a memory reduction is a frontier extension unless the resource stop actually moved.
 - Any ratio against Magma's wall clock, at any date, on any instance.
@@ -1172,9 +1035,8 @@ parity is reachable by implementation at all.
 - A ratio across the #318/#319 boundary without its ~20% systematic stated.
 - A microbenchmark improvement reported as a share of a stage, or a stage share reported as a
   speedup.
-- That an engineering surrogate's or faithful reduction's witness is evidence about an official
-  problem. The three classes are never added together.
-- That M27 advanced the Poseidon round count. It does not attempt to.
+- *Three non-claims about challenge instances, scoreboard classes and Poseidon round counts were
+  moved out with the cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 ---
 
@@ -1187,13 +1049,13 @@ parity is reachable by implementation at all.
 | **The matrix interreduction pass costs more than the 170 ms estimated** | **moderate** | part of factor B's 5.03x | The estimate is Groebner.jl's 1.74 ms scaled by Zeebra's own 97.1x per-operation constant, which is the best-grounded stage estimate in the repository — but it is an estimate. The division route is retained, so a loss is recorded and reverted rather than shipped |
 | **#440 stage 1 returns "none of them"** | moderate | M27-A's 2x target | That is a complete result and closes the issue cheaply. The 80.4% then needs #436's candidates 2–3 or an algorithmic answer, which routes to M27-D |
 | **#447 shows Zeebra does asymptotically more work** | **moderate-to-high** | the parity half of M27-A, permanently | Stated in advance in §6.2 so it cannot be re-interpreted afterwards. It *strengthens* M27-D and hands it an instance |
-| III n=20 is still entry-bound after #322 | moderate | the frontier target | The diagnosis is itself a deliverable, and it names the barrier for M27-D and for M28 |
-| III n=20 is time-bound and the time is very large | moderate | the frontier target | No authorization without a cost model including the dominant term; Magma's 259.27 s is not a budget for this machine |
 | #317's monomial change has a 53-file blast radius | high if attempted | schedule, and merge conflicts across the repo | Last in NORMALFORM's sequence, gated twice, and never concurrent with anything |
-| #421's fixture table is larger than "one arm" | **certain** | FUKUOKA's schedule | Planned for in §5.3 as three coupled changes with a fixture-generation step |
 | Two agents measure simultaneously | moderate | a silently wrong figure, the worst failure mode here | `tools/benchlock.sh` is mandatory and machine-wide; overlapping `START..END` windows are a machine-checkable proof the protocol was violated |
 | The board is filled by weakening the floor | low | the credibility of every row | The floor is in code, not prose, and `is_publishable()` is the conjunction of both gates |
 | **The milestone delivers only negative results** | moderate | the headline | Four of them would be genuinely valuable — #447's work-count answer, #440 stage 1's verdict, #453's barrier, and #457's refusal — and §10's Minimum is written so that all four count |
+
+*Three risks on the Fukuoka frontier run and its import path were moved out with the cryptanalysis
+research in #668; they are preserved at commit 9532a9a2.*
 
 ---
 
@@ -1206,12 +1068,11 @@ parity is reachable by implementation at all.
 | Solve without a final reduced basis | Not task-equivalent to a reduced-basis comparison | A protocol that can report it as its own task without conflation |
 | Griffin/FreeLunch (#202, #306) | Buys one family | A generalization, or a witness it uniquely reaches |
 | Boolean/SAT (#218–#221) | Formulation work first | A defined key-recovery workload and a comparison protocol that survives review |
-| MinRank (#206, #207) | Its own document registers nothing deliberately | Challenge C's *shape* as the single target — `GF(65521)`, one rank check, and four independent published non-timing quantities to check against |
-| HFE Challenge 1 (#198) | 80 Boolean variables, and the GF(2) path is unwritten | #272 plus an importable GF(2) route |
 | GPU / out-of-core (#69, #86–#89, #225) | No named kernel, workload, predicted benefit, benchmark | All four |
-| `rf6-rp0`, eight-round rows | 16.15 h / ≥ 490.5 d | Four walls, three of them serial quadratic stages |
 | Multigraded Hilbert series | `HilbertSeries` is single-graded — one numerator, one variable count, one degree argument — and `MonomialOrder` has three variants with no weighted or block order | #207 naming a workload that needs it |
-| Poseidon Attack Reward Program (#200) | Requires a public ePrint paper by 2026-12-31 and an improvement to published attacks; a faster implementation of an established algorithm does not qualify | An owner decision. Tracked separately and **not a dependency of anything in M27** |
+
+*Four rows — MinRank, HFE, further Poseidon round counts and an attack reward programme — were moved
+out with the cryptanalysis research in #668; they are preserved at commit 9532a9a2.*
 
 **Initial M28 hypotheses, to test once M27's results exist:**
 
@@ -1220,10 +1081,10 @@ parity is reachable by implementation at all.
    testable by #317's microbenchmark plus #440 stage 1's comparison region.
 2. If the counts disagree, then pair handling and symbolic preprocessing set the gap, and HDF4 at
    scale (#74) and reduced Macaulay dimensions become the M28 program.
-3. If III n=20 is time-bound at a low-GB working set, then a long supervised run is the cheapest
-   frontier extension available and the barrier is scheduling rather than algorithms.
-4. If III n=20 is matrix-size-bound at degree 5, then XL (#76) has both external evidence and a
-   measured local bottleneck, which is more than any candidate has had so far.
+3. *A hypothesis on the Fukuoka III n=20 run was moved out with the cryptanalysis research in #668;
+   it is preserved at commit 9532a9a2.*
+4. *A hypothesis on XL against the Fukuoka III n=20 barrier was moved out with the cryptanalysis
+   research in #668; it is preserved at commit 9532a9a2.*
 5. Variable ordering at 1.6x–1.7x may be the best unclaimed lever in the repository, and an
    order-specific default is the shape M22-A's and M22-E's measurements jointly imply.
 
@@ -1240,7 +1101,6 @@ parity is reachable by implementation at all.
 # M27-0: what is on main, measured nowhere else
 cargo run --release --example f4_profile -- mq          # the #349 split, digest-pinned
 cargo run --release --example competitive               # render only; measures nothing
-cargo run --release --example scoreboard -- render --write
 
 # M27-A gate 0 (#447) and stage 1 (#440). On the lock, pinned, flags verified not assumed
 cargo build -v 2>&1 | grep target-cpu                   # must show x86-64-v3
@@ -1249,14 +1109,7 @@ RUSTC_WRAPPER="" ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0 \
   cargo run --release --example f4_profile -- mq
 cargo bench --bench sparse_polynomial -- normal_form    # the microbench that cannot settle a stage
 
-# M27-B: the published instances, and the re-diagnosis
-tools/fetch-mq-challenge.sh                             # fetches; redistributes nothing
-tools/fetch-mq-challenge.sh --verify
-ZEEBRA_MACHINE=workstation ZEEBRA_AFFINITY=0-7 \
-  tools/scoreboard.sh mq fukuoka-mq-III-n20-seed0 --write
-cargo run --release --example mq_challenge
-cargo test --lib grobner::research::challenge           # the registry's freeze and faithfulness
-cargo test --lib grobner::research::scoreboard          # the refusals
+# M27-B's commands (the scoreboard, the MQ challenge fetcher and importer) moved out in #668
 
 # M27-C: the competitive board. Measurement and rendering are separate binaries,
 # and only --measure gives an attributable peak RSS

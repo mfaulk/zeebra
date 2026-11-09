@@ -12,7 +12,6 @@ pub mod pairs;
 pub mod planning;
 pub mod record;
 pub mod reference;
-pub mod research;
 pub mod resultant;
 mod s_polynomial;
 pub mod shape_certificate;

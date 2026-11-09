@@ -101,25 +101,6 @@ cargo test --release --lib -- --ignored --exact \
     grobner::differential::tests::test_a_live_sweep_against_singular_agrees
 ```
 
-One more needs data this repository does not redistribute. The Fukuoka MQ Challenge files are
-"All Rights Reserved" with no stated licence, so the test against a genuine instance is opt-in for
-the same reason:
-
-```sh
-tools/fetch-mq-challenge.sh
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_a_published_instance_is_reproduced
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_real_n24_challenges_import
-# the three #197 added: the modulus oracle, the GF(2) families, and the two real m = 16 instances
-# checked against the answer vectors their 2015 solver published
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_published_answer_vanishes_only_under_the_challenges_modulus
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_published_gf2_instances_import
-cargo test --release --lib -- --ignored --exact \
-    grobner::research::mq::tests::test_the_real_m16_challenges_vanish_at_their_published_answers
-```
 
 ## Other external engines, for comparison
 

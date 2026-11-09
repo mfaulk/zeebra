@@ -6,9 +6,11 @@ recovered from git rather than recorded at the time ([§10](external-comparison-
 Reference for M22-0 (#74, #81). Every figure here comes from
 
 ```sh
-tools/fetch-mq-challenge.sh
 cargo run --release --example f4_degrees
 ```
+
+*The Fukuoka MQ instances were fetched with `tools/fetch-mq-challenge.sh` and the Poseidon systems
+built by the research module, both moved out in #668; those rows reproduce at commit 9532a9a2.*
 
 under `F4Options::recommended()` with `profile_degrees` and `measure_stages` set,
 `max_matrix_columns = 60_000` and `max_live_bytes = 400 MB` (slack: the effective live cap is the `min` of the two budgets, so `max_live_nonzeros` bound first at 20 000 000 entries — **320 MB** over these fields' 16-byte entry; #322, #469), grevlex throughout. Machine: 64-core
@@ -104,45 +106,8 @@ be kept apart. They are.
 
 ## 4. The controlled Poseidon comparison, and what it corrects
 
-`N − E = t − 2k`, so at `k = 1` the `t = 3` instance has one more variable than equation and the
-`t = 2` instance is square. M21's two nine-variable benchmarks are therefore **not the same kind of
-system**, and M21's report states the comparison as a finding about state width:
-
-> **nine variables solve at `t = 2` and fail at `t = 3`** — the same variable count, different
-> reach.
-> — `docs/MILESTONE-RESOURCE-AWARE-CRYPTANALYSIS.md` §9
-
-The controlled experiment adds the row that was missing: the same `t = 3` system with **one free
-input pinned to its planted value**, which matches the equation count without touching the round
-structure.
-
-| nine-variable instance | eqs | highest degree | peak MB | time |
-|---|---:|---:|---:|---|
-| `t=3 R_F=2 R_P=1`, as generated | 8 | 11 | 155.3 | **column budget crossed after 18.3 s** |
-| `t=3 R_F=2 R_P=1`, free input 0 pinned | 9 | 5 | 0.2 | **complete, 13.9 ms** |
-| `t=2 R_F=4 R_P=0` | 9 | 5 | 3.8 | complete, 367 ms |
-
-**The `t = 3` system is not hard because `t = 3`.** Pinned, it is the *easiest* of the three — 26
-times faster than the square `t = 2` instance and nineteen times smaller in peak entries, reaching
-degree 5 where it previously reached 11. What M21 measured as a state-width frontier is the
-underdetermined direction: one free coordinate takes the computation from degree 5 to degree 11 and
-from 0.2 MB to 155 MB.
-
-Two cautions on reading this:
-
-- The pinned system is pinned to a **planted** value, so a solution is known to exist on that
-  slice. The unpinned system is also planted and consistent, so both are satisfiable; what differs
-  is dimension, not solvability. Comparing either against an arbitrary-target CICO challenge would
-  be comparing different distributions.
-- `classify_ideal` on the pinned system's computed basis reports **zero-dimensional**, so the
-  dimension is read off a basis rather than inferred from the variable count. Fixing one variable
-  does not by itself prove zero-dimensionality, which is why the program reports the
-  classification rather than asserting it.
-
-The same pattern holds on Fukuoka type VI, where it is less dramatic but in the same direction:
-as published (`n − m = 3`) the column budget is crossed after 2.8 s at 84.7 MB; with three
-variables pinned at seed 1 the same instance completes in 465 ms at 4.0 MB. Both reach degree 9,
-so here the specialization does not lower the degree — it lowers the width at each degree.
+*§4 (the controlled comparison of the nine-variable Poseidon instances against M21's state-width
+frontier) was moved out with the cryptanalysis research in #668; it is preserved at commit 9532a9a2.*
 
 ## 5. Round count at fixed state width
 
@@ -216,8 +181,7 @@ be credited with "the criteria fired more often".
 ## 9. Reproducing
 
 ```sh
-tools/fetch-mq-challenge.sh                        # type III and VI toy examples, not redistributed
-cargo run --release --example f4_degrees            # every table above
+cargo run --release --example f4_degrees            # the classical rows; see the note at the top
 cargo test --lib grobner::f4::degrees               # the attribution identities
 cargo test --lib test_the_degree_profile_reconciles_with_the_totals
 ```

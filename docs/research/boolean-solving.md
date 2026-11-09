@@ -20,9 +20,9 @@ deliberately not taken.
 ## 1. The blocker everyone was waiting on had already cleared
 
 Five issues were scoped against a claim that was false when they were written.
-`docs/research/additional-benchmarks.md` §5 said LowMC was "**Blocked, and on an interface rather
+`docs/research/additional-benchmarks.md` §5 (moved out in #668) said LowMC was "**Blocked, and on an interface rather
 than on mathematics**… `src/fields/mod.rs` declares `mod binary_field;` — private, not exported";
-`docs/research/fukuoka-mq.md` §1 marked four Fukuoka types "**no** — … is private"; `MqField::Gf2`
+`docs/research/fukuoka-mq.md` §1 (moved out in #668) marked four Fukuoka types "**no** — … is private"; `MqField::Gf2`
 and `MqField::Gf256` refused with "**Not importable yet**: … is private".
 
 The export landed in `8757b4a` (2026-11-05). `src/fields/mod.rs` has `pub use` for
@@ -37,12 +37,12 @@ through `zeebra::fields::BinaryFieldElement` for a day before five issues were w
 not.
 
 **One of those claims was load-bearing in a test.**
-`grobner::research::mq::tests::test_the_binary_and_extension_fields_are_refused_by_name` asserted
+`grobner::research::mq::tests::test_the_binary_and_extension_fields_are_refused_by_name` (moved out in #668) asserted
 `because.contains("not publicly exported")`, so the stale reason was pinned by the suite and would
 have survived any amount of documentation editing. It now asserts the accurate reason *and* that the
 stale phrase is absent, so the claim cannot come back.
 
-Corrected: `docs/research/fukuoka-mq.md` §1 and §6, `docs/research/additional-benchmarks.md` §5 (as
+Corrected: `docs/research/fukuoka-mq.md` §1 and §6 (moved out in #668), `docs/research/additional-benchmarks.md` §5 (moved out in #668) (as
 a dated "superseded" note rather than a silent edit, since the section's reasoning is still worth
 reading), `MqField`'s two variant doc comments, and the two `MqError::UnsupportedField` reason
 strings.
@@ -111,7 +111,7 @@ isomorphic; **the arithmetic is different**, because the reduction is modulo dif
 
 Reading type II or type V coefficient bytes under `Gf256` would therefore construct a different
 system from the published one, with nothing about the result looking wrong. This is precisely the
-class of error `docs/research/fukuoka-mq.md` §2.1 guarded against for the monomial layout, which was
+class of error `docs/research/fukuoka-mq.md` §2.1 (moved out in #668) guarded against for the monomial layout, which was
 "verified rather than assumed" — the layout was checked at the time because a type III instance was
 being imported, and the field representation was not, because no `GF(2^8)` instance was.
 
@@ -155,7 +155,7 @@ published solving degree would have been incomparable. `grobner::field_equations
 **The consequence that makes it worth having is radicality.** `x^q - x` is squarefree and splits
 completely over `F_q`, so `dim F_q[x]/(I + <x_i^q - x_i>)` is *exactly* the number of `F_q`-rational
 points — counted once each, however many times they occur in `I`. A solution count becomes a
-machine-independent invariant, in the role `docs/research/additional-benchmarks.md` §3.2 gives
+machine-independent invariant, in the role `docs/research/additional-benchmarks.md` §3.2 (moved out in #668) gives
 Anemoi's quotient dimension.
 
 `the_quotient_dimension_counts_gf2_points_only_with_field_equations` checks it against a comparand
@@ -189,7 +189,7 @@ would reach anyway:
 |---|---:|---|---|
 | `GF(2)` — Fukuoka I/IV, LowMC, HFE, SAT4CryptoBench | 2 | — | **yes, essentially always** |
 | `GF(2^8)` — Fukuoka II/V | 256 | — | no |
-| `GF(31)` — Fukuoka III/VI | 31 | 4 to 9 (`docs/research/fukuoka-mq.md` §4) | **no** |
+| `GF(31)` — Fukuoka III/VI | 31 | 4 to 9 (`docs/research/fukuoka-mq.md` §4 (moved out in #668)) | **no** |
 | `GF(65521)` — Courtois MinRank A–C (#205) | 65521 | — | never |
 
 So the families this importer reaches **today** are exactly the ones that do not want field
@@ -354,7 +354,6 @@ cargo test --lib -- --exact grobner::tests::test_the_whole_pipeline_over_gf256
 cargo test --lib -- --exact grobner::tests::test_planted_degenerates_to_a_square_in_characteristic_two
 cargo test --lib -- --exact fields::binary_field::tests::test_the_two_degree_eight_moduli_are_different_fields
 cargo test --lib -- --exact fields::binary_field::tests::test_declared_moduli_are_irreducible
-cargo test --lib -- --exact grobner::research::mq::tests::test_the_binary_and_extension_fields_are_refused_by_name
 cargo test --lib -- --exact grobner::differential::tests::test_every_committed_fixture_agrees
 ```
 
@@ -390,14 +389,14 @@ cargo test --release --lib -- --ignored --exact \
   families now import — `Zp2`, `Gf256Mq`, `Zp31` — and `SUPPORTED_DIMENSIONS` gained `5` for the
   signature toys. The `0x11D`-versus-`0x11B` question is now a test rather than a recorded
   observation: 20 of 20 polynomials of type II `n = 10` vanish at the published answer under the
-  challenge modulus and 0 of 20 under the AES one. See `fukuoka-mq.md` §14.
+  challenge modulus and 0 of 20 under the AES one. See `fukuoka-mq.md` §14 (moved out in #668).
 - **#198 (A6, HFE Challenge 1)** — the `GF(2)` ladder is unblocked, and the `GF(2^8)` text input the
   ladder's upper rungs need now exists (§13), with a `GF(2^8)` differential oracle behind it (§14).
   HFE-80 remains far out of reach; the reduced `HFE n_D` rungs on Steel's page are the target.
 - **#206 (F2, MinRank modellings)** — gets the field-equation mechanism it needs for challenges D–F,
   and §5.1's rule says the mechanism is worthless for A–C over `GF(65521)`. That is the answer to
   F2's question 5 for the prime-field half, derived rather than assumed.
-- **Anemoi over `GF(2^n)`**, deferred in `docs/research/additional-benchmarks.md` §9 — unblocked at
+- **Anemoi over `GF(2^n)`**, deferred in `docs/research/additional-benchmarks.md` §9 (moved out in #668) — unblocked at
   the field level, and text input over `GF(2^8)` now works too (§13).
 - **#272 (H16)** — owns the per-nonzero measurement of §9, and its end-to-end judgement belongs back
   on #218.

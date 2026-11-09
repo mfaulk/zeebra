@@ -505,7 +505,6 @@ let f = UnivariatePolynomial::<Zp7>::new(&[Zp7::new(0), Zp7::new(1), Zp7::new(0)
 assert_eq!(is_permutation_polynomial(&f), None);
 ```
 
-This changes nothing about `grobner::research::poseidon`, whose `alpha` stays what each challenge
-specifies: a different exponent is a different cryptographic problem, not a variation on the same
-one. What these utilities are for is a sweep that varies `alpha` deliberately and measures what the
+A cipher's S-box exponent is part of its specification: a different exponent is a different
+cryptographic problem, not a variation on the same one. What these utilities are for is a sweep that varies `alpha` deliberately and measures what the
 solving degree does.

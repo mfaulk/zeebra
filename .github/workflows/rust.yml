@@ -126,14 +126,6 @@ jobs:
       # and sits on the critical path of every pull request. They reuse the build the steps above
       # already paid for, so running them after a merge — where latency blocks nothing — costs
       # almost nothing, and `workflow_dispatch` runs them against a branch on demand.
-      # The scoreboard's correctness-smoke tier, which M23's execution policy wants on every
-      # change. The four surrogate rows take under a second in release and exercise the whole
-      # staged pipeline end to end — registry, generator, F4, conversion, univariate search, and
-      # the independent verifier that runs the permutation. The lib tests cover the honesty rules;
-      # this covers the wiring between them. Nothing is written without `--write`.
-      - name: Scoreboard smoke tier
-        run: cargo run --profile ci-release --example scoreboard
-
       - name: Gröbner engines agree on the slow systems
         if: github.event_name != 'pull_request'
         run: |

@@ -17,7 +17,6 @@
 //! schedule; the third is the cross product on one instance.
 //!
 //! ```text
-//! tools/fetch-mq-challenge.sh                   # for the MQ rows; the rest runs without it
 //! cargo run --release --example f4_schedule
 //! cargo run --release --example f4_schedule -- list
 //! cargo run --release --example f4_schedule -- katsura-6
@@ -28,25 +27,20 @@
 //! cover the dense buffer, the column map, or allocator overhead — and a figure the budget omits
 //! should at least be visible.
 
-use std::{path::PathBuf, time::Instant};
+use std::time::Instant;
 
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::{
         benchmark_systems::{cyclic, katsura},
-        f4_with_options,
-        research::{CicoInstance, MqInstance, Poseidon, PoseidonParameters, KOALABEAR_PRIME},
-        F4Options, F4Statistics, PairSchedule,
+        f4_with_options, F4Options, F4Statistics, PairSchedule,
     },
     util::peak_resident_bytes,
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
-type Q = PrimeFieldElement64<31>;
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 type P = PrimeFieldElement64<2_147_483_647>;
 
-const C1: u64 = 0xC0_9DE4;
 const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
 
 /// The batch caps compared. `None` is the default — every pair of the lowest degree.
@@ -197,11 +191,8 @@ fn attempt<const N: usize, F: FiniteField>(
     }
 }
 
-/// The instances, each built at its own compile-time dimension.
-///
-/// A closure per instance rather than a vector of systems: the dimensions differ, so there is no
-/// one type to hold them in, and building the Poseidon ones eagerly would run the permutation for
-/// instances the caller did not ask for.
+/// The instances, by name: each is built at its own compile-time dimension, so there is no one
+/// type to hold them in.
 fn instances() -> Vec<&'static str> {
     vec![
         "katsura-4",
@@ -209,45 +200,8 @@ fn instances() -> Vec<&'static str> {
         "katsura-6",
         "cyclic-4",
         "cyclic-5",
-        "poseidon-t2-rf2-rp2",
-        "poseidon-t2-rf4",
-        "mq3-n10",
-        "mq3-n15",
+        "cyclic-6",
     ]
-}
-
-fn mq_directory() -> PathBuf {
-    std::env::var("ZEEBRA_MQ_DIR")
-        .unwrap_or_else(|_| "research/instances/mq".to_string())
-        .into()
-}
-
-fn load_mq(stem: &str) -> Option<MqInstance> {
-    let text = std::fs::read_to_string(mq_directory().join(stem)).ok()?;
-    MqInstance::parse(&text).ok()
-}
-
-/// A planted reduced CICO system at the given parameters.
-fn cico<const N: usize>(t: usize, r_f: usize, r_p: usize) -> Vec<MultivariatePolynomial<N, K>> {
-    let poseidon = Poseidon::<K>::new(PoseidonParameters {
-        prime: KOALABEAR_PRIME,
-        alpha: 3,
-        t,
-        r_f,
-        r_p,
-    })
-    .expect("R_F is even");
-    let free: Vec<K> = (0..t - 1).map(|i| K::new(1_000 + i as u64)).collect();
-    CicoInstance::planted(
-        poseidon,
-        1,
-        &[K::new(C1)],
-        &free,
-        Some(PoseidonParameters::bounty_cico()),
-    )
-    .expect("the right widths")
-    .system::<N>()
-    .expect("the right dimension")
 }
 
 /// Every schedule on one instance at one cap, with the bases asserted equal.
@@ -304,32 +258,7 @@ fn run_instance(name: &str) {
         "katsura-6" => schedule_sweep!(katsura::<6, P>(), GREVLEX, None, ""),
         "cyclic-4" => schedule_sweep!(cyclic::<4, P>(), GREVLEX, None, ""),
         "cyclic-5" => schedule_sweep!(cyclic::<5, P>(), GREVLEX, None, ""),
-        "poseidon-t2-rf2-rp2" => schedule_sweep!(cico::<7>(2, 2, 2), GREVLEX, None, ""),
-        "poseidon-t2-rf4" => schedule_sweep!(cico::<9>(2, 4, 0), GREVLEX, None, ""),
-        "mq3-n10" => match load_mq("ToyExample-type3-n10-seed0") {
-            Some(instance) => schedule_sweep!(
-                instance.system::<10, Q>().expect("ten variables"),
-                GREVLEX,
-                None,
-                ""
-            ),
-            None => {
-                println!("instance data absent; run `tools/fetch-mq-challenge.sh`.\n");
-                return;
-            }
-        },
-        "mq3-n15" => match load_mq("ToyExample-type3-n15-seed0") {
-            Some(instance) => schedule_sweep!(
-                instance.system::<15, Q>().expect("fifteen variables"),
-                GREVLEX,
-                None,
-                ""
-            ),
-            None => {
-                println!("instance data absent; run `tools/fetch-mq-challenge.sh`.\n");
-                return;
-            }
-        },
+        "cyclic-6" => schedule_sweep!(cyclic::<6, P>(), GREVLEX, None, ""),
         other => {
             println!("unknown instance `{}`; `-- list` names them.\n", other);
             return;
@@ -350,26 +279,7 @@ fn run_instance(name: &str) {
         "katsura-6" => cap_sweep!(katsura::<6, P>(), GREVLEX, PairSchedule::DegreeThenLcm),
         "cyclic-4" => cap_sweep!(cyclic::<4, P>(), GREVLEX, PairSchedule::DegreeThenLcm),
         "cyclic-5" => cap_sweep!(cyclic::<5, P>(), GREVLEX, PairSchedule::DegreeThenLcm),
-        "poseidon-t2-rf2-rp2" => {
-            cap_sweep!(cico::<7>(2, 2, 2), GREVLEX, PairSchedule::DegreeThenLcm)
-        }
-        "poseidon-t2-rf4" => cap_sweep!(cico::<9>(2, 4, 0), GREVLEX, PairSchedule::DegreeThenLcm),
-        "mq3-n10" => cap_sweep!(
-            load_mq("ToyExample-type3-n10-seed0")
-                .expect("present, checked above")
-                .system::<10, Q>()
-                .expect("ten variables"),
-            GREVLEX,
-            PairSchedule::DegreeThenLcm
-        ),
-        "mq3-n15" => cap_sweep!(
-            load_mq("ToyExample-type3-n15-seed0")
-                .expect("present, checked above")
-                .system::<15, Q>()
-                .expect("fifteen variables"),
-            GREVLEX,
-            PairSchedule::DegreeThenLcm
-        ),
+        "cyclic-6" => cap_sweep!(cyclic::<6, P>(), GREVLEX, PairSchedule::DegreeThenLcm),
         _ => Vec::new(),
     };
 

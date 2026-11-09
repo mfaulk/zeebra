@@ -104,7 +104,7 @@ GF(2^8) families. The two are isomorphic and the arithmetic differs: over the fi
 `0x57 * 0x83 = 0xc1` (FIPS-197 §4.2), over the second it does not, and more than fifty thousand of
 the 65025 nonzero operand pairs separate them. An order check cannot tell them apart — both have
 order 256 — so the field is named at the type level rather than inferred.
-`docs/research/fukuoka-mq.md` §2.4 has the consequence for importing an instance.
+The Fukuoka MQ Challenge files use the second, which is why an importer for them must name it.
 
 **An integer names an element of an extension field in two different ways, and the API keeps them
 apart.** `FiniteField::new` is the image of an integer under the unique ring homomorphism from the

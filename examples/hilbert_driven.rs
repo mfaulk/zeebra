@@ -3,47 +3,38 @@
 //! M22-C. Four things are measured on each instance, and keeping them apart is the whole point:
 //!
 //! 1. the **baseline**, uncapped;
-//! 2. **fixed caps**, which M22-A measured at 3.6x on Fukuoka type III `n=10` with no prediction
-//!    and no certification at all;
+//! 2. **fixed caps**, chosen with no prediction and no certification at all;
 //! 3. the **Hilbert-driven cap**, at several slacks, and the deferring variant;
 //! 4. every row again with **`certify` on**, so the plan's §8.5 comparison — total cost *including*
 //!    the check — is the one that decides anything.
 //!
 //! The second row is the reference that matters. A Hilbert-driven strategy that beats the uncapped
-//! baseline has established nothing if a fixed cap of 64 beats it too: M22-B measured the
-//! Hilbert-derived quota at the degree that matters on Fukuoka `n=10` as **65**, within one pair of
-//! a number picked without any model.
+//! baseline has established nothing if a fixed cap of 64 beats it too.
 //!
 //! ```text
-//! tools/fetch-mq-challenge.sh                      # for the MQ rows
 //! cargo run --release --example hilbert_driven
 //! cargo run --release --example hilbert_driven -- list
-//! cargo run --release --example hilbert_driven -- mq3-n15
+//! cargo run --release --example hilbert_driven -- katsura-6
 //! ```
 //!
 //! Every row's basis is asserted equal to the baseline's. A cap discards no pair — a capped batch
 //! leaves the rest pending and a deferred degree is promoted back — so a differing basis would be a
 //! defect, and reporting it in a column rather than failing would bury it.
 
-use std::{path::PathBuf, time::Instant};
+use std::time::Instant;
 
 use zeebra::{
     fields::PrimeFieldElement64,
     grobner::{
         benchmark_systems::{cyclic, katsura},
-        f4_with_options,
-        research::{CicoInstance, MqInstance, Poseidon, PoseidonParameters, KOALABEAR_PRIME},
-        F4Options, F4Statistics, HilbertSelection,
+        f4_with_options, F4Options, F4Statistics, HilbertSelection,
     },
     FiniteField, MonomialOrder, MultivariatePolynomial,
 };
 
-type Q = PrimeFieldElement64<31>;
-type K = PrimeFieldElement64<KOALABEAR_PRIME>;
 type P = PrimeFieldElement64<2_147_483_647>;
 
 const GREVLEX: MonomialOrder = MonomialOrder::GradedReverseLexicographic;
-const C1: u64 = 0xC0_9DE4;
 
 /// The configurations compared, in the order the tables print them.
 ///
@@ -252,48 +243,7 @@ fn attempt<const N: usize, F: FiniteField>(
 }
 
 fn instances() -> Vec<&'static str> {
-    vec![
-        "katsura-5",
-        "katsura-6",
-        "cyclic-5",
-        "poseidon-t2-rf2-rp2",
-        "poseidon-t2-rf4",
-        "mq3-n10",
-        "mq3-n15",
-    ]
-}
-
-fn mq_directory() -> PathBuf {
-    std::env::var("ZEEBRA_MQ_DIR")
-        .unwrap_or_else(|_| "research/instances/mq".to_string())
-        .into()
-}
-
-fn load_mq(stem: &str) -> Option<MqInstance> {
-    let text = std::fs::read_to_string(mq_directory().join(stem)).ok()?;
-    MqInstance::parse(&text).ok()
-}
-
-fn cico<const N: usize>(t: usize, r_f: usize, r_p: usize) -> Vec<MultivariatePolynomial<N, K>> {
-    let poseidon = Poseidon::<K>::new(PoseidonParameters {
-        prime: KOALABEAR_PRIME,
-        alpha: 3,
-        t,
-        r_f,
-        r_p,
-    })
-    .expect("R_F is even");
-    let free: Vec<K> = (0..t - 1).map(|i| K::new(1_000 + i as u64)).collect();
-    CicoInstance::planted(
-        poseidon,
-        1,
-        &[K::new(C1)],
-        &free,
-        Some(PoseidonParameters::bounty_cico()),
-    )
-    .expect("the right widths")
-    .system::<N>()
-    .expect("the right dimension")
+    vec!["katsura-5", "katsura-6", "cyclic-5", "cyclic-6"]
 }
 
 /// Every configuration on one system, with the baseline's basis as the reference.
@@ -323,16 +273,7 @@ fn run_instance(name: &str) {
         "katsura-5" => sweep!(katsura::<5, P>()),
         "katsura-6" => sweep!(katsura::<6, P>()),
         "cyclic-5" => sweep!(cyclic::<5, P>()),
-        "poseidon-t2-rf2-rp2" => sweep!(cico::<7>(2, 2, 2)),
-        "poseidon-t2-rf4" => sweep!(cico::<9>(2, 4, 0)),
-        "mq3-n10" => match load_mq("ToyExample-type3-n10-seed0") {
-            Some(instance) => sweep!(instance.system::<10, Q>().expect("ten variables")),
-            None => println!("instance data absent; run `tools/fetch-mq-challenge.sh`."),
-        },
-        "mq3-n15" => match load_mq("ToyExample-type3-n15-seed0") {
-            Some(instance) => sweep!(instance.system::<15, Q>().expect("fifteen variables")),
-            None => println!("instance data absent; run `tools/fetch-mq-challenge.sh`."),
-        },
+        "cyclic-6" => sweep!(cyclic::<6, P>()),
         other => println!("unknown instance `{}`; `-- list` names them.", other),
     }
     println!();

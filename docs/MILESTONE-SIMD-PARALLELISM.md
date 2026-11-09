@@ -365,7 +365,7 @@ case: milliseconds to seconds against the 0.52 ms the three won't-dos above coul
 the overhead argument does not reach it. It leaves #50, #51 and #52 closed on exactly the
 measurements in §6.1 to §6.3: nothing was parallelized *inside* a Gröbner basis, and no figure in
 this document was remeasured. The sweep's product is an agreement verdict and not a timing, which
-is why concurrency is admissible there and why `tools/scoreboard.sh` — whose product *is* the
+is why concurrency is admissible there and why `tools/scoreboard.sh` (moved out in #668) — whose product *is* the
 timing — was left sequential.
 
 **And taken a second time, where the product *is* a timing.** #180 parallelized the resultant
@@ -616,7 +616,7 @@ untouched. Second, the structured path's own `interreduce_prefix` still keeps a 
 elimination layer, and outside #159. The 28.1% is therefore a lower bound on what the change is
 worth to that stage.
 
-`cargo run --release --example scoreboard -- stable`, whole solves, and
+`cargo run --release --example scoreboard -- stable` (an example moved out in #668), whole solves, and
 `scoreboard row poseidon31-cico-t16-rf2-rp0 --slice 0`, a registered full-width Poseidon reduction
 at a precommitted specialization seed. **Three runs each side, and every run is listed**, because
 these rows are whole solves and run-to-run variation is several percent — on a single pair the
