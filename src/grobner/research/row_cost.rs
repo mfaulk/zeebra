@@ -555,14 +555,69 @@ pub const ABOVE_L2_EXPONENT: f64 = 2.9953;
 /// core move by 1.00x, 1.04–1.06x and 1.20x according to working-set size, and no clock can do that.
 pub const CORE_TIME_PER_DOUBLING: f64 = 0.065;
 
-/// Euclidean core-time per determinant at [`EUCLID_MEASURED_ORDER`], milliseconds, **measured**.
-pub const EUCLID_MS_AT_1458: f64 = 1.109;
+/// The Euclidean kernel's **remainder sequence** at [`EUCLID_MEASURED_ORDER`], ms, **measured**.
+///
+/// Not the whole kernel. The kernel has two halves and until #412 this constant was the whole of
+/// the law: `1.109 ms` from #350's §5.6, taken on a pair of degree **1** in the surviving variable,
+/// where specializing a sample costs 1 460 Horner steps and is 0.4% of the sample. On that pair
+/// this *is* the kernel, which is why the omission was invisible.
+///
+/// #412 re-measured the same quantity in its own process at **1.172 ms** — 5.7% above #350's
+/// figure, inside #318's recorded ~1.2x session drift — and the larger is taken, because a cost
+/// model that under-predicts is a budget that authorizes a run nobody costed.
+pub const EUCLID_REMAINDER_MS_AT_1458: f64 = 1.172;
 
-/// The order the Euclidean anchor was measured at — the order every six-round row uses.
+/// The order the Euclidean anchors were measured at — the order every six-round row uses.
 pub const EUCLID_MEASURED_ORDER: f64 = 1458.0;
 
-/// The Euclidean kernel's fitted exponent above the L2 footprint, **fitted** over three orders.
+/// The Euclidean remainder sequence's fitted exponent, **fitted** over three orders.
+///
+/// Fitted on the synthetic pair, which is the remainder sequence alone — so it is the right
+/// exponent for [`EUCLID_REMAINDER_MS_AT_1458`] and not for the whole kernel. #412's own three
+/// orders on a row-shaped pair give 1.760 for this half, below the fit, and the fit is kept.
 pub const EUCLID_EXPONENT: f64 = 1.8452;
+
+/// Nanoseconds one Horner multiply-add of the per-sample specialization costs, **measured**.
+///
+/// `determinant_width`, one pinned core, on the lock, over row-shaped pairs at three orders:
+/// **4.31 / 4.30 / 4.45 ns** at orders 162 / 486 / 1 458, against counted operation counts of
+/// 6 642 / 59 292 / 532 170. The rate is flat across a 9x order range — Horner is a fixed-stride
+/// dependent chain and has nothing to amortize — so the term's exponent is the operation count's
+/// **2**, and the measured local exponent is **2.010**.
+///
+/// The largest of the three is taken, for the reason [`EUCLID_REMAINDER_MS_AT_1458`] gives.
+pub const EUCLID_SPECIALIZE_NS_PER_OPERATION: f64 = 4.45;
+
+/// Horner multiply-adds one sample's specialization costs on a CICO row's pair, **derived**.
+///
+/// **This is the term #412 found missing from the law.** `sylvester_resultant_euclid` evaluates
+/// every coefficient of the pair in the eliminated variable at the sample point, once per sample,
+/// *inside* the per-determinant timer:
+///
+/// ```text
+/// let a: Vec<F> = fc.iter().map(|c| c.eval(&at)).collect();
+/// let b: Vec<F> = gc.iter().map(|c| c.eval(&at)).collect();
+/// resultant_from_coefficients(&a, &b)
+/// ```
+///
+/// A CICO row of `R` rounds is a straight-line program of total degree `d = 3^R` in its two free
+/// inputs, so the coefficient of `y^j` in either output has degree `d − j`, and specializing both
+/// at one point is `2 · Σ_{j≤d} (d − j) = d(d + 1)` Horner multiply-adds with `d` half the
+/// Sylvester order. That is **2.00x the remainder sequence's own `d²/2`**, so on a real row this
+/// term is the larger half of the kernel and it grows as the square of the order where the
+/// remainder sequence grows as [`EUCLID_EXPONENT`].
+///
+/// Derived, and **confirmed by counting**: `examples/determinant_width` sums
+/// `Σ_j deg_x(fc[j]) + Σ_j deg_x(gc[j])` off each pair and gets 6 642 / 59 292 / 532 170 at orders
+/// 162 / 486 / 1 458, which is `d(d + 1)` exactly.
+///
+/// It is **zero in all but name** on the synthetic pairs `determinant_sweep` uses, which are degree
+/// 1 in the surviving variable: 1 460 steps at order 1 458 against this function's 532 170. That
+/// difference is the whole of #412.
+pub fn specialization_operations(matrix_order: usize) -> usize {
+    let degree = matrix_order / 2;
+    degree * (degree + 1)
+}
 
 /// Core-time of one Sylvester determinant at `matrix_order` on `workers` workers, in milliseconds.
 ///
@@ -584,41 +639,70 @@ pub fn determinant_core_ms(matrix_order: usize, workers: usize) -> f64 {
 
 /// Core-time per determinant for the **Euclidean** kernel, in milliseconds.
 ///
-/// Anchored at the measurement that landed with #350: **1.109 ms at order 1 458**, one pinned core,
-/// on the lock, the Euclidean kernel and its dense comparand taken in the same binary minutes
-/// apart. The exponent is the **1.8452** fitted above the L2 footprint over orders 162/486/1 458,
-/// against the dense kernel's 2.94 — the two differ by about one power of the order, which is the
-/// whole point of axis 4 and the reason the gap widens with the row.
+/// **Two terms, because the kernel has two halves** (#412). Per sample it specializes the pair's
+/// coefficients at the sample point and then runs a remainder sequence over the result, and both
+/// are inside the timer. The specialization is
+/// [`specialization_operations`] Horner steps at
+/// [`EUCLID_SPECIALIZE_NS_PER_OPERATION`] each; the remainder sequence is
+/// [`EUCLID_REMAINDER_MS_AT_1458`] scaled by [`EUCLID_EXPONENT`]. Their sum times this kernel's
+/// own [`euclidean_width_penalty`].
 ///
-/// The width penalty is this kernel's **own, measured**, and it is worse than the dense one —
-/// which falsifies the hypothesis this function was first written under.
+/// On a CICO row at order 1 458 that is `2.368 + 1.172 = 3.540 ms` against **3.259–3.495 ms**
+/// measured at one worker over three sessions, and the two halves sum to the whole to 0.6% when
+/// timed apart.
+/// On a row the specialization is the *larger* half, and because it is exactly quadratic where the
+/// remainder sequence is `order^1.8452`, its share grows with the round count: ~67% at six rounds
+/// and ~70% at seven.
 ///
-/// #350 predicted axis 4 would *recover* #319's width penalty, on the reasoning that the working
-/// set falls from a 17 MB matrix to two ~6 kB coefficient vectors. The authorized `rf4-rp2` row
-/// measured the opposite: **3.21x at 32 workers**, against the dense law's 1.32x. 59 050
-/// determinants took 6.574 s of wall on 32 workers, so 210.4 s of core time, so **3.563 ms** a
-/// determinant against the **1.109 ms** measured on one core.
+/// # What this function got wrong, and how
 ///
-/// The first version of this function used [`width_penalty`] — the dense curve — and called that
-/// conservative. It was optimistic, and under-predicted the row's determinant stage by **2.43x**.
-/// The mechanism is **unmeasured**; the plausible candidate is allocator contention, since
-/// `remainder` allocates a fresh vector per step and there are as many steps as the degree, so 32
-/// threads each allocate thousands of times per determinant where the dense kernel allocates a
-/// handful of large matrices. That is a hypothesis and #412 is the measurement.
+/// It was one term — `1.109 ms` times `order^1.8452` times a 3.21x width penalty — and it predicted
+/// the one row anyone has run **correctly, for two compensating wrong reasons**. The anchor was
+/// taken on `determinant_sweep`'s synthetic pair, which is degree **1** in the surviving variable,
+/// so it measured the remainder sequence and almost none of the specialization; and the 3.21x was
+/// read off a 32-worker row figure divided by that anchor, so it absorbed the missing term. `3.01 ×
+/// 1.049 = 3.16`, which is the 3.21x to 1.6%.
+///
+/// The product was right at `(1 458, 32)` and wrong everywhere else: 3.2x optimistic at one worker,
+/// and 3.4x pessimistic past 32 where it extrapolated a contention slope that does not exist.
+///
+/// Measured at orders 162 / 486 / 1 458 and at 1, 2, 4, 8, 16 and 32 workers. Above 1 458 it is an
+/// **extrapolation** and [`determinant_basis`] labels it as one.
 pub fn euclidean_core_ms(matrix_order: usize, workers: usize) -> f64 {
     let ratio = matrix_order as f64 / EUCLID_MEASURED_ORDER;
-    EUCLID_MS_AT_1458 * ratio.powf(EUCLID_EXPONENT) * euclidean_width_penalty(workers)
+    let remainder = EUCLID_REMAINDER_MS_AT_1458 * ratio.powf(EUCLID_EXPONENT);
+    let specialize =
+        EUCLID_SPECIALIZE_NS_PER_OPERATION * specialization_operations(matrix_order) as f64 / 1e6;
+    (remainder + specialize) * euclidean_width_penalty(workers)
 }
 
-/// The Euclidean kernel's measured core-time penalty for running at `workers` workers.
+/// The Euclidean kernel's core-time penalty for running at `workers` workers, **measured**.
 ///
-/// Anchored on the two points there are: **1.0x at one worker** and **3.21x at 32**, interpolated
-/// linearly in `log2(workers)` as [`width_penalty`] does for the dense kernel, and extrapolated at
-/// the same slope beyond 32 rather than held flat — nothing wider has been measured and flattening
-/// it would make the guard optimistic exactly where it has no evidence, which is the mistake this
-/// function already made once.
+/// **1.100x at 32 workers — 90.9% parallel efficiency**, swept over 1 / 2 / 4 / 8 / 16 / 32 in one
+/// process against the registered `rf4-rp2` row's **own two polynomials**, on the lock, at an
+/// ambient one-minute load of 2.1–3.8. Interpolated linearly in `log2(workers)` as
+/// [`width_penalty`] does for the dense kernel and extrapolated at the same slope beyond 32. Two
+/// further sessions on a random pair of the same shape gave 1.049x and 1.127x; the largest is
+/// taken.
+///
+/// This replaces a **3.21x** that was not a width penalty at all. That figure was `3.563 ms` from a
+/// 32-worker row divided by `1.109 ms` from a one-worker synthetic pair — two binaries, two
+/// sessions, and two pairs whose per-sample cost differs by 3.01x at *identical* width, which is
+/// the term [`specialization_operations`] now carries.
+///
+/// So axis 4 does not contend worse than the dense kernel. Measured in the same session, same
+/// binary, minutes apart, the **dense** kernel is 1.178x at 8 workers where this one is 1.090x, so
+/// the Euclidean kernel contends slightly *less*. Both sit on the 1.096–1.125x a **register-only**
+/// control shows — a dependent chain of field multiply-adds holding two registers, no memory and no
+/// allocation — which is the floor this machine imposes on any batch of that width. The kernel
+/// tracks that control to within 2% across three sessions at three different ambient loads, and a
+/// kernel with memory or allocator contention cannot do that.
+///
+/// The penalty is also **larger at smaller orders** — 1.370x at order 162, 1.114x at 486, 1.100x at
+/// 1 458 — which is fixed per-batch thread-spawn overhead failing to amortize, the opposite shape
+/// from contention.
 pub fn euclidean_width_penalty(workers: usize) -> f64 {
-    const PER_DOUBLING: f64 = (3.21 - 1.0) / 5.0;
+    const PER_DOUBLING: f64 = (1.100 - 1.0) / 5.0;
     1.0 + PER_DOUBLING * (workers.max(1) as f64).log2()
 }
 
@@ -660,7 +744,7 @@ fn determinant_anchor(kernel: DeterminantKernel) -> &'static str {
             "3.624 ms at order 162, one worker; max(cubic, order^2.9953) x width penalty"
         }
         DeterminantKernel::Euclidean => {
-            "1.109 ms at order 1 458, one worker; order^1.8452 x measured 3.21x width penalty"
+            "1.172 ms remainder at order 1 458 x order^1.8452, plus 4.45 ns x (order/2)(order/2+1) specialization, x measured 1.049x width penalty"
         }
     }
 }
@@ -832,5 +916,74 @@ mod tests {
         let dense = ResultantRowCost::of(&row(4, 2), DeterminantKernel::Dense, 32);
         let euclidean = ResultantRowCost::of(&row(4, 2), DeterminantKernel::Euclidean, 32);
         assert!(euclidean.determinant_seconds() < dense.determinant_seconds());
+    }
+
+    /// The Euclidean law at one worker is not below what one worker measured on a row's own pair.
+    ///
+    /// #412's finding, as a guard. The law was anchored on a **synthetic** pair of degree 1 in the
+    /// surviving variable, where the per-sample specialization is 1 460 Horner steps; a registered
+    /// row's pair is of total degree `3^R`, where the same specialization is `(order/2)²` steps and
+    /// 2.00x the remainder sequence it feeds. Both are inside the per-determinant timer, so the
+    /// anchor was 3x below the thing it was costing, and the 3.21x "width penalty" was what hid it.
+    #[test]
+    fn the_euclidean_law_at_one_worker_covers_a_row_pair_determinant() {
+        // `determinant_width`, order 1 458, one worker, on the lock, over a pair of the shape a
+        // CICO row has: 3.495 ms, the largest of three sessions. The registered `rf4-rp2` row's
+        // own pair gave 3.259 ms in the quietest of them.
+        const MEASURED_MS: f64 = 3.495;
+        let predicted = euclidean_core_ms(1_458, 1);
+        assert!(
+            predicted >= MEASURED_MS,
+            "the law predicts {predicted} ms at one worker where a row's own pair measured \
+             {MEASURED_MS} ms — a guard that under-predicts refuses nothing"
+        );
+    }
+
+    /// The Euclidean width penalty does not exceed what the swept curve measured.
+    ///
+    /// The 3.21x the law carried was never a width penalty: it was the ratio of two *pairs*, taken
+    /// at the same width in two different sessions. Swept in one process over the `rf4-rp2` row's
+    /// own pair the penalty is 1.100x at 32 workers — 90.9% parallel efficiency, and lower than the
+    /// dense kernel's 1.178x measured at 8 workers in the same session.
+    #[test]
+    fn the_euclidean_width_penalty_is_the_swept_one() {
+        let at_32 = euclidean_width_penalty(32);
+        assert!(
+            (1.0..=1.15).contains(&at_32),
+            "the penalty at 32 workers is {at_32}x against a measured 1.100x"
+        );
+        assert!(
+            euclidean_width_penalty(1) == 1.0,
+            "one worker is the curve's own reference"
+        );
+    }
+
+    /// The law reproduces the one determinant stage anyone has measured, and is not below it.
+    ///
+    /// `rf4-rp2` ran 59 050 determinants in **6.574 s** of wall on 32 workers (#367). This pins
+    /// both halves of the correction at once: a law that fixed the anchor without fixing the
+    /// penalty would predict three times this.
+    #[test]
+    fn the_law_covers_the_measured_rf4_rp2_determinant_stage() {
+        const MEASURED_SECONDS: f64 = 6.574;
+        let predicted = 59_050.0 * euclidean_core_ms(1_458, 32) / 1e3 / 32.0;
+        assert!(
+            predicted >= MEASURED_SECONDS,
+            "predicts {predicted} s against {MEASURED_SECONDS} s measured"
+        );
+        assert!(
+            predicted <= 1.25 * MEASURED_SECONDS,
+            "predicts {predicted} s against {MEASURED_SECONDS} s measured, which is not a cost \
+             model but a refusal"
+        );
+    }
+
+    /// The counted specialization operation count is `d(d + 1)` at every order measured.
+    #[test]
+    fn the_specialization_operation_count_matches_what_was_counted_off_the_pairs() {
+        // `determinant_width` counts `Σ_j deg_x(fc[j]) + Σ_j deg_x(gc[j])` off each pair.
+        for (order, counted) in [(162usize, 6_642usize), (486, 59_292), (1_458, 532_170)] {
+            assert_eq!(specialization_operations(order), counted, "order {order}");
+        }
     }
 }

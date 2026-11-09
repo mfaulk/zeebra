@@ -711,17 +711,36 @@ the dense `width_penalty` on the stated reasoning that doing so was conservative
 guard predicted **2.7 s** for a stage that took **6.574 s**, under-predicting by **2.43x**.
 Corrected in #367 to a measured two-point penalty.
 
-**The mechanism is unmeasured.** The candidate is **allocator contention**: `remainder` allocates a
-fresh `Vec<F>` per remainder step, the sequence is as long as the degree, so one order-1 458
-determinant performs on the order of a thousand allocations and 32 threads do that concurrently. The
-dense kernel allocates far more *bytes* in far fewer *calls*. If that is the mechanism the 6 kB
-working set is irrelevant to it. **This is a guess with a clear test** and the test is #412's items
-1–3; the current model is anchored on 1 and 32 workers only.
+**The mechanism was measured, and the falsification does not survive it.** See
+`structured-sylvester.md` §5.6.2. The 3.21x above is correct arithmetic over two correct
+measurements and **it is not a width penalty**: the `1.109 ms` and the `3.563 ms` were taken over
+two different *pairs*, and the per-sample cost of those two pairs differs by **3.01x at identical
+width**. Swept in one process over the `rf4-rp2` row's own two polynomials the Euclidean kernel is
+**1.100x at 32 workers — 90.9% parallel efficiency**, and the dense kernel measured in the same
+session is the worse of the two at every width they share. `2.90 × 1.100 = 3.19` against 3.21, and
+the 32-worker end re-measures at 3.584 ms against the recorded 3.563 ms.
+
+The missing quantity is a **term of the cost law**, not a property of the machine.
+`sylvester_resultant_euclid` specializes the pair at each sample point inside the per-determinant
+timer, which on a row of total degree `d = 3^R` is `d(d + 1)` Horner multiply-adds — **2.00x the
+remainder sequence's own operation count**, counted off the pairs at three orders. On
+`determinant_sweep`'s synthetic pair, which is degree 1 in the surviving variable, it is 1 460 steps
+and 0.4% of the determinant. That is the whole of the gap.
+
+The **allocator candidate is refuted**: the Euclidean kernel makes 1 391 allocation calls per
+determinant against the dense kernel's 666 and has the *lower* width penalty; the half of the kernel
+holding every per-step allocation contends within 1.7% of the half holding two; and the penalty
+*falls* with order — 1.370x / 1.114x / 1.100x at 162 / 486 / 1 458 — which is thread-spawn overhead
+amortizing, the opposite shape from contention.
+
+**So what #451 required on record is this**: §5.2's prediction that axis 4 would not contend worse
+was **right**, the measurement that appeared to falsify it was a one-term cost law reading a missing
+term as contention, and the guard was right about `rf4-rp2` only because a 3x-low anchor and a
+3x-high penalty cancelled. `euclidean_core_ms` is now two terms and no longer depends on that
+cancellation.
 
 **Not claimed:** that the Euclidean kernel is a bad choice. It is 2 094x faster per determinant at
-this order and it is what made the row run in 5.47 minutes instead of a projected 1.79 h (§4.5). The
-claim is that its parallel scaling is worse than predicted, that the prediction was load-bearing in
-a budget guard, and that the likely cause is a fixable implementation detail.
+this order and it is what made the row run in 5.47 minutes instead of a projected 1.79 h (§4.5).
 
 ---
 

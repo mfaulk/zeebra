@@ -948,6 +948,12 @@ cargo run --release --example determinant_sweep -- --kernel euclidean   # the O(
 cargo run --release --example determinant_era      # one determinant, timed the same way at two
                                                    #   commits and three widths (#318, #319)
 cargo run --release --example determinant_era -- --workers 1,8,32 --determinants 13123
+cargo run --release --example determinant_width    # the width sweep 1..32 and the kernel split,
+                                                   #   every arm in one process (#412)
+cargo run --release --example determinant_width -- --pair row --samples 1024
+                                                   # the same against the rf4-rp2 row's own pair,
+                                                   #   after a 5.66 min symbolic build
+cargo run --release --example determinant_width -- --count-allocations   # calls per determinant
 cargo run --release --example f4_profile -- mq     # the competitive MQ instance, per stage
 cargo run --release --example f4_profile -- mq-instance   # that instance as canonical text
 cargo run --release --example f4_profile -- divmask       # #331: the divisor-mask counters

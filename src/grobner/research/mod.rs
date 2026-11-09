@@ -60,10 +60,10 @@ pub use resultant::{
     ResultantError, ResultantOptions, ResultantRoute, ResultantStages,
 };
 pub use row_cost::{
-    determinant_core_ms, euclidean_core_ms, kernel_core_ms, width_penalty, CostTerm,
-    ResultantRowCost, RowVerdict, TermBasis, ABOVE_L2_EXPONENT, CORE_TIME_PER_DOUBLING,
-    DETERMINANT_MS_AT_162, EUCLID_EXPONENT, EUCLID_MEASURED_ORDER, EUCLID_MS_AT_1458,
-    MEASURED_ORDER,
+    determinant_core_ms, euclidean_core_ms, kernel_core_ms, specialization_operations,
+    width_penalty, CostTerm, ResultantRowCost, RowVerdict, TermBasis, ABOVE_L2_EXPONENT,
+    CORE_TIME_PER_DOUBLING, DETERMINANT_MS_AT_162, EUCLID_EXPONENT, EUCLID_MEASURED_ORDER,
+    EUCLID_REMAINDER_MS_AT_1458, EUCLID_SPECIALIZE_NS_PER_OPERATION, MEASURED_ORDER,
 };
 pub use scoreboard::{
     colliding_run_file, wilson_interval, Campaign, Comparison, Environment, GrobnerFrontier, Limit,
