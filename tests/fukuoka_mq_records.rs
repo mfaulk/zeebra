@@ -1,12 +1,13 @@
 //! Self-consistency checks on the committed table of Fukuoka MQ Challenge solves.
 //!
-//! The fixture is a transcription of 37 web pages, and a transcription rots silently: a swapped `n`
-//! and `m`, a dropped digit in a runtime, a per-subsystem figure relabelled as a total all look
+//! The fixture is a transcription of 125 web pages, and a transcription rots silently: a swapped
+//! `n` and `m`, a dropped digit in a runtime, a per-subsystem figure relabelled as a total all look
 //! plausible. So these checks re-derive rather than parse. `m = 2n` and `n = floor(1.5m)` come from
 //! the challenge's own generator source (`docs/research/fukuoka-mq.md` §4), the coefficient count
 //! comes from the crate's own importer, and the published runtimes are checked against their own
-//! published parts — the block-Wiedemann phase times against their total, and a hybrid attack's
-//! total against its subsystem count and average.
+//! published parts — the block-Wiedemann phase times against their total, a hybrid attack's total
+//! against its subsystem count and average, and a stated core count against the `Running Time`
+//! string it was read out of.
 //!
 //! Nothing here downloads, solves, or measures anything.
 
@@ -34,6 +35,11 @@ struct Solve {
     processes: Option<f64>,
     answer_published: String,
     details: String,
+    runtime_printed: String,
+    cores: Option<f64>,
+    resource_hours: Option<f64>,
+    resource_metric: String,
+    answer_values: u64,
 }
 
 impl Solve {
@@ -46,7 +52,7 @@ impl Solve {
     }
 }
 
-const COLUMNS: usize = 19;
+const COLUMNS: usize = 23;
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("research/fukuoka-mq/solved-instances.tsv")
@@ -100,30 +106,53 @@ fn load() -> Vec<Solve> {
                 processes: optional(f[15], "processes", &label),
                 answer_published: f[16].to_string(),
                 details: f[17].to_string(),
+                runtime_printed: f[18].to_string(),
+                cores: optional(f[19], "cores", &label),
+                resource_hours: optional(f[20], "resource_hours", &label),
+                resource_metric: f[21].to_string(),
+                answer_values: f[22].parse().expect("answer_values"),
             }
         })
         .collect()
 }
 
-/// The fixture holds every recorded solve of the four types it covers, and nothing else.
+/// The fixture holds every recorded solve of all six types, one row per published page.
+///
+/// The per-type counts are the `details_<TYPE>_*.html` links the submissions page carries, counted
+/// from its pinned bytes. They are pinned here because the count is what the write-up quotes, and
+/// because an earlier count of 58 pages came from a pattern that silently dropped every page named
+/// for a second submission on the same day — see `docs/research/fukuoka-mq.md` §14.2.
 #[test]
-fn test_the_fixture_covers_the_four_types_and_nothing_else() {
+fn test_the_fixture_covers_all_six_types_one_row_per_published_page() {
     let solves = load();
-    assert_eq!(solves.len(), 37, "expected 37 recorded solves");
+    assert_eq!(solves.len(), 125, "expected 125 recorded solves");
     let types: BTreeSet<&str> = solves.iter().map(|s| s.challenge_type.as_str()).collect();
-    assert_eq!(
-        types,
-        BTreeSet::from(["II", "III", "V", "VI"]),
-        "types I and IV are #197's, not this fixture's"
-    );
+    assert_eq!(types, BTreeSet::from(["I", "II", "III", "IV", "V", "VI"]));
     let mut per_type: BTreeMap<&str, usize> = BTreeMap::new();
     for s in &solves {
         *per_type.entry(s.challenge_type.as_str()).or_default() += 1;
     }
+    assert_eq!(per_type["I"], 57);
     assert_eq!(per_type["II"], 6);
     assert_eq!(per_type["III"], 8);
+    assert_eq!(per_type["IV"], 31);
     assert_eq!(per_type["V"], 12);
     assert_eq!(per_type["VI"], 11);
+}
+
+/// No detail page backs two rows, which is what makes the page count a solve count.
+///
+/// The two figures were not known to agree until #618 derived both: 58 pages against 37 solves
+/// looked like a page reporting several solves, and was in fact a regex that missed 67 pages.
+#[test]
+fn test_each_detail_page_backs_exactly_one_row() {
+    let solves = load();
+    let pages: BTreeSet<&str> = solves.iter().map(|s| s.details.as_str()).collect();
+    assert_eq!(
+        pages.len(),
+        solves.len(),
+        "a detail page is cited by more than one row"
+    );
 }
 
 /// The encryption families are overdetermined with exactly `m = 2n`, as their generator fixes.
@@ -131,7 +160,7 @@ fn test_the_fixture_covers_the_four_types_and_nothing_else() {
 fn test_the_encryption_families_have_m_equal_to_twice_n() {
     for s in load()
         .iter()
-        .filter(|s| matches!(s.challenge_type.as_str(), "II" | "III"))
+        .filter(|s| matches!(s.challenge_type.as_str(), "I" | "II" | "III"))
     {
         assert_eq!(
             s.m,
@@ -149,7 +178,7 @@ fn test_the_encryption_families_have_m_equal_to_twice_n() {
 fn test_the_signature_families_have_n_equal_to_the_truncation_of_one_and_a_half_m() {
     for s in load()
         .iter()
-        .filter(|s| matches!(s.challenge_type.as_str(), "V" | "VI"))
+        .filter(|s| matches!(s.challenge_type.as_str(), "IV" | "V" | "VI"))
     {
         let expected = (s.m * 3) / 2;
         assert_eq!(
@@ -277,40 +306,142 @@ fn test_the_published_memory_figures_carry_their_metric() {
     );
 }
 
-/// The rows whose figure is per-subsystem rather than a total are exactly the five known ones.
+/// The rows whose figure is not a wall-clock total are exactly the twelve known ones.
 ///
 /// Pinned by name because the distinction is invisible in the number itself: 370 seconds looks like
-/// a fast solve and is in fact the cost of one of an unstated number of subsystems. A future edit
-/// that relabelled one of these as `wall-total` would make it quotable as a record time.
+/// a fast solve and is in fact the cost of one of an unstated number of subsystems, and 805 000
+/// CPU.h is not a duration anyone waited. A future edit that relabelled one of these as
+/// `wall-total` would make it quotable as a record time.
 #[test]
-fn test_the_per_subsystem_figures_are_exactly_the_known_ones() {
+fn test_the_figures_that_are_not_wall_clock_totals_are_exactly_the_known_ones() {
     let flagged: BTreeSet<String> = load()
         .iter()
         .filter(|s| s.figure_kind != "wall-total")
-        .map(|s| format!("{} m={} seed={}", s.challenge_type, s.m, s.seed))
+        .map(|s| {
+            format!(
+                "{} n={} seed={} {}",
+                s.challenge_type, s.n, s.seed, s.figure_kind
+            )
+        })
         .collect();
     assert_eq!(
         flagged,
         BTreeSet::from([
-            "V m=16 seed=2".to_string(),
-            "V m=17 seed=1".to_string(),
-            "V m=18 seed=4".to_string(),
-            "V m=19 seed=0".to_string(),
-            "V m=19 seed=4".to_string(),
+            "I n=75 seed=0 cpu-total".to_string(),
+            "I n=76 seed=0 cpu-total".to_string(),
+            "I n=77 seed=0 cpu-total".to_string(),
+            "I n=80 seed=0 cpu-total".to_string(),
+            "I n=83 seed=0 cpu-total".to_string(),
+            "IV n=90 seed=2 cpu-total".to_string(),
+            "IV n=96 seed=2 cpu-total".to_string(),
+            "V n=24 seed=2 per-subsystem-cpu".to_string(),
+            "V n=25 seed=1 per-subsystem-cpu".to_string(),
+            "V n=27 seed=4 per-subsystem-wall".to_string(),
+            "V n=28 seed=0 per-subsystem-cpu".to_string(),
+            "V n=28 seed=4 per-subsystem-wall".to_string(),
         ]),
-        "the set of per-subsystem figures changed"
+        "the set of figures that are not wall-clock totals changed"
     );
     for s in load() {
         assert!(
             matches!(
                 s.figure_kind.as_str(),
-                "wall-total" | "per-subsystem-cpu" | "per-subsystem-wall"
+                "wall-total" | "cpu-total" | "per-subsystem-cpu" | "per-subsystem-wall"
             ),
             "{}: unknown figure_kind {:?}",
             s.label(),
             s.figure_kind
         );
     }
+}
+
+/// A `cpu-total` row's seconds are its own CPU-hour figure, and nothing else.
+///
+/// The conversion is the only arithmetic in the fixture that is not a unit change of the printed
+/// string, so it is checked rather than trusted: a `cpu-total` figure that had quietly been filled
+/// in from the wall-clock hours in the same parenthetical would read as a 160-fold speedup.
+#[test]
+fn test_a_cpu_total_is_its_published_cpu_hours() {
+    let mut checked = 0;
+    for s in load() {
+        if s.figure_kind != "cpu-total" {
+            continue;
+        }
+        let hours = s
+            .resource_hours
+            .unwrap_or_else(|| panic!("{}: a cpu-total row publishes no CPU hours", s.label()));
+        assert_eq!(
+            s.resource_metric,
+            "cpu-hours",
+            "{}: a cpu-total figure is CPU hours",
+            s.label()
+        );
+        let relative = (hours * 3600.0 - s.runtime_seconds).abs() / s.runtime_seconds;
+        assert!(
+            relative < 1e-9,
+            "{}: {hours} CPU.h is {} s, but runtime_seconds is {}",
+            s.label(),
+            hours * 3600.0,
+            s.runtime_seconds
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 7, "seven rows publish only a CPU total");
+}
+
+/// A recorded core count is one the `Running Time` field itself states.
+///
+/// Not from `hardware`: a machine's core count is not evidence a run used them all, and reading it
+/// from there is how "3488 AMD EPYC 7J13 cores" would become the parallelism of a run that says
+/// nothing about how many it used. So the digits must appear in the printed figure.
+#[test]
+fn test_a_core_count_is_one_the_running_time_field_states() {
+    let mut checked = 0;
+    for s in load() {
+        let Some(cores) = s.cores else { continue };
+        assert!(
+            cores >= 1.0 && cores.fract() == 0.0,
+            "{}: {cores} is not a whole number of cores",
+            s.label()
+        );
+        let digits = format!("{}", cores as u64);
+        assert!(
+            s.runtime_printed.contains(&digits),
+            "{}: cores={digits} does not appear in the printed figure {:?}",
+            s.label(),
+            s.runtime_printed
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 26, "twenty-six rows state a core count");
+}
+
+/// An aggregate resource figure and the metric naming it are present together or absent together.
+///
+/// `mixed` is the one asymmetry and it is deliberate: three pages publish both a CPU-hour and a
+/// GPU-hour total, so no single number is the cost of the run, and a column that had to pick one
+/// would be picking. Those rows carry the metric and no figure.
+#[test]
+fn test_the_resource_aggregate_and_its_metric_agree() {
+    let mut per_metric: BTreeMap<String, usize> = BTreeMap::new();
+    for s in load() {
+        match (s.resource_hours, s.resource_metric.as_str()) {
+            (None, "-") => {}
+            (None, "mixed") => {}
+            (Some(hours), metric @ ("cpu-hours" | "gpu-hours")) => {
+                assert!(hours > 0.0, "{}: {hours} {metric} is not a cost", s.label());
+            }
+            (hours, metric) => panic!(
+                "{}: resource_hours {hours:?} with metric {metric:?}",
+                s.label()
+            ),
+        }
+        *per_metric.entry(s.resource_metric.clone()).or_default() += 1;
+    }
+    assert_eq!(per_metric["cpu-hours"], 11);
+    assert_eq!(per_metric["gpu-hours"], 7);
+    assert_eq!(per_metric["mixed"], 3);
+    assert_eq!(per_metric["-"], 104);
 }
 
 /// No `(type, n, seed)` is recorded twice, and no `n` carries more than the five rows rule 2 allows.
@@ -333,8 +464,8 @@ fn test_the_rows_obey_the_challenges_own_recording_rules() {
 
 /// The largest recorded solve of each type is the record the write-up quotes.
 ///
-/// Types II and III are ranked by `n`, types V and VI by `m`, which is why the two are compared on
-/// different columns — swapping them is precisely the mistake this pins.
+/// Types I, II and III are ranked by `n`, types IV, V and VI by `m`, which is why the two are
+/// compared on different columns — swapping them is precisely the mistake this pins.
 #[test]
 fn test_the_record_per_type_is_the_one_the_write_up_quotes() {
     let solves = load();
@@ -351,6 +482,14 @@ fn test_the_record_per_type_is_the_one_the_write_up_quotes() {
         )
     };
     assert_eq!(
+        best("I", true),
+        (
+            83,
+            "2023-09-16".into(),
+            "Charles Bouillaguet and Julia Sauvage".into()
+        )
+    );
+    assert_eq!(
         best("II", true),
         (38, "2026-09-28".into(), "Javier Verbel".into())
     );
@@ -360,6 +499,14 @@ fn test_the_record_per_type_is_the_one_the_write_up_quotes() {
             38,
             "2020-08-03".into(),
             "Tung Chou, Ruben Niederhagen, Bo-Yin Yang".into()
+        )
+    );
+    assert_eq!(
+        best("IV", false),
+        (
+            76,
+            "2024-07-27".into(),
+            "Charles Bouillaguet and Julia Sauvage".into()
         )
     );
     assert_eq!(
@@ -393,4 +540,28 @@ fn test_every_recorded_solve_publishes_an_answer_vector() {
             s.details
         );
     }
+}
+
+/// A published answer vector carries one value per variable — on every row but the one that does
+/// not, which is recorded rather than rounded off.
+///
+/// The type I `n = 75` page prints 74 values. That is a defect in the source and not in the
+/// transcription, and it matters because a witness one value short cannot be evaluated: there is no
+/// way to tell which variable is missing. Pinned by name so a future fetch that fixed it, or a
+/// second page that broke the same way, both fail here.
+#[test]
+fn test_an_answer_vector_has_one_value_per_variable() {
+    let short: BTreeMap<String, (u64, u64)> = load()
+        .iter()
+        .filter(|s| s.answer_values != s.n)
+        .map(|s| (s.details.clone(), (s.answer_values, s.n)))
+        .collect();
+    assert_eq!(
+        short,
+        BTreeMap::from([(
+            "details/details_I_20230620.html".to_string(),
+            (74u64, 75u64)
+        )]),
+        "the set of answer vectors whose length is not n changed"
+    );
 }

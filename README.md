@@ -4671,9 +4671,14 @@ challenge** is rebuilt except for one column per polynomial, and that column is 
 (`YDHTS15` Algorithm 1 Step 4), so `GeneratedMq::into_instance_with_constants` takes it from the
 caller rather than inventing it.
 
-`research/fukuoka-mq/solved-instances.tsv` records all 37 published solves of types II, III, V and
-VI — parameters, dates, solvers, algorithms, hardware and figures, with no instance data — checked
-by `tests/fukuoka_mq_records.rs`.
+`research/fukuoka-mq/solved-instances.tsv` records all **125** published solves, across all six
+types — parameters, dates, solvers, algorithms, hardware and figures, with no instance data —
+checked by `tests/fukuoka_mq_records.rs`. One row per detail page, in bijection: the 58-page count
+of the previous revision was a pattern that dropped every page named for a second submission the
+same day, and the page count and the solve count reconcile exactly once it is fixed
+(`docs/research/fukuoka-mq.md` §14.2). Twelve of the 125 published figures are not wall-clock
+totals — five per-subsystem, seven CPU-hour totals with no wall figure at all — and the fixture tags
+each one rather than letting it be quoted as a record time.
 
 #### Candidate external instances, surveyed but not imported
 

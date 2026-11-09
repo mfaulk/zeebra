@@ -37,7 +37,8 @@ and published results, and nothing in them is a measurement of this crate.
 
 Each read in place rather than through a search summary, with the bytes pinned. All are primary:
 the challenge's own site, its own utility downloads, and the paper it names as its reference. All
-accessed **2026-11-07**.
+accessed **2026-11-07**; the 125 `details/*` pages and the re-derivation of their count, 2026-11-09
+against the same `submissions` sha256 (§14.2).
 
 | short name | what it is | URL | sha256 | bytes |
 |---|---|---|---|---|
@@ -45,7 +46,7 @@ accessed **2026-11-07**.
 | **`format`** | the file-format specification, with a worked expansion of one polynomial per field | <https://www.mqchallenge.org/format.html> | `c5671f7feb3c8a72462a8820d970e8fccf30d50487748c02a9c01bc00f5603dd` | 7 440 |
 | **`guidance`** | how to participate; the rules again; **the coefficient-verifier and Magma-reader downloads** | <https://www.mqchallenge.org/guidance.html> | `2c531a6dfdea4b35fb68a4e31c1bc4c18e0fac08a1abcce7f63fdcd012cf2d79` | 7 208 |
 | **`submissions`** | "the full list of all submission details" — every recorded solve, not the front page's top five | <https://www.mqchallenge.org/submission/index.html> | `5254b50362300ce43216effbe0345e4cb70553a4330175e189193866579a814c` | 47 769 |
-| **`details/*`** | 37 per-submission pages for types II, III, V and VI, carrying runtime, hardware, notes and the answer vector | `https://www.mqchallenge.org/details/details_<TYPE>_<DATE>.html` | per row in the fixture (§3) | — |
+| **`details/*`** | 125 per-submission pages across all six types, carrying runtime, hardware, notes and the answer vector | `https://www.mqchallenge.org/details/details_<TYPE>_<DATE>.html` | per row in the fixture (§3) | — |
 | **`util.m`** | the challenge's **own Magma reader** for an instance file | <https://www.mqchallenge.org/utility/util.m> | `9ac5cd6a991b76ce5daa39284d7a52d23ad2c630a4cbca1275bb500924415c43` | 1 179 |
 | **`verifier-enc`** | coefficient verifier for types I–III: generator source plus the π file | <https://www.mqchallenge.org/utility/CoefVerifier_enc.tar.bz2> | `acdeac81b6eba37eb747ec3e13a62aa924cc8e953cb13641f27df72490e7f73c` | 32 022 033 |
 | **`verifier-sig`** | coefficient verifier for types IV–VI | <https://www.mqchallenge.org/utility/CoefVerifier_sig.tar.bz2> | `e14a2ff46082721fe2290c08d481e60e696d0e122a64842f3de6a7a023feac65` | 32 023 317 |
@@ -368,9 +369,11 @@ from a hand-written fixture in the same format; the test against the genuine ins
 test.
 
 **What *is* committed** is `research/fukuoka-mq/solved-instances.tsv`: the parameters, dates,
-contestants, algorithms, hardware and published figures of all 37 recorded solves of types II, III,
-V and VI, with each row naming the page it came from. No answer vector and no coefficient. Checked
-by `tests/fukuoka_mq_records.rs` (§8.4, §11).
+contestants, algorithms, hardware and published figures of all **125** recorded solves, across all
+six types, with each row naming the page it came from. No answer vector and no coefficient — the
+fixture records how many values each published vector carries (`answer_values`), which is what makes
+a truncated one visible without redistributing it. Checked by `tests/fukuoka_mq_records.rs`
+(§8.4, §11, §14.2).
 
 ---
 
@@ -933,7 +936,7 @@ pretend to: `into_instance_with_constants` takes it from the caller.
 
 ### 8.1 Largest solved, and smallest unsolved
 
-From `submissions` and the 37 detail pages behind it. "Largest solved" is the maximum over every
+From `submissions` and the 125 detail pages behind it. "Largest solved" is the maximum over every
 recorded solve, ranked by `n` for the encryption types and by `m` for the signature types, as the
 challenge ranks them.
 
@@ -1019,24 +1022,42 @@ record.
 
 ### 8.4 The figures are not in one unit, and some are not totals
 
-The 37 pages express "Running Time" in at least five conventions: `32 days 18 hours 26 minutes`,
-`324,591 seconds`, `16.06 days`, `811805 seconds (9 days 9 hours 30 minutes)`, and
-`370 cpu seconds for each subsystem`. The fixture converts all of them to seconds and keeps the
-original string beside it so the conversion can be rechecked by eye.
+The 125 pages express "Running Time" in at least nine conventions:
+`32 days 18 hours 26 minutes`, `324,591 seconds`, `16.06 days`,
+`811805 seconds (9 days 9 hours 30 minutes)`, `370 cpu seconds for each subsystem`,
+`4 hours on 300 cores`, `about 7h30 run on 1760 cores`, `280K CPU.h (16h wall-clock time)` and
+`805000 CPU.h (146h on 1024 cores + 188h on 3488 cores)`. The fixture converts all of them to
+seconds and keeps the original string beside it so the conversion can be rechecked by eye.
 
-**Five of the 37 figures are not totals.** Every signature-type record is a hybrid attack — guess
-some variables, solve the rest, repeat — and five rows report the cost of *one* subsystem rather
-than of the campaign. Type V `m = 16` seed 2 reads "370 cpu seconds for each subsystem" and would
-be, quoted as a total, by far the fastest solve on the site. The fixture tags each figure
-`wall-total`, `per-subsystem-cpu` or `per-subsystem-wall`, and
-`fukuoka_mq_records::test_the_per_subsystem_figures_are_exactly_the_known_ones` pins the set of
-five by name, because the distinction is invisible in the number.
+**Twelve of the 125 figures are not wall-clock totals, in two different ways.** Five are
+per-subsystem: every signature-type record is a hybrid attack — guess some variables, solve the
+rest, repeat — and five rows report the cost of *one* subsystem rather than of the campaign. Type V
+`m = 16` seed 2 reads "370 cpu seconds for each subsystem" and would be, quoted as a total, by far
+the fastest solve on the site. Seven more — five type I rows and two type IV — publish **only** a
+CPU-hour figure and no wall clock at all; the type I `n = 83` record is `805000 CPU.h`, which is
+not a duration anybody waited. The fixture tags each figure `wall-total`, `cpu-total`,
+`per-subsystem-cpu` or `per-subsystem-wall`, and
+`fukuoka_mq_records::test_the_figures_that_are_not_wall_clock_totals_are_exactly_the_known_ones`
+pins all twelve by name, because the distinction is invisible in the number.
+
+**Twenty-six rows state the parallelism in the running time itself**, as "on 300 cores" or
+"on 1760 cores", and ten publish an aggregate CPU-hour or GPU-hour cost. Those go in `cores` and in
+`resource_hours`/`resource_metric`, which is the column that keeps a cluster's wall figure from
+reading as the cost of the attack: type I `n = 83` is 805 000 CPU.h behind a 188-hour wall figure,
+a factor of 4 280. `cores` is taken only from the `Running Time` string and never from `hardware`,
+because a machine's core count is not evidence a run used them all —
+`fukuoka_mq_records::test_a_core_count_is_one_the_running_time_field_states` enforces that by
+requiring the digits to appear in the printed figure. Three pages publish both a CPU-hour and a
+GPU-hour total, so no single number is the cost; those carry `resource_metric = mixed` and no
+figure.
 
 **Two rows publish peak memory, with different metrics**: type III `n = 36` gives 29.77 GB
 "peak memory demand (VmHWM)" and type III `n = 38` gives "VmPeak: 49.45 GB". Resident high-water
 mark and peak virtual size are not the same number for the same run, so a figure without its
 metric is not comparable with anything — including with `src/util/peak_memory.rs`. That is the
-entire published evidence on memory for these four types.
+entire published evidence on memory across all six types: no type I or IV page publishes a memory
+peak, a phase breakdown, a subsystem count or a process count, which is why those columns are `-`
+on every one of their 88 rows.
 
 The figures are **internally consistent where they can be checked**, which is the main reason to
 trust the transcription. Six rows publish block-Wiedemann phase breakdowns, and in every case the
@@ -1078,13 +1099,20 @@ Three things make it worth stating precisely rather than assuming.
    `n = 10` polynomials fails at the genuine answer. A verifier in the wrong GF(2^8) rejects every
    correct witness, and one in the wrong characteristic (§2.3) accepts wrong ones.
 3. **Published answers are available far more widely than the toy `-answer` files suggest.** Every
-   one of the 37 recorded solves prints its full answer vector on its detail page — asserted for
-   the whole fixture by
-   `fukuoka_mq_records::test_every_recorded_solve_publishes_an_answer_vector`. So for types II, III,
-   V and VI there are 37 fetchable witnesses, not 4, and they reach up to `n = 38` and `m = 24`.
-   They are a check on an *importer* long before they are a target for a solver: a correctly
-   imported type III `n = 34` instance must vanish at the 2015 answer, and that costs one
-   evaluation.
+   one of the 125 recorded solves prints an answer vector on its detail page — asserted for the
+   whole fixture by `fukuoka_mq_records::test_every_recorded_solve_publishes_an_answer_vector`. So
+   there are **125** fetchable witnesses across all six types, not 4, and they reach up to
+   `n = 83` (type I) and `m = 76` (type IV). They are a check on an *importer* long before they are
+   a target for a solver: a correctly imported type III `n = 34` instance must vanish at the 2015
+   answer, and that costs one evaluation.
+
+   **One of the 125 is unusable, and it is recorded rather than rounded off.** The type I `n = 75`
+   page prints **74** values. A witness one value short cannot be evaluated at all, because nothing
+   says which variable is missing. The fixture's `answer_values` column carries the published
+   length for every row and
+   `fukuoka_mq_records::test_an_answer_vector_has_one_value_per_variable` pins that page as the only
+   one where it is not `n` — so a future fetch that fixed it, or a second page that broke the same
+   way, both fail the suite.
 
 Answer-file syntax is `[v1, v2, …]`, decimal for GF(2) and GF(31) and two-digit hex for GF(2^8).
 Both bases are handled — §2.5 item 3, #415 — and the same `MqField::radix` decides the base of a
@@ -1142,9 +1170,14 @@ Collected so they are not buried.
    published signature constants are not from the π stream. (§7.3, §7.4)
 10. **The hall of fame is not a census.** The site's own rules 2 and 3 make it an undercount, so a
     missing `(size, seed)` is not evidence of an unsolved instance. (§8.3)
-11. **Five of the 37 published runtimes are per-subsystem, not totals**, and two peak-memory
-    figures use different metrics. Quoting either kind as a total is a category error the site does
-    not flag. (§8.4)
+11. **Twelve of the 125 published runtimes are not wall-clock totals** — five per-subsystem and
+    seven CPU-hour totals with no wall figure at all — and two peak-memory figures use different
+    metrics. Quoting any of them as a wall-clock total is a category error the site does not flag.
+    (§8.4)
+12. **The 58-page count of the previous revision was a regex artefact, and the page count and the
+    solve count do reconcile: 125 each, one page per solve.** The pattern
+    `details_<TYPE>_[0-9]{8}.html` drops every page named for a second submission on the same day,
+    and both `_cs.html` pages. (§14.2)
 
 ---
 
@@ -1174,17 +1207,21 @@ new.
    under-specified, it is ambiguous between two different problems.
 4. **A published figure needs its unit *and* its scope *and* its metric.** This is `minrank.md`
    §7's third gap, and this family makes it concrete rather than merely acute. One source produced,
-   for the same four types: five time conventions, figures that are wall-clock totals and figures
-   that are the CPU cost of one subsystem of an unstated number (§8.4), and two memory figures under
-   two different metrics (VmHWM and VmPeak). #73's field 8 distinguishes measured from extrapolated,
-   which is necessary and not sufficient: a measured per-subsystem CPU figure and a measured
-   wall-clock total are both measured and are not the same kind of number. Structure, not prose —
-   `fukuoka_mq_records::test_the_per_subsystem_figures_are_exactly_the_known_ones` exists because
-   the distinction is invisible in the value.
+   for the same six types: nine time conventions, figures that are wall-clock totals, figures that
+   are the CPU cost of one subsystem of an unstated number, figures that are CPU-hour totals no one
+   waited through (§8.4), and two memory figures under two different metrics (VmHWM and VmPeak).
+   #73's field 8 distinguishes measured from extrapolated, which is necessary and not sufficient: a
+   measured per-subsystem CPU figure, a measured 805 000 CPU.h aggregate and a measured wall-clock
+   total are all three measured and are not the same kind of number. A fourth axis the schema needs
+   is **the parallelism the figure is over**: 26 of these rows state a core count in the figure
+   itself and ten publish an aggregate CPU- or GPU-hour cost, and a wall-clock figure on 3 488 cores
+   without that is unreadable. Structure, not prose —
+   `fukuoka_mq_records::test_the_figures_that_are_not_wall_clock_totals_are_exactly_the_known_ones`
+   exists because the distinction is invisible in the value.
 5. **An entry can carry many witnesses, each with its own provenance, and most of them are not in
    the instance archive.** #73's field 5 reads as one optional published solution. Here every one of
-   the 37 recorded solves publishes a full answer vector on its own URL (§9), reaching to `n = 38`
-   and `m = 24` — far past any instance with an `-answer` file. Those are importer checks available
+   the 125 recorded solves publishes an answer vector on its own URL (§9), reaching to `n = 83` and
+   `m = 76` — far past any instance with an `-answer` file. Those are importer checks available
    today at sizes no solver here will reach for a long time, and a schema that holds one witness per
    entry cannot express them.
 
@@ -1235,7 +1272,7 @@ effort: the Fukuoka challenge is unusually well documented and still live.
 | `YDHTS15` from the publisher | `https://eprint.iacr.org/2015/275.pdf`, the URL `site` itself links | **`403`**, 5 409 bytes of error page. Matches `minrank.md` §9 and `elimination-beyond-grobner.md` §8: this host's PDFs are blocked from here while its abstract pages are not. **Obtained** from the Wayback Machine instead, and the CDX index shows one content digest across captures 2015-09-08 to 2021-10-05, so the snapshot is the document the challenge has linked throughout |
 | the π recipe for the signature constants | continuing `pos` past the `m(mon-1)` main reads; a second pass from `start`; and an exhaustive scan of the first 4 000 000 bits of `PI` for any offset reproducing all ten of type VI `n = 15` seed 0's constants at this instance's `interval` | **not found.** §7.4. The scan covers 2% of the file, so this is "not found", not "not there" |
 | the π recipe read directly off decimal or base-32 digits of π | computed π's binary expansion independently by the Machin arctan series (verified against the known decimal and hex digits) and searched its base-32, base-32-mod-31, decimal-pair and base-256 expansions for the first eight coefficients of type III `n=10` seed 0 and type II `n=10` seed 0 | **not found**, in streams of 1 598 base-32, 1 200 decimal-pair and 998 base-256 digits. Superseded and explained by §7.1: the offset is `type*n` and the stride is `(seed+n)*10+type`, so no contiguous reading of π could have matched |
-| a published answer for an unsolved instance | — | **none exists, by construction.** `site` rule 4: for types I–III the team plants and keeps one answer; for types IV–VI "the MQ challenge team do not know the answers". So the only answers for signature types are the ones solvers submitted, which is exactly the 37 detail pages (§9) |
+| a published answer for an unsolved instance | — | **none exists, by construction.** `site` rule 4: for types I–III the team plants and keeps one answer; for types IV–VI "the MQ challenge team do not know the answers". So the only answers for signature types are the ones solvers submitted, which is exactly the 54 type IV, V and VI detail pages (§9) |
 | the challenge's own GF(31) verifier, run against its own data | built `CoefVerifier_enc` and ran `./coefVerifier 3 10 0` | **mismatched 1 214 of 1 300 coefficients.** Not an environment problem — §7.3 isolates it to a `while (coef == 31)` loop that the published data does not have, and removing it gives an exact match |
 
 ---
@@ -1309,20 +1346,51 @@ computed.
 
 | type | (a) above the record | (b) at/below, no published answer | (c) published with an answer |
 |---|---|---|---|
-| I | `n = 84…100` | the unlinked pairs in `n = 55…83` | toys `n = 10, 15, 20`; 15 real solves from `n = 55` up |
-| II | `n = 39…54` | the unlinked pairs in `n = 35…38` | toys; 3 real solves, smallest `n = 35` seeds 0 and 2 |
+| I | `n = 84…100` | the unlinked pairs in `n = 55…83` | toys `n = 10, 15, 20`; 56 real solves, `n = 55…83`, smallest `n = 55` seeds 0, 1, 4 |
+| II | `n = 39…54` | the unlinked pairs in `n = 35…38` | toys; 5 real solves, smallest `n = 35` seeds 0 and 2 |
 | III | `n = 39…53` | the unlinked pairs in `n = 34…38` | toys; 7 real solves, smallest `n = 34` seeds 0 and 1 |
-| IV | `m = 77…100` | the unlinked pairs in `m = 55…76` | toys `n = 5, 10, 15`; 14 real solves from `m = 63` up |
+| IV | `m = 77…100` | the unlinked pairs in `m = 55…76` | toys `n = 5, 10, 15`; 30 real solves, `m = 55…76`, smallest `m = 55` seeds 0 and 2 |
 | V | `m = 22…35` | the unlinked pairs in `m = 16…21` | toys; 11 real solves, smallest **`m = 16` seeds 0, 1, 2** |
-| VI | `m = 25…35` | the unlinked pairs in `m = 16…24` | toys; 8 real solves, smallest **`m = 16` seeds 0, 1** |
+| VI | `m = 25…35` | the unlinked pairs in `m = 16…24` | toys; 10 real solves, smallest **`m = 16` seeds 0, 1** |
 
-The (c) counts are the submission rows carrying a `details_<TYPE>_<DATE>.html` link, counted
-directly from `submissions`' pinned bytes on 2026-11-09: 15, 3, 7, 14, 11, 8 — **58** in all.
-Note this does **not** reconcile with the 37-row fixture of §8 (29 linked rows across types II, III,
-V and VI against the fixture's 37 solves), because a detail page can report more than one solve —
-Sakata and Takagi's 2025/10/16 page covers `m = 23` and `m = 24`. The fixture counts solves and
-this counts pages, and neither number has been re-derived against the other. **Treat 58 as a page
-count and not as a solve count**, and see §14.5 for the follow-up.
+**The page count and the solve count reconcile exactly, and the previous revision's 58 was a regex
+artefact.** This was recorded here as an open discrepancy — 58 pages against a 37-row fixture — with
+the suggestion that a detail page might report several solves. Re-derived for #618 from the same
+pinned `submissions` bytes, both halves of that are wrong.
+
+| type | submission rows | linked | real solves | toy solves |
+|---|---|---|---|---|
+| I | 57 | 57 | 56 | 1 |
+| II | 6 | 6 | 5 | 1 |
+| III | 8 | 8 | 7 | 1 |
+| IV | 31 | 31 | 30 | 1 |
+| V | 12 | 12 | 11 | 1 |
+| VI | 11 | 11 | 10 | 1 |
+| **total** | **125** | **125** | **119** | **6** |
+
+Three things follow, and each was previously stated otherwise.
+
+**125 pages, not 58.** The earlier count matched `details_<TYPE>_[0-9]{8}.html`. That pattern drops
+every page named for a **second submission on the same day** — `details_I_20171114_7.html`,
+`details_V_20251016_2.html` and 65 others — and both `_cs.html` toy pages it was never written for.
+Those 67 pages are not duplicates or redirects; each is a distinct submission with its own
+contestants, runtime and answer vector. Type I loses 42 pages to the pattern and type IV loses 17,
+which is why the two types this document had not transcribed were also the two it undercounted
+worst.
+
+**One page, one solve.** No detail page reports more than one solve. The specific counter-example
+named here — "Sakata and Takagi's 2025/10/16 page covers `m = 23` and `m = 24`" — does not exist:
+there are **two** pages that day, `details_VI_20251016_1.html` and `details_VI_20251016_2.html`, one
+per solve, and the regex dropped both. So the fixture's 37 rows for types II, III, V and VI were in
+bijection with those types' 37 linked pages all along, and the extended fixture's 125 rows are in
+bijection with all 125. `fukuoka_mq_records::test_each_detail_page_backs_exactly_one_row` and
+`test_the_fixture_covers_all_six_types_one_row_per_published_page` hold both halves.
+
+**Every submission row is linked.** All 125 rows carry a `Details` link, so there is no recorded
+solve whose answer is unpublished, and column (b) above is about `(size, seed)` pairs with no
+submission row at all rather than about rows without a link. One row's markup is malformed — type
+V's toy row opens `<th>Ex.</th>` with no `<tr>`, which is why a naive row walk finds 124 — but the
+link is there.
 
 **The two real instances this crate has registered are in state (c), which §6 denied.** §6 said a
 real challenge "ship[s] no answer file, so there is nothing to check a witness against but the
@@ -1431,11 +1499,15 @@ compiled; the modulus is a test rather than an argument (§2.4, and
 
 Open, and filed rather than left here:
 
-- **Extend the §8 fixture to types I and IV.** It covers II, III, V and VI by an explicit scope
-  choice, and types I and IV have 15 and 14 linked detail pages carrying full answer vectors. Their
-  hpXbred rows are also the only hybrid-enumeration comparands on the board, which §14.4 leans on.
-- **Reconcile the solve count with the page count** — 37 against 58 (§14.2). One is a solve count
-  and one a page count and neither has been re-derived against the other.
+- ~~**Extend the §8 fixture to types I and IV.**~~ **Done, #618.** The fixture covers all six types
+  and all 125 recorded solves. Types I and IV turned out to have **57 and 31** linked pages, not the
+  15 and 14 recorded here — the shortfall was the same regex artefact as the count below. Their
+  hpXbred and Crossbred rows are the only hybrid-enumeration comparands on the board, which §14.4
+  leans on, and they are now in the fixture rather than only in prose.
+- ~~**Reconcile the solve count with the page count** — 37 against 58 (§14.2).~~ **Done, #618, and
+  the premise was false.** There is no discrepancy: 125 pages, 125 solves, one each. The 58 came
+  from a pattern that dropped 67 pages, and the page said to report two solves is in fact two pages.
+  See §14.2.
 - **Compiled dimensions above 24**, which is now what blocks every type rather than any field.
 - **Packed GF(2) storage**, at 16 bytes per bit today.
 - No solving result is claimed anywhere in §14, which is #197's own acceptance criterion.
