@@ -23,4 +23,4 @@ pub use sparse_multivariate_multiply::{
     multiply_multivariate_unstable, multivariate_multiply_route_unstable, MultiplyRoute,
 };
 pub use sparse_multivariate_polynomial::SparseMultiPoly as MultivariatePolynomial;
-pub use sparse_multivariate_polynomial_arithmetic::NormalFormCounts;
+pub use sparse_multivariate_polynomial_arithmetic::{NormalFormCounts, NormalFormError};
