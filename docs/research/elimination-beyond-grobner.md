@@ -477,10 +477,17 @@ instead.
    length comes out `2^32` against a two-adicity of 24. The 127 axis reaches Bluestein only through a
    factor-sized `bluestein_convolution_domain(127, ..)` attached by hand. Unverified whether any
    caller wants that today; no code path asks for a `2^24 · 127` domain.
-3. **The memory-access hypothesis was never tested.** 2025/950's 4/3-power FFT lower bound is half of
-   #68's own framing of this regime — "reportedly bound by memory *access* rather than arithmetic" —
-   and `examples/ntt_access.rs`, specified in [`graeffe-root-finding.md`](graeffe-root-finding.md)
-   §6.3 and listed as row 2 of its §10 plan, does not exist. Filed as #591.
+3. ~~**The memory-access hypothesis was never tested.**~~ **Tested, #591, and the premise half
+   holds.** 2025/950's 4/3-power FFT lower bound is half of #68's own framing of this regime —
+   "reportedly bound by memory *access* rather than arithmetic" — and `examples/ntt_access.rs` now
+   exists to [`graeffe-root-finding.md`](graeffe-root-finding.md) §6.3's specification, with the
+   result in its §6.3.1, taken on a quiet box. Below ~16 MB of coefficients the transform is
+   **arithmetic**-bound, at 83–105% of its field's own multiply rate measured beside it, so the
+   premise does not describe it there. Between 16 and 32 MB both 8-byte fields step down to 61–65%
+   — and that step is **not** the 256 MB L3 boundary, which costs Goldilocks 16.3% and BN254 2.7%.
+   The degradation then saturates rather than growing: BN254 is flat at 73–80% from 32 MB to 2 GB.
+   So the regime is arithmetic-bound where Zeebra currently works and partly access-bound above it,
+   with a 35% ceiling on what a better access pattern could recover for an 8-byte field.
 
 ## 6. Per-child recommendation
 
