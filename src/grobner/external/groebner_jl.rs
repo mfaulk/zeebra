@@ -200,7 +200,8 @@ impl GroebnerJlSolver {
     /// else.
     ///
     /// # Errors
-    /// [`RunFailure::Io`] if the scratch directory could not be created. A *missing* `julia` is
+    /// [`RunFailure::Harness`] if the scratch directory could not be created — the harness's own
+    /// filesystem work, and never the tool's. A *missing* `julia` is
     /// not reported here, because nothing has been run yet: it surfaces from
     /// [`ExternalSolver::probe_version`] or [`ExternalSolver::run`] as
     /// [`RunFailure::Unavailable`].
@@ -717,9 +718,11 @@ impl ExternalSolver for GroebnerJlSolver {
             );
         }
         if let Err(error) = std::fs::write(&script_path, &script) {
+            // The harness's own write, so a skipped row: Julia was never started, and a full disk
+            // is not Groebner.jl losing a race (#610).
             return finish(
-                RunStatus::Failed(RunFailure::Io {
-                    reason: error.to_string(),
+                RunStatus::Failed(RunFailure::Harness {
+                    detail: format!("{}: {}", script_path.display(), error),
                 }),
                 Measurement::unmeasured(),
                 None,
@@ -882,6 +885,37 @@ mod tests {
         let root = scratch_root("absent");
         let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
         assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
+    }
+
+    /// A failure of the harness's **own** script write is a skipped row, not a failed Groebner.jl.
+    ///
+    /// Driven for real: `/bin/true` exists so the absent-tool short cut does not fire, and a
+    /// directory is placed at exactly the script path the first run writes, so `fs::write` cannot
+    /// succeed. Needs no Julia (#610).
+    #[test]
+    fn test_a_failed_script_write_is_a_skipped_row_and_not_a_failed_solve() {
+        let root = scratch_root("harness-io");
+        std::fs::create_dir_all(root.join("pair-1.jl")).expect("the blocking directory");
+        let mut solver =
+            GroebnerJlSolver::new("/bin/true", None, &root).expect("a writable scratch directory");
+        let report = solver.run(
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(5)),
+        );
+        let _ = std::fs::remove_dir_all(root.join("pair-1.jl"));
+
+        match &report.status {
+            RunStatus::Failed(RunFailure::Harness { detail }) => {
+                assert!(detail.contains("pair-1.jl"), "{}", detail)
+            }
+            other => panic!("expected Harness, got {:?}", other),
+        }
+        assert!(
+            report.was_skipped(),
+            "the harness's own write failed, so Groebner.jl was never attempted"
+        );
+        assert!(report.measurement.is_unmeasured());
     }
 
     /// An absent `julia` fails the version probe the same way, writing nothing and consulting no

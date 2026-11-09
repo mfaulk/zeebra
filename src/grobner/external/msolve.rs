@@ -983,16 +983,20 @@ fn failure_from_log(log: &str, code: Option<i32>) -> RunFailure {
             "Bad file format",
             "msolve rejected the generated input file as malformed",
         ),
-        (
-            "Cannot open output file",
-            "msolve could not open its output file",
-        ),
     ] {
         if log.contains(needle) {
             return RunFailure::Reported {
                 message: message.to_string(),
             };
         }
+    }
+    // msolve's own I/O, as msolve reported it: the tool ran and failed on a file of its own, which
+    // is its row and not the harness's. `RunFailure::Io` is that side of #610's split, and it is
+    // deliberately **not** counted by `was_skipped()`.
+    if log.contains("Cannot open output file") {
+        return RunFailure::Io {
+            reason: "msolve could not open its output file".to_string(),
+        };
     }
     RunFailure::NonZeroExit { code }
 }
@@ -1258,10 +1262,13 @@ impl ExternalSolver for MsolveSolver {
             );
         }
 
+        // The two writes below are the harness's own, so a failure of either is a skipped row
+        // rather than a failed solve: msolve was never started, and a full disk, an exhausted fd
+        // table or an unwell `/tmp` says nothing about it (#610).
         if let Err(e) = std::fs::create_dir_all(&self.work_dir) {
             return finish(
-                RunStatus::Failed(RunFailure::Io {
-                    reason: format!("{}: {}", self.work_dir.display(), e),
+                RunStatus::Failed(RunFailure::Harness {
+                    detail: format!("{}: {}", self.work_dir.display(), e),
                 }),
                 Measurement::unmeasured(),
                 None,
@@ -1270,8 +1277,8 @@ impl ExternalSolver for MsolveSolver {
         }
         if let Err(e) = std::fs::write(&input_path, input_file(instance)) {
             return finish(
-                RunStatus::Failed(RunFailure::Io {
-                    reason: format!("{}: {}", input_path.display(), e),
+                RunStatus::Failed(RunFailure::Harness {
+                    detail: format!("{}: {}", input_path.display(), e),
                 }),
                 Measurement::unmeasured(),
                 None,
@@ -1405,8 +1412,9 @@ mod tests {
             benchmark_systems::{cyclic, katsura},
             differential::monomial_to_string,
             external::{
-                corpus, ExternalSolver, FieldSpec, Instance, Invariants, Limits, RunFailure,
-                RunStatus, Support, Task, Unsupported, REFERENCE_CHARACTERISTIC,
+                corpus, ExternalSolver, FieldSpec, Instance, Invariants, Limits, Measurement,
+                RunFailure, RunReport, RunStatus, Support, Task, Unsupported,
+                REFERENCE_CHARACTERISTIC,
             },
             f4, f4_with_options, F4Options,
         },
@@ -2737,6 +2745,65 @@ rational param(cpu)             0.75 sec
         let root = scratch_root("absent");
         let written = std::fs::read_dir(&root).map_or(0, |dir| dir.count());
         assert_eq!(written, 0, "{} holds {} file(s)", root.display(), written);
+    }
+
+    /// A failure of the harness's **own** scratch work is a skipped row, not a failed msolve.
+    ///
+    /// Driven for real rather than asserted on a constructed report: the binary is present, so the
+    /// absent-tool short cut does not fire, and the scratch root is named under an existing *file*
+    /// so `create_dir_all` cannot succeed. Needs no msolve (#610).
+    #[test]
+    fn test_a_failed_scratch_write_is_a_skipped_row_and_not_a_failed_solve() {
+        let blocker = scratch_root("harness-io-blocker");
+        if let Some(parent) = blocker.parent() {
+            std::fs::create_dir_all(parent).expect("a writable temp dir");
+        }
+        std::fs::write(&blocker, b"not a directory").expect("the blocking file");
+        // `/bin/true` exists and is executable, so absence is not what this row reports.
+        let mut solver = MsolveSolver::new("/bin/true", blocker.join("work"));
+        let report = solver.run(
+            &pair(P30),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(30)),
+        );
+        let _ = std::fs::remove_file(&blocker);
+
+        match &report.status {
+            RunStatus::Failed(RunFailure::Harness { detail }) => {
+                assert!(detail.contains("work"), "{}", detail)
+            }
+            other => panic!("expected Harness, got {:?}", other),
+        }
+        assert!(
+            report.was_skipped(),
+            "the harness's own filesystem failed, so msolve was never attempted"
+        );
+        assert!(!report.status.is_timing_evidence());
+        assert!(report.measurement.is_unmeasured());
+    }
+
+    /// msolve's own `Cannot open output file` is the **tool's** I/O, so the row is attempted.
+    ///
+    /// The other half of #610's split, read off the log the way every other msolve failure is.
+    #[test]
+    fn test_msolves_own_output_file_error_is_the_tools_io_and_not_skipped() {
+        let failure = failure_from_log("Cannot open output file\n", Some(1));
+        match &failure {
+            RunFailure::Io { reason } => assert!(reason.contains("output file"), "{}", reason),
+            other => panic!("expected Io, got {:?}", other),
+        }
+        let report = RunReport::new(
+            "msolve",
+            &pair(P30),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(30)),
+            RunStatus::Failed(failure),
+            Measurement::unmeasured(),
+        );
+        assert!(
+            !report.was_skipped(),
+            "msolve ran and reported a failure of its own I/O"
+        );
     }
 
     /// An absent msolve fails the version probe the same way.

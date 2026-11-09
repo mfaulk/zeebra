@@ -3358,10 +3358,11 @@ An absent binary is resolved by `process::unavailable_binary`, a path lookup tha
 under any budget, including none. Only definite absence takes that short cut; a file that exists
 but may not be executable is left to the spawn, whose reason is the kernel's rather than a guess.
 
-`RunReport::was_skipped()` is true for the three outcomes that mean **the tool did not run**:
-`Unsupported` (the input is unrepresentable), `RunFailure::Unavailable` (the tool is absent) and
-`RunFailure::Environment` (the harness's own environment would have invalidated the measurement).
-The last is why it exists: an adapter can set a child's environment but cannot *clear* it, so an
+`RunReport::was_skipped()` is true for the four outcomes that mean **the tool did not run**:
+`Unsupported` (the input is unrepresentable), `RunFailure::Unavailable` (the tool is absent),
+`RunFailure::Environment` (the harness's own environment would have invalidated the measurement)
+and `RunFailure::Harness` (the harness's own filesystem work failed).
+`Environment` is why it exists: an adapter can set a child's environment but cannot *clear* it, so an
 inherited switch that selects a different algorithm — or writes a trace into the stream the basis
 is parsed from — cannot be undone from inside the run, and the honest answer is to refuse rather
 than to measure something no user of the tool gets. It is deliberately not `Reported`, which means
@@ -3369,6 +3370,17 @@ than to measure something no user of the tool gets. It is deliberately not `Repo
 an operator knows what to unset and the effect so the refusal can be judged. Sagebrush has seven
 such switches (`sagebrush::PINNED_SWITCHES`), every one read with `env::var(..).is_ok()` — truthy
 if set, so `SB_SIGF4=0` *enables* the experimental signature path.
+
+`RunFailure::Harness` is the same argument applied to the filesystem, and the two I/O variants are
+split by **which side failed**. Every adapter writes its own scratch files — the input or the
+script, and through `Supervisor` the work directory and the output the child's streams are
+redirected to. A failed write there is the harness's, the tool was never started, and a full disk
+or an exhausted fd table says nothing about msolve. `RunFailure::Io` is the other side: I/O the
+tool itself reported, such as msolve's `Cannot open output file`, which is an attempted run and so
+is **not** skipped. `From<std::io::Error>` lands on `Harness` because an adapter only ever sees a
+`std::io::Error` from work it did itself; the tool's own complaints arrive as text in a log and are
+classified by reading it. `SpawnError::Harness` and `OracleError::Harness` are the same
+distinction one layer down — the supervisor and the Singular oracle never speak for the tool.
 
 Two msolve-specific facts the adapter encodes as named constants, because both are capability
 bounds rather than slow paths and both are narrower than they look:

@@ -159,7 +159,7 @@ current column at this standard, which is why re-taking them is its own serializ
 | Outcome | One of `RunStatus`'s five: `Complete`, `Verified`, `StoppedByLimit`, `Unsupported`, `Failed`. §3. |
 | Invariants | The implementation-independent quantities extracted from the answer: quotient dimension, the sorted leading monomials of the reduced basis, basis cardinality, solution count, eliminant degree. `Invariants`. §5. |
 | Verification | What independently agreed, and **how many invariants were actually shared** (`Verification::shared_invariants`). Zero shared invariants is not a verification, and `RunStatus::is_verified` returns false in that case — two empty invariant sets agree vacuously, which is the trap this guards. |
-| Failure or limit | `LimitStop` names the resource and the limit; `RunFailure` names the mode (`Unavailable`, `Reported`, `Incomplete`, `MissingMarker`, `Unparsable`, `SelfInconsistent`, `NonZeroExit`, `Io`, `Environment`); `Unsupported` names the missing capability and the tool's own bound. §3. |
+| Failure or limit | `LimitStop` names the resource and the limit; `RunFailure` names the mode (`Unavailable`, `Reported`, `Incomplete`, `MissingMarker`, `Unparsable`, `SelfInconsistent`, `NonZeroExit`, `Io`, `Harness`, `Environment`); `Unsupported` names the missing capability and the tool's own bound. §3. |
 | Reproduction command | The exact command line, shell-quoted, including the environment variables set for the child. `Invocation::command_line()`. Plus the input file, which is recoverable from the identity digest's canonical text. |
 | Raw log | Kept for every failure. A parse error is not diagnosable without it, and a failure with no log is an assertion rather than a finding. |
 
@@ -175,7 +175,7 @@ The five outcomes, and what each licenses:
 | `Verified(Answer, Verification)` | yes | yes | the time |
 | `StoppedByLimit(LimitStop)` | the time **is the limit** | **no** | `> 600 s (wall limit)` |
 | `Unsupported(Unsupported)` | **no** | **no** | the missing capability, e.g. `field > 2^31` |
-| `Failed(RunFailure)` | the time to fail, or none at all when the run was never attempted (`Unavailable`, `Environment`) | **no** | the failure mode |
+| `Failed(RunFailure)` | the time to fail, or none at all when the run was never attempted (`Unavailable`, `Environment`, `Harness`) | **no** | the failure mode |
 
 `RunStatus::is_timing_evidence()` is this table's third column, and `speedup_over` consults it for
 **both** operands. The prohibitions:
@@ -214,8 +214,23 @@ The five outcomes, and what each licenses:
   carrying the task that does not apply. A fifth adapter gets it by returning the variant rather
   than by rediscovering the rule; a driver's own error line is still the evidence the condition
   holds, but it is classified before the exit status is consulted.
-- `RunReport::was_skipped()` covers `Unsupported`, `Unavailable` and `Environment` together,
-  because all three mean "not attempted" rather than "attempted and lost".
+- A failure of **the harness's own filesystem work** (`RunFailure::Harness`) is a skipped row on
+  exactly the same argument. Every adapter writes its own scratch files — the input or the script,
+  and through `Supervisor` the work directory and the output file the child's streams are
+  redirected to — and when one of those writes fails, no process was started, there is no
+  measurement, and nothing about the solver follows. A `/tmp` that is momentarily unwell, an
+  exhausted fd table or a full disk is not msolve losing a race, which is what a single `Io`
+  variant covering both sides made it read as (#610).
+- **The two I/O variants are split by which side failed.** `RunFailure::Io` is I/O *the tool itself
+  reported* — msolve's `Cannot open output file` is the live instance — which is an attempted run
+  and therefore **not** skipped: that row is the tool's. `RunFailure::Harness` is the harness's own,
+  and is skipped. `From<std::io::Error>` lands on `Harness`, because an adapter only ever sees a
+  `std::io::Error` from work it did itself; a tool's own I/O complaint arrives as text in a log and
+  is classified by reading it. `SpawnError::Harness` and `OracleError::Harness` carry the same
+  distinction one layer down, and are named for the side rather than for the syscall because
+  neither the supervisor nor the Singular oracle ever speaks for the tool.
+- `RunReport::was_skipped()` covers `Unsupported`, `Unavailable`, `Environment` and `Harness`
+  together, because all four mean "not attempted" rather than "attempted and lost".
 - A tool that contradicts itself (`SelfInconsistent`) produces **no finding at all**. Nothing may be
   concluded about any other implementation from a run in which the reference was unsound. This is
   not hypothetical: Singular's `std` under lex is cross-checked against its own `fglm` precisely

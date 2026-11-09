@@ -105,8 +105,14 @@ pub enum OracleError {
     /// it is an error and not a finding.
     SelfInconsistent { detail: String },
 
-    /// The filesystem work the run needs failed.
-    Io { reason: String },
+    /// **The oracle's own** filesystem work failed: the scratch directory, or the script it was
+    /// about to hand Singular.
+    ///
+    /// Named for the side that failed. Nothing about Singular follows from it — the oracle never
+    /// got as far as starting it — which is why the competitive adapter maps it to
+    /// [`RunFailure::Harness`](crate::grobner::external::RunFailure::Harness), a skipped row rather
+    /// than a failed solve (#610).
+    Harness { detail: String },
 }
 
 impl Display for OracleError {
@@ -141,17 +147,23 @@ impl Display for OracleError {
             Self::SelfInconsistent { detail } => {
                 write!(f, "Singular disagrees with itself: {}", detail)
             }
-            Self::Io { reason } => write!(f, "{}", reason),
+            Self::Harness { detail } => {
+                write!(f, "the harness's own filesystem work failed: {}", detail)
+            }
         }
     }
 }
 
 impl std::error::Error for OracleError {}
 
+/// The oracle's own I/O, never Singular's.
+///
+/// The only `io::Error`s this oracle sees come from work it did itself, so `?` on one is
+/// [`OracleError::Harness`]. Singular's own complaints arrive as text in its output.
 impl From<io::Error> for OracleError {
     fn from(e: io::Error) -> Self {
-        Self::Io {
-            reason: e.to_string(),
+        Self::Harness {
+            detail: e.to_string(),
         }
     }
 }
@@ -168,7 +180,7 @@ impl From<SpawnError> for OracleError {
     fn from(e: SpawnError) -> Self {
         match e {
             SpawnError::Unavailable { binary, reason } => Self::Unavailable { binary, reason },
-            SpawnError::Io { reason } => Self::Io { reason },
+            SpawnError::Harness { detail } => Self::Harness { detail },
         }
     }
 }
@@ -231,7 +243,11 @@ impl SingularOracle {
         keep_files: bool,
     ) -> Result<Self, OracleError> {
         let work_dir = work_dir.into();
-        std::fs::create_dir_all(&work_dir)?;
+        if let Err(e) = std::fs::create_dir_all(&work_dir) {
+            return Err(OracleError::Harness {
+                detail: format!("{}: {}", work_dir.display(), e),
+            });
+        }
         Ok(Self {
             binary: binary.into(),
             timeout,
@@ -549,7 +565,13 @@ impl SingularOracle {
         if let Some(absent) = invocation.unavailable() {
             return Err(OracleError::from(absent));
         }
-        std::fs::write(&script_path, script)?;
+        // Named with its path: the detail is the whole diagnostic for a scratch failure, and
+        // `From<io::Error>` alone would report "Is a directory" against no file in particular.
+        if let Err(e) = std::fs::write(&script_path, script) {
+            return Err(OracleError::Harness {
+                detail: format!("{}: {}", script_path.display(), e),
+            });
+        }
         let measurement = match Supervisor::new(self.timeout)
             .with_poll_interval(Duration::from_millis(5))
             .run(&invocation)

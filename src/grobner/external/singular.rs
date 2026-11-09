@@ -74,7 +74,8 @@ impl SingularSolver {
     /// A solver using `binary`, with scratch files under `work_dir` and a per-run time limit.
     ///
     /// # Errors
-    /// [`RunFailure::Io`] if the scratch directory could not be created. A *missing binary* is not
+    /// [`RunFailure::Harness`] if the scratch directory could not be created — the harness's own
+    /// filesystem work, and never the tool's. A *missing binary* is not
     /// reported here, because nothing has been run yet — it surfaces from
     /// [`ExternalSolver::probe_version`] or [`ExternalSolver::run`] as
     /// [`RunFailure::Unavailable`].
@@ -283,7 +284,9 @@ fn failure_from_oracle_error(error: OracleError) -> RunFailure {
         },
         OracleError::Untranslatable { reason } => RunFailure::Reported { message: reason },
         OracleError::SelfInconsistent { detail } => RunFailure::SelfInconsistent { detail },
-        OracleError::Io { reason } => RunFailure::Io { reason },
+        // The harness's own filesystem work, so the harness's own variant: nothing about Singular
+        // follows from a scratch directory that could not be created (#610).
+        OracleError::Harness { detail } => RunFailure::Harness { detail },
     }
 }
 
@@ -830,6 +833,12 @@ mod tests {
             }),
             RunFailure::SelfInconsistent { .. }
         ));
+        assert!(matches!(
+            failure_from_oracle_error(OracleError::Harness {
+                detail: "/tmp/zb: No space left on device".into()
+            }),
+            RunFailure::Harness { .. }
+        ));
         match failure_from_oracle_error(OracleError::Timeout {
             limit: Duration::from_secs(1),
         }) {
@@ -837,6 +846,56 @@ mod tests {
                 assert!(detail.contains("limit stop"), "{}", detail)
             }
             other => panic!("expected a flagged Incomplete, got {:?}", other),
+        }
+    }
+
+    /// A failure of the oracle's **own** script write is a skipped row, not a failed Singular.
+    ///
+    /// Driven for real through both entry points the adapter has: `/bin/true` exists so the
+    /// absent-tool short cut does not fire, and a directory sits at exactly the script path the
+    /// oracle's first run writes. Needs no Singular (#610).
+    #[test]
+    fn test_a_failed_script_write_is_a_skipped_row_and_not_a_failed_solve() {
+        for (tag, probe) in [("harness-io-run", false), ("harness-io-probe", true)] {
+            let root = scratch_root(tag);
+            let mut solver = solver_with_timeout("/bin/true", tag, Duration::from_secs(5));
+            // The oracle numbers its scripts `run-<pid>-<n>.sing` and this oracle is fresh, so
+            // the next one is `-1`.
+            let blocked = root.join(format!("run-{}-1.sing", std::process::id()));
+            std::fs::create_dir_all(&blocked).expect("the blocking directory");
+
+            let failure = if probe {
+                solver
+                    .probe_version()
+                    .expect_err("the write cannot succeed")
+            } else {
+                let report = solver.run(
+                    &instance(65521, MonomialOrder::GradedReverseLexicographic),
+                    Task::ReducedGrobnerBasis,
+                    &Limits::wall(Duration::from_secs(5)),
+                );
+                assert!(
+                    report.was_skipped(),
+                    "the harness's own write failed, so Singular was never attempted"
+                );
+                assert!(report.measurement.is_unmeasured());
+                match report.status {
+                    RunStatus::Failed(failure) => failure,
+                    other => panic!("expected a failure, got {:?}", other),
+                }
+            };
+            let _ = std::fs::remove_dir_all(&blocked);
+
+            match &failure {
+                RunFailure::Harness { detail } => {
+                    assert!(
+                        detail.contains(".sing"),
+                        "the path is the diagnostic: {}",
+                        detail
+                    )
+                }
+                other => panic!("{}: expected Harness, got {:?}", tag, other),
+            }
         }
     }
 }

@@ -610,7 +610,8 @@ directly, under `--route fglm`.
 
    Three details worth recording. `RunReport::was_skipped()` counts it, alongside `Unavailable` and
    `Unsupported`, because all three mean the tool did not run — the issue left that open and the
-   answer is yes. Its `Display` begins `not run:`, so the board cell a reader actually sees says
+   answer is yes. (#610 later added a fourth on the same argument, `RunFailure::Harness`: a failed
+   scratch write of the harness's own.) Its `Display` begins `not run:`, so the board cell a reader actually sees says
    so rather than implying a tool error. And `PINNED_SWITCHES` now carries each switch's *effect*
    next to its name, so `detail` is specific: a refusal that named only the variable would tell an
    operator to unset it without letting them judge whether it should have been set.
