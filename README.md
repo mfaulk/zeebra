@@ -913,6 +913,8 @@ cargo run --release --example field_width          # what a 4-byte field element
 cargo run --release --example field_width -- axpy  # arm: the kernel, a dense echelon, F4
 cargo run --release --example mq_challenge         # import and solve a Fukuoka MQ instance
 cargo run --release --example poseidon_cico        # reduced-round Poseidon CICO, end to end
+cargo run --release --example feistel_mimc_cico    # Feistel-MiMC CICO: the round ladder, and the
+                                                   # per-round and univariate models side by side
 cargo run --release --example univariate_scaling   # univariate cost and memory against degree
 cargo run --release --example univariate_scaling -- list
 cargo run --release --example univariate_scaling -- points=250,500,1000,2000   # lagrange only, exact counts
@@ -4787,6 +4789,57 @@ exits 2 if they are not. An unpinned wall-clock figure is not a measurement, and
 accident is one that gets quoted later; measurements must also be serialized under
 `tools/benchlock.sh`. The timed ladder is a follow-up, and `(α+2)^N` is checked at `N = 1 … 4` by a
 unit test so a regression fails CI rather than appearing as a table row.
+
+#### Feistel-MiMC and Rescue-Prime, the 2021–2022 EF bounty primitives
+
+Two more imported primitives, both over `p = 2^64 − 59` — the fastest non-trivial field in the table
+above at 1.71 ns per multiply, and until now the one nothing exercised cryptanalytically.
+[`docs/research/mimc-rescue.md`](docs/research/mimc-rescue.md) is the full account;
+[`docs/research/ef-cryptanalysis.md`](docs/research/ef-cryptanalysis.md) §4 is the survey the
+parameters come from.
+
+**The reference ships known-answer tests and all ten reproduce.** `zkfriendlyhashzoo` at
+`b9c09d5a6302725a65ff59e4219d1beb4c524154` (MIT) publishes one per instance — five Feistel-MiMC
+round counts and five Rescue-Prime instances — and each output depends on every round constant, the
+S-box placement and the field, so reproducing all ten is a third-party oracle rather than a self-
+check. That is the standard #197 set: two fields of the same order with different moduli are
+indistinguishable by any shape check, so only a published vector can tell them apart.
+
+The two primitives make opposite choices about their constants and each module follows its own:
+
+- **Feistel-MiMC derives them**, from a SHAKE128 seeded with `"FeistelMimc"` and the field
+  characteristic. `src/util/shake128.rs` is a hand-written Keccak-f[1600] for it, beside the
+  existing SHA-256. One detail decides every constant and no shape check could catch it: the
+  reference's `ff` repr is **two** limbs wide for a 64-bit modulus, so the seed absorbs `p` followed
+  by eight zero bytes, while `KnownOrder::characteristic_limbs()` is canonical and reports one limb.
+  `FeistelMimc::derived_digest` pins the result.
+- **Rescue-Prime tabulates them**, so they are transcribed into
+  `research/rescue-prime/bounty-constants.txt` with the source file's digest in its header. Its
+  inverse S-box exponent `α^{-1} mod (p − 1)` is **computed from the field's order**, not copied, and
+  a test checks `x^α` and `x^{α^{-1}}` are mutually inverse by evaluation — `12297829382473034371`
+  here against Anemoi's `12297829382473034175`, two numbers a glance cannot tell apart.
+
+Both record **`m` is not always 3**: three of the five Rescue-Prime bounty instances are `t = 2`,
+against the `m = 3` both #203 and #71 describe. And both Feistel-MiMC ladders are carried, because
+the published parameters were revised: `r ∈ {6, 10, 14, 18, 22}` was replaced by
+`r ∈ {22, 25, 30, 35, 40}` after `r = 14` and `r = 18` fell to equation solving, so **the old
+hardest rung became the new easiest** and "r = 22" is ambiguous without a ladder named beside it.
+
+Feistel-MiMC CICO has **two models that differ in kind**, which is what makes it worth generating
+rather than duplicating the Poseidon work. There is no MDS layer, so nothing couples the branches
+and the round relation `A_{j+1} = A_{j−1} + (A_j + c_j)^α` is a recurrence in one unknown:
+eliminating the intermediates by substitution leaves a **single univariate of degree `α^r`**, which
+is root-finding's problem and not F4's. The per-round model is `r` cubics in `r` variables, square
+and zero-dimensional with no slice. `test_the_two_formulations_have_the_same_solution_set` asserts
+they agree on the whole solution set — the univariate's roots are exhaustive over the base field —
+before any cost is compared. The `t = 3` Rescue-Prime instances are **underdetermined by one**
+(`N − E = t − 2k`), so they are not comparable to a square rung at matched variable count without a
+slice.
+
+Two rejections are recorded so they are not reopened. **MiMCSponge is not a polynomial-solving
+target**: its challenge objective is a *collision*, which is birthday-bounded. **Reinforced Concrete
+is not expressible** at any useful degree: its S-box decomposes into digits and inverts each modulo
+a different modulus `v`.
 
 `solve_one` is not a convenience wrapper. Time to one solution is dominated by the Gröbner basis
 and barely depends on how many solutions exist, while enumerating them all scales with the count —

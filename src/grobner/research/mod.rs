@@ -10,6 +10,8 @@ pub mod anemoi;
 pub mod anemoi_cico;
 pub mod challenge;
 pub mod cost_model;
+pub mod feistel_mimc;
+pub mod feistel_mimc_cico;
 pub mod griffin;
 pub mod linear;
 pub mod manifest;
@@ -18,6 +20,8 @@ pub mod mq_generator;
 pub mod poseidon;
 pub mod record;
 pub mod reorder;
+pub mod rescue_prime;
+pub mod rescue_prime_cico;
 pub mod resultant;
 pub mod row_cost;
 pub mod scoreboard;
@@ -39,6 +43,15 @@ pub use cost_model::{
     FigureBasis, Intermediate, LimitingStage, NextSizeProjection, PredictionError, Quantity,
     RunSelectionError, SchemaError, SelectedRuns, COST_MODEL_HISTORY_CONTRACT,
 };
+pub use feistel_mimc::{
+    FeistelMimc, FeistelMimcError, FeistelMimcParameters,
+    BOUNTY_ROUNDS as FEISTEL_MIMC_BOUNTY_ROUNDS, FEISTEL_MIMC_PRIME,
+    WITHDRAWN_ROUNDS as FEISTEL_MIMC_WITHDRAWN_ROUNDS,
+};
+pub use feistel_mimc_cico::{
+    dispatch_feistel_mimc_cico, verify_against_feistel_mimc_trace, FeistelMimcCico,
+    FeistelMimcCicoVisitor, FeistelMimcModel,
+};
 pub use griffin::{FixtureError, FreeLunchSystem, FREELUNCH_PRIME, FREELUNCH_R4, FREELUNCH_R5};
 pub use linear::{eliminate_affine, AffineElimination, Elimination, LinearError};
 pub use manifest::{Claim, InstanceManifest, Provenance};
@@ -53,6 +66,14 @@ pub use poseidon::{
 };
 pub use record::{AttemptRecord, ExperimentRecord, Json};
 pub use reorder::{ReorderError, RoundLayout, VariableOrder};
+pub use rescue_prime::{
+    BountyInstance, RescuePrime, RescuePrimeError, RescuePrimeParameters, BOUNTY_INSTANCES,
+    RESCUE_PRIME_PRIME,
+};
+pub use rescue_prime_cico::{
+    dispatch_rescue_prime_cico, verify_against_rescue_prime_trace, RescuePrimeCico,
+    RescuePrimeCicoVisitor,
+};
 pub use resultant::{
     bivariate_resultant, bivariate_resultant_ntt, bivariate_resultant_ntt_with,
     bivariate_resultant_predicted, bivariate_resultant_reference,
