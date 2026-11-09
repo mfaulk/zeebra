@@ -2336,6 +2336,19 @@ Newton, where it measures 2.2x to 7.8x faster. A single threshold on `deg(g)`, o
 `min(k, m)`, gets one of those two wrong; the shipped rule is `m > t^(2-e) * k^(e-1)` with
 `e = log2 3` and one measured `t` per element width.
 
+**The floor on `k` was separately 16x-32x too high, and #527 measured it.** The rule also carries a
+floor that the inequality does not imply — at `k = 2`, `m = 10^6` the inequality holds and only the
+floor refuses Newton. #193 put that floor at `t`, the one length it had measured, and guessed the
+true value near `t/68`; both were wrong. Sweeping `k` downward at a fixed `m = 65536`, long
+division's last win is at `k = 32 / 8 / 16 / 4` across the four fields and Newton wins by more than
+10% from `64 / 16 / 32 / 8` — so the floor refused 1.2x to 3.7x across a 16x band of `k`, and of 44
+rows the rule picked the slower route on 22.
+
+The floor is now **`karatsuba_base_case`** — 48 / 16 / 4 — which is not a new constant but the one
+§4.1.1 already measured, and the right anchor: below the base case every product inside the Newton
+iteration is schoolbook, so the route is long division with allocations. Re-measured with it
+shipped, the rule picks the slower route on **1 row of 44**.
+
 **`gcd` stays quadratic**, and that is now a smaller gap than it was. Half-GCD is `O(M(d) log d)`,
 which against Euclid's `d^2` is a real crossing rather than the `d^2 log d`-against-`d^2`
 non-crossing it was under a schoolbook `M`; it also needs a fast division to recurse on, and that

@@ -16,7 +16,8 @@ mod div_with_remainder;
 #[doc(hidden)]
 pub use div_with_remainder::{
     div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
-    newton_crossover_unstable, newton_is_cheaper_at_unstable,
+    newton_crossover_unstable, newton_floor_unstable, newton_is_cheaper_at_unstable,
+    newton_is_cheaper_unstable,
 };
 mod factorize;
 mod gcd;

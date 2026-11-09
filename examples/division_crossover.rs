@@ -39,7 +39,8 @@ use rand::{prelude::StdRng, SeedableRng};
 use zeebra::{
     div_with_remainder_long_unstable, div_with_remainder_newton_unstable,
     fields::{Bn254Fr, Mersenne31, PrimeFieldElement64},
-    newton_crossover_unstable, newton_is_cheaper_at_unstable,
+    newton_crossover_unstable, newton_floor_unstable, newton_is_cheaper_at_unstable,
+    newton_is_cheaper_unstable,
     util::peak_resident_bytes,
     FiniteField, Polynomial, UnivariatePolynomial,
 };
@@ -403,12 +404,133 @@ fn skewed<F: FiniteField>(seed: u64) {
     }
 }
 
+/// The floor on the precision: `k` swept **downward** at a fixed large `m`.
+///
+/// #527, and the axis [`skewed`] cannot reach. That sweep fixes `base = 2 * crossover` and moves
+/// `k` by factors of four *around* it, so every row has `k` at or above the crossover — which is
+/// exactly the regime the floor excludes by construction. This one holds `m` large and walks `k`
+/// down through the floor.
+///
+/// The shipped rule is `k > t` **and** `m > t^(2-e) * k^(e-1)`. The second half is derived and
+/// measured; the first is a floor that the inequality does not imply — at `k = 2`, `m = 10^6` the
+/// inequality holds and the floor is the only thing refusing Newton. #193 put the floor at `t`
+/// because that is the one length it had measured, and predicted the true floor near **`t / 68`**
+/// from the model
+///
+/// ```text
+///   5 k^(e-1) / m + k^-(2-e)  <  6 t^-(2-e)
+/// ```
+///
+/// which says the fixed cost of five products at the precision stops being amortized somewhere far
+/// below `t`. If that is right the shipped rule forgoes Newton across nearly two decades of `k`, in
+/// the regime where it measured *fastest*: at `k = 1024` against `m = 65536` Newton was 3.6x long
+/// division over Mersenne-31 and 7.8x over BN254 `Fr`.
+///
+/// **A null result is a complete result here.** If the fixed cost really does dominate up to `t`,
+/// the floor stays and the model is wrong, and that is worth knowing.
+fn floor_sweep<F: FiniteField>(seed: u64) {
+    let compiled_in = newton_crossover_unstable::<F>();
+    // Large enough that `m` is never the binding side of the inequality, and a power of two so the
+    // quotient lengths below divide it cleanly.
+    let m = 1usize << 16;
+
+    println!(
+        "\nfloor: divisor length {} fixed, quotient length swept down through the shipped floor \
+         of {} (the balanced crossover is {})",
+        m,
+        newton_floor_unstable::<F>(),
+        compiled_in
+    );
+    println!(
+        "| {:>8} | {:>11} | {:>11} | {:>8} | {:>8} | {:>10} | {:>9} |",
+        "k", "long s", "newton s", "speedup", "rule", "model says", "agrees"
+    );
+    println!("{}", rule(&[10, 13, 13, 10, 10, 12, 11]));
+
+    // Through the floor and well below it: the model's t/68 is 15 at t = 1024 and 4 at t = 256.
+    let mut lengths: Vec<usize> = vec![2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+    lengths.retain(|k| *k <= m);
+    lengths.sort_unstable();
+
+    let mut first_win: Option<usize> = None;
+    let mut last_loss: Option<usize> = None;
+
+    for k in lengths {
+        let (dividend, divisor) = operands::<F>(k, m, seed ^ (k as u64) << 4);
+        let (long, newton) = pair(&dividend, &divisor);
+        let speedup = long.as_secs_f64() / newton.as_secs_f64();
+        if speedup > 1.1 {
+            if first_win.is_none() {
+                first_win = Some(k);
+            }
+        } else {
+            last_loss = Some(k);
+        }
+        // What the shipped rule does, and what #193's model predicts it should do.
+        let shipped = newton_is_cheaper_unstable::<F>(k, m);
+        let model = model_prefers_newton(k, m, compiled_in);
+        println!(
+            "| {:>8} | {:>11.6} | {:>11.6} | {:>8.2} | {:>10} | {:>12} | {:>11} |",
+            k,
+            long.as_secs_f64(),
+            newton.as_secs_f64(),
+            speedup,
+            if shipped { "newton" } else { "long" },
+            if model { "newton" } else { "long" },
+            if shipped == (speedup > 1.1) {
+                "yes"
+            } else {
+                "NO"
+            },
+        );
+    }
+
+    match (last_loss, first_win) {
+        (Some(loss), Some(win)) => println!(
+            "- measured: long division still wins at k = {loss}, Newton wins by more than 10% from \
+             k = {win}. The shipped floor is {}, so the rule takes Newton from k = {}.",
+            newton_floor_unstable::<F>(),
+            newton_floor_unstable::<F>() + 1
+        ),
+        (None, Some(win)) => println!(
+            "- measured: Newton wins from the smallest k swept, {win} — the floor of \
+             {compiled_in} forgoes every one of these"
+        ),
+        (Some(loss), None) => println!(
+            "- measured: long division wins at every k up to {loss} — a null result, and the floor \
+             of {compiled_in} is vindicated"
+        ),
+        (None, None) => println!("- no row was measured"),
+    }
+    println!(
+        "- #193 guessed this floor at t = {} and then at t/68 = {}; #527 measured it and it is \
+         neither — the shipped floor is `karatsuba_base_case` = {}",
+        compiled_in,
+        (compiled_in / 68).max(1),
+        newton_floor_unstable::<F>()
+    );
+}
+
+/// Whether #193's cost model prefers Newton, which is what #527 exists to test against the clock.
+///
+/// `5 k^(e-1) / m + k^-(2-e) < 6 t^-(2-e)`, the inequality in [`floor_sweep`]'s comment. The
+/// constants 5 and 6 count products at the precision and are the modelled part; the exponent is
+/// the crate's multiplication exponent.
+fn model_prefers_newton(k: usize, m: usize, t: usize) -> bool {
+    const E: f64 = 1.584_962_500_721_156;
+    let k = k as f64;
+    let m = m as f64;
+    let t = t as f64;
+    5.0 * k.powf(E - 1.0) / m + k.powf(-(2.0 - E)) < 6.0 * t.powf(-(2.0 - E))
+}
+
 /// One field's sweeps, with its element width stated.
 fn measure_field<F: FiniteField>(name: &str, seed: u64, max_log: u32) {
     println!("\n\n## {}", name);
     println!("\n- an element is {} bytes", std::mem::size_of::<F>());
     balanced::<F>(seed, max_log);
     skewed::<F>(seed ^ 0x5_1193);
+    floor_sweep::<F>(seed ^ 0x5_1527);
 }
 
 fn main() {

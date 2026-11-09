@@ -4,7 +4,8 @@
 that published those figures, recovered from git rather than recorded at the time
 ([§10](external-comparison-protocol.md#10-the-commit-and-what-a-publication-bound-is)). **§4.3.3
 was taken at `1154bf5b` plus the change it measures**, recorded at the time rather than recovered;
-its `from_zeros` subsection at `bccad1fc` plus that change.
+its `from_zeros` subsection at `bccad1fc` plus that change, and §4.5's `#527` subsection at
+`66acfed2` plus that change.
 
 Reference for D2 (#83), a child of the #68 epic and a prerequisite for D3.
 
@@ -1473,6 +1474,57 @@ Euclidean loop wants the remainder anyway.
   that floor is the one part of it no measurement here covers. The model puts the true floor near
   `t/68`, which would widen the Newton band by nearly two decades in `k` — in exactly the regime
   where it measured fastest.
+
+#### #527: the floor was mine and it was 16x-32x too high
+
+**Measured at `66acfed2` plus the change itself.** `examples/division_crossover.rs` grew a third
+sweep, `floor`, which walks the quotient length `k` **downward** at a fixed `m = 65536`. The
+existing `skew` sweep cannot reach that axis: it pins `base = 2 * crossover` and moves `k` by
+factors of four *around* it, so every one of its rows sits at or above the crossover — which is
+exactly the regime the floor excludes by construction.
+
+The rule this section derives is `k > floor` **and** `m > t^(2-e) k^(e-1)`. The inequality was
+derived and measured. The floor was not: #193 set it at `t` because that was the only length it had
+measured, and predicted the true floor near `t/68`. **Both were wrong.**
+
+| field | floor was | long division's last win | Newton's first win by >10% | `t/68` predicted |
+|---|---:|---:|---:|---:|
+| Mersenne-31 in a `u32` | 1024 | 32 | **64** | 15 |
+| Mersenne-31 in a `u64` | 256 | 8 | **16** | 3 |
+| Goldilocks | 256 | 16 | **32** | 3 |
+| BN254 `Fr` | 128 | 4 | **8** | 1 |
+
+So the floor refused Newton across a 16x band of `k` on every field, in the regime where #193 had
+measured it *fastest*. The forgone speedups inside that band, from the same sweep: **1.25x to 3.74x**
+over Mersenne-31 in a `u32`, 1.20x to 3.65x in a `u64`, 1.40x to 3.44x over Goldilocks, 1.21x to
+3.24x over BN254 `Fr`. Of 44 rows the shipped rule picked the slower route on **22**.
+
+The model was directionally right — the floor is far below `t` — and quantitatively wrong by about
+4x in the other direction.
+
+##### The floor is `karatsuba_base_case`, which is not a new constant
+
+#527 asked for "a stated function of `t` ... rather than a fourth tuned number per width". The
+measured floors are 32 / 16 / 4, and `karatsuba_base_case` is **48 / 16 / 4** — the same numbers,
+and already measured, by §4.1.1. It is also the right anchor rather than a coincidence: below the
+base case every product inside the Newton iteration is schoolbook, so the route is long division
+with allocations; at and above it Karatsuba starts paying for the recursion that Newton exists to
+exploit.
+
+It brackets every measured boundary without regressing any field. 48 excludes `k = 32`, where the
+4-byte field measures 0.99x, and admits `k = 64` at 1.25x; 4 excludes BN254's 1.01x tie at `k = 4`
+and admits its 1.21x at 8. Re-measured with it shipped, the rule picks the slower route on **1 row
+of 44** instead of 22 — Mersenne-31 in a `u64` at `k = 16`, where Newton is 1.19x and the rule's
+`k > floor` excludes equality. That is the deliberate cost of taking 16 rather than 8 for the
+8-byte tier, where the two 8-byte fields disagreed.
+
+##### One consequence inside the rule
+
+The floor and the balanced crossover were the same constant, and the balanced case `k = m = t` rode
+on that: in exact arithmetic the inequality reduces to `t > t` there, so only `powf` rounding could
+disturb it, and the floor's integer test covered it. Now that they differ by 16x the balanced case
+needs its own guard, and it has one — `k == m` returns `k > crossover` with no floating point at
+all. `test_the_balanced_case_still_follows_the_crossover_not_the_floor` pins it.
 
 #### Protocol
 
