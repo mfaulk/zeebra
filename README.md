@@ -861,8 +861,8 @@ got faster; `f4_stages` says whether a change removed cost or moved it from one 
 of four instances over one field under `F4Options::baseline()`, which is the right unit for "did the
 stage get faster" and the wrong one for "which kernel is faster on which matrix": the shapes are
 summed over, the field is fixed, and `baseline()` builds matrices the shipping default never builds.
-This benchmark times **one named matrix at a time**, across five fields and three scaffolding
-regimes under both presets, with Criterion's throughput set from the matrix's nonzero count. Each
+This benchmark times **one named matrix at a time**, across six field types spanning five field
+widths and three scaffolding regimes under both presets, with Criterion's throughput set from the matrix's nonzero count. Each
 matrix is captured out of a live run through the `BatchObserver::matrix` hook — it is the object F4
 handed to elimination, not a reconstruction — and is pinned by digest, so a benchmark here cannot
 report a figure about a matrix that moved. See
@@ -892,7 +892,7 @@ cargo run --release --example f4_blocks            # F4, row arrangements of the
 cargo run --release --example f4_matrix_corpus -- list     # the pinned matrix corpus
 cargo run --release --example f4_matrix_corpus -- check    # capture it and verify every digest
 cargo run --release --example f4_matrix_corpus -- pin      # re-derive the pinned table
-cargo run --release --example f4_matrix_corpus -- predict  # does the corpus rank kernels as a run does
+cargo run --release --example f4_matrix_corpus -- predict  # does the corpus rank kernels as a run
 cargo run --release --example f4_selection         # reducer selection and the reducer cache
 cargo run --release --example elimination_density  # how dense an F4 matrix really is
 cargo run --release --example accumulator_span     # whether a vectorizable inner loop is available
@@ -5581,9 +5581,9 @@ input instead of on a synthetic approximation of it; `benches/f4_stages.rs` is b
 and the cross-batch reducer cache as arguments — so a harness that passes different ones gets a
 different matrix and no error at all. `BatchObserver::matrix` instead hands over the matrix itself,
 before elimination touches it. `grobner::f4::matrix_corpus` is built on that: seventeen matrices
-from 61x72 to 12554x12020, spanning five field widths and three scaffolding regimes under both
-option presets, each pinned by digest, generated on demand with no bytes committed, and each
-asserted equal to what rebuilding from its own inputs produces. See
+from 61x72 to 12554x12020, spanning six field types across five field widths and three scaffolding
+regimes under both option presets, each pinned by digest, generated on demand with no bytes
+committed, and each asserted equal to what rebuilding from its own inputs produces. See
 [`docs/research/f4-matrix-corpus.md`](docs/research/f4-matrix-corpus.md).
 
 Field elements reject non-canonical representatives on deserialization. Every value this crate
