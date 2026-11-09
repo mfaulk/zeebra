@@ -625,16 +625,29 @@ All eight upper rungs verify in 334 s under `--release`.
 Measured at the reference prime under grevlex at `F4Options::default()`. The answer is **not** where
 the family index is largest:
 
-| rung | basis | `D` | conversion |
-|---|---:|---:|---:|
-| `katsura-8` | 0.22 s | 128 | 13 ms |
-| `katsura-9` | 2.1 s | 256 | 84 ms |
-| `katsura-10` | 21.8 s | 512 | 0.62 s |
-| `katsura-11` | 277 s | 1024 | 5.2 s |
-| `cyclic-7` | 1.4 s | 924 | 0.16 s |
-| `cyclic-8` | 21.3 s | — (positive-dimensional) | n/a |
-| `cyclic-9` | **refuses after 10.6 s** | — | — |
-| `cyclic-10` | **refuses after 24.3 s** | — | — |
+| rung | basis, pre-#575 default | basis, post-#575 default | `D` | conversion |
+|---|---:|---:|---:|---:|
+| `katsura-8` | 0.22 s | **53 ms** | 128 | 13 ms |
+| `katsura-9` | 2.1 s | **419 ms** | 256 | 84 ms |
+| `katsura-10` | 21.8 s | **3.53 s** | 512 | 0.62 s |
+| `katsura-11` | 277 s | **33.6 s** | 1024 | 5.2 s |
+| `cyclic-7` | 1.4 s | **666 ms** | 924 | 0.16 s |
+| `cyclic-8` | 21.3 s | 25.9 s | — (positive-dimensional) | n/a |
+| `cyclic-9` | **refuses** | **refuses** | — | — |
+| `cyclic-10` | **refuses** | **refuses** | — | — |
+
+**The second column is an upper bound and not a figure.** #575 moved both interreduction defaults,
+so the first column no longer describes `F4Options::default()` and the ladder had to be re-walked.
+The re-walk ran at a **one-minute load average of 983** on this 128-thread box — other agents'
+linkers, which `tools/benchlock.sh` does not serialize because they are builds and not measurements.
+Load inflates a wall time and cannot deflate one, which is the only reason these numbers are usable:
+every one of them is an **upper** bound, so a rung that fits a budget here fits it on a quiet box.
+No ratio is taken from them and none should be.
+
+The two refusals are not upper bounds but exact: `cyclic-9` at 20 001 315 live nonzero entries and
+`cyclic-10` at 20 000 254, against the 20 000 000 limit. An entry count crosses at the same counter
+whatever the box is doing, which is the property §9 is built on, and it is why the ceiling survived a
+default change that moved every reachable rung by 4x to 8x.
 
 **The ceiling is `cyclic-9`, and the stage that sets it is the F4 basis**, crossing the live-entry
 budget: `TooManyNonzeros { nonzeros: 20000001, limit: 20000000 }`. The whole Katsura ladder is
@@ -661,6 +674,65 @@ and both rungs' dimension class comes from Backelin rather than from a computati
 so in each entry.
 
 ---
+
+### 9a. #489: the budget for sweeping the upper rungs onto the board
+
+#489 asked for three decisions **before** the run, on the grounds that the rows would otherwise not
+be worth their cost. Here they are, with what decides each.
+
+**1. The budget: the board's standard 60 s wall, unchanged, for all eight rungs.**
+
+#489's premise was that this would not do — "a 60 s wall makes `katsura-10` and up uninformative" —
+and that premise was true of the default it was written against. It is **false now**. Under #575's
+defaults the slowest reachable upper rung is `katsura-11` at **33.6 s** and the slowest of all is
+`cyclic-8` at 25.9 s, both measured as upper bounds at load 983 (§9). A budget that the slowest rung
+clears by 1.8x with the box under a 1 000-fold load clears it on a quiet one.
+
+So no per-rung budget is needed, and the sweep does not need the 600 s wall #489 feared would cost
+"most of a day". That is a consequence of #575 rather than a discovery about the budget: the rungs
+got 4x to 8x cheaper and walked under the existing wall.
+
+**2. Deterministic limits where the answer is a refusal: already satisfied, and not by the wall.**
+
+#489 wanted a resource limit rather than a wall wherever the result is a refusal, because an entry
+count crosses at the same counter on any machine. Both refusing rungs already do exactly that:
+`cyclic-9` and `cyclic-10` stop on `max_live_nonzeros` at 20 001 315 and 20 000 254 entries, and
+would stop there at **any** wall. The board's `Limits` being wall-shaped — which #489 names as "the
+thing in the way" — turns out not to be in the way for these eight rungs, because the wall never
+binds: it is never reached by the rungs that complete, and never consulted by the rungs that refuse.
+
+It would be in the way for a rung that is merely *slow*, and none of the eight is. Changing
+`Limits` is therefore not this sweep's prerequisite, and the issue that wants it should be filed
+from a rung that needs it.
+
+**3. The reference prime only, and this is a decision rather than an omission.**
+
+`GF(32003)` is not swept for the upper rungs. The lower ladder measured the two published
+characteristics as differing by less than noise (§4b-i), and the upper rungs double the most
+expensive part of the sweep to re-establish that. The reference prime `2^31 − 1` is the one every
+retained upper-rung figure in §9 was taken at, so sweeping it keeps the board and this document on
+one identity.
+
+What that forgoes: `cyclic-9`'s and `cyclic-10`'s refusals are **entry-count** refusals, and an
+entry count is a function of the field's representation width. At a 16-bit prime the same ideal might
+fit the same 20 000 000-entry budget. That is a real and unmeasured question, and it is the one
+reason to revisit this decision — not a suspicion that the timings would differ.
+
+### 9b. What #489 still needs, and why it is not here
+
+**The sweep itself.** The three decisions above are what #489 asked to settle first; the rows are not
+taken, because this box could not produce an honest one. Over the hour the sweep was attempted the
+one-minute load average ran **592 → 1 261 and rising**, from other agents' `ld.mold` linkers, and
+`benchlock` serializes measurements rather than builds — so the lock gives a sweep no protection
+against it.
+
+Under that load a 60 s wall stops producing a measurement and starts producing an artefact: an
+engine that needs 20 s reports a `StoppedByLimit` it would never hit on a quiet box, and a
+wall-clock stop written onto the board is the weakest row the protocol defines. Two attempts were
+killed for this rather than committed.
+
+So the sweep is a quiet-box task and the budget above is what it should use. Nothing about it is
+uncertain any more except when the machine is free.
 
 ## 10. Adding a family
 
