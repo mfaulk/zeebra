@@ -433,7 +433,7 @@ pub fn cico_univariate_family_with_stats<F: KnownOrder>(
     }
 }
 
-/// The `k = 1` analogue of [`cico_bivariate`](super::resultant::cico_bivariate): one free input left
+/// The `k = 1` analogue of [`cico_bivariate`](super::resultant_cico::cico_bivariate): one free input left
 /// symbolic, the rest fixed, and the first constrained output word returned with its target
 /// subtracted.
 ///

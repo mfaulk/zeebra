@@ -11,7 +11,7 @@
 //! magnitude — because all ten were written in the same prose with the same confidence.
 //!
 //! The name is deliberately not `Provenance`: [`f4::certify::Provenance`](crate::grobner::f4) is
-//! about whether a derivation invariant holds and [`research::manifest::Provenance`](super::Provenance)
+//! about whether a derivation invariant holds and [`record::Provenance`](crate::grobner::record::Provenance)
 //! is a licensing struct. It is deliberately *like* `RssBasis` and `CpuBasis` in
 //! `grobner::external::contract`, which are the same idea one level down: a byte count whose basis
 //! is unstated is the quantity those two exist to keep apart.

@@ -1,6 +1,6 @@
 //! SHA-256, FIPS 180-4, for pinning the identity of an instance.
 //!
-//! Hand-written rather than depended upon, for the same reason as [`Json`](crate::grobner::research::Json):
+//! Hand-written rather than depended upon, for the same reason as [`Json`](crate::util::Json):
 //! the whole of it is ninety lines and a dependency would be the larger thing. It is here because
 //! M23's registry has to answer "is this the same mathematical problem?" with a checksum rather
 //! than a name — `Provenance::sha256` was a string a shell script computed and no Rust code could

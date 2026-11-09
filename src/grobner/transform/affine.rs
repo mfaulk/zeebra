@@ -371,7 +371,7 @@ mod tests {
     use super::{eliminate_affine, AffineElimination, LinearError};
     use crate::{
         fields::Zp2147483647,
-        grobner::{benchmark_systems::planted, f4, research::specialization::satisfies, solve_one},
+        grobner::{benchmark_systems::planted, f4, solve_one, transform::satisfies},
         FiniteField, MonomialOrder, MultivariatePolynomial, One, Zero,
     };
     use rand::{prelude::StdRng, SeedableRng};

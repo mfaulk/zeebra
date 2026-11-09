@@ -32,8 +32,8 @@ use super::{
     FieldSpec, Instance, RunReport, RunStatus, Verification,
 };
 use crate::{
-    grobner::research::{Environment, Json},
     MonomialOrder,
+    {grobner::record::Environment, util::Json},
 };
 
 /// What `research/competitive/results/history.json` promises a consumer.
