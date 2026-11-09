@@ -423,7 +423,8 @@ impl SagebrushSolver {
     /// A solver over the driver at `binary`, with scratch files under `work_dir`.
     ///
     /// # Errors
-    /// [`RunFailure::Io`] if the scratch directory could not be created. A *missing* driver is not
+    /// [`RunFailure::Harness`] if the scratch directory could not be created — the harness's own
+    /// filesystem work, and never the tool's. A *missing* driver is not
     /// reported here, because nothing has been run yet: it surfaces from
     /// [`ExternalSolver::probe_version`] or [`ExternalSolver::run`] as
     /// [`RunFailure::Unavailable`].
@@ -1006,9 +1007,11 @@ impl ExternalSolver for SagebrushSolver {
             );
         }
         if let Err(error) = std::fs::write(&input_path, Self::input(instance)) {
+            // The harness's own write, so a skipped row: the driver was never started, and a full
+            // disk is not Sagebrush losing a race (#610).
             return finish(
-                RunStatus::Failed(RunFailure::Io {
-                    reason: error.to_string(),
+                RunStatus::Failed(RunFailure::Harness {
+                    detail: format!("{}: {}", input_path.display(), error),
                 }),
                 Measurement::unmeasured(),
                 None,
@@ -1965,6 +1968,38 @@ mod tests {
             other => panic!("expected an Environment refusal, got {:?}", other),
         }
         assert!(report.was_skipped(), "nothing was attempted");
+        assert!(report.measurement.is_unmeasured());
+    }
+
+    /// A failure of the harness's **own** input write is a skipped row, not a failed driver.
+    ///
+    /// Driven for real: `/bin/true` exists so the absent-tool short cut does not fire, and a
+    /// directory is placed at exactly the input path the first run writes, so `fs::write` cannot
+    /// succeed. Needs no driver (#610).
+    #[test]
+    fn test_a_failed_input_write_is_a_skipped_row_and_not_a_failed_solve() {
+        let root = scratch_root("harness-io");
+        std::fs::create_dir_all(root.join("pair-1.ms")).expect("the blocking directory");
+        let mut solver = SagebrushSolver::new("/bin/true", &root)
+            .expect("a writable scratch directory")
+            .with_switch_probe(|_| None);
+        let report = solver.run(
+            &instance(65521, MonomialOrder::GradedReverseLexicographic),
+            Task::ReducedGrobnerBasis,
+            &Limits::wall(Duration::from_secs(5)),
+        );
+        let _ = std::fs::remove_dir_all(root.join("pair-1.ms"));
+
+        match &report.status {
+            RunStatus::Failed(RunFailure::Harness { detail }) => {
+                assert!(detail.contains("pair-1.ms"), "{}", detail)
+            }
+            other => panic!("expected Harness, got {:?}", other),
+        }
+        assert!(
+            report.was_skipped(),
+            "the harness's own write failed, so the driver was never attempted"
+        );
         assert!(report.measurement.is_unmeasured());
     }
 

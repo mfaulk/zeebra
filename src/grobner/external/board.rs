@@ -68,9 +68,10 @@ pub enum Outcome {
     /// The library cannot accept this input or task. **There is no time.**
     Unsupported(Unsupported),
 
-    /// It failed. **There is no time**, and for two variants it did not even run:
-    /// [`RunFailure::Unavailable`] (the tool is absent) and [`RunFailure::Environment`] (the
-    /// harness's own environment would have invalidated the measurement). Both render through
+    /// It failed. **There is no time**, and for three variants it did not even run:
+    /// [`RunFailure::Unavailable`] (the tool is absent), [`RunFailure::Environment`] (the
+    /// harness's own environment would have invalidated the measurement) and
+    /// [`RunFailure::Harness`] (the harness's own filesystem work failed). All three render through
     /// [`Self::instead_of_a_time`] with text that says so.
     Failed(RunFailure),
 }

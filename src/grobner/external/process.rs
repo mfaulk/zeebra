@@ -198,15 +198,21 @@ pub enum SpawnError {
     /// This is the **missing tool** case every adapter must report rather than treat as slow.
     Unavailable { binary: String, reason: String },
 
-    /// The filesystem work the run needs failed.
-    Io { reason: String },
+    /// The supervisor's **own** filesystem or process work failed: the scratch directory, the
+    /// output file the child's streams are redirected to, or waiting on the child.
+    ///
+    /// Named for the side that failed rather than for the syscall, because nothing here is ever the
+    /// tool's doing — the tool has not started yet, or has not been reaped. An adapter must turn
+    /// this into [`RunFailure::Harness`](super::RunFailure::Harness), which a board counts as a
+    /// skipped row (#610).
+    Harness { detail: String },
 }
 
 impl Display for SpawnError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Unavailable { binary, reason } => write!(f, "cannot run {}: {}", binary, reason),
-            Self::Io { reason } => write!(f, "{}", reason),
+            Self::Harness { detail } => write!(f, "{}", detail),
         }
     }
 }
@@ -215,8 +221,8 @@ impl std::error::Error for SpawnError {}
 
 impl From<std::io::Error> for SpawnError {
     fn from(e: std::io::Error) -> Self {
-        Self::Io {
-            reason: e.to_string(),
+        Self::Harness {
+            detail: e.to_string(),
         }
     }
 }
@@ -419,7 +425,8 @@ impl Supervisor {
     /// # Errors
     /// [`SpawnError::Unavailable`] if the binary could not be started, which is the case an
     /// adapter must turn into a skipped-and-reported run rather than a failure of the solver.
-    /// [`SpawnError::Io`] if the output file could not be created.
+    /// [`SpawnError::Harness`] if the supervisor's own work — the scratch directory, the output
+    /// file, reaping the child — failed. Never the tool's doing, and never the tool's row.
     pub fn run(&self, invocation: &Invocation) -> Result<ProcessMeasurement, SpawnError> {
         if let Some(absent) = invocation.unavailable() {
             return Err(absent);
@@ -461,8 +468,8 @@ impl Supervisor {
                 Ok(Some(status)) => break Some(status),
                 Ok(None) => {}
                 Err(e) => {
-                    return Err(SpawnError::Io {
-                        reason: e.to_string(),
+                    return Err(SpawnError::Harness {
+                        detail: e.to_string(),
                     })
                 }
             }

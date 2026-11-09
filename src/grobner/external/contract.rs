@@ -821,8 +821,27 @@ pub enum RunFailure {
     /// The tool exited non-zero without printing anything the adapter recognised.
     NonZeroExit { code: Option<i32> },
 
-    /// The filesystem or process work the run needs failed.
+    /// **The tool** reported a failure of its own I/O.
+    ///
+    /// The tool ran, got far enough to touch a file of its own, and said so — msolve's
+    /// `Cannot open output file` is the live instance. An attempted run that went wrong, so it is
+    /// *not* counted by [`RunReport::was_skipped`]: the row is the tool's.
+    ///
+    /// Not for the harness's own filesystem work, which is [`Self::Harness`]. Which side failed is
+    /// the distinction this whole contract is built on, and a single `Io` variant covering both
+    /// attributed a full disk to the solver (#610).
     Io { reason: String },
+
+    /// **The harness's own** filesystem or process work failed, so the tool was never started.
+    ///
+    /// Writing the input file or the script, creating the scratch directory, opening the output
+    /// the child's stdout is redirected to, waiting on the child: every one of these is the
+    /// harness's, and none of them is evidence about any solver. A full disk, an exhausted fd
+    /// table or a `/tmp` that is momentarily unwell is not msolve losing a race.
+    ///
+    /// Counted by [`RunReport::was_skipped`], on exactly the argument [`Self::Environment`]
+    /// already won: nothing ran, so there is no measurement and nothing to conclude.
+    Harness { detail: String },
 
     /// The harness's own environment would have changed what was measured.
     ///
@@ -839,7 +858,8 @@ pub enum RunFailure {
     ///   is specifically a statement about the tool's declared capability;
     /// * not [`Self::Reported`] or [`Self::NonZeroExit`] — the tool never ran, so it printed
     ///   nothing and exited nothing;
-    /// * not [`Self::Io`] — nothing on the filesystem failed.
+    /// * not [`Self::Io`] — nothing of the *tool's* failed, because the tool never started;
+    /// * not [`Self::Harness`] — nothing of the harness's filesystem work failed either.
     ///
     /// Counted by [`RunReport::was_skipped`], because a board must show the row as not attempted
     /// rather than as a result.
@@ -871,7 +891,12 @@ impl Display for RunFailure {
                 Some(code) => write!(f, "the tool exited {}", code),
                 None => write!(f, "the tool was killed by a signal"),
             },
-            Self::Io { reason } => write!(f, "{}", reason),
+            Self::Io { reason } => write!(f, "the tool reported an I/O failure: {}", reason),
+            Self::Harness { detail } => write!(
+                f,
+                "not run: the harness's own filesystem work failed: {}",
+                detail
+            ),
             Self::Environment { variable, detail } => write!(
                 f,
                 "not run: the environment sets {}, which {}",
@@ -887,15 +912,20 @@ impl From<SpawnError> for RunFailure {
     fn from(e: SpawnError) -> Self {
         match e {
             SpawnError::Unavailable { binary, reason } => Self::Unavailable { binary, reason },
-            SpawnError::Io { reason } => Self::Io { reason },
+            SpawnError::Harness { detail } => Self::Harness { detail },
         }
     }
 }
 
+/// The harness's own I/O, never the tool's.
+///
+/// An adapter sees a [`std::io::Error`] only from work it did itself — the input file, the script,
+/// the scratch directory — so `?` on one is [`RunFailure::Harness`]. The tool's own I/O reaches the
+/// adapter as text in a log, and is classified by reading it.
 impl From<std::io::Error> for RunFailure {
     fn from(e: std::io::Error) -> Self {
-        Self::Io {
-            reason: e.to_string(),
+        Self::Harness {
+            detail: e.to_string(),
         }
     }
 }
@@ -1365,20 +1395,24 @@ impl RunReport {
 
     /// True if this run was skipped rather than attempted.
     ///
-    /// The three cases a board shows as "not attempted" rather than as a result: the input is
+    /// The four cases a board shows as "not attempted" rather than as a result: the input is
     /// unrepresentable ([`RunStatus::Unsupported`]), the tool is absent
-    /// ([`RunFailure::Unavailable`]), or the harness's own environment would have invalidated the
-    /// measurement ([`RunFailure::Environment`]).
+    /// ([`RunFailure::Unavailable`]), the harness's own environment would have invalidated the
+    /// measurement ([`RunFailure::Environment`]), or the harness's own filesystem work failed
+    /// ([`RunFailure::Harness`]).
     ///
     /// The common property is that **the tool did not run**, so there is no measurement and nothing
     /// about any implementation follows. Every other [`RunFailure`] describes a run that was
-    /// attempted and went wrong, which is a different thing for a reader to act on.
+    /// attempted and went wrong, which is a different thing for a reader to act on — including
+    /// [`RunFailure::Io`], which is the *tool's* I/O and therefore the tool's row.
     pub fn was_skipped(&self) -> bool {
         matches!(
             &self.status,
             RunStatus::Unsupported(_)
                 | RunStatus::Failed(
-                    RunFailure::Unavailable { .. } | RunFailure::Environment { .. }
+                    RunFailure::Unavailable { .. }
+                        | RunFailure::Environment { .. }
+                        | RunFailure::Harness { .. }
                 )
         )
     }
@@ -1611,8 +1645,8 @@ pub trait ExternalSolver {
 mod tests {
     use super::{
         order_from_tag, order_tag, FieldSpec, Instance, Invariants, Limits, Measurement,
-        NotComparable, RunFailure, RunReport, RunStatus, Support, Task, ToolVersion, Unsupported,
-        Verification,
+        NotComparable, RunFailure, RunReport, RunStatus, SpawnError, Support, Task, ToolVersion,
+        Unsupported, Verification,
     };
     use crate::MonomialOrder;
     use std::time::Duration;
@@ -1952,6 +1986,98 @@ mod tests {
             "an environment refusal is not a tool error: {}",
             rendered
         );
+    }
+
+    /// A failure of the harness's own scratch I/O is a skipped run, not a failed solve.
+    ///
+    /// The tool was never started, so a full disk or an exhausted fd table is not the solver's
+    /// loss — which is what `RunFailure::Io` made it read as before #610.
+    #[test]
+    fn test_a_failed_harness_write_is_a_skipped_run_and_not_a_failed_solve() {
+        let report = report(
+            "msolve",
+            RunStatus::Failed(RunFailure::Harness {
+                detail: "/tmp/zb/katsura-4.ms: No space left on device".to_string(),
+            }),
+            0,
+        );
+        assert!(report.was_skipped(), "nothing was attempted");
+        assert!(!report.status.answered());
+        assert!(!report.status.is_timing_evidence());
+    }
+
+    /// An I/O failure the **tool** reported is an attempted run, so it is not skipped.
+    ///
+    /// The other half of #610's split: msolve saying it cannot open its own output file is a row
+    /// about msolve.
+    #[test]
+    fn test_a_tool_reported_io_failure_is_an_attempted_run() {
+        let report = report(
+            "msolve",
+            RunStatus::Failed(RunFailure::Io {
+                reason: "msolve could not open its output file".to_string(),
+            }),
+            0,
+        );
+        assert!(
+            !report.was_skipped(),
+            "the tool ran and reported its own I/O failure"
+        );
+    }
+
+    /// The two I/O failures say which side failed, and neither borrows the other's phrasing.
+    #[test]
+    fn test_the_two_io_failures_name_which_side_failed() {
+        let harness = RunFailure::Harness {
+            detail: "/tmp/zb: Permission denied".to_string(),
+        }
+        .to_string();
+        assert!(harness.contains("the harness's own"), "{}", harness);
+        assert!(harness.starts_with("not run"), "{}", harness);
+        assert!(
+            !harness.contains("the tool"),
+            "a harness failure is not the tool's: {}",
+            harness
+        );
+
+        let tool = RunFailure::Io {
+            reason: "could not open its output file".to_string(),
+        }
+        .to_string();
+        assert!(tool.contains("the tool reported"), "{}", tool);
+        assert!(!tool.contains("harness"), "{}", tool);
+    }
+
+    /// A `std::io::Error` and a supervisor `Harness` error both land on `RunFailure::Harness`.
+    ///
+    /// The conversions are where an adapter's `?` decides the classification, so they are the only
+    /// place the split can be undone by accident.
+    #[test]
+    fn test_the_io_conversions_classify_as_the_harness_side() {
+        let from_io: RunFailure =
+            std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied").into();
+        assert!(
+            matches!(from_io, RunFailure::Harness { .. }),
+            "{:?}",
+            from_io
+        );
+
+        let from_spawn: RunFailure = SpawnError::Harness {
+            detail: "denied".to_string(),
+        }
+        .into();
+        assert!(
+            matches!(from_spawn, RunFailure::Harness { .. }),
+            "{:?}",
+            from_spawn
+        );
+
+        let absent: RunFailure = SpawnError::Unavailable {
+            binary: "msolve".to_string(),
+            reason: "no such file".to_string(),
+        }
+        .into();
+        assert!(matches!(absent, RunFailure::Unavailable { .. }));
     }
 
     /// Limits are comparable only when every declared resource matches.
